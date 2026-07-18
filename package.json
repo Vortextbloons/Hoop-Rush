@@ -1,0 +1,20 @@
+{
+  "name": "dynasty-desk-v2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @dynasty-desk/web dev",
+    "build": "pnpm --filter @dynasty-desk/web build",
+    "preview": "pnpm --filter @dynasty-desk/web preview",
+    "check": "pnpm -r check",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "test:run": "pnpm -r test:run"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.5",
+    "prettier-plugin-svelte": "^4.1.1"
+  }
+}
