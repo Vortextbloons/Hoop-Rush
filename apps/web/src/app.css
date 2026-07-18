@@ -1,0 +1,161 @@
+@import 'tailwindcss';
+
+/* ----------------------------------------------------------------------------
+   Dynasty Desk — Theme tokens
+   Dark-mode-first front-office dashboard. Amber/gold accent on near-black.
+---------------------------------------------------------------------------- */
+
+@theme {
+  /* Brand */
+  --color-background: hsl(220 22% 6%);
+  --color-foreground: hsl(40 20% 94%);
+
+  --color-card: hsl(220 20% 9%);
+  --color-card-foreground: hsl(40 20% 94%);
+
+  --color-popover: hsl(220 22% 7%);
+  --color-popover-foreground: hsl(40 20% 94%);
+
+  /* Primary = bright scoreboard amber */
+  --color-primary: hsl(38 96% 56%);
+  --color-primary-foreground: hsl(220 30% 6%);
+
+  /* Secondary = cool slate panel */
+  --color-secondary: hsl(220 16% 14%);
+  --color-secondary-foreground: hsl(40 20% 94%);
+
+  --color-muted: hsl(220 16% 14%);
+  --color-muted-foreground: hsl(220 10% 60%);
+
+  /* Accent = teal for stat highlights */
+  --color-accent: hsl(174 72% 52%);
+  --color-accent-foreground: hsl(220 30% 6%);
+
+  --color-destructive: hsl(0 72% 58%);
+  --color-destructive-foreground: hsl(40 20% 94%);
+
+  --color-border: hsl(220 14% 18%);
+  --color-input: hsl(220 16% 14%);
+  --color-ring: hsl(38 96% 56%);
+
+  --radius: 0.625rem;
+
+  /* Custom surface tokens */
+  --color-surface-1: hsl(220 20% 9%);
+  --color-surface-2: hsl(220 18% 12%);
+  --color-surface-3: hsl(220 16% 16%);
+
+  --color-line-soft: hsl(220 14% 18%);
+  --color-line-strong: hsl(220 14% 26%);
+
+  --color-positive: hsl(150 60% 48%);
+  --color-negative: hsl(0 72% 58%);
+
+  /* Fonts (loaded via index.html <link>) */
+  --font-display: 'Archivo Black', system-ui, sans-serif;
+  --font-sans: 'Inter Tight', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.light {
+  --color-background: hsl(40 20% 97%);
+  --color-foreground: hsl(220 30% 8%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(220 30% 8%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(220 30% 8%);
+  --color-primary: hsl(28 92% 46%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(40 14% 92%);
+  --color-secondary-foreground: hsl(220 30% 8%);
+  --color-muted: hsl(40 14% 92%);
+  --color-muted-foreground: hsl(220 10% 38%);
+  --color-accent: hsl(186 80% 32%);
+  --color-accent-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(0 72% 50%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-border: hsl(40 14% 86%);
+  --color-input: hsl(40 14% 92%);
+  --color-ring: hsl(28 92% 46%);
+
+  --color-surface-1: hsl(0 0% 100%);
+  --color-surface-2: hsl(40 14% 96%);
+  --color-surface-3: hsl(40 14% 92%);
+  --color-line-soft: hsl(40 14% 86%);
+  --color-line-strong: hsl(40 14% 76%);
+  --color-positive: hsl(150 60% 36%);
+  --color-negative: hsl(0 72% 50%);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background-image:
+      radial-gradient(
+        1200px 600px at 0% -10%,
+        color-mix(in oklab, var(--color-primary) 8%, transparent),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 500px at 100% 110%,
+        color-mix(in oklab, var(--color-accent) 6%, transparent),
+        transparent 60%
+      );
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-primary) 50%, transparent);
+    color: var(--color-foreground);
+  }
+}
+
+/* Display utility */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Scrollbar polish */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-soft);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-line-strong);
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}

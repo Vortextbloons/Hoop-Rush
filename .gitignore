@@ -1,0 +1,60 @@
+# Markdown / planning docs
+*.md
+*.mdc
+
+# OpenCode
+opencode.json
+opencode.jsonc
+.opencode/
+.opencodeignore
+
+# Dependencies
+node_modules/
+
+# Build / Vite
+dist/
+build/
+.svelte-kit/
+.vite/
+*.local
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs / caches
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.cache/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors / IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# Cursor / agent local
+.cursor/*
+!.cursor/mcp.json
+agent-transcripts/*
+AGENTS.md
+.cursor/
