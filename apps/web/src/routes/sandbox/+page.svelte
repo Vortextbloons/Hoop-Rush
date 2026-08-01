@@ -19,13 +19,7 @@
     toSimulationPlayer,
     validateLineup,
   } from '@hoop-rush/engine';
-  import {
-    getBracket,
-    getEraSimulationProfile,
-    getManifest,
-    getPool,
-    prefetchPools,
-  } from '$lib/data';
+  import { getBracket, getEraSimulationProfile, getManifest, getPool } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { generateSeed } from '$lib/sandbox-url';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
@@ -45,17 +39,17 @@
   ] as const;
   const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
 
-  let manifest = $state<HoopRushManifest | null>(null);
+  let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
 
   let franchiseId = $state('');
   let eraId = $state('');
 
-  let pool: FranchiseEraPool | null = $state(null);
+  let pool = $state.raw<FranchiseEraPool | null>(null);
   let poolError: string | null = $state(null);
 
-  let profile = $state<EraSimulationProfile | null>(null);
-  let bracket = $state<OpponentBracket | null>(null);
+  let profile = $state.raw<EraSimulationProfile | null>(null);
+  let bracket = $state.raw<OpponentBracket | null>(null);
   let starting = $state(false);
 
   let slots = $state<(PeakPlayer | null)[]>([null, null, null, null, null]);
@@ -69,7 +63,6 @@
       (m) => {
         if (!cancelled) {
           manifest = m;
-          prefetchPools(m.pools);
           restoreUrlState(m);
         }
       },
@@ -93,22 +86,6 @@
       },
       () => {
         if (!cancelled) poolError = 'The decade simulation profile is unavailable.';
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  $effect(() => {
-    if (!manifest?.bracket) return;
-    let cancelled = false;
-    getBracket(manifest.bracket).then(
-      (b) => {
-        if (!cancelled) bracket = b;
-      },
-      () => {
-        if (!cancelled) poolError = 'The opponent bracket is unavailable.';
       },
     );
     return () => {
@@ -407,19 +384,19 @@
   });
 
   const ready = $derived(
-    lineupIsLegal &&
-      manifest !== null &&
-      pool !== null &&
-      profile !== null &&
-      bracket !== null &&
-      franchise !== null,
+    lineupIsLegal && manifest !== null && pool !== null && profile !== null && franchise !== null,
   );
 
   /** Creates and persists the active 82-game run, then starts it immediately. */
   async function play82() {
-    if (!ready || !pool || !profile || !bracket || !franchise) return;
+    if (!ready || !pool || !profile || !franchise || !manifest) return;
+    if (!manifest.bracket) {
+      poolError = 'The opponent bracket is unavailable.';
+      return;
+    }
     starting = true;
     try {
+      bracket = await getBracket(manifest.bracket);
       const players = slots.filter((p): p is PeakPlayer => p !== null);
       const sample = players[0];
       const run = createChallenge({

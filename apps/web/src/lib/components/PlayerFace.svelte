@@ -62,6 +62,7 @@
         height={size === 'sm' ? 36 : 48}
         class="h-full w-full origin-top scale-[1.2] object-cover object-top"
         loading="lazy"
+        decoding="async"
         crossorigin={useAnonymousCors ? 'anonymous' : undefined}
         referrerpolicy="no-referrer"
         onerror={onError}

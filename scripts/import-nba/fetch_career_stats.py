@@ -1,6 +1,6 @@
 """Compute career stats by reading all season-stats.json files.
 
-Output: apps/web/static/data/nba/{season}/career-stats.json
+Output: raw-data/nba/{season}/career-stats.json
 
 This replaces the per-player API loop with instant computation.
 """

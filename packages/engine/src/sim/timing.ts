@@ -13,7 +13,10 @@ import { ENGINE_CONSTANTS } from './constants.js';
 /** Mean wall-clock seconds of one offensive trip for the era pace. */
 export function meanTripSeconds(profile: EraSimulationProfile): number {
   const pace = profile.parameters.pace;
-  return 2880 / (2 * pace);
+  return Math.max(
+    ENGINE_CONSTANTS.minimumTripSeconds,
+    2880 / (2 * pace) - ENGINE_CONSTANTS.paceDeadBallAdjustment,
+  );
 }
 
 /**

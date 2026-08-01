@@ -26,6 +26,10 @@ export const playerSeasonStatsSchema = z.object({
   minutes: z.number().int().nonnegative(),
   points: z.number().int().nonnegative(),
   rebounds: z.number().int().nonnegative(),
+  /** Optional because older packaged snapshots predate the split rebound feed. */
+  offensiveRebounds: z.number().int().nonnegative().optional(),
+  /** Optional because older packaged snapshots predate the split rebound feed. */
+  defensiveRebounds: z.number().int().nonnegative().optional(),
   assists: z.number().int().nonnegative(),
   steals: z.number().int().nonnegative(),
   blocks: z.number().int().nonnegative(),

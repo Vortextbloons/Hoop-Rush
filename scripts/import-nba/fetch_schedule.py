@@ -1,6 +1,6 @@
 """Fetch NBA schedule for a given season.
 
-Optional output: apps/web/static/data/nba/{season}/schedule.json
+Optional output: raw-data/nba/{season}/schedule.json
 """
 
 from __future__ import annotations

@@ -11,7 +11,8 @@ import {
   pickAction,
   pickDefender,
   pickInitiator,
-  pickShooter,
+  pickAssister,
+  pickShot,
   pickZone,
   isThreePointZone,
 } from './usage.js';
@@ -99,23 +100,32 @@ function assistProbability(passer: SimulationPlayer, profile: EraSimulationProfi
   const anchor = factor({
     ratings: { passing: profile.parameters.assistAnchorRating },
   } as SimulationPlayer);
+  const roleFactor = passer.anchors
+    ? 0.75 + Math.min(1, passer.anchors.assistsPerGame / 8) * 0.25
+    : 1;
   return Math.min(
-    0.9,
-    Math.max(0.1, profile.parameters.assistRate * (factor(passer) / Math.max(1e-9, anchor))),
+    0.95,
+    Math.max(
+      0.1,
+      profile.parameters.assistRate * 1.45 * roleFactor * (factor(passer) / Math.max(1e-9, anchor)),
+    ),
   );
 }
 
-/** Records an assist for the initiator after a made basket. */
+/** Records one assist for an actual passer after a made basket. */
 function creditAssist(
   ctx: TripContext,
   offenseSide: SideIndex,
   team: SimulationTeam,
-  passer: SimulationPlayer,
+  shooter: SimulationPlayer,
+  initiator: SimulationPlayer,
+  passed: boolean,
 ): void {
-  if (ctx.rng.chance(assistProbability(passer, ctx.profile))) {
-    const slot = team.players.findIndex((p) => p.playerId === passer.playerId);
-    if (slot >= 0) ctx.recorder.assist(offenseSide, slot);
-  }
+  if (!passed) return;
+  const passer = pickAssister(team, shooter, initiator, ctx.rng);
+  if (!passer || !ctx.rng.chance(assistProbability(passer, ctx.profile))) return;
+  const slot = team.players.findIndex((p) => p.playerId === passer.playerId);
+  if (slot >= 0) ctx.recorder.assist(offenseSide, slot);
 }
 
 /** Resolves a missed last free throw (live or dead-ball rebound). */
@@ -196,7 +206,8 @@ function resolveShot(
 
   const initiator = pickInitiator(team, rng);
   const action = pickAction(initiator, rng);
-  const shooter = pickShooter(team, initiator, action, rng);
+  const shot = pickShot(team, initiator, action, rng);
+  const shooter = shot.shooter;
   const zone = pickZone(shooter, action, profile, rng);
   const defender = pickDefender(defense, shooter, zone, rng);
 
@@ -219,7 +230,7 @@ function resolveShot(
     const made = rng.chance(shotP);
     recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three);
     if (made) {
-      creditAssist(ctx, offenseSide, team, initiator);
+      creditAssist(ctx, offenseSide, team, shooter, initiator, shot.passed);
       // And-one free throw.
       resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, false);
     } else {
@@ -253,7 +264,7 @@ function resolveShot(
   const made = rng.chance(shotP);
   recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three);
   if (made) {
-    creditAssist(ctx, offenseSide, team, initiator);
+    creditAssist(ctx, offenseSide, team, shooter, initiator, shot.passed);
     return false; // made basket changes possession
   }
   return reboundAfterMiss(ctx, offenseSide, defenseSide, zone, deadBall);

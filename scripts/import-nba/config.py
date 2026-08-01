@@ -7,7 +7,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PUBLIC_DATA = REPO_ROOT / "apps" / "web" / "static" / "data"
-NBA_ROOT = PUBLIC_DATA / "nba"
+NBA_ROOT = REPO_ROOT / "raw-data" / "nba"
 SHARED_ROOT = PUBLIC_DATA / "shared"
 RAW_CACHE = REPO_ROOT / ".raw_nba_cache"
 RAW_CACHE.mkdir(exist_ok=True)

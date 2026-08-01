@@ -48,6 +48,13 @@ Commands:
                          Exits 1 when any required gate fails.
   calibrate sensitivity  A/B the single-dimension sensitivity fixtures.
                          --samples N (default 200)   --profile <path>
+  combine docs           Combine every markdown file under the docs directory
+                         into one file in the docs root (outside subfolders).
+                         --input <dir>        Docs directory (default Docs/)
+                         --output <path>      Combined file (default <dir>/combined.md)
+                         --exceptions <path>  Exclusion list, one relative path per
+                                              line, # comments allowed (default
+                                              <dir>/combine-exceptions.txt)
   help                   Show this help
 
 Fixtures:

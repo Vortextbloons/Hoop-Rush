@@ -28,10 +28,10 @@ MANIFEST_PATH = PUBLIC_DATA / "manifest.json"
 
 SCHEMA_VERSION = 1
 POSITION_NORMALIZATION_VERSION = "position-v1"
-RATINGS_VERSION = "ratings-v6"
+RATINGS_VERSION = "ratings-v7-simulation-anchors"
 SELECTION_SCORE_VERSION = "selection-v1"
 MIN_TEAM_GAMES = 40
-DATA_VERSION = "m1.5"
+DATA_VERSION = "m1.6"
 
 # ---------------------------------------------------------------------------
 # Position normalization (spec/02)
@@ -165,6 +165,8 @@ def build_stats(season_stats: dict[str, Any]) -> dict[str, Any]:
         "minutes": int(num("minutes")),
         "points": int(num("points")),
         "rebounds": int(num("rebounds")),
+        "offensiveRebounds": int(num("offensiveRebounds")),
+        "defensiveRebounds": int(num("defensiveRebounds")),
         "assists": int(num("assists")),
         "steals": int(num("steals")),
         "blocks": int(num("blocks")),
@@ -231,6 +233,7 @@ def compute_pool(
     era_id: str,
     manifest: dict[str, Any],
     bbref_ids: dict[str, str] | None = None,
+    with_assets: bool = True,
 ) -> dict[str, Any]:
     if bbref_ids is None:
         bbref_ids = load_bbref_ids()
@@ -362,16 +365,21 @@ def compute_pool(
         )
 
     if not players_out:
-        raise SystemExit(f"no eligible players for {franchise_id} {era_id}")
+        print(
+            f"  [SKIP] no eligible players for {franchise_id} {era_id} "
+            f"(no packaged stints for team {lineage['teamExternalId']} in era seasons)"
+        )
+        return None
 
-    try:
-        from .fetch_nba_headshots import annotate_nba_headshots
-        from .fetch_wikipedia_photos import ensure_photos
+    if with_assets:
+        try:
+            from .fetch_nba_headshots import annotate_nba_headshots
+            from .fetch_wikipedia_photos import ensure_photos
 
-        annotate_nba_headshots(players_out)
-        ensure_photos(players_out)
-    except Exception as exc:  # noqa: BLE001 - photos are best-effort, never fail a build
-        print(f"  [WARN] headshot annotation failed: {exc}")
+            annotate_nba_headshots(players_out)
+            ensure_photos(players_out)
+        except Exception as exc:  # noqa: BLE001 - photos are best-effort, never fail a build
+            print(f"  [WARN] headshot annotation failed: {exc}")
 
     pool = {
         "schemaVersion": SCHEMA_VERSION,
@@ -417,14 +425,16 @@ def parse_pool_targets(raw: list[str]) -> list[tuple[str, str]]:
     return targets
 
 
-def run(targets: list[tuple[str, str]] | None = None) -> None:
+def run(targets: list[tuple[str, str]] | None = None, with_assets: bool = True) -> None:
     if targets is None:
         targets = [("lakers", "1990s")]
     manifest = load_manifest()
     bbref_ids = load_bbref_ids()
     entries: list[dict[str, str]] = []
     for franchise_id, era_id in targets:
-        pool = compute_pool(franchise_id, era_id, manifest, bbref_ids)
+        pool = compute_pool(franchise_id, era_id, manifest, bbref_ids, with_assets)
+        if pool is None:
+            continue
         digest = write_pool(pool)
         entries.append(
             {
@@ -446,19 +456,25 @@ def main() -> None:
     parser.add_argument(
         "--all", action="store_true", help="compute every available (franchise, era) combination",
     )
+    parser.add_argument(
+        "--no-assets", action="store_true",
+        help="skip per-player headshot/photo network annotation (altIds fields omitted)",
+    )
     args = parser.parse_args()
 
     if args.all:
         manifest = load_manifest()
+        packaged_seasons = {p.name for p in NBA_ROOT.iterdir() if p.is_dir()}
         targets = [
             (entry["franchiseId"], era["eraId"])
             for entry in manifest["franchiseLineage"]
             for era in manifest["eras"]
-            if not entry.get("firstNbaSeasonKey") or entry["firstNbaSeasonKey"] <= era["toSeasonKey"]
+            if any(era["fromSeasonKey"] <= s <= era["toSeasonKey"] for s in packaged_seasons)
+            and (not entry.get("firstNbaSeasonKey") or entry["firstNbaSeasonKey"] <= era["toSeasonKey"])
         ]
     else:
         targets = parse_pool_targets(args.pools)
-    run(targets)
+    run(targets, with_assets=not args.no_assets)
 
 
 if __name__ == "__main__":

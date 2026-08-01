@@ -51,6 +51,7 @@ export function checkGameResult(result: GameResult): string[] {
     if (fgm > fga) failures.push(`${side}: field-goal makes exceed attempts`);
     if (tpm > tpa) failures.push(`${side}: three-point makes exceed attempts`);
     if (ftm > fta) failures.push(`${side}: free-throw makes exceed attempts`);
+    if (box.assists > fgm) failures.push(`${side}: assists exceed made field goals`);
     if (
       box.rebounds.offensive + box.rebounds.defensive + box.rebounds.team !==
       box.rebounds.total

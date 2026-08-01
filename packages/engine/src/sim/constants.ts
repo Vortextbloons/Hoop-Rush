@@ -8,18 +8,18 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v1';
+export const ENGINE_VERSION = 'm3-engine-v2';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
 
   /** Base make probability by zone before any player or era adjustment. */
   zoneBaseMake: {
-    rim: 0.66,
-    shortMid: 0.45,
-    longMid: 0.43,
-    cornerThree: 0.48,
-    aboveBreakThree: 0.45,
+    rim: 0.67,
+    shortMid: 0.46,
+    longMid: 0.44,
+    cornerThree: 0.52,
+    aboveBreakThree: 0.49,
   } as const satisfies Record<ShotZone, number>,
 
   /** Player skill deviates make chance by at most this much around the 70 anchor. */
@@ -69,15 +69,23 @@ export const ENGINE_CONSTANTS = {
   minimumStartSeconds: 0.5,
 
   /** Player-level three-point volume boost from the threePointRate tendency. */
-  threePointRateWeight: 0.5,
-  /** Blend of league 3PA rate into player shot-mix selection. */
-  eraThreePointBlend: 0.7,
+  threePointRateWeight: 0.35,
+  /** Blend of era zone mix into player shot-mix selection. */
+  eraZoneMixBlend: 0.55,
+  /** Base-trip allowance reserved for fouls and free throws charged afterward. */
+  paceDeadBallAdjustment: 0.75,
+  /** How strongly observed three-point percentage anchors the shot result. */
+  observedThreePointBlend: 0.7,
+  /** How strongly observed free-throw percentage anchors the shot result. */
+  observedFreeThrowBlend: 0.8,
 
   /** Rebounds: offensive rebound probability coefficient around team ratings. */
   offensiveReboundScale: 0.05,
   offensiveReboundRange: 50,
   offensiveReboundRimBonus: 0.04,
   offensiveReboundPerimeterPenalty: 0.04,
+  /** Weight of observed per-game rebound production in player attribution. */
+  observedReboundWeight: 6,
 
   /** Blocked shots resolve as misses; this chance a block also records the shot as made-free. */
   blockedShotMiss: true,

@@ -1,6 +1,6 @@
 """Fetch NBA team definitions + opening-night rosters per season.
 
-Output: apps/web/static/data/nba/{season}/teams.json + roster.json
+Output: raw-data/nba/{season}/teams.json + roster.json
 """
 
 from __future__ import annotations

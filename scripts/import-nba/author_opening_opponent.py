@@ -18,7 +18,7 @@ OUT_DIR = DATA_DIR / "opponents"
 POOL_PATH = DATA_DIR / "pools" / "lakers-1990s.json"
 
 OPPONENT_ID = "lakers-1990s-opening"
-BRACKET_VERSION = "bracket-m3-preview-v1"
+BRACKET_VERSION = "bracket-m3-v2"
 SEASON_KEY = "1995-96"
 
 # Van Exel, Threatt, A.C. Green, Horry, Divac -> G, G, F, F, C.
@@ -52,6 +52,46 @@ def clamp(value, low, high):
     return max(low, min(high, value))
 
 
+def ratio(numerator, denominator, fallback):
+    return numerator / denominator if denominator > 0 else fallback
+
+
+def shrunk_ratio(numerator, denominator, prior, prior_attempts=80):
+    return ((numerator + prior * prior_attempts) / (denominator + prior_attempts)
+            if denominator > 0 else prior)
+
+
+def anchors_for_player(player):
+    stats = player["stats"]
+    games = max(1, stats["gamesPlayed"])
+    positions = player["positions"]["canonical"]
+    fallback_share = 0.28 if "C" in positions else 0.22 if "F" in positions else 0.15
+    has_split = (
+        stats.get("offensiveRebounds") is not None
+        and stats.get("defensiveRebounds") is not None
+        and (stats["offensiveRebounds"] > 0 or ("C" not in positions and not ("F" in positions and stats["rebounds"] / games > 2.5)))
+    )
+    offensive = stats["offensiveRebounds"] if has_split else round(stats["rebounds"] * fallback_share)
+    defensive = stats["defensiveRebounds"] if has_split else max(0, stats["rebounds"] - offensive)
+    return {
+        "gamesPlayed": stats["gamesPlayed"],
+        "minutesPerGame": min(60, stats["minutes"] / games),
+        "pointsPerGame": stats["points"] / games,
+        "reboundsPerGame": stats["rebounds"] / games,
+        "offensiveReboundsPerGame": offensive / games,
+        "defensiveReboundsPerGame": defensive / games,
+        "assistsPerGame": stats["assists"] / games,
+        "stealsPerGame": stats["steals"] / games,
+        "blocksPerGame": stats["blocks"] / games,
+        "turnoversPerGame": stats["turnovers"] / games,
+        "fieldGoalPct": shrunk_ratio(stats["fieldGoalsMade"], stats["fieldGoalsAttempted"], 0.45),
+        "threePointPct": shrunk_ratio(stats["threesMade"], stats["threesAttempted"], 0.34) if stats["threesAttempted"] > 0 else None,
+        "freeThrowPct": shrunk_ratio(stats["freeThrowsMade"], stats["freeThrowsAttempted"], 0.75),
+        "threePointAttemptRate": ratio(stats["threesAttempted"], stats["fieldGoalsAttempted"], 0),
+        "freeThrowAttemptRate": ratio(stats["freeThrowsAttempted"], stats["fieldGoalsAttempted"], 0.2),
+    }
+
+
 def main():
     pool = json.loads(POOL_PATH.read_text(encoding="utf-8"))
     by_id = {p["playerId"]: p for p in pool["players"]}
@@ -77,6 +117,7 @@ def main():
             "weightLbs": p["weightLbs"],
             "ratings": {k: clamp(round(p["detailedRatings"].get(k, 50)), 0, 100) for k in RATING_KEYS},
             "tendencies": {k: clamp(p["tendencies"].get(k, 0), 0, 100) for k in TENDENCY_KEYS},
+            "anchors": anchors_for_player(p),
         }
         players.append(sim)
 

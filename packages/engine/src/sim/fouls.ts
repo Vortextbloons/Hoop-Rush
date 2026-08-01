@@ -73,5 +73,12 @@ export function freeThrowProbability(
 ): number {
   const anchor = profile.parameters.freeThrowAnchorRating;
   const factor = shooter.ratings.freeThrow / Math.max(1, anchor);
-  return Math.min(0.97, Math.max(0.1, profile.parameters.leagueFtPct * factor));
+  const ratingProbability = profile.parameters.leagueFtPct * factor;
+  const observedProbability = shooter.anchors?.freeThrowPct;
+  const probability =
+    observedProbability === undefined
+      ? ratingProbability
+      : observedProbability * ENGINE_CONSTANTS.observedFreeThrowBlend +
+        ratingProbability * (1 - ENGINE_CONSTANTS.observedFreeThrowBlend);
+  return Math.min(0.97, Math.max(0.1, probability));
 }

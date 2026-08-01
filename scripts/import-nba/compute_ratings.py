@@ -521,10 +521,18 @@ def derive_ratings(stats: dict[str, Any], position: str, season: str, rng: rando
         return v + j(0, sigma)
 
     # Shooting
-    ts_component = (ts_pct - 0.5) * 200
-    three_component = (three_pct - 0.3) * 200
-    ft_component = (ft_pct - 0.7) * 100
-    three_raw = 62 + ts_component * 0.35 + three_component * 0.45 + ft_component * 0.25
+    ts_component = (ts_pct - 0.5) * 60
+    three_component = (three_pct - 0.3) * 140
+    ft_component = (ft_pct - 0.7) * 15
+    # Three-point skill is primarily shot-specific. The previous formula let
+    # overall TS and free-throw shooting overwhelm the actual three-point
+    # percentage, which turned ordinary wings into implausible 45% shooters.
+    three_raw = 58 + ts_component + three_component + ft_component
+
+    # Keep the rating scale meaningful for poor-but-real free-throw shooters.
+    # A 53% shooter should be a roughly 50-60 rating, never a rating of 4 that
+    # later gets multiplied by the league percentage in the simulator.
+    free_throw_raw = 50 + (ft_pct - 0.5) * 120
 
     # Playmaking
     pass_raw = 60 + (apg - 3) * 5 + per * 0.6
@@ -553,7 +561,7 @@ def derive_ratings(stats: dict[str, Any], position: str, season: str, rng: rando
         "closeShot": clamp_rating(jitter(blend(60 + (ppg - 10) * 1.5, 59))),
         "midrange": clamp_rating(jitter(blend(60 + (efg_pct - 0.48) * 100, 54))),
         "threePoint": clamp_rating(jitter(blend(three_raw, 54))),
-        "freeThrow": clamp_rating(jitter(blend(60 + (ft_pct - 0.75) * 250, 69))),
+        "freeThrow": clamp_rating(jitter(blend(free_throw_raw, 69))),
         "ballHandling": clamp_rating(jitter(blend(60 + (usage - 16) * 0.8, 54))),
         "passing": clamp_rating(jitter(blend(pass_raw, 54))),
         "offensiveIq": clamp_rating(jitter(blend(60 + per * 1.0 + bpm * 2.0, 59))),
@@ -628,7 +636,7 @@ def derive_tendencies(stats: dict[str, Any], ratings: dict[str, int], position: 
     tpa = float(stats.get("tpa", 0) or 0)
     fta = float(stats.get("fta", 0) or 0)
     tov = float(stats.get("turnovers", 0) or 0)
-    apg = float(stats.get("assists", 0) or 0)
+    apg = float(stats.get("assists", 0) or 0) / gp
     usage = float(stats.get("usageRate", 0) or 15)
 
     j = rng.gauss
@@ -643,7 +651,7 @@ def derive_tendencies(stats: dict[str, Any], ratings: dict[str, int], position: 
 
     tendencies = {
         "usageRate": clamp(usage + j(0, 1), 10, 40),
-        "passRate": clamp(pass_rate + j(0, 2), 5, 35),
+        "passRate": clamp(pass_rate + j(0, 2), 2, 35),
         "shotRate": clamp(fga / max(1, gp) / 48 * 100 + j(0, 2), 10, 50),
         "driveRate": clamp(10 + (8 if is_guard else 0) + j(0, 2), 5, 35),
         "postUpRate": clamp(5 + (8 if is_big else 0) + j(0, 2), 0, 30),
@@ -652,8 +660,12 @@ def derive_tendencies(stats: dict[str, Any], ratings: dict[str, int], position: 
         "longMidFrequency": clamp(10 + j(0, 2), 0, 20),
         "cornerThreeFrequency": clamp(ratings.get("threePoint", 50) / 100 * 15 + j(0, 2), 0, 15),
         "aboveBreakThreeFrequency": clamp(ratings.get("threePoint", 50) / 100 * 25 + j(0, 2), 5, 30),
-        "threePointRate": clamp(three_rate + j(0, 3), 15, 60),
-        "freeThrowRate": clamp(ft_rate + j(0, 2), 10, 50),
+        # Do not invent three-point or free-throw volume for players whose
+        # selected season had none. The era profile supplies a small prior in
+        # the engine when the sample is genuinely missing, not when it is an
+        # observed zero.
+        "threePointRate": 0 if tpa == 0 else clamp(three_rate + j(0, 3), 0, 60),
+        "freeThrowRate": 0 if fta == 0 else clamp(ft_rate + j(0, 2), 0, 50),
         "turnoverRate": clamp(tov_rate + j(0, 2), 5, 25),
         "isolationRate": clamp(usage * 0.3 + j(0, 2), 0, 35),
         "pickAndRollBallHandlerRate": clamp(20 + (15 if is_guard else 0) + j(0, 3), 5, 50),

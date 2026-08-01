@@ -20,6 +20,11 @@
 
   const firstLoss = $derived(run.firstLossGameNumber);
 
+  /** Opponent display names keyed by opponentId; the bracket is fixed per run. */
+  const opponentNames = $derived(
+    new Map(run.bracket.opponents.map((o) => [o.opponentId, o.displayName])),
+  );
+
   const cells = $derived.by(() => {
     const byGame = new Map(games.map((g) => [g.gameNumber, g]));
     return Array.from({ length: 82 }, (_, index) => {
@@ -37,9 +42,12 @@
 
   /** Opponent display name for one game number. */
   function opponentName(gameNumber: number): string {
-    const entry = run.bracket.schedule[gameNumber - 1];
-    const opponent = run.bracket.opponents.find((o) => o.opponentId === entry?.opponentId);
-    return opponent?.displayName ?? entry?.opponentId ?? 'Unknown';
+    const opponentId = run.bracket.schedule[gameNumber - 1]?.opponentId;
+    return (
+      (opponentId === undefined ? undefined : opponentNames.get(opponentId)) ??
+      opponentId ??
+      'Unknown'
+    );
   }
 </script>
 

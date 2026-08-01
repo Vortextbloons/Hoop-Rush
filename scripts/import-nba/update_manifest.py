@@ -37,6 +37,12 @@ def main() -> None:
     manifest["opponents"] = []
     for path in sorted((DATA_DIR / "opponents").glob("*.json")):
         opponent = json.loads(path.read_text(encoding="utf-8"))
+        if path.name == "bracket.json":
+            manifest["bracket"] = {
+                "url": f"opponents/{path.name}",
+                "contentHash": sha256(path),
+            }
+            continue
         manifest["opponents"].append(
             {"opponentId": opponent["opponentId"], "url": f"opponents/{path.name}", "contentHash": sha256(path)}
         )

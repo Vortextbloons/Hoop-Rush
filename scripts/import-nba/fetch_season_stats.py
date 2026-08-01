@@ -1,6 +1,6 @@
 """Fetch per-season player aggregate stats from nba_api.
 
-Output: apps/web/static/data/nba/{season}/season-stats.json
+Output: raw-data/nba/{season}/season-stats.json
 """
 
 from __future__ import annotations

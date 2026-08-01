@@ -38,7 +38,7 @@ function resolveAssetUrl(url: string): string {
 /** Load (once) and validate the Hoop Rush manifest. */
 export function getManifest(): Promise<HoopRushManifest> {
   if (!manifestPromise) {
-    manifestPromise = loadManifest(manifestUrl(), { cache: 'no-store' });
+    manifestPromise = loadManifest(manifestUrl(), { cache: 'no-cache' });
   }
   return manifestPromise;
 }
@@ -100,19 +100,4 @@ export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> 
     });
   }
   return promise;
-}
-
-/**
- * Kick off background loads so a later pick resolves from memory instantly.
- *
- * Today the manifest packages a handful of pools; when the pool count grows
- * into the hundreds, gate this on user intent (e.g. opening the franchise
- * dropdown) instead of prefetching everything eagerly.
- */
-export function prefetchPools(entries: readonly PoolIndexEntry[]): void {
-  for (const entry of entries) {
-    void getPool(entry).catch(() => {
-      // Best-effort warm-up; the selection path surfaces real errors.
-    });
-  }
 }

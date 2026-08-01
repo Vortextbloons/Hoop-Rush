@@ -1,38 +1,30 @@
-"""Build-time derivation of the versioned 1990s era simulation profile.
+"""Build-time derivation of era simulation profiles.
 
-M2 scope: the profile is derived from the decade's packaged source data
-(`apps/web/static/data/nba/<season>/stints.json` per season, plus the packaged
-Lakers 1990s pool for population anchor ratings and shot-mix priors).
+Each profile is derived from the era's packaged source data
+(`raw-data/nba/<season>/stints.json` per season, plus the packaged
+Lakers pool for that era, which provides population anchor ratings and shot-mix
+priors).
 
-Output: `apps/web/static/data/era-sim/1990s.json` (EraSimulationProfile).
+Output: `apps/web/static/data/era-sim/<era>.json` (EraSimulationProfile).
 
 Targets are emitted as initial estimates from the same source aggregates with
-wide tolerances; the M2 calibration baseline freezes the final gates.
+wide tolerances; the calibration baseline freezes the final gates.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "apps" / "web" / "static" / "data"
 OUT_DIR = DATA_DIR / "era-sim"
-POOL_PATH = DATA_DIR / "pools" / "lakers-1990s.json"
-SEASONS = [
-    "1990-91",
-    "1991-92",
-    "1992-93",
-    "1993-94",
-    "1994-95",
-    "1995-96",
-    "1996-97",
-    "1997-98",
-    "1998-99",
-    "1999-00",
-]
-PROFILE_VERSION = "m2-1990s-v1"
-DATA_VERSION = "m1.0"
+NBA_DIR = DATA_DIR / "nba"
+POOLS_DIR = DATA_DIR / "pools"
+MANIFEST_PATH = DATA_DIR / "manifest.json"
+PROFILE_VERSION_PREFIX = "m3"
+DATA_VERSION = "m1.6"
 
 
 def load_json(path: Path):
@@ -40,15 +32,32 @@ def load_json(path: Path):
         return json.load(fh)
 
 
-def derive_league_aggregates():
+def packaged_seasons() -> list[str]:
+    return sorted(p.name for p in NBA_DIR.iterdir() if p.is_dir())
+
+
+def era_seasons(era: dict[str, str]) -> list[str]:
+    return [
+        season
+        for season in packaged_seasons()
+        if era["fromSeasonKey"] <= season <= era["toSeasonKey"]
+    ]
+
+
+def eras_with_data() -> list[dict[str, str]]:
+    manifest = load_json(MANIFEST_PATH)
+    return [era for era in manifest["eras"] if era_seasons(era)]
+
+
+def derive_league_aggregates(seasons: list[str]):
     sums = {
         "fga": 0.0, "fgm": 0.0, "tpa": 0.0, "tpm": 0.0,
         "fta": 0.0, "ftm": 0.0, "oreb": 0.0, "dreb": 0.0,
         "ast": 0.0, "stl": 0.0, "tov": 0.0, "pf": 0.0, "pts": 0.0,
         "player_games": 0.0,
     }
-    for season in SEASONS:
-        stints = load_json(DATA_DIR / "nba" / season / "stints.json")
+    for season in seasons:
+        stints = load_json(NBA_DIR / season / "stints.json")
         for stint in stints:
             sums["fga"] += stint.get("fga", 0)
             sums["fgm"] += stint.get("fgm", 0)
@@ -89,8 +98,11 @@ def derive_league_aggregates():
     }
 
 
-def pool_shot_mix_and_anchors():
-    pool = load_json(POOL_PATH)
+def pool_shot_mix_and_anchors(era_id: str):
+    pool_path = POOLS_DIR / f"lakers-{era_id}.json"
+    if not pool_path.exists():
+        raise SystemExit(f"anchor pool missing: {pool_path} (run compute_pools first)")
+    pool = load_json(pool_path)
     players = pool["players"]
     total_usage = sum(p["tendencies"].get("usageRate", 0) for p in players) or 1.0
     zones = ["rimFrequency", "shortMidFrequency", "longMidFrequency",
@@ -113,9 +125,14 @@ def target(value, tolerance, minimum_sample=200):
     return {"value": round(value, 4), "tolerance": tolerance, "minimumSample": minimum_sample}
 
 
-def main():
-    a = derive_league_aggregates()
-    mix, ft_anchor, pass_anchor = pool_shot_mix_and_anchors()
+def compute_era_profile(era: dict[str, str]) -> dict[str, object]:
+    era_id = era["eraId"]
+    seasons = era_seasons(era)
+    if not seasons:
+        raise SystemExit(f"no packaged seasons for era {era_id}")
+
+    a = derive_league_aggregates(seasons)
+    mix, ft_anchor, pass_anchor = pool_shot_mix_and_anchors(era_id)
 
     pace = a["possessions"] / a["team_games"]  # per team per game
     ppg = a["points"] / a["team_games"]
@@ -137,13 +154,14 @@ def main():
     fta_per_game = a["fta"] / a["team_games"]
     pf_per_game = a["pf"] / a["team_games"]
 
-    profile = {
+    first, last = seasons[0], seasons[-1]
+    return {
         "schemaVersion": 1,
-        "eraId": "1990s",
-        "profileVersion": PROFILE_VERSION,
+        "eraId": era_id,
+        "profileVersion": f"{PROFILE_VERSION_PREFIX}-{era_id}-v1",
         "dataVersion": DATA_VERSION,
-        "seasons": SEASONS,
-        "baselineReport": "derived from packaged 1990s stints; targets frozen after m2 calibration baseline",
+        "seasons": seasons,
+        "baselineReport": f"derived from packaged {first}..{last} stints; targets frozen after calibration baseline",
         "parameters": {
             "pace": round(pace, 3),
             "league3PARate": round(three_rate, 4),
@@ -159,7 +177,7 @@ def main():
             "freeThrowAnchorRating": ft_anchor,
             "assistAnchorRating": pass_anchor,
             "zoneMix": mix,
-            "source": "packaged stints 1990-91..1999-00 + Lakers 1990s pool rating anchors",
+            "source": f"packaged stints {first}..{last} + Lakers {era_id} pool rating anchors",
         },
         "targets": {
             "possessionsPerGame": target(pace, 3),
@@ -194,15 +212,32 @@ def main():
         },
     }
 
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Compute era simulation profiles")
+    parser.add_argument(
+        "--era", nargs="+", default=None,
+        help="eraIds to compute (default: every era with packaged seasons)",
+    )
+    args = parser.parse_args()
+
+    eras = eras_with_data()
+    if args.era:
+        by_id = {era["eraId"]: era for era in eras}
+        missing = [e for e in args.era if e not in by_id]
+        if missing:
+            raise SystemExit(f"no packaged data for era(s): {', '.join(missing)}")
+        eras = [by_id[e] for e in args.era]
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUT_DIR / "1990s.json"
-    with out.open("w", encoding="utf-8") as fh:
-        json.dump(profile, fh, indent=2)
-        fh.write("\n")
-    print(f"wrote {out}")
-    print(f"pace={pace:.2f} ppg={ppg:.2f} ts={ts_pct:.3f} ftaPerFga={fta_per_fga:.3f} "
-          f"tovPp={tov_per_poss:.3f} stealShare={steal_share:.3f} orebRate={oreb_rate:.3f} "
-          f"astRate={assist_rate:.3f} foulsPp={fouls_per_poss:.3f} ftAnchor={ft_anchor} passAnchor={pass_anchor}")
+    for era in eras:
+        profile = compute_era_profile(era)
+        out = OUT_DIR / f"{era['eraId']}.json"
+        with out.open("w", encoding="utf-8") as fh:
+            json.dump(profile, fh, indent=2)
+            fh.write("\n")
+        params = profile["parameters"]
+        print(f"wrote {out} pace={params['pace']:.2f}")
 
 
 if __name__ == "__main__":

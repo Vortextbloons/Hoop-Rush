@@ -69,6 +69,31 @@ export const simulationTendenciesSchema = z
   .strict();
 export type SimulationTendencies = z.infer<typeof simulationTendenciesSchema>;
 
+/**
+ * Observed player-season anchors used by the possession engine. These are
+ * deliberately separate from ratings: ratings describe transferable ability,
+ * while anchors preserve what the player actually did in the selected season.
+ * Low-sample values are shrunk during import before they reach this boundary.
+ */
+export const simulationAnchorsSchema = z.object({
+  gamesPlayed: z.number().int().nonnegative(),
+  minutesPerGame: z.number().min(0).max(60),
+  pointsPerGame: z.number().nonnegative(),
+  reboundsPerGame: z.number().nonnegative(),
+  offensiveReboundsPerGame: z.number().nonnegative(),
+  defensiveReboundsPerGame: z.number().nonnegative(),
+  assistsPerGame: z.number().nonnegative(),
+  stealsPerGame: z.number().nonnegative(),
+  blocksPerGame: z.number().nonnegative(),
+  turnoversPerGame: z.number().nonnegative(),
+  fieldGoalPct: z.number().min(0).max(1),
+  threePointPct: z.number().min(0).max(1).nullable(),
+  freeThrowPct: z.number().min(0).max(1),
+  threePointAttemptRate: z.number().min(0).max(1),
+  freeThrowAttemptRate: z.number().min(0).max(1),
+});
+export type SimulationAnchors = z.infer<typeof simulationAnchorsSchema>;
+
 /** One player exactly as the possession engine sees them. */
 export const simulationPlayerSchema = z.object({
   playerId: playerIdSchema,
@@ -79,6 +104,8 @@ export const simulationPlayerSchema = z.object({
   weightLbs: z.number().int().min(120).max(400).nullable(),
   ratings: simulationRatingsSchema,
   tendencies: simulationTendenciesSchema,
+  /** Optional for authored opponents and legacy fixtures without source stats. */
+  anchors: simulationAnchorsSchema.optional(),
 });
 export type SimulationPlayer = z.infer<typeof simulationPlayerSchema>;
 

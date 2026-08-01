@@ -6,7 +6,6 @@
   import type {
     ChallengeRun,
     EraSimulationProfile,
-    GameResult,
     HoopRushManifest,
   } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
@@ -25,12 +24,11 @@
    * game. Cancel pauses at the last persisted prefix; reload resumes.
    */
 
-  let manifest = $state<HoopRushManifest | null>(null);
-  let profile = $state<EraSimulationProfile | null>(null);
-  let run = $state<ChallengeRun | null>(null);
+  let manifest = $state.raw<HoopRushManifest | null>(null);
+  let profile = $state.raw<EraSimulationProfile | null>(null);
+  let run = $state.raw<ChallengeRun | null>(null);
   let loadError = $state<string | null>(null);
 
-  let revealed = $state<GameResult[]>([]);
   let phase = $state<RunnerPhase>('idle');
   let runnerError = $state<string | null>(null);
   let announcedCount = 0;
@@ -66,7 +64,6 @@
           return;
         }
         run = active;
-        revealed = active.games;
         getManifest().then(
           (m) => {
             if (cancelled) return;
@@ -105,10 +102,10 @@
   // is intentionally NON-reactive (a plain variable): the effect must not
   // re-run when it changes, or Svelte would reschedule the effect in a loop,
   // disposing and recreating the worker every cycle. The session snapshot is
-  // set once by the load effect; display state (`run`, `revealed`) is
-  // separate so updates never re-trigger this boundary.
+  // set once by the load effect; display state (`run`) is separate so updates
+  // never re-trigger this boundary.
   let runner: ChallengeRunner | null = null;
-  let session = $state<{ run: ChallengeRun; profile: EraSimulationProfile } | null>(null);
+  let session = $state.raw<{ run: ChallengeRun; profile: EraSimulationProfile } | null>(null);
   $effect(() => {
     const active = session;
     if (!browser || !active || runner !== null) return;
@@ -116,8 +113,7 @@
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const instance = new ChallengeRunner(challengeRepository, {
-      onReveal(result, nextRun) {
-        revealed = [...revealed, result];
+      onReveal(_result, nextRun) {
         run = nextRun;
         announcedCount += 1;
         if (announcedCount % ANNOUNCEMENT_EVERY === 0) {
@@ -153,7 +149,7 @@
   }
 
   const record = $derived(run?.aggregates.team);
-  const latest = $derived(revealed[revealed.length - 1] ?? null);
+  const latest = $derived(run?.games.at(-1) ?? null);
   const latestOpponent = $derived.by(() => {
     if (!latest || !run) return null;
     const entry = run.bracket.schedule[latest.gameNumber - 1];
@@ -300,7 +296,7 @@
 
         <!-- The 82-cell strip -->
         <div class="mt-6 rounded-xl border border-border bg-card p-4 sm:p-5">
-          <GameStrip {run} games={revealed} />
+          <GameStrip {run} games={run.games} />
           <div class="mt-3 flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase">
             <span class="flex items-center gap-1.5 text-muted-foreground">
               <span class="h-2 w-2 rounded-sm bg-primary/80" aria-hidden="true"></span>
@@ -310,7 +306,7 @@
               <span class="h-2 w-2 rounded-sm bg-destructive/70" aria-hidden="true"></span>
               Loss
             </span>
-            {#if run.firstLossGameNumber !== null && run.firstLossGameNumber <= revealed.length}
+            {#if run.firstLossGameNumber !== null && run.firstLossGameNumber <= run.games.length}
               <span class="flex items-center gap-1.5 text-muted-foreground">
                 <span
                   class="h-2 w-2 rounded-sm bg-destructive shadow-[0_0_0_2px_hsl(var(--destructive))]"
@@ -320,7 +316,7 @@
               </span>
             {/if}
             <span class="ml-auto text-muted-foreground">
-              {revealed.length}/82 committed
+              {run.games.length}/82 committed
             </span>
           </div>
         </div>

@@ -47,6 +47,7 @@
       height="20"
       class="h-5 w-5 shrink-0 object-contain {className}"
       loading="lazy"
+      decoding="async"
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
       onerror={onError}

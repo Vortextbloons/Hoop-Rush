@@ -8,6 +8,7 @@ import { bracketAudit, BRACKET_AUDIT_OPTIONS } from './commands/bracket-audit.js
 import { bracketGenerate, BRACKET_GENERATE_OPTIONS } from './commands/bracket-generate.js';
 import { benchmark, BENCHMARK_OPTIONS } from './commands/benchmark.js';
 import { replay, REPLAY_OPTIONS } from './commands/replay.js';
+import { combineDocs, COMBINE_DOCS_OPTIONS } from './commands/docs-combine.js';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.js';
 import {
   makeReport,
@@ -132,6 +133,15 @@ const COMMANDS: Record<string, CommandDef> = {
       calibrateSensitivity({
         samples: getOptionString(args, 'samples') ?? undefined,
         profile: getOptionString(args, 'profile') ?? undefined,
+      }),
+  },
+  'combine docs': {
+    options: COMBINE_DOCS_OPTIONS,
+    run: (args) =>
+      combineDocs({
+        input: getOptionString(args, 'input') ?? undefined,
+        output: getOptionString(args, 'output') ?? undefined,
+        exceptions: getOptionString(args, 'exceptions') ?? undefined,
       }),
   },
 };

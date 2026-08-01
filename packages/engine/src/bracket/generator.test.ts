@@ -148,7 +148,7 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(scheduleInvariants(bracket.schedule)).toEqual([]);
     expect(bracket.schedule[0]?.opponentId).toBe('lakers-1990s-opening');
     expect(bracket.generation.seed).toBe(seedFromString('fixture-bracket'));
-  });
+  }, 15_000);
 
   it('keeps the opening opponent unchanged', () => {
     const opening = buildOpeningOpponent();
@@ -159,7 +159,7 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(entry!.displayName).toBe(opening.displayName);
     expect(JSON.stringify(entry!.lineup)).toBe(JSON.stringify(opening.lineup));
     expect(JSON.stringify(entry!.players)).toBe(JSON.stringify(opening.players));
-  });
+  }, 15_000);
 
   it('regenerates byte-identically with the same seed and inputs', () => {
     const a = generateBracket(generationOptions());

@@ -5,10 +5,10 @@ import { gameResultSchema } from './result.js';
 
 /**
  * Versioned Web Worker messages (spec/04 static deployment and workers). The
- * worker receives runtime-validated requests and returns runtime-validated
- * results; it never writes IndexedDB directly. Every message carries the
- * request id so the main thread can ignore stale responses after a cancel or
- * a route change.
+ * worker receives runtime-validated requests and posts results in batches;
+ * the main thread validates every message once at its boundary. The worker
+ * never writes IndexedDB directly. Every message carries the request id so
+ * the main thread can ignore stale responses after a cancel or a route change.
  */
 
 export const workerSimulateRequestSchema = z.object({
@@ -39,14 +39,15 @@ export const workerRequestSchema = z.discriminatedUnion('type', [
 ]);
 export type WorkerRequest = z.infer<typeof workerRequestSchema>;
 
-export const workerResultMessageSchema = z.object({
+export const workerResultsMessageSchema = z.object({
   schemaVersion: z.literal(1),
-  type: z.literal('result'),
+  type: z.literal('results'),
   requestId: z.string().min(1).max(64),
-  gameNumber: z.number().int().min(1).max(82),
-  result: gameResultSchema,
+  /** First game in the batch; results are consecutive games in schedule order. */
+  fromGameNumber: z.number().int().min(1).max(82),
+  results: z.array(gameResultSchema).min(1).max(8),
 });
-export type WorkerResultMessage = z.infer<typeof workerResultMessageSchema>;
+export type WorkerResultsMessage = z.infer<typeof workerResultsMessageSchema>;
 
 export const workerCompleteMessageSchema = z.object({
   schemaVersion: z.literal(1),

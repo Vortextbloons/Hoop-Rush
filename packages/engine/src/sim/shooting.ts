@@ -70,10 +70,23 @@ export function makeProbability(
   context: ShotContext,
   periodSecondsRemaining: number,
 ): number {
-  const base = ENGINE_CONSTANTS.zoneBaseMake[context.zone];
-  const skill = ((zoneSkillRating(shooter, context.zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange;
+  const observedThreePointPct = isThreePointZone(context.zone)
+    ? shooter.anchors?.threePointPct
+    : null;
+  const base =
+    observedThreePointPct === null || observedThreePointPct === undefined
+      ? ENGINE_CONSTANTS.zoneBaseMake[context.zone]
+      : observedThreePointPct * ENGINE_CONSTANTS.observedThreePointBlend +
+        profile.targets.threePointPct.value * (1 - ENGINE_CONSTANTS.observedThreePointBlend);
+  const skill =
+    observedThreePointPct === null || observedThreePointPct === undefined
+      ? ((zoneSkillRating(shooter, context.zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange
+      : ((zoneSkillRating(shooter, context.zone) - 70) / 100) * 0.05;
   const contest = -contestPenalty(defender, context.zone);
-  const era = (profile.parameters.leagueTsPct - 0.55) * ENGINE_CONSTANTS.eraEfficiencyWeight;
+  const era =
+    observedThreePointPct === null || observedThreePointPct === undefined
+      ? (profile.parameters.leagueTsPct - 0.55) * ENGINE_CONSTANTS.eraEfficiencyWeight
+      : 0;
   const latePenalty =
     periodSecondsRemaining <= 4
       ? -(0.04 + Math.min(1, Math.max(0, (4 - periodSecondsRemaining) / 4)) * 0.06)

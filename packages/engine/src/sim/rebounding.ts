@@ -76,6 +76,21 @@ export function pickRebounder(
   const rating = offensive ? 'offensiveRebound' : 'defensiveRebound';
   return rng.weightedPick(
     team.players,
-    team.players.map((p) => Math.max(0.5, p.ratings[rating] + p.ratings.vertical * 0.25)),
+    team.players.map((p) => {
+      const historical = offensive
+        ? (p.anchors?.offensiveReboundsPerGame ?? 0)
+        : (p.anchors?.defensiveReboundsPerGame ?? 0);
+      const heightContribution =
+        p.heightInches === null ? 0 : Math.max(0, p.heightInches - 72) * 0.8;
+      const weightContribution = p.weightLbs === null ? 0 : Math.max(0, p.weightLbs - 180) * 0.03;
+      return Math.max(
+        0.5,
+        p.ratings[rating] +
+          p.ratings.vertical * 0.25 +
+          historical * ENGINE_CONSTANTS.observedReboundWeight +
+          heightContribution +
+          weightContribution,
+      );
+    }),
   );
 }

@@ -7,6 +7,7 @@
   PositionUnion,
   Seed,
   SimulationPlayer,
+  SimulationAnchors,
   SimulationRatings,
   SimulationTeam,
   SimulationTendencies,
@@ -41,6 +42,7 @@ export interface BracketCandidatePlayer {
   weightLbs: number | null;
   ratings: SimulationRatings;
   tendencies: SimulationTendencies;
+  anchors?: SimulationAnchors;
   seasonKey: string;
   /** Quality score used for weighted proposal sampling. */
   score: number;
@@ -99,6 +101,7 @@ function toSimulationPlayer(player: BracketCandidatePlayer): SimulationPlayer {
     weightLbs: player.weightLbs,
     ratings: player.ratings,
     tendencies: player.tendencies,
+    anchors: player.anchors,
   };
 }
 

@@ -26,6 +26,13 @@ export const ACTION_TYPES: readonly ActionType[] = [
   'transition',
 ];
 
+export interface ShotSelection {
+  shooter: SimulationPlayer;
+  initiator: SimulationPlayer;
+  /** Whether the possession produced a pass before the shot. */
+  passed: boolean;
+}
+
 /** Selects the possession initiator, weighted by usage rate. */
 export function pickInitiator(team: SimulationTeam, rng: Rng): SimulationPlayer {
   return rng.weightedPick(
@@ -48,6 +55,22 @@ export function pickAction(initiator: SimulationPlayer, rng: Rng): ActionType {
     t.cutRate,
     transitionWeight,
   ]);
+}
+
+/** Probability that an action produces a pass before the shot. */
+export function passProbability(initiator: SimulationPlayer, action: ActionType): number {
+  const actionBase =
+    action === 'spotUp' || action === 'cut' || action === 'transition'
+      ? 0.9
+      : action === 'pickAndRollRoll'
+        ? 0.78
+        : action === 'pickAndRoll'
+          ? 0.62
+          : action === 'postUp'
+            ? 0.28
+            : 0.2;
+  const passingFactor = 0.65 + initiator.tendencies.passRate / 100;
+  return Math.min(0.97, Math.max(0.05, actionBase * 1.2 * passingFactor));
 }
 
 /**
@@ -79,6 +102,48 @@ export function pickShooter(
     );
   }
   return initiator;
+}
+
+/** Selects whether the initiator passes and, if so, a teammate shooter. */
+export function pickShot(
+  team: SimulationTeam,
+  initiator: SimulationPlayer,
+  action: ActionType,
+  rng: Rng,
+): ShotSelection {
+  if (!rng.chance(passProbability(initiator, action))) {
+    return { shooter: initiator, initiator, passed: false };
+  }
+  const teammates = team.players.filter((p) => p.playerId !== initiator.playerId);
+  if (teammates.length === 0) return { shooter: initiator, initiator, passed: false };
+  const weights = teammates.map((p) =>
+    action === 'pickAndRollRoll'
+      ? Math.max(0.5, p.tendencies.pickAndRollRollManRate)
+      : Math.max(0.5, p.tendencies.shotRate),
+  );
+  return { shooter: rng.weightedPick(teammates, weights), initiator, passed: true };
+}
+
+/** Selects a plausible passer while preventing self-assists. */
+export function pickAssister(
+  team: SimulationTeam,
+  shooter: SimulationPlayer,
+  initiator: SimulationPlayer,
+  rng: Rng,
+): SimulationPlayer | null {
+  const candidates = team.players.filter((p) => p.playerId !== shooter.playerId);
+  if (candidates.length === 0) return null;
+  const weights = candidates.map((p) => {
+    const observedCreation = p.anchors?.assistsPerGame;
+    const roleWeight =
+      observedCreation === undefined
+        ? Math.max(0.5, p.tendencies.passRate / 5)
+        : Math.max(0.5, observedCreation + 1);
+    const passingWeight = 0.7 + p.ratings.passing / 100;
+    const initiatorBonus = p.playerId === initiator.playerId ? 1.35 : 1;
+    return roleWeight * passingWeight * initiatorBonus;
+  });
+  return rng.weightedPick(candidates, weights);
 }
 
 /** Weight profile for a defender based on zone and position matchup. */
@@ -124,40 +189,61 @@ export function pickZone(
   rng: Rng,
 ): ShotZone {
   const f = shooter.tendencies;
-  const threePointRate = profile.parameters.league3PARate;
-  const playerThree = f.threePointRate / 100;
-  const tendencyThreeShare =
-    (f.cornerThreeFrequency + f.aboveBreakThreeFrequency) /
-    Math.max(
-      1e-9,
-      f.rimFrequency +
-        f.shortMidFrequency +
-        f.longMidFrequency +
-        f.cornerThreeFrequency +
-        f.aboveBreakThreeFrequency,
-    );
-  const volume = 0.5 + playerThree;
-  const targetThreeShare = Math.min(
-    0.65,
-    Math.max(
-      0.01,
-      (1 - ENGINE_CONSTANTS.eraThreePointBlend) * tendencyThreeShare +
-        ENGINE_CONSTANTS.eraThreePointBlend * threePointRate * volume,
-    ),
-  );
-  const twoPointWeight = f.rimFrequency + f.shortMidFrequency + f.longMidFrequency;
-  const threePointTendencyWeight = f.cornerThreeFrequency + f.aboveBreakThreeFrequency;
-  const threeScale =
-    (targetThreeShare / Math.max(1e-9, 1 - targetThreeShare)) *
-    (twoPointWeight / Math.max(1e-9, threePointTendencyWeight));
-
-  const weights: number[] = [
-    f.rimFrequency * (action === 'transition' ? 1.2 : action === 'postUp' ? 1.1 : 1),
-    f.shortMidFrequency * (action === 'postUp' ? 1.15 : 1),
+  const eraMix = profile.parameters.zoneMix;
+  const tendencyWeights = [
+    f.rimFrequency,
+    f.shortMidFrequency,
     f.longMidFrequency,
-    f.cornerThreeFrequency * threeScale,
-    f.aboveBreakThreeFrequency * threeScale,
+    f.cornerThreeFrequency,
+    f.aboveBreakThreeFrequency,
   ];
+  const tendencyTotal = tendencyWeights.reduce((sum, value) => sum + value, 0);
+  const tendencyMix = tendencyWeights.map((value) => value / Math.max(1e-9, tendencyTotal));
+  const eraWeights = [
+    eraMix.rim,
+    eraMix.shortMid,
+    eraMix.longMid,
+    eraMix.cornerThree,
+    eraMix.aboveBreakThree,
+  ];
+  const blend = ENGINE_CONSTANTS.eraZoneMixBlend;
+  const weights = eraWeights.map(
+    (value, index) => value * (1 - blend) + (tendencyMix[index] ?? 0) * blend,
+  );
+
+  // Historical three-point volume is a strong role anchor. A player with no
+  // recorded three-point attempts should not become a modern floor-spacer just
+  // because the era has a nonzero league average.
+  const observedRate = shooter.anchors?.threePointAttemptRate;
+  const observedPct = shooter.anchors?.threePointPct;
+  const eraThreeRate = profile.parameters.league3PARate;
+  const targetThreeRate =
+    observedRate !== undefined
+      ? observedPct === null
+        ? Math.min(0.03, eraThreeRate * 0.25)
+        : Math.min(0.65, Math.max(0.01, observedRate * 0.7 + eraThreeRate * 0.3))
+      : Math.min(
+          0.65,
+          Math.max(
+            0.01,
+            (f.threePointRate / 100) * ENGINE_CONSTANTS.threePointRateWeight +
+              eraThreeRate * (1 - ENGINE_CONSTANTS.threePointRateWeight),
+          ),
+        );
+  const currentThree = (weights[3] ?? 0) + (weights[4] ?? 0);
+  const currentTwo = Math.max(
+    1e-9,
+    weights.reduce((sum, value, index) => (index < 3 ? sum + value : sum), 0),
+  );
+  const targetTwoRate = 1 - targetThreeRate;
+  const threeScale = targetThreeRate / Math.max(1e-9, currentThree);
+  const twoScale = targetTwoRate / currentTwo;
+  for (let index = 0; index < weights.length; index += 1) {
+    weights[index] = (weights[index] ?? 0) * (index < 3 ? twoScale : threeScale);
+  }
+
+  weights[0] = (weights[0] ?? 0) * (action === 'transition' ? 1.2 : action === 'postUp' ? 1.1 : 1);
+  weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.15 : 1);
   return rng.weightedPick(ZONES, weights);
 }
 

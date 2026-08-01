@@ -15,6 +15,7 @@ import {
   type OpponentTeam,
   type PositionUnion,
   type Seed,
+  type SimulationAnchors,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
 import { bracketGenerateReportSchema } from '../report-schemas.js';
@@ -41,9 +42,9 @@ export const BRACKET_GENERATE_OPTIONS: Record<string, boolean> = {
 
 /** Fixed default generation seed; --seed overrides for regeneration checks. */
 const DEFAULT_GENERATION_SEED: Seed = '2b7e151628aed2a6abf7158809cf4f3c';
-const GENERATION_VERSION = 'bracket-m3-v1';
+const GENERATION_VERSION = 'bracket-m3-v2';
 
-const NBA_ROOT = resolve(REPO_ROOT, 'apps/web/static/data/nba');
+const NBA_ROOT = resolve(REPO_ROOT, 'raw-data/nba');
 const OPPONENTS_DIR = resolve(REPO_ROOT, 'apps/web/static/data/opponents');
 const MANIFEST_PATH = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
 
@@ -127,6 +128,26 @@ interface RosterPlayer {
   summaryRatings: { overallRating: number; offenseRating: number; defenseRating: number } | null;
 }
 
+interface SeasonStats {
+  playerExternalId: string;
+  gamesPlayed: number;
+  minutes: number;
+  points: number;
+  rebounds: number;
+  offensiveRebounds?: number;
+  defensiveRebounds?: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  turnovers: number;
+  fgm: number;
+  fga: number;
+  tpm: number;
+  tpa: number;
+  ftm: number;
+  fta: number;
+}
+
 interface Stint {
   playerExternalId: string;
   teamExternalId: string;
@@ -148,6 +169,55 @@ function clampRating(value: number): number {
 
 function clampTendency(value: number): number {
   return Math.min(100, Math.max(0, value));
+}
+
+function ratio(numerator: number, denominator: number, fallback: number): number {
+  return denominator > 0 ? numerator / denominator : fallback;
+}
+
+function shrunkRatio(
+  numerator: number,
+  denominator: number,
+  prior: number,
+  priorAttempts = 80,
+): number {
+  return denominator > 0
+    ? (numerator + prior * priorAttempts) / (denominator + priorAttempts)
+    : prior;
+}
+
+function anchorsFromStats(
+  stats: SeasonStats | undefined,
+  positions: PositionUnion,
+): SimulationAnchors | undefined {
+  if (!stats || stats.gamesPlayed <= 0) return undefined;
+  const games = Math.max(1, stats.gamesPlayed);
+  const hasReliableSplit =
+    stats.offensiveRebounds !== undefined &&
+    stats.defensiveRebounds !== undefined &&
+    (stats.offensiveRebounds > 0 ||
+      (!positions.includes('C') && !(positions.includes('F') && stats.rebounds / games > 2.5)));
+  const offensiveRebounds = hasReliableSplit ? stats.offensiveRebounds! : stats.rebounds * 0.2;
+  const defensiveRebounds = hasReliableSplit
+    ? stats.defensiveRebounds!
+    : Math.max(0, stats.rebounds - offensiveRebounds);
+  return {
+    gamesPlayed: stats.gamesPlayed,
+    minutesPerGame: Math.min(60, stats.minutes / games),
+    pointsPerGame: stats.points / games,
+    reboundsPerGame: stats.rebounds / games,
+    offensiveReboundsPerGame: offensiveRebounds / games,
+    defensiveReboundsPerGame: defensiveRebounds / games,
+    assistsPerGame: stats.assists / games,
+    stealsPerGame: stats.steals / games,
+    blocksPerGame: stats.blocks / games,
+    turnoversPerGame: stats.turnovers / games,
+    fieldGoalPct: shrunkRatio(stats.fgm, stats.fga, 0.45),
+    threePointPct: stats.tpa > 0 ? shrunkRatio(stats.tpm, stats.tpa, 0.34) : null,
+    freeThrowPct: shrunkRatio(stats.ftm, stats.fta, 0.75),
+    threePointAttemptRate: ratio(stats.tpa, stats.fga, 0),
+    freeThrowAttemptRate: ratio(stats.fta, stats.fga, 0.2),
+  };
 }
 
 /** Canonical position union for a set of source labels (same map as the pool importer). */
@@ -214,6 +284,7 @@ export function buildCandidateCatalog(
   // Career position labels across every season (career-wide union, spec/02).
   const careerLabels = new Map<string, Set<string>>();
   const rosterBySeason = new Map<string, Map<string, RosterPlayer>>();
+  const statsBySeason = new Map<string, Map<string, SeasonStats>>();
   for (const season of seasonDirs) {
     let roster: unknown[];
     try {
@@ -232,6 +303,20 @@ export function buildCandidateCatalog(
       careerLabels.set(player.externalId, labels);
     }
     rosterBySeason.set(season, byId);
+
+    try {
+      const rawStats = readJson(resolve(NBA_ROOT, season, 'season-stats.json'));
+      const byPlayer = new Map<string, SeasonStats>();
+      if (Array.isArray(rawStats)) {
+        for (const raw of rawStats) {
+          const stats = raw as SeasonStats;
+          if (stats.playerExternalId) byPlayer.set(stats.playerExternalId, stats);
+        }
+      }
+      statsBySeason.set(season, byPlayer);
+    } catch {
+      statsBySeason.set(season, new Map());
+    }
   }
 
   // Per franchise: player -> best eligible season by the same selection score
@@ -246,6 +331,7 @@ export function buildCandidateCatalog(
     positions: PositionUnion;
     ratings: BracketCandidatePlayer['ratings'];
     tendencies: BracketCandidatePlayer['tendencies'];
+    anchors?: SimulationAnchors;
     score: number;
   }
   const candidates: FranchiseCandidates[] = [];
@@ -291,6 +377,13 @@ export function buildCandidateCatalog(
             const value = player.tendencies[keyName];
             tendencies[keyName] = typeof value === 'number' ? clampTendency(value) : 0;
           }
+          const positions = canonicalPositions(
+            careerLabels.get(stint.playerExternalId) ?? new Set(),
+          );
+          const anchors = anchorsFromStats(
+            statsBySeason.get(season)?.get(stint.playerExternalId),
+            positions,
+          );
           perPlayer.set(key, {
             playerId: key,
             displayName: `${player.firstName} ${player.lastName}`.trim(),
@@ -298,9 +391,10 @@ export function buildCandidateCatalog(
             heightInches: player.heightInches ?? null,
             weightLbs: player.weightLbs ?? null,
             minutes: stint.minutes,
-            positions: canonicalPositions(careerLabels.get(stint.playerExternalId) ?? new Set()),
+            positions,
             ratings,
             tendencies,
+            anchors,
             score: Math.round(score * 100) / 100,
           });
         }
@@ -362,7 +456,7 @@ export function bracketGenerate(args: {
   const openingOpponent: OpponentTeam = openingParsed.data;
 
   const difficulty: DifficultyProfile = {
-    profileVersion: 'm3-medium-v1',
+    profileVersion: 'm3-medium-v2',
     name: 'medium',
     leagueMedianPercentileBand: [0.45, 0.6],
     teamPercentileBand: [0.3, 0.7],

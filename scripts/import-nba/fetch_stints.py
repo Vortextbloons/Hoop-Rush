@@ -4,7 +4,7 @@ Eligibility for franchise/decade pools uses games played for the franchise
 stint, not league totals (spec/02). PlayerGameLogs returns every player-game
 for a season; grouping by (player, team) produces exact stint rows.
 
-Output: apps/web/static/data/nba/{season}/stints.json
+Output: raw-data/nba/{season}/stints.json
 """
 
 from __future__ import annotations
