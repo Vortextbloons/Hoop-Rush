@@ -20,6 +20,8 @@ export const franchiseLineageEntrySchema = z.object({
   displayName: z.string().min(1).max(64),
   /** NBA API team ID used to resolve logos and external records. */
   teamExternalId: teamExternalIdSchema,
+  /** First NBA season of this franchise; earlier eras are unavailable. */
+  firstNbaSeasonKey: seasonKeySchema.optional(),
   /** Known franchise identity history, oldest first. Ranges may leave gaps. */
   names: z.array(franchiseNameSchema).min(1),
 });

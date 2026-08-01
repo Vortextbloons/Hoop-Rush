@@ -35,10 +35,13 @@ def compute_for_season(season: str) -> dict[str, Any]:
     total_3pa = sum(r.get("tpa", 0) for r in valid)
     total_pts = sum(r.get("points", 0) for r in valid)
     total_games = sum(r.get("gamesPlayed", 0) for r in valid)
-    total_teams = max(1, total_games / 82) if total_games else 30
+    # ~10 players log minutes per team-game; player-games / 10 approximates
+    # league team-games (and self-corrects for the 50-game 1998-99 season).
+    team_games = max(1, total_games / 10) if total_games else 82 * 30
+    total_teams = max(1, team_games / 82) if team_games else 30
 
     league_3pa_rate = (total_3pa / total_fga) if total_fga else 0.3
-    league_ppg = (total_pts / total_games) if total_games else 100
+    league_ppg = (total_pts / team_games) if team_games else 100
     avg_ts = sum(r.get("tsPct", 0) for r in valid) / len(valid)
 
     out = {

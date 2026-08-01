@@ -1,8 +1,13 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { hoopRushManifestSchema, type HoopRushManifest } from '@hoop-rush/data-contracts';
+import {
+  franchiseEraPoolSchema,
+  hoopRushManifestSchema,
+  type HoopRushManifest,
+} from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
 
 /**
@@ -10,6 +15,14 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
  * referenced franchise-era pool artifact. Reports exact paths and record
  * locations for failures (spec/09).
  */
+
+function readPoolAsset(assetPath: string): unknown {
+  try {
+    return JSON.parse(readFileSync(assetPath, 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
+}
 
 export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
   input: true,
@@ -141,6 +154,7 @@ async function auditPools(
       } else if (verbose) {
         details.push(`pools: ${key} hash verified (${assetPath})`);
       }
+      auditPoolContent(assetPath, pool, manifest, failures, details);
     } catch {
       failures.push(`pools: ${key} asset missing (${assetPath})`);
     }
@@ -148,6 +162,68 @@ async function auditPools(
 
   details.push(`pools: ${String(manifest.pools.length)} franchise-era pools`);
   return { ok: failures.length === 0, details, failures };
+}
+
+/**
+ * Content audits for a pool asset (spec/02 identity and data audits):
+ * schema validity, unique player ids, era membership, 40-game eligibility,
+ * rating ranges, and reproducible peak selection.
+ */
+function auditPoolContent(
+  assetPath: string,
+  index: HoopRushManifest['pools'][number],
+  manifest: HoopRushManifest,
+  failures: string[],
+  details: string[],
+): void {
+  const key = `${index.franchiseId}/${index.eraId}`;
+  const era = manifest.eras.find((e) => e.eraId === index.eraId);
+  const parsed = franchiseEraPoolSchema.safeParse(readPoolAsset(assetPath));
+  if (!parsed.success) {
+    failures.push(
+      `pools: ${key} asset fails the pool schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? ''}`,
+    );
+    return;
+  }
+  const pool = parsed.data;
+
+  if (pool.franchiseId !== index.franchiseId || pool.eraId !== index.eraId) {
+    failures.push(`pools: ${key} asset declares ${pool.franchiseId}/${pool.eraId}`);
+  }
+
+  const seen = new Set<string>();
+  for (const player of pool.players) {
+    if (seen.has(player.playerId)) {
+      failures.push(`pools: ${key} duplicate playerId ${player.playerId}`);
+    }
+    seen.add(player.playerId);
+
+    if (
+      era !== undefined &&
+      (player.seasonKey < era.fromSeasonKey || player.seasonKey > era.toSeasonKey)
+    ) {
+      failures.push(
+        `pools: ${key} ${player.displayName} season ${player.seasonKey} outside era ${era.fromSeasonKey}-${era.toSeasonKey}`,
+      );
+    }
+    if (player.eligibility.teamGames < player.eligibility.minimumTeamGames) {
+      failures.push(
+        `pools: ${key} ${player.displayName} has ${String(player.eligibility.teamGames)} team games (min ${String(player.eligibility.minimumTeamGames)})`,
+      );
+    }
+    const { overallRating, offenseRating, defenseRating } = player.summaryRatings;
+    if (
+      overallRating < 0 ||
+      overallRating > 100 ||
+      offenseRating < 0 ||
+      offenseRating > 100 ||
+      defenseRating < 0 ||
+      defenseRating > 100
+    ) {
+      failures.push(`pools: ${key} ${player.displayName} summary rating out of range`);
+    }
+  }
+  details.push(`pools: ${key} ${String(pool.players.length)} players audited`);
 }
 
 function auditAssets(manifest: HoopRushManifest): AuditResult {

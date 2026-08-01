@@ -5,6 +5,7 @@ Output: apps/web/static/data/nba/{season}/season-stats.json
 
 from __future__ import annotations
 
+import json
 import math
 import sys
 from pathlib import Path
@@ -144,8 +145,16 @@ def to_player_season_stats(payload: list[dict[str, Any]], season: str, roster: l
     adv = next((p for p in payload if p["measureType"] == "Advanced"), None)
     if base is None:
         return []
-    base_by_id = {str(r["PLAYER_ID"]): r for r in base["rows"]}
-    adv_by_id = {str(r["PLAYER_ID"]): r for r in (adv["rows"] if adv else [])}
+    base_by_id = {
+        str(r["PLAYER_ID"]): r
+        for r in base["rows"]
+        if r.get("PLAYER_ID") is not None and not (isinstance(r.get("PLAYER_ID"), float) and math.isnan(r["PLAYER_ID"]))
+    }
+    adv_by_id = {
+        str(r["PLAYER_ID"]): r
+        for r in (adv["rows"] if adv else [])
+        if r.get("PLAYER_ID") is not None and not (isinstance(r.get("PLAYER_ID"), float) and math.isnan(r["PLAYER_ID"]))
+    }
     roster_by_id = {str(p["externalId"]): p for p in roster}
 
     out: list[dict[str, Any]] = []
@@ -209,10 +218,94 @@ def to_player_season_stats(payload: list[dict[str, Any]], season: str, roster: l
     return out
 
 
+def estimate_usage(fga: float, fta: float, tov: float, gp: int, pace: float = 95.0) -> float:
+    """Approximate usage percentage from per-game box stats (era pace based)."""
+    if gp == 0:
+        return 0
+    per_game = (fga + 0.44 * fta + tov) / gp
+    return clamp(per_game / pace * 100, 0, 100)
+
+
+def stats_from_stints(season: str) -> list[dict[str, Any]]:
+    """Build league-total season stats from aggregated team stints.
+
+    LeagueDashPlayerStats returns no rows for some early-90s seasons; team
+    stints from game logs cover every player who appeared.
+    """
+    from .config import NBA_ROOT
+
+    stints_path = NBA_ROOT / season / "stints.json"
+    if not stints_path.exists():
+        return []
+
+    totals: dict[str, dict[str, float]] = {}
+    for stint in json.loads(stints_path.read_text(encoding="utf-8")):
+        pid = stint["playerExternalId"]
+        row = totals.setdefault(pid, {})
+        for key in ("gamesPlayed", "minutes", "points", "rebounds", "assists", "steals",
+                    "blocks", "turnovers", "fouls", "fgm", "fga", "tpm", "tpa", "ftm", "fta"):
+            row[key] = row.get(key, 0) + float(stint.get(key, 0))
+
+    out: list[dict[str, Any]] = []
+    for pid, t in totals.items():
+        gp = int(t["gamesPlayed"])
+        if gp == 0:
+            continue
+        minutes = t["minutes"]
+        fga = t["fga"]
+        fta = t["fta"]
+        tpa = t["tpa"]
+        pts = t["points"]
+        out.append(
+            {
+                "playerExternalId": pid,
+                "season": season,
+                "teamExternalId": None,
+                "gamesPlayed": gp,
+                "minutes": minutes,
+                "starts": 0,
+                "points": pts,
+                "rebounds": t["rebounds"],
+                "offensiveRebounds": 0,
+                "defensiveRebounds": t["rebounds"],
+                "assists": t["assists"],
+                "steals": t["steals"],
+                "blocks": t["blocks"],
+                "turnovers": t["turnovers"],
+                "fouls": t["fouls"],
+                "fgm": t["fgm"],
+                "fga": fga,
+                "tpm": t["tpm"],
+                "tpa": tpa,
+                "ftm": t["ftm"],
+                "fta": fta,
+                "tsPct": (pts / (2 * (fga + 0.44 * fta))) if (fga + fta) > 0 else 0.0,
+                "efgPct": ((t["fgm"] + 0.5 * t["tpm"]) / fga) if fga > 0 else 0.0,
+                "per": estimate_per(
+                    pts, t["rebounds"], t["assists"], t["steals"], t["blocks"],
+                    t["turnovers"], fga, fta, 0, gp,
+                ),
+                "usageRate": estimate_usage(fga, fta, t["turnovers"], gp),
+                "winShares": 0,
+                "boxPlusMinus": estimate_bpm(
+                    pts, t["rebounds"], t["assists"], t["steals"], t["blocks"],
+                    t["turnovers"], fga, fta, gp,
+                ),
+                "vorp": 0,
+                "statsSource": "stints-derived",
+            }
+        )
+    return out
+
+
 def run(season: str, roster: list[dict[str, Any]]) -> None:
     out = ensure_output_dir(season)
     print(f"[{season}] fetching season stats")
     payload = fetch_league_dash(season)
     rows = to_player_season_stats(payload, season, roster)
+    if not rows:
+        rows = stats_from_stints(season)
+        if rows:
+            print(f"  [WARN] league dash empty for {season}; using stint-derived stats")
     write_json(out / "season-stats.json", rows)
     print(f"  [OK] wrote season-stats.json ({len(rows)} players)")

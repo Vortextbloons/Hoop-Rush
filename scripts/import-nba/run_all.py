@@ -60,6 +60,14 @@ def _fetch_season(season: str, include_schedule: bool, force_ratings: bool) -> N
     if roster_path.exists():
         roster = json.loads(roster_path.read_text(encoding="utf-8"))
 
+    # Stints run before season stats: early-90s seasons fall back to
+    # stint-derived league totals when the league dashboard returns nothing.
+    try:
+        fetch_stints = _import("fetch_stints")
+        fetch_stints.compute_for_season(season, force=force_ratings)
+    except Exception as exc:
+        print(f"  ! stints fetch failed: {exc}")
+
     try:
         fetch_season_stats(season, roster)
     except Exception as exc:
@@ -91,9 +99,18 @@ def main() -> int:
     parser.add_argument("--include-schedule", action="store_true")
     parser.add_argument("--force-ratings", action="store_true")
     parser.add_argument("--workers", type=int, default=config.MAX_WORKERS)
+    parser.add_argument(
+        "--pools", nargs="+", default=["lakers/1990s"],
+        help="franchiseId/eraId pool targets (default lakers/1990s)",
+    )
+    parser.add_argument(
+        "--skip-careers", action="store_true",
+        help="skip the per-player career-stats fetch (not used by pools)",
+    )
     args = parser.parse_args()
 
     seasons = args.seasons or DEFAULT_SEASONS
+    pools = [tuple(p.split("/")) for p in args.pools]  # type: ignore[assignment]
     workers = max(1, min(args.workers, len(seasons)))
     started_at = time.perf_counter()
     print(f"Running pipeline for {len(seasons)} seasons ({workers} workers)")
@@ -116,8 +133,15 @@ def main() -> int:
             _fetch_season(season, args.include_schedule, args.force_ratings)
 
     print("\n--- Phase 2: Careers ---")
-    compute_careers = _import("compute_careers").run
-    compute_careers(seasons)
+    if args.skip_careers:
+        print("  (skipped)")
+    else:
+        compute_careers = _import("compute_careers").run
+        compute_careers(seasons)
+
+    print("\n--- Phase 3: Franchise-era pools ---")
+    compute_pools = _import("compute_pools")
+    compute_pools.run(targets=pools)
 
     metrics = _import("util").import_metrics()
     elapsed = time.perf_counter() - started_at

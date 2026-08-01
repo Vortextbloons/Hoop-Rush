@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
+
+  const sandboxHref = resolve('/sandbox');
+
   const steps = [
     {
       title: 'Draft five',
@@ -33,16 +37,14 @@
       decade, then simulate a deterministic 82-game season against every team in the league.
     </p>
     <div class="flex flex-wrap items-center gap-4">
-      <button
-        type="button"
-        disabled
-        aria-disabled="true"
-        class="rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+      <a
+        href={sandboxHref}
+        class="rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground"
       >
         Start a sandbox challenge
-      </button>
+      </a>
       <span class="font-mono text-xs text-muted-foreground">
-        Franchise pools arrive with the first playable decade
+        First pool: Los Angeles Lakers · 1990s
       </span>
     </div>
   </div>

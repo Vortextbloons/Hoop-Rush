@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
-from .config import ensure_output_dir, MAX_WORKERS
+from .config import ensure_output_dir, MAX_WORKERS, team_exists_in_season
 from .util import read_cache, with_retry, write_cache, write_json
 
 
@@ -181,7 +181,10 @@ def fetch_bio_stats(season: str) -> dict[str, dict[str, Any]]:
         df = bio.get_data_frames()[0]
         out: dict[str, dict[str, Any]] = {}
         for _, row in df.iterrows():
-            pid = str(int(row["PLAYER_ID"]))
+            player_id = _safe_int(row.get("PLAYER_ID"))
+            if player_id == 0:
+                continue
+            pid = str(player_id)
             out[pid] = {
                 "country": row.get("COUNTRY", ""),
                 "birthDate": row.get("BIRTH_DATE", ""),
@@ -236,6 +239,9 @@ def fetch_roster(season: str, team_external_id: str) -> list[dict[str, Any]]:
         df = r.get_data_frames()[0]
         out: list[dict[str, Any]] = []
         for _, row in df.iterrows():
+            player_id = _safe_int(row.get("PLAYER_ID"))
+            if player_id == 0:
+                continue  # historical seasons sometimes return NaN rows
             full_name = str(row.get("PLAYER", "")).strip()
             nickname = str(row.get("NICKNAME", "")).strip()
             parts = full_name.split(None, 1) if full_name else ["", ""]
@@ -243,7 +249,7 @@ def fetch_roster(season: str, team_external_id: str) -> list[dict[str, Any]]:
             last = parts[1] if len(parts) > 1 else (parts[0] if len(parts) == 1 else "")
             out.append(
                 {
-                    "externalId": str(int(row["PLAYER_ID"])),
+                    "externalId": str(player_id),
                     "firstName": first,
                     "lastName": last,
                     "teamExternalId": team_external_id,
@@ -307,7 +313,10 @@ def run(season: str) -> None:
     print(f"  [OK] got bio stats for {len(bio_map)} players")
 
     print(f"[{season}] fetching rosters ({MAX_WORKERS} workers)")
-    team_ids = [t["externalId"] for t in teams]
+    team_ids = [t["externalId"] for t in teams if team_exists_in_season(t["externalId"], season)]
+    skipped = len(teams) - len(team_ids)
+    if skipped:
+        print(f"  ... skipping {skipped} teams not yet founded in {season}")
 
     def _fetch_one(team_id: str) -> tuple[str, list[dict[str, Any]]]:
         return team_id, fetch_roster(season, team_id)
@@ -346,7 +355,9 @@ def run(season: str) -> None:
                     parts = height_str.split("-")
                     height_inches = int(parts[0]) * 12 + int(parts[1])
                 elif isinstance(height_str, (int, float)):
-                    height_inches = int(height_str)
+                    import math
+                    if not math.isnan(height_str) and not math.isinf(height_str):
+                        height_inches = int(height_str)
 
                 weight_lbs = 200
                 try:

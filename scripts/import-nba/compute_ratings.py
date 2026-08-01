@@ -158,6 +158,80 @@ def compute_overall(ratings: dict[str, int], position: str) -> int:
     return int(min(99, round(50 + deviation * (1 + deviation / divisor))))
 
 
+# ---------------------------------------------------------------------------
+# Summary ratings (spec/11 candidate weights)
+# ---------------------------------------------------------------------------
+# Offense =
+#   14% rim scoring       14% three-point value
+#    8% midrange           8% foul drawing/free throws
+#   16% self-creation     12% passing
+#   10% handling/security 10% offensive IQ
+#    4% offensive rebounding
+#    4% off-ball spacing/activity
+#
+# Defense =
+#   22% perimeter defense 22% interior defense
+#   18% defensive IQ      10% steals/disruption
+#   10% blocks/deterrence 12% defensive rebounding
+#    6% foul discipline
+#
+# Overall = 55% Offense + 45% Defense
+#
+# Summary ratings are UI-facing only and never replace detailed attributes in
+# possession resolution. Weights map the detailed ratings + tendencies onto the
+# spec/11 dimensions; changes require a new ratings version.
+
+
+def _turnover_security(tendencies: dict[str, Any], ball_handling: int) -> float:
+    rate = float(tendencies.get("turnoverRate", 12) or 12)
+    penalty = clamp((rate - 5) * 5, 0, 100)
+    return 0.5 * ball_handling + 0.5 * (100 - penalty)
+
+
+def _off_ball_spacing(ratings: dict[str, int]) -> float:
+    return 0.6 * ratings.get("threePoint", 50) + 0.4 * ratings.get("consistency", 50)
+
+
+def _foul_discipline(tendencies: dict[str, Any]) -> float:
+    rate = float(tendencies.get("foulRate", 2) or 2)
+    return clamp(100 - rate * 8, 0, 100)
+
+
+def compute_summary_ratings(
+    ratings: dict[str, int], tendencies: dict[str, Any]
+) -> dict[str, int]:
+    """Compute spec/11 summary offense/defense/overall from detailed ratings."""
+    offense = (
+        0.14 * ratings.get("insideScoring", 50)
+        + 0.14 * ratings.get("threePoint", 50)
+        + 0.08 * ratings.get("midrange", 50)
+        + 0.08 * ratings.get("freeThrow", 50)
+        + 0.16 * ratings.get("ballHandling", 50)
+        + 0.12 * ratings.get("passing", 50)
+        + 0.10 * _turnover_security(tendencies, ratings.get("ballHandling", 50))
+        + 0.10 * ratings.get("offensiveIq", 50)
+        + 0.04 * ratings.get("offensiveRebound", 50)
+        + 0.04 * _off_ball_spacing(ratings)
+    )
+    defense = (
+        0.22 * ratings.get("perimeterDefense", 50)
+        + 0.22 * ratings.get("interiorDefense", 50)
+        + 0.18 * ratings.get("defensiveIq", 50)
+        + 0.10 * ratings.get("steal", 50)
+        + 0.10 * ratings.get("block", 50)
+        + 0.12 * ratings.get("defensiveRebound", 50)
+        + 0.06 * _foul_discipline(tendencies)
+    )
+    offense_rating = clamp_rating(offense)
+    defense_rating = clamp_rating(defense)
+    overall_rating = clamp_rating(0.55 * offense_rating + 0.45 * defense_rating)
+    return {
+        "offenseRating": offense_rating,
+        "defenseRating": defense_rating,
+        "overallRating": overall_rating,
+    }
+
+
 def compute_production_impact(stats: dict[str, Any]) -> float:
     """Estimate top-line player impact from real production.
 
@@ -730,6 +804,7 @@ def compute_for_season(season: str, force: bool = False) -> None:
         # Derive all fields
         player["ratings"] = derive_ratings(stats, pos, season, rng)
         player["tendencies"] = derive_tendencies(stats, player["ratings"], pos, rng)
+        player["summaryRatings"] = compute_summary_ratings(player["ratings"], player["tendencies"])
         player["traits"] = derive_traits(player["ratings"], stats, pos, rng)
         player["contract"] = derive_contract(
             player["ratings"]["overall"],

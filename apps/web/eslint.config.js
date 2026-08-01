@@ -9,7 +9,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['vitest.config.ts'],
+          allowDefaultProject: ['vitest.config.ts', 'playwright.config.ts', 'e2e/*.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
       },

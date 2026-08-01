@@ -1,8 +1,10 @@
-import { defineConfig } from 'vitest/config';
+import { defaultExclude, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // No testable units until M1 screens introduce component/lib code.
+    // Playwright journeys live in e2e/ and run via `pnpm e2e`.
+    exclude: [...defaultExclude, 'e2e/**'],
+    // No testable units yet beyond the journeys; keep the gate green.
     passWithNoTests: true,
   },
 });

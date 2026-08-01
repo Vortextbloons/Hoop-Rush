@@ -8,3 +8,6 @@ export * from './difficulty.js';
 export * from './run.js';
 export * from './result.js';
 export * from './manifest.js';
+export * from './loaders/manifest.js';
+export * from './loaders/pool.js';
+export * from './loaders/assets.js';
