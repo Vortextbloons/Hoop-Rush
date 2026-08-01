@@ -27,6 +27,8 @@ const manifest = (assetOverrides: Partial<typeof assets> = {}): HoopRushManifest
     franchiseLineage: [],
     eras: [],
     pools: [],
+    eraSimulationProfiles: [],
+    opponents: [],
     assets: { ...assets, ...assetOverrides },
   }) as HoopRushManifest;
 
@@ -190,6 +192,15 @@ describe('logo URL resolution', () => {
   it('resolves the secondary template from the franchise abbreviation', () => {
     expect(resolveSecondaryLogoUrl(manifest(), 'lakers')).toBe(
       'https://a.espncdn.com/i/teamlogos/nba/500/lal.png',
+    );
+  });
+
+  it('uses the legacy host slugs for the Pelicans and Jazz', () => {
+    expect(resolveSecondaryLogoUrl(manifest(), 'pelicans')).toBe(
+      'https://a.espncdn.com/i/teamlogos/nba/500/no.png',
+    );
+    expect(resolveSecondaryLogoUrl(manifest(), 'jazz')).toBe(
+      'https://a.espncdn.com/i/teamlogos/nba/500/utah.png',
     );
   });
 

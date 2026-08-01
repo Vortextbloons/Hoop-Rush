@@ -10,11 +10,13 @@
     "lint": "prettier --check . && eslint .",
     "test": "vitest",
     "test:run": "vitest run",
-    "hoop-rush": "tsx src/index.ts"
+    "hoop-rush": "tsx src/index.ts",
+    "gen-fixtures": "tsx src/gen-fixtures.ts"
   },
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@hoop-rush/engine": "workspace:*"
   },
   "devDependencies": {
     "@hoop-rush/test-fixtures": "workspace:*",

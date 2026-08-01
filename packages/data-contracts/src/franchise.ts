@@ -72,3 +72,24 @@ const FRANCHISE_ABBREVIATIONS: Readonly<Record<string, string>> = {
 export function franchiseAbbreviation(franchiseId: string): string {
   return FRANCHISE_ABBREVIATIONS[franchiseId] ?? franchiseId.slice(0, 3).toUpperCase();
 }
+
+/**
+ * Lowercase slugs used by secondary logo hosts (e.g. ESPN). Most franchises
+ * match their three-letter abbreviation; the Pelicans and Jazz use legacy
+ * host slugs (`no`, `utah`) that differ.
+ */
+const FRANCHISE_LOGO_SLUGS: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(
+    Object.entries(FRANCHISE_ABBREVIATIONS).map(([franchiseId, abbreviation]) => [
+      franchiseId,
+      abbreviation.toLowerCase(),
+    ]),
+  ),
+  pelicans: 'no',
+  jazz: 'utah',
+};
+
+/** Return the lowercase logo-host slug for a franchise ID. */
+export function franchiseLogoSlug(franchiseId: string): string {
+  return FRANCHISE_LOGO_SLUGS[franchiseId] ?? franchiseId.slice(0, 3).toLowerCase();
+}

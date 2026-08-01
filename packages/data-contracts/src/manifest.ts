@@ -35,6 +35,24 @@ export const poolIndexEntrySchema = z.object({
 });
 export type PoolIndexEntry = z.infer<typeof poolIndexEntrySchema>;
 
+export const simProfileIndexEntrySchema = z.object({
+  eraId: eraIdSchema,
+  /** Relative or absolute URL of the EraSimulationProfile asset. */
+  url: z.string().min(1).max(512),
+  /** SHA-256 content hash of the referenced asset. */
+  contentHash: contentHashSchema,
+});
+export type SimProfileIndexEntry = z.infer<typeof simProfileIndexEntrySchema>;
+
+export const opponentIndexEntrySchema = z.object({
+  opponentId: z.string().min(1).max(64),
+  /** Relative or absolute URL of the OpponentTeam artifact. */
+  url: z.string().min(1).max(512),
+  /** SHA-256 content hash of the referenced asset. */
+  contentHash: contentHashSchema,
+});
+export type OpponentIndexEntry = z.infer<typeof opponentIndexEntrySchema>;
+
 export const hoopRushManifestSchema = z.object({
   schemaVersion: z.literal(1),
   dataVersion: z.string().min(1).max(64),
@@ -42,6 +60,10 @@ export const hoopRushManifestSchema = z.object({
   eras: z.array(eraDefSchema),
   /** Empty until the M1 packaging pipeline publishes pools. */
   pools: z.array(poolIndexEntrySchema),
+  /** Versioned era simulation profiles (M2+), indexed by era. */
+  eraSimulationProfiles: z.array(simProfileIndexEntrySchema),
+  /** Fixed opponent artifacts (M2 opens with one entry; M3 completes the bracket). */
+  opponents: z.array(opponentIndexEntrySchema),
   assets: assetConfigSchema,
 });
 export type HoopRushManifest = z.infer<typeof hoopRushManifestSchema>;

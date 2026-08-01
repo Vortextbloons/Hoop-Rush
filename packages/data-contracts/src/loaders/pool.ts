@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { franchiseEraPoolSchema, type FranchiseEraPool } from '../player-season.js';
+import { sha256Hex } from './verify-hash.js';
 
 /** Validate an unknown pool value at a runtime boundary. */
 export function parsePool(value: unknown): FranchiseEraPool {
@@ -29,12 +30,4 @@ export async function loadPool(
   }
   const text = new TextDecoder().decode(bytes);
   return parsePool(JSON.parse(text) as unknown);
-}
-
-async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-  if (typeof globalThis.crypto?.subtle === 'undefined') {
-    throw new Error('crypto.subtle is unavailable');
-  }
-  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

@@ -1,0 +1,502 @@
+import type { z } from 'zod';
+import { checkGameResult, createEngineContext, toSimulationPlayer } from '@hoop-rush/engine';
+import type { SimulationPlayer } from '@hoop-rush/data-contracts';
+import {
+  type EraSimulationProfile,
+  type FranchiseEraPool,
+  type GameResult,
+  type GameSimulationInput,
+  type SimulationTeam,
+} from '@hoop-rush/data-contracts';
+import { makeReport, type CliReport } from '../report.js';
+import {
+  calibrationMetricSchema,
+  calibrateRunReportSchema,
+  calibrateSensitivityReportSchema,
+} from '../report-schemas.js';
+import {
+  buildInput,
+  fixtureSeed,
+  loadFixture,
+  runSingleGame,
+  UsageError,
+  loadProfileFile,
+} from './sim.js';
+import { loadPackagedData, PackagedData } from './data-loader.js';
+
+/**
+ * `calibrate run` and `calibrate sensitivity` (spec/09, spec/06). Calibration
+ * uses the authoritative engine and the packaged data; the era profile holds
+ * the frozen targets and tolerances that these commands enforce.
+ */
+
+export const CALIBRATE_OPTIONS: Record<string, boolean> = {
+  samples: true,
+  'seed-from': true,
+  workers: true,
+  fixture: true,
+  profile: true,
+  format: true,
+  verbose: false,
+};
+
+function parseCount(value: string | undefined, option: string, fallback: number): number {
+  if (value === undefined) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
+  }
+  return parsed;
+}
+
+/** Builds a league-average team from the packaged pool (usage-weighted means). */
+export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
+  const usage = pool.players.map((p) => Math.max(0.01, p.tendencies.usageRate ?? 0.01));
+  const totalUsage = usage.reduce((a, b) => a + b, 0);
+  const meanRatings: Record<string, number> = {};
+  const meanTendencies: Record<string, number> = {};
+  pool.players.forEach((player, i) => {
+    const usageAt = usage[i];
+    if (usageAt === undefined) return;
+    const weight = usageAt / totalUsage;
+    for (const [key, value] of Object.entries(player.detailedRatings)) {
+      const numeric = typeof value === 'number' ? value : 0;
+      meanRatings[key] = (meanRatings[key] ?? 0) + numeric * weight;
+    }
+    for (const [key, value] of Object.entries(player.tendencies)) {
+      const numeric = typeof value === 'number' ? value : 0;
+      meanTendencies[key] = (meanTendencies[key] ?? 0) + numeric * weight;
+    }
+  });
+  const firstPlayer = pool.players[0];
+  if (!firstPlayer) throw new UsageError('pool is empty');
+  const sample = toSimulationPlayer(firstPlayer);
+  const ratings = { ...sample.ratings };
+  const tendencies = { ...sample.tendencies };
+  for (const key of Object.keys(ratings) as Array<keyof typeof ratings>) {
+    ratings[key] = Math.min(100, Math.max(0, Math.round(meanRatings[key] ?? ratings[key])));
+  }
+  for (const key of Object.keys(tendencies) as Array<keyof typeof tendencies>) {
+    tendencies[key] = meanTendencies[key] ?? tendencies[key];
+  }
+  const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  return {
+    teamId: 'league-average',
+    displayName: 'League Average',
+    players: slots.map((positions, i) => ({
+      playerId: `avg-${String(i)}`,
+      displayName: 'League Average',
+      positions,
+      heightInches: sample.heightInches,
+      weightLbs: sample.weightLbs,
+      ratings,
+      tendencies,
+    })),
+  };
+}
+
+/** Strongest and weakest legal lineups from the pool by selection score.
+ * Selection is slot-greedy: for each G,G,F,F,C requirement, take the best
+ * remaining eligible player, so the result is always legal. */
+export function poolStrengthLineups(pool: FranchiseEraPool): {
+  strong: SimulationTeam;
+  weak: SimulationTeam;
+} {
+  const SLOTS: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const pick = (players: typeof pool.players): SimulationTeam => {
+    const remaining = [...players];
+    const chosen: Array<{
+      player: (typeof pool.players)[number];
+      positions: SimulationPlayer['positions'];
+    }> = [];
+    for (const slot of SLOTS) {
+      const requirement = slot[0];
+      if (!requirement) throw new UsageError('pool cannot form a legal lineup');
+      const index = remaining.findIndex((p) => p.positions.canonical.includes(requirement));
+      if (index < 0) throw new UsageError('pool cannot form a legal lineup');
+      const player = remaining[index];
+      if (!player) throw new UsageError('pool cannot form a legal lineup');
+      remaining.splice(index, 1);
+      chosen.push({ player, positions: slot });
+    }
+    return {
+      teamId: 'pool-lineup',
+      displayName: 'Pool Lineup',
+      players: chosen.map(({ player, positions }) => ({
+        ...toSimulationPlayer(player),
+        positions,
+      })),
+    };
+  };
+  const byScoreDesc = [...pool.players].sort((a, b) => b.selectionScore - a.selectionScore);
+  return { strong: pick(byScoreDesc), weak: pick([...byScoreDesc].reverse()) };
+}
+
+interface MetricAccumulator {
+  points: number;
+  fga: number;
+  fgm: number;
+  tpa: number;
+  tpm: number;
+  fta: number;
+  ftm: number;
+  oreb: number;
+  dreb: number;
+  ast: number;
+  tov: number;
+  pf: number;
+  possessions: number;
+  closeGames: number;
+  blowouts: number;
+  overtime: number;
+  homeWins: number;
+  zoneAttempts: Record<string, number>;
+}
+
+function newAccumulator(): MetricAccumulator {
+  return {
+    points: 0,
+    fga: 0,
+    fgm: 0,
+    tpa: 0,
+    tpm: 0,
+    fta: 0,
+    ftm: 0,
+    oreb: 0,
+    dreb: 0,
+    ast: 0,
+    tov: 0,
+    pf: 0,
+    possessions: 0,
+    closeGames: 0,
+    blowouts: 0,
+    overtime: 0,
+    homeWins: 0,
+    zoneAttempts: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+  };
+}
+
+/** Runs one game and folds its home side into the accumulator. */
+function accumulate(
+  acc: MetricAccumulator,
+  input: GameSimulationInput,
+  trackHomeWin: boolean,
+): number {
+  const result = runSingleGame(input).result;
+  const b = result.home.box;
+  const other = result.away.box;
+  acc.points += b.points;
+  acc.fga += b.fieldGoals.attempted;
+  acc.fgm += b.fieldGoals.made;
+  acc.tpa += b.threes.attempted;
+  acc.tpm += b.threes.made;
+  acc.fta += b.freeThrows.attempted;
+  acc.ftm += b.freeThrows.made;
+  acc.oreb += b.rebounds.offensive;
+  acc.dreb += b.rebounds.defensive;
+  acc.ast += b.assists;
+  acc.tov += b.turnovers;
+  acc.pf += b.fouls;
+  acc.possessions += b.possessions;
+  const margin = Math.abs(b.points - other.points);
+  if (margin <= 5) acc.closeGames += 1;
+  if (margin >= 20) acc.blowouts += 1;
+  if (result.overtimePeriods > 0) acc.overtime += 1;
+  if (trackHomeWin && result.winner === 'home') acc.homeWins += 1;
+  for (const zone of result.home.shotZones) {
+    acc.zoneAttempts[zone.zone] = (acc.zoneAttempts[zone.zone] ?? 0) + zone.attempts;
+  }
+  return checkGameResult(result).length;
+}
+
+export function calibrateRun(args: {
+  samples?: string;
+  'seed-from'?: string;
+  workers?: string;
+  profile?: string;
+}): CliReport {
+  const samples = parseCount(args.samples, '--samples', 2000);
+  const seedFrom = parseCount(args['seed-from'], '--seed-from', 0);
+  const packaged = loadPackagedData();
+  const data = new PackagedData(packaged.manifest, packaged.dir);
+  const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile();
+
+  const pool = data.pool('lakers', '1990s');
+  const average = leagueAverageTeam(pool);
+  const { strong, weak } = poolStrengthLineups(pool);
+  const opponent = data.openingOpponent();
+
+  const equalAcc = newAccumulator();
+  const strongWeakAcc = newAccumulator();
+  const opponentAcc = newAccumulator();
+  let invariantFailures = 0;
+  let opponentGames = 0;
+  let opponentWins = 0;
+
+  for (let i = seedFrom; i < seedFrom + samples; i += 1) {
+    const seed = fixtureSeed('calibrate', i);
+    const equalInput: GameSimulationInput = {
+      schemaVersion: 1,
+      seed,
+      dataVersion: profile.dataVersion,
+      profile,
+      home: average,
+      away: average,
+    };
+    const swInput: GameSimulationInput = {
+      schemaVersion: 1,
+      seed,
+      dataVersion: profile.dataVersion,
+      profile,
+      home: strong,
+      away: weak,
+    };
+    invariantFailures += accumulate(equalAcc, equalInput, true);
+    invariantFailures += accumulate(strongWeakAcc, swInput, false);
+    const swResult = runSingleGame(swInput).result;
+    if (swResult.winner === 'home') strongWeakAcc.homeWins += 1;
+
+    // Opening opponent vs a strong user lineup (informational difficulty probe).
+    if (i < seedFrom + Math.min(samples, 400)) {
+      const oppInput: GameSimulationInput = {
+        schemaVersion: 1,
+        seed: fixtureSeed('user-opponent', i),
+        dataVersion: profile.dataVersion,
+        profile,
+        home: { ...strong, teamId: 'user', displayName: 'User Lineup' },
+        away: {
+          teamId: opponent.teamId,
+          displayName: opponent.displayName,
+          players: opponent.players,
+        },
+      };
+      const oppResult = runSingleGame(oppInput).result;
+      opponentAcc.points += oppResult.home.box.points;
+      opponentGames += 1;
+      if (oppResult.winner === 'home') opponentWins += 1;
+    }
+  }
+
+  const metrics = buildMetrics(equalAcc, strongWeakAcc, samples, profile);
+  const payload = calibrateRunReportSchema.parse({
+    schemaVersion: 1,
+    command: 'calibrate run',
+    profileVersion: profile.profileVersion,
+    eraId: profile.eraId,
+    samples,
+    engineVersion: createEngineContext().engineVersion,
+    pass: metrics.every((m) => m.pass),
+    metrics,
+    openingOpponentWinRateVsStrongUser:
+      opponentGames === 0 ? null : 1 - opponentWins / opponentGames,
+    invariantFailures,
+  });
+
+  const failures: string[] = [];
+  if (!payload.pass) {
+    for (const m of metrics) {
+      if (!m.pass) {
+        failures.push(
+          `${m.key}: observed ${m.observed.toFixed(4)} outside ${(m.target - m.tolerance).toFixed(4)}..${(m.target + m.tolerance).toFixed(4)}`,
+        );
+      }
+    }
+  }
+  if (invariantFailures > 0) failures.push(`${String(invariantFailures)} invariant failures`);
+
+  const details = [
+    `profile ${profile.profileVersion} · era ${profile.eraId} · ${String(samples)} samples · engine ${payload.engineVersion}`,
+    ...metrics.map(
+      (m) =>
+        `${m.pass ? 'pass' : 'FAIL'} ${m.key}: ${m.observed.toFixed(4)} (target ${m.target.toFixed(4)} ± ${m.tolerance.toFixed(4)})`,
+    ),
+    payload.openingOpponentWinRateVsStrongUser === null
+      ? 'opening opponent vs strong user: not measured'
+      : `opening opponent win rate vs strong user: ${(payload.openingOpponentWinRateVsStrongUser * 100).toFixed(1)}% (informational)`,
+  ];
+  return makeReport(
+    'calibrate run',
+    { profile: profile.profileVersion, samples },
+    { details, failures, payload },
+  );
+}
+
+function buildMetrics(
+  equal: MetricAccumulator,
+  strongWeak: MetricAccumulator,
+  n: number,
+  profile: EraSimulationProfile,
+): Array<z.infer<typeof calibrationMetricSchema>> {
+  const t = profile.targets;
+  // The accumulator folds the home side of every equal-fixture game once,
+  // so per-game metrics divide by n (one team line per game). Possession
+  // denominators use the standard league estimate FGA + 0.44*FTA - OReb + TOV
+  // so efficiency gates compare with the stint-derived targets directly.
+  const perGame = (value: number) => value / n;
+  const fga = Math.max(1, equal.fga);
+  const possEst = Math.max(1, equal.fga + 0.44 * equal.fta - equal.oreb + equal.tov);
+  const orebTotal = Math.max(1, equal.oreb + equal.dreb);
+  return [
+    metric('possessionsPerGame', perGame(equal.possessions), t.possessionsPerGame, n),
+    metric('pointsPerGame', perGame(equal.points), t.pointsPerGame, n),
+    metric('offensiveRating', (equal.points / possEst) * 100, t.offensiveRating, n),
+    metric('fieldGoalPct', equal.fgm / fga, t.fieldGoalPct, n),
+    metric('efgPct', (equal.fgm + 0.5 * equal.tpm) / fga, t.efgPct, n),
+    metric('tsPct', equal.points / (2 * possEst), t.tsPct, n),
+    metric('threePointRate', equal.tpa / fga, t.threePointRate, n),
+    metric('threePointPct', equal.tpm / Math.max(1, equal.tpa), t.threePointPct, n),
+    metric('freeThrowsAttemptedPerGame', perGame(equal.fta), t.freeThrowsAttemptedPerGame, n),
+    metric('freeThrowPct', equal.ftm / Math.max(1, equal.fta), t.freeThrowPct, n),
+    metric('turnoversPerGame', perGame(equal.tov), t.turnoversPerGame, n),
+    metric('turnoversPerPossession', equal.tov / possEst, t.turnoversPerPossession, n),
+    metric('offensiveReboundsPerGame', perGame(equal.oreb), t.offensiveReboundsPerGame, n),
+    metric('offensiveReboundRate', equal.oreb / orebTotal, t.offensiveReboundRate, n),
+    metric('assistsPerGame', perGame(equal.ast), t.assistsPerGame, n),
+    metric('assistRate', equal.ast / Math.max(1, equal.fgm), t.assistRate, n),
+    metric('personalFoulsPerGame', perGame(equal.pf), t.personalFoulsPerGame, n),
+    metric('zoneMix.rim', (equal.zoneAttempts.rim ?? 0) / fga, t.zoneMix.rim, n),
+    metric('zoneMix.shortMid', (equal.zoneAttempts.shortMid ?? 0) / fga, t.zoneMix.shortMid, n),
+    metric('zoneMix.longMid', (equal.zoneAttempts.longMid ?? 0) / fga, t.zoneMix.longMid, n),
+    metric(
+      'zoneMix.cornerThree',
+      (equal.zoneAttempts.cornerThree ?? 0) / fga,
+      t.zoneMix.cornerThree,
+      n,
+    ),
+    metric(
+      'zoneMix.aboveBreakThree',
+      (equal.zoneAttempts.aboveBreakThree ?? 0) / fga,
+      t.zoneMix.aboveBreakThree,
+      n,
+    ),
+    metric('closeGameRate', equal.closeGames / n, t.closeGameRate, n),
+    metric('blowoutRate', equal.blowouts / n, t.blowoutRate, n),
+    metric('overtimeRate', equal.overtime / n, t.overtimeRate, n),
+    metric('strongVsWeakWinRate', strongWeak.homeWins / Math.max(1, n), t.strongVsWeakWinRate, n),
+    metric('equalLineupHomeWinRate', equal.homeWins / Math.max(1, n), t.equalLineupHomeWinRate, n),
+  ];
+}
+
+function metric(
+  key: string,
+  observed: number,
+  target: { value: number; tolerance: number; minimumSample: number },
+  sample: number,
+): z.infer<typeof calibrationMetricSchema> {
+  // Gates below their minimum sample are not evaluated (vacuous pass); the
+  // sample count is still reported.
+  const pass =
+    sample < target.minimumSample ||
+    (observed >= target.value - target.tolerance && observed <= target.value + target.tolerance);
+  return { key, target: target.value, tolerance: target.tolerance, observed, pass, sample };
+}
+
+const SENSITIVITY_FAMILIES: Array<{
+  id: string;
+  direction: string;
+  pass: (base: number, changed: number) => boolean;
+}> = [
+  { id: 'sens-shooting', direction: 'points up', pass: (b, c) => c > b * 1.02 },
+  { id: 'sens-creation', direction: 'initiator usage share up', pass: (b, c) => c > b * 1.05 },
+  { id: 'sens-passing', direction: 'assists up', pass: (b, c) => c > b * 1.02 },
+  { id: 'sens-turnovers', direction: 'turnovers down', pass: (b, c) => c < b * 0.97 },
+  { id: 'sens-defense', direction: 'opponent points down', pass: (b, c) => c < b * 0.97 },
+  { id: 'sens-rebounding', direction: 'offensive rebounds up', pass: (b, c) => c > b * 1.03 },
+  { id: 'sens-fouls', direction: 'free throws attempted up', pass: (b, c) => c > b * 1.02 },
+  { id: 'sens-pace', direction: 'possessions up', pass: (b, c) => c > b * 1.1 },
+  { id: 'sens-shot-mix', direction: 'three-point share up', pass: (b, c) => c > b * 1.1 },
+];
+
+export function calibrateSensitivity(args: { samples?: string; profile?: string }): CliReport {
+  const samples = parseCount(args.samples, '--samples', 200);
+  const packaged = loadPackagedData();
+  const data = new PackagedData(packaged.manifest, packaged.dir);
+  const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile();
+
+  const metrics = SENSITIVITY_FAMILIES.map((family) => {
+    const fixture = loadFixture(family.id);
+    const base = sampleMetric(family.id, profile, fixture, false, samples);
+    const changed = sampleMetric(family.id, profile, fixture, true, samples);
+    const pass = family.pass(base, changed);
+    return {
+      family: family.id,
+      direction: family.direction,
+      baseValue: base,
+      changedValue: changed,
+      relativeShift: base === 0 ? 0 : (changed - base) / Math.abs(base),
+      pass,
+    };
+  });
+
+  const payload = calibrateSensitivityReportSchema.parse({
+    schemaVersion: 1,
+    command: 'calibrate sensitivity',
+    samples,
+    engineVersion: createEngineContext().engineVersion,
+    pass: metrics.every((m) => m.pass),
+    metrics,
+  });
+
+  const failures = payload.pass
+    ? []
+    : metrics
+        .filter((m) => !m.pass)
+        .map(
+          (m) =>
+            `${m.family}: expected ${m.direction}, got base ${m.baseValue.toFixed(2)} -> changed ${m.changedValue.toFixed(2)}`,
+        );
+  const details = [
+    `engine ${payload.engineVersion} · ${String(samples)} samples per family`,
+    ...metrics.map(
+      (m) =>
+        `${m.pass ? 'pass' : 'FAIL'} ${m.family}: ${m.baseValue.toFixed(2)} -> ${m.changedValue.toFixed(2)} (${(m.relativeShift * 100).toFixed(1)}%, expected ${m.direction})`,
+    ),
+  ];
+  return makeReport('calibrate sensitivity', { samples }, { details, failures, payload });
+}
+
+function sampleMetric(
+  fixtureId: string,
+  profile: EraSimulationProfile,
+  fixture: ReturnType<typeof loadFixture>,
+  variant: boolean,
+  samples: number,
+): number {
+  let total = 0;
+  for (let i = 0; i < samples; i += 1) {
+    const input = buildInput(fixture, profile, fixtureSeed(fixtureId, i), variant);
+    const { result } = runSingleGame(input);
+    total += metricValue(fixtureId, result.home, result.away);
+  }
+  return total / Math.max(1, samples);
+}
+
+function metricValue(
+  fixtureId: string,
+  home: GameResult['home'],
+  away: GameResult['away'],
+): number {
+  switch (fixtureId) {
+    case 'sens-creation': {
+      const player = home.players.find((p) => p.playerId === 'p-fixture-1');
+      if (!player) return 0;
+      return player.fieldGoals.attempted / Math.max(1, home.box.fieldGoals.attempted);
+    }
+    case 'sens-passing':
+      return home.box.assists;
+    case 'sens-turnovers':
+      return home.box.turnovers;
+    case 'sens-defense':
+      return away.box.points;
+    case 'sens-rebounding':
+      return home.box.rebounds.offensive;
+    case 'sens-fouls':
+      return home.box.freeThrows.attempted;
+    case 'sens-pace':
+      return home.box.possessions;
+    case 'sens-shot-mix':
+      return home.box.threes.attempted / Math.max(1, home.box.fieldGoals.attempted);
+    default:
+      return home.box.points;
+  }
+}

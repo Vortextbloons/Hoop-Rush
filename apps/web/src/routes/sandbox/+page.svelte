@@ -1,13 +1,15 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { ArrowRight, ArrowRightLeft, Check, ChevronDown, Lock, Plus, X } from '@lucide/svelte';
+  import { ArrowRight, Check, ChevronDown, Lock, Plus, Search, X } from '@lucide/svelte';
   import { Dialog, Select } from 'bits-ui';
   import type { FranchiseEraPool, HoopRushManifest, SlotIndex } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
   import { getManifest, getPool, prefetchPools } from '$lib/data';
+  import { buildSandboxUrl } from '$lib/sandbox-url';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import LineupCourt from '$lib/components/LineupCourt.svelte';
 
   type PeakPlayer = FranchiseEraPool['players'][number];
 
@@ -33,6 +35,8 @@
 
   let slots = $state<(PeakPlayer | null)[]>([null, null, null, null, null]);
   let pickerPlayer = $state<PeakPlayer | null>(null);
+  let search = $state('');
+  let positionFilter = $state<SlotIndex | null>(null);
 
   $effect(() => {
     let cancelled = false;
@@ -41,6 +45,7 @@
         if (!cancelled) {
           manifest = m;
           prefetchPools(m.pools);
+          restoreUrlState(m);
         }
       },
       (error: unknown) => {
@@ -51,6 +56,40 @@
       cancelled = true;
     };
   });
+
+  /**
+   * Restores a draft carried in the URL (franchise, era, and five slot
+   * assignments) so "edit lineup" returns to the exact same draft.
+   */
+  function restoreUrlState(m: HoopRushManifest) {
+    if (franchiseId || eraId || slots.some((p) => p !== null)) return;
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const nextFranchise = params.get('franchise');
+    const nextEra = params.get('era');
+    const nextSlots = params.get('slots');
+    if (!nextFranchise || !nextEra || !nextSlots) return;
+    if (!m.franchiseLineage.some((e) => e.franchiseId === nextFranchise)) return;
+    if (!m.eras.some((e) => e.eraId === nextEra)) return;
+    const poolEntry = m.pools.find((p) => p.franchiseId === nextFranchise && p.eraId === nextEra);
+    if (!poolEntry) return;
+    franchiseId = nextFranchise;
+    eraId = nextEra;
+    loadPoolFor(nextFranchise, nextEra);
+    getPool(poolEntry).then(
+      (p) => {
+        if (p === null) return;
+        const byId = new Map(p.players.map((player) => [player.playerId, player]));
+        const ids = nextSlots.split(',');
+        if (ids.length !== 5 || new Set(ids).size !== 5) return;
+        slots = ids.map((id) => byId.get(id) ?? null);
+        pickerPlayer = null;
+      },
+      () => {
+        // Invalid draft state falls back to an empty board.
+      },
+    );
+  }
 
   const franchise = $derived(
     manifest?.franchiseLineage.find((e) => e.franchiseId === franchiseId) ?? null,
@@ -82,9 +121,22 @@
     if (!pool) return [] as PeakPlayer[];
     return [...pool.players].sort(
       (a, b) =>
-        b.summaryRatings.overallRating - a.summaryRatings.overallRating ||
+        (b.detailedRatings.overall ?? 0) - (a.detailedRatings.overall ?? 0) ||
         a.displayName.localeCompare(b.displayName),
     );
+  });
+
+  const filteredPlayers = $derived.by(() => {
+    let list = sortedPlayers;
+    if (positionFilter !== null) {
+      const requirement = slotRequirement(positionFilter);
+      list = list.filter((p) => p.positions.canonical.includes(requirement));
+    }
+    const query = search.trim().toLowerCase();
+    if (query) {
+      list = list.filter((p) => p.displayName.toLowerCase().includes(query));
+    }
+    return list;
   });
 
   function selectFranchise(id: string) {
@@ -120,6 +172,8 @@
     poolError = null;
     slots = [null, null, null, null, null];
     pickerPlayer = null;
+    search = '';
+    positionFilter = null;
   }
 
   function loadPoolFor(franchise: string | null, era: string | null) {
@@ -251,21 +305,28 @@
     displace: { incumbent: PeakPlayer; targetSlot: number } | null;
   };
 
-  /** Eligibility shown on the pool card itself, before any click. */
+  /**
+   * Eligibility shown on the pool card itself, before any click. A player is
+   * "place" whenever any eligible slot is open; the displace highlight is
+   * reserved for the case where displacement is the only option.
+   */
   function poolCardInfoFor(player: PeakPlayer): PoolCardInfo {
     if (slots.some((p) => p !== null && p.playerId === player.playerId)) {
       return { state: 'lineup', displace: null };
     }
+    let displace: PoolCardInfo['displace'] = null;
     for (const i of SLOT_INDEXES) {
       if (!canFillSlot(player, i)) continue;
       const incumbent = slots[i] ?? null;
       if (!incumbent) return { state: 'place', displace: null };
-      const target = displacementTargetFor(incumbent, i, -1);
-      if (target !== null) {
-        return { state: 'displace', displace: { incumbent, targetSlot: target } };
+      if (displace === null) {
+        const target = displacementTargetFor(incumbent, i, -1);
+        if (target !== null) displace = { incumbent, targetSlot: target };
       }
     }
-    return { state: 'blocked', displace: null };
+    return displace !== null
+      ? { state: 'displace', displace }
+      : { state: 'blocked', displace: null };
   }
 
   function removePlayer(slotIndex: number) {
@@ -285,6 +346,20 @@
       })),
     }).ok;
   });
+
+  /** Setup URL carrying franchise, era, and slot assignments (validated on load). */
+  const setupHref = $derived(
+    lineupIsLegal && franchiseId && eraId
+      ? buildSandboxUrl(
+          {
+            franchiseId,
+            eraId,
+            playerIds: slots.map((player) => player!.playerId),
+          },
+          'setup',
+        )
+      : null,
+  );
 </script>
 
 <svelte:head>
@@ -480,7 +555,7 @@
         {poolError}
       </p>
     {:else if franchise && era}
-      <div class="mt-10 grid gap-6 pb-24 lg:grid-cols-[minmax(0,1fr)_360px] lg:pb-0">
+      <div class="mt-10 flex flex-col gap-6 pb-32">
         <div class="rounded-xl border border-border bg-card">
           <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">
@@ -497,67 +572,122 @@
             </span>
           </div>
           {#if pool}
-            <ul class="grid max-h-[55vh] gap-1 overflow-y-auto p-2 sm:max-h-[560px] sm:grid-cols-2">
-              {#each sortedPlayers as player (player.playerId)}
-                {@const card = poolCardInfoFor(player)}
-                {@const cardState = card.state}
-                <li>
+            <div class="flex flex-col gap-2 border-b border-border p-2">
+              <div class="relative">
+                <Search
+                  class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <input
+                  type="search"
+                  bind:value={search}
+                  placeholder="Search players…"
+                  aria-label="Search players by name"
+                  class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div
+                class="flex items-center gap-1 overflow-x-auto pb-0.5"
+                role="group"
+                aria-label="Filter by position"
+              >
+                <button
+                  type="button"
+                  aria-pressed={positionFilter === null}
+                  onclick={() => (positionFilter = null)}
+                  class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
+                  null
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+                >
+                  All
+                </button>
+                {#each SLOT_INDEXES as i (i)}
                   <button
                     type="button"
-                    disabled={cardState === 'blocked'}
-                    aria-disabled={cardState === 'blocked' ? 'true' : undefined}
-                    onclick={() => openPicker(player)}
-                    class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left {cardState ===
-                    'lineup'
-                      ? 'border-primary/50 bg-primary/10 opacity-60'
-                      : cardState === 'displace'
-                        ? 'border-accent/50 bg-accent/10 opacity-90 shadow-[0_0_8px_hsl(42_91%_61%/0.15)] hover:bg-accent/20 hover:opacity-100'
-                        : cardState === 'blocked'
-                          ? 'border-transparent opacity-40 disabled:cursor-not-allowed'
-                          : 'border-transparent hover:border-border hover:bg-surface-2'}"
+                    aria-pressed={positionFilter === i}
+                    onclick={() => (positionFilter = positionFilter === i ? null : i)}
+                    class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
+                    i
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
                   >
-                    <PlayerFace
-                      {player}
-                      {manifest}
-                      size="md"
-                      fallbackInitials={player.firstName[0]! + player.lastName[0]!}
-                    />
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate text-sm font-bold">{player.displayName}</span>
-                      <span class="block font-mono text-[10px] text-muted-foreground">
-                        {player.seasonKey} · {player.positions.sourceLabels.join('/')}
-                      </span>
-                    </span>
-                    <span class="flex shrink-0 gap-1 font-mono text-[10px]">
-                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
-                        O {player.summaryRatings.overallRating}
-                      </span>
-                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Offense">
-                        A {player.summaryRatings.offenseRating}
-                      </span>
-                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Defense">
-                        D {player.summaryRatings.defenseRating}
-                      </span>
-                      {#if cardState === 'displace' && card.displace}
-                        <span
-                          class="rounded bg-accent/25 px-1.5 py-0.5 font-bold text-accent"
-                          title={`Moves ${card.displace.incumbent.displayName} to ${SLOT_NAMES[card.displace.targetSlot]}`}
-                        >
-                          Moves {card.displace.incumbent.displayName.split(' ').pop()}
-                        </span>
-                      {:else if cardState === 'blocked'}
-                        <span
-                          class="rounded bg-surface-3 px-1.5 py-0.5 text-muted-foreground"
-                          title="No open or movable position"
-                        >
-                          No slot
-                        </span>
-                      {/if}
-                    </span>
+                    {SLOT_LABELS[i]}
                   </button>
-                </li>
-              {/each}
-            </ul>
+                {/each}
+                <span class="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">
+                  {filteredPlayers.length}/{pool.players.length}
+                </span>
+              </div>
+            </div>
+            {#if filteredPlayers.length === 0}
+              <p class="p-6 text-center font-mono text-xs text-muted-foreground">
+                No players match.
+              </p>
+            {:else}
+              <ul
+                class="grid max-h-[55vh] gap-1 overflow-y-auto p-2 sm:max-h-[560px] sm:grid-cols-2 xl:grid-cols-3"
+              >
+                {#each filteredPlayers as player (player.playerId)}
+                  {@const card = poolCardInfoFor(player)}
+                  {@const cardState = card.state}
+                  <li>
+                    <button
+                      type="button"
+                      disabled={cardState === 'blocked'}
+                      aria-disabled={cardState === 'blocked' ? 'true' : undefined}
+                      onclick={() => openPicker(player)}
+                      class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left {cardState ===
+                      'lineup'
+                        ? 'border-primary/50 bg-primary/10 opacity-60'
+                        : cardState === 'displace'
+                          ? 'border-accent/50 bg-accent/10 opacity-90 shadow-[0_0_8px_hsl(42_91%_61%/0.15)] hover:bg-accent/20 hover:opacity-100'
+                          : cardState === 'blocked'
+                            ? 'border-transparent opacity-40 disabled:cursor-not-allowed'
+                            : 'border-transparent hover:border-border hover:bg-surface-2'}"
+                    >
+                      <PlayerFace
+                        {player}
+                        {manifest}
+                        size="md"
+                        fallbackInitials={player.firstName[0]! + player.lastName[0]!}
+                      />
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-bold">{player.displayName}</span>
+                        <span class="block font-mono text-[10px] text-muted-foreground">
+                          {player.seasonKey} · {player.positions.sourceLabels.join('/')}
+                        </span>
+                      </span>
+                      <span class="flex shrink-0 gap-1 font-mono text-[10px]">
+                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
+                          O {player.detailedRatings.overall ?? 0}
+                        </span>
+                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Offense">
+                          A {player.summaryRatings.offenseRating}
+                        </span>
+                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Defense">
+                          D {player.summaryRatings.defenseRating}
+                        </span>
+                        {#if cardState === 'displace' && card.displace}
+                          <span
+                            class="rounded bg-accent/25 px-1.5 py-0.5 font-bold text-accent"
+                            title={`Moves ${card.displace.incumbent.displayName} to ${SLOT_NAMES[card.displace.targetSlot]}`}
+                          >
+                            Moves {card.displace.incumbent.displayName.split(' ').pop()}
+                          </span>
+                        {:else if cardState === 'blocked'}
+                          <span
+                            class="rounded bg-surface-3 px-1.5 py-0.5 text-muted-foreground"
+                            title="No open or movable position"
+                          >
+                            No slot
+                          </span>
+                        {/if}
+                      </span>
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
           {:else}
             <ul
               aria-hidden="true"
@@ -583,104 +713,59 @@
           {/if}
         </div>
 
-        <div class="flex flex-col gap-4">
-          <div id="your-five" class="scroll-mt-4 rounded-xl border border-border bg-card p-4">
-            <div class="flex items-center justify-between">
-              <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">
-                Your five
-              </h2>
-              <span class="font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
-                {pickedCount}/5
-              </span>
-            </div>
-            <div class="mt-3 flex flex-col gap-2">
-              {#each SLOT_LABELS as label, slotIndex (slotIndex)}
-                {@const player = slots[slotIndex]}
-                <div
-                  class="flex items-center gap-3 rounded-lg border px-3 py-2 {player
-                    ? 'border-line-strong bg-surface-2'
-                    : 'border-dashed border-border'}"
-                >
-                  <span
-                    class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-sm font-extrabold text-primary"
-                  >
-                    {label}
-                  </span>
-                  {#if player}
-                    <button
-                      type="button"
-                      aria-label={`Move ${player.displayName} to another position`}
-                      class="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left outline-none transition-colors hover:bg-surface-3/60 focus-visible:ring-2 focus-visible:ring-ring"
-                      onclick={() => openPicker(player)}
-                    >
-                      <PlayerFace
-                        {player}
-                        {manifest}
-                        size="sm"
-                        fallbackInitials={player.firstName[0]! + player.lastName[0]!}
-                      />
-                      <span class="min-w-0 flex-1">
-                        <span class="block truncate text-sm font-bold">{player.displayName}</span>
-                        <span class="block font-mono text-[10px] text-muted-foreground">
-                          {player.seasonKey} · {player.positions.canonical.join('/')} · O
-                          {player.summaryRatings.overallRating}
-                        </span>
-                      </span>
-                      <ArrowRightLeft class="h-4 w-4 shrink-0 text-muted-foreground" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Remove ${player.displayName}`}
-                      class="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border text-muted-foreground hover:text-foreground"
-                      onclick={() => removePlayer(slotIndex)}
-                    >
-                      ×
-                    </button>
-                  {:else}
-                    <span class="font-mono text-xs text-muted-foreground">
-                      Open {label} slot
-                    </span>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-            {#if lineupIsLegal}
-              <p
-                class="mt-4 rounded-lg border border-line-strong bg-surface-2 p-3 text-xs text-muted-foreground"
-              >
-                Lineup ready.
-              </p>
-            {/if}
+        <LineupCourt
+          {slots}
+          {manifest}
+          ready={lineupIsLegal}
+          onmove={openPicker}
+          onremove={removePlayer}
+        />
+        {#if lineupIsLegal && setupHref}
+          <div class="mt-4">
+            <a
+              href={resolve(setupHref)}
+              class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Continue to challenge setup
+              <ArrowRight class="h-4 w-4" />
+            </a>
           </div>
-        </div>
+        {/if}
       </div>
 
-      <a
-        href="#your-five"
-        class="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:hidden"
+      <nav
+        aria-label="Lineup summary"
+        class="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
       >
-        <span class="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
-          <span class="font-display text-sm font-extrabold tracking-tight uppercase">
+        <div
+          class="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6"
+        >
+          <a
+            href="#your-five"
+            class="font-display text-sm font-extrabold tracking-tight uppercase transition-colors hover:text-primary"
+          >
             Your five
-          </span>
-          <span class="flex gap-1">
+          </a>
+          <span class="flex gap-1 sm:gap-1.5">
             {#each SLOT_LABELS as label, slotIndex (slotIndex)}
-              <span
-                class="grid h-6 w-6 place-items-center rounded-md text-[10px] font-bold {slots[
+              <a
+                href="#court-slot-{slotIndex}"
+                aria-label={`${SLOT_NAMES[slotIndex]} slot: {slots[slotIndex]?.displayName ?? 'empty'}`}
+                class="grid h-7 w-7 place-items-center rounded-md text-[10px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-8 sm:w-8 {slots[
                   slotIndex
                 ]
                   ? 'bg-primary text-primary-foreground'
-                  : 'border border-border text-muted-foreground'}"
+                  : 'border border-border text-muted-foreground transition-colors hover:border-line-strong hover:text-foreground'}"
               >
                 {label}
-              </span>
+              </a>
             {/each}
           </span>
           <span class="ml-auto font-mono text-xs text-muted-foreground">
             Picked {pickedCount} of 5
           </span>
-        </span>
-      </a>
+        </div>
+      </nav>
     {/if}
   {/if}
 
@@ -713,7 +798,7 @@
                 </Dialog.Title>
                 <p class="font-mono text-[10px] text-muted-foreground">
                   {subject.seasonKey} · {subject.positions.canonical.join('/')} · O
-                  {subject.summaryRatings.overallRating}
+                  {subject.detailedRatings.overall ?? 0}
                 </p>
               </div>
             </div>

@@ -28,10 +28,10 @@ MANIFEST_PATH = PUBLIC_DATA / "manifest.json"
 
 SCHEMA_VERSION = 1
 POSITION_NORMALIZATION_VERSION = "position-v1"
-RATINGS_VERSION = "ratings-v1"
+RATINGS_VERSION = "ratings-v6"
 SELECTION_SCORE_VERSION = "selection-v1"
 MIN_TEAM_GAMES = 40
-DATA_VERSION = "m1.0"
+DATA_VERSION = "m1.5"
 
 # ---------------------------------------------------------------------------
 # Position normalization (spec/02)
@@ -354,7 +354,7 @@ def compute_pool(
                     else "derived-medium"
                 ),
                 "source": {
-                    "dataVersion": manifest.get("dataVersion", DATA_VERSION),
+                    "dataVersion": DATA_VERSION,
                     "ratingsVersion": RATINGS_VERSION,
                     "selectionScoreVersion": SELECTION_SCORE_VERSION,
                 },
@@ -375,7 +375,7 @@ def compute_pool(
 
     pool = {
         "schemaVersion": SCHEMA_VERSION,
-        "dataVersion": manifest.get("dataVersion", DATA_VERSION),
+        "dataVersion": DATA_VERSION,
         "franchiseId": franchise_id,
         "eraId": era_id,
         "eligibility": {"minimumTeamGames": MIN_TEAM_GAMES},

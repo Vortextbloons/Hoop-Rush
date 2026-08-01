@@ -5,7 +5,10 @@ import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   lineupSchema,
+  opponentTeamSchema,
   peakPlayerSeasonSchema,
+  simulationPlayerSchema,
+  simulationTeamSchema,
 } from './index.js';
 import type { Lineup, LineupAssignment, PeakPlayerSeason } from './index.js';
 
@@ -273,6 +276,8 @@ describe('manifest contracts', () => {
       ],
       eras: [{ eraId: '1990s', label: '1990s', fromSeasonKey: '1990-91', toSeasonKey: '1999-00' }],
       pools: [],
+      eraSimulationProfiles: [],
+      opponents: [],
       assets: {
         headshotUrlTemplate: 'https://cdn.example.com/{playerExternalId}.png',
         headshotUrlTemplateSecondary:
@@ -294,6 +299,8 @@ describe('manifest contracts', () => {
       franchiseLineage: [],
       eras: [],
       pools: [{ franchiseId: 'lakers', eraId: '1990s', url: 'pools/l.json', contentHash: 'short' }],
+      eraSimulationProfiles: [],
+      opponents: [],
       assets: {
         headshotUrlTemplate: null,
         headshotUrlTemplateSecondary: null,
@@ -304,6 +311,106 @@ describe('manifest contracts', () => {
       },
     };
     expect(hoopRushManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+});
+
+describe('simulation contracts', () => {
+  const player = {
+    playerId: 'p-1',
+    displayName: 'Test Player',
+    positions: ['G'],
+    heightInches: 76,
+    weightLbs: 200,
+    ratings: {
+      insideScoring: 80,
+      closeShot: 70,
+      midrange: 70,
+      threePoint: 70,
+      freeThrow: 75,
+      ballHandling: 75,
+      passing: 75,
+      offensiveIq: 75,
+      offensiveRebound: 60,
+      defensiveRebound: 60,
+      perimeterDefense: 65,
+      interiorDefense: 65,
+      steal: 60,
+      block: 60,
+      defensiveIq: 65,
+      speed: 75,
+      strength: 65,
+      vertical: 70,
+    },
+    tendencies: {
+      usageRate: 20,
+      passRate: 30,
+      shotRate: 25,
+      driveRate: 20,
+      postUpRate: 5,
+      rimFrequency: 30,
+      shortMidFrequency: 20,
+      longMidFrequency: 15,
+      cornerThreeFrequency: 8,
+      aboveBreakThreeFrequency: 12,
+      threePointRate: 25,
+      freeThrowRate: 20,
+      turnoverRate: 12,
+      isolationRate: 10,
+      pickAndRollBallHandlerRate: 25,
+      pickAndRollRollManRate: 10,
+      spotUpRate: 20,
+      transitionRate: 15,
+      cutRate: 10,
+      foulRate: 2,
+      stealAttemptRate: 8,
+      blockAttemptRate: 10,
+      crashOffensiveGlassRate: 12,
+    },
+  } as const;
+
+  it('accepts a valid simulation player', () => {
+    expect(simulationPlayerSchema.safeParse(player).success).toBe(true);
+  });
+
+  it('rejects a player carrying a summary overall rating', () => {
+    const invalid = { ...player, ratings: { ...player.ratings, overall: 90 } };
+    expect(simulationPlayerSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects a rating outside 0-100', () => {
+    const invalid = { ...player, ratings: { ...player.ratings, passing: 101 } };
+    expect(simulationPlayerSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('rejects a team without exactly five players', () => {
+    const team = { teamId: 'lakers', displayName: 'Lakers', players: [player] };
+    expect(simulationTeamSchema.safeParse(team).success).toBe(false);
+  });
+});
+
+describe('opponent contracts', () => {
+  it('rejects an opponent whose lineup and players disagree', () => {
+    const opponent = {
+      schemaVersion: 1,
+      opponentId: 'lakers-1990s-opening',
+      bracketVersion: 'bracket-v1',
+      difficultyBand: 'medium',
+      teamId: 'lakers',
+      displayName: 'Los Angeles Lakers',
+      seasonKey: '1995-96',
+      lineup: {
+        structure: ['G', 'G', 'F', 'F', 'C'],
+        assignments: [
+          { slotIndex: 0, playerId: 'p-89', positions: ['G'] },
+          { slotIndex: 1, playerId: 'p-9', positions: ['G'] },
+          { slotIndex: 2, playerId: 'p-920', positions: ['F'] },
+          { slotIndex: 3, playerId: 'p-109', positions: ['F'] },
+          { slotIndex: 4, playerId: 'p-124', positions: ['C'] },
+        ],
+      },
+      players: [],
+    };
+    expect(opponentTeamSchema.safeParse(opponent).success).toBe(false);
   });
 });
 

@@ -16,7 +16,7 @@
   }: {
     player: PeakPlayer;
     manifest: HoopRushManifest;
-    size?: 'sm' | 'md';
+    size?: 'sm' | 'md' | 'court';
     fallbackInitials: string;
   } = $props();
 
@@ -44,7 +44,11 @@
   }
 
   const faceClass = $derived(
-    size === 'sm' ? 'h-9 w-9 rounded-md text-xs' : 'h-12 w-12 rounded-lg text-sm',
+    size === 'sm'
+      ? 'h-9 w-9 rounded-md text-xs'
+      : size === 'court'
+        ? 'h-12 w-12 rounded-full text-xs lg:h-14 lg:w-14 lg:text-sm'
+        : 'h-12 w-12 rounded-lg text-sm',
   );
 </script>
 

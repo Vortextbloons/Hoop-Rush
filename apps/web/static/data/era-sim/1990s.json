@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "eraId": "1990s",
+  "profileVersion": "m2-1990s-v2",
+  "dataVersion": "m1.0",
+  "seasons": [
+    "1990-91",
+    "1991-92",
+    "1992-93",
+    "1993-94",
+    "1994-95",
+    "1995-96",
+    "1996-97",
+    "1997-98",
+    "1998-99",
+    "1999-00"
+  ],
+  "baselineReport": "frozen from approved 10,000-seed baseline (10000 samples, engine m2-engine-v1, observed targets with tolerances per spec/06)",
+  "parameters": {
+    "pace": 95.017,
+    "league3PARate": 0.1477,
+    "leagueTsPct": 0.5207,
+    "leagueFtaPerFga": 0.321,
+    "leagueFtPct": 0.7449,
+    "turnoverPerPossession": 0.1577,
+    "stealShareOfTurnovers": 0.5514,
+    "offensiveReboundRate": 0.313,
+    "assistRate": 0.6095,
+    "foulsPerPossession": 0.2361,
+    "shootingFoulShare": 0.55,
+    "freeThrowAnchorRating": 58,
+    "assistAnchorRating": 62,
+    "zoneMix": {
+      "rim": 0.3755,
+      "shortMid": 0.1942,
+      "longMid": 0.1259,
+      "cornerThree": 0.1153,
+      "aboveBreakThree": 0.1891
+    },
+    "source": "packaged stints 1990-91..1999-00 + Lakers 1990s pool rating anchors"
+  },
+  "targets": {
+    "possessionsPerGame": {
+      "value": 90.7871,
+      "tolerance": 1.5,
+      "minimumSample": 200
+    },
+    "pointsPerGame": {
+      "value": 100.9405,
+      "tolerance": 3.0,
+      "minimumSample": 200
+    },
+    "offensiveRating": {
+      "value": 100.6587,
+      "tolerance": 3.0,
+      "minimumSample": 200
+    },
+    "fieldGoalPct": {
+      "value": 0.4439,
+      "tolerance": 0.01,
+      "minimumSample": 200
+    },
+    "efgPct": {
+      "value": 0.4718,
+      "tolerance": 0.01,
+      "minimumSample": 200
+    },
+    "tsPct": {
+      "value": 0.5033,
+      "tolerance": 0.01,
+      "minimumSample": 200
+    },
+    "threePointRate": {
+      "value": 0.1615,
+      "tolerance": 0.01,
+      "minimumSample": 200
+    },
+    "threePointPct": {
+      "value": 0.3463,
+      "tolerance": 0.015,
+      "minimumSample": 200
+    },
+    "freeThrowsAttemptedPerGame": {
+      "value": 25.5815,
+      "tolerance": 2.0,
+      "minimumSample": 200
+    },
+    "freeThrowPct": {
+      "value": 0.7568,
+      "tolerance": 0.015,
+      "minimumSample": 200
+    },
+    "turnoversPerGame": {
+      "value": 15.1845,
+      "tolerance": 1.0,
+      "minimumSample": 200
+    },
+    "turnoversPerPossession": {
+      "value": 0.1514,
+      "tolerance": 0.008,
+      "minimumSample": 200
+    },
+    "offensiveReboundsPerGame": {
+      "value": 12.6129,
+      "tolerance": 1.0,
+      "minimumSample": 200
+    },
+    "offensiveReboundRate": {
+      "value": 0.3013,
+      "tolerance": 0.012,
+      "minimumSample": 200
+    },
+    "assistsPerGame": {
+      "value": 24.5022,
+      "tolerance": 2.0,
+      "minimumSample": 200
+    },
+    "assistRate": {
+      "value": 0.6385,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "personalFoulsPerGame": {
+      "value": 23.5478,
+      "tolerance": 2.0,
+      "minimumSample": 200
+    },
+    "zoneMix": {
+      "rim": {
+        "value": 0.4608,
+        "tolerance": 0.015,
+        "minimumSample": 200
+      },
+      "shortMid": {
+        "value": 0.2299,
+        "tolerance": 0.015,
+        "minimumSample": 200
+      },
+      "longMid": {
+        "value": 0.1478,
+        "tolerance": 0.015,
+        "minimumSample": 200
+      },
+      "cornerThree": {
+        "value": 0.0614,
+        "tolerance": 0.012,
+        "minimumSample": 200
+      },
+      "aboveBreakThree": {
+        "value": 0.1001,
+        "tolerance": 0.015,
+        "minimumSample": 200
+      }
+    },
+    "closeGameRate": {
+      "value": 0.271,
+      "tolerance": 0.03,
+      "minimumSample": 2000
+    },
+    "blowoutRate": {
+      "value": 0.202,
+      "tolerance": 0.03,
+      "minimumSample": 2000
+    },
+    "overtimeRate": {
+      "value": 0.027,
+      "tolerance": 0.012,
+      "minimumSample": 2000
+    },
+    "strongVsWeakWinRate": {
+      "value": 0.9999,
+      "tolerance": 0.005,
+      "minimumSample": 2000
+    },
+    "equalLineupHomeWinRate": {
+      "value": 0.4966,
+      "tolerance": 0.03,
+      "minimumSample": 2000
+    }
+  }
+}

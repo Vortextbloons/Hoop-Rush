@@ -4,8 +4,10 @@ import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  eraSimulationProfileSchema,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
+  opponentTeamSchema,
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
@@ -239,6 +241,121 @@ function auditPoolContent(
   details.push(`pools: ${key} ${String(pool.players.length)} players audited`);
 }
 
+/**
+ * Audits era simulation profiles: schema validity, hash verification, and
+ * that the referenced era exists in the manifest.
+ */
+async function auditEraSimulationProfiles(
+  manifest: HoopRushManifest,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const eraIds = new Set(manifest.eras.map((e) => e.eraId));
+
+  for (const entry of manifest.eraSimulationProfiles) {
+    if (!eraIds.has(entry.eraId)) {
+      failures.push(`era-sim: unknown eraId ${entry.eraId}`);
+    }
+    const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
+    try {
+      const info = await stat(assetPath);
+      if (!info.isFile()) {
+        failures.push(`era-sim: ${entry.eraId} asset is not a file (${assetPath})`);
+        continue;
+      }
+      const content = await readFile(assetPath);
+      const actualHash = createHash('sha256').update(content).digest('hex');
+      if (actualHash !== entry.contentHash) {
+        failures.push(`era-sim: ${entry.eraId} content hash mismatch (${assetPath})`);
+      } else if (verbose) {
+        details.push(`era-sim: ${entry.eraId} hash verified (${assetPath})`);
+      }
+      const parsed = eraSimulationProfileSchema.safeParse(
+        JSON.parse(content.toString('utf8')) as unknown,
+      );
+      if (!parsed.success) {
+        failures.push(`era-sim: ${entry.eraId} fails the profile schema`);
+      } else if (parsed.data.eraId !== entry.eraId) {
+        failures.push(`era-sim: ${entry.eraId} asset declares ${parsed.data.eraId}`);
+      } else {
+        details.push(
+          `era-sim: ${entry.eraId} profile ${parsed.data.profileVersion} (${parsed.data.parameters.source})`,
+        );
+      }
+    } catch {
+      failures.push(`era-sim: ${entry.eraId} asset missing (${assetPath})`);
+    }
+  }
+  details.push(`era-sim: ${String(manifest.eraSimulationProfiles.length)} profiles`);
+  return { ok: failures.length === 0, details, failures };
+}
+
+/**
+ * Audits opponent artifacts: schema validity, hash verification, legal
+ * G,G,F,F,C assignments, and five matching simulation players.
+ */
+async function auditOpponents(
+  manifest: HoopRushManifest,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const ids = new Set<string>();
+
+  for (const entry of manifest.opponents) {
+    if (ids.has(entry.opponentId)) {
+      failures.push(`opponents: duplicate opponentId ${entry.opponentId}`);
+    }
+    ids.add(entry.opponentId);
+    const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
+    try {
+      const info = await stat(assetPath);
+      if (!info.isFile()) {
+        failures.push(`opponents: ${entry.opponentId} asset is not a file (${assetPath})`);
+        continue;
+      }
+      const content = await readFile(assetPath);
+      const actualHash = createHash('sha256').update(content).digest('hex');
+      if (actualHash !== entry.contentHash) {
+        failures.push(`opponents: ${entry.opponentId} content hash mismatch (${assetPath})`);
+      } else if (verbose) {
+        details.push(`opponents: ${entry.opponentId} hash verified (${assetPath})`);
+      }
+      const parsed = opponentTeamSchema.safeParse(JSON.parse(content.toString('utf8')) as unknown);
+      if (!parsed.success) {
+        failures.push(`opponents: ${entry.opponentId} fails the opponent schema`);
+        continue;
+      }
+      const opponent = parsed.data;
+      const assignmentIds = opponent.lineup.assignments.map((a) => a.playerId);
+      const playerIds = opponent.players.map((p) => p.playerId);
+      if (assignmentIds.length !== 5 || new Set(assignmentIds).size !== 5) {
+        failures.push(`opponents: ${entry.opponentId} lineup must assign five distinct players`);
+      }
+      for (const playerId of assignmentIds) {
+        if (!playerIds.includes(playerId)) {
+          failures.push(
+            `opponents: ${entry.opponentId} lineup references ${playerId} missing from players`,
+          );
+        }
+      }
+      if (playerIds.length !== 5 || new Set(playerIds).size !== 5) {
+        failures.push(`opponents: ${entry.opponentId} must carry five distinct players`);
+      }
+      details.push(
+        `opponents: ${entry.opponentId} (${opponent.difficultyBand}, ${opponent.players.map((p) => p.displayName).join(', ')})`,
+      );
+    } catch {
+      failures.push(`opponents: ${entry.opponentId} asset missing (${assetPath})`);
+    }
+  }
+  details.push(`opponents: ${String(manifest.opponents.length)} artifacts`);
+  return { ok: failures.length === 0, details, failures };
+}
+
 function auditAssets(manifest: HoopRushManifest): AuditResult {
   const failures: string[] = [];
   const details: string[] = [];
@@ -315,6 +432,8 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     auditLineage(manifest),
     auditEras(manifest),
     await auditPools(manifest, manifestDir, verbose),
+    await auditEraSimulationProfiles(manifest, manifestDir, verbose),
+    await auditOpponents(manifest, manifestDir, verbose),
     auditAssets(manifest),
   ];
 

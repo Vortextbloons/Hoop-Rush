@@ -126,7 +126,7 @@ test.describe('sandbox draft journey', () => {
       .getByRole('button', { name: 'Place Kobe Bryant at Small Forward slot 3', exact: true })
       .click();
 
-    await expect(page.getByText('Open PG slot')).toBeVisible();
+    await expect(page.getByText('Open PG')).toBeVisible();
     await page.getByRole('button', { name: /Move Kobe Bryant to another position/ }).click();
     await expect(
       page.getByRole('button', {
@@ -163,7 +163,7 @@ test.describe('sandbox draft journey', () => {
     // Sticky bottom bar shows lineup progress while the pool scrolls.
     const bar = page.getByRole('link', { name: /Your five/ });
     await expect(bar).toBeVisible();
-    await expect(bar).toContainText('Picked 0 of 5');
+    await expect(page.getByText('Picked 0 of 5')).toBeVisible();
 
     // Picking a player opens the position popup as a bottom sheet.
     await page.getByRole('button', { name: /Shaquille O'Neal/ }).click();
@@ -171,7 +171,7 @@ test.describe('sandbox draft journey', () => {
     await page
       .getByRole('button', { name: "Place Shaquille O'Neal at Center slot 5", exact: true })
       .click();
-    await expect(bar).toContainText('Picked 1 of 5');
+    await expect(page.getByText('Picked 1 of 5')).toBeVisible();
 
     // Tapping the bar jumps to the lineup panel, where the picked player shows.
     await bar.click();

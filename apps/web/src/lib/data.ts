@@ -1,22 +1,38 @@
 import {
   loadManifest,
   loadPool,
+  loadEraSimulationProfile,
+  loadOpponentTeam,
   type HoopRushManifest,
   type FranchiseEraPool,
   type PoolIndexEntry,
+  type SimProfileIndexEntry,
+  type OpponentIndexEntry,
+  type EraSimulationProfile,
+  type OpponentTeam,
 } from '@hoop-rush/data-contracts';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 
 let manifestPromise: Promise<HoopRushManifest> | null = null;
 
+/**
+ * Site root for packaged assets. The static build sets a relative base
+ * (`./`), which would resolve nested routes like /sandbox/game to
+ * /sandbox/data/...; assets always live at the site root.
+ */
+function siteRoot(): string {
+  const base = import.meta.env.BASE_URL;
+  return base.startsWith('/') ? base : '/';
+}
+
 function manifestUrl(): string {
-  return `${import.meta.env.BASE_URL}data/manifest.json`;
+  return `${siteRoot()}data/manifest.json`;
 }
 
 /** Pool URLs are relative to the manifest directory (e.g. pools/lakers-1990s.json). */
 function resolveAssetUrl(url: string): string {
   if (/^https?:\/\//.test(url) || url.startsWith('/')) return url;
-  return `${import.meta.env.BASE_URL}data/${url}`;
+  return `${siteRoot()}data/${url}`;
 }
 
 /** Load (once) and validate the Hoop Rush manifest. */
@@ -50,6 +66,40 @@ async function loadPoolForEntry(entry: PoolIndexEntry, key: string): Promise<Fra
   const pool = await loadPool(resolveAssetUrl(entry.url), entry.contentHash);
   void writeCachedPool(key, entry.contentHash, pool);
   return pool;
+}
+
+const profileCache = new Map<string, Promise<EraSimulationProfile>>();
+
+/** Load, hash-verify, and validate an era simulation profile asset. */
+export function getEraSimulationProfile(
+  entry: SimProfileIndexEntry,
+): Promise<EraSimulationProfile> {
+  const key = entry.eraId;
+  let promise = profileCache.get(key);
+  if (!promise) {
+    promise = loadEraSimulationProfile(resolveAssetUrl(entry.url), entry.contentHash);
+    profileCache.set(key, promise);
+    promise.catch(() => {
+      profileCache.delete(key);
+    });
+  }
+  return promise;
+}
+
+const opponentCache = new Map<string, Promise<OpponentTeam>>();
+
+/** Load, hash-verify, and validate an opponent artifact. */
+export function getOpeningOpponent(entry: OpponentIndexEntry): Promise<OpponentTeam> {
+  const key = entry.opponentId;
+  let promise = opponentCache.get(key);
+  if (!promise) {
+    promise = loadOpponentTeam(resolveAssetUrl(entry.url), entry.contentHash);
+    opponentCache.set(key, promise);
+    promise.catch(() => {
+      opponentCache.delete(key);
+    });
+  }
+  return promise;
 }
 
 /**

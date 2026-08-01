@@ -107,6 +107,9 @@ importers:
         specifier: workspace:*
         version: link:../data-contracts
     devDependencies:
+      '@hoop-rush/test-fixtures':
+        specifier: workspace:*
+        version: link:../test-fixtures
       fast-check:
         specifier: ^4.2.0
         version: 4.9.0
@@ -157,6 +160,9 @@ importers:
       '@hoop-rush/data-contracts':
         specifier: workspace:*
         version: link:../../packages/data-contracts
+      '@hoop-rush/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       zod:
         specifier: ^4.4.3
         version: 4.4.3

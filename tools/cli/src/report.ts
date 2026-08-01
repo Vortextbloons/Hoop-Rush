@@ -14,12 +14,13 @@ export interface CliReport {
   input: Record<string, unknown>;
   details: string[];
   failures: string[];
+  payload?: unknown;
 }
 
 export function makeReport(
   command: string,
   input: Record<string, unknown>,
-  opts: { failures?: string[]; details?: string[]; exitCode?: ExitCode } = {},
+  opts: { failures?: string[]; details?: string[]; exitCode?: ExitCode; payload?: unknown } = {},
 ): CliReport {
   const failures = opts.failures ?? [];
   const details = opts.details ?? [];
@@ -32,6 +33,7 @@ export function makeReport(
     input,
     details,
     failures,
+    ...(opts.payload === undefined ? {} : { payload: opts.payload }),
   };
 }
 

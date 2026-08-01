@@ -1,7 +1,7 @@
 import type { HoopRushManifest } from '../manifest.js';
 import type { PlayerExternalId, TeamExternalId } from '../ids.js';
 import type { PeakPlayerSeason } from '../player-season.js';
-import { franchiseAbbreviation } from '../franchise.js';
+import { franchiseLogoSlug } from '../franchise.js';
 
 /**
  * Asset URL resolution from the manifest's versioned templates (spec/02).
@@ -70,8 +70,9 @@ export function resolveSecondaryLogoUrl(
 ): string | null {
   const template = manifest.assets.logoUrlTemplateSecondary;
   if (!template) return null;
-  // Secondary logo hosts (e.g. ESPN) use lowercase team slugs.
-  return template.replace('{teamAbbreviation}', franchiseAbbreviation(franchiseId).toLowerCase());
+  // Secondary logo hosts (e.g. ESPN) use lowercase slugs that can differ
+  // from the standard abbreviation (Pelicans -> no, Jazz -> utah).
+  return template.replace('{teamAbbreviation}', franchiseLogoSlug(franchiseId));
 }
 
 /** Ordered logo candidates: primary NBA CDN, then secondary, then none. */

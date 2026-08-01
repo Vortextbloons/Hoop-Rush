@@ -288,6 +288,7 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
     rpg = float(stats.get("rebounds", 0) or 0) / max(1, gp)
     apg = float(stats.get("assists", 0) or 0) / max(1, gp)
     mpg = minutes / max(1, gp)
+    per = float(stats.get("per", 0) or 0)
     usage = float(stats.get("usageRate", 0) or 0)
     bpm = float(stats.get("boxPlusMinus", 0) or 0)
     ts_pct = float(stats.get("tsPct", 0) or 0)
@@ -357,14 +358,47 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
 
     boosted = max(blended, floor)
 
-    # --- Big-man profile caps (matches TS) ---
+    # A high-minute, efficient two-way wing should not be capped merely because
+    # his usage is below a heliocentric threshold. Kobe's 1999-00 season is the
+    # motivating case: 38.2 MPG, 21.1 PPG, 19.1 PER, and +3.2 BPM at 26.1% usage.
+    # This is a mechanism-based production floor, not a player-name override.
     is_big = _is_big_profile(ratings, position)
+    two_way_star = (
+        not is_big
+        and gp >= 50
+        and mpg >= 34
+        and ppg >= 20
+        and usage >= 24
+        and per >= 18
+        and bpm >= 2.5
+    )
+    if two_way_star:
+        boosted = max(boosted, 88)
 
+    # Primary creators can carry elite offensive value without a high shot
+    # volume. Reward sustained, efficient playmaking so pass-first stars are not
+    # treated as ordinary low-usage players (Magic's 1990-91 season is the
+    # motivating case: 12.5 APG, 62.3% TS, and 21.8 PER at 20.5% usage).
+    primary_creator = (
+        not is_big
+        and gp >= 50
+        and mpg >= 30
+        and apg >= 8
+        and usage >= 18
+        and per >= 18
+        and ts_pct >= 0.58
+    )
+    if primary_creator:
+        boosted = max(boosted, 91)
+
+    # --- Big-man profile caps (matches TS) ---
     if is_big and usage < 28:
         if ppg < 12:
             boosted = min(boosted, 82)
         elif ppg < 17:
-            boosted = min(boosted, 88 if bpm >= 3 else 83)
+            # Strong defensive impact can raise a low-volume big, but should
+            # not let inflated raw attributes reach the star band on their own.
+            boosted = min(boosted, 86 if bpm >= 3 else 83)
         elif ppg < 20:
             boosted = min(boosted, 88 if bpm >= 3 else 82)
         elif ppg < 25 and bpm < 3:
@@ -390,7 +424,7 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
     if not is_big and ppg >= 18 and ppg < 23 and usage >= 24 and bpm < 1.5:
         boosted = min(boosted, 83 if ppg >= 22 else 82)
 
-    if not is_big and ppg >= 20 and usage < 28 and bpm < 2.5:
+    if not is_big and ppg >= 20 and usage < 28 and bpm < 2.5 and not two_way_star:
         boosted = min(boosted, 87)
 
     if not is_big and ppg >= 20 and ppg < 25 and usage < 28:
@@ -398,6 +432,18 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
 
     if not is_big and ppg >= 20 and usage < 26 and bpm < 1.5:
         boosted = min(boosted, 82)
+
+    # A regular-minute season with weak overall impact should not remain in the
+    # upper-80s solely because the derived skill profile is broad. Apply a
+    # smooth, position-neutral penalty so low-impact role players separate
+    # naturally instead of collapsing onto one hard cap.
+    low_impact_rotation = (
+        gp >= 40
+        and mpg >= 20
+        and ppg < 16
+        and per < 14
+        and bpm < 1
+    )
 
     # --- Final boost (matches TS) ---
     if boosted < 65:
@@ -411,7 +457,11 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
     else:
         final_boost = 2.0
 
-    return clamp_rating(boosted + final_boost)
+    final_overall = clamp_rating(boosted + final_boost)
+    if low_impact_rotation:
+        impact_penalty = round(max(0, (14 - per) * 0.5 + (1 - bpm)))
+        final_overall = max(0, final_overall - impact_penalty)
+    return final_overall
 
 
 # ---------------------------------------------------------------------------
