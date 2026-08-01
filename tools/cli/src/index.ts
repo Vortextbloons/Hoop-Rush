@@ -3,6 +3,10 @@ import { dataValidate, DATA_VALIDATE_OPTIONS, DEFAULT_MANIFEST } from './command
 import { dataOveralls, DATA_OVERALLS_OPTIONS } from './commands/data-overalls.js';
 import { helpCommand } from './commands/help.js';
 import { simGame, simBatch, SIM_OPTIONS, UsageError as SimUsageError } from './commands/sim.js';
+import { simChallenge, SIM_CHALLENGE_OPTIONS } from './commands/challenge.js';
+import { bracketAudit, BRACKET_AUDIT_OPTIONS } from './commands/bracket-audit.js';
+import { bracketGenerate, BRACKET_GENERATE_OPTIONS } from './commands/bracket-generate.js';
+import { benchmark, BENCHMARK_OPTIONS } from './commands/benchmark.js';
 import { replay, REPLAY_OPTIONS } from './commands/replay.js';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.js';
 import {
@@ -63,6 +67,45 @@ const COMMANDS: Record<string, CommandDef> = {
         profile: getOptionString(args, 'profile') ?? undefined,
       }),
   },
+  'sim challenge': {
+    options: SIM_CHALLENGE_OPTIONS,
+    run: (args) =>
+      simChallenge({
+        lineup: getOptionString(args, 'lineup') ?? undefined,
+        seed: getOptionString(args, 'seed') ?? undefined,
+        profile: getOptionString(args, 'profile') ?? undefined,
+        bracket: getOptionString(args, 'bracket') ?? undefined,
+      }),
+  },
+  'bracket audit': {
+    options: BRACKET_AUDIT_OPTIONS,
+    run: (args) =>
+      bracketAudit(getOptionString(args, 'input') ?? DEFAULT_MANIFEST, hasOption(args, 'verbose')),
+  },
+  'bracket generate': {
+    options: BRACKET_GENERATE_OPTIONS,
+    run: (args) =>
+      bracketGenerate({
+        seed: getOptionString(args, 'seed') ?? undefined,
+        proposals: getOptionString(args, 'proposals') ?? undefined,
+        samples: getOptionString(args, 'samples') ?? undefined,
+        'min-score': getOptionString(args, 'min-score') ?? undefined,
+        'data-version': getOptionString(args, 'data-version') ?? undefined,
+        verbose: hasOption(args, 'verbose'),
+      }),
+  },
+  benchmark: {
+    options: BENCHMARK_OPTIONS,
+    run: (args) =>
+      benchmark({
+        fixture: getOptionString(args, 'fixture') ?? undefined,
+        samples: getOptionString(args, 'samples') ?? undefined,
+        'seed-from': getOptionString(args, 'seed-from') ?? undefined,
+        'seed-to': getOptionString(args, 'seed-to') ?? undefined,
+        workers: getOptionString(args, 'workers') ?? undefined,
+        profile: getOptionString(args, 'profile') ?? undefined,
+      }),
+  },
   replay: {
     options: REPLAY_OPTIONS,
     run: (args) =>
@@ -79,6 +122,8 @@ const COMMANDS: Record<string, CommandDef> = {
         'seed-from': getOptionString(args, 'seed-from') ?? undefined,
         workers: getOptionString(args, 'workers') ?? undefined,
         profile: getOptionString(args, 'profile') ?? undefined,
+        'challenge-samples': getOptionString(args, 'challenge-samples') ?? undefined,
+        'opponent-games': getOptionString(args, 'opponent-games') ?? undefined,
       }),
   },
   'calibrate sensitivity': {

@@ -111,8 +111,9 @@ export function buildInput(
         }
       : profile;
   const input: GameSimulationInput = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     seed,
+    gameNumber: 1,
     dataVersion: profile.dataVersion,
     profile: variantProfile,
     home: variant && fixture.variantHome ? fixture.variantHome : fixture.home,

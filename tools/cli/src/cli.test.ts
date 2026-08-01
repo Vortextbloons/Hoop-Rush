@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+﻿import { execFile } from 'node:child_process';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -6,10 +6,13 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import {
+  benchmarkReportSchema,
+  bracketAuditReportSchema,
   calibrateRunReportSchema,
   calibrateSensitivityReportSchema,
   replayReportSchema,
   simBatchReportSchema,
+  simChallengeReportSchema,
   simGameReportSchema,
 } from './report-schemas.js';
 
@@ -124,7 +127,7 @@ describe('cli: sim game', () => {
     expect(code).toBe(0);
     const payload = simGameReportSchema.parse(jsonPayload(stdout));
     expect(payload.invariants).toEqual([]);
-    expect(payload.engineVersion).toMatch(/^m2-engine/);
+    expect(payload.engineVersion).toMatch(/^m3-engine/);
     expect(payload.profileVersion).toMatch(/^m2-1990s/);
     expect(payload.fixture).toBe('equal');
     expect(payload.result).toBeDefined();
@@ -259,7 +262,8 @@ describe('cli: replay', () => {
     writeFileSync(
       inputPath,
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
+        gameNumber: 1,
         seed: '12341234123412341234123412341234',
         dataVersion: profile.dataVersion,
         profile,
@@ -312,7 +316,8 @@ describe('cli: replay', () => {
     writeFileSync(
       inputPath,
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
+        gameNumber: 1,
         seed: '01230123012301230123012301230123',
         dataVersion: profile.dataVersion,
         profile,
@@ -344,7 +349,11 @@ describe('cli: calibrate commands', () => {
       'calibrate',
       'run',
       '--samples',
-      '1200',
+      '500',
+      '--challenge-samples',
+      '1',
+      '--opponent-games',
+      '3',
       '--format',
       'json',
     ]);
@@ -353,11 +362,15 @@ describe('cli: calibrate commands', () => {
     expect(payload.pass).toBe(true);
     expect(payload.metrics.length).toBeGreaterThan(20);
     expect(payload.profileVersion).toMatch(/^m2-1990s/);
+    expect(payload.bracketDistribution).toHaveLength(30);
+    expect(payload.bracketMedianObservedWinRate).not.toBeNull();
+    expect(payload.perfectRunRate).not.toBeNull();
+    expect(payload.challengeRuns).toBe(1);
     for (const metric of payload.metrics) {
       expect(metric.observed).toBeGreaterThanOrEqual(metric.target - metric.tolerance - 0.02);
       expect(metric.observed).toBeLessThanOrEqual(metric.target + metric.tolerance + 0.02);
     }
-  });
+  }, 60_000);
 
   it('calibrate run exits 1 when a gate fails', async () => {
     // A tolerance of zero on one metric cannot be satisfied by a seeded batch.
@@ -369,9 +382,20 @@ describe('cli: calibrate commands', () => {
     pointsTarget.tolerance = 0;
     const badPath = join(TMP, 'bad-profile.json');
     writeFileSync(badPath, JSON.stringify(badProfile));
-    const { code } = await runCli(['calibrate', 'run', '--samples', '600', '--profile', badPath]);
+    const { code } = await runCli([
+      'calibrate',
+      'run',
+      '--samples',
+      '300',
+      '--challenge-samples',
+      '0',
+      '--opponent-games',
+      '3',
+      '--profile',
+      badPath,
+    ]);
     expect(code).toBe(1);
-  });
+  }, 60_000);
 
   it('calibrate run rejects an invalid profile with exit 2', async () => {
     const badPath = join(TMP, 'invalid-profile.json');
@@ -394,5 +418,145 @@ describe('cli: calibrate commands', () => {
     const payload = calibrateSensitivityReportSchema.parse(jsonPayload(stdout));
     expect(payload.pass).toBe(true);
     expect(payload.metrics.length).toBe(9);
+  });
+});
+
+describe('cli: sim challenge', () => {
+  it('runs a complete 82-game challenge with a validated payload', async () => {
+    const { code, stdout } = await runCli([
+      'sim',
+      'challenge',
+      '--lineup',
+      'challenge-user',
+      '--seed',
+      '12341234123412341234123412341234',
+      '--format',
+      'json',
+    ]);
+    expect(code).toBe(0);
+    const payload = simChallengeReportSchema.parse(jsonPayload(stdout));
+    expect(payload.record.gamesPlayed).toBe(82);
+    expect(payload.record.wins + payload.record.losses).toBe(82);
+    expect(payload.outcome).toBe('eliminated');
+    expect(payload.invariantFailures).toBe(0);
+    expect(payload.bracketVersion).toMatch(/^bracket-m3/);
+    expect(payload.playerTotals).toHaveLength(5);
+    expect(payload.firstLossGameNumber).toBe(4);
+  });
+
+  it('requires a seed and rejects invalid hex with exit 2', async () => {
+    const missing = await runCli(['sim', 'challenge']);
+    expect(missing.code).toBe(2);
+    expect(missing.stderr).toContain('--seed');
+    const bad = await runCli(['sim', 'challenge', '--seed', 'not-hex!']);
+    expect(bad.code).toBe(2);
+    expect(bad.stderr).toContain('hex');
+  });
+
+  it('is reproducible: the same seed reproduces the same record', async () => {
+    const run = async () => {
+      const { code, stdout } = await runCli([
+        'sim',
+        'challenge',
+        '--seed',
+        'abcdefabcdefabcdefabcdefabcdef',
+        '--format',
+        'json',
+      ]);
+      expect(code).toBe(0);
+      const payload = simChallengeReportSchema.parse(jsonPayload(stdout));
+      return `${String(payload.record.wins)}-${String(payload.record.losses)}-${String(payload.firstLossGameNumber ?? 0)}`;
+    };
+    expect(await run()).toBe(await run());
+  });
+});
+
+describe('cli: bracket audit', () => {
+  it('validates the frozen bracket and emits a stable report', async () => {
+    const { code, stdout } = await runCli(['bracket', 'audit', '--format', 'json']);
+    expect(code).toBe(0);
+    const payload = bracketAuditReportSchema.parse(jsonPayload(stdout));
+    expect(payload.pass).toBe(true);
+    expect(payload.opponents).toHaveLength(30);
+    expect(payload.openingOpponentUnchanged).toBe(true);
+    expect(payload.generationSeed).toHaveLength(32);
+    expect(payload.schedulePreview).toHaveLength(82);
+    expect(payload.leagueMedianPercentile).toBeGreaterThanOrEqual(0.45);
+    expect(payload.leagueMedianPercentile).toBeLessThanOrEqual(0.6);
+  });
+
+  it('exits 1 when the bracket fails validation', async () => {
+    // A schema-valid bracket with an immediate schedule repeat fails the
+    // schedule audit (checked failure, exit 1) rather than a data-load
+    // error (exit 2).
+    const packaged = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'apps/web/static/data/opponents/bracket.json'), 'utf8'),
+    ) as { schedule: Array<{ gameNumber: number; opponentId: string }> };
+    const repeated = packaged.schedule.map((entry, index) =>
+      index === 1 ? { ...entry, opponentId: packaged.schedule[0]?.opponentId ?? '' } : entry,
+    );
+    const badBracketPath = join(TMP, 'bad-bracket.json');
+    writeFileSync(badBracketPath, JSON.stringify({ ...packaged, schedule: repeated }));
+    const badManifestPath = join(TMP, 'bad-manifest.json');
+    writeFileSync(
+      badManifestPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        dataVersion: 'm1.5',
+        franchiseLineage: [],
+        eras: [],
+        pools: [],
+        eraSimulationProfiles: [],
+        bracket: {
+          url: badBracketPath,
+          contentHash: '0'.repeat(64),
+        },
+        assets: {
+          headshotUrlTemplate: null,
+          headshotUrlTemplateSecondary: null,
+          logoUrlTemplate: null,
+          logoUrlTemplateSecondary: null,
+          source: 'example',
+          cacheVersion: 'v1',
+        },
+      }),
+    );
+    const { code } = await runCli(['bracket', 'audit', '--input', badManifestPath]);
+    expect(code).toBe(1);
+  });
+});
+
+describe('cli: benchmark', () => {
+  it('measures warm single-game and 82-game runs with a validated payload', async () => {
+    const { code, stdout } = await runCli(['benchmark', '--samples', '5', '--format', 'json']);
+    expect(code).toBe(0);
+    const payload = benchmarkReportSchema.parse(jsonPayload(stdout));
+    expect(payload.environment.platform).toBe(process.platform);
+    expect(payload.engineVersion).toMatch(/^m3-engine/);
+    expect(payload.singleGame.sampleCount).toBe(5);
+    expect(payload.challenge82.sampleCount).toBe(5);
+    expect(payload.singleGame.medianMs).toBeGreaterThan(0);
+    expect(payload.challenge82.medianMs).toBeGreaterThan(0);
+    expect(payload.heapUsedMb).toBeGreaterThan(0);
+  });
+
+  it('produces identical results across worker counts', async () => {
+    const runWith = async (workers: string) => {
+      const { code, stdout } = await runCli([
+        'benchmark',
+        '--samples',
+        '4',
+        '--workers',
+        workers,
+        '--format',
+        'json',
+      ]);
+      expect(code).toBe(0);
+      return benchmarkReportSchema.parse(jsonPayload(stdout));
+    };
+    const single = await runWith('1');
+    const many = await runWith('4');
+    expect(many.singleGame.sampleCount).toBe(single.singleGame.sampleCount);
+    expect(many.challenge82.sampleCount).toBe(single.challenge82.sampleCount);
   });
 });

@@ -31,7 +31,8 @@ describe('fixture builders', () => {
   it('build a schema-valid challenge run', () => {
     const run = buildChallengeRun();
     expect(challengeRunSchema.safeParse(run).success).toBe(true);
-    expect(run.schedule.opponents).toHaveLength(30);
+    expect(run.bracket.opponents).toHaveLength(30);
+    expect(run.bracket.schedule).toHaveLength(82);
   });
 
   it('produces deterministic seeds', () => {

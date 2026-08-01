@@ -25,6 +25,22 @@ Commands:
                          --seed-from N --seed-to N   Inclusive seed range
                          --samples N           Convenience for seed-to = seed-from + N - 1
                          --workers N           Chunks; results never depend on the count
+  sim challenge          Run one complete 82-game challenge against the frozen bracket.
+                         --lineup <fixture-id|team.json>  User five (default challenge-user)
+                         --seed <hex>          Run seed (required)
+                         --profile <path>      Override the packaged 1990s era profile
+                         --bracket <path>      Override the packaged bracket artifact
+  bracket audit          Validate the frozen 30-team bracket and 82-game schedule:
+                         schema/hash/versions, legal balanced lineups, duplicates,
+                         strength percentiles and median, schedule counts and repeats,
+                         opening opponent unchanged, and schedule regeneration.
+                         --input <path>   Manifest path (default apps/web/static/data/manifest.json)
+  bracket generate       (dev) Author the frozen bracket from packaged NBA data and
+                         commit it with the manifest. Deterministic under --seed.
+                         --seed <hex> --proposals N --samples N --min-score N
+  benchmark              Measure warm single-game and 82-game throughput.
+                         --fixture <id> (default equal) --samples N (default 50)
+                         --seed-from N --workers N
   replay                 Reproduce a saved game input and compare with an expected result.
                          --input <game-input.json> --expected <game-result.json>
   calibrate run          Compare seeded batches against the frozen era profile targets.

@@ -1,12 +1,33 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { ArrowRight, Check, ChevronDown, Lock, Plus, Search, X } from '@lucide/svelte';
   import { Dialog, Select } from 'bits-ui';
-  import type { FranchiseEraPool, HoopRushManifest, SlotIndex } from '@hoop-rush/data-contracts';
+  import type {
+    EraSimulationProfile,
+    FranchiseEraPool,
+    HoopRushManifest,
+    OpponentBracket,
+    SlotIndex,
+  } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
-  import { getManifest, getPool, prefetchPools } from '$lib/data';
-  import { buildSandboxUrl } from '$lib/sandbox-url';
+  import {
+    canPlay,
+    createChallenge,
+    createEngineContext,
+    slotRequirement,
+    toSimulationPlayer,
+    validateLineup,
+  } from '@hoop-rush/engine';
+  import {
+    getBracket,
+    getEraSimulationProfile,
+    getManifest,
+    getPool,
+    prefetchPools,
+  } from '$lib/data';
+  import { challengeRepository } from '$lib/challenge-repo';
+  import { generateSeed } from '$lib/sandbox-url';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
@@ -33,6 +54,10 @@
   let pool: FranchiseEraPool | null = $state(null);
   let poolError: string | null = $state(null);
 
+  let profile = $state<EraSimulationProfile | null>(null);
+  let bracket = $state<OpponentBracket | null>(null);
+  let starting = $state(false);
+
   let slots = $state<(PeakPlayer | null)[]>([null, null, null, null, null]);
   let pickerPlayer = $state<PeakPlayer | null>(null);
   let search = $state('');
@@ -50,6 +75,40 @@
       },
       (error: unknown) => {
         if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  $effect(() => {
+    if (!manifest || !eraId) return;
+    const profileEntry = manifest.eraSimulationProfiles.find((p) => p.eraId === eraId);
+    if (!profileEntry) return;
+    let cancelled = false;
+    getEraSimulationProfile(profileEntry).then(
+      (p) => {
+        if (!cancelled) profile = p;
+      },
+      () => {
+        if (!cancelled) poolError = 'The decade simulation profile is unavailable.';
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  $effect(() => {
+    if (!manifest?.bracket) return;
+    let cancelled = false;
+    getBracket(manifest.bracket).then(
+      (b) => {
+        if (!cancelled) bracket = b;
+      },
+      () => {
+        if (!cancelled) poolError = 'The opponent bracket is unavailable.';
       },
     );
     return () => {
@@ -347,19 +406,56 @@
     }).ok;
   });
 
-  /** Setup URL carrying franchise, era, and slot assignments (validated on load). */
-  const setupHref = $derived(
-    lineupIsLegal && franchiseId && eraId
-      ? buildSandboxUrl(
-          {
-            franchiseId,
-            eraId,
-            playerIds: slots.map((player) => player!.playerId),
-          },
-          'setup',
-        )
-      : null,
+  const ready = $derived(
+    lineupIsLegal &&
+      manifest !== null &&
+      pool !== null &&
+      profile !== null &&
+      bracket !== null &&
+      franchise !== null,
   );
+
+  /** Creates and persists the active 82-game run, then starts it immediately. */
+  async function play82() {
+    if (!ready || !pool || !profile || !bracket || !franchise) return;
+    starting = true;
+    try {
+      const players = slots.filter((p): p is PeakPlayer => p !== null);
+      const sample = players[0];
+      const run = createChallenge({
+        runId: crypto.randomUUID(),
+        mode: 'sandbox',
+        franchiseId,
+        eraId,
+        homeDisplayName: franchise.displayName,
+        lineup: {
+          structure: [...SLOT_REQUIREMENTS],
+          assignments: players.map((player, slotIndex) => ({
+            slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+            playerId: player.playerId,
+            positions: player.positions.canonical,
+          })),
+        },
+        players: players.map((player) => toSimulationPlayer(player)),
+        runSeed: generateSeed(),
+        dataVersion: profile.dataVersion,
+        ratingVersion: sample?.source.ratingsVersion ?? 'unknown',
+        positionNormalizationVersion: sample?.positions.normalizationVersion ?? 'position-v1',
+        engineVersion: createEngineContext().engineVersion,
+        profile,
+        bracket,
+      });
+      await challengeRepository.saveActiveRun({
+        recordId: 'active',
+        saveSchemaVersion: 2,
+        run,
+      });
+      void goto(resolve('/sandbox/challenge'));
+    } catch (e) {
+      poolError = e instanceof Error ? e.message : String(e);
+      starting = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -720,15 +816,17 @@
           onmove={openPicker}
           onremove={removePlayer}
         />
-        {#if lineupIsLegal && setupHref}
+        {#if ready}
           <div class="mt-4">
-            <a
-              href={resolve(setupHref)}
-              class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <button
+              type="button"
+              onclick={play82}
+              disabled={starting}
+              class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Continue to challenge setup
+              {starting ? 'Starting…' : 'Play 82 games'}
               <ArrowRight class="h-4 w-4" />
-            </a>
+            </button>
           </div>
         {/if}
       </div>
@@ -847,7 +945,6 @@
                     </span>
                   {:else}
                     <span class="block truncate text-sm font-semibold">Open {label} slot</span>
-                    <span class="block font-mono text-[10px] text-muted-foreground">Empty</span>
                   {/if}
                 </span>
                 <span class="flex shrink-0 items-center gap-1.5">

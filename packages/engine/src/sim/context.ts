@@ -1,5 +1,6 @@
 import type { Rng } from './rng.js';
 import { createRng } from './rng.js';
+import { ENGINE_VERSION } from './constants.js';
 
 /**
  * Engine context (spec/10 public boundary). The RNG factory is injected so
@@ -15,7 +16,7 @@ export interface EngineContext {
 
 export function createEngineContext(overrides: Partial<EngineContext> = {}): EngineContext {
   return {
-    engineVersion: 'm2-engine-v1',
+    engineVersion: ENGINE_VERSION,
     rngFactory: createRng,
     ...overrides,
   };

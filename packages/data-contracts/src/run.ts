@@ -1,16 +1,21 @@
 import { z } from 'zod';
 import { franchiseIdSchema, playerIdSchema, seedSchema } from './ids.js';
 import { difficultyProfileSchema } from './difficulty.js';
+import { lineupSchema } from './lineup.js';
+import { simulationPlayerSchema } from './simulation.js';
+import { madeAttemptedSchema, gameResultSchema } from './result.js';
+import { opponentBracketCoreSchema } from './bracket.js';
 
 /**
- * Accepted challenge-run state (spec/04 minimal run state). The domain shape of
- * an active or completed Sandbox run; persistence wraps it with storage
- * metadata. Only accepted domain state is ever persisted.
+ * Accepted challenge-run state (spec/04 minimal run state). The domain shape
+ * of an active or completed Sandbox run; persistence wraps it with storage
+ * metadata. Only accepted domain state is ever persisted, and every result
+ * is verified by the challenge command before it joins the run.
  */
 
 export const runVersionBoundariesSchema = z.object({
-  /** Persisted-save layout version. */
-  saveSchemaVersion: z.number().int().positive(),
+  /** Persisted-save layout version (2 = M3 challenge state). */
+  saveSchemaVersion: z.literal(2),
   /** Static data (pools, eras, lineage) version. */
   dataVersion: z.string().min(1).max(64),
   /** Rating derivation version. */
@@ -19,10 +24,12 @@ export const runVersionBoundariesSchema = z.object({
   positionNormalizationVersion: z.string().min(1).max(64),
   /** Possession engine version. */
   engineVersion: z.string().min(1).max(64),
-  /** Opponent-bracket version (fixed content, empty until M3). */
+  /** Opponent-bracket version (fixed content). */
   bracketVersion: z.string().min(1).max(64),
-  /** Shared 82-game schedule version (fixed content, empty until M3). */
+  /** Shared 82-game schedule version (fixed content). */
   scheduleVersion: z.string().min(1).max(64),
+  /** Per-game seed derivation version. */
+  seedDerivationVersion: z.string().min(1).max(64),
 });
 export type RunVersionBoundaries = z.infer<typeof runVersionBoundariesSchema>;
 
@@ -32,10 +39,67 @@ export type RunMode = z.infer<typeof runModeSchema>;
 export const classicVariantSchema = z.enum(['ratings', 'ball-knowledge']);
 export type ClassicVariant = z.infer<typeof classicVariantSchema>;
 
-export const runStatusSchema = z.enum(['active', 'eliminated', 'finished', 'abandoned']);
+export const runStatusSchema = z.enum(['active', 'finished', 'abandoned']);
 export type RunStatus = z.infer<typeof runStatusSchema>;
 
+/** Final outcome of a finished run: all 82 wins or at least one loss. */
+export const runOutcomeSchema = z.enum(['perfect', 'eliminated']);
+export type RunOutcome = z.infer<typeof runOutcomeSchema>;
+
+/** Exact season totals for one user player, accumulated from accepted results. */
+export const playerSeasonAggregateSchema = z.object({
+  playerId: playerIdSchema,
+  gamesPlayed: z.number().int().nonnegative(),
+  minutes: z.number().int().nonnegative(),
+  points: z.number().int().nonnegative(),
+  fieldGoals: madeAttemptedSchema,
+  threes: madeAttemptedSchema,
+  freeThrows: madeAttemptedSchema,
+  rebounds: z.object({
+    total: z.number().int().nonnegative(),
+    offensive: z.number().int().nonnegative(),
+    defensive: z.number().int().nonnegative(),
+  }),
+  assists: z.number().int().nonnegative(),
+  steals: z.number().int().nonnegative(),
+  blocks: z.number().int().nonnegative(),
+  turnovers: z.number().int().nonnegative(),
+  fouls: z.number().int().nonnegative(),
+});
+export type PlayerSeasonAggregate = z.infer<typeof playerSeasonAggregateSchema>;
+
+/** Exact season totals for the user's team, accumulated from accepted results. */
+export const teamAggregateSchema = z.object({
+  wins: z.number().int().nonnegative(),
+  losses: z.number().int().nonnegative(),
+  gamesPlayed: z.number().int().nonnegative(),
+  points: z.number().int().nonnegative(),
+  fieldGoals: madeAttemptedSchema,
+  threes: madeAttemptedSchema,
+  freeThrows: madeAttemptedSchema,
+  rebounds: z.object({
+    total: z.number().int().nonnegative(),
+    offensive: z.number().int().nonnegative(),
+    defensive: z.number().int().nonnegative(),
+    team: z.number().int().nonnegative(),
+  }),
+  assists: z.number().int().nonnegative(),
+  steals: z.number().int().nonnegative(),
+  blocks: z.number().int().nonnegative(),
+  turnovers: z.number().int().nonnegative(),
+  fouls: z.number().int().nonnegative(),
+  possessions: z.number().int().nonnegative(),
+});
+export type TeamAggregate = z.infer<typeof teamAggregateSchema>;
+
+export const runAggregatesSchema = z.object({
+  team: teamAggregateSchema,
+  players: z.array(playerSeasonAggregateSchema).length(5),
+});
+export type RunAggregates = z.infer<typeof runAggregatesSchema>;
+
 export const challengeRunSchema = z.object({
+  schemaVersion: z.literal(1),
   runId: z.string().min(1).max(64),
   mode: runModeSchema,
   /** Immutable after creation; present only for classic mode. */
@@ -43,27 +107,30 @@ export const challengeRunSchema = z.object({
   /** Sandbox selection. */
   franchiseId: franchiseIdSchema,
   eraId: z.string().min(1).max(24),
-  /** Exactly five distinct selected peak player-seasons. */
+  /** Display name for the user's lineup (resolved from lineage at creation). */
+  homeDisplayName: z.string().min(1).max(96),
+  /** Exactly five distinct selected peak player-seasons, in slot order. */
   playerIds: z.array(playerIdSchema).length(5),
+  /** Legal G,G,F,F,C assignment validated at creation. */
+  lineup: lineupSchema,
+  /** Five immutable SimulationPlayer snapshots matching the lineup. */
+  players: z.array(simulationPlayerSchema).length(5),
   /** Run seed; per-game seeds derive from this value. */
   runSeed: seedSchema,
   versions: runVersionBoundariesSchema,
+  /** Era simulation profile version every accepted result must report. */
+  eraProfileVersion: z.string().min(1).max(64),
   difficulty: difficultyProfileSchema,
+  /** Complete frozen bracket content (30 opponents + 82-game schedule). */
+  bracket: opponentBracketCoreSchema,
   status: runStatusSchema,
-  /** Fixed schedule references; opponents appear in order of the shared schedule. */
-  schedule: z.object({
-    /** 30 fixed opponent franchise IDs (fixed bracket content). */
-    opponents: z.array(franchiseIdSchema).length(30),
-  }),
-  /** Recorded game results in played order; empty until M2. */
-  games: z.array(z.object({ gameNumber: z.number().int().min(1).max(82) })).default([]),
-  /** Compact completed-run totals for history (filled when complete). */
-  totals: z
-    .object({
-      wins: z.number().int().nonnegative(),
-      losses: z.number().int().nonnegative(),
-      gamesPlayed: z.number().int().nonnegative(),
-    })
-    .optional(),
+  /** Final outcome; present once the run is finished. */
+  outcome: runOutcomeSchema.optional(),
+  /** First loss game number (1-82), or null while the run is undefeated. */
+  firstLossGameNumber: z.number().int().min(1).max(82).nullable(),
+  /** Accepted game results in schedule order. */
+  games: z.array(gameResultSchema),
+  /** Exact season totals accumulated from accepted results. */
+  aggregates: runAggregatesSchema,
 });
 export type ChallengeRun = z.infer<typeof challengeRunSchema>;

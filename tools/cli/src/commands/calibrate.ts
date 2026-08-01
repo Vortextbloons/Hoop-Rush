@@ -1,5 +1,12 @@
-import type { z } from 'zod';
-import { checkGameResult, createEngineContext, toSimulationPlayer } from '@hoop-rush/engine';
+﻿import type { z } from 'zod';
+import {
+  checkGameResult,
+  createChallenge,
+  createEngineContext,
+  evaluateLineupStrength,
+  simulateChallenge,
+  toSimulationPlayer,
+} from '@hoop-rush/engine';
 import type { SimulationPlayer } from '@hoop-rush/data-contracts';
 import {
   type EraSimulationProfile,
@@ -22,12 +29,16 @@ import {
   UsageError,
   loadProfileFile,
 } from './sim.js';
+import { lineupForTeam } from './challenge.js';
 import { loadPackagedData, PackagedData } from './data-loader.js';
 
 /**
  * `calibrate run` and `calibrate sensitivity` (spec/09, spec/06). Calibration
  * uses the authoritative engine and the packaged data; the era profile holds
- * the frozen targets and tolerances that these commands enforce.
+ * the frozen targets and tolerances that these commands enforce. `calibrate
+ * run` additionally remeasures every bracket opponent against the fixed
+ * benchmark matrix and reports the observed bracket distribution plus the
+ * informational 82-0 completion rate.
  */
 
 export const CALIBRATE_OPTIONS: Record<string, boolean> = {
@@ -36,6 +47,8 @@ export const CALIBRATE_OPTIONS: Record<string, boolean> = {
   workers: true,
   fixture: true,
   profile: true,
+  'challenge-samples': true,
+  'opponent-games': true,
   format: true,
   verbose: false,
 };
@@ -214,9 +227,13 @@ export function calibrateRun(args: {
   'seed-from'?: string;
   workers?: string;
   profile?: string;
+  'challenge-samples'?: string;
+  'opponent-games'?: string;
 }): CliReport {
   const samples = parseCount(args.samples, '--samples', 2000);
   const seedFrom = parseCount(args['seed-from'], '--seed-from', 0);
+  const challengeSamples = parseCount(args['challenge-samples'], '--challenge-samples', 25);
+  const opponentGames = parseCount(args['opponent-games'], '--opponent-games', 60);
   const packaged = loadPackagedData();
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile();
@@ -224,19 +241,18 @@ export function calibrateRun(args: {
   const pool = data.pool('lakers', '1990s');
   const average = leagueAverageTeam(pool);
   const { strong, weak } = poolStrengthLineups(pool);
-  const opponent = data.openingOpponent();
+  const bracket = data.bracket();
+  const context = createEngineContext();
 
   const equalAcc = newAccumulator();
   const strongWeakAcc = newAccumulator();
-  const opponentAcc = newAccumulator();
   let invariantFailures = 0;
-  let opponentGames = 0;
-  let opponentWins = 0;
 
   for (let i = seedFrom; i < seedFrom + samples; i += 1) {
     const seed = fixtureSeed('calibrate', i);
     const equalInput: GameSimulationInput = {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      gameNumber: 1,
       seed,
       dataVersion: profile.dataVersion,
       profile,
@@ -244,7 +260,8 @@ export function calibrateRun(args: {
       away: average,
     };
     const swInput: GameSimulationInput = {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      gameNumber: 1,
       seed,
       dataVersion: profile.dataVersion,
       profile,
@@ -255,26 +272,84 @@ export function calibrateRun(args: {
     invariantFailures += accumulate(strongWeakAcc, swInput, false);
     const swResult = runSingleGame(swInput).result;
     if (swResult.winner === 'home') strongWeakAcc.homeWins += 1;
+  }
 
-    // Opening opponent vs a strong user lineup (informational difficulty probe).
-    if (i < seedFrom + Math.min(samples, 400)) {
+  // Opening opponent vs a strong user lineup (informational difficulty probe).
+  const openingOpponent = bracket.opponents.find((o) => o.opponentId === 'lakers-1990s-opening');
+  let openingWinRateVsStrongUser: number | null = null;
+  if (openingOpponent) {
+    let wins = 0;
+    const games = Math.min(opponentGames, 400);
+    for (let i = 0; i < games; i += 1) {
       const oppInput: GameSimulationInput = {
-        schemaVersion: 1,
+        schemaVersion: 2,
+        gameNumber: 1,
         seed: fixtureSeed('user-opponent', i),
         dataVersion: profile.dataVersion,
         profile,
         home: { ...strong, teamId: 'user', displayName: 'User Lineup' },
         away: {
-          teamId: opponent.teamId,
-          displayName: opponent.displayName,
-          players: opponent.players,
+          teamId: openingOpponent.teamId,
+          displayName: openingOpponent.displayName,
+          players: openingOpponent.players,
         },
       };
       const oppResult = runSingleGame(oppInput).result;
-      opponentAcc.points += oppResult.home.box.points;
-      opponentGames += 1;
-      if (oppResult.winner === 'home') opponentWins += 1;
+      if (oppResult.winner === 'home') wins += 1;
     }
+    openingWinRateVsStrongUser = games === 0 ? null : 1 - wins / games;
+  }
+
+  // Remeasure every bracket opponent against the fixed benchmark matrix.
+  const bracketDistribution: Array<{
+    opponentId: string;
+    recordedWinRate: number;
+    observedWinRate: number;
+    recordedPercentile: number;
+  }> = [];
+  for (const opponent of bracket.opponents) {
+    const team: SimulationTeam = {
+      teamId: opponent.teamId,
+      displayName: opponent.displayName,
+      players: opponent.players,
+    };
+    const measurement = evaluateLineupStrength(team, context, profile, {
+      samplesPerBenchmark: Math.max(3, Math.floor(opponentGames / 3)),
+      seedBase: `calibrate-opp-${opponent.opponentId}`,
+    });
+    bracketDistribution.push({
+      opponentId: opponent.opponentId,
+      recordedWinRate: opponent.strength.winRate,
+      observedWinRate: Math.round(measurement.winRate * 1000) / 1000,
+      recordedPercentile: opponent.strength.percentile,
+    });
+  }
+  const observedRates = bracketDistribution.map((d) => d.observedWinRate).sort((a, b) => a - b);
+  const medianObserved = observedRates[Math.floor(observedRates.length / 2)] ?? null;
+
+  // Informational 82-0 completion probe: complete 82-game runs vs the bracket.
+  const userLineup = lineupForTeam(strong);
+  const samplePlayer = pool.players[0];
+  let perfectRuns = 0;
+  for (let i = 0; i < challengeSamples; i += 1) {
+    const run = createChallenge({
+      runId: `calibrate-run-${String(i)}`,
+      mode: 'sandbox',
+      franchiseId: 'lakers',
+      eraId: '1990s',
+      homeDisplayName: 'User Lineup',
+      lineup: userLineup.lineup,
+      players: userLineup.players,
+      runSeed: fixtureSeed('calibrate-run82', i),
+      dataVersion: profile.dataVersion,
+      ratingVersion: samplePlayer?.source.ratingsVersion ?? 'unknown',
+      positionNormalizationVersion: samplePlayer?.positions.normalizationVersion ?? 'position-v1',
+      engineVersion: context.engineVersion,
+      profile,
+      bracket,
+    });
+    const finished = simulateChallenge(run, profile, context);
+    if (finished.outcome === 'perfect') perfectRuns += 1;
   }
 
   const metrics = buildMetrics(equalAcc, strongWeakAcc, samples, profile);
@@ -284,11 +359,14 @@ export function calibrateRun(args: {
     profileVersion: profile.profileVersion,
     eraId: profile.eraId,
     samples,
-    engineVersion: createEngineContext().engineVersion,
+    engineVersion: context.engineVersion,
     pass: metrics.every((m) => m.pass),
     metrics,
-    openingOpponentWinRateVsStrongUser:
-      opponentGames === 0 ? null : 1 - opponentWins / opponentGames,
+    openingOpponentWinRateVsStrongUser: openingWinRateVsStrongUser,
+    bracketDistribution,
+    bracketMedianObservedWinRate: medianObserved,
+    perfectRunRate: challengeSamples === 0 ? null : perfectRuns / challengeSamples,
+    challengeRuns: challengeSamples,
     invariantFailures,
   });
 
@@ -313,6 +391,8 @@ export function calibrateRun(args: {
     payload.openingOpponentWinRateVsStrongUser === null
       ? 'opening opponent vs strong user: not measured'
       : `opening opponent win rate vs strong user: ${(payload.openingOpponentWinRateVsStrongUser * 100).toFixed(1)}% (informational)`,
+    `bracket remeasurement: median observed win rate ${payload.bracketMedianObservedWinRate === null ? 'n/a' : `${(payload.bracketMedianObservedWinRate * 100).toFixed(1)}%`} (${String(payload.bracketDistribution?.length ?? 0)} opponents)`,
+    `82-0 completion rate: ${payload.perfectRunRate === null ? 'n/a' : `${(payload.perfectRunRate * 100).toFixed(1)}%`} over ${String(payload.challengeRuns)} runs (informational)`,
   ];
   return makeReport(
     'calibrate run',

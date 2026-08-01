@@ -1,13 +1,17 @@
 import type {
+  BracketOpponent,
+  BracketScheduleEntry,
   ChallengeRun,
   DifficultyProfile,
   EraSimulationProfile,
   FranchiseEraPool,
   GameSimulationInput,
   HoopRushManifest,
+  OpponentBracket,
   OpponentTeam,
   PeakPlayerSeason,
   PlayerSeasonStats,
+  RunAggregates,
   Seed,
   SimulationPlayer,
   SimulationRatings,
@@ -153,28 +157,196 @@ const ALL_FRANCHISE_IDS = [
 ] as const;
 
 export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): ChallengeRun {
+  const bracket = buildFixtureBracket();
+  const players = buildUserTeam().players;
   return {
+    schemaVersion: 1,
     runId: 'run-1',
     mode: 'sandbox',
     franchiseId: 'lakers',
     eraId: '1990s',
+    homeDisplayName: 'Los Angeles Lakers',
     playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
+    lineup: {
+      structure: ['G', 'G', 'F', 'F', 'C'],
+      assignments: players.map((player, slotIndex) => ({
+        slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+        playerId: player.playerId,
+        positions: player.positions,
+      })),
+    },
+    players,
     runSeed: seedFromString('fixture-run-1'),
     versions: {
-      saveSchemaVersion: 1,
+      saveSchemaVersion: 2,
       dataVersion: 'data-v1',
       ratingVersion: 'ratings-v1',
       positionNormalizationVersion: 'position-v1',
       engineVersion: 'engine-v1',
-      bracketVersion: 'bracket-v1',
-      scheduleVersion: 'schedule-v1',
+      bracketVersion: bracket.bracketVersion,
+      scheduleVersion: bracket.scheduleVersion,
+      seedDerivationVersion: 'seed-v1',
     },
+    eraProfileVersion: 'm2-1990s-fixture-v1',
     difficulty: DEFAULT_DIFFICULTY,
+    bracket: {
+      bracketVersion: bracket.bracketVersion,
+      scheduleVersion: bracket.scheduleVersion,
+      opponents: bracket.opponents,
+      schedule: bracket.schedule,
+    },
     status: 'active',
-    schedule: { opponents: [...ALL_FRANCHISE_IDS] },
+    firstLossGameNumber: null,
     games: [],
+    aggregates: zeroAggregates(players),
     ...overrides,
   };
+}
+
+/** Five fixture players in legal G,G,F,F,C slot order (fixture team content). */
+export function buildUserTeam(): SimulationTeam {
+  const positions: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  return {
+    teamId: 'user',
+    displayName: 'Los Angeles Lakers',
+    players: positions.map((position, i) =>
+      buildSimulationPlayer({
+        playerId: `p-${String(i + 1)}`,
+        displayName: `Fixture ${i + 1}`,
+        positions: position,
+      }),
+    ),
+  };
+}
+
+/** Zeroed season aggregates for the five fixture players. */
+export function zeroAggregates(players: readonly SimulationPlayer[]): RunAggregates {
+  const zero = () => ({ made: 0, attempted: 0 });
+  return {
+    team: {
+      wins: 0,
+      losses: 0,
+      gamesPlayed: 0,
+      points: 0,
+      fieldGoals: zero(),
+      threes: zero(),
+      freeThrows: zero(),
+      rebounds: { total: 0, offensive: 0, defensive: 0, team: 0 },
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+      possessions: 0,
+    },
+    players: players.map((player) => ({
+      playerId: player.playerId,
+      gamesPlayed: 0,
+      minutes: 0,
+      points: 0,
+      fieldGoals: zero(),
+      threes: zero(),
+      freeThrows: zero(),
+      rebounds: { total: 0, offensive: 0, defensive: 0 },
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+    })),
+  };
+}
+
+/** One parametrized bracket opponent with a legal lineup and measured strength. */
+export function buildBracketOpponent(
+  franchiseId: string,
+  opponentId: string,
+  index: number,
+  overrides: Partial<BracketOpponent> = {},
+): BracketOpponent {
+  const positions: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const players = positions.map((position, slot) =>
+    buildSimulationPlayer({
+      playerId: `p-opp-${String(index)}-${String(slot)}`,
+      displayName: `Opponent ${index} ${slot}`,
+      positions: position,
+    }),
+  );
+  return {
+    schemaVersion: 1,
+    opponentId,
+    bracketVersion: 'bracket-v1',
+    difficultyBand: 'medium',
+    teamId: franchiseId,
+    displayName: `Fixture ${franchiseId}`,
+    seasonKey: '1995-96',
+    lineup: {
+      structure: ['G', 'G', 'F', 'F', 'C'],
+      assignments: players.map((player, slotIndex) => ({
+        slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+        playerId: player.playerId,
+        positions: player.positions,
+      })),
+    },
+    players,
+    strength: {
+      evaluationVersion: 'test-v1',
+      benchmarkVersion: 'benchmark-v1',
+      sampleCount: 1,
+      winRate: 0.5,
+      percentile: 0.5,
+    },
+    ...overrides,
+  };
+}
+
+/**
+ * A fixed no-repeat 82-game schedule for the 30 fixture opponents: the first
+ * opponent (the opening opponent) plays game one, the first eight appear
+ * twice, the remaining 22 three times.
+ */
+export function buildFixtureSchedule(opponentIds: readonly string[]): BracketScheduleEntry[] {
+  if (opponentIds.length !== 30) {
+    throw new Error(`fixture schedule needs 30 opponents (got ${String(opponentIds.length)})`);
+  }
+  const twice = opponentIds.slice(0, 8);
+  const thrice = opponentIds.slice(8);
+  const round1 = [opponentIds[0]!, ...thrice, ...twice.slice(1)];
+  const round2 = [...twice, ...thrice];
+  const round3 = [...thrice];
+  const order = [...round1, ...round2, ...round3];
+  return order.map((opponentId, gameNumber) => ({ gameNumber: gameNumber + 1, opponentId }));
+}
+
+/** A complete 30-opponent fixture bracket with the fixed 82-game schedule. */
+export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): OpponentBracket {
+  const opponents = ALL_FRANCHISE_IDS.map((franchiseId, index) =>
+    buildBracketOpponent(
+      franchiseId,
+      index === 0 ? 'lakers-1990s-opening' : `bracket-${franchiseId}`,
+      index,
+    ),
+  );
+  const opponentIds = opponents.map((o) => o.opponentId);
+  const bracket: OpponentBracket = {
+    schemaVersion: 1,
+    bracketVersion: 'bracket-v1',
+    scheduleVersion: 'schedule-v1',
+    difficulty: DEFAULT_DIFFICULTY,
+    generation: {
+      seed: 'abc123abc123abc123abc123abc123ab',
+      generationVersion: 'fixture-v1',
+      dataVersion: 'data-v1',
+      targetBands: {
+        teamPercentileBand: [0.3, 0.7],
+        leagueMedianPercentileBand: [0.45, 0.6],
+      },
+    },
+    opponents,
+    schedule: buildFixtureSchedule(opponentIds),
+    ...overrides,
+  };
+  return bracket;
 }
 
 export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRushManifest {
@@ -212,7 +384,6 @@ export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRu
     ],
     pools: [],
     eraSimulationProfiles: [],
-    opponents: [],
     assets: {
       headshotUrlTemplate:
         'https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png',
@@ -467,8 +638,9 @@ export function buildGameSimulationInput(
 ): GameSimulationInput {
   const { home, away } = buildEqualFixture();
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     seed: seedFromString('fixture-game'),
+    gameNumber: 1,
     dataVersion: 'data-v1',
     profile: DEFAULT_ERA_SIM_PROFILE,
     home,

@@ -9,10 +9,10 @@ import { seedSchema } from '@hoop-rush/data-contracts';
 import { validateLineup } from '@hoop-rush/engine';
 
 /**
- * Validated URL state shared by /sandbox/setup and /sandbox/game (spec/08).
- * The draft page carries franchise, era, slot assignments, and player IDs
- * through the URL so setup and results survive refresh without persistence;
- * every value is re-validated against the manifest and pool at load time.
+ * Validated URL state shared by the sandbox draft (spec/08). The draft page
+ * carries franchise, era, slot assignments, and player IDs through the URL so
+ * drafts survive refresh without persistence; every value is re-validated
+ * against the manifest and pool at load time.
  */
 
 export interface SandboxUrlState {
@@ -31,7 +31,7 @@ export interface UrlStateValidation {
 }
 
 /** Route template literal so callers can pass the result through resolve(). */
-export type SandboxUrlTarget = `/sandbox/${'setup' | 'game'}?${string}`;
+export type SandboxUrlTarget = `/sandbox?${string}`;
 
 /** The query-string portion of a sandbox URL (combined with resolve() by pages). */
 export function buildSandboxQuery(state: SandboxUrlState): string {
@@ -45,17 +45,11 @@ export function buildSandboxQuery(state: SandboxUrlState): string {
 }
 
 /** Typed sandbox hrefs: members of the app's route union, so resolve() accepts them. */
-export type SandboxHref =
-  `/sandbox?${string}` | `/sandbox/setup?${string}` | `/sandbox/game?${string}`;
+export type SandboxHref = `/sandbox?${string}`;
 
-/** Full sandbox href for a target route (callers pass it through resolve()). */
-export function buildSandboxUrl(
-  state: SandboxUrlState,
-  target: 'setup' | 'game' | 'draft',
-): SandboxHref {
-  const query = buildSandboxQuery(state);
-  if (target === 'draft') return `/sandbox?${query}`;
-  return `/sandbox/${target}?${query}`;
+/** Full sandbox href for the draft route (callers pass it through resolve()). */
+export function buildSandboxUrl(state: SandboxUrlState): SandboxHref {
+  return `/sandbox?${buildSandboxQuery(state)}`;
 }
 
 export function parseSandboxUrl(

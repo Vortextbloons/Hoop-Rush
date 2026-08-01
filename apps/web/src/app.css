@@ -109,18 +109,6 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    background-image:
-      radial-gradient(
-        1200px 600px at 0% -10%,
-        color-mix(in oklab, var(--color-primary) 9%, transparent),
-        transparent 60%
-      ),
-      radial-gradient(
-        900px 500px at 100% 110%,
-        color-mix(in oklab, var(--color-accent) 7%, transparent),
-        transparent 60%
-      );
-    background-attachment: fixed;
   }
   ::selection {
     background: color-mix(in oklab, var(--color-primary) 50%, transparent);

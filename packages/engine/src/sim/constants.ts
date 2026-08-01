@@ -8,7 +8,7 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm2-engine-v1';
+export const ENGINE_VERSION = 'm3-engine-v1';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,

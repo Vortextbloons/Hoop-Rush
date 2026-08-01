@@ -3,11 +3,12 @@ import { readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateBracketContent, scheduleInvariants } from '@hoop-rush/engine';
 import {
   eraSimulationProfileSchema,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
-  opponentTeamSchema,
+  opponentBracketSchema,
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
@@ -293,66 +294,56 @@ async function auditEraSimulationProfiles(
 }
 
 /**
- * Audits opponent artifacts: schema validity, hash verification, legal
- * G,G,F,F,C assignments, and five matching simulation players.
+ * Audits the frozen opponent bracket: schema validity, hash verification,
+ * legal balanced lineups, internal duplicates, and the fixed schedule.
  */
-async function auditOpponents(
+async function auditBracket(
   manifest: HoopRushManifest,
   manifestDir: string,
   verbose: boolean,
 ): Promise<AuditResult> {
   const failures: string[] = [];
   const details: string[] = [];
-  const ids = new Set<string>();
-
-  for (const entry of manifest.opponents) {
-    if (ids.has(entry.opponentId)) {
-      failures.push(`opponents: duplicate opponentId ${entry.opponentId}`);
-    }
-    ids.add(entry.opponentId);
-    const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
-    try {
-      const info = await stat(assetPath);
-      if (!info.isFile()) {
-        failures.push(`opponents: ${entry.opponentId} asset is not a file (${assetPath})`);
-        continue;
-      }
-      const content = await readFile(assetPath);
-      const actualHash = createHash('sha256').update(content).digest('hex');
-      if (actualHash !== entry.contentHash) {
-        failures.push(`opponents: ${entry.opponentId} content hash mismatch (${assetPath})`);
-      } else if (verbose) {
-        details.push(`opponents: ${entry.opponentId} hash verified (${assetPath})`);
-      }
-      const parsed = opponentTeamSchema.safeParse(JSON.parse(content.toString('utf8')) as unknown);
-      if (!parsed.success) {
-        failures.push(`opponents: ${entry.opponentId} fails the opponent schema`);
-        continue;
-      }
-      const opponent = parsed.data;
-      const assignmentIds = opponent.lineup.assignments.map((a) => a.playerId);
-      const playerIds = opponent.players.map((p) => p.playerId);
-      if (assignmentIds.length !== 5 || new Set(assignmentIds).size !== 5) {
-        failures.push(`opponents: ${entry.opponentId} lineup must assign five distinct players`);
-      }
-      for (const playerId of assignmentIds) {
-        if (!playerIds.includes(playerId)) {
-          failures.push(
-            `opponents: ${entry.opponentId} lineup references ${playerId} missing from players`,
-          );
-        }
-      }
-      if (playerIds.length !== 5 || new Set(playerIds).size !== 5) {
-        failures.push(`opponents: ${entry.opponentId} must carry five distinct players`);
-      }
-      details.push(
-        `opponents: ${entry.opponentId} (${opponent.difficultyBand}, ${opponent.players.map((p) => p.displayName).join(', ')})`,
-      );
-    } catch {
-      failures.push(`opponents: ${entry.opponentId} asset missing (${assetPath})`);
-    }
+  const entry = manifest.bracket;
+  if (!entry) {
+    details.push('bracket: none packaged');
+    return { ok: true, details, failures };
   }
-  details.push(`opponents: ${String(manifest.opponents.length)} artifacts`);
+  const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
+  try {
+    const info = await stat(assetPath);
+    if (!info.isFile()) {
+      failures.push(`bracket: asset is not a file (${assetPath})`);
+      return { ok: false, details, failures };
+    }
+    const content = await readFile(assetPath);
+    const actualHash = createHash('sha256').update(content).digest('hex');
+    if (actualHash !== entry.contentHash) {
+      failures.push(`bracket: content hash mismatch (${assetPath})`);
+    } else if (verbose) {
+      details.push(`bracket: hash verified (${assetPath})`);
+    }
+    const parsed = opponentBracketSchema.safeParse(JSON.parse(content.toString('utf8')) as unknown);
+    if (!parsed.success) {
+      failures.push(
+        `bracket: artifact fails the bracket schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+      );
+      return { ok: failures.length === 0, details, failures };
+    }
+    const bracket = parsed.data;
+    failures.push(
+      ...validateBracketContent(bracket).map((f) => `bracket: ${f}`),
+      ...scheduleInvariants(bracket.schedule).map((f) => `bracket: ${f}`),
+    );
+    const percentiles = bracket.opponents.map((o) => o.strength.percentile);
+    const sorted = [...percentiles].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+    details.push(
+      `bracket: ${String(bracket.opponents.length)} opponents · ${String(bracket.schedule.length)} games · median pct ${median.toFixed(3)} · version ${bracket.bracketVersion}`,
+    );
+  } catch {
+    failures.push(`bracket: asset missing (${assetPath})`);
+  }
   return { ok: failures.length === 0, details, failures };
 }
 
@@ -433,7 +424,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     auditEras(manifest),
     await auditPools(manifest, manifestDir, verbose),
     await auditEraSimulationProfiles(manifest, manifestDir, verbose),
-    await auditOpponents(manifest, manifestDir, verbose),
+    await auditBracket(manifest, manifestDir, verbose),
     auditAssets(manifest),
   ];
 

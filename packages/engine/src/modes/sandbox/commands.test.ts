@@ -169,7 +169,7 @@ describe('sandbox commands', () => {
     expect(checkGameResult(result)).toEqual([]);
     expect(result.home.teamId).toBe('user');
     expect(result.away.teamId).toBe('lakers');
-    expect(result.engineVersion).toBe('m2-engine-v1');
+    expect(result.engineVersion).toBe(createEngineContext().engineVersion);
     expect(result.profileVersion).toBe(input.profile.profileVersion);
   });
 

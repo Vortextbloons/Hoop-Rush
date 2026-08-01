@@ -23,6 +23,9 @@ importers:
       '@hoop-rush/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@hoop-rush/persistence':
+        specifier: workspace:*
+        version: link:../../packages/persistence
       '@lucide/svelte':
         specifier: ^1.25.0
         version: 1.25.0(svelte@5.56.6(@typescript-eslint/types@8.65.0))
@@ -135,6 +138,9 @@ importers:
       '@hoop-rush/test-fixtures':
         specifier: workspace:*
         version: link:../test-fixtures
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -1001,6 +1007,10 @@ packages:
   expect-type@1.4.0:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
+
+  fake-indexeddb@6.2.5:
+    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
+    engines: {node: '>=18'}
 
   fast-check@4.9.0:
     resolution: {integrity: sha512-7ms6T7SybUev/PQITciI0yLM2pOSFy5zpG8Ty7tQofcVaQUvrMXp6CBwqF6fThLCLOrfBtuHAtwq6Yu4XPCllg==}
@@ -2378,6 +2388,8 @@ snapshots:
   esutils@2.0.3: {}
 
   expect-type@1.4.0: {}
+
+  fake-indexeddb@6.2.5: {}
 
   fast-check@4.9.0:
     dependencies:

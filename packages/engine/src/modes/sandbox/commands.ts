@@ -52,8 +52,9 @@ export function createOpeningGameInput(args: OpeningGameArgs): GameSimulationInp
     return toSimulationPlayer(player);
   });
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     seed: args.seed,
+    gameNumber: 1,
     dataVersion: args.dataVersion,
     profile: args.profile,
     home: {

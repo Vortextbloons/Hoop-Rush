@@ -45,10 +45,9 @@ export const simProfileIndexEntrySchema = z.object({
 export type SimProfileIndexEntry = z.infer<typeof simProfileIndexEntrySchema>;
 
 export const opponentIndexEntrySchema = z.object({
-  opponentId: z.string().min(1).max(64),
-  /** Relative or absolute URL of the OpponentTeam artifact. */
+  /** Relative or absolute URL of the OpponentBracket artifact. */
   url: z.string().min(1).max(512),
-  /** SHA-256 content hash of the referenced asset. */
+  /** SHA-256 content hash of the referenced artifact. */
   contentHash: contentHashSchema,
 });
 export type OpponentIndexEntry = z.infer<typeof opponentIndexEntrySchema>;
@@ -62,8 +61,8 @@ export const hoopRushManifestSchema = z.object({
   pools: z.array(poolIndexEntrySchema),
   /** Versioned era simulation profiles (M2+), indexed by era. */
   eraSimulationProfiles: z.array(simProfileIndexEntrySchema),
-  /** Fixed opponent artifacts (M2 opens with one entry; M3 completes the bracket). */
-  opponents: z.array(opponentIndexEntrySchema),
+  /** The single frozen opponent bracket (M3+), loaded and cached as a unit. */
+  bracket: opponentIndexEntrySchema.optional(),
   assets: assetConfigSchema,
 });
 export type HoopRushManifest = z.infer<typeof hoopRushManifestSchema>;

@@ -84,7 +84,7 @@ export function simulateGame(input: GameSimulationInput, context: EngineContext)
 
   const result: GameResult = {
     schemaVersion: 1,
-    gameNumber: 1,
+    gameNumber: input.gameNumber,
     seed: input.seed,
     engineVersion: context.engineVersion,
     dataVersion: input.dataVersion,

@@ -2,14 +2,14 @@ import {
   loadManifest,
   loadPool,
   loadEraSimulationProfile,
-  loadOpponentTeam,
+  loadOpponentBracket,
   type HoopRushManifest,
   type FranchiseEraPool,
   type PoolIndexEntry,
   type SimProfileIndexEntry,
   type OpponentIndexEntry,
   type EraSimulationProfile,
-  type OpponentTeam,
+  type OpponentBracket,
 } from '@hoop-rush/data-contracts';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 
@@ -86,17 +86,17 @@ export function getEraSimulationProfile(
   return promise;
 }
 
-const opponentCache = new Map<string, Promise<OpponentTeam>>();
+const bracketCache = new Map<string, Promise<OpponentBracket>>();
 
-/** Load, hash-verify, and validate an opponent artifact. */
-export function getOpeningOpponent(entry: OpponentIndexEntry): Promise<OpponentTeam> {
-  const key = entry.opponentId;
-  let promise = opponentCache.get(key);
+/** Load, hash-verify, and validate the frozen opponent bracket as a unit. */
+export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> {
+  const key = entry.url;
+  let promise = bracketCache.get(key);
   if (!promise) {
-    promise = loadOpponentTeam(resolveAssetUrl(entry.url), entry.contentHash);
-    opponentCache.set(key, promise);
+    promise = loadOpponentBracket(resolveAssetUrl(entry.url), entry.contentHash);
+    bracketCache.set(key, promise);
     promise.catch(() => {
-      opponentCache.delete(key);
+      bracketCache.delete(key);
     });
   }
   return promise;

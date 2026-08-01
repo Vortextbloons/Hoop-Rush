@@ -91,11 +91,15 @@ export const simulationTeamSchema = z.object({
 });
 export type SimulationTeam = z.infer<typeof simulationTeamSchema>;
 
-/** Everything needed to reproduce one game: seed, versions, era profile, and
- * both fixed lineups. Engine version is injected through EngineContext. */
+/** Everything needed to reproduce one game: seed, game number, versions, era
+ * profile, and both fixed lineups. Engine version is injected through
+ * EngineContext. The game number is explicit so challenge results are
+ * numbered by the shared schedule (spec/01) rather than inferred. */
 export const gameSimulationInputSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   seed: seedSchema,
+  /** 1-based game number inside the shared 82-game challenge schedule. */
+  gameNumber: z.number().int().min(1).max(82),
   dataVersion: z.string().min(1).max(64),
   profile: eraSimulationProfileSchema,
   home: simulationTeamSchema,

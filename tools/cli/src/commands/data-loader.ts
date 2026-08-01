@@ -6,11 +6,11 @@ import {
   eraSimulationProfileSchema,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
-  opponentTeamSchema,
+  opponentBracketSchema,
   type EraSimulationProfile,
   type FranchiseEraPool,
   type HoopRushManifest,
-  type OpponentTeam,
+  type OpponentBracket,
 } from '@hoop-rush/data-contracts';
 
 /**
@@ -91,13 +91,14 @@ export class PackagedData {
     return parsed.data;
   }
 
-  openingOpponent(): OpponentTeam {
-    const entry = this.manifest.opponents[0];
-    if (!entry) throw new Error('no opponents packaged in the manifest');
+  /** The single frozen opponent bracket (spec/02), hash-verified. */
+  bracket(): OpponentBracket {
+    const entry = this.manifest.bracket;
+    if (!entry) throw new Error('no bracket packaged in the manifest');
     const { path, read } = this.artifact(entry.url);
     verifyHash(path, entry.contentHash);
-    const parsed = opponentTeamSchema.safeParse(read());
-    if (!parsed.success) throw new Error(`opponent ${path} fails validation`);
+    const parsed = opponentBracketSchema.safeParse(read());
+    if (!parsed.success) throw new Error(`bracket ${path} fails validation`);
     return parsed.data;
   }
 }
