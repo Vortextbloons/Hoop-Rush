@@ -15,6 +15,9 @@ T = TypeVar("T")
 # Global rate limiter
 _last_request_time = 0.0
 _rate_lock = threading.Lock()
+_metrics_lock = threading.Lock()
+_network_requests = 0
+_cache_hits = 0
 
 
 def _global_rate_wait() -> None:
@@ -43,7 +46,11 @@ def read_cache(name: str, **params: Any) -> Any | None:
     if not p.exists():
         return None
     try:
-        return json.loads(p.read_text(encoding="utf-8"))
+        value = json.loads(p.read_text(encoding="utf-8"))
+        global _cache_hits
+        with _metrics_lock:
+            _cache_hits += 1
+        return value
     except Exception:
         return None
 
@@ -58,6 +65,9 @@ def with_retry(fn: Callable[[], T]) -> T:
     for attempt in range(MAX_RETRIES):
         try:
             _global_rate_wait()
+            global _network_requests
+            with _metrics_lock:
+                _network_requests += 1
             result = fn()
             if attempt > 0:
                 print(f"  [OK] recovered after {attempt} retries")
@@ -74,6 +84,15 @@ def with_retry(fn: Callable[[], T]) -> T:
 def rate_limit_sleep() -> None:
     """Thread-safe rate limit sleep."""
     _global_rate_wait()
+
+
+def import_metrics() -> dict[str, int]:
+    """Return process-wide request/cache counts for pipeline reporting."""
+    with _metrics_lock:
+        return {
+            "networkRequests": _network_requests,
+            "cacheHits": _cache_hits,
+        }
 
 
 def write_json(path: Path, value: Any) -> None:

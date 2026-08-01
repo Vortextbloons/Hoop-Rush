@@ -1,6 +1,6 @@
 """Fetch per-season player aggregate stats from nba_api.
 
-Output: public/data/nba/{season}/season-stats.json
+Output: apps/web/static/data/nba/{season}/season-stats.json
 """
 
 from __future__ import annotations
@@ -11,7 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import ensure_output_dir
-from .util import rate_limit_sleep, read_cache, with_retry, write_cache, write_json
+from .util import read_cache, with_retry, write_cache, write_json
+
+
+REQUIRED_MEASURE_TYPES = ("Base", "Advanced")
 
 
 def _safe_int(value: Any, default: int = 0) -> int:
@@ -38,38 +41,58 @@ try:
 except Exception as exc:  # pragma: no cover
     print(
         f"Could not import nba_api: {exc}\n"
-        "Install with: pip install -r scripts/import_nba/requirements.txt",
+        "Install with: pip install -r scripts/import-nba/requirements.txt",
         file=sys.stderr,
     )
     raise
 
 
 def fetch_league_dash(season: str) -> list[dict[str, Any]]:
+    """Fetch only datasets consumed by rating derivation.
+
+    Each measure is cached independently so a later failure never forces already
+    successful requests to be repeated. The old aggregate cache remains readable.
+    """
     cached = read_cache("league_dash_player_stats", season=season)
     if cached is not None:
-        return cached
+        by_type = {item.get("measureType"): item for item in cached}
+        if all(measure in by_type for measure in REQUIRED_MEASURE_TYPES):
+            return [by_type[measure] for measure in REQUIRED_MEASURE_TYPES]
 
-    def _do_fetch() -> list[dict[str, Any]]:
-        out: list[dict[str, Any]] = []
-        for measure_type in ("Base", "Advanced", "Scoring", "Usage", "Defense"):
-            rate_limit_sleep()
+    out: list[dict[str, Any]] = []
+    for measure_type in REQUIRED_MEASURE_TYPES:
+        measure_cached = read_cache(
+            "league_dash_player_stats_measure",
+            season=season,
+            measure=measure_type,
+        )
+        if measure_cached is not None:
+            out.append(measure_cached)
+            continue
+
+        def _do_fetch(measure: str = measure_type) -> dict[str, Any]:
             resp = leaguedashplayerstats.LeagueDashPlayerStats(
                 season=season,
-                measure_type_detailed_defense=measure_type,
+                measure_type_detailed_defense=measure,
                 per_mode_detailed="PerGame",
             )
             df = resp.get_data_frames()[0]
-            out.append(
-                {
-                    "measureType": measure_type,
-                    "rows": jsonable_rows(df),
-                }
-            )
-        return out
+            return {
+                "measureType": measure,
+                "rows": jsonable_rows(df),
+            }
 
-    payload = with_retry(_do_fetch)
-    write_cache("league_dash_player_stats", payload, season=season)
-    return payload
+        result = with_retry(_do_fetch)
+        write_cache(
+            "league_dash_player_stats_measure",
+            result,
+            season=season,
+            measure=measure_type,
+        )
+        out.append(result)
+
+    write_cache("league_dash_player_stats", out, season=season)
+    return out
 
 
 def clamp(v: float, lo: float, hi: float) -> float:

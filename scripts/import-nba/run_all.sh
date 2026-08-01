@@ -4,4 +4,4 @@ cd "$(dirname "$0")/../.."
 if [ -d ".venv-import" ]; then
   source .venv-import/bin/activate
 fi
-python -m scripts.import_nba.run_all "$@"
+python scripts/import-nba/run_all.py "$@"

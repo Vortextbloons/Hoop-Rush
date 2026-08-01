@@ -1,6 +1,6 @@
 """Fetch historical award winners.
 
-Output: public/data/shared/awards-history.json
+Optional output: apps/web/static/data/shared/awards-history.json
 
 Uses CommonAllPlayers + PlayerAwards per star player.
 Falls back to empty list on failure.

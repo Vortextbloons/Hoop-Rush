@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PUBLIC_DATA = REPO_ROOT / "public" / "data"
+PUBLIC_DATA = REPO_ROOT / "apps" / "web" / "static" / "data"
 NBA_ROOT = PUBLIC_DATA / "nba"
 SHARED_ROOT = PUBLIC_DATA / "shared"
 RAW_CACHE = REPO_ROOT / ".raw_nba_cache"
@@ -48,9 +48,9 @@ DEFAULT_SEASONS = [
     "1995-96",
 ]
 
-RATE_LIMIT_SECONDS = float(os.environ.get("DD_NBA_RATE_LIMIT", "0.4"))
-MAX_RETRIES = int(os.environ.get("DD_NBA_MAX_RETRIES", "6"))
-MAX_WORKERS = int(os.environ.get("DD_NBA_MAX_WORKERS", "6"))
+RATE_LIMIT_SECONDS = float(os.environ.get("HOOP_RUSH_NBA_RATE_LIMIT", "0.4"))
+MAX_RETRIES = int(os.environ.get("HOOP_RUSH_NBA_MAX_RETRIES", "6"))
+MAX_WORKERS = int(os.environ.get("HOOP_RUSH_NBA_MAX_WORKERS", "6"))
 
 
 def season_to_season_type(season: str) -> str:

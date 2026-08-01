@@ -1,6 +1,6 @@
 """Fetch NBA schedule for a given season.
 
-Output: public/data/nba/{season}/schedule.json
+Optional output: apps/web/static/data/nba/{season}/schedule.json
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ try:
 except Exception as exc:  # pragma: no cover - import-time guard
     print(
         f"Could not import nba_api: {exc}\n"
-        "Install with: pip install -r scripts/import_nba/requirements.txt",
+        "Install with: pip install -r scripts/import-nba/requirements.txt",
         file=sys.stderr,
     )
     raise

@@ -1,6 +1,6 @@
 """Fetch NBA team definitions + opening-night rosters per season.
 
-Output: public/data/nba/{season}/teams.json + roster.json
+Output: apps/web/static/data/nba/{season}/teams.json + roster.json
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ try:
 except Exception as exc:  # pragma: no cover - import-time guard
     print(
         f"Could not import nba_api: {exc}\n"
-        "Install with: pip install -r scripts/import_nba/requirements.txt",
+        "Install with: pip install -r scripts/import-nba/requirements.txt",
         file=sys.stderr,
     )
     raise
@@ -163,7 +163,8 @@ def fetch_team_definitions() -> list[dict[str, Any]]:
             )
         return out
 
-    teams = with_retry(_do_fetch)
+    # nba_api's static team registry is local package data, not a network request.
+    teams = _do_fetch()
     write_cache("teams_static", teams)
     return teams
 
