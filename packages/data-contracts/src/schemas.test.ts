@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   challengeRunSchema,
+  franchiseAbbreviation,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   lineupSchema,
@@ -69,6 +70,45 @@ describe('player-season contracts', () => {
     const invalid = {
       ...validPlayer,
       eligibility: { ...validPlayer.eligibility, teamGames: 39 },
+    };
+    expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('accepts a player with a Basketball-Reference alt id', () => {
+    const withAltIds = {
+      ...validPlayer,
+      altIds: { bbref: 'jordami01' },
+    };
+    expect(peakPlayerSeasonSchema.safeParse(withAltIds).success).toBe(true);
+  });
+
+  it('accepts a player without alt ids', () => {
+    expect(peakPlayerSeasonSchema.safeParse({ ...validPlayer, altIds: null }).success).toBe(true);
+    expect(
+      peakPlayerSeasonSchema.safeParse({ ...validPlayer, altIds: { bbref: null } }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a malformed Basketball-Reference alt id', () => {
+    const invalid = {
+      ...validPlayer,
+      altIds: { bbref: 'Jordan-01!' },
+    };
+    expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
+  });
+
+  it('accepts a player with a direct photo url', () => {
+    const withPhoto = {
+      ...validPlayer,
+      altIds: { bbref: null, photoUrl: 'https://upload.wikimedia.org/wikipedia/commons/x.png' },
+    };
+    expect(peakPlayerSeasonSchema.safeParse(withPhoto).success).toBe(true);
+  });
+
+  it('rejects a malformed direct photo url', () => {
+    const invalid = {
+      ...validPlayer,
+      altIds: { photoUrl: 'not-a-url' },
     };
     expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
   });
@@ -235,7 +275,11 @@ describe('manifest contracts', () => {
       pools: [],
       assets: {
         headshotUrlTemplate: 'https://cdn.example.com/{playerExternalId}.png',
+        headshotUrlTemplateSecondary:
+          'https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg',
         logoUrlTemplate: 'https://cdn.example.com/{teamExternalId}.svg',
+        logoUrlTemplateSecondary:
+          'https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png',
         source: 'example',
         cacheVersion: 'v1',
       },
@@ -252,11 +296,55 @@ describe('manifest contracts', () => {
       pools: [{ franchiseId: 'lakers', eraId: '1990s', url: 'pools/l.json', contentHash: 'short' }],
       assets: {
         headshotUrlTemplate: null,
+        headshotUrlTemplateSecondary: null,
         logoUrlTemplate: null,
+        logoUrlTemplateSecondary: null,
         source: 'example',
         cacheVersion: 'v1',
       },
     };
     expect(hoopRushManifestSchema.safeParse(manifest).success).toBe(false);
+  });
+});
+
+describe('franchise abbreviations', () => {
+  it('uses standard three-letter codes for every current NBA franchise', () => {
+    const abbreviations = [
+      ['hawks', 'ATL'],
+      ['celtics', 'BOS'],
+      ['nets', 'BKN'],
+      ['hornets', 'CHA'],
+      ['bulls', 'CHI'],
+      ['cavaliers', 'CLE'],
+      ['mavericks', 'DAL'],
+      ['nuggets', 'DEN'],
+      ['pistons', 'DET'],
+      ['warriors', 'GSW'],
+      ['rockets', 'HOU'],
+      ['pacers', 'IND'],
+      ['clippers', 'LAC'],
+      ['lakers', 'LAL'],
+      ['grizzlies', 'MEM'],
+      ['heat', 'MIA'],
+      ['bucks', 'MIL'],
+      ['timberwolves', 'MIN'],
+      ['pelicans', 'NOP'],
+      ['knicks', 'NYK'],
+      ['thunder', 'OKC'],
+      ['magic', 'ORL'],
+      ['sixers', 'PHI'],
+      ['suns', 'PHX'],
+      ['blazers', 'POR'],
+      ['kings', 'SAC'],
+      ['spurs', 'SAS'],
+      ['raptors', 'TOR'],
+      ['jazz', 'UTA'],
+      ['wizards', 'WAS'],
+    ] as const;
+
+    for (const [franchiseId, abbreviation] of abbreviations) {
+      expect(franchiseAbbreviation(franchiseId)).toBe(abbreviation);
+      expect(abbreviation).toHaveLength(3);
+    }
   });
 });

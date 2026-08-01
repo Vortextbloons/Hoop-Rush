@@ -217,7 +217,23 @@ def _candidate_key(candidate: dict[str, Any]) -> tuple[float, int, int, int]:
     )
 
 
-def compute_pool(franchise_id: str, era_id: str, manifest: dict[str, Any]) -> dict[str, Any]:
+def load_bbref_ids() -> dict[str, str]:
+    """External NBA id -> Basketball-Reference id (fetch_bbref_ids.py output)."""
+    path = RAW_CACHE / "bbref_ids.json"
+    if not path.exists():
+        print("  [WARN] bbref_ids.json missing; run fetch_bbref_ids or run_all (no altIds)")
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def compute_pool(
+    franchise_id: str,
+    era_id: str,
+    manifest: dict[str, Any],
+    bbref_ids: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    if bbref_ids is None:
+        bbref_ids = load_bbref_ids()
     lineage = next(
         (e for e in manifest["franchiseLineage"] if e["franchiseId"] == franchise_id), None
     )
@@ -302,6 +318,7 @@ def compute_pool(franchise_id: str, era_id: str, manifest: dict[str, Any]) -> di
                 "lastName": player.get("lastName", ""),
                 "displayName": f"{player.get('firstName', '')} {player.get('lastName', '')}".strip(),
                 "playerExternalId": pid,
+                "altIds": {"bbref": bbref_ids[pid]} if pid in bbref_ids else None,
                 "positions": {
                     "sourceLabels": known_labels,
                     "canonical": canonical,
@@ -346,6 +363,15 @@ def compute_pool(franchise_id: str, era_id: str, manifest: dict[str, Any]) -> di
 
     if not players_out:
         raise SystemExit(f"no eligible players for {franchise_id} {era_id}")
+
+    try:
+        from .fetch_nba_headshots import annotate_nba_headshots
+        from .fetch_wikipedia_photos import ensure_photos
+
+        annotate_nba_headshots(players_out)
+        ensure_photos(players_out)
+    except Exception as exc:  # noqa: BLE001 - photos are best-effort, never fail a build
+        print(f"  [WARN] headshot annotation failed: {exc}")
 
     pool = {
         "schemaVersion": SCHEMA_VERSION,
@@ -395,9 +421,10 @@ def run(targets: list[tuple[str, str]] | None = None) -> None:
     if targets is None:
         targets = [("lakers", "1990s")]
     manifest = load_manifest()
+    bbref_ids = load_bbref_ids()
     entries: list[dict[str, str]] = []
     for franchise_id, era_id in targets:
-        pool = compute_pool(franchise_id, era_id, manifest)
+        pool = compute_pool(franchise_id, era_id, manifest, bbref_ids)
         digest = write_pool(pool)
         entries.append(
             {

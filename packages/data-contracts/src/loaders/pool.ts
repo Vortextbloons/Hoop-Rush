@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { franchiseEraPoolSchema, type FranchiseEraPool } from '../player-season.js';
 
 /** Validate an unknown pool value at a runtime boundary. */
@@ -10,8 +11,12 @@ export function parsePool(value: unknown): FranchiseEraPool {
  * `expectedHash` is provided (manifest content hash), the response bytes must
  * match before the pool is parsed.
  */
-export async function loadPool(url: string, expectedHash?: string): Promise<FranchiseEraPool> {
-  const response = await fetch(url);
+export async function loadPool(
+  url: string,
+  expectedHash?: string,
+  init?: RequestInit,
+): Promise<FranchiseEraPool> {
+  const response = await fetch(url, init);
   if (!response.ok) {
     throw new Error(`pool request failed: ${response.status} ${response.statusText}`);
   }

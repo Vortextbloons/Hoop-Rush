@@ -223,6 +223,19 @@ function auditPoolContent(
       failures.push(`pools: ${key} ${player.displayName} summary rating out of range`);
     }
   }
+
+  const withFallback = pool.players.filter(
+    (p) => p.altIds?.bbref != null || p.altIds?.photoUrl != null,
+  ).length;
+  const coverage = Math.round((withFallback / pool.players.length) * 1000) / 10;
+  details.push(
+    `pools: ${key} fallback coverage ${String(withFallback)}/${String(pool.players.length)} (${String(coverage)}%)`,
+  );
+  if (manifest.assets.headshotUrlTemplateSecondary && withFallback === 0) {
+    failures.push(
+      `pools: ${key} no player carries a fallback id while a secondary headshot template is configured`,
+    );
+  }
   details.push(`pools: ${key} ${String(pool.players.length)} players audited`);
 }
 
@@ -236,10 +249,22 @@ function auditAssets(manifest: HoopRushManifest): AuditResult {
     failures.push('assets: headshotUrlTemplate lacks {playerExternalId} placeholder');
   }
   if (
+    manifest.assets.headshotUrlTemplateSecondary &&
+    !manifest.assets.headshotUrlTemplateSecondary.includes('{altIds.bbref}')
+  ) {
+    failures.push('assets: headshotUrlTemplateSecondary lacks {altIds.bbref} placeholder');
+  }
+  if (
     manifest.assets.logoUrlTemplate &&
     !manifest.assets.logoUrlTemplate.includes('{teamExternalId}')
   ) {
     failures.push('assets: logoUrlTemplate lacks {teamExternalId} placeholder');
+  }
+  if (
+    manifest.assets.logoUrlTemplateSecondary &&
+    !manifest.assets.logoUrlTemplateSecondary.includes('{teamAbbreviation}')
+  ) {
+    failures.push('assets: logoUrlTemplateSecondary lacks {teamAbbreviation} placeholder');
   }
   details.push(
     `assets: source "${manifest.assets.source}", cacheVersion ${manifest.assets.cacheVersion}`,

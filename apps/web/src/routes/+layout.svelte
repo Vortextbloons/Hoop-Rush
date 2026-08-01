@@ -17,7 +17,7 @@
 <ModeWatcher />
 
 <header class="border-b border-border/70">
-  <div class="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
+  <div class="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
     <a href={homeHref} class="font-display text-2xl font-extrabold tracking-tight text-foreground">
       Hoop <span class="text-primary">Rush</span>
     </a>

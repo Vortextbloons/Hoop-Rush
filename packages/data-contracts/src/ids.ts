@@ -34,6 +34,10 @@ export type PlayerExternalId = z.infer<typeof playerExternalIdSchema>;
 export const teamExternalIdSchema = z.string().regex(/^\d{1,12}$/);
 export type TeamExternalId = z.infer<typeof teamExternalIdSchema>;
 
+/** Basketball-Reference player ID (e.g. "jordami01"), used for fallback headshots. */
+export const bbrefIdSchema = z.string().regex(/^[a-z0-9]{6,12}$/);
+export type BbrefId = z.infer<typeof bbrefIdSchema>;
+
 /** Hex-encoded run seed. Derived game seeds come from this value. */
 export const seedSchema = z.string().regex(/^[0-9a-f]{16,64}$/);
 export type Seed = z.infer<typeof seedSchema>;

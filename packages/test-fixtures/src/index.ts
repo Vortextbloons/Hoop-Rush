@@ -208,7 +208,10 @@ export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRu
     assets: {
       headshotUrlTemplate:
         'https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png',
+      headshotUrlTemplateSecondary:
+        'https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg',
       logoUrlTemplate: 'https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg',
+      logoUrlTemplateSecondary: 'https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png',
       source: 'NBA.com',
       cacheVersion: '2026-07-01',
     },

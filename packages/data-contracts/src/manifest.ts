@@ -12,8 +12,12 @@ import { eraDefSchema } from './eras.js';
 export const assetConfigSchema = z.object({
   /** NBA CDN headshot template; {playerExternalId} is substituted at runtime. */
   headshotUrlTemplate: z.string().url().nullable(),
+  /** Optional fallback headshot template; {altIds.bbref} is substituted when set. */
+  headshotUrlTemplateSecondary: z.string().url().nullable(),
   /** NBA CDN logo template; {teamExternalId} is substituted at runtime. */
   logoUrlTemplate: z.string().url().nullable(),
+  /** Optional fallback logo template; {teamAbbreviation} is substituted when set. */
+  logoUrlTemplateSecondary: z.string().url().nullable(),
   /** Source attribution for image assets. */
   source: z.string().min(1).max(256),
   /** Cache-busting version for asset URLs. */

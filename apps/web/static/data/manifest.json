@@ -602,13 +602,15 @@
       "franchiseId": "lakers",
       "eraId": "1990s",
       "url": "pools/lakers-1990s.json",
-      "contentHash": "d73867f00f8fca60d844de5d7fac46c0472fb8ba95b8c73df61208286c456d49"
+      "contentHash": "00fc9c6da68316bebbbf7397ffae2b8f4c70e3bcfab1c10ad5daf2484a789480"
     }
   ],
   "assets": {
     "headshotUrlTemplate": "https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png",
+    "headshotUrlTemplateSecondary": "https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg",
     "logoUrlTemplate": "https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg",
     "source": "NBA.com",
-    "cacheVersion": "2026-07-01"
+    "cacheVersion": "2026-07-01-bbref-espn",
+    "logoUrlTemplateSecondary": "https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png"
   }
 }

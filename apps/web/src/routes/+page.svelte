@@ -6,15 +6,12 @@
   const steps = [
     {
       title: 'Draft five',
-      body: 'Pick a real NBA franchise and decade, then choose exactly five players from their best eligible seasons.',
     },
     {
       title: 'Face all 30',
-      body: 'A fixed 82-game schedule against every franchise. No substitutions, no fatigue — five players, full games.',
     },
     {
       title: 'Chase 82-0',
-      body: 'One loss ends the default run. Retry with the same seed, or rebuild the lineup and try again.',
     },
   ] as const;
 </script>
@@ -32,10 +29,6 @@
         <span class="text-primary">82-0?</span>
       </h1>
     </div>
-    <p class="max-w-xl text-lg text-muted-foreground">
-      Hoop Rush is a basketball sandbox: build a five-player lineup from a real NBA franchise and
-      decade, then simulate a deterministic 82-game season against every team in the league.
-    </p>
     <div class="flex flex-wrap items-center gap-4">
       <a
         href={sandboxHref}
@@ -43,9 +36,7 @@
       >
         Start a sandbox challenge
       </a>
-      <span class="font-mono text-xs text-muted-foreground">
-        First pool: Los Angeles Lakers · 1990s
-      </span>
+      <span class="font-mono text-xs text-muted-foreground"> First pool: LAL · 1990s </span>
     </div>
   </div>
 
@@ -56,7 +47,6 @@
         <h2 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase">
           {step.title}
         </h2>
-        <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
       </li>
     {/each}
   </ol>

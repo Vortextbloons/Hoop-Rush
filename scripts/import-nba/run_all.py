@@ -107,6 +107,10 @@ def main() -> int:
         "--skip-careers", action="store_true",
         help="skip the per-player career-stats fetch (not used by pools)",
     )
+    parser.add_argument(
+        "--skip-bbref", action="store_true",
+        help="skip the Basketball-Reference id mapping (pools ship without altIds)",
+    )
     args = parser.parse_args()
 
     seasons = args.seasons or DEFAULT_SEASONS
@@ -139,7 +143,14 @@ def main() -> int:
         compute_careers = _import("compute_careers").run
         compute_careers(seasons)
 
-    print("\n--- Phase 3: Franchise-era pools ---")
+    print("\n--- Phase 3: Basketball-Reference IDs ---")
+    if args.skip_bbref:
+        print("  (skipped)")
+    else:
+        fetch_bbref_ids = _import("fetch_bbref_ids").run
+        fetch_bbref_ids()
+
+    print("\n--- Phase 4: Franchise-era pools ---")
     compute_pools = _import("compute_pools")
     compute_pools.run(targets=pools)
 
