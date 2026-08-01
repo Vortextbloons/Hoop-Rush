@@ -1,82 +1,82 @@
 @import 'tailwindcss';
 
 /* ----------------------------------------------------------------------------
-   Dynasty Desk — Theme tokens
-   Dark-mode-first front-office dashboard. Amber/gold accent on near-black.
----------------------------------------------------------------------------- */
+   Hoop Rush — Theme tokens
+   Dark arena floor with scoreboard orange and championship gold accents.
+--------------------------------------------------------------------------- */
 
 @theme {
   /* Brand */
-  --color-background: hsl(220 22% 6%);
+  --color-background: hsl(222 22% 6%);
   --color-foreground: hsl(40 20% 94%);
 
-  --color-card: hsl(220 20% 9%);
+  --color-card: hsl(222 20% 9%);
   --color-card-foreground: hsl(40 20% 94%);
 
-  --color-popover: hsl(220 22% 7%);
+  --color-popover: hsl(222 22% 7%);
   --color-popover-foreground: hsl(40 20% 94%);
 
-  /* Primary = bright scoreboard amber */
-  --color-primary: hsl(38 96% 56%);
-  --color-primary-foreground: hsl(220 30% 6%);
+  /* Primary = scoreboard orange */
+  --color-primary: hsl(13 100% 62%);
+  --color-primary-foreground: hsl(222 30% 6%);
 
   /* Secondary = cool slate panel */
-  --color-secondary: hsl(220 16% 14%);
+  --color-secondary: hsl(222 16% 14%);
   --color-secondary-foreground: hsl(40 20% 94%);
 
-  --color-muted: hsl(220 16% 14%);
-  --color-muted-foreground: hsl(220 10% 60%);
+  --color-muted: hsl(222 16% 14%);
+  --color-muted-foreground: hsl(222 10% 60%);
 
-  /* Accent = teal for stat highlights */
-  --color-accent: hsl(174 72% 52%);
-  --color-accent-foreground: hsl(220 30% 6%);
+  /* Accent = championship gold */
+  --color-accent: hsl(42 91% 61%);
+  --color-accent-foreground: hsl(222 30% 6%);
 
   --color-destructive: hsl(0 72% 58%);
   --color-destructive-foreground: hsl(40 20% 94%);
 
-  --color-border: hsl(220 14% 18%);
-  --color-input: hsl(220 16% 14%);
-  --color-ring: hsl(38 96% 56%);
+  --color-border: hsl(222 14% 18%);
+  --color-input: hsl(222 16% 14%);
+  --color-ring: hsl(13 100% 62%);
 
   --radius: 0.625rem;
 
   /* Custom surface tokens */
-  --color-surface-1: hsl(220 20% 9%);
-  --color-surface-2: hsl(220 18% 12%);
-  --color-surface-3: hsl(220 16% 16%);
+  --color-surface-1: hsl(222 20% 9%);
+  --color-surface-2: hsl(222 18% 12%);
+  --color-surface-3: hsl(222 16% 16%);
 
-  --color-line-soft: hsl(220 14% 18%);
-  --color-line-strong: hsl(220 14% 26%);
+  --color-line-soft: hsl(222 14% 18%);
+  --color-line-strong: hsl(222 14% 26%);
 
   --color-positive: hsl(150 60% 48%);
   --color-negative: hsl(0 72% 58%);
 
-  /* Fonts (loaded via index.html <link>) */
-  --font-display: 'Archivo Black', system-ui, sans-serif;
-  --font-sans: 'Inter Tight', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Fonts (loaded via app.html <link>) */
+  --font-display: 'Barlow Condensed', 'Archivo Black', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .light {
   --color-background: hsl(40 20% 97%);
-  --color-foreground: hsl(220 30% 8%);
+  --color-foreground: hsl(222 30% 8%);
   --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(220 30% 8%);
+  --color-card-foreground: hsl(222 30% 8%);
   --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(220 30% 8%);
-  --color-primary: hsl(28 92% 46%);
+  --color-popover-foreground: hsl(222 30% 8%);
+  --color-primary: hsl(13 92% 46%);
   --color-primary-foreground: hsl(0 0% 100%);
   --color-secondary: hsl(40 14% 92%);
-  --color-secondary-foreground: hsl(220 30% 8%);
+  --color-secondary-foreground: hsl(222 30% 8%);
   --color-muted: hsl(40 14% 92%);
-  --color-muted-foreground: hsl(220 10% 38%);
-  --color-accent: hsl(186 80% 32%);
+  --color-muted-foreground: hsl(222 10% 38%);
+  --color-accent: hsl(42 90% 36%);
   --color-accent-foreground: hsl(0 0% 100%);
   --color-destructive: hsl(0 72% 50%);
   --color-destructive-foreground: hsl(0 0% 100%);
   --color-border: hsl(40 14% 86%);
   --color-input: hsl(40 14% 92%);
-  --color-ring: hsl(28 92% 46%);
+  --color-ring: hsl(13 92% 46%);
 
   --color-surface-1: hsl(0 0% 100%);
   --color-surface-2: hsl(40 14% 96%);
@@ -93,8 +93,7 @@
   }
   html,
   body {
-    height: 100%;
-    overflow: hidden;
+    min-height: 100%;
   }
   body {
     background-color: var(--color-background);
@@ -105,12 +104,12 @@
     background-image:
       radial-gradient(
         1200px 600px at 0% -10%,
-        color-mix(in oklab, var(--color-primary) 8%, transparent),
+        color-mix(in oklab, var(--color-primary) 9%, transparent),
         transparent 60%
       ),
       radial-gradient(
         900px 500px at 100% 110%,
-        color-mix(in oklab, var(--color-accent) 6%, transparent),
+        color-mix(in oklab, var(--color-accent) 7%, transparent),
         transparent 60%
       );
     background-attachment: fixed;

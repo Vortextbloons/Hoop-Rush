@@ -1,1 +1,1 @@
-"""Dynasty Desk NBA import pipeline."""
+"""Hoop Rush NBA import pipeline."""

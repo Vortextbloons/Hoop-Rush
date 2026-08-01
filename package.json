@@ -1,11 +1,12 @@
 {
-  "name": "dynasty-desk-v2",
+  "name": "hoop-rush",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @dynasty-desk/web dev",
-    "build": "pnpm --filter @dynasty-desk/web build",
-    "preview": "pnpm --filter @dynasty-desk/web preview",
+    "dev": "pnpm --filter @hoop-rush/web dev",
+    "build": "pnpm --filter @hoop-rush/web build",
+    "preview": "pnpm --filter @hoop-rush/web preview",
+    "hoop-rush": "pnpm --filter @hoop-rush/cli hoop-rush",
     "check": "pnpm -r check",
     "lint": "pnpm -r lint",
     "format": "prettier --write .",

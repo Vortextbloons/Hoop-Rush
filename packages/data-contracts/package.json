@@ -1,7 +1,12 @@
 {
-  "name": "@dynasty-desk/data-contracts",
+  "name": "@hoop-rush/data-contracts",
   "private": true,
   "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest",
@@ -11,7 +16,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }
 }

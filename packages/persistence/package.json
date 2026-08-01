@@ -1,16 +1,24 @@
 {
-  "name": "@dynasty-desk/persistence",
+  "name": "@hoop-rush/persistence",
   "private": true,
   "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run"
   },
   "dependencies": {
-    "dexie": "^4.4.4"
+    "@hoop-rush/data-contracts": "workspace:*",
+    "dexie": "^4.4.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@hoop-rush/test-fixtures": "workspace:*",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }

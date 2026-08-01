@@ -1,14 +1,22 @@
 {
-  "name": "@dynasty-desk/test-fixtures",
+  "name": "@hoop-rush/test-fixtures",
   "private": true,
   "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "check": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run"
   },
+  "dependencies": {
+    "@hoop-rush/data-contracts": "workspace:*"
+  },
   "devDependencies": {
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }
 }

@@ -1,0 +1,28 @@
+{
+  "name": "@hoop-rush/cli",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "hoop-rush": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "lint": "prettier --check . && eslint .",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "hoop-rush": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@hoop-rush/data-contracts": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@hoop-rush/test-fixtures": "workspace:*",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.8.0",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  }
+}

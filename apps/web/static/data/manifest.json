@@ -1,16 +1,268 @@
 {
-  "version": "0.2.0-v2",
-  "defaultSnapshotId": "nba-2025-26",
-  "snapshots": [
+  "schemaVersion": 1,
+  "dataVersion": "m0.1",
+  "franchiseLineage": [
     {
-      "id": "nba-2025-26",
-      "name": "NBA 2025-26",
-      "type": "nba",
-      "seasonLabel": "2025-26",
-      "startYear": 2025,
-      "basePath": "/data/nba/2025-26",
-      "teamCount": 30,
-      "playerCount": 300
+      "franchiseId": "hawks",
+      "displayName": "Atlanta Hawks",
+      "teamExternalId": "1610612737",
+      "names": [
+        { "name": "Tri-Cities Blackhawks", "fromSeasonKey": "1946-47", "toSeasonKey": "1950-51" },
+        { "name": "Milwaukee Hawks", "fromSeasonKey": "1951-52", "toSeasonKey": "1954-55" },
+        { "name": "St. Louis Hawks", "fromSeasonKey": "1955-56", "toSeasonKey": "1967-68" },
+        { "name": "Atlanta Hawks", "fromSeasonKey": "1968-69", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "celtics",
+      "displayName": "Boston Celtics",
+      "teamExternalId": "1610612738",
+      "names": [{ "name": "Boston Celtics", "fromSeasonKey": "1946-47", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "nets",
+      "displayName": "Brooklyn Nets",
+      "teamExternalId": "1610612751",
+      "names": [
+        { "name": "New Jersey Americans", "fromSeasonKey": "1967-68", "toSeasonKey": "1967-68" },
+        { "name": "New York Nets", "fromSeasonKey": "1968-69", "toSeasonKey": "1976-77" },
+        { "name": "New Jersey Nets", "fromSeasonKey": "1977-78", "toSeasonKey": "2011-12" },
+        { "name": "Brooklyn Nets", "fromSeasonKey": "2012-13", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "hornets",
+      "displayName": "Charlotte Hornets",
+      "teamExternalId": "1610612766",
+      "names": [
+        { "name": "Charlotte Bobcats", "fromSeasonKey": "2004-05", "toSeasonKey": "2013-14" },
+        { "name": "Charlotte Hornets", "fromSeasonKey": "2014-15", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "bulls",
+      "displayName": "Chicago Bulls",
+      "teamExternalId": "1610612741",
+      "names": [{ "name": "Chicago Bulls", "fromSeasonKey": "1966-67", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "cavaliers",
+      "displayName": "Cleveland Cavaliers",
+      "teamExternalId": "1610612739",
+      "names": [{ "name": "Cleveland Cavaliers", "fromSeasonKey": "1970-71", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "mavericks",
+      "displayName": "Dallas Mavericks",
+      "teamExternalId": "1610612742",
+      "names": [{ "name": "Dallas Mavericks", "fromSeasonKey": "1980-81", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "nuggets",
+      "displayName": "Denver Nuggets",
+      "teamExternalId": "1610612743",
+      "names": [
+        { "name": "Denver Rockets", "fromSeasonKey": "1967-68", "toSeasonKey": "1973-74" },
+        { "name": "Denver Nuggets", "fromSeasonKey": "1974-75", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "pistons",
+      "displayName": "Detroit Pistons",
+      "teamExternalId": "1610612765",
+      "names": [
+        { "name": "Fort Wayne Zollner Pistons", "fromSeasonKey": "1941-42", "toSeasonKey": "1947-48" },
+        { "name": "Fort Wayne Pistons", "fromSeasonKey": "1948-49", "toSeasonKey": "1956-57" },
+        { "name": "Detroit Pistons", "fromSeasonKey": "1957-58", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "warriors",
+      "displayName": "Golden State Warriors",
+      "teamExternalId": "1610612744",
+      "names": [
+        { "name": "Philadelphia Warriors", "fromSeasonKey": "1946-47", "toSeasonKey": "1961-62" },
+        { "name": "San Francisco Warriors", "fromSeasonKey": "1962-63", "toSeasonKey": "1970-71" },
+        { "name": "Golden State Warriors", "fromSeasonKey": "1971-72", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "rockets",
+      "displayName": "Houston Rockets",
+      "teamExternalId": "1610612745",
+      "names": [
+        { "name": "San Diego Rockets", "fromSeasonKey": "1967-68", "toSeasonKey": "1970-71" },
+        { "name": "Houston Rockets", "fromSeasonKey": "1971-72", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "pacers",
+      "displayName": "Indiana Pacers",
+      "teamExternalId": "1610612754",
+      "names": [{ "name": "Indiana Pacers", "fromSeasonKey": "1967-68", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "clippers",
+      "displayName": "Los Angeles Clippers",
+      "teamExternalId": "1610612746",
+      "names": [
+        { "name": "Buffalo Braves", "fromSeasonKey": "1970-71", "toSeasonKey": "1977-78" },
+        { "name": "San Diego Clippers", "fromSeasonKey": "1978-79", "toSeasonKey": "1983-84" },
+        { "name": "Los Angeles Clippers", "fromSeasonKey": "1984-85", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "lakers",
+      "displayName": "Los Angeles Lakers",
+      "teamExternalId": "1610612747",
+      "names": [
+        { "name": "Minneapolis Lakers", "fromSeasonKey": "1948-49", "toSeasonKey": "1959-60" },
+        { "name": "Los Angeles Lakers", "fromSeasonKey": "1960-61", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "grizzlies",
+      "displayName": "Memphis Grizzlies",
+      "teamExternalId": "1610612763",
+      "names": [
+        { "name": "Vancouver Grizzlies", "fromSeasonKey": "1995-96", "toSeasonKey": "2000-01" },
+        { "name": "Memphis Grizzlies", "fromSeasonKey": "2001-02", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "heat",
+      "displayName": "Miami Heat",
+      "teamExternalId": "1610612748",
+      "names": [{ "name": "Miami Heat", "fromSeasonKey": "1988-89", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "bucks",
+      "displayName": "Milwaukee Bucks",
+      "teamExternalId": "1610612749",
+      "names": [{ "name": "Milwaukee Bucks", "fromSeasonKey": "1968-69", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "timberwolves",
+      "displayName": "Minnesota Timberwolves",
+      "teamExternalId": "1610612750",
+      "names": [{ "name": "Minnesota Timberwolves", "fromSeasonKey": "1989-90", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "pelicans",
+      "displayName": "New Orleans Pelicans",
+      "teamExternalId": "1610612740",
+      "names": [
+        { "name": "Charlotte Hornets", "fromSeasonKey": "1988-89", "toSeasonKey": "2001-02" },
+        { "name": "New Orleans Hornets", "fromSeasonKey": "2002-03", "toSeasonKey": "2012-13" },
+        { "name": "New Orleans Pelicans", "fromSeasonKey": "2013-14", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "knicks",
+      "displayName": "New York Knicks",
+      "teamExternalId": "1610612752",
+      "names": [{ "name": "New York Knicks", "fromSeasonKey": "1946-47", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "thunder",
+      "displayName": "Oklahoma City Thunder",
+      "teamExternalId": "1610612760",
+      "names": [
+        { "name": "Seattle SuperSonics", "fromSeasonKey": "1967-68", "toSeasonKey": "2007-08" },
+        { "name": "Oklahoma City Thunder", "fromSeasonKey": "2008-09", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "magic",
+      "displayName": "Orlando Magic",
+      "teamExternalId": "1610612753",
+      "names": [{ "name": "Orlando Magic", "fromSeasonKey": "1989-90", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "sixers",
+      "displayName": "Philadelphia 76ers",
+      "teamExternalId": "1610612755",
+      "names": [
+        { "name": "Syracuse Nationals", "fromSeasonKey": "1949-50", "toSeasonKey": "1962-63" },
+        { "name": "Philadelphia 76ers", "fromSeasonKey": "1963-64", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "suns",
+      "displayName": "Phoenix Suns",
+      "teamExternalId": "1610612756",
+      "names": [{ "name": "Phoenix Suns", "fromSeasonKey": "1968-69", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "blazers",
+      "displayName": "Portland Trail Blazers",
+      "teamExternalId": "1610612757",
+      "names": [{ "name": "Portland Trail Blazers", "fromSeasonKey": "1970-71", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "kings",
+      "displayName": "Sacramento Kings",
+      "teamExternalId": "1610612758",
+      "names": [
+        { "name": "Rochester Royals", "fromSeasonKey": "1948-49", "toSeasonKey": "1956-57" },
+        { "name": "Cincinnati Royals", "fromSeasonKey": "1957-58", "toSeasonKey": "1971-72" },
+        { "name": "Kansas City-Omaha Kings", "fromSeasonKey": "1972-73", "toSeasonKey": "1974-75" },
+        { "name": "Kansas City Kings", "fromSeasonKey": "1975-76", "toSeasonKey": "1984-85" },
+        { "name": "Sacramento Kings", "fromSeasonKey": "1985-86", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "spurs",
+      "displayName": "San Antonio Spurs",
+      "teamExternalId": "1610612759",
+      "names": [
+        { "name": "Dallas Chaparrals", "fromSeasonKey": "1967-68", "toSeasonKey": "1972-73" },
+        { "name": "San Antonio Spurs", "fromSeasonKey": "1973-74", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "raptors",
+      "displayName": "Toronto Raptors",
+      "teamExternalId": "1610612761",
+      "names": [{ "name": "Toronto Raptors", "fromSeasonKey": "1995-96", "toSeasonKey": null }]
+    },
+    {
+      "franchiseId": "jazz",
+      "displayName": "Utah Jazz",
+      "teamExternalId": "1610612762",
+      "names": [
+        { "name": "New Orleans Jazz", "fromSeasonKey": "1974-75", "toSeasonKey": "1978-79" },
+        { "name": "Utah Jazz", "fromSeasonKey": "1979-80", "toSeasonKey": null }
+      ]
+    },
+    {
+      "franchiseId": "wizards",
+      "displayName": "Washington Wizards",
+      "teamExternalId": "1610612764",
+      "names": [
+        { "name": "Chicago Packers", "fromSeasonKey": "1961-62", "toSeasonKey": "1961-62" },
+        { "name": "Chicago Zephyrs", "fromSeasonKey": "1962-63", "toSeasonKey": "1962-63" },
+        { "name": "Baltimore Bullets", "fromSeasonKey": "1963-64", "toSeasonKey": "1972-73" },
+        { "name": "Capital Bullets", "fromSeasonKey": "1973-74", "toSeasonKey": "1973-74" },
+        { "name": "Washington Bullets", "fromSeasonKey": "1974-75", "toSeasonKey": "1996-97" },
+        { "name": "Washington Wizards", "fromSeasonKey": "1997-98", "toSeasonKey": null }
+      ]
     }
-  ]
+  ],
+  "eras": [
+    { "eraId": "1960s", "label": "1960s", "fromSeasonKey": "1960-61", "toSeasonKey": "1969-70" },
+    { "eraId": "1970s", "label": "1970s", "fromSeasonKey": "1970-71", "toSeasonKey": "1979-80" },
+    { "eraId": "1980s", "label": "1980s", "fromSeasonKey": "1980-81", "toSeasonKey": "1989-90" },
+    { "eraId": "1990s", "label": "1990s", "fromSeasonKey": "1990-91", "toSeasonKey": "1999-00" },
+    { "eraId": "2000s", "label": "2000s", "fromSeasonKey": "2000-01", "toSeasonKey": "2009-10" },
+    { "eraId": "2010s", "label": "2010s", "fromSeasonKey": "2010-11", "toSeasonKey": "2019-20" },
+    { "eraId": "2020s", "label": "2020s", "fromSeasonKey": "2020-21", "toSeasonKey": "2029-30" }
+  ],
+  "pools": [],
+  "assets": {
+    "headshotUrlTemplate": "https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png",
+    "logoUrlTemplate": "https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg",
+    "source": "NBA.com",
+    "cacheVersion": "2026-07-01"
+  }
 }
