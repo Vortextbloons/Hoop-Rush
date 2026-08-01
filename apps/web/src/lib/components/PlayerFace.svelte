@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { isNbaCdnHeadshotUrl, resolveHeadshotUrls, type HoopRushManifest } from '@hoop-rush/data-contracts';
+  import {
+    isNbaCdnHeadshotUrl,
+    resolveHeadshotUrls,
+    type HoopRushManifest,
+  } from '@hoop-rush/data-contracts';
   import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
 
   type PeakPlayer = FranchiseEraPool['players'][number];

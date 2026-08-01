@@ -124,9 +124,7 @@ describe('headshot URL resolution', () => {
         manifest(),
         player({ altIds: { bbref: 'jordami01', nbaHeadshotAvailable: false } }),
       ),
-    ).toEqual([
-      'https://www.basketball-reference.com/req/20200617/images/headshots/jordami01.jpg',
-    ]);
+    ).toEqual(['https://www.basketball-reference.com/req/20200617/images/headshots/jordami01.jpg']);
   });
 
   it('detects NBA CDN headshot urls', () => {
