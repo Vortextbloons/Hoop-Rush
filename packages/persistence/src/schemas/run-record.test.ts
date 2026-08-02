@@ -54,11 +54,12 @@ describe('storedRunRecordSchema', () => {
   });
 
   it('rejects a free-form run with a null franchiseId', () => {
+    const run = buildChallengeRun();
     const record = {
       recordId: 'record-6',
       saveSchemaVersion: 2,
-      run: buildChallengeRun({ franchiseId: null }),
-    };
+      run: { ...run, franchiseId: null },
+    } as unknown;
     expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
   });
 

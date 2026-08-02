@@ -23,9 +23,11 @@ describe('real-data dry run (lakers/1990s vs Python-built pool)', () => {
   it('matches the committed pool eligibility count and top-5 selection scores', () => {
     const manifest = loadManifest();
     const bbrefIds = loadBbrefIds();
-    const pool = computePool('lakers', '1990s', manifest, bbrefIds, false);
-    expect(pool).not.toBeNull();
-    const computed = pool as Pool;
+    const result = computePool('lakers', '1990s', manifest, bbrefIds, false);
+    if ('reason' in result) {
+      throw new Error(`pool lakers/1990s failed: ${result.reason} ${result.detail}`);
+    }
+    const computed = result;
 
     // The TS port must produce a schema-valid pool.
     expect(() => parsePool(computed)).not.toThrow();
@@ -43,7 +45,6 @@ describe('real-data dry run (lakers/1990s vs Python-built pool)', () => {
         .map((p) => [p.playerExternalId, p.seasonKey, p.selectionScore]);
 
     expect(computed.players.length).toBe(committed.players.length);
-    expect(computed.players.length).toBe(44);
     expect(summary(computed.players)).toEqual(summary(committed.players));
   });
 });

@@ -10,7 +10,6 @@
     PeakPlayerSeason,
     PlayerSeasonAggregate,
     RunAggregates,
-    RunPlayerSelection,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
@@ -20,7 +19,6 @@
   import { buildSandboxUrl, generateSeed } from '$lib/sandbox-url';
   import { loadRunPlayersById, lineupPlayersFromRun } from '$lib/sandbox-lineup';
   import { startSandboxRun } from '$lib/sandbox-run';
-  import FreeformTeamRoster from '$lib/components/FreeformTeamRoster.svelte';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
@@ -87,7 +85,7 @@
     };
   });
 
-  /** Resolves the run's player pools (selections when present, legacy single pool otherwise). */
+  /** Resolves the run's single franchise-era player pool. */
   $effect(() => {
     const currentRun = run;
     const m = manifest;
@@ -107,7 +105,7 @@
   });
 
   const franchise = $derived(
-    manifest?.franchiseLineage.find((e) => e.franchiseId === run?.franchiseId) ?? null,
+    manifest?.modernFranchiseSlots.find((e) => e.franchiseId === run?.franchiseId) ?? null,
   );
   const era = $derived(manifest?.eras.find((e) => e.eraId === run?.eraId) ?? null);
 
@@ -216,12 +214,10 @@
     running = true;
     try {
       const resolved = await loadRunPlayersById(currentRun, m);
-      const players = currentRun.selections
-        ? currentRun.selections.map((s) => resolved.get(s.playerId))
-        : currentRun.playerIds.map((id) => resolved.get(id));
+      const players = currentRun.playerIds.map((id) => resolved.get(id));
       const complete = players.filter((p): p is PeakPlayer => p !== undefined);
       if (complete.length !== 5) {
-        error = 'This lineup cannot be replayed because one of its player pools is unavailable.';
+        error = 'This lineup cannot be replayed because its player pool is unavailable.';
         return;
       }
       await startSandboxRun(complete, generateSeed());
@@ -239,21 +235,10 @@
   const editHref = $derived.by(() => {
     const currentRun = run;
     if (!currentRun) return null;
-    let slots: RunPlayerSelection[] | null;
-    if (currentRun.selections) {
-      slots = currentRun.selections;
-    } else if (currentRun.franchiseId) {
-      const franchiseId = currentRun.franchiseId;
-      slots = currentRun.playerIds.map((playerId) => ({
-        playerId,
-        franchiseId,
-        eraId: currentRun.eraId,
-      }));
-    } else {
-      slots = null;
-    }
-    if (!slots) return null;
-    return buildSandboxUrl({ slots }) as RouteId;
+    return buildSandboxUrl({
+      franchiseId: currentRun.franchiseId,
+      eraId: currentRun.eraId,
+    }) as RouteId;
   });
 </script>
 
@@ -297,48 +282,26 @@
       <div
         class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
       >
-        {#if run.franchiseId === null}
-          {#if lineupPlayers && manifest}
-            <div class="min-w-0 flex-1">
-              <FreeformTeamRoster
-                players={lineupPlayers}
-                {manifest}
-                simulationEraLabel={era?.label ?? run.eraId}
-              />
-            </div>
-          {:else}
-            <div class="min-w-0 flex-1">
-              <p class="font-display text-lg font-extrabold tracking-tight uppercase sm:text-xl">
-                Your five
-              </p>
-              <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-                {era?.label ?? run.eraId} · five players, no bench
-              </p>
-              <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading lineup…</p>
-            </div>
+        <div class="flex items-center gap-3">
+          {#if franchise && manifest}
+            <TeamLogo
+              {manifest}
+              franchiseId={franchise.franchiseId}
+              teamExternalId={franchise.teamExternalId}
+              alt=""
+              className="h-10 w-10"
+            />
           {/if}
-        {:else}
-          <div class="flex items-center gap-3">
-            {#if franchise && manifest}
-              <TeamLogo
-                {manifest}
-                franchiseId={franchise.franchiseId}
-                teamExternalId={franchise.teamExternalId}
-                alt=""
-                className="h-10 w-10"
-              />
-            {/if}
-            <div>
-              <p class="font-display text-xl font-extrabold tracking-tight uppercase">
-                {run.homeDisplayName}
-              </p>
-              <p class="font-mono text-[10px] text-muted-foreground">
-                {franchiseAbbreviation(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no
-                bench
-              </p>
-            </div>
+          <div>
+            <p class="font-display text-xl font-extrabold tracking-tight uppercase">
+              {run.homeDisplayName}
+            </p>
+            <p class="font-mono text-[10px] text-muted-foreground">
+              {franchiseAbbreviation(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no
+              bench
+            </p>
           </div>
-        {/if}
+        </div>
         <div class="shrink-0 text-center sm:text-right">
           <p class="font-display text-5xl font-extrabold tracking-tight sm:text-6xl">
             {record.wins}<span class="text-muted-foreground">–</span>{record.losses}

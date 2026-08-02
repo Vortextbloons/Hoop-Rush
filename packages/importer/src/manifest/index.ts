@@ -13,14 +13,13 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PUBLIC_DATA } from '../config.js';
 import { fileExists, readJson, sha256File, writeJsonRetry } from '../json.js';
-import { LINEAGE_RULE_VERSION, ARTIFACT_SCHEMA_VERSION, parsePlayersIndex } from '@hoop-rush/data-contracts';
+import { LINEAGE_RULE_VERSION, ARTIFACT_SCHEMA_VERSION, parsePool, parsePlayersIndex } from '@hoop-rush/data-contracts';
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.js';
 import {
   classifyUnattempted,
   loadCoverageReport,
   loadManifest,
   type Pool,
-  type PoolPlayer,
 } from '../pools/compute.js';
 
 type Manifest = Record<string, unknown>;
@@ -29,7 +28,7 @@ export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
 
 export const DATA_VERSION = 'm3.5';
 
-function poolPlayerToIndexEntry(player: PoolPlayer) {
+function peakPlayerToIndexEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
     playerId: player.playerId,
     franchiseId: player.franchiseId,
@@ -39,7 +38,7 @@ function poolPlayerToIndexEntry(player: PoolPlayer) {
     lastName: player.lastName,
     displayName: player.displayName,
     playerExternalId: player.playerExternalId,
-    altIds: player.altIds,
+    altIds: player.altIds ?? null,
     positionsCanonical: player.positions.canonical,
     overall: player.summaryRatings.overallRating,
     offense: player.summaryRatings.offenseRating,
@@ -115,6 +114,32 @@ export function run(dataDir = PUBLIC_DATA): void {
     });
   }
   manifest['pools'] = poolEntries;
+
+  // Global players index: schema-valid peak player-seasons across packaged pools.
+  const indexPlayers: ReturnType<typeof peakPlayerToIndexEntry>[] = [];
+  for (const name of poolFiles) {
+    try {
+      const validated = parsePool(readJson(join(poolsDir, name)));
+      for (const player of validated.players) {
+        indexPlayers.push(peakPlayerToIndexEntry(player));
+      }
+    } catch (error) {
+      console.warn(`skipped pool ${name} for players index: ${(error as Error).message}`);
+    }
+  }
+  if (indexPlayers.length > 0) {
+    const indexPath = join(dataDir, 'players-index.json');
+    const index = parsePlayersIndex({
+      schemaVersion: ARTIFACT_SCHEMA_VERSION,
+      dataVersion: DATA_VERSION,
+      players: indexPlayers,
+    });
+    writeJsonRetry(indexPath, index, true);
+    manifest['playersIndex'] = {
+      url: 'players-index.json',
+      contentHash: sha256File(indexPath),
+    };
+  }
 
   // Complete availability matrix: every slot x era combination, from the
   // persisted coverage report (truthful reasons) with cheap classification

@@ -74,7 +74,7 @@
 
   function franchiseName(franchiseId: string): string {
     return (
-      manifest?.franchiseLineage.find((e) => e.franchiseId === franchiseId)?.displayName ??
+      manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
       franchiseId
     );
   }

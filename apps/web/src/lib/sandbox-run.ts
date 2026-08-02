@@ -1,6 +1,6 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import type { PeakPlayerSeason, RunPlayerSelection, Seed } from '@hoop-rush/data-contracts';
+import type { PeakPlayerSeason, Seed } from '@hoop-rush/data-contracts';
 import {
   createChallenge,
   createEngineContext,
@@ -13,13 +13,11 @@ import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
 
 /**
  * The single authoritative path from a resolved five-player lineup to an
- * active saved sandbox run (spec/01 sandbox loop). The draft page picks any
- * five peak player-seasons from the global index; the run always simulates
- * in the fixed '2010s' environment era.
+ * active saved sandbox run (spec/01 sandbox loop). The draft page picks five
+ * peak player-seasons from one franchise's selected-decade pool; the run's
+ * franchiseId is that slot and its eraId is the selected decade, which is
+ * also the simulation environment era (spec/12 challenge contract).
  */
-
-/** Fixed simulation environment era for every sandbox run. */
-export const FIXED_SANDBOX_ERA = '2010s';
 
 const LINEUP_STRUCTURE = ['G', 'G', 'F', 'F', 'C'] as const;
 
@@ -32,8 +30,17 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
   if (players.length !== 5) {
     throw new Error('A lineup needs exactly five players.');
   }
+  const sample = players[0];
+  if (!sample) {
+    throw new Error('A lineup needs exactly five players.');
+  }
+  const franchiseId = sample.franchiseId;
+  const eraId = sample.eraId;
+  if (players.some((p) => p.franchiseId !== franchiseId || p.eraId !== eraId)) {
+    throw new Error('All five players must come from the same franchise-era pool.');
+  }
   const manifest = await getManifest();
-  const profileEntry = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SANDBOX_ERA);
+  const profileEntry = manifest.eraSimulationProfiles.find((p) => p.eraId === eraId);
   if (!profileEntry) {
     throw new Error('The decade simulation profile is unavailable.');
   }
@@ -44,18 +51,12 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
     getEraSimulationProfile(profileEntry),
     getBracket(manifest.bracket),
   ]);
-  const selections: RunPlayerSelection[] = players.map((p) => ({
-    playerId: p.playerId,
-    franchiseId: p.franchiseId,
-    eraId: p.eraId,
-  }));
-  const sample = players[0];
   const context = createEngineContext();
   const creation: ChallengeCreation = {
     runId: crypto.randomUUID(),
     mode: 'sandbox',
-    franchiseId: null,
-    eraId: FIXED_SANDBOX_ERA,
+    franchiseId,
+    eraId,
     homeDisplayName: players
       .map((p) => p.displayName)
       .join(' · ')
@@ -69,11 +70,10 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
       })),
     },
     players: players.map((player) => toSimulationPlayer(player)),
-    selections,
     runSeed: seed,
     dataVersion: profile.dataVersion,
-    ratingVersion: sample?.source.ratingsVersion ?? 'unknown',
-    positionNormalizationVersion: sample?.positions.normalizationVersion ?? 'position-v1',
+    ratingVersion: sample.source.ratingsVersion,
+    positionNormalizationVersion: sample.positions.normalizationVersion,
     engineVersion: context.engineVersion,
     profile,
     bracket,
