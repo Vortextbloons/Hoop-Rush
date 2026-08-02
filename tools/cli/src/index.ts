@@ -12,6 +12,26 @@ import { replay, REPLAY_OPTIONS } from './commands/replay.js';
 import { combineDocs, COMBINE_DOCS_OPTIONS } from './commands/docs-combine.js';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.js';
 import {
+  importCareers,
+  importEraConfig,
+  importEraProfile,
+  importFreeze,
+  importManifest,
+  importOpponent,
+  importPools,
+  importRatings,
+  importRunAll,
+  IMPORT_CAREERS_OPTIONS,
+  IMPORT_ERA_CONFIG_OPTIONS,
+  IMPORT_ERA_PROFILE_OPTIONS,
+  IMPORT_FREEZE_OPTIONS,
+  IMPORT_MANIFEST_OPTIONS,
+  IMPORT_OPPONENT_OPTIONS,
+  IMPORT_POOLS_OPTIONS,
+  IMPORT_RATINGS_OPTIONS,
+  IMPORT_RUN_ALL_OPTIONS,
+} from './commands/import.js';
+import {
   makeReport,
   renderJson,
   renderText,
@@ -163,6 +183,65 @@ const COMMANDS: Record<string, CommandDef> = {
         input: getOptionString(args, 'input') ?? undefined,
         output: getOptionString(args, 'output') ?? undefined,
         exceptions: getOptionString(args, 'exceptions') ?? undefined,
+      }),
+  },
+  'import ratings': {
+    options: IMPORT_RATINGS_OPTIONS,
+    run: (args) =>
+      importRatings({
+        seasons: getOptionString(args, 'seasons'),
+        forceRatings: hasOption(args, 'force-ratings'),
+      }),
+  },
+  'import pools': {
+    options: IMPORT_POOLS_OPTIONS,
+    run: (args) =>
+      importPools({
+        pools: getOptionString(args, 'pools'),
+        all: hasOption(args, 'all'),
+        noAssets: hasOption(args, 'no-assets'),
+      }),
+  },
+  'import era-profile': {
+    options: IMPORT_ERA_PROFILE_OPTIONS,
+    run: (args) => importEraProfile({ era: getOptionString(args, 'era') }),
+  },
+  'import era-config': {
+    options: IMPORT_ERA_CONFIG_OPTIONS,
+    run: (args) => importEraConfig({ seasons: getOptionString(args, 'seasons') }),
+  },
+  'import careers': {
+    options: IMPORT_CAREERS_OPTIONS,
+    run: (args) => importCareers({ seasons: getOptionString(args, 'seasons') }),
+  },
+  'import manifest': {
+    options: IMPORT_MANIFEST_OPTIONS,
+    run: () => importManifest(),
+  },
+  'import opponent': {
+    options: IMPORT_OPPONENT_OPTIONS,
+    run: () => importOpponent(),
+  },
+  'import freeze': {
+    options: IMPORT_FREEZE_OPTIONS,
+    run: (args) =>
+      importFreeze({
+        report: getOptionString(args, 'report'),
+        era: getOptionString(args, 'era'),
+      }),
+  },
+  'import run-all': {
+    options: IMPORT_RUN_ALL_OPTIONS,
+    run: (args) =>
+      importRunAll({
+        seasons: getOptionString(args, 'seasons'),
+        includeSchedule: hasOption(args, 'include-schedule'),
+        forceStints: hasOption(args, 'force-stints'),
+        forceRatings: hasOption(args, 'force-ratings'),
+        workers: getOptionString(args, 'workers'),
+        skipCareers: hasOption(args, 'skip-careers'),
+        skipBbref: hasOption(args, 'skip-bbref'),
+        pools: getOptionString(args, 'pools'),
       }),
   },
 };

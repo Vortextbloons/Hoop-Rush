@@ -1,0 +1,75 @@
+/**
+ * JSON and filesystem helpers for the import pipeline.
+ *
+ * Output formatting mirrors the Python importer: `JSON.stringify(value, null, 2)`
+ * without a trailing newline (with-newline variants are used where the Python
+ * source appended "\n"). Number formatting differs cosmetically from Python's
+ * `json.dumps` (e.g. `60` vs `60.0`); content hashes are recomputed on rebuild.
+ */
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+
+export function ensureDir(path: string): void {
+  mkdirSync(path, { recursive: true });
+}
+
+export function fileExists(path: string): boolean {
+  try {
+    readFileSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function readJson(path: string): unknown {
+  return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+}
+
+/** Write JSON with 2-space indent; `newline` appends "\n" like the Python source did. */
+export function writeJson(path: string, value: unknown, newline = false): void {
+  ensureDir(dirname(path));
+  const text = JSON.stringify(value, null, 2) + (newline ? '\n' : '');
+  writeFileSync(path, text, 'utf8');
+}
+
+export function sha256Hex(data: string | Uint8Array): string {
+  return createHash('sha256').update(data).digest('hex');
+}
+
+export function sha256File(path: string): string {
+  return sha256Hex(readFileSync(path));
+}
+
+/**
+ * Mirror of the Python `_safe_float`/`float(x or 0)` semantics: null, undefined,
+ * empty strings and non-numeric values fall back to `fallback`; NaN/Inf also
+ * fall back. Booleans coerce like Python floats (true -> 1).
+ */
+export function safeFloat(value: unknown, fallback = 0): number {
+  if (value === null || value === undefined || value === '') return fallback;
+  const n = Number(value);
+  if (Number.isNaN(n) || !Number.isFinite(n)) return fallback;
+  return n;
+}
+
+/**
+ * Mirror of the Python `_safe_int` semantics: convert via float then truncate
+ * toward zero (Python `int(float(x))`); NaN/Inf/non-numeric fall back.
+ */
+export function safeInt(value: unknown, fallback = 0): number {
+  if (value === null || value === undefined || value === '') return fallback;
+  const n = Number(value);
+  if (Number.isNaN(n) || !Number.isFinite(n)) return fallback;
+  return Math.trunc(n);
+}
+
+export function clamp(value: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, value));
+}
+
+export function clampRating(value: number): number {
+  // Python's clamp_rating is int(clamp(v, 0, 100)): truncation, not rounding.
+  return clamp(Math.trunc(value), 0, 100);
+}

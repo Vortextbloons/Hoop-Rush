@@ -294,15 +294,18 @@ export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulati
 }
 
 /**
- * Selects the shot zone from the shooter's frequency tendencies, blended
- * toward the era's three-point rate and modulated by three-point tendency.
+ * Blended five-zone shot weights for a player before three-point volume
+ * rescaling and play-type pulls: the player's frequency tendencies blended
+ * with the era zone mix. Shared by pickZone (which then applies the
+ * three-point evidence gates and action pulls) and by the two-point
+ * efficiency anchor in shooting.ts, so the anchor's expected conversion is
+ * computed against the exact mix the sim actually shoots instead of the raw
+ * tendency mix.
  */
-export function pickZone(
+export function blendedZoneWeights(
   shooter: SimulationPlayer,
-  action: ActionType,
   profile: EraSimulationProfile,
-  rng: Rng,
-): ShotZone {
+): number[] {
   const f = shooter.tendencies;
   const eraMix = profile.parameters.zoneMix;
   const tendencyWeights = [
@@ -322,9 +325,39 @@ export function pickZone(
     eraMix.aboveBreakThree,
   ];
   const blend = ENGINE_CONSTANTS.eraZoneMixBlend;
-  const weights = eraWeights.map(
-    (value, index) => value * (1 - blend) + (tendencyMix[index] ?? 0) * blend,
-  );
+  return eraWeights.map((value, index) => value * (1 - blend) + (tendencyMix[index] ?? 0) * blend);
+}
+
+/**
+ * Normalized two-point (rim / short-mid / long-mid) share of the blended
+ * zone mix. These are the exact relative two-point weights pickZone uses:
+ * the three-point rescaling and play-type pulls scale all two-point zones
+ * by the same factor, so the proportions are identical.
+ */
+export function twoPointZoneShares(
+  shooter: SimulationPlayer,
+  profile: EraSimulationProfile,
+): [number, number, number] {
+  const weights = blendedZoneWeights(shooter, profile);
+  const total = (weights[0] ?? 0) + (weights[1] ?? 0) + (weights[2] ?? 0) || 1;
+  return [
+    (weights[0] ?? 0) / Math.max(1e-9, total),
+    (weights[1] ?? 0) / Math.max(1e-9, total),
+    (weights[2] ?? 0) / Math.max(1e-9, total),
+  ];
+}
+
+/**
+ * Selects the shot zone from the shooter's frequency tendencies, blended
+ * toward the era's three-point rate and modulated by three-point tendency.
+ */
+export function pickZone(
+  shooter: SimulationPlayer,
+  action: ActionType,
+  profile: EraSimulationProfile,
+  rng: Rng,
+): ShotZone {
+  const weights = blendedZoneWeights(shooter, profile);
 
   // Historical three-point volume is a strong role anchor (see
   // threePointTarget): the era rate never manufactures a jump shot.

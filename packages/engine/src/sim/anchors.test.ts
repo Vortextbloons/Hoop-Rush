@@ -179,3 +179,169 @@ describe('observed player anchors', () => {
     expect(simulateGame(input, context)).toEqual(simulateGame(input, context));
   });
 });
+
+/** Average field-goal percentage of one anchored player across many games. */
+function averageDefenseTeam(): SimulationTeam {
+  const base = buildLegalSimulationTeam();
+  const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const ratings = {} as SimulationPlayer['ratings'];
+  for (const key of Object.keys(base.players[0]!.ratings) as Array<
+    keyof SimulationPlayer['ratings']
+  >) {
+    ratings[key] = 66;
+  }
+  return {
+    teamId: 'average-defense',
+    displayName: 'Average Defense',
+    players: slots.map((positions, index) => ({
+      ...base.players[index]!,
+      playerId: `avg-def-${index}`,
+      displayName: `Avg Def ${index}`,
+      positions,
+      ratings,
+    })),
+  };
+}
+
+function sampleFieldGoalPct(
+  playerId: string,
+  home: SimulationTeam,
+  away: SimulationTeam,
+  games: number,
+): { fieldGoalPct: number; threePointPct: number; freeThrowPct: number; turnoverRate: number } {
+  let fgm = 0;
+  let fga = 0;
+  let tpm = 0;
+  let tpa = 0;
+  let ftm = 0;
+  let fta = 0;
+  let tov = 0;
+  let tovPossessionEstimate = 0;
+  for (let index = 0; index < games; index += 1) {
+    const result = simulateGame(
+      buildGameSimulationInput({
+        seed: seedFromString(`anchor-pin-${playerId}-${index}`),
+        home,
+        away,
+      }),
+      context,
+    );
+    const box = result.home.players.find((p) => p.playerId === playerId)!;
+    fgm += box.fieldGoals.made;
+    fga += box.fieldGoals.attempted;
+    tpm += box.threes.made;
+    tpa += box.threes.attempted;
+    ftm += box.freeThrows.made;
+    fta += box.freeThrows.attempted;
+    tov += box.turnovers;
+    tovPossessionEstimate +=
+      box.fieldGoals.attempted + 0.44 * box.freeThrows.attempted + box.turnovers;
+  }
+  return {
+    fieldGoalPct: fgm / Math.max(1, fga),
+    threePointPct: tpm / Math.max(1, tpa),
+    freeThrowPct: ftm / Math.max(1, fta),
+    turnoverRate: tov / Math.max(1, tovPossessionEstimate),
+  };
+}
+
+describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
+  it('pins a rim-reliant interior scorer to his observed two-point percentage', () => {
+    // Shaq's observed FG% is 0.573 with no three-point attempts. Before the
+    // anchor mix fix the era-blended shot mix dragged this to ~0.52; the
+    // anchor must now be computed against the exact mix the sim shoots.
+    // The opponent is a league-average defense (all ratings at the
+    // population mean), so the zero-centered contest leaves the anchored
+    // conversion intact.
+    const team = anchoredCenterTeam();
+    const { fieldGoalPct } = sampleFieldGoalPct(
+      'shaquille-anchor',
+      team,
+      averageDefenseTeam(),
+      300,
+    );
+    expect(fieldGoalPct).toBeGreaterThan(0.545);
+    expect(fieldGoalPct).toBeLessThan(0.59);
+  });
+
+  it('pins a perimeter star to observed field-goal, three-point, and free-throw rates', () => {
+    const mjAnchors: SimulationAnchors = {
+      gamesPlayed: 82,
+      minutesPerGame: 37.9,
+      pointsPerGame: 29.6,
+      reboundsPerGame: 6.9,
+      offensiveReboundsPerGame: 1.1,
+      defensiveReboundsPerGame: 5.8,
+      assistsPerGame: 4.3,
+      stealsPerGame: 1.7,
+      blocksPerGame: 0.6,
+      turnoversPerGame: 2.6,
+      fieldGoalPct: 0.486,
+      threePointPct: 0.374,
+      freeThrowPct: 0.833,
+      threePointAttemptRate: 0.158,
+      freeThrowAttemptRate: 0.379,
+    };
+    const base = buildLegalSimulationTeam();
+    const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+    const star = buildSimulationPlayer({
+      playerId: 'mj-anchor',
+      displayName: 'Anchor Star',
+      positions: ['G'],
+      ratings: {
+        ...base.players[0]!.ratings,
+        insideScoring: 90,
+        closeShot: 80,
+        midrange: 85,
+        threePoint: 80,
+        ballHandling: 90,
+        passing: 80,
+      },
+      tendencies: {
+        ...base.players[0]!.tendencies,
+        usageRate: 33,
+        shotRate: 35,
+        rimFrequency: 40,
+        shortMidFrequency: 22,
+        longMidFrequency: 22,
+        cornerThreeFrequency: 5,
+        aboveBreakThreeFrequency: 11,
+        threePointRate: 16,
+        freeThrowRate: 38,
+        turnoverRate: 9,
+      },
+      anchors: mjAnchors,
+    });
+    const home = {
+      ...base,
+      players: slots.map((positions, index) =>
+        index === 0 ? { ...star, positions } : { ...base.players[index]!, positions },
+      ),
+    };
+    const away = {
+      ...base,
+      players: slots.map((positions, index) =>
+        index === 0 ? { ...star, positions } : { ...base.players[index]!, positions },
+      ),
+    };
+    const { fieldGoalPct, threePointPct, freeThrowPct, turnoverRate } = sampleFieldGoalPct(
+      'mj-anchor',
+      home,
+      away,
+      300,
+    );
+    // Observed FG% is 0.486 overall (0.374 from three). The anchor blend must
+    // hold the aggregate near the recorded season, not the era mean.
+    expect(fieldGoalPct).toBeGreaterThan(0.451);
+    expect(fieldGoalPct).toBeLessThan(0.521);
+    expect(threePointPct).toBeGreaterThan(0.334);
+    expect(threePointPct).toBeLessThan(0.414);
+    expect(freeThrowPct).toBeGreaterThan(0.81);
+    expect(freeThrowPct).toBeLessThan(0.88);
+    // Real MJ converts ~8.6% of his possessions into turnovers; the old
+    // era-anchored model pushed stars to the league mean (~11-12%). The
+    // observed-tendency blend must keep stars near their own rate.
+    expect(turnoverRate).toBeLessThan(0.1);
+    expect(turnoverRate).toBeGreaterThan(0.04);
+  });
+});

@@ -1,11 +1,16 @@
-"""Run the full nba_api import pipeline.
+"""Fetch-only NBA import pipeline (compute moved to TypeScript).
+
+Fetches raw nba_api data for the requested seasons: rosters, stints, season
+stats, and optionally schedules, plus the Basketball-Reference id mapping.
+All compute (era config, ratings, pools, careers) lives in TypeScript.
 
 Usage:
-    python scripts/import-nba/run_all.py                 # fetch all default seasons
-    python scripts/import-nba/run_all.py --seasons 2024-25 2023-24
-    python scripts/import-nba/run_all.py --include-schedule
-    python scripts/import-nba/run_all.py --workers 16     # concurrent workers
-    python scripts/import-nba/run_all.py --force-ratings  # recompute ratings
+    python scripts/import-nba/fetch_all.py                 # fetch all default seasons
+    python scripts/import-nba/fetch_all.py --seasons 2024-25 2023-24
+    python scripts/import-nba/fetch_all.py --include-schedule
+    python scripts/import-nba/fetch_all.py --force-stints  # recompute stints
+    python scripts/import-nba/fetch_all.py --workers 16    # concurrent workers
+    python scripts/import-nba/fetch_all.py --skip-bbref    # skip bbref id mapping
 """
 
 from __future__ import annotations
@@ -40,12 +45,10 @@ def _import(module_name: str):
     return importlib.import_module(full)
 
 
-def _fetch_season(season: str, include_schedule: bool, force_ratings: bool) -> None:
-    """Fetch all data for a single season."""
+def _fetch_season(season: str, include_schedule: bool, force_stints: bool) -> None:
+    """Fetch all raw data for a single season."""
     fetch_rosters = _import("fetch_rosters").run
     fetch_season_stats = _import("fetch_season_stats").run
-    compute_era_config = _import("compute_era_config").run
-    compute_ratings = _import("compute_ratings").run
 
     print(f"\n=== {season} ===")
     try:
@@ -64,7 +67,7 @@ def _fetch_season(season: str, include_schedule: bool, force_ratings: bool) -> N
     # stint-derived league totals when the league dashboard returns nothing.
     try:
         fetch_stints = _import("fetch_stints")
-        fetch_stints.compute_for_season(season, force=force_ratings)
+        fetch_stints.compute_for_season(season, force=force_stints)
     except Exception as exc:
         print(f"  ! stints fetch failed: {exc}")
 
@@ -72,16 +75,6 @@ def _fetch_season(season: str, include_schedule: bool, force_ratings: bool) -> N
         fetch_season_stats(season, roster)
     except Exception as exc:
         print(f"  ! season stats fetch failed: {exc}")
-
-    try:
-        compute_era_config([season])
-    except Exception as exc:
-        print(f"  ! era config compute failed: {exc}")
-
-    try:
-        compute_ratings([season], force=force_ratings)
-    except Exception as exc:
-        print(f"  ! ratings compute failed: {exc}")
 
     if include_schedule:
         try:
@@ -97,16 +90,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--seasons", nargs="*", default=None)
     parser.add_argument("--include-schedule", action="store_true")
-    parser.add_argument("--force-ratings", action="store_true")
+    parser.add_argument("--force-stints", action="store_true")
     parser.add_argument("--workers", type=int, default=config.MAX_WORKERS)
-    parser.add_argument(
-        "--pools", nargs="+", default=["lakers/1990s"],
-        help="franchiseId/eraId pool targets (default lakers/1990s)",
-    )
-    parser.add_argument(
-        "--skip-careers", action="store_true",
-        help="skip the per-player career-stats fetch (not used by pools)",
-    )
     parser.add_argument(
         "--skip-bbref", action="store_true",
         help="skip the Basketball-Reference id mapping (pools ship without altIds)",
@@ -114,7 +99,6 @@ def main() -> int:
     args = parser.parse_args()
 
     seasons = args.seasons or DEFAULT_SEASONS
-    pools = [tuple(p.split("/")) for p in args.pools]  # type: ignore[assignment]
     workers = max(1, min(args.workers, len(seasons)))
     started_at = time.perf_counter()
     print(f"Running pipeline for {len(seasons)} seasons ({workers} workers)")
@@ -123,7 +107,7 @@ def main() -> int:
         print(f"\n--- Phase 1: Fetching seasons concurrently ({workers} workers) ---")
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = {
-                pool.submit(_fetch_season, s, args.include_schedule, args.force_ratings): s
+                pool.submit(_fetch_season, s, args.include_schedule, args.force_stints): s
                 for s in seasons
             }
             for future in as_completed(futures):
@@ -134,25 +118,17 @@ def main() -> int:
                     print(f"  ! {season} failed: {exc}")
     else:
         for season in seasons:
-            _fetch_season(season, args.include_schedule, args.force_ratings)
+            _fetch_season(season, args.include_schedule, args.force_stints)
 
-    print("\n--- Phase 2: Careers ---")
-    if args.skip_careers:
-        print("  (skipped)")
-    else:
-        compute_careers = _import("compute_careers").run
-        compute_careers(seasons)
-
-    print("\n--- Phase 3: Basketball-Reference IDs ---")
+    print("\n--- Phase 2: Basketball-Reference IDs ---")
     if args.skip_bbref:
         print("  (skipped)")
     else:
-        fetch_bbref_ids = _import("fetch_bbref_ids").run
-        fetch_bbref_ids()
-
-    print("\n--- Phase 4: Franchise-era pools ---")
-    compute_pools = _import("compute_pools")
-    compute_pools.run(targets=pools)
+        try:
+            fetch_bbref_ids = _import("fetch_bbref_ids").run
+            fetch_bbref_ids()
+        except Exception as exc:
+            print(f"  ! bbref ids fetch failed: {exc}")
 
     metrics = _import("util").import_metrics()
     elapsed = time.perf_counter() - started_at

@@ -418,7 +418,7 @@ describe('cli: calibrate commands', () => {
       'calibrate',
       'sensitivity',
       '--samples',
-      '150',
+      '200',
       '--format',
       'json',
     ]);

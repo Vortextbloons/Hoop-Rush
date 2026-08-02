@@ -8,18 +8,23 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v4';
+export const ENGINE_VERSION = 'm3-engine-v5';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
 
-  /** Base make probability by zone before any player or era adjustment. */
+  /** Base make probability by zone before any player or era adjustment.
+   * m3-engine-v5: zero-centered contests (see contestRatioPivot) removed the
+   * implicit league-wide penalty from the unanchored path, so the bases were
+   * lowered to keep league-average (unanchored) conversion on the era
+   * targets. Anchored two-point players are unaffected: their anchor factor
+   * rescales against these bases. */
   zoneBaseMake: {
-    rim: 0.68,
-    shortMid: 0.52,
-    longMid: 0.5,
-    cornerThree: 0.46,
-    aboveBreakThree: 0.43,
+    rim: 0.62,
+    shortMid: 0.46,
+    longMid: 0.44,
+    cornerThree: 0.43,
+    aboveBreakThree: 0.4,
   } as const satisfies Record<ShotZone, number>,
 
   /**
@@ -45,51 +50,89 @@ export const ENGINE_CONSTANTS = {
    */
   skillRange: 0.08,
   /**
-   * Defensive contest can reduce make chance by at most this much. Sized
-   * with skillRange so contests compress blowouts without silencing
-   * perimeter-defense sensitivity.
+   * Defensive contest moves make chance by at most this much. The contest is
+   * zero-centered at the population-mean contest rating (contestRatioPivot):
+   * an average defender leaves anchored efficiency intact, elite defenders
+   * subtract, weak defenders add. Without the zero-center, the always-
+   * negative contest silently depressed every anchored player below their
+   * own observed season rate.
    */
   contestMax: 0.1,
-  /** Contest ratio pivots here and spans this rating range. */
-  contestRatioPivot: 55,
-  contestRatioRange: 35,
+  /** Contest can help the shooter by at most this much (weak-defender boost). */
+  contestMin: -0.05,
+  /** Contest ratio pivots here (the packaged pool's usage-weighted mean
+   * contest rating) and spans this rating range. The range was narrowed in
+   * m3-engine-v5 (from 35) to keep the defensive contest response steep
+   * after the contest became zero-centered: the swing per rating point is
+   * what makes perimeter/interior defense measurably move opponent scoring
+   * without the old always-negative bias. */
+  contestRatioPivot: 66,
+  contestRatioRange: 28,
   /** Era efficiency anchor blends league TS% into the final make chance. */
   eraEfficiencyWeight: 0.35,
 
   /**
    * Turnover probability coefficients around the era turnover-per-possession
-   * baseline (security.ts). A handler at the documented neutral reference
-   * (tendency 0.14, team pressure 0.671, handling offset 0.22, passing
-   * offset 0.12 — the packaged pool population means) converts at the era
-   * rate; deviations move the probability in bounded steps. Pressure weight
-   * is softer so elite defenses force extra turnovers without guaranteeing
-   * them.
+   * baseline (security.ts). The observed per-possession turnover tendency is
+   * the primary anchor (turnoverObservedBlend): a player's real turnover
+   * rate carries the model, and the era base only pulls the residual toward
+   * the league. At the population mean the blend reproduces the era rate
+   * exactly, so league turnover calibration is preserved while star ball
+   * handlers convert near their own observed rates instead of the league
+   * mean. The pressure/handling/passing terms are unchanged: they remain
+   * deviations around the packaged pool population means (pressure 0.671,
+   * handling 0.22, passing 0.12).
    */
+  turnoverObservedBlend: 0.7,
   turnoverNeutralTendency: 0.14,
   turnoverNeutralPressure: 0.671,
   turnoverNeutralHandling: 0.22,
   turnoverNeutralPassing: 0.12,
-  turnoverTendencyWeight: 0.12,
   turnoverPressureWeight: 0.12,
   turnoverHandlingWeight: 0.05,
   turnoverPassingWeight: 0.03,
   turnoverMin: 0.03,
   turnoverMax: 0.3,
+  /** Steal crediting centers at this team steal-rating (the packaged pool's
+   * usage-weighted population mean), so an average defensive team converts
+   * turnovers into steals at the era's recorded steal share. Previously the
+   * factor started at 0.5 and silently under-credited steals by roughly a
+   * quarter of the real rate. */
+  stealNeutralAbility: 67,
 
   /** Block probability coefficients by zone (V1 possessionEngine, revalidated). */
   blockRimMax: 0.14,
   blockMidMax: 0.07,
   blockThreeMax: 0.04,
   blockDriveBonus: 0.03,
+  /**
+   * Observed shot-blocking anchor (rim and short-mid only). A player's
+   * per-48-minute block production above the population floor adds a bounded
+   * bonus on top of the rating-based probability, so real rim protectors
+   * (Duncan, Robinson, Holmgren) get credited near their seasons. The
+   * population mean sits at the floor, so league block totals are unchanged.
+   */
+  blockAnchorFloorPer48: 0.8,
+  blockAnchorScale: 0.025,
+  blockAnchorMax: 0.06,
 
   /**
    * Shooting-foul calibration scale: the zone/position/discipline modifiers
    * drag the raw foulsPerPossession rate below the league value, so the base
    * is scaled to restore the league average at population-mean inputs.
+   * m3-engine-v5: the observed free-throw-rate anchor (observedFoulDrawBlend)
+   * raised the population-mean foul-draw factor, so the scale was reduced to
+   * keep the free-throw-attempt gate on target.
    */
-  shootingFoulScale: 1.5,
-  /** Fouled shots convert less often: contact lowers the make chance. */
-  fouledShotMakeScale: 0.75,
+  shootingFoulScale: 1.35,
+  /**
+   * Fouled shots convert close to their normal rate: contact on a shooting
+   * foul usually arrives after the release, so an and-one should not be
+   * systematically suppressed. m3-engine-v5 raised this from 0.75 to 0.95.
+   */
+  fouledShotMakeScale: 0.95,
+  /** How strongly the observed free-throw-attempt rate anchors foul draws. */
+  observedFoulDrawBlend: 0.5,
 
   /** Free-throw conversion anchor: a 75 rating converts at leagueFtPct. */
   freeThrowAnchorRating: 75,

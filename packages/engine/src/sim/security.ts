@@ -26,34 +26,78 @@ export function defenderPressure(defender: SimulationPlayer): number {
   );
 }
 
-/** Turnover probability for a ball handler against a five-man defense. */
+/**
+ * Possession-estimates per trip for the era (FGA + 0.44*FTA + TOV per game
+ * divided by trips per team game). Turnover tendencies are measured per
+ * possession-estimate while the engine checks ball security once per trip,
+ * so the blend in turnoverProbability converts the player tendency to the
+ * per-trip convention with this ratio. Derived from the frozen era targets;
+ * null when the targets cannot support it.
+ */
+export function eraPossEstimatePerTrip(profile: EraSimulationProfile): number | null {
+  const t = profile.targets;
+  const fta = t.freeThrowsAttemptedPerGame.value;
+  const tov = t.turnoversPerGame.value;
+  const poss = t.possessionsPerGame.value;
+  const ftPct = t.freeThrowPct.value;
+  const fgPct = t.fieldGoalPct.value;
+  const threeRate = t.threePointRate.value;
+  const threePct = t.threePointPct.value;
+  const points = t.pointsPerGame.value;
+  const denom = 2 * fgPct + threeRate * threePct;
+  if (poss <= 0 || denom <= 0) return null;
+  const freeThrowMade = fta * ftPct;
+  const fga = (points - freeThrowMade) / denom;
+  const possEstimate = fga + 0.44 * fta + tov;
+  return possEstimate / poss;
+}
+
+/**
+ * Turnover probability for a ball handler against a five-man defense. The
+ * player's observed per-possession turnover tendency is the primary anchor
+ * (turnoverObservedBlend) so a star handler converts near his own real rate
+ * instead of the league mean; the era base pulls the residual. The tendency
+ * is converted to the engine's per-trip convention so at the population mean
+ * the blend reproduces the era turnover target exactly. Defensive pressure,
+ * ball handling, and passing then move the probability in bounded steps
+ * around the packaged pool population means.
+ */
 export function turnoverProbability(
   handler: SimulationPlayer,
   defense: SimulationTeam,
   profile: EraSimulationProfile,
 ): number {
-  const eraBase = profile.parameters.turnoverPerPossession;
   const c = ENGINE_CONSTANTS;
+  const eraBase = profile.parameters.turnoverPerPossession;
   const tendency = handler.tendencies.turnoverRate / 100;
+  const possEstimatePerTrip = eraPossEstimatePerTrip(profile) ?? 1;
+  const tendencyPerTrip = tendency * possEstimatePerTrip;
   const pressure =
     defense.players.reduce((sum, d) => sum + defenderPressure(d), 0) / defense.players.length;
   const handling = (handler.ratings.ballHandling - 50) / 50;
   const passing = (handler.ratings.passing - 50) / 100;
   const raw =
-    eraBase +
-    (tendency - c.turnoverNeutralTendency) * c.turnoverTendencyWeight +
+    eraBase * (1 - c.turnoverObservedBlend) +
+    tendencyPerTrip * c.turnoverObservedBlend +
     (pressure - c.turnoverNeutralPressure) * c.turnoverPressureWeight -
     (handling - c.turnoverNeutralHandling) * c.turnoverHandlingWeight -
     (passing - c.turnoverNeutralPassing) * c.turnoverPassingWeight;
   return Math.min(c.turnoverMax, Math.max(c.turnoverMin, raw));
 }
 
-/** Whether a turnover is credited as an opponent steal (player-ability aware). */
+/**
+ * Whether a turnover is credited as an opponent steal. The era's recorded
+ * steal share of turnovers is the anchor: an average defensive team
+ * (steal-rating neutral) converts turnovers into steals at exactly the era
+ * share, and above-average ball pressure earns a bounded bonus.
+ */
 export function isSteal(rng: Rng, defense: SimulationTeam, profile: EraSimulationProfile): boolean {
   const stealAbility =
     defense.players.reduce((sum, d) => sum + d.ratings.steal, 0) / defense.players.length;
-  const p = profile.parameters.stealShareOfTurnovers * (0.5 + (stealAbility - 50) / 100);
-  return rng.chance(Math.min(0.9, Math.max(0.1, p)));
+  const p =
+    profile.parameters.stealShareOfTurnovers *
+    (1 + (stealAbility - ENGINE_CONSTANTS.stealNeutralAbility) / 100);
+  return rng.chance(Math.min(0.9, Math.max(0.3, p)));
 }
 
 /** Credits the stealer, weighted by steal rating. */

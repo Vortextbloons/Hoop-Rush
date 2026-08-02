@@ -126,6 +126,34 @@ importers:
         specifier: ^4.1.10
         version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))
 
+  packages/importer:
+    dependencies:
+      '@hoop-rush/data-contracts':
+        specifier: workspace:*
+        version: link:../data-contracts
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.13.3
+      eslint:
+        specifier: ^10.8.0
+        version: 10.8.0(jiti@2.7.0)
+      tsx:
+        specifier: ^4.20.0
+        version: 4.23.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8.65.0
+        version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@24.13.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1))
+
   packages/persistence:
     dependencies:
       '@hoop-rush/data-contracts':
@@ -172,6 +200,9 @@ importers:
       '@hoop-rush/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@hoop-rush/importer':
+        specifier: workspace:*
+        version: link:../../packages/importer
       zod:
         specifier: ^4.4.3
         version: 4.4.3

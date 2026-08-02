@@ -56,6 +56,34 @@ Commands:
                          --exceptions <path>  Exclusion list, one relative path per
                                               line, # comments allowed (default
                                               <dir>/combine-exceptions.txt)
+  import ratings         Derive ratings/tendencies/traits/contracts from fetched
+                         raw-data roster + season-stats (Python stays the fetch
+                         layer only). --seasons 2024-25,2023-24 (comma-separated)
+                         --force-ratings       Recompute already-rated seasons
+  import pools           Build franchise-era pools (spec/02) and update the
+                         manifest pool index.
+                         --pools lakers/1990s,celtics/1980s  Targets (comma-sep)
+                         --all                 Every available (franchise, era)
+                         --no-assets           Skip headshot/photo annotation
+                         (annotation itself stays in Python: reannotate_assets.py)
+  import era-profile     Derive era simulation profiles from packaged stints +
+                         Lakers pool anchors. --era 1990s,1980s (default all)
+  import era-config      Compute per-season era-config.json league averages.
+                         --seasons 2024-25,2023-24 (comma-separated)
+  import careers         Compute per-season career-stats.json from season stats.
+                         --seasons 2024-25,2023-24 (comma-separated)
+  import manifest        Refresh manifest content hashes for pools, era profiles,
+                         opponents, and the bracket artifact
+  import opponent        Author the lakers-1990s opening opponent artifact
+  import freeze          Freeze a calibrate-run baseline into the era profile.
+                         --report <calibrate-report.json>  (required)
+                         --era <eraId> (default 1990s)
+  import run-all         Full pipeline: Python fetch layer (rosters, stints,
+                         season stats, schedule, bbref ids) then native ratings,
+                         careers, pools.
+                         --seasons 2024-25,2023-24  --workers N (default 6)
+                         --include-schedule  --force-stints  --force-ratings
+                         --skip-careers  --skip-bbref  --pools lakers/1990s
   help                   Show this help
 
 Fixtures:

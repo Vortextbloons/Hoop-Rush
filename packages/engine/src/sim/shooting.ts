@@ -5,7 +5,7 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import { ENGINE_CONSTANTS } from './constants.js';
-import { isThreePointZone, zoneSkillRating, type ActionType } from './usage.js';
+import { isThreePointZone, twoPointZoneShares, zoneSkillRating, type ActionType } from './usage.js';
 
 /**
  * Zone skill, defender selection, perimeter/interior pressure, and era
@@ -45,8 +45,14 @@ export function shotQualityBonus(action: ActionType, zone: ShotZone): number {
   return table?.[zone] ?? 0;
 }
 
-/** Defensive contest penalty for a shooter, zone-aware: interior pressure on
- * rim/close shots, perimeter pressure on threes, a blend in between. */
+/**
+ * Defensive contest adjustment for a shooter, zone-aware: interior pressure on
+ * rim/close shots, perimeter pressure on threes, a blend in between. The
+ * adjustment is zero-centered at the population-mean contest rating, so an
+ * average defender leaves the anchored conversion intact, elite defenders
+ * subtract, and weak defenders add. A strictly negative contest silently
+ * dragged every anchored player below their own observed season rate.
+ */
 export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): number {
   let contest: number;
   if (zone === 'rim' || zone === 'shortMid') {
@@ -65,7 +71,7 @@ export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): numb
   const ratio = Math.min(
     1,
     Math.max(
-      0,
+      ENGINE_CONSTANTS.contestMin / ENGINE_CONSTANTS.contestMax,
       (contest - ENGINE_CONSTANTS.contestRatioPivot) / ENGINE_CONSTANTS.contestRatioRange,
     ),
   );
@@ -91,17 +97,21 @@ export function observedTwoPointPct(shooter: SimulationPlayer): number | null {
 /**
  * Soft two-point efficiency anchor (null when the player has no reliable
  * season data). The ratio of the player's observed two-point percentage to
- * the expected conversion at the zone bases for their shot mix. Zone
- * differentiation stays intact because every zone scales by the same
- * factor; the anchor keeps overall two-point efficiency tied to the real
- * season instead of drifting to zone-skill extremes beside elite creators
- * and spacing. The factor is clamped so context still matters.
+ * the expected conversion at the zone bases for their *actual* blended shot
+ * mix. The expected mix is the same era-blended mix pickZone produces, so
+ * the factor pins overall two-point efficiency to the real season instead of
+ * drifting to the era mix (which previously dragged rim-reliant interior
+ * scorers below their own observed rate). Zone differentiation stays intact
+ * because every zone scales by the same factor; the factor is clamped so
+ * context still matters.
  */
-export function twoPointAnchorFactor(shooter: SimulationPlayer): number | null {
+export function twoPointAnchorFactor(
+  shooter: SimulationPlayer,
+  profile: EraSimulationProfile,
+): number | null {
   const observed = observedTwoPointPct(shooter);
   if (observed === null) return null;
-  const t = shooter.tendencies;
-  const shares = [t.rimFrequency, t.shortMidFrequency, t.longMidFrequency];
+  const shares = twoPointZoneShares(shooter, profile);
   const bases = [
     ENGINE_CONSTANTS.zoneBaseMake.rim,
     ENGINE_CONSTANTS.zoneBaseMake.shortMid,
@@ -131,17 +141,30 @@ export function blockProbability(
   action: ActionType,
 ): number {
   const c = ENGINE_CONSTANTS;
+  const anchors = defender.anchors;
+  const per48 =
+    anchors && anchors.blocksPerGame !== undefined && anchors.minutesPerGame > 0
+      ? (anchors.blocksPerGame / anchors.minutesPerGame) * 48
+      : 0;
+  const anchorBonus =
+    per48 > c.blockAnchorFloorPer48
+      ? Math.min(c.blockAnchorMax, (per48 - c.blockAnchorFloorPer48) * c.blockAnchorScale)
+      : 0;
   if (zone === 'rim') {
     const base = Math.min(
       c.blockRimMax,
       Math.max(0, ((defender.ratings.block - 40) / 60) * c.blockRimMax),
     );
-    return base + (action === 'isolation' || action === 'pickAndRoll' ? c.blockDriveBonus : 0);
+    return (
+      base +
+      (action === 'isolation' || action === 'pickAndRoll' ? c.blockDriveBonus : 0) +
+      anchorBonus
+    );
   }
   if (zone === 'shortMid') {
     return Math.min(
       c.blockMidMax,
-      Math.max(0, ((defender.ratings.block - 50) / 50) * c.blockMidMax),
+      Math.max(0, ((defender.ratings.block - 50) / 50) * c.blockMidMax) + anchorBonus * 0.5,
     );
   }
   return Math.min(
@@ -162,7 +185,7 @@ export function makeProbability(
   const threePointZone = isThreePointZone(context.zone);
   const observedThreePointPct = threePointZone ? shooter.anchors?.threePointPct : null;
   const hasObservedThree = observedThreePointPct !== null && observedThreePointPct !== undefined;
-  const twoAnchor = threePointZone ? null : twoPointAnchorFactor(shooter);
+  const twoAnchor = threePointZone ? null : twoPointAnchorFactor(shooter, profile);
   const anchoredTwo = twoAnchor !== null;
   const base = threePointZone
     ? hasObservedThree

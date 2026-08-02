@@ -1,0 +1,173 @@
+/**
+ * Main ratings entry (port of compute_ratings.py compute_for_season / run).
+ *
+ * Reads roster.json + season-stats.json, derives ratings/tendencies/summary
+ * ratings/traits/contracts, and writes the complete StaticPlayer-compatible
+ * roster.json back.
+ */
+import { readFileSync } from 'node:fs';
+import { DEFAULT_SEASONS, ensureOutputDir } from '../config.js';
+import { fileExists, readJson, safeFloat, writeJson } from '../json.js';
+import { createRng, pythonSeasonSeed } from '../rng.js';
+import { deriveRatings, mapPosition } from './derive.js';
+import { deriveTendencies } from './tendencies.js';
+import { deriveTraits } from './traits.js';
+import { deriveContract } from './contracts.js';
+import { computeSummaryRatings } from './summary.js';
+import type { StatsRow } from './stats.js';
+
+export interface RosterPlayer extends Record<string, unknown> {
+  externalId?: string | null;
+  position?: string | null;
+  id?: string | null;
+  teamInternalId?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  height?: unknown;
+  heightInches?: unknown;
+  weight?: unknown;
+  weightLbs?: unknown;
+  secondaryPositions?: unknown;
+  age?: unknown;
+  ratings?: Record<string, number>;
+  tendencies?: Record<string, number>;
+  summaryRatings?: { offenseRating: number; defenseRating: number; overallRating: number };
+  traits?: Record<string, number>;
+  contract?: unknown;
+  importMeta?: { snapshotSeason: string; statsSource: string; lastUpdated: string };
+}
+
+/**
+ * Python's json.loads accepts bare `NaN` tokens produced by json.dumps of
+ * pandas NaN values; JSON.parse rejects them. Replace the token with null
+ * (equivalent behavior for the fields we consume).
+ */
+export function parseJsonLoose(text: string): unknown {
+  return JSON.parse(text.replace(/\bNaN\b/g, 'null')) as unknown;
+}
+
+export function readJsonLoose(path: string): unknown {
+  return parseJsonLoose(readFileSync(path, 'utf8'));
+}
+
+function safeHeight(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return Math.trunc(value);
+}
+
+export function computeForSeason(season: string, force = false): void {
+  const out = ensureOutputDir(season);
+  const rosterPath = `${out}/roster.json`;
+  const statsPath = `${out}/season-stats.json`;
+
+  if (!fileExists(rosterPath)) {
+    console.log(`  ! ${season}: no roster.json, skipping`);
+    return;
+  }
+  if (!fileExists(statsPath)) {
+    console.log(`  ! ${season}: no season-stats.json, skipping`);
+    return;
+  }
+
+  const roster = readJsonLoose(rosterPath) as RosterPlayer[];
+  const statsList = readJson(statsPath) as StatsRow[];
+
+  if (!Array.isArray(roster) || roster.length === 0) {
+    console.log(`  ! ${season}: empty roster, skipping`);
+    return;
+  }
+
+  // Check if already computed (unless force)
+  if (!force) {
+    const meta = roster[0]?.importMeta;
+    if (meta?.statsSource === 'nba_api') {
+      console.log(`  [SKIP] ${season}: ratings already computed (use --force to recompute)`);
+      return;
+    }
+  }
+
+  // Build stats lookup by externalId
+  const statsById = new Map<string, StatsRow>();
+  for (const s of statsList) {
+    const pid = s['playerExternalId'];
+    if (typeof pid === 'string' && pid !== '') {
+      statsById.set(pid, s);
+    }
+  }
+
+  const rng = createRng(pythonSeasonSeed(season));
+
+  let computed = 0;
+  for (const player of roster) {
+    const extId = player.externalId ?? '';
+    const pos = mapPosition(player.position ?? 'SF');
+    player.position = pos;
+
+    // Set internal ID if missing
+    if (player.id === undefined || player.id === null || player.id === '') {
+      const teamAbbr = (player.teamInternalId ?? 'unk').replace('team-', '');
+      const first = player.firstName ?? '?';
+      const last = player.lastName ?? '?';
+      player.id = `p-${teamAbbr}-${first[0] ?? '?'}${last[0] ?? '?'}-${extId}`;
+    }
+
+    // Convert height/weight
+    const heightStr = player.height;
+    if (typeof heightStr === 'string' && heightStr.includes('-')) {
+      const parts = heightStr.split('-');
+      player.heightInches = Number(parts[0]) * 12 + Number(parts[1]);
+    } else if (typeof heightStr === 'number') {
+      player.heightInches = Math.trunc(heightStr);
+    } else if (player.heightInches === undefined || player.heightInches === null) {
+      player.heightInches = 78;
+    }
+
+    if (safeFloat(player.weightLbs) === 0) {
+      const weightStr = player.weight;
+      if (
+        typeof weightStr === 'string' &&
+        weightStr.trim() !== '' &&
+        /^\d+$/.test(weightStr.trim())
+      ) {
+        player.weightLbs = Number(weightStr.trim());
+      } else if (typeof weightStr === 'number' && weightStr > 0) {
+        player.weightLbs = Math.trunc(weightStr);
+      }
+    }
+
+    // Set secondaryPositions
+    if (player.secondaryPositions === undefined || player.secondaryPositions === null) {
+      player.secondaryPositions = [];
+    }
+
+    // Get stats
+    const stats: StatsRow = statsById.get(extId) ?? {};
+
+    // Derive all fields
+    player.ratings = deriveRatings(stats, pos, season, rng, safeHeight(player.heightInches));
+    player.tendencies = deriveTendencies(stats, player.ratings, pos, rng);
+    player.summaryRatings = computeSummaryRatings(player.ratings, player.tendencies);
+    player.traits = deriveTraits(player.ratings, stats, pos, rng);
+    const age = safeFloat(stats['age'] ?? player.age, 25) || 25;
+    player.contract = deriveContract(player.ratings['overall'] ?? 0, Math.trunc(age), rng);
+
+    player.importMeta = {
+      snapshotSeason: season,
+      statsSource: 'nba_api',
+      lastUpdated: '2026-01-01T00:00:00Z',
+    };
+
+    computed += 1;
+  }
+
+  writeJson(rosterPath, roster);
+  console.log(`  [OK] computed ratings for ${String(computed)} players in ${season}`);
+}
+
+export function run(seasons?: string[], force = false): void {
+  const target = seasons ?? DEFAULT_SEASONS;
+  console.log('[ratings] deriving ratings from real stats');
+  for (const season of target) {
+    computeForSeason(season, force);
+  }
+}

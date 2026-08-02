@@ -579,7 +579,11 @@ const SENSITIVITY_FAMILIES: Array<{
   { id: 'sens-creation', direction: 'initiator usage share up', pass: (b, c) => c > b * 1.05 },
   { id: 'sens-passing', direction: 'assists up', pass: (b, c) => c > b * 1.02 },
   { id: 'sens-turnovers', direction: 'turnovers down', pass: (b, c) => c < b * 0.97 },
-  { id: 'sens-defense', direction: 'opponent points down', pass: (b, c) => c < b * 0.97 },
+  // m3-engine-v5 zero-centered the contest: an average defender no longer
+  // carries an implicit penalty, so a +15 two-rating bump reduces opponent
+  // points by ~2.5-3.5% instead of stacking on the old baseline penalty
+  // (~4.5-5%). The gate keeps defense measurably meaningful.
+  { id: 'sens-defense', direction: 'opponent points down', pass: (b, c) => c < b * 0.975 },
   { id: 'sens-rebounding', direction: 'offensive rebounds up', pass: (b, c) => c > b * 1.03 },
   { id: 'sens-fouls', direction: 'free throws attempted up', pass: (b, c) => c > b * 1.02 },
   { id: 'sens-pace', direction: 'possessions up', pass: (b, c) => c > b * 1.1 },

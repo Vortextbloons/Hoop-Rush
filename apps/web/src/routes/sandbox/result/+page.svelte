@@ -176,7 +176,7 @@
     return denominator <= 0 ? '—' : `${((points / denominator) * 100).toFixed(1)}%`;
   }
 
-  /** Usage percentage: the player's possession estimate divided by the team's. */
+  /** Usage percentage: the player's possession estimate share of the team's. */
   function usagePct(raw: PlayerSeasonAggregate, team: RunAggregates['team']): string {
     const possessionEstimate = (p: {
       fieldGoals: MadeAttempted;
@@ -186,8 +186,7 @@
     const player = possessionEstimate(raw);
     const teamTotal = possessionEstimate(team);
     if (teamTotal <= 0) return '—';
-    // All five players play the full game, so the team total is split evenly.
-    return `${((player / (teamTotal / 5)) * 100).toFixed(1)}%`;
+    return `${((player / teamTotal) * 100).toFixed(1)}%`;
   }
 
   function perGameValue(value: number, games: number, decimals = 1): string {

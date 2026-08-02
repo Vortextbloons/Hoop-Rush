@@ -23,7 +23,10 @@ import { createEngineContext } from './context.js';
  */
 
 const ctx = createEngineContext();
-const SEEDS = 200;
+// 300 seeded games per side keep the magnitude gates stable: the zero-centered
+// v5 contest and lower zone bases make single-dimension bumps move totals by
+// ~2-4%, which is real but small enough that 200 seeds flirted with the floors.
+const SEEDS = 300;
 
 type TeamMutator = (team: SimulationTeam) => SimulationTeam;
 
@@ -95,7 +98,7 @@ function expectDirection(
   // by default) but not an explosion for a one-dimension change (cap varies
   // by stat). Role-based usage concentrates shots on high-usage players, so
   // all-five skill bumps move totals a little less than flat-usage models.
-  // The m3-engine-v4 calibration softened the skill/contest slopes (to
+  // The m3-engine-v5 calibration softened the skill/contest slopes (to
   // compress blowouts), so single-dimension +15 bumps move points ~2% and
   // defense ~2%; callers pass tighter or looser floors per dimension.
   expect(
@@ -187,7 +190,10 @@ describe('sensitivity: ball security', () => {
   it('higher turnoverRate tendency increases turnovers', () => {
     const changed = mutateAllTendencies(baseTeam, 'turnoverRate', 15);
     const tov = compare('tov-tend', baseTeam, changed, (r) => r.home.box.turnovers);
-    expectDirection('turnovers', tov.base, tov.changed, 1);
+    // m3-engine-v5 made the observed turnover tendency the primary anchor
+    // (turnoverObservedBlend), so a +15 tendency bump (12 -> 27) moves the
+    // per-possession rate by ~0.10 and team turnovers by ~0.9 relative.
+    expectDirection('turnovers', tov.base, tov.changed, 1, 1.2);
   });
 });
 
@@ -195,7 +201,7 @@ describe('sensitivity: defense', () => {
   it('higher perimeterDefense lowers opponent points', () => {
     const changed = mutateAllRatings(baseTeam, 'perimeterDefense', 15);
     const oppPts = compare('perim', baseTeam, changed, (r) => r.away.box.points);
-    // The calibrated contest slope (m3-engine-v4) trades magnitude for
+    // The calibrated contest slope (m3-engine-v5, zero-centered) trades magnitude for
     // compressed blowouts; a +15 perimeter bump still cuts ~2% off opponent
     // scoring (the CLI sensitivity gate bumps interior too and shows -4%).
     expect(oppPts.changed, `base=${oppPts.base} changed=${oppPts.changed}`).toBeLessThan(

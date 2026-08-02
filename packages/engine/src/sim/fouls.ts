@@ -14,7 +14,14 @@ import { isThreePointZone } from './usage.js';
  * distribution follows the packaged targets.
  */
 
-/** Probability a shot attempt draws a shooting foul. */
+/**
+ * Probability a shot attempt draws a shooting foul. The player's observed
+ * free-throw-attempt rate (relative to the era's FTA/FGA) anchors the draw
+ * factor alongside the free-throw-rate tendency, so elite draw-foul players
+ * get credited near their real free-throw volume instead of the tendency
+ * alone. At the population mean the anchor is 1, preserving the era foul
+ * rate.
+ */
 export function shootingFoulProbability(
   shooter: SimulationPlayer,
   defender: SimulationPlayer,
@@ -23,7 +30,15 @@ export function shootingFoulProbability(
 ): number {
   const p = profile.parameters;
   const base = p.foulsPerPossession * p.shootingFoulShare * ENGINE_CONSTANTS.shootingFoulScale;
-  const drawsFouls = 0.5 + shooter.tendencies.freeThrowRate / 100;
+  const tendencyFactor = 0.5 + shooter.tendencies.freeThrowRate / 100;
+  const observedRate = shooter.anchors?.freeThrowAttemptRate;
+  const anchorFactor =
+    observedRate === undefined
+      ? 1
+      : Math.min(1.8, Math.max(0.4, observedRate / Math.max(1e-9, p.leagueFtaPerFga)));
+  const drawsFouls =
+    tendencyFactor * (1 - ENGINE_CONSTANTS.observedFoulDrawBlend) +
+    anchorFactor * ENGINE_CONSTANTS.observedFoulDrawBlend;
   const zoneFactor = zone === 'rim' ? 1.4 : isThreePointZone(zone) ? 0.7 : 1;
   const discipline = 1 - (defender.ratings.defensiveIq - 50) / 200;
   return Math.min(0.25, Math.max(0.01, base * drawsFouls * zoneFactor * discipline));
