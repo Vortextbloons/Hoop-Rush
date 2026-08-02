@@ -232,7 +232,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       : detailPos === 'PF' || detailPos === 'SF'
         ? 'F'
         : 'C';
-  const priors = POSITION_PRIORS[position] ?? POSITION_PRIORS['F']!;
+  const priors = POSITION_PRIORS[position] ?? POSITION_PRIORS['F'] ?? POSITION_PRIORS['G']!;
 
   const unclamped: Record<string, number> = {};
   const methods: Record<string, ProvenanceKind> = {};
@@ -592,19 +592,11 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     freeThrowAttemptRate: clampUnitInterval(Math.min(1, freeThrowAttemptRate)) ?? 0,
   };
 
-  const skillSummary = computeSummaryRatings(
-    ratings as unknown as Record<string, number>,
-    tendencies as unknown as Record<string, number>,
-  );
+  const skillSummary = computeSummaryRatings(ratings, tendencies);
   const summaryRatings: SummaryRatings = {
     offenseRating: skillSummary.offenseRating,
     defenseRating: skillSummary.defenseRating,
-    overallRating: computeRealOverall(
-      ratings as unknown as Record<string, number>,
-      position,
-      input.stats,
-      input.heightInches,
-    ),
+    overallRating: computeRealOverall(ratings, position, input.stats, input.heightInches),
   };
 
   return {

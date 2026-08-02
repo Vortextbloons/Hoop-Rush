@@ -60,7 +60,7 @@ export function run(dataDir = PUBLIC_DATA): void {
       sourceIdentityIds: [segment.historicalTeamId],
       lineageRuleVersion: LINEAGE_RULE_VERSION,
     })),
-    eras: (previous?.eras as unknown[] | undefined) ?? [],
+    eras: previous?.eras ?? [],
     pools: [],
     availability: [],
     eraSimulationProfiles: [],
@@ -128,7 +128,7 @@ export function run(dataDir = PUBLIC_DATA): void {
         eraId: era.eraId,
         status: 'unavailable',
         reason: classified.reason,
-        ...(classified.detail !== undefined ? { detail: classified.detail } : {}),
+        detail: classified.detail,
         ...(classified.firstSupportedSeason !== undefined
           ? { firstSupportedSeason: classified.firstSupportedSeason }
           : {}),

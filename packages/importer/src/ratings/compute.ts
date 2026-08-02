@@ -169,11 +169,11 @@ export function computeForSeason(season: string, force = false): void {
       stats,
       era: context,
     });
-    player.ratings = derived.ratings as unknown as Record<string, number>;
-    player.tendencies = derived.tendencies as unknown as Record<string, number>;
+    player.ratings = derived.ratings;
+    player.tendencies = derived.tendencies;
     player.summaryRatings = derived.summaryRatings;
-    player.anchors = derived.anchors as unknown as Record<string, unknown>;
-    player.provenance = derived.provenance as unknown as Record<string, unknown>;
+    player.anchors = derived.anchors;
+    player.provenance = derived.provenance;
     player.unclamped = derived.unclamped;
     player.methods = derived.methods;
     player.traits = deriveTraits(player.ratings, stats, pos);

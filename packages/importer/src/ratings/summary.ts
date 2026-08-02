@@ -197,9 +197,7 @@ export function computeRealOverall(
     // ladder let ordinary high-volume historical bigs reach 95+ because the
     // ppg branch ignored efficiency and impact.
     const eliteBigImpact =
-      per >= 23 ||
-      (bpm >= 5 && per >= 22) ||
-      (per >= 20 && tsPct >= 0.58 && bpm >= 2);
+      per >= 23 || (bpm >= 5 && per >= 22) || (per >= 20 && tsPct >= 0.58 && bpm >= 2);
     if (ppg >= 25) {
       boosted = Math.min(boosted, eliteBigImpact ? (gp >= 55 ? 97 : 92) : gp >= 55 ? 92 : 89);
     } else if (usage >= 28) {

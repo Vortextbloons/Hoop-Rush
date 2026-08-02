@@ -89,9 +89,7 @@ function writeJsonRetry(path, value) {
 async function annotatePool(path) {
   const pool = JSON.parse(readFileSync(path, 'utf8'));
   const players = pool.players ?? [];
-  const pending = players.filter(
-    (p) => (p.altIds ?? {}).nbaHeadshotAvailable === undefined,
-  );
+  const pending = players.filter((p) => (p.altIds ?? {}).nbaHeadshotAvailable === undefined);
   if (pending.length === 0) return 'up-to-date';
   await mapLimit(pending, CONCURRENCY, async (player) => {
     const available = await headAvailable(player.playerExternalId);

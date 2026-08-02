@@ -62,7 +62,7 @@ describe('parity: pools vs committed artifacts', () => {
       if ('reason' in result) {
         throw new Error(`pool ${franchiseId}/${eraId} failed: ${result.reason} ${result.detail}`);
       }
-      const pool = result as Pool;
+      const pool = result;
 
       const committed = readJson(
         `${PUBLIC_DATA}/pools/${franchiseId}-${eraId}.json`,

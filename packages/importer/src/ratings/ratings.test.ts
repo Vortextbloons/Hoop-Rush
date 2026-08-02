@@ -16,7 +16,7 @@ function input(
     season,
     position,
     heightInches: 79,
-    stats: stats as StatsRow,
+    stats: stats,
     era: MODERN,
     ...overrides,
   };
@@ -182,10 +182,7 @@ describe('derivePlayerRecord (field-method registry)', () => {
         'SG',
       ),
     );
-    const skillOnly = computeSummaryRatings(
-      derived.ratings as unknown as Record<string, number>,
-      derived.tendencies as unknown as Record<string, number>,
-    );
+    const skillOnly = computeSummaryRatings(derived.ratings, derived.tendencies);
     expect(derived.summaryRatings.overallRating).toBeGreaterThan(skillOnly.overallRating);
   });
 

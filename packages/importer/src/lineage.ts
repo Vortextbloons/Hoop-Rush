@@ -690,7 +690,8 @@ export function auditLineageTable(): string[] {
       a.validFromSeasonKey.localeCompare(b.validFromSeasonKey),
     );
     for (let i = 0; i < sorted.length; i += 1) {
-      const current = sorted[i]!;
+      const current = sorted[i];
+      if (current === undefined) continue;
       if (current.validFromSeasonKey > (current.validThroughSeasonKey ?? '9999-99')) {
         failures.push(`${franchiseId}: inverted range ${current.validFromSeasonKey}`);
       }

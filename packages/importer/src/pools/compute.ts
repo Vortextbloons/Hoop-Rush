@@ -48,7 +48,6 @@ import {
   MODERN_SLOTS,
   firstSupportedSeason,
   resolveHistoricalIdentity,
-  type LineageSegment,
 } from '../lineage.js';
 
 /**
@@ -1046,7 +1045,7 @@ export function run(targets: Array<[string, string]> | null = null, withAssets =
         eraId,
         status: 'unavailable',
         reason: pool.reason,
-        ...(pool.detail !== undefined ? { detail: pool.detail } : {}),
+        detail: pool.detail,
         ...(pool.firstSupportedSeason !== undefined
           ? { firstSupportedSeason: pool.firstSupportedSeason }
           : {}),
@@ -1092,7 +1091,7 @@ export function coverageReportPath(): string {
 /** Loads the persisted coverage audit; empty when no build has written one. */
 export function loadCoverageReport(): CoverageReportEntry[] {
   if (!fileExists(coverageReportPath())) return [];
-  return (readJsonLoose(coverageReportPath()) as CoverageReportEntry[]) ?? [];
+  return readJsonLoose(coverageReportPath()) as CoverageReportEntry[];
 }
 
 /** Writes the coverage audit atomically alongside the manifest (merge, never replace). */
