@@ -51,6 +51,26 @@ export function isNbaCdnHeadshotUrl(url: string): boolean {
   return url.includes('cdn.nba.com/headshots/');
 }
 
+/** NBA CDN returns this exact byte length for the generic silhouette placeholder. */
+export const NBA_HEADSHOT_PLACEHOLDER_BYTES = 12430;
+
+/**
+ * Whether a stalled NBA CDN request should advance to the next fallback.
+ * When build-time annotation confirms a real NBA headshot exists, do not
+ * time out into the wiki photo tier — only advance on an actual load error
+ * or when a bbref secondary is still available to try.
+ */
+export function shouldStallTimeoutHeadshot(
+  url: string,
+  urls: string[],
+  attempt: number,
+  player: Pick<PeakPlayerSeason, 'altIds'>,
+): boolean {
+  if (!isNbaCdnHeadshotUrl(url)) return true;
+  if (player.altIds?.nbaHeadshotAvailable !== true) return true;
+  return urls.slice(attempt + 1).some((candidate) => candidate.includes('basketball-reference'));
+}
+
 export function resolveLogoUrl(
   manifest: HoopRushManifest,
   teamExternalId: TeamExternalId,

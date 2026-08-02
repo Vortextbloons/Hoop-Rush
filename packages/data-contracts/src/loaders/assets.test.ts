@@ -8,6 +8,7 @@ import {
   resolveLogoUrls,
   resolveSecondaryHeadshotUrl,
   resolveSecondaryLogoUrl,
+  shouldStallTimeoutHeadshot,
 } from './assets.js';
 
 const assets: HoopRushManifest['assets'] = {
@@ -138,6 +139,28 @@ describe('headshot URL resolution', () => {
         'https://www.basketball-reference.com/req/20200617/images/headshots/jordami01.jpg',
       ),
     ).toBe(false);
+  });
+
+  it('keeps confirmed NBA headshots from timing out into wiki-only fallbacks', () => {
+    const nba = 'https://cdn.nba.com/headshots/nba/latest/1040x760/2548.png';
+    const wiki = 'https://upload.wikimedia.org/wikipedia/commons/wade.jpg';
+    const bbref =
+      'https://www.basketball-reference.com/req/20200617/images/headshots/wadedw01.jpg';
+    expect(
+      shouldStallTimeoutHeadshot(nba, [nba, wiki], 0, {
+        altIds: { nbaHeadshotAvailable: true },
+      }),
+    ).toBe(false);
+    expect(
+      shouldStallTimeoutHeadshot(nba, [nba, bbref, wiki], 0, {
+        altIds: { nbaHeadshotAvailable: true },
+      }),
+    ).toBe(true);
+    expect(
+      shouldStallTimeoutHeadshot(nba, [nba, wiki], 0, {
+        altIds: { nbaHeadshotAvailable: false },
+      }),
+    ).toBe(true);
   });
 
   it('appends the direct photo url after the secondary candidate', () => {

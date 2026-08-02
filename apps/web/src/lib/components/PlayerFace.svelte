@@ -1,11 +1,16 @@
 <script lang="ts">
-  import { resolveHeadshotUrls, type HoopRushManifest } from '@hoop-rush/data-contracts';
+  import {
+    isNbaCdnHeadshotUrl,
+    resolveHeadshotUrls,
+    shouldStallTimeoutHeadshot,
+    type HoopRushManifest,
+  } from '@hoop-rush/data-contracts';
   import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
 
   type HeadshotPlayer = Pick<PeakPlayerSeason, 'playerId' | 'playerExternalId' | 'altIds'>;
 
   /** Seconds before a pending headshot request is treated as stalled. */
-  const HEADSHOT_TIMEOUT_MS = 8000;
+  const HEADSHOT_TIMEOUT_MS = 15000;
 
   let {
     player,
@@ -33,15 +38,18 @@
 
   const src = $derived(urls[attempt] ?? '');
   const showInitials = $derived(!src || attempt >= urls.length);
+  const useAnonymousCors = $derived(src !== '' && !isNbaCdnHeadshotUrl(src));
+  const applyStallTimeout = $derived(shouldStallTimeoutHeadshot(src, urls, attempt, player));
 
   /**
    * A request that hangs (e.g. a reset connection that never errors) would
    * otherwise stall the fallback chain; advance past any src that has not
-   * completed within the timeout.
+   * completed within the timeout. Confirmed NBA headshots are exempt when
+   * the only remaining fallback is a wiki action photo.
    */
   $effect(() => {
     const current = src;
-    if (!current) return;
+    if (!current || !applyStallTimeout) return;
     const timer = setTimeout(() => {
       if (imgEl && !imgEl.complete && imgEl.naturalWidth === 0) {
         onError();
@@ -79,6 +87,7 @@
         class="h-full w-full origin-top scale-[1.2] object-cover object-top"
         loading="lazy"
         decoding="async"
+        crossorigin={useAnonymousCors ? 'anonymous' : undefined}
         referrerpolicy="no-referrer"
         onerror={onError}
       />
