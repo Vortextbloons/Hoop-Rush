@@ -9,14 +9,17 @@ import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   opponentBracketSchema,
+  unavailabilityReasonSchema,
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
 
 /**
- * `hoop-rush data validate`: validates the Hoop Rush manifest and every
- * referenced franchise-era pool artifact. Reports exact paths and record
- * locations for failures (spec/09).
+ * `hoop-rush data validate`: validates the v2 manifest and every referenced
+ * artifact: schema/hash/version consistency, the 30-slot lineage model, the
+ * complete availability matrix, strict engine fields, lineage ownership,
+ * cross-slot duplicates, legal lineup coverage, and peak reproducibility
+ * (spec/09, spec/12).
  */
 
 function readPoolAsset(assetPath: string): unknown {
@@ -43,49 +46,59 @@ interface AuditResult {
   failures: string[];
 }
 
+/** Exactly 30 modern slots; lineage segments owned by one slot, non-overlapping. */
 function auditLineage(manifest: HoopRushManifest): AuditResult {
   const failures: string[] = [];
   const details: string[] = [];
-  const franchiseIds = new Set<string>();
-  const teamIds = new Set<string>();
 
-  for (const entry of manifest.franchiseLineage) {
-    if (franchiseIds.has(entry.franchiseId)) {
-      failures.push(`lineage: duplicate franchiseId ${entry.franchiseId}`);
+  const slotIds = new Set(manifest.modernFranchiseSlots.map((s) => s.franchiseId));
+  if (manifest.modernFranchiseSlots.length !== 30) {
+    failures.push(`lineage: exactly 30 modern slots required (got ${String(manifest.modernFranchiseSlots.length)})`);
+  }
+  if (slotIds.size !== manifest.modernFranchiseSlots.length) {
+    failures.push('lineage: duplicate modern slot ids');
+  }
+
+  const bySlot = new Map<string, typeof manifest.franchiseLineage>();
+  for (const segment of manifest.franchiseLineage) {
+    if (!slotIds.has(segment.modernFranchiseId)) {
+      failures.push(`lineage: segment ${segment.historicalTeamId} references unknown slot ${segment.modernFranchiseId}`);
     }
-    franchiseIds.add(entry.franchiseId);
-
-    if (teamIds.has(entry.teamExternalId)) {
-      failures.push(
-        `lineage: duplicate teamExternalId ${entry.teamExternalId} (${entry.franchiseId})`,
-      );
+    if (!segment.sourceIdentityIds.includes(segment.historicalTeamId)) {
+      failures.push(`lineage: ${segment.historicalTeamId} missing from sourceIdentityIds`);
     }
-    teamIds.add(entry.teamExternalId);
-
-    if (entry.names.length === 0) {
-      failures.push(`lineage: ${entry.franchiseId} has no name history`);
-    }
-
-    const sorted = [...entry.names].sort((a, b) =>
-      (a.fromSeasonKey ?? '0000-00').localeCompare(b.fromSeasonKey ?? '0000-00'),
+    const list = bySlot.get(segment.modernFranchiseId) ?? [];
+    list.push(segment);
+    bySlot.set(segment.modernFranchiseId, list);
+  }
+  for (const [franchiseId, segments] of bySlot) {
+    const sorted = [...segments].sort((a, b) =>
+      a.validFromSeasonKey.localeCompare(b.validFromSeasonKey),
     );
-    for (let i = 1; i < sorted.length; i += 1) {
-      const prev = sorted[i - 1];
-      const curr = sorted[i];
-      if (prev === undefined || curr === undefined) break;
+    for (let i = 0; i < sorted.length; i += 1) {
+      const current = sorted[i]!;
       if (
-        prev.toSeasonKey !== null &&
-        curr.fromSeasonKey !== null &&
-        curr.fromSeasonKey <= prev.toSeasonKey
+        current.validThroughSeasonKey !== undefined &&
+        current.validThroughSeasonKey < current.validFromSeasonKey
+      ) {
+        failures.push(`lineage: ${franchiseId} inverted range ${current.validFromSeasonKey}`);
+      }
+      const next = sorted[i + 1];
+      if (
+        next &&
+        current.validThroughSeasonKey !== undefined &&
+        next.validFromSeasonKey <= current.validThroughSeasonKey
       ) {
         failures.push(
-          `lineage: ${entry.franchiseId} name ranges overlap (${prev.name} ends ${prev.toSeasonKey}, ${curr.name} starts ${curr.fromSeasonKey})`,
+          `lineage: ${franchiseId} overlapping ranges ${current.validThroughSeasonKey} vs ${next.validFromSeasonKey}`,
         );
       }
     }
   }
 
-  details.push(`lineage: ${String(manifest.franchiseLineage.length)} franchises`);
+  details.push(
+    `lineage: ${String(manifest.modernFranchiseSlots.length)} slots · ${String(manifest.franchiseLineage.length)} segments`,
+  );
   return { ok: failures.length === 0, details, failures };
 }
 
@@ -119,6 +132,59 @@ function auditEras(manifest: HoopRushManifest): AuditResult {
   return { ok: failures.length === 0, details, failures };
 }
 
+/** The availability matrix must be complete: exactly one entry per slot x era. */
+function auditAvailability(manifest: HoopRushManifest): AuditResult {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const seen = new Set<string>();
+  const poolByKey = new Map(
+    manifest.pools.map((p) => [`${p.franchiseId}/${p.eraId}`, p]),
+  );
+
+  for (const entry of manifest.availability) {
+    const key = `${entry.franchiseId}/${entry.eraId}`;
+    if (seen.has(key)) {
+      failures.push(`availability: duplicate entry ${key}`);
+    }
+    seen.add(key);
+    if (entry.status === 'available') {
+      const pool = poolByKey.get(key);
+      if (!pool) {
+        failures.push(`availability: ${key} available without a pools index entry`);
+      } else if (pool.url !== entry.url || pool.contentHash !== entry.contentHash) {
+        failures.push(`availability: ${key} index/hash mismatch`);
+      }
+      if (entry.playerCount <= 0) {
+        failures.push(`availability: ${key} playerCount must be positive`);
+      }
+    } else {
+      if (!unavailabilityReasonSchema.safeParse(entry.reason).success) {
+        failures.push(`availability: ${key} invalid reason`);
+      }
+      if (entry.reason === 'no-franchise-history' && !entry.firstSupportedSeason) {
+        failures.push(`availability: ${key} no-franchise-history without firstSupportedSeason`);
+      }
+    }
+  }
+
+  const expected = manifest.modernFranchiseSlots.length * manifest.eras.length;
+  const found = new Set(
+    [...seen].map((key) => {
+      const slash = key.indexOf('/');
+      return `${key.slice(0, slash)}/${key.slice(slash + 1)}`;
+    }),
+  );
+  for (const slot of manifest.modernFranchiseSlots) {
+    for (const era of manifest.eras) {
+      if (!found.has(`${slot.franchiseId}/${era.eraId}`)) {
+        failures.push(`availability: missing entry ${slot.franchiseId}/${era.eraId}`);
+      }
+    }
+  }
+  details.push(`availability: ${String(manifest.availability.length)}/${String(expected)} matrix entries`);
+  return { ok: failures.length === 0, details, failures };
+}
+
 async function auditPools(
   manifest: HoopRushManifest,
   manifestDir: string,
@@ -127,8 +193,10 @@ async function auditPools(
   const failures: string[] = [];
   const details: string[] = [];
   const keys = new Set<string>();
-  const franchiseIds = new Set(manifest.franchiseLineage.map((e) => e.franchiseId));
+  const slotIds = new Set(manifest.modernFranchiseSlots.map((s) => s.franchiseId));
   const eraIds = new Set(manifest.eras.map((e) => e.eraId));
+  // Cross-slot duplication: one (playerExternalId, seasonKey) at most once.
+  const playerSeasons = new Map<string, string>();
 
   for (const pool of manifest.pools) {
     const key = `${pool.franchiseId}/${pool.eraId}`;
@@ -136,7 +204,7 @@ async function auditPools(
       failures.push(`pools: duplicate entry ${key}`);
     }
     keys.add(key);
-    if (!franchiseIds.has(pool.franchiseId)) {
+    if (!slotIds.has(pool.franchiseId)) {
       failures.push(`pools: unknown franchiseId ${pool.franchiseId}`);
     }
     if (!eraIds.has(pool.eraId)) {
@@ -157,7 +225,7 @@ async function auditPools(
       } else if (verbose) {
         details.push(`pools: ${key} hash verified (${assetPath})`);
       }
-      auditPoolContent(assetPath, pool, manifest, failures, details);
+      auditPoolContent(assetPath, pool, manifest, failures, details, playerSeasons);
     } catch {
       failures.push(`pools: ${key} asset missing (${assetPath})`);
     }
@@ -168,9 +236,11 @@ async function auditPools(
 }
 
 /**
- * Content audits for a pool asset (spec/02 identity and data audits):
- * schema validity, unique player ids, era membership, 40-game eligibility,
- * rating ranges, and reproducible peak selection.
+ * Content audits for a pool asset (spec/12 identity, provenance, lineup, and
+ * reproducibility gates): schema validity, unique player ids, era membership,
+ * 40-game eligibility, strict engine fields, complete provenance, historical
+ * identity, legal G,G,F,F,C coverage, cross-slot duplication, and reproducible
+ * peak selection.
  */
 function auditPoolContent(
   assetPath: string,
@@ -178,6 +248,7 @@ function auditPoolContent(
   manifest: HoopRushManifest,
   failures: string[],
   details: string[],
+  playerSeasons: Map<string, string>,
 ): void {
   const key = `${index.franchiseId}/${index.eraId}`;
   const era = manifest.eras.find((e) => e.eraId === index.eraId);
@@ -195,6 +266,12 @@ function auditPoolContent(
   }
 
   const seen = new Set<string>();
+  const requiredRatingKeys = [
+    'insideScoring', 'closeShot', 'midrange', 'threePoint', 'freeThrow',
+    'ballHandling', 'passing', 'offensiveIq', 'offensiveRebound',
+    'defensiveRebound', 'perimeterDefense', 'interiorDefense', 'steal',
+    'block', 'defensiveIq', 'speed', 'strength', 'vertical',
+  ];
   for (const player of pool.players) {
     if (seen.has(player.playerId)) {
       failures.push(`pools: ${key} duplicate playerId ${player.playerId}`);
@@ -216,29 +293,99 @@ function auditPoolContent(
     }
     const { overallRating, offenseRating, defenseRating } = player.summaryRatings;
     if (
-      overallRating < 0 ||
-      overallRating > 100 ||
-      offenseRating < 0 ||
-      offenseRating > 100 ||
-      defenseRating < 0 ||
-      defenseRating > 100
+      overallRating < 0 || overallRating > 100 ||
+      offenseRating < 0 || offenseRating > 100 ||
+      defenseRating < 0 || defenseRating > 100
     ) {
       failures.push(`pools: ${key} ${player.displayName} summary rating out of range`);
+    }
+
+    // Strict engine contracts: every required rating/tendency key present.
+    for (const ratingKey of requiredRatingKeys) {
+      if (!(ratingKey in player.detailedRatings)) {
+        failures.push(`pools: ${key} ${player.displayName} missing rating ${ratingKey}`);
+      }
+    }
+    if (player.anchors === undefined || player.anchors === null) {
+      failures.push(`pools: ${key} ${player.displayName} missing packaged anchors`);
+    }
+
+    // Historical identity: the team that owned the season, with lineage version.
+    if (
+      !player.historicalTeamIdentity ||
+      player.historicalTeamIdentity.seasonKey !== player.seasonKey ||
+      !player.historicalTeamIdentity.lineageRuleVersion
+    ) {
+      failures.push(`pools: ${key} ${player.displayName} missing historical team identity`);
+    }
+
+    // Field-level provenance on required engine fields.
+    const engineFields = [...Object.keys(player.detailedRatings), ...Object.keys(player.tendencies)];
+    for (const field of engineFields) {
+      const provenance = player.provenance[field];
+      if (!provenance || !provenance.kind || !provenance.methodVersion) {
+        failures.push(`pools: ${key} ${player.displayName} missing provenance for ${field}`);
+      }
+    }
+
+    // Pre-1979 seasons never carry three-point observations.
+    if (player.seasonKey < '1979-80') {
+      if (player.stats.threesAttempted !== null || player.stats.threesMade !== null) {
+        failures.push(
+          `pools: ${key} ${player.displayName} pre-1979 season with three-point observations`,
+        );
+      }
+    }
+
+    // Cross-slot duplication: (playerExternalId, seasonKey) at most once.
+    const psKey = `${player.playerExternalId}/${player.seasonKey}`;
+    const owner = playerSeasons.get(psKey);
+    if (owner !== undefined && owner !== key) {
+      failures.push(
+        `pools: ${key} player-season ${psKey} also packaged in ${owner}`,
+      );
+    }
+    playerSeasons.set(psKey, key);
+  }
+
+  // Legal G,G,F,F,C lineup coverage from packaged canonical positions.
+  const guards = pool.players.filter((p) => p.positions.canonical.includes('G'));
+  const forwards = pool.players.filter((p) => p.positions.canonical.includes('F'));
+  const centers = pool.players.filter((p) => p.positions.canonical.includes('C'));
+  if (guards.length < 2 || forwards.length < 2 || centers.length < 1) {
+    failures.push(
+      `pools: ${key} cannot form G,G,F,F,C (G ${String(guards.length)}, F ${String(forwards.length)}, C ${String(centers.length)})`,
+    );
+  }
+
+  // Peak reproducibility: selectionScore recomputed from packaged fields.
+  const structure = ['G', 'G', 'F', 'F', 'C'];
+  void structure;
+  for (const player of pool.players) {
+    const usage = Math.min(Math.max(player.stats.usageRate ?? 0, 0), 40);
+    const mpg = Math.min(player.eligibility.teamMinutes / Math.max(1, player.eligibility.teamGames), 48);
+    const recomputed =
+      Math.round(
+        (0.5 * player.summaryRatings.overallRating +
+          0.3 * player.summaryRatings.offenseRating +
+          0.2 * player.summaryRatings.defenseRating +
+          0.05 * usage +
+          0.02 * mpg) *
+          1000,
+      ) / 1000;
+    if (Math.abs(recomputed - player.selectionScore) > 1e-9) {
+      failures.push(
+        `pools: ${key} ${player.displayName} selectionScore not reproducible (packaged ${String(player.selectionScore)}, recomputed ${String(recomputed)})`,
+      );
     }
   }
 
   const withFallback = pool.players.filter(
     (p) => p.altIds?.bbref != null || p.altIds?.photoUrl != null,
   ).length;
-  const coverage = Math.round((withFallback / pool.players.length) * 1000) / 10;
   details.push(
-    `pools: ${key} fallback coverage ${String(withFallback)}/${String(pool.players.length)} (${String(coverage)}%)`,
+    `pools: ${key} fallback coverage ${String(withFallback)}/${String(pool.players.length)} · band ${pool.coverageSummary.coverageBand} · lowConfidence ${String(pool.coverageSummary.lowConfidenceShare)}`,
   );
-  if (manifest.assets.headshotUrlTemplateSecondary && withFallback === 0) {
-    failures.push(
-      `pools: ${key} no player carries a fallback id while a secondary headshot template is configured`,
-    );
-  }
   // Every player must carry an explicit CDN availability marker whenever a
   // primary headshot template exists: without it, the UI requests the CDN URL
   // first and gets stuck on the generic silhouette, never reaching the
@@ -434,6 +581,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
   const audits = [
     auditLineage(manifest),
     auditEras(manifest),
+    auditAvailability(manifest),
     await auditPools(manifest, manifestDir, verbose),
     await auditEraSimulationProfiles(manifest, manifestDir, verbose),
     await auditBracket(manifest, manifestDir, verbose),

@@ -1,24 +1,50 @@
 /**
- * Franchise-era pool computation (spec/02 fast-load artifact) — port of
+ * Franchise-era pool computation (spec/02, spec/12) - port of
  * scripts/import-nba/compute_pools.py.
  *
  * Pipeline:
- *   roster.json (ratings/positions) + stints.json (team-stint accounting)
- *   + season-stats.json (league totals) + manifest lineage/eras
- *   -> eligible peak player-seasons per (franchise, era)
- *   -> compact FranchiseEraPool JSON + manifest pool index with content hashes
+ *   roster.json (strict ratings/tendencies/anchors/provenance) + stints.json
+ *   (team-stint accounting) + season-stats.json (league totals) + lineage
+ *   + eras -> eligible peak player-seasons per (franchise, era)
+ *   -> compact v2 FranchiseEraPool JSON + availability matrix + manifest
+ *
+ * Ownership rules (spec/12): every source team-season resolves through the
+ * authoritative lineage table to exactly one modern slot; the team-stint row
+ * (40 games minimum) establishes eligibility; league-total rows inform
+ * ratings but never eligibility. Incomplete players fail packaging instead
+ * of silently receiving neutral values.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { parsePool } from '@hoop-rush/data-contracts';
-import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE, TEAM_FOUNDING_SEASON } from '../config.js';
-import { fileExists, safeFloat, safeInt, sha256File, writeJson } from '../json.js';
+import {
+  ARTIFACT_SCHEMA_VERSION,
+  DERIVATION_METHOD_VERSION,
+  LINEAGE_RULE_VERSION,
+  POSITION_NORMALIZATION_VERSION,
+  RATINGS_VERSION,
+  SELECTION_SCORE_VERSION,
+  SOURCE_VERSION,
+  type Confidence,
+  type CoverageSummary,
+  type HistoricalValueProvenance,
+  type UnavailabilityReason,
+} from '@hoop-rush/data-contracts';
+import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.js';
+import { fileExists, safeFloat, safeInt, sha256File, writeJson, writeJsonRetry } from '../json.js';
 import { normalizePositionLabels } from './positions.js';
+import {
+  LINEAGE_SEGMENTS,
+  MODERN_SLOTS,
+  firstSupportedSeason,
+  resolveHistoricalIdentity,
+  type LineageSegment,
+} from '../lineage.js';
 
 /**
  * Python's json.loads accepts the bare NaN token that the fetch layer's
  * json.dumps writes (e.g. "college": NaN); JSON.parse does not. Pools never
- * consume the NaN fields, so the token is read as null — the same value the
+ * consume the NaN fields, so the token is read as null - the same value the
  * Python num()/nullable() helpers would produce for it.
  */
 function readJsonLoose(path: string): unknown {
@@ -44,12 +70,13 @@ export function manifestPath(): string {
   return join(PUBLIC_DATA, 'manifest.json');
 }
 
-export const SCHEMA_VERSION = 1;
-export const POSITION_NORMALIZATION_VERSION = 'position-v1';
-export const RATINGS_VERSION = 'ratings-v8-production-overall';
-export const SELECTION_SCORE_VERSION = 'selection-v1';
+export const SCHEMA_VERSION = ARTIFACT_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm1.7';
+export const DATA_VERSION = 'm3.5';
+/** Confidence policy v1: maximum allowed low-confidence share of required fields. */
+export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
+export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
+export { POSITION_NORMALIZATION_VERSION, RATINGS_VERSION, SELECTION_SCORE_VERSION } from '@hoop-rush/data-contracts';
 
 // ---------------------------------------------------------------------------
 // Career position unions (cached; scans every packaged roster once)
@@ -58,7 +85,7 @@ export function loadCareerPositionLabels(): Map<string, Set<string>> {
   // The cache is derived from the packaged roster snapshot. Version the
   // filename so older imports cannot silently erase positions for players
   // added in a later snapshot.
-  const cachePath = join(RAW_CACHE, 'career-position-labels-v3.json');
+  const cachePath = join(RAW_CACHE, 'career-position-labels-v4.json');
   if (fileExists(cachePath)) {
     const data = readJsonLoose(cachePath) as Record<string, unknown>;
     return new Map(Object.entries(data).map(([pid, labels]) => [pid, new Set(labels as string[])]));
@@ -103,14 +130,6 @@ export interface EraEntry {
   toSeasonKey: string;
 }
 
-export interface FranchiseLineageEntry {
-  franchiseId: string;
-  displayName: string;
-  teamExternalId: string;
-  firstNbaSeasonKey?: string | null;
-  names: unknown[];
-}
-
 export interface PoolIndexEntry {
   franchiseId: string;
   eraId: string;
@@ -121,7 +140,6 @@ export interface PoolIndexEntry {
 export interface Manifest {
   schemaVersion: number;
   dataVersion: string;
-  franchiseLineage: FranchiseLineageEntry[];
   eras: EraEntry[];
   pools: PoolIndexEntry[];
   [key: string]: unknown;
@@ -149,14 +167,20 @@ export interface SeasonData {
   statsByPlayer: Record<string, Record<string, unknown>>;
 }
 
+/** Memoized per run so availability scans read each season's JSON once. */
+const seasonDataCache = new Map<string, SeasonData>();
+
 /** Return { rosterByExtId, stintsByTeam, statsByPlayer } for a season. */
 export function loadSeasonData(season: string): SeasonData {
+  const cached = seasonDataCache.get(season);
+  if (cached !== undefined) return cached;
   const seasonDir = join(NBA_ROOT, season);
   const rosterByExtId: Record<string, Record<string, unknown>> = {};
-  for (const player of readJsonLoose(join(seasonDir, 'roster.json')) as Array<
-    Record<string, unknown>
-  >) {
-    rosterByExtId[str(player.externalId)] = player;
+  const rosterPath = join(seasonDir, 'roster.json');
+  if (fileExists(rosterPath)) {
+    for (const player of readJsonLoose(rosterPath) as Array<Record<string, unknown>>) {
+      rosterByExtId[str(player.externalId)] = player;
+    }
   }
 
   const stintsByTeam: Record<string, Array<Record<string, unknown>>> = {};
@@ -181,7 +205,14 @@ export function loadSeasonData(season: string): SeasonData {
     }
   }
 
-  return { rosterByExtId, stintsByTeam, statsByPlayer };
+  const data: SeasonData = { rosterByExtId, stintsByTeam, statsByPlayer };
+  seasonDataCache.set(season, data);
+  return data;
+}
+
+/** @internal Clears the per-run season cache (determinism tests). */
+export function clearSeasonDataCache(): void {
+  seasonDataCache.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -219,16 +250,16 @@ export interface PoolStats {
   minutes: number;
   points: number;
   rebounds: number;
-  offensiveRebounds: number;
-  defensiveRebounds: number;
+  offensiveRebounds: number | null;
+  defensiveRebounds: number | null;
   assists: number;
-  steals: number;
-  blocks: number;
-  turnovers: number;
+  steals: number | null;
+  blocks: number | null;
+  turnovers: number | null;
   fieldGoalsMade: number;
   fieldGoalsAttempted: number;
-  threesMade: number;
-  threesAttempted: number;
+  threesMade: number | null;
+  threesAttempted: number | null;
   freeThrowsMade: number;
   freeThrowsAttempted: number;
   per: number | null;
@@ -238,22 +269,27 @@ export interface PoolStats {
   efgPct: number | null;
 }
 
+/** Null-preserving stats: genuinely absent historical fields stay null. */
 export function buildStats(seasonStats: Record<string, unknown>): PoolStats {
+  const truncNullable = (key: string): number | null => {
+    const value = nullableValue(seasonStats, key);
+    return value === null ? null : Math.trunc(value);
+  };
   return {
     gamesPlayed: Math.trunc(num(seasonStats, 'gamesPlayed')),
     minutes: Math.trunc(num(seasonStats, 'minutes')),
     points: Math.trunc(num(seasonStats, 'points')),
     rebounds: Math.trunc(num(seasonStats, 'rebounds')),
-    offensiveRebounds: Math.trunc(num(seasonStats, 'offensiveRebounds')),
-    defensiveRebounds: Math.trunc(num(seasonStats, 'defensiveRebounds')),
+    offensiveRebounds: truncNullable('offensiveRebounds'),
+    defensiveRebounds: truncNullable('defensiveRebounds'),
     assists: Math.trunc(num(seasonStats, 'assists')),
-    steals: Math.trunc(num(seasonStats, 'steals')),
-    blocks: Math.trunc(num(seasonStats, 'blocks')),
-    turnovers: Math.trunc(num(seasonStats, 'turnovers')),
+    steals: truncNullable('steals'),
+    blocks: truncNullable('blocks'),
+    turnovers: truncNullable('turnovers'),
     fieldGoalsMade: Math.trunc(num(seasonStats, 'fgm')),
     fieldGoalsAttempted: Math.trunc(num(seasonStats, 'fga')),
-    threesMade: Math.trunc(num(seasonStats, 'tpm')),
-    threesAttempted: Math.trunc(num(seasonStats, 'tpa')),
+    threesMade: truncNullable('tpm'),
+    threesAttempted: truncNullable('tpa'),
     freeThrowsMade: Math.trunc(num(seasonStats, 'ftm')),
     freeThrowsAttempted: Math.trunc(num(seasonStats, 'fta')),
     per: nullableValue(seasonStats, 'per'),
@@ -380,14 +416,26 @@ export interface PoolPlayer {
   selectionScore: number;
   selectionScoreVersion: string;
   stats: PoolStats;
+  historicalTeamIdentity: {
+    teamId: string;
+    displayName: string;
+    city: string;
+    abbreviation: string | null;
+    seasonKey: string;
+    lineageRuleVersion: string;
+  };
   summaryRatings: { overallRating: number; offenseRating: number; defenseRating: number };
   detailedRatings: Record<string, number>;
   tendencies: Record<string, number>;
-  dataConfidence: string;
+  anchors: Record<string, unknown>;
+  provenance: Record<string, HistoricalValueProvenance>;
   source: {
     dataVersion: string;
     ratingsVersion: string;
     selectionScoreVersion: string;
+    sourceVersion: string;
+    derivationMethodVersion: string;
+    lineageRuleVersion: string;
   };
 }
 
@@ -397,7 +445,118 @@ export interface Pool {
   franchiseId: string;
   eraId: string;
   eligibility: { minimumTeamGames: number };
+  coverageSummary: CoverageSummary;
   players: PoolPlayer[];
+}
+
+export type PoolBuildFailure = {
+  reason: UnavailabilityReason;
+  detail: string;
+  firstSupportedSeason?: string;
+};
+
+function failure(
+  reason: UnavailabilityReason,
+  detail: string,
+  firstSupportedSeason?: string,
+): PoolBuildFailure {
+  return { reason, detail, ...(firstSupportedSeason !== undefined ? { firstSupportedSeason } : {}) };
+}
+
+/** Coverage band from the pool's packaged season range (spec/12). */
+export function coverageBandForSeasons(seasons: readonly string[]): CoverageSummary['coverageBand'] {
+  const earliest = seasons.reduce((a, b) => (a < b ? a : b));
+  if (earliest >= '1996-97') return 'advanced-supported';
+  if (earliest >= '1979-80') return 'complete-box-derived';
+  if (earliest >= '1973-74') return 'late-historical';
+  return 'reconstructed';
+}
+
+/** True when at least one legal G,G,F,F,C assignment exists over the pool. */
+export function legalLineupCovered(players: readonly PoolPlayer[]): boolean {
+  const guards = players.filter((p) => p.positions.canonical.includes('G'));
+  const forwards = players.filter((p) => p.positions.canonical.includes('F'));
+  const centers = players.filter((p) => p.positions.canonical.includes('C'));
+  if (guards.length < 2 || forwards.length < 2 || centers.length < 1) return false;
+  // Any guard can take a G slot, any forward an F slot; C must be a center.
+  return true;
+}
+
+/**
+ * Builds the coverage summary: observed/derived/estimated families, missing
+ * categories, and the low-confidence share under the versioned policy.
+ */
+export function buildCoverageSummary(
+  players: readonly PoolPlayer[],
+  seasons: readonly string[],
+): CoverageSummary {
+  const requiredFields = players.flatMap((player) => [
+    ...Object.keys(player.detailedRatings),
+    ...Object.keys(player.tendencies),
+    ...Object.keys(player.anchors),
+  ]);
+  let lowConfidence = 0;
+  const observedFamilies = new Set<string>();
+  const derivedFamilies = new Set<string>();
+  const estimatedFamilies = new Set<string>();
+  const missingCategories = new Set<string>();
+
+  for (const player of players) {
+    for (const [field, provenance] of Object.entries(player.provenance)) {
+      if (provenance.kind === 'observed') observedFamilies.add(fieldFamily(field));
+      else if (provenance.kind === 'derived') derivedFamilies.add(fieldFamily(field));
+      else estimatedFamilies.add(fieldFamily(field));
+      if (provenance.sourceStatus === 'not-applicable') {
+        missingCategories.add(fieldFamily(field));
+      }
+    }
+    if (player.provenance['threePoint']?.sourceStatus === 'not-applicable') {
+      missingCategories.add('three-point');
+    }
+  }
+  // Count confidence on required engine fields only.
+  for (const field of requiredFields) {
+    const provenance = players[0]?.provenance[field];
+    if (provenance !== undefined && provenance.confidence === 'low') lowConfidence += 1;
+  }
+  const lowConfidenceShare = requiredFields.length > 0 ? lowConfidence / requiredFields.length : 0;
+  return {
+    coverageBand: coverageBandForSeasons(seasons),
+    observedFamilies: [...observedFamilies].sort(),
+    derivedFamilies: [...derivedFamilies].sort(),
+    estimatedFamilies: [...estimatedFamilies].sort(),
+    missingCategories: [...missingCategories].sort(),
+    lowConfidenceShare: Math.round(lowConfidenceShare * 1000) / 1000,
+    policyVersion: CONFIDENCE_POLICY_VERSION,
+  };
+}
+
+function fieldFamily(field: string): string {
+  const tendency = field.startsWith('tendency:') ? field.slice('tendency:'.length) : field;
+  if (tendency === 'usageRate' || tendency === 'passRate' || tendency === 'shotRate') return 'usage';
+  if (tendency.includes('Frequency') || tendency === 'threePointRate') return 'shot-mix';
+  if (tendency === 'freeThrowRate') return 'fouls';
+  if (tendency === 'turnoverRate') return 'turnovers';
+  if (tendency.includes('Rebound')) return 'rebounding';
+  if (tendency.includes('AttemptRate')) return 'defensive-events';
+  if (tendency.includes('Rate')) return 'usage';
+  if (field === 'threePoint' || field === 'midrange' || field === 'closeShot') return 'shooting';
+  if (field === 'insideScoring') return 'shooting';
+  if (field === 'freeThrow') return 'fouls';
+  if (field === 'passing' || field === 'ballHandling' || field === 'offensiveIq') return 'creation';
+  if (field.includes('Rebound')) return 'rebounding';
+  if (field.includes('Defense') || field === 'defensiveIq' || field === 'steal' || field === 'block') {
+    return 'defense';
+  }
+  if (field === 'speed' || field === 'strength' || field === 'vertical') return 'athleticism';
+  if (field === 'pointsPerGame') return 'scoring';
+  if (field === 'assistsPerGame') return 'playmaking';
+  if (field === 'stealsPerGame' || field === 'blocksPerGame') return 'defensive-events';
+  if (field === 'turnoversPerGame') return 'turnovers';
+  if (field.includes('Rebound')) return 'rebounding';
+  if (field === 'fieldGoalPct' || field === 'threePointPct' || field === 'freeThrowPct') return 'shooting';
+  if (field.includes('AttemptRate')) return 'shot-mix';
+  return tendency;
 }
 
 function asNumberOrNull(value: unknown): number | null {
@@ -407,31 +566,61 @@ function asNumberOrNull(value: unknown): number | null {
   return null;
 }
 
+/** Confidence of a player's provenance over required engine fields. */
+function playerLowConfidenceShare(player: PoolPlayer): number {
+  const fields = [
+    ...Object.keys(player.detailedRatings),
+    ...Object.keys(player.tendencies),
+    ...Object.keys(player.anchors),
+  ];
+  let low = 0;
+  for (const field of fields) {
+    if (player.provenance[field]?.confidence === 'low') low += 1;
+  }
+  return fields.length > 0 ? low / fields.length : 0;
+}
+
 export function computePool(
   franchiseId: string,
   eraId: string,
   manifest: Manifest,
   bbrefIds?: Record<string, string>,
   withAssets = true,
-): Pool | null {
+): Pool | PoolBuildFailure {
   if (bbrefIds === undefined) {
     bbrefIds = loadBbrefIds();
   }
-  const lineage = manifest.franchiseLineage.find((e) => e.franchiseId === franchiseId);
-  if (lineage === undefined) {
-    throw new Error(`unknown franchiseId ${franchiseId}`);
+  const slot = MODERN_SLOTS.find((s) => s.franchiseId === franchiseId);
+  if (slot === undefined) {
+    return failure('identity-failed', `unknown franchiseId ${franchiseId}`);
   }
   const era = manifest.eras.find((e) => e.eraId === eraId);
   if (era === undefined) {
-    throw new Error(`unknown eraId ${eraId}`);
+    return failure('identity-failed', `unknown eraId ${eraId}`);
   }
 
-  const teamExternalId = lineage.teamExternalId;
+  // No-franchise-history: the slot has no NBA lineage inside the era range.
+  const eraHasLineage = LINEAGE_SEGMENTS.some(
+    (segment) =>
+      segment.modernFranchiseId === franchiseId &&
+      segment.validFromSeasonKey <= era.toSeasonKey &&
+      (segment.validThroughSeasonKey === undefined || segment.validThroughSeasonKey >= era.fromSeasonKey),
+  );
+  if (!eraHasLineage) {
+    const first = firstSupportedSeason(franchiseId);
+    return failure(
+      'no-franchise-history',
+      `no NBA history for ${franchiseId} between ${era.fromSeasonKey} and ${era.toSeasonKey}`,
+      first ?? undefined,
+    );
+  }
+
+  const teamExternalId = slot.teamExternalId;
   const seasons = listSeasonKeys().filter(
     (season) => era.fromSeasonKey <= season && season <= era.toSeasonKey,
   );
   if (seasons.length === 0) {
-    throw new Error(`no seasons available for ${franchiseId} ${eraId}`);
+    return failure('source-incomplete', `no packaged seasons for era ${eraId}`);
   }
 
   console.log(`[${franchiseId} ${eraId}] scanning ${String(seasons.length)} seasons`);
@@ -442,8 +631,10 @@ export function computePool(
 
   for (const season of seasons) {
     const { rosterByExtId, stintsByTeam, statsByPlayer } = loadSeasonData(season);
-    const stints = stintsByTeam[teamExternalId] ?? [];
+    const identity = resolveHistoricalIdentity(franchiseId, season);
+    const stints = identity === null ? [] : (stintsByTeam[teamExternalId] ?? []);
     if (
+      identity !== null &&
       stints.length === 0 &&
       Object.values(rosterByExtId).some((p) => p.teamExternalId === teamExternalId)
     ) {
@@ -469,6 +660,13 @@ export function computePool(
         console.log(`  ! ${pid} missing summaryRatings in ${season}; re-run compute_ratings`);
         continue;
       }
+      const ratings = player.ratings;
+      const tendencies = player.tendencies;
+      const anchors = player.anchors;
+      if (ratings === undefined || tendencies === undefined || anchors === undefined) {
+        console.log(`  ! ${pid} incomplete engine inputs in ${season}; re-run compute_ratings`);
+        continue;
+      }
       let candidates = eligible.get(pid);
       if (!candidates) {
         candidates = [];
@@ -483,6 +681,7 @@ export function computePool(
   }
 
   const playersOut: PoolPlayer[] = [];
+  const identityFailures: string[] = [];
   for (const pid of [...eligible.keys()].sort()) {
     const candidates = eligible.get(pid);
     if (!candidates) {
@@ -504,6 +703,12 @@ export function computePool(
       );
     }
 
+    const identity = resolveHistoricalIdentity(franchiseId, best.season);
+    if (identity === null) {
+      identityFailures.push(`${pid} ${best.season}`);
+      continue;
+    }
+
     const teamGames = Math.trunc(num(stint, 'gamesPlayed'));
     const teamMinutes = Math.trunc(num(stint, 'minutes'));
     const ratings = (player.ratings ?? {}) as Record<string, unknown>;
@@ -514,15 +719,71 @@ export function computePool(
         detailedRatings[key] = Math.trunc(value);
       }
     }
+    // Strict engine contracts: incomplete players fail packaging.
+    const requiredRatingKeys = [
+      'insideScoring',
+      'closeShot',
+      'midrange',
+      'threePoint',
+      'freeThrow',
+      'ballHandling',
+      'passing',
+      'offensiveIq',
+      'offensiveRebound',
+      'defensiveRebound',
+      'perimeterDefense',
+      'interiorDefense',
+      'steal',
+      'block',
+      'defensiveIq',
+      'speed',
+      'strength',
+      'vertical',
+    ];
+    const requiredTendencyKeys = [
+      'usageRate',
+      'passRate',
+      'shotRate',
+      'driveRate',
+      'postUpRate',
+      'rimFrequency',
+      'shortMidFrequency',
+      'longMidFrequency',
+      'cornerThreeFrequency',
+      'aboveBreakThreeFrequency',
+      'threePointRate',
+      'freeThrowRate',
+      'turnoverRate',
+      'isolationRate',
+      'pickAndRollBallHandlerRate',
+      'pickAndRollRollManRate',
+      'spotUpRate',
+      'transitionRate',
+      'cutRate',
+      'foulRate',
+      'stealAttemptRate',
+      'blockAttemptRate',
+      'crashOffensiveGlassRate',
+    ];
+    for (const key of requiredRatingKeys) {
+      if (!(key in detailedRatings)) {
+        identityFailures.push(`${pid} missing rating ${key} in ${best.season}`);
+      }
+    }
     const tendenciesOut: Record<string, number> = {};
-    for (const [key, value] of Object.entries(tendencies)) {
+    for (const key of requiredTendencyKeys) {
+      const value = tendencies[key];
       const n = Number(value);
       if (Number.isNaN(n)) {
-        throw new Error(
-          `non-numeric tendency ${key} for ${pid} (${str(player.firstName)} ${str(player.lastName)})`,
-        );
+        identityFailures.push(`${pid} missing tendency ${key} in ${best.season}`);
+      } else {
+        tendenciesOut[key] = n;
       }
-      tendenciesOut[key] = n;
+    }
+    const anchorsOut = player.anchors as Record<string, unknown>;
+    const provenanceOut = (player.provenance ?? {}) as Record<string, HistoricalValueProvenance>;
+    if (identityFailures.length > 0) {
+      continue;
     }
 
     playersOut.push({
@@ -556,6 +817,14 @@ export function computePool(
       ),
       selectionScoreVersion: SELECTION_SCORE_VERSION,
       stats: buildStats(stats),
+      historicalTeamIdentity: {
+        teamId: identity.historicalTeamId,
+        displayName: identity.displayName,
+        city: identity.city,
+        abbreviation: identity.abbreviation ?? null,
+        seasonKey: best.season,
+        lineageRuleVersion: LINEAGE_RULE_VERSION,
+      },
       summaryRatings: {
         overallRating: safeInt(summary?.overallRating),
         offenseRating: safeInt(summary?.offenseRating),
@@ -563,26 +832,41 @@ export function computePool(
       },
       detailedRatings,
       tendencies: tendenciesOut,
-      dataConfidence:
-        stats.statsSource === 'stints-derived'
-          ? 'derived-medium'
-          : stats.boxPlusMinus !== null && stats.boxPlusMinus !== undefined
-            ? 'observed'
-            : 'derived-medium',
+      anchors: anchorsOut,
+      provenance: provenanceOut,
       source: {
         dataVersion: DATA_VERSION,
         ratingsVersion: RATINGS_VERSION,
         selectionScoreVersion: SELECTION_SCORE_VERSION,
+        sourceVersion: SOURCE_VERSION,
+        derivationMethodVersion: DERIVATION_METHOD_VERSION,
+        lineageRuleVersion: LINEAGE_RULE_VERSION,
       },
     });
   }
 
   if (playersOut.length === 0) {
-    console.log(
-      `  [SKIP] no eligible players for ${franchiseId} ${eraId} ` +
-        `(no packaged stints for team ${lineage.teamExternalId} in era seasons)`,
+    const detail =
+      identityFailures.length > 0
+        ? `all candidates incomplete: ${identityFailures.slice(0, 5).join(', ')}`
+        : `no eligible players (no packaged stints for team ${teamExternalId} in era seasons)`;
+    return failure('insufficient-players', detail);
+  }
+
+  if (!legalLineupCovered(playersOut)) {
+    return failure(
+      'position-coverage-failed',
+      `cannot form G,G,F,F,C from ${String(playersOut.length)} players`,
     );
-    return null;
+  }
+
+  const coverageSummary = buildCoverageSummary(playersOut, seasons);
+  const policyFailures = playersOut.filter((p) => playerLowConfidenceShare(p) > MAX_LOW_CONFIDENCE_SHARE);
+  if (policyFailures.length > 0) {
+    return failure(
+      'confidence-failed',
+      `${String(policyFailures.length)} players exceed the low-confidence share under ${CONFIDENCE_POLICY_VERSION}`,
+    );
   }
 
   if (withAssets) {
@@ -599,6 +883,7 @@ export function computePool(
     franchiseId,
     eraId,
     eligibility: { minimumTeamGames: MIN_TEAM_GAMES },
+    coverageSummary,
     players: playersOut,
   };
 }
@@ -618,37 +903,24 @@ export function logPoolValidation(pool: Pool): void {
 
 export function writePool(pool: Pool): string {
   const path = join(poolDir(), `${pool.franchiseId}-${pool.eraId}.json`);
-  writeJson(path, pool);
-  const digest = sha256File(path);
-  console.log(
-    `  [OK] wrote ${basename(path)} (${String(pool.players.length)} players, ${digest.slice(0, 12)}…)`,
-  );
-  return digest;
-}
-
-export function updateManifest(
-  entries: Array<{ franchiseId: string; eraId: string; url: string; contentHash: string }>,
-): void {
-  const manifest = loadManifest();
-  manifest.dataVersion = DATA_VERSION;
-  for (const lineage of manifest.franchiseLineage) {
-    if (lineage.firstNbaSeasonKey === undefined) {
-      lineage.firstNbaSeasonKey = TEAM_FOUNDING_SEASON[lineage.teamExternalId] ?? null;
+  // Synced/filtered filesystems intermittently fail writes; retry with
+  // backoff, then hash the committed bytes.
+  writeJsonRetry(path, pool);
+  let digest = '';
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try {
+      digest = sha256File(path);
+      break;
+    } catch (error) {
+      if (attempt === 11) throw error;
+      const wait = 200 * (attempt + 1);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
     }
   }
-  const existing = new Map(
-    manifest.pools.map((entry) => [`${entry.franchiseId}/${entry.eraId}`, entry]),
-  );
-  for (const entry of entries) {
-    existing.set(`${entry.franchiseId}/${entry.eraId}`, entry);
-  }
-  manifest.pools = [...existing.entries()]
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([, entry]) => entry);
-  writeJson(manifestPath(), manifest);
   console.log(
-    `  [OK] manifest updated: ${String(manifest.pools.length)} pools, dataVersion ${DATA_VERSION}`,
+    `  [OK] wrote ${basename(path)} (${String(pool.players.length)} players, ${digest.slice(0, 12)}...)`,
   );
+  return digest;
 }
 
 export function parsePoolTargets(raw: readonly string[]): Array<[string, string]> {
@@ -663,19 +935,25 @@ export function parsePoolTargets(raw: readonly string[]): Array<[string, string]
   return targets;
 }
 
-/** The --all logic from Python main(): lineage x eras with season overlap and founding check. */
+/** The --all logic: modern slots x eras with lineage overlap and packaged seasons. */
 export function allPoolTargets(manifest: Manifest = loadManifest()): Array<[string, string]> {
   const packagedSeasons = new Set(listSeasonKeys());
   const targets: Array<[string, string]> = [];
-  for (const entry of manifest.franchiseLineage) {
+  for (const slot of MODERN_SLOTS) {
     for (const era of manifest.eras) {
+      const hasLineage = LINEAGE_SEGMENTS.some(
+        (segment) =>
+          segment.modernFranchiseId === slot.franchiseId &&
+          segment.validFromSeasonKey <= era.toSeasonKey &&
+          (segment.validThroughSeasonKey === undefined || segment.validThroughSeasonKey >= era.fromSeasonKey),
+      );
       const overlaps =
+        hasLineage &&
         [...packagedSeasons].some(
           (season) => era.fromSeasonKey <= season && season <= era.toSeasonKey,
-        ) &&
-        (!entry.firstNbaSeasonKey || entry.firstNbaSeasonKey <= era.toSeasonKey);
+        );
       if (overlaps) {
-        targets.push([entry.franchiseId, era.eraId]);
+        targets.push([slot.franchiseId, era.eraId]);
       }
     }
   }
@@ -690,9 +968,21 @@ export function run(targets: Array<[string, string]> | null = null, withAssets =
   const bbrefIds = loadBbrefIds();
   const entries: Array<{ franchiseId: string; eraId: string; url: string; contentHash: string }> =
     [];
+  const coverage: CoverageReportEntry[] = [];
   for (const [franchiseId, eraId] of targets) {
     const pool = computePool(franchiseId, eraId, manifest, bbrefIds, withAssets);
-    if (pool === null) {
+    if ('reason' in pool) {
+      console.log(`  [UNAVAILABLE] ${franchiseId} ${eraId}: ${pool.reason} (${pool.detail})`);
+      coverage.push({
+        franchiseId,
+        eraId,
+        status: 'unavailable',
+        reason: pool.reason,
+        ...(pool.detail !== undefined ? { detail: pool.detail } : {}),
+        ...(pool.firstSupportedSeason !== undefined
+          ? { firstSupportedSeason: pool.firstSupportedSeason }
+          : {}),
+      });
       continue;
     }
     logPoolValidation(pool);
@@ -703,17 +993,154 @@ export function run(targets: Array<[string, string]> | null = null, withAssets =
       url: `pools/${franchiseId}-${eraId}.json`,
       contentHash: digest,
     });
+    coverage.push({
+      franchiseId,
+      eraId,
+      status: 'available',
+      playerCount: pool.players.length,
+      coverageSummary: pool.coverageSummary,
+    });
   }
   updateManifest(entries);
+  recordCoverageReport(coverage);
+}
+
+/** One persisted coverage-audit row (spec/12 first full audit + CLI data coverage). */
+export interface CoverageReportEntry {
+  franchiseId: string;
+  eraId: string;
+  status: 'available' | 'unavailable';
+  reason?: UnavailabilityReason;
+  detail?: string;
+  firstSupportedSeason?: string;
+  playerCount?: number;
+  coverageSummary?: CoverageSummary;
+}
+
+export function coverageReportPath(): string {
+  return join(PUBLIC_DATA, 'coverage-report.json');
+}
+
+/** Loads the persisted coverage audit; empty when no build has written one. */
+export function loadCoverageReport(): CoverageReportEntry[] {
+  if (!fileExists(coverageReportPath())) return [];
+  return (readJsonLoose(coverageReportPath()) as CoverageReportEntry[]) ?? [];
+}
+
+/** Writes the coverage audit atomically alongside the manifest (merge, never replace). */
+export function recordCoverageReport(entries: CoverageReportEntry[]): void {
+  const existing = new Map(
+    loadCoverageReport().map((entry) => [`${entry.franchiseId}/${entry.eraId}`, entry]),
+  );
+  for (const entry of entries) {
+    existing.set(`${entry.franchiseId}/${entry.eraId}`, entry);
+  }
+  const merged = [...existing.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([, entry]) => entry);
+  writeJsonRetry(coverageReportPath(), merged);
+  console.log(
+    `  [OK] coverage report updated: ${String(merged.filter((e) => e.status === 'available').length)} available, ${String(merged.filter((e) => e.status === 'unavailable').length)} unavailable`,
+  );
+}
+
+/** Cheap truthful classification for combos the last build did not attempt. */
+export function classifyUnattempted(franchiseId: string, eraId: string, manifest: Manifest): PoolBuildFailure {
+  const era = manifest.eras.find((e) => e.eraId === eraId);
+  const eraHasLineage = era === undefined
+    ? false
+    : LINEAGE_SEGMENTS.some(
+        (segment) =>
+          segment.modernFranchiseId === franchiseId &&
+          segment.validFromSeasonKey <= era.toSeasonKey &&
+          (segment.validThroughSeasonKey === undefined || segment.validThroughSeasonKey >= era.fromSeasonKey),
+      );
+  if (!eraHasLineage) {
+    const first = firstSupportedSeason(franchiseId);
+    return failure(
+      'no-franchise-history',
+      `no NBA history for ${franchiseId} between ${era?.fromSeasonKey ?? '?'} and ${era?.toSeasonKey ?? '?'}`,
+      first ?? undefined,
+    );
+  }
+  const hasSeasons = listSeasonKeys().some(
+    (season) => era !== undefined && era.fromSeasonKey <= season && season <= era.toSeasonKey,
+  );
+  if (!hasSeasons) {
+    return failure('source-incomplete', `no packaged seasons for era ${eraId}`);
+  }
+  return failure('insufficient-players', 'not attempted in the last coverage build');
+}
+
+/** Written into the manifest availability matrix (runtime-validated by CLI). */
+export function availabilityEntryFor(
+  franchiseId: string,
+  eraId: string,
+  manifest: Manifest,
+  poolFile: Pool | null,
+): Record<string, unknown> {
+  if (poolFile !== null) {
+    return {
+      franchiseId,
+      eraId,
+      status: 'available',
+      url: `pools/${franchiseId}-${eraId}.json`,
+      contentHash: sha256File(join(poolDir(), `${franchiseId}-${eraId}.json`)),
+      playerCount: poolFile.players.length,
+      coverageSummary: poolFile.coverageSummary,
+    };
+  }
+  const computed = computePool(franchiseId, eraId, manifest, undefined, false);
+  if ('reason' in computed) {
+    return {
+      franchiseId,
+      eraId,
+      status: 'unavailable',
+      reason: computed.reason,
+      ...(computed.detail !== undefined ? { detail: computed.detail } : {}),
+      ...(computed.firstSupportedSeason !== undefined
+        ? { firstSupportedSeason: computed.firstSupportedSeason }
+        : {}),
+    };
+  }
+  return {
+    franchiseId,
+    eraId,
+    status: 'unavailable',
+    reason: 'source-incomplete',
+    detail: 'no packaged pool asset',
+  };
+}
+
+export function updateManifest(
+  entries: Array<{ franchiseId: string; eraId: string; url: string; contentHash: string }>,
+): void {
+  const manifest = loadManifest();
+  manifest.dataVersion = DATA_VERSION;
+  const existing = new Map(
+    manifest.pools.map((entry) => [`${entry.franchiseId}/${entry.eraId}`, entry]),
+  );
+  for (const entry of entries) {
+    existing.set(`${entry.franchiseId}/${entry.eraId}`, entry);
+  }
+  manifest.pools = [...existing.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([, entry]) => entry);
+  writeJsonRetry(manifestPath(), manifest);
+  console.log(
+    `  [OK] manifest updated: ${String(manifest.pools.length)} pools, dataVersion ${DATA_VERSION}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
+/** Season dirs with actual packaged data (roster or stints present). */
 function listSeasonKeys(): string[] {
   return readdirSync(NBA_ROOT, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
+    .filter((name) => fileExists(join(NBA_ROOT, name, 'roster.json')) || fileExists(join(NBA_ROOT, name, 'stints.json')))
     .sort();
 }
 
@@ -721,3 +1148,5 @@ function listSeasonKeys(): string[] {
 function formatList(values: readonly string[]): string {
   return `[${values.map((value) => `'${value}'`).join(', ')}]`;
 }
+
+export type { Confidence };

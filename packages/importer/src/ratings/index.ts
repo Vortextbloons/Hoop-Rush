@@ -5,7 +5,7 @@ export * from './era.js';
 export * from './weights.js';
 export * from './summary.js';
 export * from './derive.js';
-export * from './tendencies.js';
+export * from './v2.js';
 export * from './traits.js';
 export * from './contracts.js';
 export * from './compute.js';

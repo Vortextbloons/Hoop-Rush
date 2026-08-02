@@ -116,11 +116,6 @@ export function benchmark(args: {
       homeDisplayName: userTeam.displayName,
       lineup,
       players,
-      selections: players.map((player) => ({
-        playerId: player.playerId,
-        franchiseId: 'lakers',
-        eraId: '1990s',
-      })),
       runSeed: seedFor('bench-challenge', i),
       dataVersion: profile.dataVersion,
       ratingVersion: samplePlayer?.source.ratingsVersion ?? 'unknown',

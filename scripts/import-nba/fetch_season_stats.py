@@ -37,6 +37,17 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     except (ValueError, TypeError):
         return default
 
+
+def _nullable(value: Any) -> float | None:
+    """Value or None when missing/NaN (spec/12: absent fields stay null)."""
+    try:
+        f = float(value)
+    except (ValueError, TypeError):
+        return None
+    if math.isnan(f) or math.isinf(f):
+        return None
+    return f
+
 try:
     from nba_api.stats.endpoints import leaguedashplayerstats
 except Exception as exc:  # pragma: no cover
@@ -185,8 +196,8 @@ def to_player_season_stats(payload: list[dict[str, Any]], season: str, roster: l
                 "tpa": _safe_float(b.get("FG3A")) * gp,
                 "ftm": _safe_float(b.get("FTM")) * gp,
                 "fta": _safe_float(b.get("FTA")) * gp,
-                "tsPct": _safe_float(a.get("TS_PCT")),
-                "efgPct": _safe_float(a.get("EFG_PCT")),
+                "tsPct": _nullable(a.get("TS_PCT")),
+                "efgPct": _nullable(a.get("EFG_PCT")),
                 "per": _safe_float(a.get("PER")) or estimate_per(
                     _safe_float(b.get("PTS")) * gp,
                     _safe_float(b.get("REB")) * gp,
@@ -199,7 +210,7 @@ def to_player_season_stats(payload: list[dict[str, Any]], season: str, roster: l
                     _safe_float(b.get("OREB")) * gp,
                     gp,
                 ),
-                "usageRate": _safe_float(a.get("USG_PCT")) * 100 if a.get("USG_PCT") is not None else 0,
+                "usageRate": _nullable(a.get("USG_PCT")) * 100 if a.get("USG_PCT") is not None else None,
                 "winShares": _safe_float(a.get("WS")),
                 "boxPlusMinus": _safe_float(a.get("BPM")) or estimate_bpm(
                     _safe_float(b.get("PTS")) * gp,
@@ -229,8 +240,12 @@ def estimate_usage(fga: float, fta: float, tov: float, gp: int, pace: float = 95
 def stats_from_stints(season: str) -> list[dict[str, Any]]:
     """Build league-total season stats from aggregated team stints.
 
-    LeagueDashPlayerStats returns no rows for some early-90s seasons; team
-    stints from game logs cover every player who appeared.
+    LeagueDashPlayerStats returns no rows before 1996-97; team stints from
+    game logs cover every player who appeared. Absent field families (steals/
+    blocks before 1973-74, turnovers before 1977-78, rebound splits before
+    1973-74, threes before 1979-80) stay None - never converted zeros.
+    Advanced estimates are derived from whatever evidence exists and are
+    marked `stints-derived` (spec/12 provenance).
     """
     from .config import NBA_ROOT
 
@@ -238,24 +253,41 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
     if not stints_path.exists():
         return []
 
-    totals: dict[str, dict[str, float]] = {}
+    totals: dict[str, dict[str, Any]] = {}
     for stint in json.loads(stints_path.read_text(encoding="utf-8")):
         pid = stint["playerExternalId"]
         row = totals.setdefault(pid, {})
-        for key in ("gamesPlayed", "minutes", "points", "rebounds", "assists", "steals",
-                    "blocks", "turnovers", "fouls", "fgm", "fga", "tpm", "tpa", "ftm", "fta"):
-            row[key] = row.get(key, 0) + float(stint.get(key, 0))
+        row["gamesPlayed"] = row.get("gamesPlayed", 0) + int(stint.get("gamesPlayed") or 0)
+        for key in ("minutes", "points", "rebounds", "offensiveRebounds",
+                    "defensiveRebounds", "assists", "steals", "blocks",
+                    "turnovers", "fouls", "fgm", "fga", "tpm", "tpa", "ftm", "fta"):
+            value = stint.get(key)
+            if value is None or value is False:
+                continue
+            try:
+                f = float(value)
+            except (ValueError, TypeError):
+                continue
+            if math.isnan(f) or math.isinf(f):
+                continue
+            row[key] = row.get(key, 0.0) + f
 
     out: list[dict[str, Any]] = []
     for pid, t in totals.items():
-        gp = int(t["gamesPlayed"])
+        gp = int(t.get("gamesPlayed") or 0)
         if gp == 0:
             continue
-        minutes = t["minutes"]
-        fga = t["fga"]
-        fta = t["fta"]
-        tpa = t["tpa"]
-        pts = t["points"]
+        minutes = t.get("minutes", 0.0)
+        fga = t.get("fga", 0.0)
+        fta = t.get("fta", 0.0)
+        tpa = t.get("tpa")
+        tpm = t.get("tpm")
+        pts = t.get("points", 0.0)
+        stl = t.get("steals")
+        blk = t.get("blocks")
+        tov = t.get("turnovers")
+        efg = ((t.get("fgm", 0.0) + 0.5 * (tpm or 0.0)) / fga) if fga > 0 else None
+        ts = (pts / (2 * (fga + 0.44 * fta))) if (fga + fta) > 0 else None
         out.append(
             {
                 "playerExternalId": pid,
@@ -265,31 +297,31 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
                 "minutes": minutes,
                 "starts": 0,
                 "points": pts,
-                "rebounds": t["rebounds"],
-                "offensiveRebounds": 0,
-                "defensiveRebounds": t["rebounds"],
-                "assists": t["assists"],
-                "steals": t["steals"],
-                "blocks": t["blocks"],
-                "turnovers": t["turnovers"],
-                "fouls": t["fouls"],
-                "fgm": t["fgm"],
+                "rebounds": t.get("rebounds", 0.0),
+                "offensiveRebounds": t.get("offensiveRebounds"),
+                "defensiveRebounds": t.get("defensiveRebounds"),
+                "assists": t.get("assists", 0.0),
+                "steals": stl,
+                "blocks": blk,
+                "turnovers": tov,
+                "fouls": t.get("fouls", 0.0),
+                "fgm": t.get("fgm", 0.0),
                 "fga": fga,
-                "tpm": t["tpm"],
+                "tpm": tpm,
                 "tpa": tpa,
-                "ftm": t["ftm"],
+                "ftm": t.get("ftm", 0.0),
                 "fta": fta,
-                "tsPct": (pts / (2 * (fga + 0.44 * fta))) if (fga + fta) > 0 else 0.0,
-                "efgPct": ((t["fgm"] + 0.5 * t["tpm"]) / fga) if fga > 0 else 0.0,
+                "tsPct": ts,
+                "efgPct": efg,
                 "per": estimate_per(
-                    pts, t["rebounds"], t["assists"], t["steals"], t["blocks"],
-                    t["turnovers"], fga, fta, 0, gp,
+                    pts, t.get("rebounds", 0.0), t.get("assists", 0.0), stl or 0.0,
+                    blk or 0.0, tov or 0.0, fga, fta, 0, gp,
                 ),
-                "usageRate": estimate_usage(fga, fta, t["turnovers"], gp),
+                "usageRate": estimate_usage(fga, fta, tov or 0.0, gp),
                 "winShares": 0,
                 "boxPlusMinus": estimate_bpm(
-                    pts, t["rebounds"], t["assists"], t["steals"], t["blocks"],
-                    t["turnovers"], fga, fta, gp,
+                    pts, t.get("rebounds", 0.0), t.get("assists", 0.0), stl or 0.0,
+                    blk or 0.0, tov or 0.0, fga, fta, gp,
                 ),
                 "vorp": 0,
                 "statsSource": "stints-derived",

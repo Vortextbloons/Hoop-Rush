@@ -15,6 +15,7 @@ import { parsePool } from '@hoop-rush/data-contracts';
 import { readJson, sha256File, writeJson } from '../json.js';
 import { normalizePositionLabels } from './positions.js';
 import {
+  CONFIDENCE_POLICY_VERSION,
   DATA_VERSION,
   MIN_TEAM_GAMES,
   POSITION_NORMALIZATION_VERSION,
@@ -34,6 +35,7 @@ import {
   type Candidate,
   type Manifest,
   type Pool,
+  type PoolBuildFailure,
 } from './compute.js';
 
 const TEAM = '1610612747';
@@ -68,9 +70,71 @@ interface RosterSpec {
 
 const SUMMARY_60 = { overallRating: 60, offenseRating: 60, defenseRating: 60 };
 const SUMMARY_55 = { overallRating: 55, offenseRating: 55, defenseRating: 55 };
-const RATINGS_60 = { insideScoring: 60, threePoint: 60, overall: 60 };
-const RATINGS_55 = { insideScoring: 55, threePoint: 55, overall: 55 };
-const TENDENCIES = { usageRate: 10, passRate: 10 };
+const FULL_RATINGS_60: Record<string, number> = {
+  insideScoring: 60,
+  closeShot: 60,
+  midrange: 60,
+  threePoint: 60,
+  freeThrow: 60,
+  ballHandling: 60,
+  passing: 60,
+  offensiveIq: 60,
+  offensiveRebound: 60,
+  defensiveRebound: 60,
+  perimeterDefense: 60,
+  interiorDefense: 60,
+  steal: 60,
+  block: 60,
+  defensiveIq: 60,
+  speed: 60,
+  strength: 60,
+  vertical: 60,
+};
+const FULL_RATINGS_55: Record<string, number> = Object.fromEntries(
+  Object.entries(FULL_RATINGS_60).map(([key, value]) => [key, value - 5]),
+);
+const FULL_TENDENCIES: Record<string, number> = {
+  usageRate: 10,
+  passRate: 10,
+  shotRate: 10,
+  driveRate: 10,
+  postUpRate: 10,
+  rimFrequency: 10,
+  shortMidFrequency: 10,
+  longMidFrequency: 10,
+  cornerThreeFrequency: 10,
+  aboveBreakThreeFrequency: 10,
+  threePointRate: 10,
+  freeThrowRate: 10,
+  turnoverRate: 10,
+  isolationRate: 10,
+  pickAndRollBallHandlerRate: 10,
+  pickAndRollRollManRate: 10,
+  spotUpRate: 10,
+  transitionRate: 10,
+  cutRate: 10,
+  foulRate: 2,
+  stealAttemptRate: 5,
+  blockAttemptRate: 5,
+  crashOffensiveGlassRate: 5,
+};
+const FULL_ANCHORS: Record<string, number | null> = {
+  gamesPlayed: 60,
+  minutesPerGame: 20,
+  pointsPerGame: 1.7,
+  reboundsPerGame: 0.8,
+  offensiveReboundsPerGame: 0.2,
+  defensiveReboundsPerGame: 0.7,
+  assistsPerGame: 0.5,
+  stealsPerGame: 0.1,
+  blocksPerGame: 0.1,
+  turnoversPerGame: 0.2,
+  fieldGoalPct: 0.5,
+  threePointPct: 0.5,
+  freeThrowPct: 0.83,
+  threePointAttemptRate: 0.25,
+  freeThrowAttemptRate: 0.15,
+};
 
 const ROSTER_S1: RosterSpec[] = [
   {
@@ -206,6 +270,7 @@ const ROSTER_S2: RosterSpec[] = [
 ];
 
 function rosterRow(spec: RosterSpec): Record<string, unknown> {
+  const ratings = spec.summary === SUMMARY_55 ? FULL_RATINGS_55 : FULL_RATINGS_60;
   return {
     externalId: spec.id,
     firstName: spec.firstName,
@@ -215,8 +280,10 @@ function rosterRow(spec: RosterSpec): Record<string, unknown> {
     heightInches: spec.height,
     weightLbs: spec.weight,
     ...(spec.summary ? { summaryRatings: spec.summary } : {}),
-    ratings: spec.summary === SUMMARY_55 ? RATINGS_55 : RATINGS_60,
-    tendencies: TENDENCIES,
+    ratings,
+    tendencies: FULL_TENDENCIES,
+    anchors: FULL_ANCHORS,
+    provenance: { threePoint: { kind: 'derived', confidence: 'medium', methodVersion: 'derive-v1', sourceVersion: 'source-v1', sourceFields: ['tpm', 'tpa'] } },
   };
 }
 
@@ -412,7 +479,7 @@ function buildStandardFixture(label: string): FixtureRoot {
   const root = makeRoot(label);
   writeSeason(root, '1991-92', ROSTER_S1, STINTS_S1, STATS_S1);
   writeSeason(root, '1992-93', ROSTER_S2, STINTS_S2, STATS_S2);
-  writeJson(join(root.cache, 'career-position-labels-v3.json'), CAREER_LABELS);
+  writeJson(join(root.cache, 'career-position-labels-v4.json'), CAREER_LABELS);
   writeJson(join(root.cache, 'bbref_ids.json'), BBREF_IDS);
   writeJson(join(root.data, 'manifest.json'), fixtureManifest());
   return root;
@@ -584,22 +651,28 @@ describe('computePool (fixture)', () => {
     expect(alpha?.selectionScore).toBe(62.29);
     expect(alpha?.eligibility).toEqual({ minimumTeamGames: 40, teamGames: 80, teamMinutes: 3160 });
     expect(alpha?.altIds).toEqual({ bbref: 'alpha01' });
-    expect(alpha?.dataConfidence).toBe('derived-medium');
     expect(alpha?.playerId).toBe('p-1');
     expect(alpha?.displayName).toBe('Alpha Ace');
+    expect(alpha?.historicalTeamIdentity).toEqual({
+      teamId: TEAM,
+      displayName: 'Los Angeles Lakers',
+      city: 'Los Angeles',
+      abbreviation: 'LAL',
+      seasonKey: '1992-93',
+      lineageRuleVersion: 'lineage-v1',
+    });
     expect(alpha?.positions).toEqual({
       sourceLabels: ['G-F', 'SG'],
       canonical: ['F', 'G'],
       normalizationVersion: POSITION_NORMALIZATION_VERSION,
     });
 
-    // Bravo: peak season 2 also beats season 1; 40 games is the boundary; bpm -> observed.
+    // Bravo: peak season 2 also beats season 1; 40 games is the boundary.
     const bravo = byId.get('2');
     expect(bravo?.seasonKey).toBe('1992-93');
     expect(bravo?.selectionScore).toBe(61.9);
     expect(bravo?.eligibility.teamGames).toBe(40);
     expect(bravo?.eligibility.teamMinutes).toBe(800);
-    expect(bravo?.dataConfidence).toBe('observed');
     expect(bravo?.altIds).toEqual({ bbref: 'bravo01' });
     expect(bravo?.source.selectionScoreVersion).toBe(SELECTION_SCORE_VERSION);
     expect(bravo?.source.ratingsVersion).toBe(RATINGS_VERSION);
@@ -634,7 +707,6 @@ describe('computePool (fixture)', () => {
       canonical: ['F'],
       normalizationVersion: POSITION_NORMALIZATION_VERSION,
     });
-    expect(foxtrot?.dataConfidence).toBe('derived-medium');
 
     // Golf: full tie (score, minutes, games) -> earlier season wins (1991-92).
     const golf = byId.get('7');
@@ -649,9 +721,17 @@ describe('computePool (fixture)', () => {
     expect(hotel?.eligibility.teamGames).toBe(60);
     expect(hotel?.eligibility.teamMinutes).toBe(1200);
 
-    // detailedRatings holds int values only; tendencies hold numbers.
-    expect(Object.values(alpha?.detailedRatings ?? {})).toEqual([60, 60, 60]);
-    expect(Object.values(alpha?.tendencies ?? {})).toEqual([10, 10]);
+    // Strict engine contracts survive packaging; provenance and anchors too.
+    expect(Object.keys(alpha?.detailedRatings ?? {})).toHaveLength(18);
+    expect(Object.keys(alpha?.tendencies ?? {})).toHaveLength(23);
+    expect(alpha?.detailedRatings.passing).toBe(60);
+    expect(alpha?.anchors.gamesPlayed).toBe(60);
+    expect(alpha?.provenance['threePoint']?.kind).toBe('derived');
+
+    // Coverage summary carries the band and the policy version.
+    const poolResult = pool as Pool;
+    expect(poolResult.coverageSummary.coverageBand).toBe('complete-box-derived');
+    expect(poolResult.coverageSummary.policyVersion).toBe(CONFIDENCE_POLICY_VERSION);
 
     // Unknown position label is warned and excluded from the canonical union.
     const warning = messages(log).find((message) => message.includes('unknown position labels'));
@@ -688,29 +768,36 @@ describe('computePool (fixture)', () => {
 });
 
 describe('computePool error and skip paths', () => {
-  it('throws on unknown franchiseId / eraId / era without seasons', () => {
+  it('returns identity failures for unknown franchise/era and source-incomplete eras', () => {
     buildStandardFixture('errors');
     const manifest = fixtureManifest();
-    expect(() => computePool('spurs', '1990s', manifest, BBREF_IDS, false)).toThrow(
-      'unknown franchiseId spurs',
-    );
-    expect(() => computePool('lakers', '1980s', manifest, BBREF_IDS, false)).toThrow(
-      'unknown eraId 1980s',
-    );
-    expect(() => computePool('lakers', '2000s', manifest, BBREF_IDS, false)).toThrow(
-      'no seasons available for lakers 2000s',
-    );
+    const spurs = computePool('spurs', '1990s', manifest, BBREF_IDS, false) as PoolBuildFailure;
+    expect(spurs.reason).toBe('insufficient-players');
+    const unknownEra = computePool('lakers', '1980s', manifest, BBREF_IDS, false) as PoolBuildFailure;
+    expect(unknownEra.reason).toBe('identity-failed');
+    expect(unknownEra.detail).toContain('unknown eraId 1980s');
+    const noSeasons = computePool('lakers', '2000s', manifest, BBREF_IDS, false) as PoolBuildFailure;
+    expect(noSeasons.reason).toBe('source-incomplete');
+    expect(noSeasons.detail).toContain('no packaged seasons for era 2000s');
   });
 
-  it('returns null with a SKIP message when nothing is eligible', () => {
+  it('reports no-franchise-history with the first supported season', () => {
+    buildStandardFixture('nohistory');
+    const manifest = fixtureManifest();
+    manifest.eras = [
+      { eraId: '1980s', label: '1980s', fromSeasonKey: '1980-81', toSeasonKey: '1989-90' },
+      { eraId: '1990s', label: '1990s', fromSeasonKey: '1990-91', toSeasonKey: '1999-00' },
+    ];
+    const result = computePool('grizzlies', '1980s', manifest, BBREF_IDS, false) as PoolBuildFailure;
+    expect(result.reason).toBe('no-franchise-history');
+    expect(result.firstSupportedSeason).toBe('1995-96');
+  });
+
+  it('returns an insufficient-players failure when nothing is eligible', () => {
     buildStandardFixture('skip');
     const manifest = fixtureManifest();
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const pool = computePool('nets', '1990s', manifest, BBREF_IDS, false);
-    expect(pool).toBeNull();
-    expect(messages(log).some((m) => m.includes('[SKIP] no eligible players for nets 1990s'))).toBe(
-      true,
-    );
+    const pool = computePool('nets', '1990s', manifest, BBREF_IDS, false) as PoolBuildFailure;
+    expect(pool.reason).toBe('insufficient-players');
   });
 
   it('logs a warning instead of annotating assets (stays in Python)', () => {
@@ -745,7 +832,7 @@ describe('loadBbrefIds', () => {
 describe('loadCareerPositionLabels', () => {
   it('reads the versioned cache when present', () => {
     const root = makeRoot('labels-cached');
-    writeJson(join(root.cache, 'career-position-labels-v3.json'), { '1': ['SG', 'G-F'] });
+    writeJson(join(root.cache, 'career-position-labels-v4.json'), { '1': ['SG', 'G-F'] });
     const labels = loadCareerPositionLabels();
     expect(labels.get('1')).toEqual(new Set(['G-F', 'SG']));
   });
@@ -758,23 +845,26 @@ describe('loadCareerPositionLabels', () => {
     expect(labels.get('1')).toEqual(new Set(['SG']));
     expect(labels.get('999')).toBeUndefined();
     expect(
-      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v3.json'), 'utf8')),
+      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v4.json'), 'utf8')),
     ).toEqual(expect.objectContaining({ '1': ['SG'], '5': ['C'] }));
     expect(messages(log).some((m) => m.includes('[OK] career position labels for'))).toBe(true);
   });
 });
 
 describe('allPoolTargets', () => {
-  it('matches Python --all: lineage x eras with season overlap and founding check', () => {
+  it('matches slots x eras with lineage overlap and packaged seasons', () => {
     buildStandardFixture('all-targets');
     const targets = allPoolTargets(fixtureManifest());
-    // lakers (no founding key) and celtics (1946-47 <= 1999-00) qualify for the
-    // 1990s; nets is excluded (founding 2000-01 after era end); the 2000s era
-    // has no packaged seasons.
-    expect(targets).toEqual([
-      ['lakers', '1990s'],
-      ['celtics', '1990s'],
-    ]);
+    // Every slot with NBA lineage in the 1990s and packaged fixture seasons
+    // qualifies (29 slots); only the Pelicans (2002-03 founding) do not.
+    expect(targets).toContainEqual(['lakers', '1990s']);
+    expect(targets).toContainEqual(['celtics', '1990s']);
+    expect(targets).toContainEqual(['nets', '1990s']);
+    expect(targets).toContainEqual(['grizzlies', '1990s']);
+    expect(targets).not.toContainEqual(['pelicans', '1990s']);
+    expect(targets).toHaveLength(29);
+    // The 2000s era has no packaged seasons.
+    expect(targets.some(([, era]) => era === '2000s')).toBe(false);
   });
 });
 
@@ -844,12 +934,6 @@ describe('run / writePool / updateManifest', () => {
 
     const manifest = readJson(join(root.data, 'manifest.json')) as Manifest;
     expect(manifest.dataVersion).toBe(DATA_VERSION);
-    expect(
-      manifest.franchiseLineage.find((l) => l.franchiseId === 'lakers')?.firstNbaSeasonKey,
-    ).toBe('1948-49');
-    expect(
-      manifest.franchiseLineage.find((l) => l.franchiseId === 'celtics')?.firstNbaSeasonKey,
-    ).toBe('1946-47');
     expect(manifest.pools).toEqual([
       {
         franchiseId: 'celtics',
@@ -870,7 +954,7 @@ describe('run / writePool / updateManifest', () => {
     expect(messages(log).some((m) => m.includes('[OK] manifest updated: 2 pools'))).toBe(true);
   });
 
-  it('skips skipped pools and still updates the manifest', () => {
+  it('skips failed pools and still updates the manifest', () => {
     const root = buildStandardFixture('run-skip');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     run([['nets', '1990s']], false);

@@ -130,13 +130,6 @@ def main() -> int:
         except Exception as exc:
             print(f"  ! bbref ids fetch failed: {exc}")
 
-    print("\n--- Phase 3: Players index ---")
-    try:
-        compute_players_index = _import("compute_players_index")
-        compute_players_index.run()
-    except Exception as exc:
-        print(f"  ! players index build failed: {exc}")
-
     metrics = _import("util").import_metrics()
     elapsed = time.perf_counter() - started_at
     print(

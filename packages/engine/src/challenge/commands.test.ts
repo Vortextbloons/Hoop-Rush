@@ -43,11 +43,6 @@ function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeC
       })),
     },
     players: team.players,
-    selections: team.players.map((player) => ({
-      playerId: player.playerId,
-      franchiseId: 'lakers',
-      eraId: '1990s',
-    })),
     runSeed: seedFromString('fixture-run-1'),
     dataVersion: 'data-v1',
     ratingVersion: 'ratings-v1',
@@ -74,21 +69,15 @@ describe('challenge commands', () => {
     expect(run.bracket.schedule).toHaveLength(82);
   });
 
-  it('carries per-player selections in slot order', () => {
-    const run = createChallenge(fixtureCreation());
-    expect(run.selections).toHaveLength(5);
-    expect(run.selections?.map((s) => s.playerId)).toEqual(run.playerIds);
-    expect(run.selections?.[0]).toEqual({
-      playerId: 'p-1',
-      franchiseId: 'lakers',
-      eraId: '1990s',
-    });
+  it('requires the selected franchise', () => {
+    expect(() => createChallenge(fixtureCreation({ franchiseId: '' }))).toThrow(
+      /requires a selected franchise/,
+    );
   });
 
-  it('accepts a null franchiseId for free-form lineups', () => {
-    const run = createChallenge(fixtureCreation({ franchiseId: null }));
-    expect(run.franchiseId).toBeNull();
-    expect(challengeRunSchema.safeParse(run).success).toBe(true);
+  it('requires the eraId to match the simulation profile era', () => {
+    const creation = fixtureCreation({ eraId: '2010s' });
+    expect(() => createChallenge(creation)).toThrow(/must match the era profile era/);
   });
 
   it('rejects an illegal lineup', () => {

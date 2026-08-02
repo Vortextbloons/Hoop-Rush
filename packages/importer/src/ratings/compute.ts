@@ -1,19 +1,21 @@
 /**
  * Main ratings entry (port of compute_ratings.py compute_for_season / run).
  *
- * Reads roster.json + season-stats.json, derives ratings/tendencies/summary
- * ratings/traits/contracts, and writes the complete StaticPlayer-compatible
- * roster.json back.
+ * Reads roster.json + season-stats.json, derives the strict engine ratings,
+ * tendencies, packaged anchors, summary ratings, provenance, and unclamped
+ * diagnostics through the versioned field-method registry (spec/12), and
+ * writes the complete roster.json back. No random jitter: every value is a
+ * pure function of versioned inputs.
  */
 import { readFileSync } from 'node:fs';
 import { DEFAULT_SEASONS, ensureOutputDir } from '../config.js';
-import { fileExists, readJson, safeFloat, writeJson } from '../json.js';
-import { createRng, pythonSeasonSeed } from '../rng.js';
-import { deriveRatings, mapPosition } from './derive.js';
-import { deriveTendencies } from './tendencies.js';
+import { fileExists, readJson, safeFloat, writeJsonRetry } from '../json.js';
 import { deriveTraits } from './traits.js';
 import { deriveContract } from './contracts.js';
 import { computeSummaryRatings } from './summary.js';
+import { derivePlayerRecord, fieldPublished, type SeasonContext } from './v2.js';
+import { getEra } from './era.js';
+import { mapPosition } from './derive.js';
 import type { StatsRow } from './stats.js';
 
 export interface RosterPlayer extends Record<string, unknown> {
@@ -32,6 +34,9 @@ export interface RosterPlayer extends Record<string, unknown> {
   ratings?: Record<string, number>;
   tendencies?: Record<string, number>;
   summaryRatings?: { offenseRating: number; defenseRating: number; overallRating: number };
+  anchors?: Record<string, unknown>;
+  provenance?: Record<string, unknown>;
+  unclamped?: Record<string, number>;
   traits?: Record<string, number>;
   contract?: unknown;
   importMeta?: { snapshotSeason: string; statsSource: string; lastUpdated: string };
@@ -53,6 +58,12 @@ export function readJsonLoose(path: string): unknown {
 function safeHeight(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return Math.trunc(value);
+}
+
+/** League context for era-relative translation, from era-config.json when present. */
+function seasonContext(season: string): SeasonContext {
+  const era = getEra(season);
+  return { leaguePpg: era.leaguePpg, league3PARate: era.league3PARate, pace: era.pace };
 }
 
 export function computeForSeason(season: string, force = false): void {
@@ -80,7 +91,7 @@ export function computeForSeason(season: string, force = false): void {
   // Check if already computed (unless force)
   if (!force) {
     const meta = roster[0]?.importMeta;
-    if (meta?.statsSource === 'nba_api') {
+    if (meta?.statsSource === 'nba_api' || meta?.statsSource === 'stints-derived') {
       console.log(`  [SKIP] ${season}: ratings already computed (use --force to recompute)`);
       return;
     }
@@ -95,7 +106,7 @@ export function computeForSeason(season: string, force = false): void {
     }
   }
 
-  const rng = createRng(pythonSeasonSeed(season));
+  const context = seasonContext(season);
 
   let computed = 0;
   for (const player of roster) {
@@ -143,24 +154,35 @@ export function computeForSeason(season: string, force = false): void {
     // Get stats
     const stats: StatsRow = statsById.get(extId) ?? {};
 
-    // Derive all fields
-    player.ratings = deriveRatings(stats, pos, season, rng, safeHeight(player.heightInches));
-    player.tendencies = deriveTendencies(stats, player.ratings, pos, rng);
-    player.summaryRatings = computeSummaryRatings(player.ratings, player.tendencies);
-    player.traits = deriveTraits(player.ratings, stats, pos, rng);
+    // Derive all fields through the versioned registry (no jitter).
+    const derived = derivePlayerRecord({
+      season,
+      position: pos,
+      heightInches: safeHeight(player.heightInches),
+      stats,
+      era: context,
+    });
+    player.ratings = derived.ratings as unknown as Record<string, number>;
+    player.tendencies = derived.tendencies as unknown as Record<string, number>;
+    player.summaryRatings = derived.summaryRatings;
+    player.anchors = derived.anchors as unknown as Record<string, unknown>;
+    player.provenance = derived.provenance as unknown as Record<string, unknown>;
+    player.unclamped = derived.unclamped;
+    player.methods = derived.methods;
+    player.traits = deriveTraits(player.ratings, stats, pos);
     const age = safeFloat(stats['age'] ?? player.age, 25) || 25;
-    player.contract = deriveContract(player.ratings['overall'] ?? 0, Math.trunc(age), rng);
+    player.contract = deriveContract(player.summaryRatings.overallRating, Math.trunc(age));
 
     player.importMeta = {
       snapshotSeason: season,
-      statsSource: 'nba_api',
-      lastUpdated: '2026-01-01T00:00:00Z',
+      statsSource: stats['statsSource'] === 'stints-derived' ? 'stints-derived' : 'nba_api',
+      lastUpdated: '2026-08-02T00:00:00Z',
     };
 
     computed += 1;
   }
 
-  writeJson(rosterPath, roster);
+  writeJsonRetry(rosterPath, roster);
   console.log(`  [OK] computed ratings for ${String(computed)} players in ${season}`);
 }
 
@@ -171,3 +193,5 @@ export function run(seasons?: string[], force = false): void {
     computeForSeason(season, force);
   }
 }
+
+export { fieldPublished };

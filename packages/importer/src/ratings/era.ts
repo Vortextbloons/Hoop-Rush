@@ -1,5 +1,9 @@
 /**
  * Era configs (port of compute_ratings.py ERA_CONFIGS / src/game/models/eraConfig.ts).
+ *
+ * The 1960-61 through 1989-90 rows are documented league averages used as a
+ * deterministic fallback before the fetched era-config.json aggregates exist;
+ * the fetch pipeline overrides these from validated league evidence.
  */
 export interface EraConfig {
   leaguePpg: number;
@@ -11,6 +15,36 @@ export const MODERN_PPG = 114.7;
 export const MODERN_3PA_RATE = 0.39;
 
 export const ERA_CONFIGS: Record<string, EraConfig> = {
+  '1960-61': { leaguePpg: 118.1, league3PARate: 0, pace: 122.0 },
+  '1961-62': { leaguePpg: 118.8, league3PARate: 0, pace: 123.0 },
+  '1962-63': { leaguePpg: 115.4, league3PARate: 0, pace: 120.0 },
+  '1963-64': { leaguePpg: 111.4, league3PARate: 0, pace: 116.0 },
+  '1964-65': { leaguePpg: 110.8, league3PARate: 0, pace: 115.0 },
+  '1965-66': { leaguePpg: 115.9, league3PARate: 0, pace: 120.0 },
+  '1966-67': { leaguePpg: 117.2, league3PARate: 0, pace: 121.0 },
+  '1967-68': { leaguePpg: 116.2, league3PARate: 0, pace: 120.0 },
+  '1968-69': { leaguePpg: 113.2, league3PARate: 0, pace: 117.0 },
+  '1969-70': { leaguePpg: 113.1, league3PARate: 0, pace: 117.0 },
+  '1970-71': { leaguePpg: 111.4, league3PARate: 0, pace: 115.0 },
+  '1971-72': { leaguePpg: 108.7, league3PARate: 0, pace: 112.0 },
+  '1972-73': { leaguePpg: 107.5, league3PARate: 0, pace: 111.0 },
+  '1973-74': { leaguePpg: 105.0, league3PARate: 0, pace: 109.0 },
+  '1974-75': { leaguePpg: 102.6, league3PARate: 0, pace: 107.0 },
+  '1975-76': { leaguePpg: 103.7, league3PARate: 0, pace: 107.0 },
+  '1976-77': { leaguePpg: 106.5, league3PARate: 0, pace: 108.0 },
+  '1977-78': { leaguePpg: 108.4, league3PARate: 0, pace: 109.0 },
+  '1978-79': { leaguePpg: 108.6, league3PARate: 0, pace: 108.0 },
+  '1979-80': { leaguePpg: 109.3, league3PARate: 0.02, pace: 109.0 },
+  '1980-81': { leaguePpg: 108.1, league3PARate: 0.02, pace: 106.0 },
+  '1981-82': { leaguePpg: 108.6, league3PARate: 0.03, pace: 105.0 },
+  '1982-83': { leaguePpg: 108.5, league3PARate: 0.03, pace: 104.0 },
+  '1983-84': { leaguePpg: 110.1, league3PARate: 0.03, pace: 105.0 },
+  '1984-85': { leaguePpg: 112.8, league3PARate: 0.04, pace: 105.0 },
+  '1985-86': { leaguePpg: 110.2, league3PARate: 0.05, pace: 103.0 },
+  '1986-87': { leaguePpg: 109.9, league3PARate: 0.06, pace: 101.0 },
+  '1987-88': { leaguePpg: 108.2, league3PARate: 0.06, pace: 99.0 },
+  '1988-89': { leaguePpg: 109.2, league3PARate: 0.07, pace: 99.0 },
+  '1989-90': { leaguePpg: 107.0, league3PARate: 0.07, pace: 98.0 },
   '1990-91': { leaguePpg: 106.7, league3PARate: 0.1, pace: 96.4 },
   '1991-92': { leaguePpg: 106.5, league3PARate: 0.11, pace: 95.4 },
   '1992-93': { leaguePpg: 105.3, league3PARate: 0.12, pace: 94.7 },

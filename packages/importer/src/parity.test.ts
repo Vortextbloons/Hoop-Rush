@@ -1,17 +1,17 @@
 /**
  * Parity harness: read-only comparison of TS-computed artifacts against the
- * committed (Python-built) artifacts under apps/web/static/data.
+ * committed artifacts under apps/web/static/data.
  *
  * Eligibility counts and peak-selection ordering must match exactly (they are
  * deterministic rules over the same inputs). Era-sim parameters must match
- * within rounding tolerance (same stint aggregates). Values jittered by the
- * RNG (detailed ratings) are intentionally not compared.
+ * within rounding tolerance (same stint aggregates). Ratings are pure
+ * deterministic derivations, so top-5 selection ordering must also match.
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PUBLIC_DATA } from './config.js';
 import { readJson } from './json.js';
-import { computePool, loadBbrefIds, loadManifest } from './pools/compute.js';
+import { computePool, loadBbrefIds, loadManifest, type Pool } from './pools/compute.js';
 import { computeEraProfile, erasWithData } from './era-profile/profile.js';
 
 interface CommittedPoolPlayer {
@@ -24,8 +24,8 @@ interface CommittedPool {
   players: CommittedPoolPlayer[];
 }
 
-// Only eras with packaged raw-data seasons can be recomputed; the snapshot
-// covers 1990-91 onward, so pre-1990 pools are legacy artifacts.
+// Eras with packaged raw-data seasons can be recomputed; the snapshot covers
+// 1960-61 onward after the M3.5 import.
 const TARGETS = [
   ['lakers', '1990s'],
   ['celtics', '1990s'],
@@ -58,14 +58,17 @@ describe('parity: pools vs committed artifacts', () => {
     it(`${franchiseId}/${eraId} eligibility and top-5 selection match`, () => {
       const manifest = loadManifest();
       const bbrefIds = loadBbrefIds();
-      const pool = computePool(franchiseId, eraId, manifest, bbrefIds, false);
-      expect(pool).not.toBeNull();
+      const result = computePool(franchiseId, eraId, manifest, bbrefIds, false);
+      if ('reason' in result) {
+        throw new Error(`pool ${franchiseId}/${eraId} failed: ${result.reason} ${result.detail}`);
+      }
+      const pool = result as Pool;
 
       const committed = readJson(
         `${PUBLIC_DATA}/pools/${franchiseId}-${eraId}.json`,
       ) as CommittedPool;
-      expect(pool?.players.length).toBe(committed.players.length);
-      expect(topFive(pool?.players ?? [])).toEqual(topFive(committed.players));
+      expect(pool.players.length).toBe(committed.players.length);
+      expect(topFive(pool.players)).toEqual(topFive(committed.players));
     });
   }
 });

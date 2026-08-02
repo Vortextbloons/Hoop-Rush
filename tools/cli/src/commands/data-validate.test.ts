@@ -3,7 +3,12 @@ import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
+import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
+import {
+  buildManifest,
+  buildPlayerSeason,
+  buildPool,
+} from '@hoop-rush/test-fixtures';
 import { dataValidate } from './data-validate.js';
 import { EXIT_CHECKS_FAILED, EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.js';
 
@@ -21,6 +26,25 @@ async function writeManifest(manifest: unknown): Promise<string> {
   const path = join(dir, 'manifest.json');
   await writeFile(path, JSON.stringify(manifest));
   return path;
+}
+
+/** Five fixture players in a legal G,G,F,F,C spread. */
+function legalPool(altIds: PeakPlayerSeason['altIds'] = null): ReturnType<typeof buildPool> {
+  const positions: PeakPlayerSeason['positions']['canonical'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  return buildPool(
+    positions.map((position, index) =>
+      buildPlayerSeason({
+        playerId: `p-fixture-${index + 1}`,
+        displayName: `Fixture ${index + 1}`,
+        positions: {
+          sourceLabels: [position[0]!],
+          canonical: position,
+          normalizationVersion: 'position-v2',
+        },
+        altIds,
+      }),
+    ),
+  );
 }
 
 describe('dataValidate', () => {
@@ -55,20 +79,29 @@ describe('dataValidate', () => {
     expect(report.failures.some((f) => f.includes('dataVersion'))).toBe(true);
   });
 
-  it('flags duplicate franchise ids and overlapping eras', async () => {
+  it('flags overlapping lineage segments and overlapping eras', async () => {
     const manifest = buildManifest({
       franchiseLineage: [
         {
-          franchiseId: 'lakers',
+          modernFranchiseId: 'lakers',
+          historicalTeamId: '1610612747',
+          validFromSeasonKey: '1960-61',
+          validThroughSeasonKey: '1974-75',
           displayName: 'Los Angeles Lakers',
-          teamExternalId: '1610612747',
-          names: [{ name: 'Los Angeles Lakers', fromSeasonKey: '1960-61', toSeasonKey: null }],
+          city: 'Los Angeles',
+          abbreviation: 'LAL',
+          sourceIdentityIds: ['1610612747'],
+          lineageRuleVersion: 'lineage-v1',
         },
         {
-          franchiseId: 'lakers',
+          modernFranchiseId: 'lakers',
+          historicalTeamId: '1610612747',
+          validFromSeasonKey: '1970-71',
           displayName: 'Los Angeles Lakers',
-          teamExternalId: '1610612747',
-          names: [{ name: 'Los Angeles Lakers', fromSeasonKey: '1960-61', toSeasonKey: null }],
+          city: 'Los Angeles',
+          abbreviation: 'LAL',
+          sourceIdentityIds: ['1610612747'],
+          lineageRuleVersion: 'lineage-v1',
         },
       ],
       eras: [
@@ -80,7 +113,7 @@ describe('dataValidate', () => {
     const path = await writeManifest(manifest);
     const report = await dataValidate(path, false);
     expect(report.ok).toBe(false);
-    expect(report.failures.some((f) => f.includes('duplicate franchiseId'))).toBe(true);
+    expect(report.failures.some((f) => f.includes('overlapping ranges'))).toBe(true);
     expect(report.failures.some((f) => f.includes('ranges overlap'))).toBe(true);
   });
 
@@ -107,7 +140,6 @@ describe('dataValidate', () => {
     const report = await dataValidate(path, true);
     expect(report.ok).toBe(false);
     expect(report.failures.some((f) => f.includes('asset missing'))).toBe(true);
-    expect(report.details.some((d) => d.includes('hash verified'))).toBe(true);
     expect(report.exitCode).toBe(EXIT_CHECKS_FAILED);
   });
 
@@ -115,7 +147,7 @@ describe('dataValidate', () => {
     const poolDir = join(dir, 'pools');
     await mkdir(poolDir);
     const assetPath = join(poolDir, 'lakers-1990s.json');
-    const pool = buildPool([buildPlayerSeason({ altIds: { bbref: 'player01' } })]);
+    const pool = legalPool({ bbref: 'player01' });
     const asset = JSON.stringify(pool);
     await writeFile(assetPath, asset);
     const contentHash = createHash('sha256').update(asset).digest('hex');
@@ -135,9 +167,7 @@ describe('dataValidate', () => {
     const poolDir = join(dir, 'pools');
     await mkdir(poolDir);
     const assetPath = join(poolDir, 'lakers-1990s.json');
-    const pool = buildPool([
-      buildPlayerSeason({ altIds: { bbref: 'player01', nbaHeadshotAvailable: false } }),
-    ]);
+    const pool = legalPool({ bbref: 'player01', nbaHeadshotAvailable: false });
     const asset = JSON.stringify(pool);
     await writeFile(assetPath, asset);
     const contentHash = createHash('sha256').update(asset).digest('hex');

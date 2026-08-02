@@ -53,7 +53,9 @@ function rowFromPlayer(player: PeakPlayerSeason): OverallRow {
     eraId: player.eraId,
     seasonKey: player.seasonKey,
     positions: player.positions.canonical.join('/'),
-    detailedOverall: player.detailedRatings.overall ?? null,
+    // The strict engine contract carries no summary `overall` key; the
+    // packaged summary rating is the UI-facing overall.
+    detailedOverall: null,
     summaryOverall: player.summaryRatings.overallRating,
     selectionScore: player.selectionScore,
     selectionScoreVersion: player.selectionScoreVersion,

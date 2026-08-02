@@ -350,11 +350,6 @@ export function calibrateRun(args: {
       homeDisplayName: 'User Lineup',
       lineup: userLineup.lineup,
       players: userLineup.players,
-      selections: userLineup.players.map((player) => ({
-        playerId: player.playerId,
-        franchiseId: 'lakers',
-        eraId: profile.eraId,
-      })),
       runSeed: fixtureSeed('calibrate-run82', i),
       dataVersion: profile.dataVersion,
       ratingVersion: samplePlayer?.source.ratingsVersion ?? 'unknown',

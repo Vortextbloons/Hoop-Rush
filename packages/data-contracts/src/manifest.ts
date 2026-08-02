@@ -1,12 +1,16 @@
 import { z } from 'zod';
 import { contentHashSchema, eraIdSchema, franchiseIdSchema } from './ids.js';
-import { franchiseLineageEntrySchema } from './franchise.js';
+import { franchiseLineageSchema, modernFranchiseSlotSchema } from './franchise.js';
 import { eraDefSchema } from './eras.js';
+import { poolAvailabilitySchema } from './provenance.js';
 
 /**
- * The single build-time manifest the browser loads first (spec/02). It maps
- * (franchiseId, eraId) directly to compact pool assets and carries franchise
- * lineage, era definitions, and asset URL configuration.
+ * The single build-time manifest the browser loads first (spec/02, spec/12).
+ * It carries the 30 modern franchise slots, the explicit historical lineage
+ * segments, the complete franchise-era availability matrix, era definitions,
+ * and asset URL configuration. Pool artifacts are advertised only through
+ * the availability matrix; unavailable combinations carry a versioned reason
+ * and are never discovered by scanning records.
  */
 
 export const assetConfigSchema = z.object({
@@ -52,27 +56,22 @@ export const opponentIndexEntrySchema = z.object({
 });
 export type OpponentIndexEntry = z.infer<typeof opponentIndexEntrySchema>;
 
-export const playersIndexAssetSchema = z.object({
-  /** Relative or absolute URL of the global players index artifact. */
-  url: z.string().min(1).max(512),
-  /** SHA-256 content hash of the referenced artifact. */
-  contentHash: contentHashSchema,
-});
-export type PlayersIndexAsset = z.infer<typeof playersIndexAssetSchema>;
-
 export const hoopRushManifestSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   dataVersion: z.string().min(1).max(64),
-  franchiseLineage: z.array(franchiseLineageEntrySchema),
+  /** Exactly 30 stable modern franchise slots (selectable + bracket identity). */
+  modernFranchiseSlots: z.array(modernFranchiseSlotSchema).length(30),
+  /** Explicit historical lineage segments (relocations, renames, founders). */
+  franchiseLineage: franchiseLineageSchema,
   eras: z.array(eraDefSchema),
-  /** Empty until the M1 packaging pipeline publishes pools. */
+  /** Available pools only; parallel to the availability matrix. */
   pools: z.array(poolIndexEntrySchema),
+  /** Complete franchise-era availability matrix (available + unavailable). */
+  availability: z.array(poolAvailabilitySchema),
   /** Versioned era simulation profiles (M2+), indexed by era. */
   eraSimulationProfiles: z.array(simProfileIndexEntrySchema),
   /** The single frozen opponent bracket (M3+), loaded and cached as a unit. */
   bracket: opponentIndexEntrySchema.optional(),
-  /** Global players index (free-form sandbox), loaded and cached as a unit. */
-  playersIndex: playersIndexAssetSchema.optional(),
   assets: assetConfigSchema,
 });
 export type HoopRushManifest = z.infer<typeof hoopRushManifestSchema>;

@@ -17,7 +17,7 @@ function turnoverSecurity(tendencies: Record<string, number>, ballHandling: numb
 }
 
 function offBallSpacing(ratings: Record<string, number>): number {
-  return 0.6 * (ratings['threePoint'] ?? 50) + 0.4 * (ratings['consistency'] ?? 50);
+  return 0.6 * (ratings['threePoint'] ?? 50) + 0.4 * (ratings['passing'] ?? 50);
 }
 
 function foulDiscipline(tendencies: Record<string, number>): number {

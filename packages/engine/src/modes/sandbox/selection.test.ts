@@ -35,11 +35,6 @@ function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeC
       })),
     },
     players: team.players,
-    selections: team.players.map((player) => ({
-      playerId: player.playerId,
-      franchiseId: 'lakers',
-      eraId: '1990s',
-    })),
     runSeed: seedFromString('selection-run'),
     dataVersion: 'data-v1',
     ratingVersion: 'ratings-v1',

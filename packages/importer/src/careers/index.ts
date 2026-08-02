@@ -8,7 +8,7 @@
  */
 import { join } from 'node:path';
 import { DEFAULT_SEASONS, NBA_ROOT } from '../config.js';
-import { ensureDir, fileExists, readJson, writeJson } from '../json.js';
+import { ensureDir, fileExists, readJson, writeJsonRetry } from '../json.js';
 
 export interface CareerRecord {
   playerExternalId: string;
@@ -76,7 +76,7 @@ export function computeCareerStats(
       if (career !== undefined) careers.push(career);
     }
     ensureDir(join(root, season));
-    writeJson(join(root, season, 'career-stats.json'), careers);
+    writeJsonRetry(join(root, season, 'career-stats.json'), careers);
     console.log(`  [OK] computed ${String(careers.length)} career stat files for ${season}`);
   }
 }

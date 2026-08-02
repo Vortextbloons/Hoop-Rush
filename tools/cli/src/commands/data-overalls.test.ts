@@ -17,8 +17,8 @@ describe('dataOveralls', () => {
           ...buildPlayerSeason(),
           playerId: 'p-shaq',
           displayName: "Shaquille O'Neal",
-          detailedRatings: { ...buildPlayerSeason().detailedRatings, overall: 100 },
           summaryRatings: { overallRating: 77, offenseRating: 68, defenseRating: 89 },
+          // Reproducible from summary/usage/minutes: 0.5*77+0.3*68+0.2*89+...
           selectionScore: 79.056,
         },
       ]);

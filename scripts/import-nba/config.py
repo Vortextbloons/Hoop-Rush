@@ -14,6 +14,8 @@ RAW_CACHE.mkdir(exist_ok=True)
 
 CURRENT_SEASON_END_YEAR = 2026  # 2025-26 season
 
+# Versioned supported-season configuration (spec/12): the 1960-61 through
+# 1989-90 historical band plus the existing 1990s-2020s coverage.
 DEFAULT_SEASONS = [
     "2025-26",
     "2024-25",
@@ -51,15 +53,48 @@ DEFAULT_SEASONS = [
     "1992-93",
     "1991-92",
     "1990-91",
+    "1989-90",
+    "1988-89",
+    "1987-88",
+    "1986-87",
+    "1985-86",
+    "1984-85",
+    "1983-84",
+    "1982-83",
+    "1981-82",
+    "1980-81",
+    "1979-80",
+    "1978-79",
+    "1977-78",
+    "1976-77",
+    "1975-76",
+    "1974-75",
+    "1973-74",
+    "1972-73",
+    "1971-72",
+    "1970-71",
+    "1969-70",
+    "1968-69",
+    "1967-68",
+    "1966-67",
+    "1965-66",
+    "1964-65",
+    "1963-64",
+    "1962-63",
+    "1961-62",
+    "1960-61",
 ]
 
-# Earliest NBA season key in which each current franchise existed, by NBA team
-# external id. Rosters are only fetched for teams that existed in the season.
+# Earliest NBA season key per source team id, aligned with the authoritative
+# lineage table (spec/12). Rosters are only fetched for teams that existed in
+# the season; ABA and predecessor-league seasons are never fetched. The
+# Hornets lineage includes the original Charlotte Hornets (1988-89); the
+# Pelicans lineage begins with the New Orleans Hornets (2002-03).
 TEAM_FOUNDING_SEASON: dict[str, str] = {
     "1610612737": "1946-47",  # Hawks
     "1610612738": "1946-47",  # Celtics
     "1610612751": "1976-77",  # Nets (ABA before)
-    "1610612766": "2004-05",  # Hornets (Bobcats expansion)
+    "1610612766": "1988-89",  # Hornets (original Charlotte Hornets)
     "1610612741": "1966-67",  # Bulls
     "1610612739": "1970-71",  # Cavaliers
     "1610612742": "1980-81",  # Mavericks
@@ -74,7 +109,7 @@ TEAM_FOUNDING_SEASON: dict[str, str] = {
     "1610612748": "1988-89",  # Heat
     "1610612749": "1968-69",  # Bucks
     "1610612750": "1989-90",  # Timberwolves
-    "1610612740": "1988-89",  # Pelicans (Hornets lineage)
+    "1610612740": "2002-03",  # Pelicans (New Orleans Hornets lineage)
     "1610612752": "1946-47",  # Knicks
     "1610612760": "1967-68",  # Thunder (SuperSonics)
     "1610612753": "1989-90",  # Magic

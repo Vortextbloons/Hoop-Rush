@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { eraIdSchema } from './ids.js';
+import { historicalValueProvenanceSchema } from './provenance.js';
 
 /**
  * Versioned era simulation profile (spec/03, spec/06). One artifact per decade,
@@ -58,6 +59,13 @@ export const eraSimulationParametersSchema = z.object({
   zoneMix: eraZoneMixSchema,
   /** Descriptive source of the packaged values, e.g. "era-config + stints 1990-91..1999-00". */
   source: z.string().min(1).max(256),
+  /**
+   * Field-level provenance for estimated parameters (spec/12): estimated
+   * inputs (e.g. shootingFoulShare before a dedicated source exists) carry
+   * their own provenance instead of silently inheriting zero-filled
+   * aggregates. Absent on fully derived profiles.
+   */
+  parameterProvenance: z.record(z.string().min(1).max(64), historicalValueProvenanceSchema).optional(),
 });
 export type EraSimulationParameters = z.infer<typeof eraSimulationParametersSchema>;
 

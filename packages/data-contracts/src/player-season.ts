@@ -11,33 +11,52 @@ import {
   positionUnionSchema,
   sourcePositionSchema,
 } from './positions.js';
+import { simulationRatingsSchema, simulationTendenciesSchema, simulationAnchorsSchema } from './simulation.js';
+import { historicalTeamIdentitySchema, provenanceMapSchema, coverageSummarySchema } from './provenance.js';
 
 /**
- * Player-season records and the packaged peak-season pools they feed.
+ * Player-season records and the packaged peak-season pools they feed
+ * (spec/02 and spec/12).
  *
  * Eligibility and peak selection follow spec/02: team-stint games (not league
  * totals) establish the 40-game rule; each distinct player appears once per
  * franchise/decade pool as their best eligible season.
+ *
+ * Historical observation rules (spec/12): a field that is genuinely absent
+ * from the available source evidence is `null` — never a converted zero.
+ * Pre-1979 three-point observations are `not-applicable` (a league rule, not
+ * a player judgment), and every packaged value carries field-level
+ * provenance.
  */
 
-/** Counting statistics for one player-season (league totals may exceed team stint). */
+/**
+ * Counting statistics for one player-season. Fields that predate their
+ * league-wide availability (steals/blocks before 1973-74, turnovers before
+ * 1977-78, rebound splits before 1973-74, threes before 1979-80) are
+ * nullable: `null` means unavailable evidence, never a zero observation.
+ */
 export const playerSeasonStatsSchema = z.object({
   gamesPlayed: z.number().int().nonnegative(),
   minutes: z.number().int().nonnegative(),
   points: z.number().int().nonnegative(),
   rebounds: z.number().int().nonnegative(),
-  /** Optional because older packaged snapshots predate the split rebound feed. */
-  offensiveRebounds: z.number().int().nonnegative().optional(),
-  /** Optional because older packaged snapshots predate the split rebound feed. */
-  defensiveRebounds: z.number().int().nonnegative().optional(),
+  /** Null when the source did not publish offensive rebounds. */
+  offensiveRebounds: z.number().int().nonnegative().nullable(),
+  /** Null when the source did not publish defensive rebounds. */
+  defensiveRebounds: z.number().int().nonnegative().nullable(),
   assists: z.number().int().nonnegative(),
-  steals: z.number().int().nonnegative(),
-  blocks: z.number().int().nonnegative(),
-  turnovers: z.number().int().nonnegative(),
+  /** Null when the source did not publish steals. */
+  steals: z.number().int().nonnegative().nullable(),
+  /** Null when the source did not publish blocks. */
+  blocks: z.number().int().nonnegative().nullable(),
+  /** Null when the source did not publish turnovers. */
+  turnovers: z.number().int().nonnegative().nullable(),
   fieldGoalsMade: z.number().int().nonnegative(),
   fieldGoalsAttempted: z.number().int().nonnegative(),
-  threesMade: z.number().int().nonnegative(),
-  threesAttempted: z.number().int().nonnegative(),
+  /** Null before 1979-80; the shot did not exist as a league rule. */
+  threesMade: z.number().int().nonnegative().nullable(),
+  /** Null before 1979-80; the shot did not exist as a league rule. */
+  threesAttempted: z.number().int().nonnegative().nullable(),
   freeThrowsMade: z.number().int().nonnegative(),
   freeThrowsAttempted: z.number().int().nonnegative(),
   /** Player efficiency rating, when published by the source. */
@@ -55,7 +74,8 @@ export type PlayerSeasonStats = z.infer<typeof playerSeasonStatsSchema>;
 
 /**
  * One player-season-team row. Eligibility for a franchise/decade pool is
- * evaluated on the team stint, never on league-wide totals.
+ * evaluated on the team stint, never on league-wide totals (spec/12 keeps
+ * the stint row separate from league-total rows).
  */
 export const teamStintSchema = z.object({
   playerId: playerIdSchema,
@@ -68,15 +88,6 @@ export const teamStintSchema = z.object({
 });
 export type TeamStint = z.infer<typeof teamStintSchema>;
 
-/** Confidence of a packaged field per spec/02 historical derivation rules. */
-export const dataConfidenceSchema = z.enum([
-  'observed',
-  'derived-high',
-  'derived-medium',
-  'derived-low',
-]);
-export type DataConfidence = z.infer<typeof dataConfidenceSchema>;
-
 /** Summary ratings shown in the draft UI. Never possession inputs (spec/11). */
 export const summaryRatingsSchema = z.object({
   /** Balanced shorthand for comparison on a 0-100 scale. */
@@ -88,34 +99,27 @@ export const summaryRatingsSchema = z.object({
 });
 export type SummaryRatings = z.infer<typeof summaryRatingsSchema>;
 
-/**
- * Detailed possession-resolution attributes on a 0-100 scale. Keys are frozen
- * when the possession engine (M2) locks its consumption contract; until then
- * any named attribute in range is accepted at runtime boundaries.
- */
-export const detailedRatingsSchema = z.record(
-  z.string().regex(/^[a-zA-Z][a-zA-Z0-9]*$/),
-  z.number().int().min(0).max(100),
-);
-export type DetailedRatings = z.infer<typeof detailedRatingsSchema>;
-
-/** Tendency values (rates/percentages) preserved separately from ability. */
-export const tendenciesSchema = z.record(z.string(), z.number());
-export type Tendencies = z.infer<typeof tendenciesSchema>;
-
 export const sourceMetadataSchema = z.object({
   dataVersion: z.string().min(1).max(64),
   ratingsVersion: z.string().min(1).max(64),
   selectionScoreVersion: z.string().min(1).max(64),
+  /** Cached source snapshot version (spec/12 provenance). */
+  sourceVersion: z.string().min(1).max(64),
+  /** Field-method registry version (spec/12 derivation ladder). */
+  derivationMethodVersion: z.string().min(1).max(64),
+  /** Lineage rule version that resolved this player's team ownership. */
+  lineageRuleVersion: z.string().min(1).max(64),
 });
 export type SourceMetadata = z.infer<typeof sourceMetadataSchema>;
 
 /**
  * One packaged peak player-season: the representative version of a player
- * within a franchise/decade pool. Produced at build time, validated at load.
+ * within a franchise/decade pool. Detailed ratings and tendencies are the
+ * strict engine contracts (no open records, no silent runtime defaults);
+ * packaged simulation anchors preserve the season's observable production.
  */
 export const peakPlayerSeasonSchema = z.object({
-  schemaVersion: z.number().int().positive(),
+  schemaVersion: z.literal(2),
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
   eraId: z.string().min(1).max(24),
@@ -157,22 +161,30 @@ export const peakPlayerSeasonSchema = z.object({
   selectionScoreVersion: z.string().min(1).max(64),
   /** The selected season's counting statistics (league totals for context). */
   stats: playerSeasonStatsSchema,
+  /** Historical team that owned this season (e.g. Seattle SuperSonics). */
+  historicalTeamIdentity: historicalTeamIdentitySchema,
   summaryRatings: summaryRatingsSchema,
-  detailedRatings: detailedRatingsSchema,
-  tendencies: tendenciesSchema,
-  /** Highest-confidence provenance across packaged fields. */
-  dataConfidence: dataConfidenceSchema,
+  /** Strict engine ratings contract; packaging fails on missing keys. */
+  detailedRatings: simulationRatingsSchema,
+  /** Strict engine tendencies contract; packaging fails on missing keys. */
+  tendencies: simulationTendenciesSchema,
+  /** Packaged simulation anchors; the engine adapter no longer recomputes them. */
+  anchors: simulationAnchorsSchema,
+  /** Field-level provenance for every packaged value (spec/12). */
+  provenance: provenanceMapSchema,
   source: sourceMetadataSchema,
 });
 export type PeakPlayerSeason = z.infer<typeof peakPlayerSeasonSchema>;
 
 /** Compact, directly indexed franchise/decade pool (spec/02 fast-load artifact). */
 export const franchiseEraPoolSchema = z.object({
-  schemaVersion: z.number().int().positive(),
+  schemaVersion: z.literal(2),
   dataVersion: z.string().min(1).max(64),
   franchiseId: franchiseIdSchema,
   eraId: z.string().min(1).max(24),
   eligibility: z.object({ minimumTeamGames: z.literal(40) }),
+  /** Compact coverage label for the whole pool (spec/12). */
+  coverageSummary: coverageSummarySchema,
   players: z.array(peakPlayerSeasonSchema).min(1),
 });
 export type FranchiseEraPool = z.infer<typeof franchiseEraPoolSchema>;

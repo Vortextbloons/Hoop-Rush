@@ -4,6 +4,7 @@
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { foundingSeasonByTeamExternalId } from './lineage.js';
 
 // …/packages/importer/src/ -> repo root is three levels up.
 const SRC_DIR = dirname(fileURLToPath(import.meta.url));
@@ -19,6 +20,10 @@ mkdirSync(RAW_CACHE, { recursive: true });
 
 export const CURRENT_SEASON_END_YEAR = 2026; // 2025-26 season
 
+/**
+ * Versioned supported-season configuration (spec/12): the 1960-61 through
+ * 1989-90 historical band plus the existing 1990s-2020s coverage.
+ */
 export const DEFAULT_SEASONS = [
   '2025-26',
   '2024-25',
@@ -56,49 +61,72 @@ export const DEFAULT_SEASONS = [
   '1992-93',
   '1991-92',
   '1990-91',
+  '1989-90',
+  '1988-89',
+  '1987-88',
+  '1986-87',
+  '1985-86',
+  '1984-85',
+  '1983-84',
+  '1982-83',
+  '1981-82',
+  '1980-81',
+  '1979-80',
+  '1978-79',
+  '1977-78',
+  '1976-77',
+  '1975-76',
+  '1974-75',
+  '1973-74',
+  '1972-73',
+  '1971-72',
+  '1970-71',
+  '1969-70',
+  '1968-69',
+  '1967-68',
+  '1966-67',
+  '1965-66',
+  '1964-65',
+  '1963-64',
+  '1962-63',
+  '1961-62',
+  '1960-61',
 ];
 
 /**
- * Earliest NBA season key in which each current franchise existed, by NBA team
- * external id. Rosters are only fetched for teams that existed in the season.
+ * Earliest NBA season per source team id, derived from the authoritative
+ * lineage table (spec/12). Rosters are only fetched for teams that existed
+ * in the season; ABA and predecessor-league rows are excluded.
  */
-export const TEAM_FOUNDING_SEASON: Record<string, string> = {
-  '1610612737': '1946-47', // Hawks
-  '1610612738': '1946-47', // Celtics
-  '1610612751': '1976-77', // Nets (ABA before)
-  '1610612766': '2004-05', // Hornets (Bobcats expansion)
-  '1610612741': '1966-67', // Bulls
-  '1610612739': '1970-71', // Cavaliers
-  '1610612742': '1980-81', // Mavericks
-  '1610612743': '1976-77', // Nuggets (ABA before)
-  '1610612765': '1948-49', // Pistons
-  '1610612744': '1946-47', // Warriors
-  '1610612745': '1967-68', // Rockets
-  '1610612754': '1976-77', // Pacers (ABA before)
-  '1610612746': '1970-71', // Clippers (Braves)
-  '1610612747': '1948-49', // Lakers
-  '1610612763': '1995-96', // Grizzlies
-  '1610612748': '1988-89', // Heat
-  '1610612749': '1968-69', // Bucks
-  '1610612750': '1989-90', // Timberwolves
-  '1610612740': '1988-89', // Pelicans (Hornets lineage)
-  '1610612752': '1946-47', // Knicks
-  '1610612760': '1967-68', // Thunder (SuperSonics)
-  '1610612753': '1989-90', // Magic
-  '1610612755': '1949-50', // 76ers
-  '1610612756': '1968-69', // Suns
-  '1610612757': '1970-71', // Trail Blazers
-  '1610612758': '1948-49', // Kings
-  '1610612759': '1976-77', // Spurs (ABA before)
-  '1610612761': '1995-96', // Raptors
-  '1610612762': '1974-75', // Jazz
-  '1610612764': '1961-62', // Wizards
-};
+export const TEAM_FOUNDING_SEASON: Record<string, string> = foundingSeasonByTeamExternalId();
 
 export function teamExistsInSeason(teamExternalId: string, season: string): boolean {
   const founding = TEAM_FOUNDING_SEASON[teamExternalId];
   if (founding === undefined) return true;
   return season >= founding;
+}
+
+/**
+ * Source availability boundaries (spec/12): the first NBA season in which a
+ * field family is a validated observation. Earlier values are `null` with
+ * `not-applicable` or `unavailable` source status — never converted zeros.
+ */
+export const FIELD_AVAILABILITY: Record<string, string> = {
+  steals: '1973-74',
+  blocks: '1973-74',
+  offensiveRebounds: '1973-74',
+  defensiveRebounds: '1973-74',
+  turnovers: '1977-78',
+  threesMade: '1979-80',
+  threesAttempted: '1979-80',
+  gamesStarted: '1970-71',
+  advanced: '1996-97',
+};
+
+export function fieldAvailableFrom(field: string, season: string): boolean {
+  const boundary = FIELD_AVAILABILITY[field];
+  if (boundary === undefined) return true;
+  return season >= boundary;
 }
 
 export function outputDir(season: string): string {

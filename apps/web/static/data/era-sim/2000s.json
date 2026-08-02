@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "eraId": "2000s",
-  "profileVersion": "m3-2000s-v2",
-  "dataVersion": "m1.6",
+  "profileVersion": "m3-2000s-v1",
+  "dataVersion": "m3.5",
   "seasons": [
     "2000-01",
     "2001-02",
@@ -15,7 +15,7 @@
     "2008-09",
     "2009-10"
   ],
-  "baselineReport": "calibrate run --samples 2000 (engine m3-engine-v6)",
+  "baselineReport": "derived from packaged 2000-01..2009-10 stints; targets frozen after calibration baseline",
   "parameters": {
     "pace": 93.046,
     "league3PARate": 0.2002,
@@ -28,152 +28,301 @@
     "assistRate": 0.5884,
     "foulsPerPossession": 0.2314,
     "shootingFoulShare": 0.55,
-    "freeThrowAnchorRating": 76,
+    "freeThrowAnchorRating": 77,
     "assistAnchorRating": 61,
     "zoneMix": {
-      "rim": 0.4205,
-      "shortMid": 0.2242,
-      "longMid": 0.155,
-      "cornerThree": 0.0726,
-      "aboveBreakThree": 0.1276
+      "rim": 0.4349,
+      "shortMid": 0.2189,
+      "longMid": 0.146,
+      "cornerThree": 0.0751,
+      "aboveBreakThree": 0.1252
     },
-    "source": "packaged stints 2000-01..2009-10 + Lakers 2000s pool rating anchors; zone-mix three-point share normalized to the league 3P rate"
+    "source": "packaged stints 2000-01..2009-10 + Lakers 2000s pool rating anchors; zone-mix three-point share normalized to the league 3P rate",
+    "parameterProvenance": {
+      "pace": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "fga",
+          "fta",
+          "oreb",
+          "tov"
+        ]
+      },
+      "league3PARate": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "tpa",
+          "fga"
+        ]
+      },
+      "leagueTsPct": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "points",
+          "fga",
+          "fta",
+          "oreb",
+          "tov"
+        ]
+      },
+      "leagueFtaPerFga": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "fta",
+          "fga"
+        ]
+      },
+      "leagueFtPct": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "ftm",
+          "fta"
+        ]
+      },
+      "turnoverPerPossession": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "tov",
+          "possessions"
+        ]
+      },
+      "stealShareOfTurnovers": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "stl",
+          "tov"
+        ]
+      },
+      "offensiveReboundRate": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "oreb",
+          "dreb"
+        ]
+      },
+      "assistRate": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "ast",
+          "fgm"
+        ]
+      },
+      "foulsPerPossession": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "pf",
+          "possessions"
+        ]
+      },
+      "shootingFoulShare": {
+        "kind": "estimated",
+        "confidence": "low",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "prior"
+        ],
+        "sourceStatus": "unavailable",
+        "notesCode": "not-derivable-from-box-scores"
+      },
+      "freeThrowAnchorRating": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "lakers-pool",
+          "stints"
+        ]
+      },
+      "assistAnchorRating": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "lakers-pool",
+          "stints"
+        ]
+      },
+      "zoneMix": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "pool-tendencies",
+          "tpa",
+          "fga"
+        ]
+      }
+    }
   },
   "targets": {
     "possessionsPerGame": {
-      "value": 87.3021,
+      "value": 86.5331,
       "tolerance": 3,
       "minimumSample": 200
     },
     "pointsPerGame": {
-      "value": 99.4116,
+      "value": 96.3316,
       "tolerance": 5,
       "minimumSample": 200
     },
     "offensiveRating": {
-      "value": 103.6747,
+      "value": 103.5307,
       "tolerance": 5,
       "minimumSample": 200
     },
     "fieldGoalPct": {
-      "value": 0.463,
+      "value": 0.4507,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "efgPct": {
-      "value": 0.4984,
+      "value": 0.4863,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "tsPct": {
-      "value": 0.5184,
+      "value": 0.5177,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "threePointRate": {
-      "value": 0.2079,
+      "value": 0.2002,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "threePointPct": {
-      "value": 0.3403,
+      "value": 0.3564,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "freeThrowsAttemptedPerGame": {
-      "value": 22.677,
+      "value": 24.7753,
       "tolerance": 3,
       "minimumSample": 200
     },
     "freeThrowPct": {
-      "value": 0.765,
+      "value": 0.7547,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "turnoversPerGame": {
-      "value": 13.7132,
+      "value": 13.8063,
       "tolerance": 1.5,
       "minimumSample": 200
     },
     "turnoversPerPossession": {
-      "value": 0.143,
+      "value": 0.1484,
       "tolerance": 0.012,
       "minimumSample": 200
     },
     "offensiveReboundsPerGame": {
-      "value": 10.1322,
+      "value": 11.4724,
       "tolerance": 1.5,
       "minimumSample": 200
     },
     "offensiveReboundRate": {
-      "value": 0.261,
+      "value": 0.2769,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "assistsPerGame": {
-      "value": 20.9765,
+      "value": 21.1629,
       "tolerance": 2.5,
       "minimumSample": 200
     },
     "assistRate": {
-      "value": 0.5503,
+      "value": 0.5884,
       "tolerance": 0.03,
       "minimumSample": 200
     },
     "personalFoulsPerGame": {
-      "value": 21.4244,
+      "value": 21.5297,
       "tolerance": 2.5,
       "minimumSample": 200
     },
     "zoneMix": {
       "rim": {
-        "value": 0.4188,
+        "value": 0.4349,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "shortMid": {
-        "value": 0.2213,
+        "value": 0.2189,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "longMid": {
-        "value": 0.152,
+        "value": 0.146,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "cornerThree": {
-        "value": 0.0753,
+        "value": 0.0751,
         "tolerance": 0.015,
         "minimumSample": 200
       },
       "aboveBreakThree": {
-        "value": 0.1326,
+        "value": 0.1252,
         "tolerance": 0.02,
         "minimumSample": 200
       }
     },
     "closeGameRate": {
-      "value": 0.2742,
+      "value": 0.28,
       "tolerance": 0.04,
       "minimumSample": 2000
     },
     "blowoutRate": {
-      "value": 0.2002,
+      "value": 0.19,
       "tolerance": 0.04,
       "minimumSample": 2000
     },
     "overtimeRate": {
-      "value": 0.024,
-      "tolerance": 0.02,
+      "value": 0.027,
+      "tolerance": 0.012,
       "minimumSample": 2000
     },
     "strongVsWeakWinRate": {
-      "value": 0.9319,
+      "value": 0.88,
       "tolerance": 0.07,
       "minimumSample": 2000
     },
     "equalLineupHomeWinRate": {
-      "value": 0.4941,
+      "value": 0.5,
       "tolerance": 0.05,
       "minimumSample": 2000
     }

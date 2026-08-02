@@ -2,28 +2,52 @@ import { z } from 'zod';
 import { franchiseIdSchema, seasonKeySchema, teamExternalIdSchema } from './ids.js';
 
 /**
- * Franchise lineage is the authoritative identity spine. One franchiseId spans
- * relocations and renames (e.g. Minneapolis Lakers -> Los Angeles Lakers) and
- * is separate from display names and logos.
+ * Modern franchise slots and historical lineage (spec/12). A modern slot is
+ * the selectable 30-franchise identity and the fixed opponent-bracket
+ * identity. Historical lineage segments describe the real NBA teams that
+ * owned player-seasons within a slot, so a Thunder pool can display
+ * "Seattle SuperSonics, 1988-89".
+ *
+ * The lineage table, not names or abbreviations, determines ownership: each
+ * player-season-team row resolves to exactly one historical identity and one
+ * modern franchise slot.
  */
 
-export const franchiseNameSchema = z.object({
-  name: z.string().min(1).max(64),
-  fromSeasonKey: seasonKeySchema.nullable(),
-  toSeasonKey: seasonKeySchema.nullable(),
-});
-export type FranchiseName = z.infer<typeof franchiseNameSchema>;
-
-export const franchiseLineageEntrySchema = z.object({
+/** Exactly 30 stable modern franchise slots. */
+export const modernFranchiseSlotSchema = z.object({
+  /** Modern slot identity; selectable franchiseId (e.g. 'thunder'). */
   franchiseId: franchiseIdSchema,
-  /** Current display name for the franchise. */
+  /** Current display name for the slot (e.g. "Oklahoma City Thunder"). */
   displayName: z.string().min(1).max(64),
-  /** NBA API team ID used to resolve logos and external records. */
+  /** Modern NBA API team ID used to resolve logos and external records. */
   teamExternalId: teamExternalIdSchema,
-  /** First NBA season of this franchise; earlier eras are unavailable. */
-  firstNbaSeasonKey: seasonKeySchema.optional(),
-  /** Known franchise identity history, oldest first. Ranges may leave gaps. */
-  names: z.array(franchiseNameSchema).min(1),
+});
+export type ModernFranchiseSlot = z.infer<typeof modernFranchiseSlotSchema>;
+
+/**
+ * One contiguous NBA lineage segment owned by a modern franchise slot.
+ * Segments are explicit: they never infer a rename or relocation from a
+ * name or abbreviation.
+ */
+export const franchiseLineageEntrySchema = z.object({
+  /** Modern slot that owns this historical identity. */
+  modernFranchiseId: franchiseIdSchema,
+  /** Source team identity for the segment (e.g. Seattle's NBA team ID). */
+  historicalTeamId: teamExternalIdSchema,
+  /** First NBA season of this identity, inclusive. */
+  validFromSeasonKey: seasonKeySchema,
+  /** Last NBA season of this identity, inclusive; absent when current. */
+  validThroughSeasonKey: seasonKeySchema.optional(),
+  /** Historical display name (e.g. "Seattle SuperSonics"). */
+  displayName: z.string().min(1).max(64),
+  /** Historical city (e.g. "Seattle"). */
+  city: z.string().min(1).max(64),
+  /** Historical source abbreviation when the source publishes one. */
+  abbreviation: z.string().min(1).max(8).optional(),
+  /** Source identity IDs that resolve this segment (NBA team IDs, alt ids). */
+  sourceIdentityIds: z.array(z.string().min(1).max(64)).min(1),
+  /** Lineage rule version that produced this segment. */
+  lineageRuleVersion: z.string().min(1).max(64),
 });
 export type FranchiseLineageEntry = z.infer<typeof franchiseLineageEntrySchema>;
 
@@ -31,7 +55,7 @@ export const franchiseLineageSchema = z.array(franchiseLineageEntrySchema);
 export type FranchiseLineage = z.infer<typeof franchiseLineageSchema>;
 
 /**
- * Standard three-letter NBA abbreviations for the current franchise IDs.
+ * Standard three-letter NBA abbreviations for the current franchise slots.
  * These are presentation labels; franchiseId remains the identity used by
  * data, persistence, and simulation contracts.
  */

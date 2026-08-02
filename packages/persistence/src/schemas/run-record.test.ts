@@ -2,12 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { buildChallengeRun } from '@hoop-rush/test-fixtures';
 import { completedRunIndexSchema, storedRunRecordSchema } from './run-record.js';
 
-const selections = ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'].map((playerId) => ({
-  playerId,
-  franchiseId: 'lakers',
-  eraId: '1990s',
-}));
-
 describe('storedRunRecordSchema', () => {
   it('round-trips an accepted challenge run', () => {
     const record = {
@@ -59,20 +53,17 @@ describe('storedRunRecordSchema', () => {
     expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
   });
 
-  it('round-trips a free-form run with a null franchiseId and selections', () => {
+  it('rejects a free-form run with a null franchiseId', () => {
     const record = {
       recordId: 'record-6',
       saveSchemaVersion: 2,
-      run: buildChallengeRun({ franchiseId: null, selections }),
+      run: buildChallengeRun({ franchiseId: null }),
     };
-    const parsed = storedRunRecordSchema.parse(record);
-    expect(parsed.run.franchiseId).toBeNull();
-    expect(parsed.run.selections).toEqual(selections);
+    expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
   });
 
-  it('still parses a legacy record without selections', () => {
+  it('still parses a legacy single-pool record without selections', () => {
     const legacy = buildChallengeRun();
-    expect(legacy.selections).toBeUndefined();
     const record = {
       recordId: 'record-7',
       saveSchemaVersion: 2,
@@ -81,11 +72,13 @@ describe('storedRunRecordSchema', () => {
     expect(storedRunRecordSchema.safeParse(record).success).toBe(true);
   });
 
-  it('rejects a free-form run with the wrong selection count', () => {
+  it('rejects a run without the required franchiseId', () => {
+    const run = buildChallengeRun();
+    const { franchiseId: _franchiseId, ...withoutFranchise } = run;
     const record = {
       recordId: 'record-8',
       saveSchemaVersion: 2,
-      run: buildChallengeRun({ franchiseId: null, selections: selections.slice(0, 4) }),
+      run: withoutFranchise,
     };
     expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
   });
@@ -110,7 +103,7 @@ describe('completedRunIndexSchema', () => {
     expect(completedRunIndexSchema.safeParse(row).success).toBe(true);
   });
 
-  it('accepts a free-form index row with a null franchiseId and selections', () => {
+  it('rejects an index row with a null franchiseId', () => {
     const row = {
       recordId: 'run-free',
       runId: 'run-free',
@@ -118,26 +111,6 @@ describe('completedRunIndexSchema', () => {
       franchiseId: null,
       eraId: '2010s',
       playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
-      selections,
-      runSeed: 'abcd1234abcd1234abcd1234abcd1234',
-      wins: 82,
-      losses: 0,
-      gamesPlayed: 82,
-      outcome: 'perfect',
-      completedAtIso: '2026-07-31T12:00:00.000Z',
-    };
-    expect(completedRunIndexSchema.safeParse(row).success).toBe(true);
-  });
-
-  it('rejects a free-form index row with the wrong selection count', () => {
-    const row = {
-      recordId: 'run-free-bad',
-      runId: 'run-free-bad',
-      mode: 'sandbox',
-      franchiseId: null,
-      eraId: '2010s',
-      playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
-      selections: selections.slice(0, 3),
       runSeed: 'abcd1234abcd1234abcd1234abcd1234',
       wins: 82,
       losses: 0,

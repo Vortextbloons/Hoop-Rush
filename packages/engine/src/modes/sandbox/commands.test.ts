@@ -100,60 +100,25 @@ describe('sandbox commands', () => {
     expect(input.seed).toBe(seedFromString('opening-1'));
   });
 
-  it('adapts pool players without leaking summary ratings', () => {
+  it('adapts pool players by passing strict packaged contracts through', () => {
     const player = buildPlayerSeason({
       detailedRatings: {
-        insideScoring: 88,
-        threePoint: 71,
-        freeThrow: 68,
-        ballHandling: 61,
+        ...buildPlayerSeason().detailedRatings,
         passing: 96,
-        offensiveIq: 73,
-        offensiveRebound: 38,
-        defensiveRebound: 59,
-        perimeterDefense: 72,
-        interiorDefense: 66,
-        steal: 72,
-        block: 62,
-        defensiveIq: 60,
-        speed: 88,
-        strength: 89,
-        vertical: 59,
-        closeShot: 71,
-        midrange: 61,
-        overall: 99,
+        insideScoring: 88,
       },
       tendencies: {
+        ...buildPlayerSeason().tendencies,
         usageRate: 19.19,
-        passRate: 35,
-        shotRate: 31.34,
-        driveRate: 20.88,
-        postUpRate: 2.03,
-        rimFrequency: 32.94,
-        shortMidFrequency: 11.5,
-        longMidFrequency: 7.83,
-        cornerThreeFrequency: 10.68,
-        aboveBreakThreeFrequency: 15.66,
-        threePointRate: 44.7,
-        freeThrowRate: 29.37,
-        turnoverRate: 12.24,
-        isolationRate: 8.76,
-        pickAndRollBallHandlerRate: 32.11,
-        pickAndRollRollManRate: 8.17,
-        spotUpRate: 19.37,
-        transitionRate: 14.04,
-        cutRate: 10.05,
-        foulRate: 1.86,
-        stealAttemptRate: 9.58,
-        blockAttemptRate: 11.01,
-        crashOffensiveGlassRate: 15.42,
       },
     });
     const sim = toSimulationPlayer(player);
     expect(sim.ratings.passing).toBe(96);
-    expect(sim.ratings).not.toHaveProperty('overall');
     expect(sim.ratings.insideScoring).toBe(88);
+    expect(sim.ratings).not.toHaveProperty('overall');
     expect(sim.tendencies.usageRate).toBeCloseTo(19.19);
+    expect(sim.anchors).toEqual(player.anchors);
+    expect(sim.anchors?.pointsPerGame).toBeCloseTo(24.3);
   });
 
   it('simulates the opening game with exact invariants', () => {

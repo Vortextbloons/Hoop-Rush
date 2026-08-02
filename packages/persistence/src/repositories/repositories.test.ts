@@ -42,11 +42,6 @@ function indexFor(runId = 'run-1'): CompletedRunIndex {
     franchiseId: 'lakers',
     eraId: '1990s',
     playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
-    selections: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'].map((playerId) => ({
-      playerId,
-      franchiseId: 'lakers',
-      eraId: '1990s',
-    })),
     runSeed: 'abcd1234abcd1234abcd1234abcd1234',
     wins: 82,
     losses: 0,
@@ -294,13 +289,8 @@ describe.each([
     expect(history[0]?.outcome).toBe('perfect');
   });
 
-  it('promotes and lists a free-form completed run with selections', async () => {
+  it('promotes and lists a completed run with its selected franchise', async () => {
     const { repo } = makeAdapter();
-    const freeFormSelections = ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'].map((playerId) => ({
-      playerId,
-      franchiseId: 'lakers',
-      eraId: '1990s',
-    }));
     const record = {
       ...finishedRecord('run-free'),
       run: buildChallengeRun({
@@ -308,19 +298,23 @@ describe.each([
         status: 'finished',
         outcome: 'perfect',
         firstLossGameNumber: null,
-        franchiseId: null,
-        selections: freeFormSelections,
+        franchiseId: 'thunder',
+        eraId: '1980s',
       }),
     };
     await repo.saveActiveRun(record);
-    await repo.promoteActiveToCompleted(record, { ...indexFor('run-free'), franchiseId: null });
+    await repo.promoteActiveToCompleted(record, {
+      ...indexFor('run-free'),
+      franchiseId: 'thunder',
+      eraId: '1980s',
+    });
     const loaded = await repo.loadCompletedRun('run-free');
-    expect(loaded?.run.franchiseId).toBeNull();
-    expect(loaded?.run.selections).toEqual(freeFormSelections);
+    expect(loaded?.run.franchiseId).toBe('thunder');
+    expect(loaded?.run.eraId).toBe('1980s');
     const history = await repo.listCompletedRuns();
     expect(history).toHaveLength(1);
-    expect(history[0]?.franchiseId).toBeNull();
-    expect(history[0]?.selections).toEqual(freeFormSelections);
+    expect(history[0]?.franchiseId).toBe('thunder');
+    expect(history[0]?.eraId).toBe('1980s');
   });
 
   it('promotion removes the checkpoint and game rows', async () => {

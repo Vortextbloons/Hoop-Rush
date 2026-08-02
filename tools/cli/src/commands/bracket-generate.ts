@@ -278,8 +278,8 @@ export function buildCandidateCatalog(
   ];
 
   const byTeamExternalId = new Map<string, string>();
-  for (const entry of manifest.franchiseLineage) {
-    byTeamExternalId.set(entry.teamExternalId, entry.franchiseId);
+  for (const slot of manifest.modernFranchiseSlots) {
+    byTeamExternalId.set(slot.teamExternalId, slot.franchiseId);
   }
   void byTeamExternalId;
 
@@ -339,7 +339,7 @@ export function buildCandidateCatalog(
   const candidates: FranchiseCandidates[] = [];
   const details: string[] = [];
 
-  for (const lineage of manifest.franchiseLineage) {
+  for (const slot of manifest.modernFranchiseSlots) {
     const perPlayer = new Map<string, PeakCandidate>();
     for (const season of seasonDirs) {
       const roster = rosterBySeason.get(season);
@@ -351,7 +351,7 @@ export function buildCandidateCatalog(
       }
       if (!Array.isArray(stints) || !roster) continue;
       for (const stint of stints) {
-        if (stint.teamExternalId !== lineage.teamExternalId) continue;
+        if (stint.teamExternalId !== slot.teamExternalId) continue;
         if (stint.gamesPlayed < MIN_TEAM_GAMES) continue;
         const player = roster.get(stint.playerExternalId);
         if (!player?.summaryRatings) continue;
@@ -404,15 +404,15 @@ export function buildCandidateCatalog(
     }
     const players = [...perPlayer.values()].sort((a, b) => a.playerId.localeCompare(b.playerId));
     if (players.length === 0) {
-      throw new Error(`no candidate players for franchise ${lineage.franchiseId}`);
+      throw new Error(`no candidate players for franchise ${slot.franchiseId}`);
     }
     candidates.push({
-      franchiseId: lineage.franchiseId,
-      displayName: lineage.displayName,
+      franchiseId: slot.franchiseId,
+      displayName: slot.displayName,
       players,
     });
     if (verbose) {
-      details.push(`catalog ${lineage.franchiseId}: ${String(players.length)} players`);
+      details.push(`catalog ${slot.franchiseId}: ${String(players.length)} players`);
     }
   }
   return { candidates, details };

@@ -34,6 +34,26 @@ export function writeJson(path: string, value: unknown, newline = false): void {
   writeFileSync(path, text, 'utf8');
 }
 
+/**
+ * Write JSON with retry: synced/filtered filesystems (OneDrive, AV scanners)
+ * intermittently fail `open` with UV_UNKNOWN on write bursts. Retries with
+ * backoff before giving up.
+ */
+export function writeJsonRetry(path: string, value: unknown, newline = false): void {
+  ensureDir(dirname(path));
+  const text = JSON.stringify(value, null, 2) + (newline ? '\n' : '');
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try {
+      writeFileSync(path, text, 'utf8');
+      return;
+    } catch (error) {
+      if (attempt === 11) throw error;
+      const wait = 200 * (attempt + 1);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, wait);
+    }
+  }
+}
+
 export function sha256Hex(data: string | Uint8Array): string {
   return createHash('sha256').update(data).digest('hex');
 }

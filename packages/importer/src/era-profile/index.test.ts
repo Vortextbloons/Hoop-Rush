@@ -61,13 +61,16 @@ describe('deriveLeagueAggregatesFromStints', () => {
     expect(a.dreb).toBe(50);
   });
 
-  it('floors team_games at 1.0 when there is no data', () => {
+  it('floors team_games at 1.0 and leaves unavailable families null', () => {
     const a = deriveLeagueAggregatesFromStints([]);
     expect(a.teamGames).toBe(1.0);
-    expect(a.possessions).toBe(0);
+    expect(a.possessions).toBeNull();
+    expect(a.oreb).toBeNull();
+    expect(a.tov).toBeNull();
+    expect(a.tpa).toBeNull();
   });
 
-  it('coerces missing fields like float(x or 0)', () => {
+  it('coerces missing fields like float(x or 0) and keeps family availability', () => {
     const a = deriveLeagueAggregatesFromStints([
       stint({ fga: undefined, points: 10, gamesPlayed: 5 }),
     ]);
@@ -75,6 +78,10 @@ describe('deriveLeagueAggregatesFromStints', () => {
     expect(a.points).toBe(10);
     // team_games = max(1, player_games / 10) floors at one team-game.
     expect(a.teamGames).toBe(1.0);
+    // Absent families stay null; present ones sum.
+    expect(a.oreb).toBeNull();
+    expect(a.possessions).toBeNull();
+    expect(a.tpa).toBeNull();
   });
 });
 

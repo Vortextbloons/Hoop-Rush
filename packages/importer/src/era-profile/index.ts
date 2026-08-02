@@ -6,7 +6,7 @@
  */
 import { parseEraSimulationProfile } from '@hoop-rush/data-contracts';
 import { join } from 'node:path';
-import { ensureDir, writeJson } from '../json.js';
+import { ensureDir, writeJsonRetry } from '../json.js';
 import { computeEraProfile, ERA_SIM_DIR, erasWithData, type EraDef } from './profile.js';
 
 export { computeEraProfile, eraSeasons, erasWithData, packagedSeasons, target } from './profile.js';
@@ -41,7 +41,7 @@ export function run(eras?: readonly string[]): void {
     // corrupt artifact.
     parseEraSimulationProfile(profile);
     const out = join(ERA_SIM_DIR, `${era.eraId}.json`);
-    writeJson(out, profile, true);
+    writeJsonRetry(out, profile, true);
     console.log(`[OK] ${era.eraId} profile validates as EraSimulationProfile`);
     console.log(`wrote ${out} pace=${profile.parameters.pace.toFixed(2)}`);
   }

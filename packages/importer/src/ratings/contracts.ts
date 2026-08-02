@@ -1,8 +1,9 @@
 /**
  * Contract derivation (port of compute_ratings.py derive_contract).
+ * Roster metadata only; deterministic (rng accepted for signature
+ * compatibility and unused).
  */
 import { safeInt } from '../json.js';
-import type { Rng } from '../rng.js';
 
 export const SALARY_TIERS: ReadonlyArray<readonly [number, number]> = [
   [95, 65_000_000],
@@ -37,7 +38,7 @@ export interface Contract {
 }
 
 /** Estimate contract from overall rating and age. Matches the TS Contract interface. */
-export function deriveContract(overall: number, age: number, rng: Rng): Contract {
+export function deriveContract(overall: number, age: number, rng?: unknown): Contract {
   void rng;
   let baseSalary = 1_500_000;
   for (const [minOvr, salary] of SALARY_TIERS) {

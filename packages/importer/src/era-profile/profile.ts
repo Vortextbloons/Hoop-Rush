@@ -5,22 +5,49 @@
  * (`raw-data/nba/<season>/stints.json` per season), plus the packaged Lakers pool
  * for that era, which provides population anchor ratings and shot-mix priors.
  *
+ * Field families that the era's league evidence does not publish (rebound
+ * splits before 1973-74, turnovers before 1977-78, threes before 1979-80)
+ * never become zero-filled aggregates: their parameters are estimated from
+ * documented league rules or priors and carry their own provenance (spec/12).
+ *
  * Targets are emitted as initial estimates from the same source aggregates with
  * wide tolerances; the calibration baseline freezes the final gates.
  */
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { NBA_ROOT, PUBLIC_DATA } from '../config.js';
 import { readJson } from '../json.js';
-import { deriveLeagueAggregates } from './aggregates.js';
+import { deriveLeagueAggregates, type LeagueAggregates } from './aggregates.js';
 import { poolShotMixAndAnchors, type ZoneMix } from './shot-mix.js';
+import { getEra } from '../ratings/era.js';
+import {
+  DERIVATION_METHOD_VERSION,
+  SOURCE_VERSION,
+  type ProvenanceKind,
+} from '@hoop-rush/data-contracts';
 
 export const ESTIMATE_TO_TRIPS_FACTOR = 0.93;
 // Engine conversion from the league possessions-per-game estimate to the
 // real trip rate the box scores account (engine constant `estimateToTripsFactor`).
 export const PROFILE_VERSION_PREFIX = 'm3';
-export const ERA_PROFILE_DATA_VERSION = 'm1.6';
+export const ERA_PROFILE_DATA_VERSION = 'm3.5';
 export const ERA_SIM_DIR = join(PUBLIC_DATA, 'era-sim');
+
+/** Documented estimates for families the league did not publish (spec/12). */
+export const ERA_RULE_ESTIMATES = {
+  /** League turnovers per possession before turnover tracking (1977-78). */
+  turnoverPerPossessionBeforeTracking: 0.17,
+  /** League steals share of turnovers before tracking. */
+  stealShareBeforeTracking: 0.3,
+  /** League offensive rebound rate before rebound splits (1973-74). */
+  offensiveReboundRateBeforeSplits: 0.28,
+  /** Share of personal fouls that are shooting fouls (not derivable from box scores). */
+  shootingFoulShare: 0.55,
+  /** Free-throw anchor when no pool exists for the era. */
+  defaultFreeThrowAnchor: 74,
+  /** Assist anchor when no pool exists for the era. */
+  defaultAssistAnchor: 70,
+} as const;
 
 export interface EraDef {
   eraId: string;
@@ -33,6 +60,16 @@ export interface CalibrationTarget {
   value: number;
   tolerance: number;
   minimumSample: number;
+}
+
+export interface ParameterProvenance {
+  kind: ProvenanceKind;
+  confidence: 'high' | 'medium' | 'low';
+  methodVersion: string;
+  sourceVersion: string;
+  sourceFields: string[];
+  sourceStatus?: 'available' | 'unavailable' | 'not-applicable';
+  notesCode?: string;
 }
 
 export interface EraSimParameters {
@@ -51,6 +88,7 @@ export interface EraSimParameters {
   assistAnchorRating: number;
   zoneMix: ZoneMix;
   source: string;
+  parameterProvenance?: Record<string, ParameterProvenance>;
 }
 
 export interface EraProfileTargets {
@@ -105,6 +143,11 @@ export function packagedSeasons(): string[] {
   return readdirSync(NBA_ROOT, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
+    .filter(
+      (name) =>
+        existsSync(join(NBA_ROOT, name, 'stints.json')) ||
+        existsSync(join(NBA_ROOT, name, 'roster.json')),
+    )
     .sort();
 }
 
@@ -121,6 +164,51 @@ export function erasWithData(): EraDef[] {
   return manifest.eras.filter((era) => eraSeasons(era).length > 0);
 }
 
+/** Provenance for a parameter produced from fully observed league evidence. */
+function derivedProvenance(fields: string[]): ParameterProvenance {
+  return {
+    kind: 'derived',
+    confidence: 'medium',
+    methodVersion: DERIVATION_METHOD_VERSION,
+    sourceVersion: SOURCE_VERSION,
+    sourceFields: fields,
+  };
+}
+
+/** Provenance for a parameter estimated from a documented league rule or prior. */
+function estimatedProvenance(
+  fields: string[],
+  sourceStatus: 'unavailable' | 'not-applicable' | 'available' = 'unavailable',
+  notesCode?: string,
+): ParameterProvenance {
+  return {
+    kind: 'estimated',
+    confidence: 'low',
+    methodVersion: DERIVATION_METHOD_VERSION,
+    sourceVersion: SOURCE_VERSION,
+    sourceFields: fields,
+    sourceStatus,
+    notesCode,
+  };
+}
+
+/** Provenance for a league-rule value (e.g. no three-point line before 1979-80). */
+function ruleProvenance(fields: string[], notesCode: string): ParameterProvenance {
+  return {
+    kind: 'derived',
+    confidence: 'high',
+    methodVersion: DERIVATION_METHOD_VERSION,
+    sourceVersion: SOURCE_VERSION,
+    sourceFields: fields,
+    sourceStatus: 'not-applicable',
+    notesCode,
+  };
+}
+
+function eraRulePace(season: string): number {
+  return getEra(season).pace;
+}
+
 export function computeEraProfile(era: EraDef): EraSimProfile {
   const eraId = era.eraId;
   const seasons = eraSeasons(era);
@@ -128,40 +216,125 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
     throw new Error(`no packaged seasons for era ${eraId}`);
   }
 
-  const a = deriveLeagueAggregates(seasons);
-  const threeRate = a.tpa / Math.max(1.0, a.fga);
-  const { mix, ftAnchor, passAnchor } = poolShotMixAndAnchors(eraId, threeRate);
+  const a: LeagueAggregates = deriveLeagueAggregates(seasons);
+  const threeRate = a.tpa !== null ? a.tpa / Math.max(1.0, a.fga) : 0;
+  const parameterProvenance: Record<string, ParameterProvenance> = {};
 
-  const pace = a.possessions / a.teamGames; // league possessions estimate per team per game
-  // The engine accounts real trips, not the league estimate: the estimate
-  // over-counts trips by the offensive-rebound continuation adjustment
-  // (engine constant `estimateToTripsFactor`). The possession gate targets
-  // the trip rate the engine actually produces.
+  // Zone mix and anchors come from the packaged Lakers pool when available;
+  // otherwise documented defaults (estimated). Three-point shares normalize
+  // to the league 3PA rate (0 before 1979-80 by league rule).
+  let mix: ZoneMix;
+  let ftAnchor: number;
+  let passAnchor: number;
+  let anchorKind: ParameterProvenance;
+  try {
+    const anchors = poolShotMixAndAnchors(eraId, threeRate);
+    mix = anchors.mix;
+    ftAnchor = anchors.ftAnchor;
+    passAnchor = anchors.passAnchor;
+    anchorKind = derivedProvenance(['lakers-pool', 'stints']);
+  } catch {
+    const era = getEra(seasons[0] as string);
+    const twoShare = 1 - threeRate;
+    mix = {
+      rim: round4(twoShare * 0.46),
+      shortMid: round4(twoShare * 0.25),
+      longMid: round4(twoShare * 0.29),
+      cornerThree: round4(threeRate * 0.35),
+      aboveBreakThree: round4(threeRate * 0.65),
+    };
+    ftAnchor = ERA_RULE_ESTIMATES.defaultFreeThrowAnchor;
+    passAnchor = ERA_RULE_ESTIMATES.defaultAssistAnchor;
+    void era;
+    anchorKind = estimatedProvenance(['prior'], 'unavailable', 'no-packaged-pool');
+  }
+
+  const paceRaw = a.possessions !== null ? a.possessions / a.teamGames : null;
+  const pace =
+    paceRaw !== null ? paceRaw : eraRulePace(seasons[0] as string);
   const tripPace = pace * ESTIMATE_TO_TRIPS_FACTOR;
   const ppg = a.points / a.teamGames;
-  const tsPct = a.points / (2.0 * a.possessions);
+  const standardPossessions = a.fga + 0.44 * a.fta;
+  const tsPct =
+    a.possessions !== null
+      ? a.points / (2.0 * a.possessions)
+      : a.points / (2.0 * standardPossessions);
   const fgPct = a.fgm / Math.max(1.0, a.fga);
-  const efgPct = (a.fgm + 0.5 * a.tpm) / Math.max(1.0, a.fga);
-  const threePct = a.tpm / Math.max(1.0, a.tpa);
+  const efgPct = a.tpm !== null ? (a.fgm + 0.5 * a.tpm) / Math.max(1.0, a.fga) : fgPct;
+  const threePct = a.tpm !== null && a.tpa !== null ? a.tpm / Math.max(1.0, a.tpa) : 0;
   const ftaPerFga = a.fta / Math.max(1.0, a.fga);
   const ftPct = a.ftm / Math.max(1.0, a.fta);
-  const tovPerPoss = a.tov / Math.max(1.0, a.possessions);
-  // The engine applies the turnover probability per real trip; the stint
-  // turnoverPerPossession above is per league-ESTIMATE possession. Convert
-  // to the per-trip rate the engine consumes.
-  const tovPerTrip = tovPerPoss / ESTIMATE_TO_TRIPS_FACTOR;
-  const stealShare = a.stl / Math.max(1.0, a.tov);
-  const orebRate = a.oreb / Math.max(1.0, a.oreb + a.dreb);
+  const tovPerPoss =
+    a.tov !== null && a.possessions !== null ? a.tov / Math.max(1.0, a.possessions) : null;
+  const tovPerTrip = tovPerPoss !== null ? tovPerPoss / ESTIMATE_TO_TRIPS_FACTOR : null;
+  const stealShare =
+    a.stl !== null && a.tov !== null && a.tov > 0 ? a.stl / a.tov : null;
+  const orebRate =
+    a.oreb !== null && a.dreb !== null ? a.oreb / Math.max(1.0, a.oreb + a.dreb) : null;
   const assistRate = a.ast / Math.max(1.0, a.fgm);
-  const foulsPerPoss = a.pf / Math.max(1.0, a.possessions);
-  const orebPerGame = a.oreb / a.teamGames;
+  const foulsPerPoss =
+    a.possessions !== null
+      ? a.pf / Math.max(1.0, a.possessions)
+      : a.pf / Math.max(1.0, standardPossessions);
+  const orebPerGame = a.oreb !== null ? a.oreb / a.teamGames : null;
   const astPerGame = a.ast / a.teamGames;
-  const tovPerGame = a.tov / a.teamGames;
+  const tovPerGame = a.tov !== null ? a.tov / a.teamGames : null;
   const ftaPerGame = a.fta / a.teamGames;
   const pfPerGame = a.pf / a.teamGames;
 
+  // Parameter provenance (spec/12): estimated inputs are explicit.
+  parameterProvenance['pace'] =
+    paceRaw !== null ? derivedProvenance(['fga', 'fta', 'oreb', 'tov']) : estimatedProvenance(['prior']);
+  parameterProvenance['league3PARate'] =
+    a.tpa !== null
+      ? derivedProvenance(['tpa', 'fga'])
+      : ruleProvenance(['prior'], 'league-rule-no-three-point-line');
+  parameterProvenance['leagueTsPct'] = derivedProvenance(['points', 'fga', 'fta', 'oreb', 'tov']);
+  parameterProvenance['leagueFtaPerFga'] = derivedProvenance(['fta', 'fga']);
+  parameterProvenance['leagueFtPct'] = derivedProvenance(['ftm', 'fta']);
+  parameterProvenance['turnoverPerPossession'] =
+    tovPerPoss !== null ? derivedProvenance(['tov', 'possessions']) : estimatedProvenance(['prior']);
+  parameterProvenance['stealShareOfTurnovers'] =
+    stealShare !== null ? derivedProvenance(['stl', 'tov']) : estimatedProvenance(['prior']);
+  parameterProvenance['offensiveReboundRate'] =
+    orebRate !== null ? derivedProvenance(['oreb', 'dreb']) : estimatedProvenance(['prior']);
+  parameterProvenance['assistRate'] = derivedProvenance(['ast', 'fgm']);
+  parameterProvenance['foulsPerPossession'] = derivedProvenance(['pf', 'possessions']);
+  parameterProvenance['shootingFoulShare'] = estimatedProvenance(
+    ['prior'],
+    'unavailable',
+    'not-derivable-from-box-scores',
+  );
+  parameterProvenance['freeThrowAnchorRating'] = anchorKind;
+  parameterProvenance['assistAnchorRating'] = anchorKind;
+  parameterProvenance['zoneMix'] =
+    a.tpa !== null
+      ? derivedProvenance(['pool-tendencies', 'tpa', 'fga'])
+      : ruleProvenance(['prior'], 'league-rule-no-three-point-line');
+
   const first = seasons[0] as string;
   const last = seasons[seasons.length - 1] as string;
+  const parameters: EraSimParameters = {
+    pace: round3(pace),
+    league3PARate: round4(threeRate),
+    leagueTsPct: round4(tsPct),
+    leagueFtaPerFga: round4(ftaPerFga),
+    leagueFtPct: round4(ftPct),
+    turnoverPerPossession:
+      tovPerTrip !== null ? round4(tovPerTrip) : ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking,
+    stealShareOfTurnovers: stealShare !== null ? round4(stealShare) : ERA_RULE_ESTIMATES.stealShareBeforeTracking,
+    offensiveReboundRate:
+      orebRate !== null ? round4(orebRate) : ERA_RULE_ESTIMATES.offensiveReboundRateBeforeSplits,
+    assistRate: round4(assistRate),
+    foulsPerPossession: round4(foulsPerPoss),
+    shootingFoulShare: ERA_RULE_ESTIMATES.shootingFoulShare,
+    freeThrowAnchorRating: ftAnchor,
+    assistAnchorRating: passAnchor,
+    zoneMix: mix,
+    source: `packaged stints ${first}..${last} + Lakers ${eraId} pool rating anchors; zone-mix three-point share normalized to the league 3P rate`,
+    parameterProvenance,
+  };
+
   return {
     schemaVersion: 1,
     eraId,
@@ -169,23 +342,7 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
     dataVersion: ERA_PROFILE_DATA_VERSION,
     seasons,
     baselineReport: `derived from packaged ${first}..${last} stints; targets frozen after calibration baseline`,
-    parameters: {
-      pace: round3(pace),
-      league3PARate: round4(threeRate),
-      leagueTsPct: round4(tsPct),
-      leagueFtaPerFga: round4(ftaPerFga),
-      leagueFtPct: round4(ftPct),
-      turnoverPerPossession: round4(tovPerTrip),
-      stealShareOfTurnovers: round4(stealShare),
-      offensiveReboundRate: round4(orebRate),
-      assistRate: round4(assistRate),
-      foulsPerPossession: round4(foulsPerPoss),
-      shootingFoulShare: 0.55, // documented estimate; not derivable from box scores
-      freeThrowAnchorRating: ftAnchor,
-      assistAnchorRating: passAnchor,
-      zoneMix: mix,
-      source: `packaged stints ${first}..${last} + Lakers ${eraId} pool rating anchors; zone-mix three-point share normalized to the league 3P rate`,
-    },
+    parameters,
     targets: {
       possessionsPerGame: target(tripPace, 3),
       pointsPerGame: target(ppg, 5),
@@ -197,10 +354,13 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
       threePointPct: target(threePct, 0.02),
       freeThrowsAttemptedPerGame: target(ftaPerGame, 3),
       freeThrowPct: target(ftPct, 0.02),
-      turnoversPerGame: target(tovPerGame, 1.5),
-      turnoversPerPossession: target(tovPerPoss, 0.012),
-      offensiveReboundsPerGame: target(orebPerGame, 1.5),
-      offensiveReboundRate: target(orebRate, 0.02),
+      turnoversPerGame: target(tovPerGame ?? (pace * ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking), 1.5),
+      turnoversPerPossession: target(tovPerPoss ?? ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking, 0.012),
+      offensiveReboundsPerGame: target(
+        orebPerGame ?? pace * ERA_RULE_ESTIMATES.offensiveReboundRateBeforeSplits * 0.5,
+        1.5,
+      ),
+      offensiveReboundRate: target(orebRate ?? ERA_RULE_ESTIMATES.offensiveReboundRateBeforeSplits, 0.02),
       assistsPerGame: target(astPerGame, 2.5),
       assistRate: target(assistRate, 0.03),
       personalFoulsPerGame: target(pfPerGame, 2.5),

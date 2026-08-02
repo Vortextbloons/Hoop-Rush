@@ -1,6 +1,9 @@
 import { parseArgs, UsageError, getOptionString, hasOption } from './args.js';
 import { dataValidate, DATA_VALIDATE_OPTIONS, DEFAULT_MANIFEST } from './commands/data-validate.js';
 import { dataOveralls, DATA_OVERALLS_OPTIONS } from './commands/data-overalls.js';
+import { dataCoverage, DATA_COVERAGE_OPTIONS } from './commands/data-coverage.js';
+import { dataLineageAudit, DATA_LINEAGE_AUDIT_OPTIONS } from './commands/data-lineage-audit.js';
+import { dataDerive, DATA_DERIVE_OPTIONS } from './commands/data-derive.js';
 import { helpCommand } from './commands/help.js';
 import { simGame, simBatch, SIM_OPTIONS, UsageError as SimUsageError } from './commands/sim.js';
 import { simDiagnose, simSeason, DIAGNOSE_OPTIONS, SEASON_OPTIONS } from './commands/diagnose.js';
@@ -66,6 +69,29 @@ const COMMANDS: Record<string, CommandDef> = {
         era: getOptionString(args, 'era') ?? undefined,
         player: getOptionString(args, 'player') ?? undefined,
         limit: getOptionString(args, 'limit') ?? undefined,
+      }),
+  },
+  'data coverage': {
+    options: DATA_COVERAGE_OPTIONS,
+    run: (args) =>
+      dataCoverage({
+        input: getOptionString(args, 'input') ?? DEFAULT_MANIFEST,
+        franchise: getOptionString(args, 'franchise') ?? undefined,
+        era: getOptionString(args, 'era') ?? undefined,
+        status: getOptionString(args, 'status') ?? undefined,
+      }),
+  },
+  'data lineage-audit': {
+    options: DATA_LINEAGE_AUDIT_OPTIONS,
+    run: (args) => dataLineageAudit({ input: getOptionString(args, 'input') ?? DEFAULT_MANIFEST }),
+  },
+  'data derive': {
+    options: DATA_DERIVE_OPTIONS,
+    run: (args) =>
+      dataDerive({
+        player: getOptionString(args, 'player') ?? undefined,
+        season: getOptionString(args, 'season') ?? undefined,
+        franchise: getOptionString(args, 'franchise') ?? undefined,
       }),
   },
   'sim game': {

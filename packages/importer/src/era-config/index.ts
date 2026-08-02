@@ -7,7 +7,7 @@
  */
 import { join } from 'node:path';
 import { DEFAULT_SEASONS, NBA_ROOT } from '../config.js';
-import { fileExists, readJson, safeFloat, writeJson } from '../json.js';
+import { fileExists, readJson, safeFloat, writeJsonRetry } from '../json.js';
 
 export interface EraConfig {
   season: string;
@@ -94,7 +94,7 @@ export function computeForSeason(season: string, root = NBA_ROOT): EraConfig {
 export function run(seasons: readonly string[] = DEFAULT_SEASONS, root = NBA_ROOT): void {
   for (const season of seasons) {
     const cfg = computeForSeason(season, root);
-    writeJson(join(root, season, 'era-config.json'), cfg);
+    writeJsonRetry(join(root, season, 'era-config.json'), cfg);
     console.log(`[${season}] wrote era-config.json`);
   }
 }

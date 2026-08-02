@@ -78,9 +78,29 @@ def _clean_id(value: Any) -> str:
         return str(value)
 
 
+def _real(value: Any) -> float | None:
+    """Float value or None when the cell is missing/NaN (spec/12: absent
+    fields must never be converted to zero)."""
+    if value is None:
+        return None
+    try:
+        f = float(value)
+    except (ValueError, TypeError):
+        return None
+    if math.isnan(f) or math.isinf(f):
+        return None
+    return f
+
+
 def aggregate_stints(logs: list[dict[str, Any]], season: str) -> list[dict[str, Any]]:
-    """Group game logs by (player, team) into stint totals."""
-    stints: dict[tuple[str, str], dict[str, float | int]] = {}
+    """Group game logs by (player, team) into stint totals.
+
+    Field families that are absent across all of a stint's games stay None
+    (e.g. steals/blocks before 1973-74, turnovers before 1977-78, threes
+    before 1979-80); per-row missingness within an available family sums
+    the present rows.
+    """
+    stints: dict[tuple[str, str], dict[str, Any]] = {}
     for game in logs:
         pid = _clean_id(game.get("PLAYER_ID"))
         tid = _clean_id(game.get("TEAM_ID"))
@@ -90,7 +110,12 @@ def aggregate_stints(logs: list[dict[str, Any]], season: str) -> list[dict[str, 
         stint = stints.setdefault(key, {"playerExternalId": pid, "teamExternalId": tid})
         stint["gamesPlayed"] = int(stint.get("gamesPlayed", 0)) + 1
         for k in AGGREGATE_KEYS:
-            stint[k] = _safe_float(stint.get(k, 0)) + _safe_float(game.get(k))
+            value = _real(game.get(k))
+            if value is None:
+                continue
+            counts = stint.setdefault("_counts", {})
+            counts[k] = counts.get(k, 0) + 1
+            stint[k] = round(float(stint.get(k, 0.0)) + value, 1)
 
     out: list[dict[str, Any]] = []
     for key, stint in sorted(stints.items()):
@@ -100,8 +125,14 @@ def aggregate_stints(logs: list[dict[str, Any]], season: str) -> list[dict[str, 
             "teamExternalId": key[1],
             "gamesPlayed": stint["gamesPlayed"],
         }
+        counts: dict[str, int] = stint.get("_counts", {})
         for k in AGGREGATE_KEYS:
-            row[OUTPUT_KEY[k]] = round(float(stint[k]), 1)
+            out_key = OUTPUT_KEY[k]
+            if k in stint:
+                row[out_key] = stint[k]
+            else:
+                # Absent family: keep null, never a converted zero.
+                row[out_key] = None
         out.append(row)
     return out
 

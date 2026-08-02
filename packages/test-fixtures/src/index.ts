@@ -7,6 +7,7 @@ import type {
   FranchiseEraPool,
   GameSimulationInput,
   HoopRushManifest,
+  ModernFranchiseSlot,
   OpponentBracket,
   OpponentTeam,
   PeakPlayerSeason,
@@ -45,6 +46,8 @@ export const DEFAULT_PLAYER_STATS: PlayerSeasonStats = {
   minutes: 2860,
   points: 1920,
   rebounds: 480,
+  offensiveRebounds: 110,
+  defensiveRebounds: 370,
   assists: 410,
   steals: 90,
   blocks: 40,
@@ -62,9 +65,60 @@ export const DEFAULT_PLAYER_STATS: PlayerSeasonStats = {
   efgPct: 0.548,
 };
 
+const FIXTURE_PROVENANCE = {
+  kind: 'observed',
+  confidence: 'high',
+  methodVersion: 'fixture-v1',
+  sourceVersion: 'source-v1',
+  sourceFields: ['fixture'],
+} as const;
+
+const FIXTURE_HISTORICAL_IDENTITY = {
+  teamId: '1610612747',
+  displayName: 'Los Angeles Lakers',
+  city: 'Los Angeles',
+  abbreviation: 'LAL',
+  seasonKey: '1996-97',
+  lineageRuleVersion: 'lineage-v1',
+};
+
+/** Field-level provenance for every strict engine field (observed/derived). */
+function fullProvenance(): PeakPlayerSeason['provenance'] {
+  const entry = {
+    kind: 'derived' as const,
+    confidence: 'medium' as const,
+    methodVersion: 'derive-v1',
+    sourceVersion: 'source-v1',
+    sourceFields: ['fixture'],
+  };
+  const provenance: PeakPlayerSeason['provenance'] = {};
+  for (const key of Object.keys(DEFAULT_SIM_RATINGS)) provenance[key] = { ...entry };
+  for (const key of Object.keys(DEFAULT_SIM_TENDENCIES)) provenance[key] = { ...entry };
+  for (const key of [
+    'gamesPlayed',
+    'minutesPerGame',
+    'pointsPerGame',
+    'reboundsPerGame',
+    'offensiveReboundsPerGame',
+    'defensiveReboundsPerGame',
+    'assistsPerGame',
+    'stealsPerGame',
+    'blocksPerGame',
+    'turnoversPerGame',
+    'fieldGoalPct',
+    'threePointPct',
+    'freeThrowPct',
+    'threePointAttemptRate',
+    'freeThrowAttemptRate',
+  ]) {
+    provenance[key] = { ...entry };
+  }
+  return provenance;
+}
+
 export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     playerId: 'p-1',
     franchiseId: 'lakers',
     eraId: '1990s',
@@ -76,7 +130,7 @@ export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): Pe
     positions: {
       sourceLabels: ['G'],
       canonical: ['G'],
-      normalizationVersion: 'position-v1',
+      normalizationVersion: 'position-v2',
     },
     heightInches: 79,
     weightLbs: 215,
@@ -85,17 +139,39 @@ export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): Pe
       teamGames: 78,
       teamMinutes: 2700,
     },
-    selectionScore: 60,
+    // Reproducible from the packaged summary/usage/minutes: 91.517.
+    selectionScore: 91.517,
     selectionScoreVersion: 'score-v1',
     stats: DEFAULT_PLAYER_STATS,
+    historicalTeamIdentity: FIXTURE_HISTORICAL_IDENTITY,
     summaryRatings: DEFAULT_SUMMARY_RATINGS,
-    detailedRatings: { insideScoring: 82, threePoint: 78 },
-    tendencies: { usageRate: 28, threePointRate: 24 },
-    dataConfidence: 'observed',
+    detailedRatings: { ...DEFAULT_SIM_RATINGS },
+    tendencies: { ...DEFAULT_SIM_TENDENCIES },
+    anchors: {
+      gamesPlayed: 79,
+      minutesPerGame: 36.2,
+      pointsPerGame: 24.3,
+      reboundsPerGame: 6.1,
+      offensiveReboundsPerGame: 1.4,
+      defensiveReboundsPerGame: 4.7,
+      assistsPerGame: 5.2,
+      stealsPerGame: 1.1,
+      blocksPerGame: 0.5,
+      turnoversPerGame: 2.8,
+      fieldGoalPct: 0.51,
+      threePointPct: 0.367,
+      freeThrowPct: 0.786,
+      threePointAttemptRate: 0.207,
+      freeThrowAttemptRate: 0.29,
+    },
+    provenance: fullProvenance(),
     source: {
       dataVersion: 'data-v1',
       ratingsVersion: 'ratings-v1',
       selectionScoreVersion: 'score-v1',
+      sourceVersion: 'source-v1',
+      derivationMethodVersion: 'derive-v1',
+      lineageRuleVersion: 'lineage-v1',
     },
     ...overrides,
   };
@@ -106,11 +182,20 @@ export function buildPool(
   overrides: Partial<FranchiseEraPool> = {},
 ): FranchiseEraPool {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     dataVersion: 'data-v1',
     franchiseId: players[0]?.franchiseId ?? 'lakers',
     eraId: players[0]?.eraId ?? '1990s',
     eligibility: { minimumTeamGames: 40 },
+    coverageSummary: {
+      coverageBand: 'complete-box-derived',
+      observedFamilies: ['base', 'rebounding', 'defensive-events', 'turnovers', 'three-point'],
+      derivedFamilies: ['advanced'],
+      estimatedFamilies: [],
+      missingCategories: [],
+      lowConfidenceShare: 0,
+      policyVersion: 'policy-v1',
+    },
     players,
     ...overrides,
   };
@@ -123,38 +208,143 @@ export const DEFAULT_DIFFICULTY: DifficultyProfile = {
   teamPercentileBand: [0.25, 0.65],
 };
 
-const ALL_FRANCHISE_IDS = [
-  'hawks',
-  'celtics',
-  'nets',
-  'hornets',
-  'bulls',
-  'cavaliers',
-  'mavericks',
-  'nuggets',
-  'pistons',
-  'warriors',
-  'rockets',
-  'pacers',
-  'clippers',
-  'lakers',
-  'grizzlies',
-  'heat',
-  'bucks',
-  'timberwolves',
-  'pelicans',
-  'knicks',
-  'thunder',
-  'magic',
-  'sixers',
-  'suns',
-  'blazers',
-  'kings',
-  'spurs',
-  'raptors',
-  'jazz',
-  'wizards',
-] as const;
+const ALL_FRANCHISE_SLOTS: ReadonlyArray<
+  { franchiseId: string; displayName: string; teamExternalId: string }
+> = [
+  { franchiseId: 'hawks', displayName: 'Atlanta Hawks', teamExternalId: '1610612737' },
+  { franchiseId: 'celtics', displayName: 'Boston Celtics', teamExternalId: '1610612738' },
+  { franchiseId: 'nets', displayName: 'Brooklyn Nets', teamExternalId: '1610612751' },
+  { franchiseId: 'hornets', displayName: 'Charlotte Hornets', teamExternalId: '1610612766' },
+  { franchiseId: 'bulls', displayName: 'Chicago Bulls', teamExternalId: '1610612741' },
+  { franchiseId: 'cavaliers', displayName: 'Cleveland Cavaliers', teamExternalId: '1610612739' },
+  { franchiseId: 'mavericks', displayName: 'Dallas Mavericks', teamExternalId: '1610612742' },
+  { franchiseId: 'nuggets', displayName: 'Denver Nuggets', teamExternalId: '1610612743' },
+  { franchiseId: 'pistons', displayName: 'Detroit Pistons', teamExternalId: '1610612765' },
+  { franchiseId: 'warriors', displayName: 'Golden State Warriors', teamExternalId: '1610612744' },
+  { franchiseId: 'rockets', displayName: 'Houston Rockets', teamExternalId: '1610612745' },
+  { franchiseId: 'pacers', displayName: 'Indiana Pacers', teamExternalId: '1610612754' },
+  { franchiseId: 'clippers', displayName: 'Los Angeles Clippers', teamExternalId: '1610612746' },
+  { franchiseId: 'lakers', displayName: 'Los Angeles Lakers', teamExternalId: '1610612747' },
+  { franchiseId: 'grizzlies', displayName: 'Memphis Grizzlies', teamExternalId: '1610612763' },
+  { franchiseId: 'heat', displayName: 'Miami Heat', teamExternalId: '1610612748' },
+  { franchiseId: 'bucks', displayName: 'Milwaukee Bucks', teamExternalId: '1610612749' },
+  { franchiseId: 'timberwolves', displayName: 'Minnesota Timberwolves', teamExternalId: '1610612750' },
+  { franchiseId: 'pelicans', displayName: 'New Orleans Pelicans', teamExternalId: '1610612740' },
+  { franchiseId: 'knicks', displayName: 'New York Knicks', teamExternalId: '1610612752' },
+  { franchiseId: 'thunder', displayName: 'Oklahoma City Thunder', teamExternalId: '1610612760' },
+  { franchiseId: 'magic', displayName: 'Orlando Magic', teamExternalId: '1610612753' },
+  { franchiseId: 'sixers', displayName: 'Philadelphia 76ers', teamExternalId: '1610612755' },
+  { franchiseId: 'suns', displayName: 'Phoenix Suns', teamExternalId: '1610612756' },
+  { franchiseId: 'blazers', displayName: 'Portland Trail Blazers', teamExternalId: '1610612757' },
+  { franchiseId: 'kings', displayName: 'Sacramento Kings', teamExternalId: '1610612758' },
+  { franchiseId: 'spurs', displayName: 'San Antonio Spurs', teamExternalId: '1610612759' },
+  { franchiseId: 'raptors', displayName: 'Toronto Raptors', teamExternalId: '1610612761' },
+  { franchiseId: 'jazz', displayName: 'Utah Jazz', teamExternalId: '1610612762' },
+  { franchiseId: 'wizards', displayName: 'Washington Wizards', teamExternalId: '1610612764' },
+];
+
+export function buildModernFranchiseSlots(): ModernFranchiseSlot[] {
+  return ALL_FRANCHISE_SLOTS.map((slot) => ({ ...slot }));
+}
+
+/** Default availability matrix: every slot x era unavailable (source-incomplete). */
+function unavailableMatrix(): HoopRushManifest['availability'] {
+  const rows: HoopRushManifest['availability'] = [];
+  for (const slot of ALL_FRANCHISE_SLOTS) {
+    for (const era of [
+      { eraId: '1960s', from: '1960-61' },
+      { eraId: '1970s', from: '1970-71' },
+      { eraId: '1980s', from: '1980-81' },
+      { eraId: '1990s', from: '1990-91' },
+      { eraId: '2000s', from: '2000-01' },
+      { eraId: '2010s', from: '2010-11' },
+      { eraId: '2020s', from: '2020-21' },
+    ]) {
+      rows.push({
+        franchiseId: slot.franchiseId,
+        eraId: era.eraId,
+        status: 'unavailable',
+        reason: 'source-incomplete',
+      });
+    }
+  }
+  return rows;
+}
+
+export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRushManifest {
+  return {
+    schemaVersion: 2,
+    dataVersion: 'data-v1',
+    modernFranchiseSlots: buildModernFranchiseSlots(),
+    franchiseLineage: [
+      {
+        modernFranchiseId: 'lakers',
+        historicalTeamId: '1610612747',
+        validFromSeasonKey: '1948-49',
+        validThroughSeasonKey: '1959-60',
+        displayName: 'Minneapolis Lakers',
+        city: 'Minneapolis',
+        abbreviation: 'MNL',
+        sourceIdentityIds: ['1610612747'],
+        lineageRuleVersion: 'lineage-v1',
+      },
+      {
+        modernFranchiseId: 'lakers',
+        historicalTeamId: '1610612747',
+        validFromSeasonKey: '1960-61',
+        displayName: 'Los Angeles Lakers',
+        city: 'Los Angeles',
+        abbreviation: 'LAL',
+        sourceIdentityIds: ['1610612747'],
+        lineageRuleVersion: 'lineage-v1',
+      },
+      {
+        modernFranchiseId: 'thunder',
+        historicalTeamId: '1610612760',
+        validFromSeasonKey: '1967-68',
+        validThroughSeasonKey: '2007-08',
+        displayName: 'Seattle SuperSonics',
+        city: 'Seattle',
+        abbreviation: 'SEA',
+        sourceIdentityIds: ['1610612760'],
+        lineageRuleVersion: 'lineage-v1',
+      },
+      {
+        modernFranchiseId: 'thunder',
+        historicalTeamId: '1610612760',
+        validFromSeasonKey: '2008-09',
+        displayName: 'Oklahoma City Thunder',
+        city: 'Oklahoma City',
+        abbreviation: 'OKC',
+        sourceIdentityIds: ['1610612760'],
+        lineageRuleVersion: 'lineage-v1',
+      },
+    ],
+    eras: [
+      { eraId: '1960s', label: '1960s', fromSeasonKey: '1960-61', toSeasonKey: '1969-70' },
+      { eraId: '1970s', label: '1970s', fromSeasonKey: '1970-71', toSeasonKey: '1979-80' },
+      { eraId: '1980s', label: '1980s', fromSeasonKey: '1980-81', toSeasonKey: '1989-90' },
+      { eraId: '1990s', label: '1990s', fromSeasonKey: '1990-91', toSeasonKey: '1999-00' },
+      { eraId: '2000s', label: '2000s', fromSeasonKey: '2000-01', toSeasonKey: '2009-10' },
+      { eraId: '2010s', label: '2010s', fromSeasonKey: '2010-11', toSeasonKey: '2019-20' },
+      { eraId: '2020s', label: '2020s', fromSeasonKey: '2020-21', toSeasonKey: '2029-30' },
+    ],
+    pools: [],
+    availability: unavailableMatrix(),
+    eraSimulationProfiles: [],
+    assets: {
+      headshotUrlTemplate:
+        'https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png',
+      headshotUrlTemplateSecondary:
+        'https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg',
+      logoUrlTemplate: 'https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg',
+      logoUrlTemplateSecondary: 'https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png',
+      source: 'NBA.com',
+      cacheVersion: '2026-07-01',
+    },
+    ...overrides,
+  };
+}
 
 export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): ChallengeRun {
   const bracket = buildFixtureBracket();
@@ -181,7 +371,7 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
       saveSchemaVersion: 2,
       dataVersion: 'data-v1',
       ratingVersion: 'ratings-v1',
-      positionNormalizationVersion: 'position-v1',
+      positionNormalizationVersion: 'position-v2',
       engineVersion: 'engine-v1',
       bracketVersion: bracket.bracketVersion,
       scheduleVersion: bracket.scheduleVersion,
@@ -320,10 +510,10 @@ export function buildFixtureSchedule(opponentIds: readonly string[]): BracketSch
 
 /** A complete 30-opponent fixture bracket with the fixed 82-game schedule. */
 export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): OpponentBracket {
-  const opponents = ALL_FRANCHISE_IDS.map((franchiseId, index) =>
+  const opponents = ALL_FRANCHISE_SLOTS.map((slot, index) =>
     buildBracketOpponent(
-      franchiseId,
-      index === 0 ? 'lakers-1990s-opening' : `bracket-${franchiseId}`,
+      slot.franchiseId,
+      index === 0 ? 'lakers-1990s-opening' : `bracket-${slot.franchiseId}`,
       index,
     ),
   );
@@ -347,55 +537,6 @@ export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): O
     ...overrides,
   };
   return bracket;
-}
-
-export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRushManifest {
-  return {
-    schemaVersion: 1,
-    dataVersion: 'data-v1',
-    franchiseLineage: [
-      {
-        franchiseId: 'lakers',
-        displayName: 'Los Angeles Lakers',
-        teamExternalId: '1610612747',
-        names: [
-          { name: 'Minneapolis Lakers', fromSeasonKey: '1948-49', toSeasonKey: '1959-60' },
-          { name: 'Los Angeles Lakers', fromSeasonKey: '1960-61', toSeasonKey: null },
-        ],
-      },
-      {
-        franchiseId: 'thunder',
-        displayName: 'Oklahoma City Thunder',
-        teamExternalId: '1610612760',
-        names: [
-          { name: 'Seattle SuperSonics', fromSeasonKey: '1967-68', toSeasonKey: '2007-08' },
-          { name: 'Oklahoma City Thunder', fromSeasonKey: '2008-09', toSeasonKey: null },
-        ],
-      },
-    ],
-    eras: [
-      { eraId: '1960s', label: '1960s', fromSeasonKey: '1960-61', toSeasonKey: '1969-70' },
-      { eraId: '1970s', label: '1970s', fromSeasonKey: '1970-71', toSeasonKey: '1979-80' },
-      { eraId: '1980s', label: '1980s', fromSeasonKey: '1980-81', toSeasonKey: '1989-90' },
-      { eraId: '1990s', label: '1990s', fromSeasonKey: '1990-91', toSeasonKey: '1999-00' },
-      { eraId: '2000s', label: '2000s', fromSeasonKey: '2000-01', toSeasonKey: '2009-10' },
-      { eraId: '2010s', label: '2010s', fromSeasonKey: '2010-11', toSeasonKey: '2019-20' },
-      { eraId: '2020s', label: '2020s', fromSeasonKey: '2020-21', toSeasonKey: '2029-30' },
-    ],
-    pools: [],
-    eraSimulationProfiles: [],
-    assets: {
-      headshotUrlTemplate:
-        'https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png',
-      headshotUrlTemplateSecondary:
-        'https://www.basketball-reference.com/req/20200617/images/headshots/{altIds.bbref}.jpg',
-      logoUrlTemplate: 'https://cdn.nba.com/logos/nba/{teamExternalId}/global/L/logo.svg',
-      logoUrlTemplateSecondary: 'https://a.espncdn.com/i/teamlogos/nba/500/{teamAbbreviation}.png',
-      source: 'NBA.com',
-      cacheVersion: '2026-07-01',
-    },
-    ...overrides,
-  };
 }
 
 /**
