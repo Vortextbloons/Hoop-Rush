@@ -18,6 +18,11 @@ function response(body: string): Response {
   return new Response(body, { status: 200 });
 }
 
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.toString() : input.url;
+}
+
 describe('data asset loading with a stale manifest', () => {
   let routes: Map<string, string>;
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -26,7 +31,7 @@ describe('data asset loading with a stale manifest', () => {
     clearDataLoaderCaches();
     routes = new Map();
     fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : new URL(input).toString();
+      const url = requestUrl(input);
       const normalized = url.replace(/[?&]v=\d+/, '').replace(/\?$/, '');
       const body = routes.get(url) ?? routes.get(normalized);
       if (body === undefined) throw new Error(`unexpected fetch: ${url}`);
@@ -120,7 +125,7 @@ describe('data asset loading with a stale manifest', () => {
     routes.set('/data/manifest.json', JSON.stringify(buildManifest({ pools: [entry] })));
     routes.set('/data/pools/lakers-1990s.json', '');
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : new URL(input).toString();
+      const url = requestUrl(input);
       const normalized = url.replace(/[?&]v=\d+/, '').replace(/\?$/, '');
       if (normalized === '/data/pools/lakers-1990s.json') {
         return Promise.resolve(new Response('server error', { status: 500 }));
