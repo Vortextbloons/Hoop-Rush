@@ -6,7 +6,7 @@ import {
   buildUserTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import type { ChallengeRun, GameResult, RunPlayerSelection, SimulationPlayer } from '@hoop-rush/data-contracts';
+import type { ChallengeRun, GameResult } from '@hoop-rush/data-contracts';
 import { challengeRunSchema } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.js';
 import { simulateGame } from '../sim/game.js';
@@ -24,18 +24,6 @@ import { deriveGameSeed } from './seeds.js';
 import { addGameToAggregates, zeroRunAggregates } from './aggregates.js';
 
 const context = createEngineContext();
-
-function defaultSelections(
-  players: SimulationPlayer[],
-  franchiseId = 'lakers',
-  eraId = '1990s',
-): RunPlayerSelection[] {
-  return players.map((player) => ({
-    playerId: player.playerId,
-    franchiseId,
-    eraId,
-  }));
-}
 
 function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeCreation {
   const bracket = buildFixtureBracket();
@@ -55,11 +43,10 @@ function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeC
       })),
     },
     players: team.players,
-    selections: defaultSelections(team.players),
     runSeed: seedFromString('fixture-run-1'),
     dataVersion: 'data-v1',
     ratingVersion: 'ratings-v1',
-    positionNormalizationVersion: 'position-v1',
+    positionNormalizationVersion: 'position-v2',
     engineVersion: context.engineVersion,
     profile: buildGameSimulationInput().profile,
     bracket,
@@ -82,15 +69,9 @@ describe('challenge commands', () => {
     expect(run.bracket.schedule).toHaveLength(82);
   });
 
-  it('accepts a free-form run with null franchiseId and selections', () => {
-    const run = createChallenge(fixtureCreation({ franchiseId: null }));
-    expect(run.franchiseId).toBeNull();
-    expect(run.selections).toHaveLength(5);
-  });
-
-  it('requires five selections', () => {
-    expect(() => createChallenge(fixtureCreation({ selections: [] }))).toThrow(
-      /requires exactly five selections/,
+  it('requires the selected franchise', () => {
+    expect(() => createChallenge(fixtureCreation({ franchiseId: '' }))).toThrow(
+      /requires a selected franchise/,
     );
   });
 

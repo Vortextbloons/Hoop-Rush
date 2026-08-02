@@ -227,22 +227,26 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const { gamesPlayed: gp, minutes } = totals;
   const detailPos = input.position;
   const position =
-    detailPos === 'PG' || detailPos === 'SG' ? 'G' : detailPos === 'PF' || detailPos === 'SF' ? 'F' : 'C';
+    detailPos === 'PG' || detailPos === 'SG'
+      ? 'G'
+      : detailPos === 'PF' || detailPos === 'SF'
+        ? 'F'
+        : 'C';
   const priors = POSITION_PRIORS[position] ?? POSITION_PRIORS['F']!;
 
   const unclamped: Record<string, number> = {};
   const methods: Record<string, ProvenanceKind> = {};
   const provenance: ProvenanceMap = {};
 
-/** Rating key -> source field family used for availability (spec/12). */
-const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
-  steal: 'steals',
-  block: 'blocks',
-  offensiveRebound: 'offensiveRebounds',
-  defensiveRebound: 'defensiveRebounds',
-  threePoint: 'threesAttempted',
-  freeThrow: 'freeThrowsAttempted',
-};
+  /** Rating key -> source field family used for availability (spec/12). */
+  const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
+    steal: 'steals',
+    block: 'blocks',
+    offensiveRebound: 'offensiveRebounds',
+    defensiveRebound: 'defensiveRebounds',
+    threePoint: 'threesAttempted',
+    freeThrow: 'freeThrowsAttempted',
+  };
 
   const record = (key: string, value: number, kind: ProvenanceKind, fields: string[]): void => {
     unclamped[key] = value;
@@ -302,14 +306,10 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
   const tpa = totals.threesAttempted;
   const tpm = totals.threesMade;
 
-  const fgPct =
-    fgm !== null && fga !== null && fga > 0 ? clampUnitInterval(fgm / fga) : null;
-  const ftPct =
-    ftm !== null && fta !== null && fta > 0 ? clampUnitInterval(ftm / fta) : null;
+  const fgPct = fgm !== null && fga !== null && fga > 0 ? clampUnitInterval(fgm / fga) : null;
+  const ftPct = ftm !== null && fta !== null && fta > 0 ? clampUnitInterval(ftm / fta) : null;
   const threePct =
-    tpm !== null && tpa !== null && tpa > 0
-      ? clampUnitInterval(Math.min(tpm, tpa) / tpa)
-      : null;
+    tpm !== null && tpa !== null && tpa > 0 ? clampUnitInterval(Math.min(tpm, tpa) / tpa) : null;
   const tsPct = clampUnitInterval(totals.tsPct);
   const efgPct = clampUnitInterval(totals.efgPct);
   const per = totals.per;
@@ -345,21 +345,20 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
   record('threePoint', blend(threeRaw, 54), threeKind, threeFields);
 
   const freeThrowRaw = ftPct !== null ? 50 + (ftPct - 0.5) * 120 : 62;
-  record(
-    'freeThrow',
-    blend(freeThrowRaw, 69),
-    ftPct !== null ? 'derived' : 'estimated',
-    ['ftm', 'fta'],
-  );
+  record('freeThrow', blend(freeThrowRaw, 69), ftPct !== null ? 'derived' : 'estimated', [
+    'ftm',
+    'fta',
+  ]);
 
-  const insideRaw = 60 + ((ppgNorm ?? 10) - 14) * 2.2 + (tsPct ?? 0.48) * 35 +
+  const insideRaw =
+    60 +
+    ((ppgNorm ?? 10) - 14) * 2.2 +
+    (tsPct ?? 0.48) * 35 +
     (position === 'C' || position === 'F' ? 4 : -2);
-  record(
-    'insideScoring',
-    blend(insideRaw, 54),
-    ppg !== null ? 'derived' : 'estimated',
-    ['points', 'tsPct'],
-  );
+  record('insideScoring', blend(insideRaw, 54), ppg !== null ? 'derived' : 'estimated', [
+    'points',
+    'tsPct',
+  ]);
 
   record(
     'closeShot',
@@ -376,38 +375,45 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
   );
 
   const passRaw = 60 + ((apg ?? 3) - 3) * 5 + (per ?? 12) * 0.6;
-  record(
-    'passing',
-    blend(passRaw, 54),
-    apg !== null ? 'derived' : 'estimated',
-    ['assists', 'per'],
-  );
+  record('passing', blend(passRaw, 54), apg !== null ? 'derived' : 'estimated', ['assists', 'per']);
+  // Usage alone systematically underrates pass-first creators. Assist volume
+  // is a direct creation/handle signal, especially for historical guards whose
+  // usage models are reconstructed less reliably than their box score.
+  const creationRaw = 60 + ((usage ?? 16) - 16) * 0.6 + ((apg ?? 3) - 3) * 3.0 + (per ?? 12) * 0.15;
   record(
     'ballHandling',
-    blend(60 + ((usage ?? 16) - 16) * 0.8, 54),
-    usage !== null ? 'derived' : 'estimated',
-    ['usageRate'],
+    blend(creationRaw, 54),
+    apg !== null || usage !== null ? 'derived' : 'estimated',
+    ['assists', 'usageRate', 'per'],
   );
 
   const rebRaw = 60 + ((rpg ?? 4) - 4) * 5;
+  // Before rebound splits were published, total rebounds are still strong
+  // evidence. The old path discarded them and shrank elite rebounders toward
+  // a generic prior, badly understating Russell-era centers.
+  const reboundEvidence = rpg !== null && (oreb.kind !== 'observed' || dreb.kind !== 'observed');
   record(
     'offensiveRebound',
     blend(rebRaw * 0.7, 45),
     oreb.kind === 'observed' ? 'derived' : oreb.kind,
-    oreb.kind === 'observed' ? ['offensiveRebounds', 'rebounds'] : oreb.fields,
+    reboundEvidence ? ['rebounds', ...oreb.fields] : oreb.fields,
   );
   record(
     'defensiveRebound',
     blend(rebRaw * 1.1, 59),
     dreb.kind === 'observed' ? 'derived' : dreb.kind,
-    dreb.kind === 'observed' ? ['defensiveRebounds', 'rebounds'] : dreb.fields,
+    reboundEvidence ? ['rebounds', ...dreb.fields] : dreb.fields,
   );
 
   const stock = spg.value * 7 + bpg.value * 7;
   const defRaw = 60 + stock + (bpm ?? 0) * 1.8;
   const defensiveKind: ProvenanceKind =
     spg.kind === 'observed' && bpg.kind === 'observed' ? 'derived' : 'estimated';
-  record('perimeterDefense', blend(defRaw, 54), defensiveKind, ['steals', 'blocks', 'boxPlusMinus']);
+  record('perimeterDefense', blend(defRaw, 54), defensiveKind, [
+    'steals',
+    'blocks',
+    'boxPlusMinus',
+  ]);
   const interior = position === 'C' || position === 'F' ? defRaw + 5 : defRaw - 3;
   record(
     'interiorDefense',
@@ -427,11 +433,12 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
     bpg.kind === 'observed' ? 'derived' : bpg.kind,
     bpg.fields,
   );
+  const reboundDefenseSignal = rpg !== null ? Math.max(0, rpg - 8) * 0.8 : 0;
   record(
     'defensiveIq',
-    blend(60 + (bpm ?? 0) * 2.0, 59),
+    blend(60 + (bpm ?? 0) * 2.0 + reboundDefenseSignal, 59),
     bpm !== null ? 'derived' : 'estimated',
-    ['boxPlusMinus'],
+    bpm !== null ? ['boxPlusMinus', 'rebounds'] : ['rebounds', 'prior'],
   );
 
   const ath = 60 + ((usage ?? 18) - 18) * 0.5 + mpg * 0.5 + (per ?? 12) * 0.7;
@@ -443,7 +450,10 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
   );
   record(
     'strength',
-    blend(position === 'C' || position === 'F' ? ath + 5 : ath, position === 'C' || position === 'F' ? 64 : 54),
+    blend(
+      position === 'C' || position === 'F' ? ath + 5 : ath,
+      position === 'C' || position === 'F' ? 64 : 54,
+    ),
     usage !== null ? 'derived' : 'estimated',
     ['usageRate', 'minutes'],
   );
@@ -518,7 +528,10 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
   if (fta !== null && fga !== null && fga > 0) {
     t('freeThrowRate', (fta / fga) * 100, 'derived', ['fta', 'fga']);
   } else if (fta !== null && fgaPerGame !== null && fgaPerGame > 0) {
-    t('freeThrowRate', Math.min(50, (fta / Math.max(1, gp) / fgaPerGame) * 100), 'derived', ['fta', 'fga']);
+    t('freeThrowRate', Math.min(50, (fta / Math.max(1, gp) / fgaPerGame) * 100), 'derived', [
+      'fta',
+      'fga',
+    ]);
   } else {
     t('freeThrowRate', clamp(usageVal * 1.2, 10, 50), 'estimated', ['usageRate', 'prior']);
   }
@@ -540,10 +553,17 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
   t('spotUpRate', 20, 'estimated', ['prior']);
   t('transitionRate', 15, 'estimated', ['prior']);
   t('cutRate', 10, 'estimated', ['prior']);
-  t('foulRate', 2 + ((totals.fouls ?? 0) / Math.max(1, minutes)) * 48, (totals.fouls ?? 0) > 0 ? 'derived' : 'estimated', ['fouls']);
+  t(
+    'foulRate',
+    2 + ((totals.fouls ?? 0) / Math.max(1, minutes)) * 48,
+    (totals.fouls ?? 0) > 0 ? 'derived' : 'estimated',
+    ['fouls'],
+  );
   t('stealAttemptRate', 5 + ratings.steal * 0.08, 'derived', ['steal']);
   t('blockAttemptRate', 5 + ratings.block * 0.08, 'derived', ['block']);
-  t('crashOffensiveGlassRate', 10 + ratings.offensiveRebound * 0.12, 'derived', ['offensiveRebound']);
+  t('crashOffensiveGlassRate', 10 + ratings.offensiveRebound * 0.12, 'derived', [
+    'offensiveRebound',
+  ]);
 
   // --- Anchors (season production) ----------------------------------------
   const games = Math.max(1, gp);
@@ -563,7 +583,8 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
     assistsPerGame: apg ?? 0,
     stealsPerGame: spg.value,
     blocksPerGame: bpg.value,
-    turnoversPerGame: totals.turnovers !== null ? totals.turnovers / games : (priors.turnoversPer36 * mpg) / 36,
+    turnoversPerGame:
+      totals.turnovers !== null ? totals.turnovers / games : (priors.turnoversPer36 * mpg) / 36,
     fieldGoalPct: fgPct ?? 0.45,
     threePointPct: threePct,
     freeThrowPct: ftPct ?? 0.75,

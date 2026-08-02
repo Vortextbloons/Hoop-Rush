@@ -99,17 +99,6 @@ export const runAggregatesSchema = z.object({
 });
 export type RunAggregates = z.infer<typeof runAggregatesSchema>;
 
-/**
- * Provenance of one lineup slot: which franchise/era pool the selected
- * peak player-season was drawn from. Present on free-form sandbox runs.
- */
-export const runPlayerSelectionSchema = z.object({
-  playerId: playerIdSchema,
-  franchiseId: franchiseIdSchema,
-  eraId: z.string().min(1).max(24),
-});
-export type RunPlayerSelection = z.infer<typeof runPlayerSelectionSchema>;
-
 export const challengeRunSchema = z.object({
   schemaVersion: z.literal(RUN_SCHEMA_VERSION),
   runId: z.string().min(1).max(64),
@@ -117,24 +106,20 @@ export const challengeRunSchema = z.object({
   /** Immutable after creation; present only for classic mode. */
   variant: classicVariantSchema.optional(),
   /**
-   * Sandbox selection. Null for free-form lineups drawn from any franchise/era
-   * pool; otherwise the selected franchise.
+   * The selected modern franchise slot. Required: every sandbox run drafts
+   * exactly five players from this one franchise's selected-decade pool.
    */
-  franchiseId: franchiseIdSchema.nullable(),
+  franchiseId: franchiseIdSchema,
   /**
-   * Simulation environment era: the era profile every accepted game result
-   * must report. Fixed to '2010s' for cross-franchise sandbox.
+   * The selected decade. It is both the pool era and the simulation
+   * environment era: every accepted game result must report the matching
+   * era profile version.
    */
   eraId: z.string().min(1).max(24),
   /** Display name for the user's lineup (resolved from lineage at creation). */
   homeDisplayName: z.string().min(1).max(96),
-  /** Exactly five distinct selected peak player-seasons, in slot order. */
+  /** Exactly five distinct selected peak player-seasons, in slot order.    */
   playerIds: z.array(playerIdSchema).length(5),
-  /**
-   * Per-player pool provenance in slot order; present for free-form sandbox
-   * lineups. Absent on legacy single-franchise runs.
-   */
-  selections: z.array(runPlayerSelectionSchema).length(5).optional(),
   /** Legal G,G,F,F,C assignment validated at creation. */
   lineup: lineupSchema,
   /** Five immutable SimulationPlayer snapshots matching the lineup. */

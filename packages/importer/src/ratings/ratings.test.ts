@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DERIVATION_METHOD_VERSION } from '@hoop-rush/data-contracts';
 import { derivePlayerRecord, fieldPublished, type DerivationInput } from './v2.js';
 import { computeSummaryRatings } from './summary.js';
 import type { StatsRow } from './stats.js';
@@ -107,7 +108,7 @@ describe('derivePlayerRecord (field-method registry)', () => {
     for (const field of Object.keys(derived.ratings)) {
       const provenance = derived.provenance[field];
       expect(provenance?.kind).toBeDefined();
-      expect(provenance?.methodVersion).toBe('derive-v1');
+      expect(provenance?.methodVersion).toBe(DERIVATION_METHOD_VERSION);
       expect(provenance?.sourceVersion).toBe('source-v1');
       expect(provenance?.sourceFields.length).toBeGreaterThan(0);
     }
@@ -121,7 +122,9 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(derived.ratings.insideScoring).toBeLessThanOrEqual(100);
     // The unclamped raw value must exist and may exceed the clamp.
     expect(typeof derived.unclamped['insideScoring']).toBe('number');
-    expect(derived.unclamped['insideScoring']).toBeGreaterThanOrEqual(derived.ratings.insideScoring);
+    expect(derived.unclamped['insideScoring']).toBeGreaterThanOrEqual(
+      derived.ratings.insideScoring,
+    );
   });
 
   it('pre-1974 defensive events are estimated with not-applicable provenance', () => {
@@ -150,7 +153,10 @@ describe('derivePlayerRecord (field-method registry)', () => {
 
   it('1973-74+ rebound splits and defensive events are observed and derive ratings', () => {
     const derived = derivePlayerRecord(
-      input('1975-76', pre1974Stats({ steals: 95, blocks: 30, offensiveRebounds: 80, defensiveRebounds: 340 })),
+      input(
+        '1975-76',
+        pre1974Stats({ steals: 95, blocks: 30, offensiveRebounds: 80, defensiveRebounds: 340 }),
+      ),
     );
     expect(derived.provenance['steal']?.kind).toBe('derived');
     expect(derived.provenance['defensiveRebound']?.kind).toBe('derived');
@@ -158,12 +164,7 @@ describe('derivePlayerRecord (field-method registry)', () => {
   });
 
   it('caps three-point anchor rate when made exceeds attempts', () => {
-    const derived = derivePlayerRecord(
-      input(
-        '1985-86',
-        starterStats({ tpm: 3, tpa: 2 }),
-      ),
-    );
+    const derived = derivePlayerRecord(input('1985-86', starterStats({ tpm: 3, tpa: 2 })));
     expect(derived.anchors.threePointPct).toBe(1);
   });
 

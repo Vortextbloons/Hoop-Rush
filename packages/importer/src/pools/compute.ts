@@ -31,9 +31,18 @@ import {
   type UnavailabilityReason,
 } from '@hoop-rush/data-contracts';
 import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.js';
-import { refreshPlayersIndexInManifest } from '../manifest/index.js';
-import { fileExists, safeFloat, safeInt, sha256File, writeJson, writeJsonRetry, clamp, clampUnitInterval } from '../json.js';
+import {
+  fileExists,
+  safeFloat,
+  safeInt,
+  sha256File,
+  writeJson,
+  writeJsonRetry,
+  clamp,
+  clampUnitInterval,
+} from '../json.js';
 import { normalizePositionLabels } from './positions.js';
+import { canonicalPlayerName } from '../identity.js';
 import {
   LINEAGE_SEGMENTS,
   MODERN_SLOTS,
@@ -77,7 +86,11 @@ export const DATA_VERSION = 'm3.5';
 /** Confidence policy v1: maximum allowed low-confidence share of required fields. */
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
-export { POSITION_NORMALIZATION_VERSION, RATINGS_VERSION, SELECTION_SCORE_VERSION } from '@hoop-rush/data-contracts';
+export {
+  POSITION_NORMALIZATION_VERSION,
+  RATINGS_VERSION,
+  SELECTION_SCORE_VERSION,
+} from '@hoop-rush/data-contracts';
 
 // ---------------------------------------------------------------------------
 // Career position unions (cached; scans every packaged roster once)
@@ -343,19 +356,21 @@ export function selectionScore(
   teamMinutes: number,
   teamGames: number,
 ): number {
-  /* selection-v1: rating blend plus availability-weighted production context. */
+  /* selection-v2: rating blend plus modest season-availability adjustment. */
   const usage = Math.min(Math.max(usageRate || 0, 0), 40.0);
   const mpg = Math.min(teamMinutes / Math.max(1, teamGames), 48.0);
-  return (
-    Math.round(
-      (0.5 * Number(summary.overallRating) +
-        0.3 * Number(summary.offenseRating) +
-        0.2 * Number(summary.defenseRating) +
-        0.05 * usage +
-        0.02 * mpg) *
-        1000,
-    ) / 1000
-  );
+  const availability = 0.96 + 0.04 * Math.min(Math.max(teamGames, 0) / 82, 1);
+  // Overall is the production-aware total-contribution estimate. Give it
+  // more weight than either component so pass-first and pre-three-point
+  // creators are not buried, while retaining offense/defense as balance
+  // signals for season selection.
+  const raw =
+    0.6 * Number(summary.overallRating) +
+    0.25 * Number(summary.offenseRating) +
+    0.15 * Number(summary.defenseRating) +
+    0.05 * usage +
+    0.02 * mpg;
+  return Math.round(raw * availability * 1000) / 1000;
 }
 
 export interface Candidate {
@@ -491,11 +506,17 @@ function failure(
   detail: string,
   firstSupportedSeason?: string,
 ): PoolBuildFailure {
-  return { reason, detail, ...(firstSupportedSeason !== undefined ? { firstSupportedSeason } : {}) };
+  return {
+    reason,
+    detail,
+    ...(firstSupportedSeason !== undefined ? { firstSupportedSeason } : {}),
+  };
 }
 
 /** Coverage band from the pool's packaged season range (spec/12). */
-export function coverageBandForSeasons(seasons: readonly string[]): CoverageSummary['coverageBand'] {
+export function coverageBandForSeasons(
+  seasons: readonly string[],
+): CoverageSummary['coverageBand'] {
   const earliest = seasons.reduce((a, b) => (a < b ? a : b));
   if (earliest >= '1996-97') return 'advanced-supported';
   if (earliest >= '1979-80') return 'complete-box-derived';
@@ -564,7 +585,8 @@ export function buildCoverageSummary(
 
 function fieldFamily(field: string): string {
   const tendency = field.startsWith('tendency:') ? field.slice('tendency:'.length) : field;
-  if (tendency === 'usageRate' || tendency === 'passRate' || tendency === 'shotRate') return 'usage';
+  if (tendency === 'usageRate' || tendency === 'passRate' || tendency === 'shotRate')
+    return 'usage';
   if (tendency.includes('Frequency') || tendency === 'threePointRate') return 'shot-mix';
   if (tendency === 'freeThrowRate') return 'fouls';
   if (tendency === 'turnoverRate') return 'turnovers';
@@ -576,7 +598,12 @@ function fieldFamily(field: string): string {
   if (field === 'freeThrow') return 'fouls';
   if (field === 'passing' || field === 'ballHandling' || field === 'offensiveIq') return 'creation';
   if (field.includes('Rebound')) return 'rebounding';
-  if (field.includes('Defense') || field === 'defensiveIq' || field === 'steal' || field === 'block') {
+  if (
+    field.includes('Defense') ||
+    field === 'defensiveIq' ||
+    field === 'steal' ||
+    field === 'block'
+  ) {
     return 'defense';
   }
   if (field === 'speed' || field === 'strength' || field === 'vertical') return 'athleticism';
@@ -585,7 +612,8 @@ function fieldFamily(field: string): string {
   if (field === 'stealsPerGame' || field === 'blocksPerGame') return 'defensive-events';
   if (field === 'turnoversPerGame') return 'turnovers';
   if (field.includes('Rebound')) return 'rebounding';
-  if (field === 'fieldGoalPct' || field === 'threePointPct' || field === 'freeThrowPct') return 'shooting';
+  if (field === 'fieldGoalPct' || field === 'threePointPct' || field === 'freeThrowPct')
+    return 'shooting';
   if (field.includes('AttemptRate')) return 'shot-mix';
   return tendency;
 }
@@ -635,7 +663,8 @@ export function computePool(
     (segment) =>
       segment.modernFranchiseId === franchiseId &&
       segment.validFromSeasonKey <= era.toSeasonKey &&
-      (segment.validThroughSeasonKey === undefined || segment.validThroughSeasonKey >= era.fromSeasonKey),
+      (segment.validThroughSeasonKey === undefined ||
+        segment.validThroughSeasonKey >= era.fromSeasonKey),
   );
   if (!eraHasLineage) {
     const first = firstSupportedSeason(franchiseId);
@@ -817,15 +846,20 @@ export function computePool(
       continue;
     }
 
+    const [firstName, lastName] = canonicalPlayerName(
+      pid,
+      str(player.firstName),
+      str(player.lastName),
+    );
     playersOut.push({
       schemaVersion: SCHEMA_VERSION,
       playerId: `p-${pid}`,
       franchiseId,
       eraId,
       seasonKey: best.season,
-      firstName: str(player.firstName),
-      lastName: str(player.lastName),
-      displayName: `${str(player.firstName)} ${str(player.lastName)}`.trim(),
+      firstName,
+      lastName,
+      displayName: `${firstName} ${lastName}`.trim(),
       playerExternalId: pid,
       altIds: Object.hasOwn(bbrefIds, pid) ? { bbref: bbrefIds[pid] as string } : null,
       positions: {
@@ -892,7 +926,9 @@ export function computePool(
   }
 
   const coverageSummary = buildCoverageSummary(playersOut, seasons);
-  const policyFailures = playersOut.filter((p) => playerLowConfidenceShare(p) > MAX_LOW_CONFIDENCE_SHARE);
+  const policyFailures = playersOut.filter(
+    (p) => playerLowConfidenceShare(p) > MAX_LOW_CONFIDENCE_SHARE,
+  );
   if (policyFailures.length > 0) {
     return failure(
       'confidence-failed',
@@ -976,7 +1012,8 @@ export function allPoolTargets(manifest: Manifest = loadManifest()): Array<[stri
         (segment) =>
           segment.modernFranchiseId === slot.franchiseId &&
           segment.validFromSeasonKey <= era.toSeasonKey &&
-          (segment.validThroughSeasonKey === undefined || segment.validThroughSeasonKey >= era.fromSeasonKey),
+          (segment.validThroughSeasonKey === undefined ||
+            segment.validThroughSeasonKey >= era.fromSeasonKey),
       );
       const overlaps =
         hasLineage &&
@@ -1034,7 +1071,6 @@ export function run(targets: Array<[string, string]> | null = null, withAssets =
   }
   updateManifest(entries);
   recordCoverageReport(coverage);
-  refreshPlayersIndexInManifest();
 }
 
 /** One persisted coverage-audit row (spec/12 first full audit + CLI data coverage). */
@@ -1077,16 +1113,22 @@ export function recordCoverageReport(entries: CoverageReportEntry[]): void {
 }
 
 /** Cheap truthful classification for combos the last build did not attempt. */
-export function classifyUnattempted(franchiseId: string, eraId: string, manifest: Manifest): PoolBuildFailure {
+export function classifyUnattempted(
+  franchiseId: string,
+  eraId: string,
+  manifest: Manifest,
+): PoolBuildFailure {
   const era = manifest.eras.find((e) => e.eraId === eraId);
-  const eraHasLineage = era === undefined
-    ? false
-    : LINEAGE_SEGMENTS.some(
-        (segment) =>
-          segment.modernFranchiseId === franchiseId &&
-          segment.validFromSeasonKey <= era.toSeasonKey &&
-          (segment.validThroughSeasonKey === undefined || segment.validThroughSeasonKey >= era.fromSeasonKey),
-      );
+  const eraHasLineage =
+    era === undefined
+      ? false
+      : LINEAGE_SEGMENTS.some(
+          (segment) =>
+            segment.modernFranchiseId === franchiseId &&
+            segment.validFromSeasonKey <= era.toSeasonKey &&
+            (segment.validThroughSeasonKey === undefined ||
+              segment.validThroughSeasonKey >= era.fromSeasonKey),
+        );
   if (!eraHasLineage) {
     const first = firstSupportedSeason(franchiseId);
     return failure(
@@ -1172,7 +1214,11 @@ function listSeasonKeys(): string[] {
   return readdirSync(NBA_ROOT, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-    .filter((name) => fileExists(join(NBA_ROOT, name, 'roster.json')) || fileExists(join(NBA_ROOT, name, 'stints.json')))
+    .filter(
+      (name) =>
+        fileExists(join(NBA_ROOT, name, 'roster.json')) ||
+        fileExists(join(NBA_ROOT, name, 'stints.json')),
+    )
     .sort();
 }
 

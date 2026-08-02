@@ -53,7 +53,9 @@ function auditLineage(manifest: HoopRushManifest): AuditResult {
 
   const slotIds = new Set(manifest.modernFranchiseSlots.map((s) => s.franchiseId));
   if (manifest.modernFranchiseSlots.length !== 30) {
-    failures.push(`lineage: exactly 30 modern slots required (got ${String(manifest.modernFranchiseSlots.length)})`);
+    failures.push(
+      `lineage: exactly 30 modern slots required (got ${String(manifest.modernFranchiseSlots.length)})`,
+    );
   }
   if (slotIds.size !== manifest.modernFranchiseSlots.length) {
     failures.push('lineage: duplicate modern slot ids');
@@ -62,7 +64,9 @@ function auditLineage(manifest: HoopRushManifest): AuditResult {
   const bySlot = new Map<string, typeof manifest.franchiseLineage>();
   for (const segment of manifest.franchiseLineage) {
     if (!slotIds.has(segment.modernFranchiseId)) {
-      failures.push(`lineage: segment ${segment.historicalTeamId} references unknown slot ${segment.modernFranchiseId}`);
+      failures.push(
+        `lineage: segment ${segment.historicalTeamId} references unknown slot ${segment.modernFranchiseId}`,
+      );
     }
     if (!segment.sourceIdentityIds.includes(segment.historicalTeamId)) {
       failures.push(`lineage: ${segment.historicalTeamId} missing from sourceIdentityIds`);
@@ -137,9 +141,7 @@ function auditAvailability(manifest: HoopRushManifest): AuditResult {
   const failures: string[] = [];
   const details: string[] = [];
   const seen = new Set<string>();
-  const poolByKey = new Map(
-    manifest.pools.map((p) => [`${p.franchiseId}/${p.eraId}`, p]),
-  );
+  const poolByKey = new Map(manifest.pools.map((p) => [`${p.franchiseId}/${p.eraId}`, p]));
 
   for (const entry of manifest.availability) {
     const key = `${entry.franchiseId}/${entry.eraId}`;
@@ -181,7 +183,9 @@ function auditAvailability(manifest: HoopRushManifest): AuditResult {
       }
     }
   }
-  details.push(`availability: ${String(manifest.availability.length)}/${String(expected)} matrix entries`);
+  details.push(
+    `availability: ${String(manifest.availability.length)}/${String(expected)} matrix entries`,
+  );
   return { ok: failures.length === 0, details, failures };
 }
 
@@ -267,10 +271,24 @@ function auditPoolContent(
 
   const seen = new Set<string>();
   const requiredRatingKeys = [
-    'insideScoring', 'closeShot', 'midrange', 'threePoint', 'freeThrow',
-    'ballHandling', 'passing', 'offensiveIq', 'offensiveRebound',
-    'defensiveRebound', 'perimeterDefense', 'interiorDefense', 'steal',
-    'block', 'defensiveIq', 'speed', 'strength', 'vertical',
+    'insideScoring',
+    'closeShot',
+    'midrange',
+    'threePoint',
+    'freeThrow',
+    'ballHandling',
+    'passing',
+    'offensiveIq',
+    'offensiveRebound',
+    'defensiveRebound',
+    'perimeterDefense',
+    'interiorDefense',
+    'steal',
+    'block',
+    'defensiveIq',
+    'speed',
+    'strength',
+    'vertical',
   ];
   for (const player of pool.players) {
     if (seen.has(player.playerId)) {
@@ -293,9 +311,12 @@ function auditPoolContent(
     }
     const { overallRating, offenseRating, defenseRating } = player.summaryRatings;
     if (
-      overallRating < 0 || overallRating > 100 ||
-      offenseRating < 0 || offenseRating > 100 ||
-      defenseRating < 0 || defenseRating > 100
+      overallRating < 0 ||
+      overallRating > 100 ||
+      offenseRating < 0 ||
+      offenseRating > 100 ||
+      defenseRating < 0 ||
+      defenseRating > 100
     ) {
       failures.push(`pools: ${key} ${player.displayName} summary rating out of range`);
     }
@@ -320,7 +341,10 @@ function auditPoolContent(
     }
 
     // Field-level provenance on required engine fields.
-    const engineFields = [...Object.keys(player.detailedRatings), ...Object.keys(player.tendencies)];
+    const engineFields = [
+      ...Object.keys(player.detailedRatings),
+      ...Object.keys(player.tendencies),
+    ];
     for (const field of engineFields) {
       const provenance = player.provenance[field];
       if (!provenance || !provenance.kind || !provenance.methodVersion) {
@@ -341,9 +365,7 @@ function auditPoolContent(
     const psKey = `${player.playerExternalId}/${player.seasonKey}`;
     const owner = playerSeasons.get(psKey);
     if (owner !== undefined && owner !== key) {
-      failures.push(
-        `pools: ${key} player-season ${psKey} also packaged in ${owner}`,
-      );
+      failures.push(`pools: ${key} player-season ${psKey} also packaged in ${owner}`);
     }
     playerSeasons.set(psKey, key);
   }
@@ -363,7 +385,10 @@ function auditPoolContent(
   void structure;
   for (const player of pool.players) {
     const usage = Math.min(Math.max(player.stats.usageRate ?? 0, 0), 40);
-    const mpg = Math.min(player.eligibility.teamMinutes / Math.max(1, player.eligibility.teamGames), 48);
+    const mpg = Math.min(
+      player.eligibility.teamMinutes / Math.max(1, player.eligibility.teamGames),
+      48,
+    );
     const recomputed =
       Math.round(
         (0.5 * player.summaryRatings.overallRating +

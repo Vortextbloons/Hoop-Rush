@@ -9,11 +9,7 @@ import {
   SELECTION_SCORE_VERSION,
   SOURCE_VERSION,
 } from '@hoop-rush/data-contracts';
-import {
-  NBA_ROOT,
-  ratings,
-  resolveHistoricalIdentity,
-} from '@hoop-rush/importer';
+import { NBA_ROOT, ratings, resolveHistoricalIdentity } from '@hoop-rush/importer';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
 
 /**
@@ -115,13 +111,14 @@ export async function dataDerive(args: {
     );
   }
 
-  const rosterRows = JSON.parse(
-    readFileSync(join(seasonDir, 'roster.json'), 'utf8'),
-  ) as Array<Record<string, unknown>>;
+  const rosterRows = JSON.parse(readFileSync(join(seasonDir, 'roster.json'), 'utf8')) as Array<
+    Record<string, unknown>
+  >;
   const roster = rosterRows.find((row) => String(row.externalId) === player);
   const stint = stints.find(
     (row) =>
-      String(row.playerExternalId) === player && String(row.teamExternalId) === identity.historicalTeamId,
+      String(row.playerExternalId) === player &&
+      String(row.teamExternalId) === identity.historicalTeamId,
   );
   const statsRow = statsRows.find((row) => String(row.playerExternalId) === player);
   if (!roster || !stint || !statsRow) {
@@ -176,7 +173,11 @@ export async function dataDerive(args: {
     },
     seasonContext: context,
     inputs: {
-      stint: { gamesPlayed: stint.gamesPlayed, minutes: stint.minutes, teamExternalId: stint.teamExternalId },
+      stint: {
+        gamesPlayed: stint.gamesPlayed,
+        minutes: stint.minutes,
+        teamExternalId: stint.teamExternalId,
+      },
       seasonStats: statsRow,
     },
     methods: derived.methods,
@@ -196,9 +197,5 @@ export async function dataDerive(args: {
     `methods: ${String(Object.values(derived.methods).length)} fields, ${String(estimatedCount)} estimated`,
     `summary OVR ${String(derived.summaryRatings.overallRating)} · OFF ${String(derived.summaryRatings.offenseRating)} · DEF ${String(derived.summaryRatings.defenseRating)}`,
   ];
-  return makeReport(
-    'data derive',
-    { player, season, franchise },
-    { details, payload },
-  );
+  return makeReport('data derive', { player, season, franchise }, { details, payload });
 }

@@ -12,10 +12,10 @@ import { DEFAULT_SEASONS, ensureOutputDir } from '../config.js';
 import { fileExists, readJson, safeFloat, writeJsonRetry } from '../json.js';
 import { deriveTraits } from './traits.js';
 import { deriveContract } from './contracts.js';
-import { computeSummaryRatings } from './summary.js';
 import { derivePlayerRecord, fieldPublished, type SeasonContext } from './v2.js';
 import { getEra } from './era.js';
 import { mapPosition } from './derive.js';
+import { canonicalPlayerName } from '../identity.js';
 import type { StatsRow } from './stats.js';
 
 export interface RosterPlayer extends Record<string, unknown> {
@@ -111,6 +111,13 @@ export function computeForSeason(season: string, force = false): void {
   let computed = 0;
   for (const player of roster) {
     const extId = player.externalId ?? '';
+    const [canonicalFirstName, canonicalLastName] = canonicalPlayerName(
+      extId,
+      player.firstName ?? '',
+      player.lastName ?? '',
+    );
+    player.firstName = canonicalFirstName;
+    player.lastName = canonicalLastName;
     const pos = mapPosition(player.position ?? 'SF');
     player.position = pos;
 

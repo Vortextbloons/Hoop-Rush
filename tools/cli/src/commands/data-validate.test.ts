@@ -4,11 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
-import {
-  buildManifest,
-  buildPlayerSeason,
-  buildPool,
-} from '@hoop-rush/test-fixtures';
+import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
 import { dataValidate } from './data-validate.js';
 import { EXIT_CHECKS_FAILED, EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.js';
 
@@ -30,7 +26,13 @@ async function writeManifest(manifest: unknown): Promise<string> {
 
 /** Five fixture players in a legal G,G,F,F,C spread. */
 function legalPool(altIds: PeakPlayerSeason['altIds'] = null): ReturnType<typeof buildPool> {
-  const positions: PeakPlayerSeason['positions']['canonical'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const positions: PeakPlayerSeason['positions']['canonical'][] = [
+    ['G'],
+    ['G'],
+    ['F'],
+    ['F'],
+    ['C'],
+  ];
   return buildPool(
     positions.map((position, index) =>
       buildPlayerSeason({

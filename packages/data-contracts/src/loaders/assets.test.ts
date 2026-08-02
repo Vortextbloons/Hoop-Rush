@@ -220,8 +220,7 @@ describe('headshot URL resolution', () => {
   it('keeps confirmed NBA headshots from timing out into wiki-only fallbacks', () => {
     const nba = 'https://cdn.nba.com/headshots/nba/latest/1040x760/2548.png';
     const wiki = 'https://upload.wikimedia.org/wikipedia/commons/wade.jpg';
-    const bbref =
-      'https://www.basketball-reference.com/req/20200617/images/headshots/wadedw01.jpg';
+    const bbref = 'https://www.basketball-reference.com/req/20200617/images/headshots/wadedw01.jpg';
     expect(
       shouldStallTimeoutHeadshot(nba, [nba, wiki], 0, {
         altIds: { nbaHeadshotAvailable: true },

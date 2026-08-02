@@ -284,7 +284,15 @@ function rosterRow(spec: RosterSpec): Record<string, unknown> {
     ratings,
     tendencies: FULL_TENDENCIES,
     anchors: FULL_ANCHORS,
-    provenance: { threePoint: { kind: 'derived', confidence: 'medium', methodVersion: 'derive-v1', sourceVersion: 'source-v1', sourceFields: ['tpm', 'tpa'] } },
+    provenance: {
+      threePoint: {
+        kind: 'derived',
+        confidence: 'medium',
+        methodVersion: 'derive-v1',
+        sourceVersion: 'source-v1',
+        sourceFields: ['tpm', 'tpa'],
+      },
+    },
   };
 }
 
@@ -596,25 +604,25 @@ describe('sanitizeAnchors', () => {
 });
 
 describe('selectionScore', () => {
-  it('computes 0.5*overall + 0.3*offense + 0.2*defense + 0.05*usage + 0.02*mpg', () => {
+  it('computes the rating blend with a modest availability adjustment', () => {
     expect(
       selectionScore({ overallRating: 90, offenseRating: 85, defenseRating: 80 }, 25, 2400, 80),
-    ).toBe(88.35);
+    ).toBe(89.013);
   });
 
   it('clamps usage to 40 and mpg to 48', () => {
     expect(
       selectionScore({ overallRating: 60, offenseRating: 60, defenseRating: 60 }, 50, 4000, 50),
-    ).toBe(62.96);
+    ).toBe(61.977);
   });
 
   it('treats null usage as 0 and guards zero team games', () => {
     expect(
       selectionScore({ overallRating: 60, offenseRating: 60, defenseRating: 60 }, null, 1200, 60),
-    ).toBe(60.4);
+    ).toBe(59.752);
     expect(
       selectionScore({ overallRating: 60, offenseRating: 60, defenseRating: 60 }, 10, 30, 0),
-    ).toBe(61.1);
+    ).toBe(58.656);
   });
 });
 
@@ -684,7 +692,7 @@ describe('computePool (fixture)', () => {
     // Alpha: higher selectionScore wins (1992-93 over 1991-92).
     const alpha = byId.get('1');
     expect(alpha?.seasonKey).toBe('1992-93');
-    expect(alpha?.selectionScore).toBe(62.29);
+    expect(alpha?.selectionScore).toBe(62.229);
     expect(alpha?.eligibility).toEqual({ minimumTeamGames: 40, teamGames: 80, teamMinutes: 3160 });
     expect(alpha?.altIds).toEqual({ bbref: 'alpha01' });
     expect(alpha?.playerId).toBe('p-1');
@@ -706,7 +714,7 @@ describe('computePool (fixture)', () => {
     // Bravo: peak season 2 also beats season 1; 40 games is the boundary.
     const bravo = byId.get('2');
     expect(bravo?.seasonKey).toBe('1992-93');
-    expect(bravo?.selectionScore).toBe(61.9);
+    expect(bravo?.selectionScore).toBe(60.632);
     expect(bravo?.eligibility.teamGames).toBe(40);
     expect(bravo?.eligibility.teamMinutes).toBe(800);
     expect(bravo?.altIds).toEqual({ bbref: 'bravo01' });
@@ -718,7 +726,7 @@ describe('computePool (fixture)', () => {
     // advanced stats pass through as null; float counts truncate.
     const echo = byId.get('5');
     expect(echo?.seasonKey).toBe('1991-92');
-    expect(echo?.selectionScore).toBe(60.4);
+    expect(echo?.selectionScore).toBe(59.752);
     expect(echo?.positions).toEqual({
       sourceLabels: ['C'],
       canonical: ['C'],
@@ -735,7 +743,7 @@ describe('computePool (fixture)', () => {
     // Foxtrot: equal score across seasons -> more team minutes wins (1991-92).
     const foxtrot = byId.get('6');
     expect(foxtrot?.seasonKey).toBe('1991-92');
-    expect(foxtrot?.selectionScore).toBe(55.9);
+    expect(foxtrot?.selectionScore).toBe(55.3);
     expect(foxtrot?.eligibility.teamMinutes).toBe(1200);
     expect(foxtrot?.altIds).toBeNull();
     expect(foxtrot?.positions).toEqual({
@@ -747,13 +755,13 @@ describe('computePool (fixture)', () => {
     // Golf: full tie (score, minutes, games) -> earlier season wins (1991-92).
     const golf = byId.get('7');
     expect(golf?.seasonKey).toBe('1991-92');
-    expect(golf?.selectionScore).toBe(55.4);
+    expect(golf?.selectionScore).toBe(54.805);
     expect(golf?.stats.usageRate).toBeNull();
 
     // Hotel: equal score + equal minutes -> more team games wins (1991-92).
     const hotel = byId.get('8');
     expect(hotel?.seasonKey).toBe('1991-92');
-    expect(hotel?.selectionScore).toBe(55.9);
+    expect(hotel?.selectionScore).toBe(55.3);
     expect(hotel?.eligibility.teamGames).toBe(60);
     expect(hotel?.eligibility.teamMinutes).toBe(1200);
 
@@ -809,10 +817,22 @@ describe('computePool error and skip paths', () => {
     const manifest = fixtureManifest();
     const spurs = computePool('spurs', '1990s', manifest, BBREF_IDS, false) as PoolBuildFailure;
     expect(spurs.reason).toBe('insufficient-players');
-    const unknownEra = computePool('lakers', '1980s', manifest, BBREF_IDS, false) as PoolBuildFailure;
+    const unknownEra = computePool(
+      'lakers',
+      '1980s',
+      manifest,
+      BBREF_IDS,
+      false,
+    ) as PoolBuildFailure;
     expect(unknownEra.reason).toBe('identity-failed');
     expect(unknownEra.detail).toContain('unknown eraId 1980s');
-    const noSeasons = computePool('lakers', '2000s', manifest, BBREF_IDS, false) as PoolBuildFailure;
+    const noSeasons = computePool(
+      'lakers',
+      '2000s',
+      manifest,
+      BBREF_IDS,
+      false,
+    ) as PoolBuildFailure;
     expect(noSeasons.reason).toBe('source-incomplete');
     expect(noSeasons.detail).toContain('no packaged seasons for era 2000s');
   });
@@ -824,7 +844,13 @@ describe('computePool error and skip paths', () => {
       { eraId: '1980s', label: '1980s', fromSeasonKey: '1980-81', toSeasonKey: '1989-90' },
       { eraId: '1990s', label: '1990s', fromSeasonKey: '1990-91', toSeasonKey: '1999-00' },
     ];
-    const result = computePool('grizzlies', '1980s', manifest, BBREF_IDS, false) as PoolBuildFailure;
+    const result = computePool(
+      'grizzlies',
+      '1980s',
+      manifest,
+      BBREF_IDS,
+      false,
+    ) as PoolBuildFailure;
     expect(result.reason).toBe('no-franchise-history');
     expect(result.firstSupportedSeason).toBe('1995-96');
   });
@@ -921,12 +947,12 @@ describe('candidateKey', () => {
     const lowerScore = mk('1991-92', 1200, 60, 10);
     expect(compareKeys(candidateKey(higherScore), candidateKey(lowerScore))).toBe(1);
 
-    // Equal score -> more minutes wins: 55.9 both (20 mpg each).
+    // Availability and minutes now contribute to the score before the
+    // documented minutes/games tie-breakers.
     const moreMinutes = mk('1991-92', 1200, 60, 10);
     const fewerMinutes = mk('1992-93', 1000, 50, 10);
     const moreKey = candidateKey(moreMinutes);
     const fewerKey = candidateKey(fewerMinutes);
-    expect(moreKey[0]).toBe(fewerKey[0]);
     expect(compareKeys(moreKey, fewerKey)).toBe(1);
 
     // Equal score + minutes -> more games wins: 55.9 both.

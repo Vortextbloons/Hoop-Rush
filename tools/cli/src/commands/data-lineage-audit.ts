@@ -176,11 +176,7 @@ export async function dataLineageAudit(args: { input?: string | null }): Promise
     ownershipFailures,
     unavailableCombinations,
   };
-  return makeReport(
-    'data lineage-audit',
-    { input: inputPath },
-    { details, failures, payload },
-  );
+  return makeReport('data lineage-audit', { input: inputPath }, { details, failures, payload });
 }
 
 export { DEFAULT_MANIFEST };

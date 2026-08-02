@@ -277,7 +277,8 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
       : null;
   const orebRate =
     a.pairs.reboundSplit !== null
-      ? a.pairs.reboundSplit.oreb / Math.max(1.0, a.pairs.reboundSplit.oreb + a.pairs.reboundSplit.dreb)
+      ? a.pairs.reboundSplit.oreb /
+        Math.max(1.0, a.pairs.reboundSplit.oreb + a.pairs.reboundSplit.dreb)
       : null;
   const assistRate = a.ast / Math.max(1.0, a.fgm);
   const foulsPerPoss =
@@ -292,7 +293,9 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
 
   // Parameter provenance (spec/12): estimated inputs are explicit.
   parameterProvenance['pace'] =
-    paceRaw !== null ? derivedProvenance(['fga', 'fta', 'oreb', 'tov']) : estimatedProvenance(['prior']);
+    paceRaw !== null
+      ? derivedProvenance(['fga', 'fta', 'oreb', 'tov'])
+      : estimatedProvenance(['prior']);
   parameterProvenance['league3PARate'] =
     a.tpa !== null
       ? derivedProvenance(['tpa', 'fga'])
@@ -301,7 +304,9 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
   parameterProvenance['leagueFtaPerFga'] = derivedProvenance(['fta', 'fga']);
   parameterProvenance['leagueFtPct'] = derivedProvenance(['ftm', 'fta']);
   parameterProvenance['turnoverPerPossession'] =
-    tovPerPoss !== null ? derivedProvenance(['tov', 'possessions']) : estimatedProvenance(['prior']);
+    tovPerPoss !== null
+      ? derivedProvenance(['tov', 'possessions'])
+      : estimatedProvenance(['prior']);
   parameterProvenance['stealShareOfTurnovers'] =
     stealShare !== null ? derivedProvenance(['stl', 'tov']) : estimatedProvenance(['prior']);
   parameterProvenance['offensiveReboundRate'] =
@@ -329,8 +334,11 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
     leagueFtaPerFga: round4(ftaPerFga),
     leagueFtPct: round4(ftPct),
     turnoverPerPossession:
-      tovPerTrip !== null ? round4(tovPerTrip) : ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking,
-    stealShareOfTurnovers: stealShare !== null ? round4(stealShare) : ERA_RULE_ESTIMATES.stealShareBeforeTracking,
+      tovPerTrip !== null
+        ? round4(tovPerTrip)
+        : ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking,
+    stealShareOfTurnovers:
+      stealShare !== null ? round4(stealShare) : ERA_RULE_ESTIMATES.stealShareBeforeTracking,
     offensiveReboundRate:
       orebRate !== null ? round4(orebRate) : ERA_RULE_ESTIMATES.offensiveReboundRateBeforeSplits,
     assistRate: round4(assistRate),
@@ -362,13 +370,22 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
       threePointPct: target(threePct, 0.02),
       freeThrowsAttemptedPerGame: target(ftaPerGame, 3),
       freeThrowPct: target(ftPct, 0.02),
-      turnoversPerGame: target(tovPerGame ?? (pace * ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking), 1.5),
-      turnoversPerPossession: target(tovPerPoss ?? ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking, 0.012),
+      turnoversPerGame: target(
+        tovPerGame ?? pace * ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking,
+        1.5,
+      ),
+      turnoversPerPossession: target(
+        tovPerPoss ?? ERA_RULE_ESTIMATES.turnoverPerPossessionBeforeTracking,
+        0.012,
+      ),
       offensiveReboundsPerGame: target(
         orebPerGame ?? pace * ERA_RULE_ESTIMATES.offensiveReboundRateBeforeSplits * 0.5,
         1.5,
       ),
-      offensiveReboundRate: target(orebRate ?? ERA_RULE_ESTIMATES.offensiveReboundRateBeforeSplits, 0.02),
+      offensiveReboundRate: target(
+        orebRate ?? ERA_RULE_ESTIMATES.offensiveReboundRateBeforeSplits,
+        0.02,
+      ),
       assistsPerGame: target(astPerGame, 2.5),
       assistRate: target(assistRate, 0.03),
       personalFoulsPerGame: target(pfPerGame, 2.5),

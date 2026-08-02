@@ -11,8 +11,16 @@ import {
   positionUnionSchema,
   sourcePositionSchema,
 } from './positions.js';
-import { simulationRatingsSchema, simulationTendenciesSchema, simulationAnchorsSchema } from './simulation.js';
-import { historicalTeamIdentitySchema, provenanceMapSchema, coverageSummarySchema } from './provenance.js';
+import {
+  simulationRatingsSchema,
+  simulationTendenciesSchema,
+  simulationAnchorsSchema,
+} from './simulation.js';
+import {
+  historicalTeamIdentitySchema,
+  provenanceMapSchema,
+  coverageSummarySchema,
+} from './provenance.js';
 
 /**
  * Player-season records and the packaged peak-season pools they feed

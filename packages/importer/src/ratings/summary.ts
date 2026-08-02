@@ -193,8 +193,15 @@ export function computeRealOverall(
   // reach the all-time band. 25+ ppg bigs previously escaped every cap and
   // could tie the absolute peaks (Cousins 2017-18 reached 100 in 48 games).
   if (isBig) {
+    // A high scoring season is not automatically an elite season. The old
+    // ladder let ordinary high-volume historical bigs reach 95+ because the
+    // ppg branch ignored efficiency and impact.
+    const eliteBigImpact =
+      per >= 23 ||
+      (bpm >= 5 && per >= 22) ||
+      (per >= 20 && tsPct >= 0.58 && bpm >= 2);
     if (ppg >= 25) {
-      boosted = Math.min(boosted, gp >= 55 ? 97 : 92);
+      boosted = Math.min(boosted, eliteBigImpact ? (gp >= 55 ? 97 : 92) : gp >= 55 ? 92 : 89);
     } else if (usage >= 28) {
       boosted = Math.min(boosted, 91);
     } else if (ppg < 12) {
@@ -206,9 +213,9 @@ export function computeRealOverall(
     } else if (ppg < 20) {
       boosted = Math.min(boosted, bpm >= 3 ? 88 : 82);
     } else if (ppg < 23) {
-      boosted = Math.min(boosted, 91);
+      boosted = Math.min(boosted, eliteBigImpact ? 91 : 88);
     } else {
-      boosted = Math.min(boosted, 94);
+      boosted = Math.min(boosted, eliteBigImpact ? 94 : 90);
     }
   }
 

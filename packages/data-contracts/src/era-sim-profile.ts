@@ -65,7 +65,9 @@ export const eraSimulationParametersSchema = z.object({
    * their own provenance instead of silently inheriting zero-filled
    * aggregates. Absent on fully derived profiles.
    */
-  parameterProvenance: z.record(z.string().min(1).max(64), historicalValueProvenanceSchema).optional(),
+  parameterProvenance: z
+    .record(z.string().min(1).max(64), historicalValueProvenanceSchema)
+    .optional(),
 });
 export type EraSimulationParameters = z.infer<typeof eraSimulationParametersSchema>;
 

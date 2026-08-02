@@ -19,7 +19,7 @@ const EXPECTED_PEAKS: Record<string, string> = {
   'James Worthy': '1990-91',
   'Nick Van Exel': '1994-95',
   'A.C. Green': '1992-93',
-  'Derek Fisher': '1997-98',
+  'Derek Fisher': '1996-97',
   'Robert Horry': '1997-98',
   'Elden Campbell': '1995-96',
 };

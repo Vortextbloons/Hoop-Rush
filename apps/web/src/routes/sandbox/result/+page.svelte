@@ -238,14 +238,11 @@
   const editHref = $derived.by(() => {
     const currentRun = run;
     if (!currentRun) return null;
-    const slots =
-      currentRun.selections ??
-      currentRun.playerIds.map((playerId) => ({
-        playerId,
-        franchiseId: currentRun.franchiseId ?? 'lakers',
-        eraId: currentRun.eraId,
-      }));
-    return buildSandboxUrl({ slots }) as RouteId;
+    return buildSandboxUrl({
+      franchiseId: currentRun.franchiseId,
+      eraId: currentRun.eraId,
+      slots: currentRun.playerIds,
+    }) as RouteId;
   });
 </script>
 
@@ -286,9 +283,7 @@
     <div
       class="mt-8 rounded-2xl border border-line-strong bg-card p-6 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:p-8"
     >
-      <div
-        class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
-      >
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div class="flex items-center gap-3">
           {#if franchise && manifest}
             <TeamLogo
@@ -304,8 +299,7 @@
               {run.homeDisplayName}
             </p>
             <p class="font-mono text-[10px] text-muted-foreground">
-              {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no
-              bench
+              {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no bench
             </p>
           </div>
         </div>

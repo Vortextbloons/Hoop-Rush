@@ -1,11 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
-import type {
-  FranchiseEraPool,
-  HoopRushManifest,
-  PoolIndexEntry,
-} from '@hoop-rush/data-contracts';
+import type { FranchiseEraPool, HoopRushManifest, PoolIndexEntry } from '@hoop-rush/data-contracts';
 import { getPool, clearDataLoaderCaches, getManifest } from './data';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 

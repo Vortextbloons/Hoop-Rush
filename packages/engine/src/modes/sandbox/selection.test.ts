@@ -5,7 +5,7 @@ import {
   buildUserTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import type { ChallengeRun, RunPlayerSelection, SimulationPlayer } from '@hoop-rush/data-contracts';
+import type { ChallengeRun } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/context.js';
 import {
   createChallenge,
@@ -16,14 +16,6 @@ import { deriveAttemptSeed } from '../../challenge/seeds.js';
 import { BEST_OF_ATTEMPTS, chooseBestRun, scoreRun, simulateChallengeBestOf } from './selection.js';
 
 const context = createEngineContext();
-
-function defaultSelections(players: SimulationPlayer[]): RunPlayerSelection[] {
-  return players.map((player) => ({
-    playerId: player.playerId,
-    franchiseId: 'lakers',
-    eraId: '1990s',
-  }));
-}
 
 function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeCreation {
   const bracket = buildFixtureBracket();
@@ -43,11 +35,10 @@ function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeC
       })),
     },
     players: team.players,
-    selections: defaultSelections(team.players),
     runSeed: seedFromString('selection-run'),
     dataVersion: 'data-v1',
     ratingVersion: 'ratings-v1',
-    positionNormalizationVersion: 'position-v1',
+    positionNormalizationVersion: 'position-v2',
     engineVersion: context.engineVersion,
     profile: buildGameSimulationInput().profile,
     bracket,
