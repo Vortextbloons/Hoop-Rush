@@ -147,8 +147,22 @@ describe('observed player anchors', () => {
       displayName: 'Anchor Team',
       players: [shooter, shooter, shooter, shooter, shooter],
     });
-    const kobeProbability = makeProbability(kobeLike, defender, teamOf(kobeLike), profile, shotContext, 300);
-    const ceballosProbability = makeProbability(ceballosLike, defender, teamOf(ceballosLike), profile, shotContext, 300);
+    const kobeProbability = makeProbability(
+      kobeLike,
+      defender,
+      teamOf(kobeLike),
+      profile,
+      shotContext,
+      300,
+    );
+    const ceballosProbability = makeProbability(
+      ceballosLike,
+      defender,
+      teamOf(ceballosLike),
+      profile,
+      shotContext,
+      300,
+    );
     expect(kobeProbability).toBeGreaterThan(0.28);
     expect(kobeProbability).toBeLessThan(0.4);
     expect(ceballosProbability).toBeGreaterThan(0.34);

@@ -15,11 +15,26 @@ export const ENGINE_CONSTANTS = {
 
   /** Base make probability by zone before any player or era adjustment. */
   zoneBaseMake: {
-    rim: 0.67,
-    shortMid: 0.46,
-    longMid: 0.44,
-    cornerThree: 0.52,
-    aboveBreakThree: 0.49,
+    rim: 0.68,
+    shortMid: 0.52,
+    longMid: 0.5,
+    cornerThree: 0.46,
+    aboveBreakThree: 0.43,
+  } as const satisfies Record<ShotZone, number>,
+
+  /**
+   * Floors for the final make probability by zone. These compress the
+   * extreme matchup tail: even a replacement-level lineup against an elite
+   * defense still converts some of its looks, so skill gaps produce
+   * credible margins instead of guaranteed blowouts. The floors sit below
+   * league-average conversion and never bind for balanced lineups.
+   */
+  zoneMakeFloor: {
+    rim: 0.46,
+    shortMid: 0.42,
+    longMid: 0.4,
+    cornerThree: 0.34,
+    aboveBreakThree: 0.32,
   } as const satisfies Record<ShotZone, number>,
 
   /**
@@ -28,30 +43,35 @@ export const ENGINE_CONSTANTS = {
    * into guaranteed winners: elite teams still shoot better, but plausible
    * upsets survive.
    */
-  skillRange: 0.12,
+  skillRange: 0.08,
   /**
    * Defensive contest can reduce make chance by at most this much. Sized
    * with skillRange so contests compress blowouts without silencing
    * perimeter-defense sensitivity.
    */
-  contestMax: 0.15,
+  contestMax: 0.1,
+  /** Contest ratio pivots here and spans this rating range. */
+  contestRatioPivot: 55,
+  contestRatioRange: 35,
   /** Era efficiency anchor blends league TS% into the final make chance. */
   eraEfficiencyWeight: 0.35,
 
   /**
    * Turnover probability coefficients around the era turnover-per-possession
    * baseline (security.ts). A handler at the documented neutral reference
-   * (tendency 0.12, team pressure 0.62, handling offset 0.4, passing offset
-   * 0.2) converts at the era rate; deviations move the probability in bounded
-   * steps. These neutral references match the packaged pool population means.
+   * (tendency 0.14, team pressure 0.671, handling offset 0.22, passing
+   * offset 0.12 — the packaged pool population means) converts at the era
+   * rate; deviations move the probability in bounded steps. Pressure weight
+   * is softer so elite defenses force extra turnovers without guaranteeing
+   * them.
    */
-  turnoverNeutralTendency: 0.12,
-  turnoverNeutralPressure: 0.62,
-  turnoverNeutralHandling: 0.4,
-  turnoverNeutralPassing: 0.2,
-  turnoverTendencyWeight: 0.18,
-  turnoverPressureWeight: 0.18,
-  turnoverHandlingWeight: 0.06,
+  turnoverNeutralTendency: 0.14,
+  turnoverNeutralPressure: 0.671,
+  turnoverNeutralHandling: 0.22,
+  turnoverNeutralPassing: 0.12,
+  turnoverTendencyWeight: 0.12,
+  turnoverPressureWeight: 0.12,
+  turnoverHandlingWeight: 0.05,
   turnoverPassingWeight: 0.03,
   turnoverMin: 0.03,
   turnoverMax: 0.3,
@@ -67,7 +87,7 @@ export const ENGINE_CONSTANTS = {
    * drag the raw foulsPerPossession rate below the league value, so the base
    * is scaled to restore the league average at population-mean inputs.
    */
-  shootingFoulScale: 1.3,
+  shootingFoulScale: 1.5,
   /** Fouled shots convert less often: contact lowers the make chance. */
   fouledShotMakeScale: 0.75,
 
@@ -92,6 +112,15 @@ export const ENGINE_CONSTANTS = {
   eraZoneMixBlend: 0.55,
   /** Base-trip allowance reserved for fouls and free throws charged afterward. */
   paceDeadBallAdjustment: 0.75,
+  /**
+   * Converts the profile's league possessions-per-game estimate (FGA +
+   * 0.44*FTA - OReb + TOV) to the real trip rate the engine accounts in box
+   * scores. The estimate convention over-counts real trips by the offensive-
+   * rebound continuation adjustment; measured at population-mean inputs this
+   * ratio is ~0.93 and is versioned with the engine. The possessions-per-game
+   * calibration gate re-checks it for every era profile.
+   */
+  estimateToTripsFactor: 0.93,
   /** How strongly observed three-point percentage anchors the shot result. */
   observedThreePointBlend: 0.7,
   /** How strongly observed free-throw percentage anchors the shot result. */
@@ -151,12 +180,12 @@ export const ENGINE_CONSTANTS = {
    * of team spacing above/below 0.5 (see shooting.ts teamSpacing). Softened
    * from 0.12 so spacing stays a lineup lever without inflating blowouts.
    */
-  spacingBonusScale: 0.09,
+  spacingBonusScale: 0.06,
 
   /** Rebounds: offensive rebound probability coefficient around team ratings. */
-  offensiveReboundScale: 0.05,
+  offensiveReboundScale: 0.055,
   offensiveReboundRange: 50,
-  offensiveReboundRimBonus: 0.04,
+  offensiveReboundRimBonus: 0.045,
   offensiveReboundPerimeterPenalty: 0.04,
   /** Weight of observed per-game rebound production in player attribution. */
   observedReboundWeight: 6,

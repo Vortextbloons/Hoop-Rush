@@ -62,7 +62,13 @@ export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): numb
   } else {
     contest = defender.ratings.perimeterDefense * 0.6 + defender.ratings.defensiveIq * 0.4;
   }
-  const ratio = Math.min(1, Math.max(0, (contest - 60) / 40));
+  const ratio = Math.min(
+    1,
+    Math.max(
+      0,
+      (contest - ENGINE_CONSTANTS.contestRatioPivot) / ENGINE_CONSTANTS.contestRatioRange,
+    ),
+  );
   return ratio * ENGINE_CONSTANTS.contestMax;
 }
 
@@ -186,9 +192,10 @@ export function makeProbability(
     periodSecondsRemaining <= 4
       ? -(0.04 + Math.min(1, Math.max(0, (4 - periodSecondsRemaining) / 4)) * 0.06)
       : 0;
+  const raw = base + skill + contest + era + spacing + quality + latePenalty;
   return Math.min(
     0.97,
-    Math.max(0.03, base + skill + contest + era + spacing + quality + latePenalty),
+    Math.max(ENGINE_CONSTANTS.zoneMakeFloor[context.zone], Math.max(0.03, raw)),
   );
 }
 

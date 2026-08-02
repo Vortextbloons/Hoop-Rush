@@ -7,6 +7,7 @@
   import type {
     ChallengeRun,
     HoopRushManifest,
+    MadeAttempted,
     PlayerSeasonAggregate,
     RunAggregates,
   } from '@hoop-rush/data-contracts';
@@ -167,6 +168,26 @@
 
   function pct(made: number, attempted: number): string {
     return attempted === 0 ? '—' : `${((made / attempted) * 100).toFixed(1)}%`;
+  }
+
+  /** True shooting percentage from exact season totals: PTS / (2*(FGA + 0.44*FTA)). */
+  function trueShootingPct(points: number, fga: number, fta: number): string {
+    const denominator = 2 * (fga + 0.44 * fta);
+    return denominator <= 0 ? '—' : `${((points / denominator) * 100).toFixed(1)}%`;
+  }
+
+  /** Usage percentage: the player's possession estimate divided by the team's. */
+  function usagePct(raw: PlayerSeasonAggregate, team: RunAggregates['team']): string {
+    const possessionEstimate = (p: {
+      fieldGoals: MadeAttempted;
+      freeThrows: MadeAttempted;
+      turnovers: number;
+    }) => p.fieldGoals.attempted + 0.44 * p.freeThrows.attempted + p.turnovers;
+    const player = possessionEstimate(raw);
+    const teamTotal = possessionEstimate(team);
+    if (teamTotal <= 0) return '—';
+    // All five players play the full game, so the team total is split evenly.
+    return `${((player / (teamTotal / 5)) * 100).toFixed(1)}%`;
   }
 
   function perGameValue(value: number, games: number, decimals = 1): string {
@@ -417,21 +438,27 @@
       </div>
       {#if displayAggregates && seasonTable.length > 0}
         <div class="mt-4 overflow-x-auto">
-          <table class="w-full min-w-[640px] border-collapse text-sm">
+          <table class="w-full min-w-[1080px] border-collapse text-sm">
             <thead>
               <tr
                 class="border-b border-border font-mono text-[10px] tracking-[0.12em] text-muted-foreground uppercase"
               >
                 <th scope="col" class="py-2 pr-3 text-left">Player</th>
                 <th scope="col" class="px-2 py-2 text-right">PTS</th>
+                <th scope="col" class="px-2 py-2 text-right">FGA</th>
                 <th scope="col" class="px-2 py-2 text-right">FG%</th>
+                <th scope="col" class="px-2 py-2 text-right">3PA</th>
                 <th scope="col" class="px-2 py-2 text-right">3P%</th>
+                <th scope="col" class="px-2 py-2 text-right">FTA</th>
                 <th scope="col" class="px-2 py-2 text-right">FT%</th>
+                <th scope="col" class="px-2 py-2 text-right">TS%</th>
+                <th scope="col" class="px-2 py-2 text-right">USG%</th>
                 <th scope="col" class="px-2 py-2 text-right">REB</th>
                 <th scope="col" class="px-2 py-2 text-right">AST</th>
                 <th scope="col" class="px-2 py-2 text-right">STL</th>
                 <th scope="col" class="px-2 py-2 text-right">BLK</th>
                 <th scope="col" class="px-2 py-2 text-right">TOV</th>
+                <th scope="col" class="px-2 py-2 text-right">3PA/G</th>
               </tr>
             </thead>
             <tbody>
@@ -465,13 +492,32 @@
                     {formatAggregateStat(aggregate.points)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.fieldGoals.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
                     {pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.threes.attempted)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
                     {pct(raw.threes.made, raw.threes.attempted)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
+                    {formatAggregateStat(aggregate.freeThrows.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
                     {pct(raw.freeThrows.made, raw.freeThrows.attempted)}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {trueShootingPct(
+                      raw.points,
+                      raw.fieldGoals.attempted,
+                      raw.freeThrows.attempted,
+                    )}
+                  </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {usagePct(raw, aggregates!.team)}
                   </td>
                   <td class="px-2 py-2 text-right font-mono">
                     {formatAggregateStat(aggregate.rebounds.total)}
@@ -488,6 +534,9 @@
                   <td class="px-2 py-2 text-right font-mono">
                     {formatAggregateStat(aggregate.turnovers)}
                   </td>
+                  <td class="px-2 py-2 text-right font-mono">
+                    {perGameValue(raw.threes.attempted, raw.gamesPlayed)}
+                  </td>
                 </tr>
               {/each}
             </tbody>
@@ -495,6 +544,8 @@
         </div>
         <p class="mt-3 font-mono text-[10px] text-muted-foreground">
           Per-game values divide exact season totals by the actual games played ({record.gamesPlayed}).
+          TS% is points per (2·(FGA + 0.44·FTA)); USG% is the player's FGA + 0.44·FTA + TOV share of
+          the team's five-player total.
         </p>
       {:else}
         <p class="mt-4 animate-pulse text-sm text-muted-foreground">Loading season table…</p>

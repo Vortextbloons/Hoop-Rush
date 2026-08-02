@@ -45,9 +45,10 @@ Commands:
                          --input <game-input.json> --expected <game-result.json>
   calibrate run          Compare seeded batches against the frozen era profile targets.
                          --samples N (default 2000)  --seed-from N  --profile <path>
+                         --era <eraId> (default 1990s; selects the era-matched pool)
                          Exits 1 when any required gate fails.
   calibrate sensitivity  A/B the single-dimension sensitivity fixtures.
-                         --samples N (default 200)   --profile <path>
+                         --samples N (default 200)   --profile <path>  --era <eraId>
   combine docs           Combine every markdown file under the docs directory
                          into one file in the docs root (outside subfolders).
                          --input <dir>        Docs directory (default Docs/)

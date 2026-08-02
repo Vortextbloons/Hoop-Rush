@@ -142,6 +142,7 @@ const COMMANDS: Record<string, CommandDef> = {
         'seed-from': getOptionString(args, 'seed-from') ?? undefined,
         workers: getOptionString(args, 'workers') ?? undefined,
         profile: getOptionString(args, 'profile') ?? undefined,
+        era: getOptionString(args, 'era') ?? undefined,
         'challenge-samples': getOptionString(args, 'challenge-samples') ?? undefined,
         'opponent-games': getOptionString(args, 'opponent-games') ?? undefined,
       }),
@@ -152,6 +153,7 @@ const COMMANDS: Record<string, CommandDef> = {
       calibrateSensitivity({
         samples: getOptionString(args, 'samples') ?? undefined,
         profile: getOptionString(args, 'profile') ?? undefined,
+        era: getOptionString(args, 'era') ?? undefined,
       }),
   },
   'combine docs': {

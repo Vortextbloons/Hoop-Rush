@@ -1,13 +1,14 @@
-"""Freezes the approved 10,000-seed calibration baseline into the era profile.
+"""Freezes an approved calibration baseline into an era profile.
 
 Reads a `calibrate run --format json` report payload and rewrites
-`apps/web/static/data/era-sim/1990s.json` so every target equals the observed
-baseline with a documented tolerance. Tolerances are sized to catch material
-regressions while remaining stable at CI sample sizes. The profile version
-advances, marking the targets as intentionally approved (spec/06).
+`apps/web/static/data/era-sim/<era>.json` so every target value equals the
+observed baseline while the profile's documented tolerances are preserved.
+The profile version advances to `m3-<era>-v2`, marking the targets as
+intentionally approved (spec/06). Distribution gates below their minimum
+sample are not re-evaluated; every gate keeps its documented minimum sample.
 
 Usage:
-  python scripts/import-nba/freeze_calibration_targets.py <baseline-report.json>
+  python scripts/import-nba/freeze_calibration_targets.py [eraId] <baseline-report.json>
 """
 
 from __future__ import annotations
@@ -17,57 +18,22 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PROFILE_PATH = ROOT / "apps" / "web" / "static" / "data" / "era-sim" / "1990s.json"
-NEW_VERSION = "m2-1990s-v2"
+DATA_DIR = ROOT / "apps" / "web" / "static" / "data" / "era-sim"
 
-# Metric key -> absolute tolerance around the observed baseline.
-TOLERANCES = {
-    "possessionsPerGame": 1.5,
-    "pointsPerGame": 3.0,
-    "offensiveRating": 3.0,
-    "fieldGoalPct": 0.010,
-    "efgPct": 0.010,
-    "tsPct": 0.010,
-    "threePointRate": 0.010,
-    "threePointPct": 0.015,
-    "freeThrowsAttemptedPerGame": 2.0,
-    "freeThrowPct": 0.015,
-    "turnoversPerGame": 1.0,
-    "turnoversPerPossession": 0.008,
-    "offensiveReboundsPerGame": 1.0,
-    "offensiveReboundRate": 0.012,
-    "assistsPerGame": 2.0,
-    "assistRate": 0.020,
-    "personalFoulsPerGame": 2.0,
-    "zoneMix.rim": 0.015,
-    "zoneMix.shortMid": 0.015,
-    "zoneMix.longMid": 0.015,
-    "zoneMix.cornerThree": 0.012,
-    "zoneMix.aboveBreakThree": 0.015,
-    "closeGameRate": 0.030,
-    "blowoutRate": 0.030,
-    "overtimeRate": 0.012,
-    "strongVsWeakWinRate": 0.005,
-    "equalLineupHomeWinRate": 0.030,
-}
-
+# Distribution gates measured on real matchups require a larger sample.
 MINIMUM_SAMPLES = {
-    "strongVsWeakWinRate": 2000,
-    "equalLineupHomeWinRate": 2000,
     "closeGameRate": 2000,
     "blowoutRate": 2000,
     "overtimeRate": 2000,
+    "strongVsWeakWinRate": 2000,
+    "equalLineupHomeWinRate": 2000,
 }
 
 
-def main() -> None:
-    if len(sys.argv) < 2:
-        raise SystemExit("usage: freeze_calibration_targets.py <baseline-report.json>")
-    raw = Path(sys.argv[1]).read_text(encoding="utf-8-sig")
+def extract_payload(raw: str) -> dict:
     start = raw.find("{")
     if start < 0:
         raise SystemExit("report contains no JSON payload")
-    # The report may carry trailing banner lines; slice the first JSON object.
     depth = 0
     end = None
     for i in range(start, len(raw)):
@@ -84,17 +50,35 @@ def main() -> None:
     payload = report["payload"]
     if payload["command"] != "calibrate run":
         raise SystemExit(f"expected a calibrate run report, got {payload['command']}")
-    observed = {m["key"]: m["observed"] for m in payload["metrics"]}
-    for key in observed:
-        if key not in TOLERANCES:
-            raise SystemExit(f"report metric {key} has no frozen tolerance")
+    return payload
 
-    profile = json.loads(PROFILE_PATH.read_text(encoding="utf-8"))
-    profile["profileVersion"] = NEW_VERSION
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        raise SystemExit("usage: freeze_calibration_targets.py [eraId] <baseline-report.json>")
+    if len(sys.argv) == 2:
+        era_id = "1990s"
+        report_path = sys.argv[1]
+    else:
+        era_id = sys.argv[1]
+        report_path = sys.argv[2]
+
+    profile_path = DATA_DIR / f"{era_id}.json"
+    if not profile_path.exists():
+        raise SystemExit(f"no era profile at {profile_path}")
+    payload = extract_payload(Path(report_path).read_text(encoding="utf-8-sig"))
+    if payload["eraId"] != era_id:
+        raise SystemExit(
+            f"report is for era {payload['eraId']}, not {era_id}"
+        )
+
+    observed = {m["key"]: m["observed"] for m in payload["metrics"]}
+    profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    new_version = f"m3-{era_id}-v2"
+    profile["profileVersion"] = new_version
     profile["baselineReport"] = (
-        f"frozen from approved 10,000-seed baseline "
-        f"({payload['samples']} samples, engine {payload['engineVersion']}, "
-        f"observed targets with tolerances per spec/06)"
+        f"calibrate run --samples {payload['samples']} "
+        f"(engine {payload['engineVersion']})"
     )
     targets = profile["targets"]
 
@@ -106,14 +90,13 @@ def main() -> None:
             else:
                 raise SystemExit(f"profile has no target {path}")
         node["value"] = round(value, 4)
-        node["tolerance"] = TOLERANCES[path]
-        node["minimumSample"] = MINIMUM_SAMPLES.get(path, node.get("minimumSample", 1000))
+        node["minimumSample"] = MINIMUM_SAMPLES.get(path, node.get("minimumSample", 200))
 
     for key, value in observed.items():
         set_target(key, value)
 
-    PROFILE_PATH.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
-    print(f"froze {len(observed)} targets into {PROFILE_PATH} ({NEW_VERSION})")
+    profile_path.write_text(json.dumps(profile, indent=2) + "\n", encoding="utf-8")
+    print(f"froze {len(observed)} targets into {profile_path} ({new_version})")
 
 
 if __name__ == "__main__":

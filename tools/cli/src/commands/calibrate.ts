@@ -47,6 +47,7 @@ export const CALIBRATE_OPTIONS: Record<string, boolean> = {
   workers: true,
   fixture: true,
   profile: true,
+  era: true,
   'challenge-samples': true,
   'opponent-games': true,
   format: true,
@@ -227,6 +228,7 @@ export function calibrateRun(args: {
   'seed-from'?: string;
   workers?: string;
   profile?: string;
+  era?: string;
   'challenge-samples'?: string;
   'opponent-games'?: string;
 }): CliReport {
@@ -236,7 +238,9 @@ export function calibrateRun(args: {
   const opponentGames = parseCount(args['opponent-games'], '--opponent-games', 60);
   const packaged = loadPackagedData();
   const data = new PackagedData(packaged.manifest, packaged.dir);
-  const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile();
+  const profile = args.profile
+    ? loadProfileFile(args.profile)
+    : data.eraProfile(args.era ?? '1990s');
 
   // The calibration fixtures must match the era under test: the harness
   // builds its league-average and strong/weak lineups from the packaged
@@ -582,11 +586,17 @@ const SENSITIVITY_FAMILIES: Array<{
   { id: 'sens-shot-mix', direction: 'three-point share up', pass: (b, c) => c > b * 1.1 },
 ];
 
-export function calibrateSensitivity(args: { samples?: string; profile?: string }): CliReport {
+export function calibrateSensitivity(args: {
+  samples?: string;
+  profile?: string;
+  era?: string;
+}): CliReport {
   const samples = parseCount(args.samples, '--samples', 200);
   const packaged = loadPackagedData();
   const data = new PackagedData(packaged.manifest, packaged.dir);
-  const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile();
+  const profile = args.profile
+    ? loadProfileFile(args.profile)
+    : data.eraProfile(args.era ?? '1990s');
 
   const metrics = SENSITIVITY_FAMILIES.map((family) => {
     const fixture = loadFixture(family.id);

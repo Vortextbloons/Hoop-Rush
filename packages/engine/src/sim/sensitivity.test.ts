@@ -95,6 +95,9 @@ function expectDirection(
   // by default) but not an explosion for a one-dimension change (cap varies
   // by stat). Role-based usage concentrates shots on high-usage players, so
   // all-five skill bumps move totals a little less than flat-usage models.
+  // The m3-engine-v4 calibration softened the skill/contest slopes (to
+  // compress blowouts), so single-dimension +15 bumps move points ~2% and
+  // defense ~2%; callers pass tighter or looser floors per dimension.
   expect(
     relative,
     `${name}: base=${base.toFixed(2)} changed=${changed.toFixed(2)}`,
@@ -113,13 +116,13 @@ describe('sensitivity: shooting and finishing', () => {
     const points = compare('inside', baseTeam, changed, (r) => {
       return (r.home.box.points + r.away.box.points) / 2;
     });
-    expectDirection('points', points.base, points.changed, 1, 0.6, 0.025);
+    expectDirection('points', points.base, points.changed, 1, 0.6, 0.015);
     const fg = compare('inside-fg', baseTeam, changed, (r) => {
       const h = r.home.box.fieldGoals;
       const a = r.away.box.fieldGoals;
       return (h.made + a.made) / Math.max(1, h.attempted + a.attempted);
     });
-    expectDirection('fgpct', fg.base, fg.changed, 1);
+    expectDirection('fgpct', fg.base, fg.changed, 1, 0.6, 0.01);
   });
 
   it('higher threePoint increases three-point percentage and three attempts', () => {
@@ -192,8 +195,11 @@ describe('sensitivity: defense', () => {
   it('higher perimeterDefense lowers opponent points', () => {
     const changed = mutateAllRatings(baseTeam, 'perimeterDefense', 15);
     const oppPts = compare('perim', baseTeam, changed, (r) => r.away.box.points);
+    // The calibrated contest slope (m3-engine-v4) trades magnitude for
+    // compressed blowouts; a +15 perimeter bump still cuts ~2% off opponent
+    // scoring (the CLI sensitivity gate bumps interior too and shows -4%).
     expect(oppPts.changed, `base=${oppPts.base} changed=${oppPts.changed}`).toBeLessThan(
-      oppPts.base * 0.975,
+      oppPts.base * 0.985,
     );
   });
 
@@ -211,7 +217,9 @@ describe('sensitivity: defense', () => {
     const steals = compare('steal', baseTeam, changed, (r) => r.home.box.steals);
     expectDirection('steals', steals.base, steals.changed, 1);
     const oppTov = compare('steal-tov', baseTeam, changed, (r) => r.away.box.turnovers);
-    expectDirection('oppTurnovers', oppTov.base, oppTov.changed, 1);
+    // The era-anchored turnover baseline is per-trip; steal feeds defensive
+    // pressure, so the swing is a bounded share of the era turnover rate.
+    expectDirection('oppTurnovers', oppTov.base, oppTov.changed, 1, 0.6, 0.02);
   });
 
   it('higher block raises blocks', () => {

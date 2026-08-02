@@ -8,14 +8,21 @@ import { ENGINE_CONSTANTS } from './constants.js';
  * around that mean, clamped to the shot clock and the time remaining in the
  * period. Free throws consume additional clock so the pace target holds for
  * high-foul games too.
+ *
+ * The profile's `pace` is the league's possessions-per-game ESTIMATE (FGA +
+ * 0.44*FTA - OReb + TOV from the packaged stints). That convention over-counts
+ * real trips by the offensive-rebound continuation adjustment, so the engine
+ * converts it to the trip rate it actually accounts for before deriving trip
+ * duration. The conversion is a versioned engine constant re-checked by the
+ * possessions-per-game calibration gate.
  */
 
 /** Mean wall-clock seconds of one offensive trip for the era pace. */
 export function meanTripSeconds(profile: EraSimulationProfile): number {
-  const pace = profile.parameters.pace;
+  const tripsPerTeamGame = profile.parameters.pace * ENGINE_CONSTANTS.estimateToTripsFactor;
   return Math.max(
     ENGINE_CONSTANTS.minimumTripSeconds,
-    2880 / (2 * pace) - ENGINE_CONSTANTS.paceDeadBallAdjustment,
+    2880 / (2 * tripsPerTeamGame) - ENGINE_CONSTANTS.paceDeadBallAdjustment,
   );
 }
 
