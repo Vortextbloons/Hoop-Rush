@@ -84,13 +84,13 @@ function buildGameResult(gameNumber: number): GameResult {
       turnovers: 3,
       fouls: 4,
     })),
-    shotZones: (
-      ['rim', 'shortMid', 'longMid', 'cornerThree', 'aboveBreakThree'] as const
-    ).map((zone) => ({
-      zone,
-      attempts: 17,
-      makes: 8,
-    })),
+    shotZones: (['rim', 'shortMid', 'longMid', 'cornerThree', 'aboveBreakThree'] as const).map(
+      (zone) => ({
+        zone,
+        attempts: 17,
+        makes: 8,
+      }),
+    ),
   });
   return {
     schemaVersion: 1,

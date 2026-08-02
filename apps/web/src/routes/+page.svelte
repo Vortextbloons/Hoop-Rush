@@ -6,6 +6,7 @@
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
+  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
   import type { CompletedRunIndex, StoredRunRecord } from '@hoop-rush/persistence';
 
   const sandboxHref = resolve('/sandbox');
@@ -225,14 +226,7 @@
                 <span class="font-display text-xl font-extrabold tracking-tight">
                   {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
                 </span>
-                <span
-                  class="rounded-full border px-3 py-0.5 font-mono text-[10px] tracking-[0.14em] uppercase {row.outcome ===
-                  'perfect'
-                    ? 'border-primary/40 bg-primary/10 text-primary'
-                    : 'border-destructive/40 bg-destructive/10 text-destructive'}"
-                >
-                  {row.outcome}
-                </span>
+                <SeasonTierBadge wins={row.wins} />
               </span></a
             >
           </li>

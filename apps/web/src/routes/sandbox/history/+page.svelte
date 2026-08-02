@@ -7,6 +7,8 @@
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
+  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
+  import { seasonTierFromWins } from '$lib/season-tier';
 
   /**
    * Compact completed-run history (spec/08). Rows list lineup, franchise/era,
@@ -121,17 +123,13 @@
 
     <ul class="mt-8 flex flex-col gap-3">
       {#each rows as row (row.runId)}
-        {@const won = row.outcome === 'perfect'}
+        {@const tier = seasonTierFromWins(row.wins)}
         <li>
           <a
             href={resolve(`/sandbox/result?runId=${encodeURIComponent(row.runId)}`)}
             class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-line-strong"
           >
-            <span
-              class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {won
-                ? 'bg-primary/15 text-primary'
-                : 'bg-destructive/10 text-destructive'}"
-            >
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg {tier.iconClass}">
               <Trophy class="h-5 w-5" />
             </span>
             <span class="min-w-0 flex-1">
@@ -150,13 +148,7 @@
             <span class="font-display text-xl font-extrabold tracking-tight">
               {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
             </span>
-            <span
-              class="rounded-full border px-3 py-0.5 font-mono text-[10px] tracking-[0.14em] uppercase {won
-                ? 'border-primary/40 bg-primary/10 text-primary'
-                : 'border-destructive/40 bg-destructive/10 text-destructive'}"
-            >
-              {row.outcome}
-            </span>
+            <SeasonTierBadge wins={row.wins} />
             <span class="w-full font-mono text-[10px] text-muted-foreground sm:w-auto">
               {formatTime(row.completedAtIso)}
             </span>

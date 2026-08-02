@@ -48,7 +48,9 @@ async function reachPlaying(page: Page) {
 async function expectSeasonReport(page: Page) {
   await expect(page).toHaveURL(/\/sandbox\/result\?runId=/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
-  await expect(page.getByText(/82 games · (perfect|eliminated)/)).toBeVisible({
+  await expect(
+    page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
+  ).toBeVisible({
     timeout: 15000,
   });
 }
@@ -70,7 +72,9 @@ test.describe('m3: draft to 82-game season journey', () => {
     await expectSeasonReport(page);
 
     // Season facts: final record, strip, facts, and the five-player table.
-    await expect(page.getByText(/82 games · (perfect|eliminated)/)).toBeVisible();
+    await expect(
+      page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
+    ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Best performance' })).toBeVisible();

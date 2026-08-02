@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { Dices, Pencil, RotateCcw, Trophy } from '@lucide/svelte';
+  import { Dices, Pencil, RotateCcw } from '@lucide/svelte';
   import type {
     ChallengeRun,
     HoopRushManifest,
@@ -20,6 +20,7 @@
   import { perGamePlayer } from '@hoop-rush/engine';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
 
   /**
@@ -104,8 +105,6 @@
 
   const aggregates = $derived(run?.aggregates ?? null);
   const record = $derived(aggregates?.team);
-
-  const perfect = $derived(run?.outcome === 'perfect');
 
   /** The user's five in slot order with their packaged names. */
   const seasonTable = $derived.by(() => {
@@ -326,18 +325,7 @@
           <p class="font-display text-5xl font-extrabold tracking-tight sm:text-6xl">
             {record.wins}<span class="text-muted-foreground">–</span>{record.losses}
           </p>
-          <p
-            class="mt-1 inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 font-mono text-[10px] tracking-[0.14em] uppercase {perfect
-              ? 'border-primary/40 bg-primary/10 text-primary'
-              : 'border-destructive/40 bg-destructive/10 text-destructive'}"
-          >
-            {#if perfect}
-              <Trophy class="h-3.5 w-3.5" />
-              82-0 · perfect
-            {:else}
-              82 games · eliminated
-            {/if}
-          </p>
+          <SeasonTierBadge wins={record.wins} size="large" />
         </div>
       </div>
 
