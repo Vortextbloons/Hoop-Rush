@@ -22,6 +22,48 @@ export const madeAttemptedSchema = z.object({
 });
 export type MadeAttempted = z.infer<typeof madeAttemptedSchema>;
 
+export const shotZoneSummarySchema = z.object({
+  zone: shotZoneSchema,
+  attempts: z.number().int().nonnegative(),
+  makes: z.number().int().nonnegative(),
+});
+export type ShotZoneSummary = z.infer<typeof shotZoneSummarySchema>;
+
+/**
+ * Opportunity-level diagnostics behind a player's box score (spec/03 outputs).
+ * These are recorded events, not derived estimates: usage is the standard
+ * possession estimate FGA + 0.44*FTA + TOV, shotZones are per-player field-goal
+ * splits, rebound chances count every miss while on the floor, and
+ * assistOpportunities are made baskets on passes the player created.
+ */
+export const playerDiagnosticsSchema = z.object({
+  /** Possession estimate used by a player: FGA + 0.44*FTA + TOV. */
+  usage: z.number().nonnegative(),
+  /** Per-player field-goal attempts/makes by zone (free throws excluded). */
+  shotZones: z.array(shotZoneSummarySchema).length(5),
+  /** Made field goals on passed possessions created by this player. */
+  assistOpportunities: z.number().int().nonnegative(),
+  /** Missed shots while this player's team was on offense. */
+  offensiveReboundChances: z.number().int().nonnegative(),
+  /** Missed shots while this player's team was on defense. */
+  defensiveReboundChances: z.number().int().nonnegative(),
+  /** Field-goal attempts where this player was the primary defender. */
+  contestedShots: z.number().int().nonnegative(),
+});
+export type PlayerDiagnostics = z.infer<typeof playerDiagnosticsSchema>;
+
+export const teamDiagnosticsSchema = z.object({
+  /** Made field goals on passed possessions. */
+  assistedFieldGoals: z.number().int().nonnegative(),
+  /** Made field goals on unassisted possessions. */
+  unassistedFieldGoals: z.number().int().nonnegative(),
+  /** Missed field goals plus missed free throws (rebound opportunities). */
+  reboundOpportunities: z.number().int().nonnegative(),
+  /** Field-goal attempts defended by this team. */
+  contestedShots: z.number().int().nonnegative(),
+});
+export type TeamDiagnostics = z.infer<typeof teamDiagnosticsSchema>;
+
 export const playerBoxScoreSchema = z.object({
   playerId: playerIdSchema,
   minutes: z.number().int().nonnegative(),
@@ -39,6 +81,8 @@ export const playerBoxScoreSchema = z.object({
   blocks: z.number().int().nonnegative(),
   turnovers: z.number().int().nonnegative(),
   fouls: z.number().int().nonnegative(),
+  /** Opportunity-level diagnostics (m3 engine); absent in legacy records. */
+  diagnostics: playerDiagnosticsSchema.optional(),
 });
 export type PlayerBoxScore = z.infer<typeof playerBoxScoreSchema>;
 
@@ -61,15 +105,10 @@ export const teamBoxScoreSchema = z.object({
   turnovers: z.number().int().nonnegative(),
   fouls: z.number().int().nonnegative(),
   possessions: z.number().int().nonnegative(),
+  /** Opportunity-level diagnostics (m3 engine); absent in legacy records. */
+  diagnostics: teamDiagnosticsSchema.optional(),
 });
 export type TeamBoxScore = z.infer<typeof teamBoxScoreSchema>;
-
-export const shotZoneSummarySchema = z.object({
-  zone: shotZoneSchema,
-  attempts: z.number().int().nonnegative(),
-  makes: z.number().int().nonnegative(),
-});
-export type ShotZoneSummary = z.infer<typeof shotZoneSummarySchema>;
 
 export const periodScoresSchema = z.object({
   home: z.array(z.number().int().nonnegative()).min(4).max(12),

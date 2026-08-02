@@ -15,6 +15,8 @@ import {
   pickShot,
   pickZone,
   isThreePointZone,
+  zoneSkillRating,
+  type ActionType,
 } from './usage.js';
 import { isSteal, pickStealer, turnoverProbability } from './security.js';
 import { blockProbability, makeProbability, type ShotContext } from './shooting.js';
@@ -28,6 +30,7 @@ import {
 } from './fouls.js';
 import { pickRebounder, resolveRebound } from './rebounding.js';
 import { ENGINE_CONSTANTS } from './constants.js';
+import { creationScore } from '../domain/archetypes.js';
 
 /**
  * One offensive trip (spec/03 pipeline stages 1-9). All clock consumption
@@ -93,9 +96,21 @@ function consumeTime(state: GameState, seconds: number): number {
   return consumed;
 }
 
-/** Assister probability for a made field goal, anchored so a passer at the
- * population anchor rating converts at the era assist rate. */
-function assistProbability(passer: SimulationPlayer, profile: EraSimulationProfile): number {
+/**
+ * Assist probability for a made field goal on a passed possession. Anchored
+ * so a passer at the population anchor rating converts at the era assist
+ * rate, then modulated by creation ability, the play type (rolls, cuts, and
+ * transition finishes are real passes; post-ups and isolations rarely earn
+ * an assist), the shot zone (rim finishes off passes convert as assists),
+ * and the shooter's finishing at the zone.
+ */
+function assistProbability(
+  passer: SimulationPlayer,
+  profile: EraSimulationProfile,
+  action: ActionType,
+  zone: ShotZone,
+  shooter: SimulationPlayer,
+): number {
   const factor = (p: SimulationPlayer) => 0.5 + (p.ratings.passing - 50) / 100;
   const anchor = factor({
     ratings: { passing: profile.parameters.assistAnchorRating },
@@ -103,29 +118,77 @@ function assistProbability(passer: SimulationPlayer, profile: EraSimulationProfi
   const roleFactor = passer.anchors
     ? 0.75 + Math.min(1, passer.anchors.assistsPerGame / 8) * 0.25
     : 1;
+  // Creation spreads the conversion: real playmakers turn more of their
+  // passes into assists than role players do.
+  const creation = 0.6 + 0.7 * creationScore(passer);
+  const actionFactor =
+    action === 'transition'
+      ? 1.25
+      : action === 'cut'
+        ? 1.2
+        : action === 'pickAndRollRoll'
+          ? 1.25
+          : action === 'spotUp'
+            ? 1.15
+            : action === 'pickAndRoll'
+              ? 1.1
+              : action === 'postUp'
+                ? 0.85
+                : 0.5;
+  const zoneFactor =
+    zone === 'rim'
+      ? 1.15
+      : zone === 'shortMid'
+        ? 1.05
+        : zone === 'longMid'
+          ? 0.95
+          : zone === 'cornerThree'
+            ? 1.1
+            : 1;
+  const finishing = 0.9 + 0.2 * (zoneSkillRating(shooter, zone) / 100);
   return Math.min(
     0.99,
     Math.max(
-      0.1,
-      profile.parameters.assistRate * 1.4 * roleFactor * (factor(passer) / Math.max(1e-9, anchor)),
+      0.05,
+      profile.parameters.assistRate *
+        0.95 *
+        roleFactor *
+        creation *
+        actionFactor *
+        zoneFactor *
+        finishing *
+        (factor(passer) / Math.max(1e-9, anchor)),
     ),
   );
 }
 
-/** Records one assist for an actual passer after a made basket. */
+/** Records one assist for an actual passer after a made basket. The pass
+ * opportunity belongs to the credited passer, so every assist is backed by
+ * an opportunity for the same player. */
 function creditAssist(
   ctx: TripContext,
   offenseSide: SideIndex,
   team: SimulationTeam,
   shooter: SimulationPlayer,
   initiator: SimulationPlayer,
+  action: ActionType,
+  zone: ShotZone,
   passed: boolean,
 ): void {
   if (!passed) return;
   const passer = pickAssister(team, shooter, initiator, ctx.rng);
-  if (!passer || !ctx.rng.chance(assistProbability(passer, ctx.profile))) return;
+  if (!passer) return;
   const slot = team.players.findIndex((p) => p.playerId === passer.playerId);
-  if (slot >= 0) ctx.recorder.assist(offenseSide, slot);
+  if (slot < 0) return;
+  ctx.recorder.assistOpportunity(offenseSide, slot);
+  if (!ctx.rng.chance(assistProbability(passer, ctx.profile, action, zone, shooter))) return;
+  ctx.recorder.assist(offenseSide, slot);
+}
+
+/** Marks one miss as a rebound opportunity for every player on both sides. */
+function reboundChances(ctx: TripContext, offenseSide: SideIndex, defenseSide: SideIndex): void {
+  ctx.recorder.offensiveReboundChance(offenseSide);
+  ctx.recorder.defensiveReboundChance(defenseSide);
 }
 
 /** Resolves a missed last free throw (live or dead-ball rebound). */
@@ -135,6 +198,7 @@ function reboundFromMissedFreeThrow(
   defenseSide: SideIndex,
   deadBall: boolean,
 ): void {
+  reboundChances(ctx, offenseSide, defenseSide);
   const result = resolveRebound(
     ctx.rng,
     ctx.teams[offenseSide],
@@ -184,6 +248,7 @@ function resolveFreeThrows(
     } else if (!made) {
       // A missed non-final free throw is a declared dead-ball miss: the
       // defensive team takes the rebound before the next attempt.
+      reboundChances(ctx, offenseSide, defenseSide);
       recorder.teamRebound(defenseSide);
     }
   }
@@ -213,11 +278,12 @@ function resolveShot(
 
   const shooterSlot = team.players.findIndex((p) => p.playerId === shooter.playerId);
   const three = isThreePointZone(zone);
+  const defenderSlot = defense.players.findIndex((p) => p.playerId === defender.playerId);
+  if (defenderSlot >= 0) recorder.contest(defenseSide, defenderSlot);
 
   // Shooting foul check (zone-aware, ability-aware).
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
   if (rng.chance(foulP)) {
-    const defenderSlot = defense.players.findIndex((p) => p.playerId === defender.playerId);
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
     const shotContext: ShotContext = {
       zone,
@@ -225,17 +291,18 @@ function resolveShot(
       secondsRemainingAtShot: state.secondsRemaining,
     };
     const shotP =
-      makeProbability(shooter, defender, profile, shotContext, state.secondsRemaining) *
+      makeProbability(shooter, defender, team, profile, shotContext, state.secondsRemaining) *
       ENGINE_CONSTANTS.fouledShotMakeScale;
     const made = rng.chance(shotP);
-    recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three);
+    recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
     if (made) {
-      creditAssist(ctx, offenseSide, team, shooter, initiator, shot.passed);
+      creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
       // And-one free throw.
       resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, false);
     } else {
       // The missed shot on a shooting foul is a declared dead-ball miss:
       // the defensive team takes the rebound, then free throws resolve.
+      reboundChances(ctx, offenseSide, defenseSide);
       recorder.teamRebound(defenseSide);
       resolveFreeThrows(
         ctx,
@@ -252,19 +319,25 @@ function resolveShot(
   // Block check (a block forces a miss, then a normal rebound).
   const blockP = blockProbability(defender, zone, action);
   if (rng.chance(blockP)) {
-    const defenderSlot = defense.players.findIndex((p) => p.playerId === defender.playerId);
     recorder.block(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
-    recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, false, three);
+    recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, false, three, shot.passed);
     return reboundAfterMiss(ctx, offenseSide, defenseSide, zone, deadBall);
   }
 
   // Shot resolution.
   const shotContext: ShotContext = { zone, action, secondsRemainingAtShot: state.secondsRemaining };
-  const shotP = makeProbability(shooter, defender, profile, shotContext, state.secondsRemaining);
+  const shotP = makeProbability(
+    shooter,
+    defender,
+    team,
+    profile,
+    shotContext,
+    state.secondsRemaining,
+  );
   const made = rng.chance(shotP);
-  recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three);
+  recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
   if (made) {
-    creditAssist(ctx, offenseSide, team, shooter, initiator, shot.passed);
+    creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
     return false; // made basket changes possession
   }
   return reboundAfterMiss(ctx, offenseSide, defenseSide, zone, deadBall);
@@ -279,6 +352,7 @@ function reboundAfterMiss(
   deadBall: boolean,
 ): boolean {
   const { rng, recorder } = ctx;
+  reboundChances(ctx, offenseSide, defenseSide);
   const result = resolveRebound(
     rng,
     ctx.teams[offenseSide],

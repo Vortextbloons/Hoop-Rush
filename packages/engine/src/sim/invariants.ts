@@ -84,6 +84,79 @@ export function checkGameResult(result: GameResult): string[] {
     reconcile('offensiveRebounds', (p) => p.rebounds.offensive, box.rebounds.offensive);
     reconcile('defensiveRebounds', (p) => p.rebounds.defensive, box.rebounds.defensive);
 
+    // Opportunity-level diagnostics (present on m3 engine results): usage
+    // identity, zone reconciliation, rebound chances, and assist accounting.
+    if (box.diagnostics || players.some((p) => p.diagnostics)) {
+      const playerDiag = (select: (d: NonNullable<PlayerBoxScore['diagnostics']>) => number) =>
+        players.reduce((acc, p) => acc + (p.diagnostics ? select(p.diagnostics) : 0), 0);
+      if (box.diagnostics) {
+        const d = box.diagnostics;
+        const misses =
+          box.fieldGoals.attempted -
+          box.fieldGoals.made +
+          box.freeThrows.attempted -
+          box.freeThrows.made;
+        if (d.reboundOpportunities !== misses) {
+          failures.push(
+            `${side}: rebound opportunities (${d.reboundOpportunities}) != misses (${misses})`,
+          );
+        }
+        if (d.assistedFieldGoals + d.unassistedFieldGoals !== box.fieldGoals.made) {
+          failures.push(
+            `${side}: assisted (${d.assistedFieldGoals}) + unassisted (${d.unassistedFieldGoals}) != made field goals (${box.fieldGoals.made})`,
+          );
+        }
+        if (playerDiag((p) => p.contestedShots) !== d.contestedShots) {
+          failures.push(`${side}: player contested shots != team contested shots`);
+        }
+        // Every miss gives all five players on the floor a rebound chance.
+        if (playerDiag((p) => p.offensiveReboundChances) !== d.reboundOpportunities * 5) {
+          failures.push(
+            `${side}: player offensive-rebound chances != 5 * team rebound opportunities`,
+          );
+        }
+        const otherDiagnostics = result[other].box.diagnostics;
+        if (
+          otherDiagnostics &&
+          playerDiag((p) => p.defensiveReboundChances) !== otherDiagnostics.reboundOpportunities * 5
+        ) {
+          failures.push(
+            `${side}: player defensive-rebound chances != 5 * opponent rebound opportunities`,
+          );
+        }
+      }
+      // Per-player zone splits reconcile with the team zone summary.
+      for (const zone of team.shotZones) {
+        const attempts = playerDiag(
+          (p) => p.shotZones.find((z) => z.zone === zone.zone)?.attempts ?? 0,
+        );
+        const makes = playerDiag((p) => p.shotZones.find((z) => z.zone === zone.zone)?.makes ?? 0);
+        if (attempts !== zone.attempts) {
+          failures.push(
+            `${side}: player zone attempts (${zone.zone}) ${attempts} != team ${zone.attempts}`,
+          );
+        }
+        if (makes !== zone.makes) {
+          failures.push(`${side}: player zone makes (${zone.zone}) ${makes} != team ${zone.makes}`);
+        }
+      }
+      for (const p of players) {
+        if (!p.diagnostics) continue;
+        const d = p.diagnostics;
+        const usageIdentity = p.fieldGoals.attempted + p.freeThrows.attempted * 0.44 + p.turnovers;
+        if (Math.abs(d.usage - usageIdentity) > 0.6) {
+          failures.push(
+            `${side}: usage ${d.usage.toFixed(2)} != fga + 0.44*fta + tov (${usageIdentity.toFixed(2)})`,
+          );
+        }
+        if (d.assistOpportunities < p.assists) {
+          failures.push(
+            `${side}: assist opportunities (${d.assistOpportunities}) < assists (${p.assists})`,
+          );
+        }
+      }
+    }
+
     // Every miss resolves to exactly one rebound bucket on the two sides:
     // the shooter's offensive rebounds plus the defense's player/team rebounds.
     const otherBox = result[other].box;

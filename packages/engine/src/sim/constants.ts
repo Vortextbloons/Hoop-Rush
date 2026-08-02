@@ -8,7 +8,7 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v2';
+export const ENGINE_VERSION = 'm3-engine-v3';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -78,6 +78,26 @@ export const ENGINE_CONSTANTS = {
   observedThreePointBlend: 0.7,
   /** How strongly observed free-throw percentage anchors the shot result. */
   observedFreeThrowBlend: 0.8,
+
+  /**
+   * Shot-quality bonuses by action and zone (two-point shots only). These
+   * translate play-type reality into conversion: transition and cut finishes
+   * convert better than isolation pull-ups. Bounded so skill and contest stay
+   * dominant.
+   */
+  shotQuality: {
+    transition: { rim: 0.03, shortMid: 0.02 },
+    cut: { rim: 0.03 },
+    pickAndRollRoll: { rim: 0.02 },
+    pickAndRoll: { rim: 0.01 },
+    postUp: { rim: -0.005, shortMid: -0.005 },
+    isolation: { longMid: -0.01, shortMid: -0.005 },
+  } as const,
+  /**
+   * Lineup spacing moves two-point conversion by at most this much per unit
+   * of team spacing above/below 0.5 (see shooting.ts teamSpacing).
+   */
+  spacingBonusScale: 0.12,
 
   /** Rebounds: offensive rebound probability coefficient around team ratings. */
   offensiveReboundScale: 0.05,

@@ -353,6 +353,8 @@ export function calibrateRun(args: {
   }
 
   const metrics = buildMetrics(equalAcc, strongWeakAcc, samples, profile);
+  const roleMetrics = buildRoleMetrics(samples, profile);
+  const allMetrics = [...metrics, ...roleMetrics];
   const payload = calibrateRunReportSchema.parse({
     schemaVersion: 1,
     command: 'calibrate run',
@@ -360,8 +362,8 @@ export function calibrateRun(args: {
     eraId: profile.eraId,
     samples,
     engineVersion: context.engineVersion,
-    pass: metrics.every((m) => m.pass),
-    metrics,
+    pass: allMetrics.every((m) => m.pass),
+    metrics: allMetrics,
     openingOpponentWinRateVsStrongUser: openingWinRateVsStrongUser,
     bracketDistribution,
     bracketMedianObservedWinRate: medianObserved,
@@ -469,6 +471,93 @@ function metric(
     sample < target.minimumSample ||
     (observed >= target.value - target.tolerance && observed <= target.value + target.tolerance);
   return { key, target: target.value, tolerance: target.tolerance, observed, pass, sample };
+}
+
+interface RoleAccumulator {
+  games: number;
+  usage: number;
+  fieldGoalAttempts: number;
+  threeAttempts: number;
+  freeThrowAttempts: number;
+  assists: number;
+  assistOpportunities: number;
+  offensiveRebounds: number;
+  defensiveRebounds: number;
+  teamMisses: number;
+  opponentMisses: number;
+}
+
+/**
+ * Player-role gates (spec/06): measures the `roles` fixture (creator,
+ * spacer, secondary, post, rim runner) and compares per-slot usage,
+ * three-point rate, free-throw rate, assist conversion, and rebound
+ * percentages against the frozen era targets. Vacuous (no metrics) when the
+ * profile has not frozen role targets yet.
+ */
+function buildRoleMetrics(
+  samples: number,
+  profile: EraSimulationProfile,
+): Array<z.infer<typeof calibrationMetricSchema>> {
+  const roleTargets = profile.targets.playerRoles;
+  if (roleTargets.length === 0) return [];
+  const fixture = loadFixture('roles');
+  const roleSamples = Math.min(samples, 500);
+  const slots = Array.from({ length: 5 }, () => ({
+    games: 0,
+    usage: 0,
+    fieldGoalAttempts: 0,
+    threeAttempts: 0,
+    freeThrowAttempts: 0,
+    assists: 0,
+    assistOpportunities: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    teamMisses: 0,
+    opponentMisses: 0,
+  })) as RoleAccumulator[];
+
+  for (let i = 0; i < roleSamples; i += 1) {
+    const input = buildInput(fixture, profile, fixtureSeed('roles', i), false);
+    const { result } = runSingleGame(input);
+    for (const side of [result.home, result.away] as const) {
+      const opponent = side === result.home ? result.away : result.home;
+      const misses = (team: GameResult['home']) =>
+        team.box.fieldGoals.attempted -
+        team.box.fieldGoals.made +
+        (team.box.freeThrows.attempted - team.box.freeThrows.made);
+      side.players.forEach((box, slotIndex) => {
+        const acc = slots[slotIndex];
+        if (!acc) return;
+        acc.games += 1;
+        acc.fieldGoalAttempts += box.fieldGoals.attempted;
+        acc.threeAttempts += box.threes.attempted;
+        acc.freeThrowAttempts += box.freeThrows.attempted;
+        acc.assists += box.assists;
+        acc.offensiveRebounds += box.rebounds.offensive;
+        acc.defensiveRebounds += box.rebounds.defensive;
+        acc.teamMisses += misses(side);
+        acc.opponentMisses += misses(opponent);
+        if (box.diagnostics) {
+          acc.usage += box.diagnostics.usage;
+          acc.assistOpportunities += box.diagnostics.assistOpportunities;
+        }
+      });
+    }
+  }
+
+  const teamUsage = slots.reduce((sum, s) => sum + s.usage, 0);
+  const observed: Record<string, number> = {};
+  slots.forEach((acc, i) => {
+    const key = (name: string) => `${name}.${String(i)}`;
+    observed[key('usageShare')] = acc.usage / Math.max(1e-9, teamUsage);
+    observed[key('threePointRate')] = acc.threeAttempts / Math.max(1, acc.fieldGoalAttempts);
+    observed[key('freeThrowRate')] = acc.freeThrowAttempts / Math.max(1, acc.fieldGoalAttempts);
+    observed[key('assistConversion')] = acc.assists / Math.max(1, acc.assistOpportunities);
+    observed[key('offensiveReboundPct')] = acc.offensiveRebounds / Math.max(1, acc.teamMisses);
+    observed[key('defensiveReboundPct')] = acc.defensiveRebounds / Math.max(1, acc.opponentMisses);
+  });
+
+  return roleTargets.map(({ key, target }) => metric(key, observed[key] ?? 0, target, roleSamples));
 }
 
 const SENSITIVITY_FAMILIES: Array<{

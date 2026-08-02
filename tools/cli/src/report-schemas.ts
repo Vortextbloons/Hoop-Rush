@@ -41,6 +41,88 @@ export const simBatchReportSchema = z.object({
 });
 export type SimBatchReport = z.infer<typeof simBatchReportSchema>;
 
+export const simDiagnoseReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('sim diagnose'),
+  fixture: z.string().min(1).max(64),
+  samples: z.number().int().nonnegative(),
+  engineVersion: z.string().min(1).max(64),
+  profileVersion: z.string().min(1).max(64),
+  players: z.array(
+    z.object({
+      playerId: z.string().min(1).max(64),
+      displayName: z.string().min(1).max(96),
+      archetype: z.string().min(1).max(32),
+      games: z.number().int().nonnegative(),
+      pointsPerGame: z.number(),
+      usagePerGame: z.number(),
+      usageShare: z.number(),
+      fieldGoalPct: z.number(),
+      threePointRate: z.number(),
+      freeThrowRate: z.number(),
+      assistsPerGame: z.number(),
+      assistConversion: z.number(),
+      assistOpportunitiesPerGame: z.number(),
+      offensiveReboundPct: z.number(),
+      defensiveReboundPct: z.number(),
+      contestedPerGame: z.number(),
+      stealsPerGame: z.number(),
+      turnoversPerGame: z.number(),
+      topZone: z.string().min(1).max(32),
+      zoneMix: z.array(
+        z.object({
+          zone: z.string().min(1).max(16),
+          attempts: z.number().int(),
+          makes: z.number().int(),
+          pct: z.number(),
+        }),
+      ),
+    }),
+  ),
+  team: z.object({
+    averagePointsPerGame: z.number(),
+    averagePossessionsPerGame: z.number(),
+    averageTeamMissesPerGame: z.number(),
+  }),
+  spread: z.object({ topToLastUsageRatio: z.number() }),
+});
+export type SimDiagnoseReport = z.infer<typeof simDiagnoseReportSchema>;
+
+export const simSeasonReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('sim season'),
+  fixture: z.string().min(1).max(64),
+  seasons: z.number().int().nonnegative(),
+  engineVersion: z.string().min(1).max(64),
+  profileVersion: z.string().min(1).max(64),
+  varianceRatioBand: z.tuple([z.number(), z.number()]),
+  rows: z.array(
+    z.object({
+      season: z.number().int().positive(),
+      players: z.array(
+        z.object({
+          playerId: z.string().min(1).max(64),
+          displayName: z.string().min(1).max(96),
+          games: z.number().int().nonnegative(),
+          pointsPerGame: z.number(),
+          fieldGoalPct: z.number(),
+          threePointPct: z.number(),
+          freeThrowPct: z.number(),
+          assistsPerGame: z.number(),
+          reboundsPerGame: z.number(),
+          turnoversPerGame: z.number(),
+          usagePerGame: z.number(),
+          variance: z.object({
+            fieldGoalRatio: z.number(),
+            freeThrowRatio: z.number(),
+          }),
+        }),
+      ),
+    }),
+  ),
+});
+export type SimSeasonReport = z.infer<typeof simSeasonReportSchema>;
+
 export const replayReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('replay'),

@@ -239,6 +239,18 @@ function auditPoolContent(
       `pools: ${key} no player carries a fallback id while a secondary headshot template is configured`,
     );
   }
+  // Every player must carry an explicit CDN availability marker whenever a
+  // primary headshot template exists: without it, the UI requests the CDN URL
+  // first and gets stuck on the generic silhouette, never reaching the
+  // secondary/photo backups (regression: pools built with --no-assets).
+  if (manifest.assets.headshotUrlTemplate) {
+    const missingMarker = pool.players.filter((p) => p.altIds?.nbaHeadshotAvailable == null);
+    if (missingMarker.length > 0) {
+      failures.push(
+        `pools: ${key} ${String(missingMarker.length)} players lack nbaHeadshotAvailable while a primary headshot template is configured`,
+      );
+    }
+  }
   details.push(`pools: ${key} ${String(pool.players.length)} players audited`);
 }
 

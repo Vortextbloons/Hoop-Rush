@@ -142,8 +142,13 @@ describe('observed player anchors', () => {
       ratings: { ...buildSimulationPlayer().ratings, threePoint: 76 },
       anchors: { ...shaquilleAnchors, threePointPct: 0.397, threePointAttemptRate: 0.149 },
     });
-    const kobeProbability = makeProbability(kobeLike, defender, profile, shotContext, 300);
-    const ceballosProbability = makeProbability(ceballosLike, defender, profile, shotContext, 300);
+    const teamOf = (shooter: ReturnType<typeof buildSimulationPlayer>) => ({
+      teamId: 'anchor-team',
+      displayName: 'Anchor Team',
+      players: [shooter, shooter, shooter, shooter, shooter],
+    });
+    const kobeProbability = makeProbability(kobeLike, defender, teamOf(kobeLike), profile, shotContext, 300);
+    const ceballosProbability = makeProbability(ceballosLike, defender, teamOf(ceballosLike), profile, shotContext, 300);
     expect(kobeProbability).toBeGreaterThan(0.28);
     expect(kobeProbability).toBeLessThan(0.4);
     expect(ceballosProbability).toBeGreaterThan(0.34);

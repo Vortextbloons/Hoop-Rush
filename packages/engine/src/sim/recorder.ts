@@ -1,4 +1,10 @@
-import type { GameResult, PlayerBoxScore, ShotZone, TeamBoxScore } from '@hoop-rush/data-contracts';
+import type {
+  GameResult,
+  PlayerBoxScore,
+  ShotZone,
+  TeamBoxScore,
+  ShotZoneSummary,
+} from '@hoop-rush/data-contracts';
 import { SHOT_ZONES } from '../domain/zones.js';
 
 /**
@@ -8,9 +14,17 @@ import { SHOT_ZONES } from '../domain/zones.js';
  *
  * Accounting is keyed by team side plus player slot, never by player ID alone,
  * so mirror matchups (the same playerId on both teams) stay correct.
+ *
+ * The recorder also tracks the event opportunities behind every credited
+ * stat (shot-zone splits, assist opportunities, rebound chances, contested
+ * shots) so role behavior can be diagnosed and calibrated, not just asserted.
  */
 
 export type SideIndex = 0 | 1;
+
+export function createZoneCounters(): Record<ShotZone, number> {
+  return { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 };
+}
 
 export interface RecorderPlayer {
   minutes: number;
@@ -28,6 +42,17 @@ export interface RecorderPlayer {
   blocks: number;
   turnovers: number;
   fouls: number;
+  /** Field-goal attempts and makes by zone (diagnostics; free throws excluded). */
+  zoneAttempts: Record<ShotZone, number>;
+  zoneMakes: Record<ShotZone, number>;
+  /** Made field goals on a passed possession where this player created the pass. */
+  assistOpportunities: number;
+  /** Missed shots while this player's team was on offense (OReb chance). */
+  offensiveReboundChances: number;
+  /** Missed shots while this player's team was on defense (DREb chance). */
+  defensiveReboundChances: number;
+  /** Field-goal attempts where this player was the primary defender. */
+  contestedShots: number;
 }
 
 export interface RecorderSide {
@@ -51,6 +76,10 @@ export interface RecorderSide {
   periodPoints: number[];
   zoneAttempts: Record<ShotZone, number>;
   zoneMakes: Record<ShotZone, number>;
+  /** Made field goals on passed possessions (diagnostics). */
+  assistedFieldGoals: number;
+  /** Made field goals on unassisted possessions (diagnostics). */
+  unassistedFieldGoals: number;
 }
 
 export function createRecorderSide(): RecorderSide {
@@ -75,6 +104,8 @@ export function createRecorderSide(): RecorderSide {
     periodPoints: [0],
     zoneAttempts: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
     zoneMakes: { rim: 0, shortMid: 0, longMid: 0, cornerThree: 0, aboveBreakThree: 0 },
+    assistedFieldGoals: 0,
+    unassistedFieldGoals: 0,
   };
 }
 
@@ -100,6 +131,12 @@ export class GameRecorder {
         blocks: 0,
         turnovers: 0,
         fouls: 0,
+        zoneAttempts: createZoneCounters(),
+        zoneMakes: createZoneCounters(),
+        assistOpportunities: 0,
+        offensiveReboundChances: 0,
+        defensiveReboundChances: 0,
+        contestedShots: 0,
       }));
     this.players = [makePlayers(), makePlayers()];
     this.sides = [createRecorderSide(), createRecorderSide()];
@@ -111,16 +148,21 @@ export class GameRecorder {
     zone: ShotZone,
     made: boolean,
     three: boolean,
+    assisted: boolean,
   ): void {
     const player = this.players[side][slot]!;
     const team = this.sides[side];
     player.fieldGoalAttempts += 1;
     team.fieldGoalAttempts += 1;
+    player.zoneAttempts[zone]! += 1;
     team.zoneAttempts[zone]! += 1;
     if (made) {
       player.fieldGoalMakes += 1;
       team.fieldGoalMakes += 1;
+      player.zoneMakes[zone]! += 1;
       team.zoneMakes[zone]! += 1;
+      if (assisted) team.assistedFieldGoals += 1;
+      else team.unassistedFieldGoals += 1;
       const points = three ? 3 : 2;
       player.points += points;
       team.points += points;
@@ -166,6 +208,26 @@ export class GameRecorder {
 
   teamRebound(side: SideIndex): void {
     this.sides[side].teamRebounds += 1;
+  }
+
+  /** One made field goal on a passed possession by this player (diagnostics). */
+  assistOpportunity(side: SideIndex, slot: number): void {
+    this.players[side][slot]!.assistOpportunities += 1;
+  }
+
+  /** Every missed shot gives each player on the offensive side an OReb chance. */
+  offensiveReboundChance(side: SideIndex): void {
+    for (const player of this.players[side]) player.offensiveReboundChances += 1;
+  }
+
+  /** Every missed shot gives each player on the defensive side a DREb chance. */
+  defensiveReboundChance(side: SideIndex): void {
+    for (const player of this.players[side]) player.defensiveReboundChances += 1;
+  }
+
+  /** One field-goal attempt defended by this player (diagnostics). */
+  contest(side: SideIndex, slot: number): void {
+    this.players[side][slot]!.contestedShots += 1;
   }
 
   assist(side: SideIndex, slot: number): void {
@@ -232,6 +294,14 @@ export class GameRecorder {
       blocks: p.blocks,
       turnovers: p.turnovers,
       fouls: p.fouls,
+      diagnostics: {
+        usage: p.fieldGoalAttempts + p.freeThrowAttempts * 0.44 + p.turnovers,
+        shotZones: zoneSummaryArray(p.zoneAttempts, p.zoneMakes),
+        assistOpportunities: p.assistOpportunities,
+        offensiveReboundChances: p.offensiveReboundChances,
+        defensiveReboundChances: p.defensiveReboundChances,
+        contestedShots: p.contestedShots,
+      },
     };
   }
 
@@ -255,15 +325,29 @@ export class GameRecorder {
       turnovers: t.turnovers,
       fouls: t.fouls,
       possessions: t.possessions,
+      diagnostics: {
+        assistedFieldGoals: t.assistedFieldGoals,
+        unassistedFieldGoals: t.unassistedFieldGoals,
+        reboundOpportunities:
+          t.fieldGoalAttempts - t.fieldGoalMakes + (t.freeThrowAttempts - t.freeThrowMakes),
+        contestedShots: this.players[side].reduce((sum, p) => sum + p.contestedShots, 0),
+      },
     };
   }
 
   zoneSummary(side: SideIndex): GameResult['home']['shotZones'] {
     const t = this.sides[side];
-    return SHOT_ZONES.map((zone) => ({
-      zone,
-      attempts: t.zoneAttempts[zone],
-      makes: t.zoneMakes[zone],
-    }));
+    return zoneSummaryArray(t.zoneAttempts, t.zoneMakes);
   }
+}
+
+function zoneSummaryArray(
+  attempts: Record<ShotZone, number>,
+  makes: Record<ShotZone, number>,
+): ShotZoneSummary[] {
+  return SHOT_ZONES.map((zone) => ({
+    zone,
+    attempts: attempts[zone] ?? 0,
+    makes: makes[zone] ?? 0,
+  }));
 }

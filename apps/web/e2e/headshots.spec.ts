@@ -70,4 +70,9 @@ test('lakers 1990s headshots fall back past the NBA CDN placeholder', async ({ p
   // majority even when the NBA CDN resets concurrent requests; six 1990s
   // Lakers have no bbref photo, so their cards depend on the CDN alone.
   expect(stats.loaded).toBeGreaterThanOrEqual(38);
+  // The two backup layers (bbref + wiki photos) must actually surface: if a
+  // pool build drops altIds (nbaHeadshotAvailable/photoUrl), players without
+  // a real CDN photo settle on the generic CDN silhouette and no non-CDN
+  // image ever loads. At least one bbref or wiki photo must appear.
+  expect(stats.bbref + stats.wiki).toBeGreaterThan(0);
 });

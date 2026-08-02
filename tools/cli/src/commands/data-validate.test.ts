@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buildManifest } from '@hoop-rush/test-fixtures';
+import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
 import { dataValidate } from './data-validate.js';
 import { EXIT_CHECKS_FAILED, EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.js';
 
@@ -109,5 +109,46 @@ describe('dataValidate', () => {
     expect(report.failures.some((f) => f.includes('asset missing'))).toBe(true);
     expect(report.details.some((d) => d.includes('hash verified'))).toBe(true);
     expect(report.exitCode).toBe(EXIT_CHECKS_FAILED);
+  });
+
+  it('requires nbaHeadshotAvailable on every player when a primary template exists', async () => {
+    const poolDir = join(dir, 'pools');
+    await mkdir(poolDir);
+    const assetPath = join(poolDir, 'lakers-1990s.json');
+    const pool = buildPool([buildPlayerSeason({ altIds: { bbref: 'player01' } })]);
+    const asset = JSON.stringify(pool);
+    await writeFile(assetPath, asset);
+    const contentHash = createHash('sha256').update(asset).digest('hex');
+
+    const manifest = buildManifest({
+      pools: [
+        { franchiseId: 'lakers', eraId: '1990s', url: 'pools/lakers-1990s.json', contentHash },
+      ],
+    });
+    const path = await writeManifest(manifest);
+    const report = await dataValidate(path, false);
+    expect(report.ok).toBe(false);
+    expect(report.failures.some((f) => f.includes('lack nbaHeadshotAvailable'))).toBe(true);
+  });
+
+  it('accepts pools whose players carry the CDN availability marker', async () => {
+    const poolDir = join(dir, 'pools');
+    await mkdir(poolDir);
+    const assetPath = join(poolDir, 'lakers-1990s.json');
+    const pool = buildPool([
+      buildPlayerSeason({ altIds: { bbref: 'player01', nbaHeadshotAvailable: false } }),
+    ]);
+    const asset = JSON.stringify(pool);
+    await writeFile(assetPath, asset);
+    const contentHash = createHash('sha256').update(asset).digest('hex');
+
+    const manifest = buildManifest({
+      pools: [
+        { franchiseId: 'lakers', eraId: '1990s', url: 'pools/lakers-1990s.json', contentHash },
+      ],
+    });
+    const path = await writeManifest(manifest);
+    const report = await dataValidate(path, false);
+    expect(report.failures.some((f) => f.includes('nbaHeadshotAvailable'))).toBe(false);
   });
 });

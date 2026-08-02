@@ -3,6 +3,7 @@ import { dataValidate, DATA_VALIDATE_OPTIONS, DEFAULT_MANIFEST } from './command
 import { dataOveralls, DATA_OVERALLS_OPTIONS } from './commands/data-overalls.js';
 import { helpCommand } from './commands/help.js';
 import { simGame, simBatch, SIM_OPTIONS, UsageError as SimUsageError } from './commands/sim.js';
+import { simDiagnose, simSeason, DIAGNOSE_OPTIONS, SEASON_OPTIONS } from './commands/diagnose.js';
 import { simChallenge, SIM_CHALLENGE_OPTIONS } from './commands/challenge.js';
 import { bracketAudit, BRACKET_AUDIT_OPTIONS } from './commands/bracket-audit.js';
 import { bracketGenerate, BRACKET_GENERATE_OPTIONS } from './commands/bracket-generate.js';
@@ -65,6 +66,24 @@ const COMMANDS: Record<string, CommandDef> = {
         'seed-to': getOptionString(args, 'seed-to') ?? undefined,
         samples: getOptionString(args, 'samples') ?? undefined,
         workers: getOptionString(args, 'workers') ?? undefined,
+        profile: getOptionString(args, 'profile') ?? undefined,
+      }),
+  },
+  'sim diagnose': {
+    options: DIAGNOSE_OPTIONS,
+    run: (args) =>
+      simDiagnose({
+        fixture: getOptionString(args, 'fixture') ?? undefined,
+        samples: getOptionString(args, 'samples') ?? undefined,
+        profile: getOptionString(args, 'profile') ?? undefined,
+      }),
+  },
+  'sim season': {
+    options: SEASON_OPTIONS,
+    run: (args) =>
+      simSeason({
+        fixture: getOptionString(args, 'fixture') ?? undefined,
+        samples: getOptionString(args, 'samples') ?? undefined,
         profile: getOptionString(args, 'profile') ?? undefined,
       }),
   },

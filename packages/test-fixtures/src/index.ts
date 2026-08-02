@@ -482,6 +482,123 @@ export function buildLegalSimulationTeam(overrides: Partial<SimulationTeam> = {}
   };
 }
 
+/**
+ * Role-differentiated lineup for player-role calibration (spec/06): one
+ * primary creator, one floor spacer, one secondary creator, one post
+ * presence, and one rim runner in legal G,G,F,F,C slot order. The engine
+ * must measurably differentiate these roles (usage hierarchy, shot mix,
+ * assist conversion, rebounding share).
+ */
+export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): SimulationTeam {
+  const players: SimulationPlayer[] = [
+    buildSimulationPlayer({
+      playerId: 'p-roles-creator',
+      displayName: 'Primary Creator',
+      positions: ['G'],
+      ratings: {
+        ...DEFAULT_SIM_RATINGS,
+        ballHandling: 88,
+        passing: 86,
+        offensiveIq: 84,
+        threePoint: 70,
+      },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 32,
+        passRate: 45,
+        shotRate: 30,
+        isolationRate: 20,
+        pickAndRollBallHandlerRate: 40,
+        threePointRate: 20,
+        freeThrowRate: 24,
+      },
+    }),
+    buildSimulationPlayer({
+      playerId: 'p-roles-spacer',
+      displayName: 'Floor Spacer',
+      positions: ['G'],
+      ratings: { ...DEFAULT_SIM_RATINGS, threePoint: 84 },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 16,
+        passRate: 28,
+        shotRate: 24,
+        spotUpRate: 38,
+        threePointRate: 42,
+        cornerThreeFrequency: 15,
+        aboveBreakThreeFrequency: 30,
+      },
+    }),
+    buildSimulationPlayer({
+      playerId: 'p-roles-secondary',
+      displayName: 'Secondary Creator',
+      positions: ['F'],
+      ratings: {
+        ...DEFAULT_SIM_RATINGS,
+        ballHandling: 74,
+        passing: 74,
+        offensiveIq: 72,
+        threePoint: 74,
+      },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 24,
+        passRate: 36,
+        shotRate: 28,
+        pickAndRollBallHandlerRate: 30,
+        threePointRate: 28,
+      },
+    }),
+    buildSimulationPlayer({
+      playerId: 'p-roles-post',
+      displayName: 'Post Presence',
+      positions: ['F'],
+      ratings: { ...DEFAULT_SIM_RATINGS, insideScoring: 82, closeShot: 74, offensiveRebound: 78 },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 18,
+        shotRate: 24,
+        postUpRate: 24,
+        rimFrequency: 40,
+        threePointRate: 8,
+        crashOffensiveGlassRate: 22,
+      },
+    }),
+    buildSimulationPlayer({
+      playerId: 'p-roles-rim',
+      displayName: 'Rim Runner',
+      positions: ['C'],
+      ratings: {
+        ...DEFAULT_SIM_RATINGS,
+        insideScoring: 86,
+        closeShot: 78,
+        offensiveRebound: 82,
+        defensiveRebound: 80,
+        vertical: 78,
+      },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 15,
+        passRate: 20,
+        shotRate: 22,
+        rimFrequency: 50,
+        shortMidFrequency: 25,
+        pickAndRollRollManRate: 32,
+        cutRate: 24,
+        threePointRate: 4,
+        freeThrowRate: 18,
+        crashOffensiveGlassRate: 20,
+      },
+    }),
+  ];
+  return {
+    teamId: 'roles',
+    displayName: 'Roles Lineup',
+    players,
+    ...overrides,
+  };
+}
+
 /** Strength bands: strong ~85 across the board, medium ~65, weak ~48. */
 function fixtureScale(targetCenter: number) {
   return (_element: unknown, index: number): SimulationPlayer => {
@@ -580,6 +697,24 @@ function fixtureTargets(): EraSimulationProfile['targets'] {
     overtimeRate: t(0.06, 0.02, 1000),
     strongVsWeakWinRate: t(0.85, 0.08, 1000),
     equalLineupHomeWinRate: t(0.5, 0.05, 1000),
+    // Player-role gates on the `roles` fixture (measured with the m3
+    // engine at build time; regenerated through `calibrate run`). Keys use
+    // slot indices: 0 creator, 1 spacer, 2 secondary, 3 post, 4 rim.
+    playerRoles: [
+      { key: 'usageShare.0', target: t(0.27, 0.035, 200) },
+      { key: 'usageShare.1', target: t(0.173, 0.035, 200) },
+      { key: 'usageShare.2', target: t(0.225, 0.035, 200) },
+      { key: 'usageShare.3', target: t(0.176, 0.035, 200) },
+      { key: 'usageShare.4', target: t(0.156, 0.035, 200) },
+      { key: 'threePointRate.0', target: t(0.16, 0.05, 200) },
+      { key: 'threePointRate.1', target: t(0.233, 0.05, 200) },
+      { key: 'threePointRate.4', target: t(0.105, 0.05, 200) },
+      { key: 'assistConversion.0', target: t(0.953, 0.08, 200) },
+      { key: 'assistConversion.4', target: t(0.817, 0.1, 200) },
+      { key: 'offensiveReboundPct.3', target: t(0.061, 0.02, 200) },
+      { key: 'offensiveReboundPct.4', target: t(0.067, 0.02, 200) },
+      { key: 'defensiveReboundPct.4', target: t(0.137, 0.03, 200) },
+    ],
   };
 }
 

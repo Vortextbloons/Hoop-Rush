@@ -6,11 +6,15 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { Rng } from './rng.js';
 import { ENGINE_CONSTANTS } from './constants.js';
+import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.js';
 
 /**
  * Usage, creation, passing, and action tendencies select the initiator,
  * action, shooter, zone, and potential assister (spec/03 pipeline stages 2-3).
- * All weights are player tendencies; no summary Overall rating is consulted.
+ * All weights are player tendencies and transferable-ability ratings; no
+ * summary Overall rating is consulted. Creation and spacing scores modulate
+ * the raw tendency weights so role hierarchies (primary creator, floor
+ * spacer, rim finisher) measurably shape who ends possessions.
  */
 
 export type ActionType =
@@ -33,27 +37,77 @@ export interface ShotSelection {
   passed: boolean;
 }
 
-/** Selects the possession initiator, weighted by usage rate. */
+/**
+ * Initiation weight: usage tendency scaled by creation ability, with a
+ * bounded creation-burden bonus for high-usage initiators on weak-creating
+ * lineups (their teammates cannot initiate instead, so the offense leans on
+ * them). The usage exponent steepens the hierarchy so a high-usage creator
+ * concentrates possession starts without rating boosts. All deterministic
+ * and bounded to keep matchups meaningful.
+ */
+export function initiatorWeight(player: SimulationPlayer, team: SimulationTeam): number {
+  const usage = Math.max(0.5, player.tendencies.usageRate);
+  const usagePower = Math.pow(usage / 10, 1.5);
+  const creationMod = 0.75 + 0.5 * creationScore(player);
+  return usagePower * creationMod * creationBurden(player, team);
+}
+
+/** Bounded (1.08..1.2) burden shift for the highest-usage creators. */
+export function creationBurden(player: SimulationPlayer, team: SimulationTeam): number {
+  if (player.tendencies.usageRate < 25) return 1;
+  const teammates = team.players.filter((p) => p.playerId !== player.playerId);
+  if (teammates.length === 0) return 1;
+  const theirCreation = teammates.reduce((sum, p) => sum + creationScore(p), 0) / teammates.length;
+  const shortfall = Math.min(1, Math.max(0, (0.6 - theirCreation) / 0.3));
+  return 1 + Math.min(0.2, 0.08 + 0.12 * shortfall);
+}
+
+/** Selects the possession initiator, weighted by creation-scaled usage. */
 export function pickInitiator(team: SimulationTeam, rng: Rng): SimulationPlayer {
   return rng.weightedPick(
     team.players,
-    team.players.map((p) => Math.max(0.5, p.tendencies.usageRate)),
+    team.players.map((p) => initiatorWeight(p, team)),
   );
 }
 
-/** Selects the play type from the initiator's action tendencies. Speed raises
- * the transition rate: faster lineups run more (physical trait mechanism). */
+/** Spacing weight for catch-and-shoot targets (0.55..1.45 around the shotRate). */
+export function spacingWeight(player: SimulationPlayer): number {
+  return 0.55 + 0.9 * spacingScore(player);
+}
+
+/**
+ * Shot responsibility on passed possessions: high-usage players keep the
+ * ball when the offense swings (they get the second look), while low-usage
+ * role players shoot only the open ones. Scales catch-and-shoot weight so
+ * box-score usage keeps a real hierarchy alongside spacing.
+ */
+export function usagePull(player: SimulationPlayer): number {
+  return 0.5 + Math.min(1, player.tendencies.usageRate / 32);
+}
+
+/**
+ * Selects the play type from the initiator's action tendencies. Speed raises
+ * the transition rate: faster lineups run more (physical trait mechanism).
+ * High-usage initiators run ball-dominant actions (isolation, pick-and-roll,
+ * post-up) at a higher rate: their shot responsibilities come from creation,
+ * not spot-up volume.
+ */
 export function pickAction(initiator: SimulationPlayer, rng: Rng): ActionType {
   const t = initiator.tendencies;
+  const ballDominance = Math.min(1, t.usageRate / 36);
   const transitionWeight = t.transitionRate * (0.5 + initiator.ratings.speed / 100);
+  const iso = t.isolationRate * (1 + 0.6 * ballDominance);
+  const pnr = t.pickAndRollBallHandlerRate * (1 + 0.5 * ballDominance);
+  const post = t.postUpRate * (1 + 0.4 * ballDominance);
+  const passiveScale = 1 - 0.3 * ballDominance;
   return rng.weightedPick(ACTION_TYPES, [
-    t.isolationRate,
-    t.pickAndRollBallHandlerRate,
+    iso,
+    pnr,
     t.pickAndRollRollManRate,
-    t.postUpRate,
-    t.spotUpRate,
-    t.cutRate,
-    transitionWeight,
+    post,
+    t.spotUpRate * passiveScale,
+    t.cutRate * passiveScale,
+    transitionWeight * passiveScale,
   ]);
 }
 
@@ -69,7 +123,8 @@ export function passProbability(initiator: SimulationPlayer, action: ActionType)
           : action === 'postUp'
             ? 0.28
             : 0.2;
-  const passingFactor = 0.65 + initiator.tendencies.passRate / 100;
+  const passingFactor =
+    0.65 + initiator.tendencies.passRate / 100 + creationScore(initiator) * 0.15;
   const creationFactor = 1.1 - initiator.tendencies.usageRate / 200;
   return Math.min(
     0.97,
@@ -80,6 +135,8 @@ export function passProbability(initiator: SimulationPlayer, action: ActionType)
 /**
  * Selects the shooter. Spot-up, cut, and transition possessions pass toward a
  * teammate; isolation, pick-and-roll, and post-up end with the initiator.
+ * Catch-and-shoot targets are weighted by shot volume times spacing, so
+ * floor spacers draw the perimeter looks.
  */
 export function pickShooter(
   team: SimulationTeam,
@@ -91,7 +148,9 @@ export function pickShooter(
     return rng.weightedPick(
       team.players,
       team.players.map((p) =>
-        p.playerId === initiator.playerId ? 0.5 : Math.max(0.5, p.tendencies.shotRate),
+        p.playerId === initiator.playerId
+          ? 0.35
+          : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * usagePull(p)),
       ),
     );
   }
@@ -101,7 +160,8 @@ export function pickShooter(
       team.players.map((p) =>
         p.playerId === initiator.playerId
           ? 0.5
-          : Math.max(0.5, p.tendencies.pickAndRollRollManRate),
+          : Math.max(0.5, p.tendencies.pickAndRollRollManRate) *
+            (0.6 + 0.8 * interiorScoringScore(p)),
       ),
     );
   }
@@ -122,8 +182,8 @@ export function pickShot(
   if (teammates.length === 0) return { shooter: initiator, initiator, passed: false };
   const weights = teammates.map((p) =>
     action === 'pickAndRollRoll'
-      ? Math.max(0.5, p.tendencies.pickAndRollRollManRate)
-      : Math.max(0.5, p.tendencies.shotRate),
+      ? Math.max(0.5, p.tendencies.pickAndRollRollManRate) * (0.6 + 0.8 * interiorScoringScore(p))
+      : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * usagePull(p)),
   );
   return { shooter: rng.weightedPick(teammates, weights), initiator, passed: true };
 }
@@ -144,8 +204,9 @@ export function pickAssister(
         ? Math.max(0.5, p.tendencies.passRate / 5)
         : Math.max(0.5, observedCreation + 1);
     const passingWeight = 0.7 + p.ratings.passing / 100;
+    const creationMod = 0.75 + 0.5 * creationScore(p);
     const initiatorBonus = p.playerId === initiator.playerId ? 1.35 : 1;
-    return roleWeight * passingWeight * initiatorBonus;
+    return roleWeight * passingWeight * creationMod * initiatorBonus;
   });
   return rng.weightedPick(candidates, weights);
 }

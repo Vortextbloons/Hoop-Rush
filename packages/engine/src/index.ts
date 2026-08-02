@@ -6,6 +6,7 @@
 export * from './domain/positions.js';
 export * from './domain/lineup.js';
 export * from './domain/zones.js';
+export * from './domain/archetypes.js';
 export * from './sim/simulate.js';
 export * from './sim/timing.js';
 export * from './sim/usage.js';

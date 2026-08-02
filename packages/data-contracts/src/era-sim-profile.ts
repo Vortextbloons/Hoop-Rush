@@ -106,6 +106,21 @@ export const eraCalibrationTargetsSchema = z.object({
   strongVsWeakWinRate: calibrationTargetSchema,
   /** Win rate of the home side in equal-lineup fixtures (neutral site: ~0.5). */
   equalLineupHomeWinRate: calibrationTargetSchema,
+  /**
+   * Player-role gates measured on the `roles` fixture (spec/06). Keys use
+   * slot indices, e.g. `usageShare.0` (primary creator at G), so the frozen
+   * era targets pin role behavior: usage hierarchy, three-point and
+   * free-throw rates, assist conversion, and rebound percentages. Empty
+   * until an era profile has been remeasured and approved.
+   */
+  playerRoles: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(64),
+        target: calibrationTargetSchema,
+      }),
+    )
+    .default([]),
 });
 export type EraCalibrationTargets = z.infer<typeof eraCalibrationTargetsSchema>;
 

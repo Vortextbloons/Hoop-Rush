@@ -46,14 +46,19 @@ export function pickFouler(
   );
 }
 
-/** Free-throw shooter, weighted by how often the player draws trips. */
+/**
+ * Free-throw shooter on bonus free throws: players who draw trips and shoot
+ * well from the line get the attempts (deterministic role behavior).
+ */
 export function pickFreeThrowShooter(
   team: SimulationTeam,
   rng: { weightedPick<T>(items: readonly T[], weights: readonly number[]): T },
 ): SimulationPlayer {
   return rng.weightedPick(
     team.players,
-    team.players.map((p) => Math.max(0.5, p.tendencies.freeThrowRate)),
+    team.players.map(
+      (p) => Math.max(0.5, p.tendencies.freeThrowRate) * (0.6 + 0.8 * (p.ratings.freeThrow / 100)),
+    ),
   );
 }
 

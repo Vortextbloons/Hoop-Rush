@@ -38,6 +38,8 @@ function candidatePlayer(
   });
   // Scale the possession ratings with the score so proposals span the
   // strength spectrum (the score alone only drives proposal sampling).
+  // Tendencies scale too: the m3 engine differentiates on creation, spacing,
+  // and shot volume, so score-flat tendencies would compress win rates.
   const delta = score - 65;
   const shifted = Object.fromEntries(
     Object.entries(sim.ratings).map(([key, value]) => [
@@ -45,6 +47,14 @@ function candidatePlayer(
       Math.max(30, Math.min(95, value + delta)),
     ]),
   ) as SimulationPlayer['ratings'];
+  const shiftedTendencies = {
+    ...sim.tendencies,
+    usageRate: Math.max(5, Math.min(40, sim.tendencies.usageRate + delta * 0.7)),
+    shotRate: Math.max(5, Math.min(50, sim.tendencies.shotRate + delta * 0.6)),
+    passRate: Math.max(5, Math.min(50, sim.tendencies.passRate + delta * 0.5)),
+    threePointRate: Math.max(0, Math.min(50, sim.tendencies.threePointRate + delta * 0.6)),
+    freeThrowRate: Math.max(0, Math.min(50, sim.tendencies.freeThrowRate + delta * 0.3)),
+  };
   return {
     playerId: sim.playerId,
     displayName: sim.displayName,
@@ -52,7 +62,7 @@ function candidatePlayer(
     heightInches: sim.heightInches,
     weightLbs: sim.weightLbs,
     ratings: shifted,
-    tendencies: sim.tendencies,
+    tendencies: shiftedTendencies,
     seasonKey: '1995-96',
     score,
   };
@@ -131,8 +141,8 @@ function generationOptions(
     openingOpponent: opening,
     difficulty,
     candidates: FRANCHISES.map(candidatesFor),
-    proposalsPerFranchise: 18,
-    samplesPerBenchmark: 6,
+    proposalsPerFranchise: 32,
+    samplesPerBenchmark: 10,
     minPlayerScore: 45,
     engineContext: createEngineContext(),
     ...overrides,
@@ -148,7 +158,7 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(scheduleInvariants(bracket.schedule)).toEqual([]);
     expect(bracket.schedule[0]?.opponentId).toBe('lakers-1990s-opening');
     expect(bracket.generation.seed).toBe(seedFromString('fixture-bracket'));
-  }, 15_000);
+  }, 40_000);
 
   it('keeps the opening opponent unchanged', () => {
     const opening = buildOpeningOpponent();
@@ -159,7 +169,7 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(entry!.displayName).toBe(opening.displayName);
     expect(JSON.stringify(entry!.lineup)).toBe(JSON.stringify(opening.lineup));
     expect(JSON.stringify(entry!.players)).toBe(JSON.stringify(opening.players));
-  }, 15_000);
+  }, 40_000);
 
   it('regenerates byte-identically with the same seed and inputs', () => {
     const a = generateBracket(generationOptions());
@@ -193,7 +203,7 @@ describe('generateBracket (propose-review-freeze)', () => {
       const assignmentIds = opponent.lineup.assignments.map((a) => a.playerId);
       expect(assignmentIds).toEqual(ids);
     }
-  });
+  }, 40_000);
 
   it('spans the team percentile band with the league median inside its band', () => {
     const bracket = generateBracket(generationOptions());
@@ -209,7 +219,7 @@ describe('generateBracket (propose-review-freeze)', () => {
     const medianBand = bracket.difficulty.leagueMedianPercentileBand;
     expect(median).toBeGreaterThanOrEqual(medianBand[0]);
     expect(median).toBeLessThanOrEqual(medianBand[1]);
-  });
+  }, 40_000);
 
   it('records committed generation metadata', () => {
     const bracket = generateBracket(generationOptions());
@@ -219,7 +229,7 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(bracket.bracketVersion).toBe('bracket-m3-v1');
     expect(bracket.scheduleVersion).toBe('schedule-v1');
     expect(bracket.difficulty.name).toBe('medium');
-  });
+  }, 40_000);
 
   it('throws when a franchise cannot form a legal lineup', () => {
     const options = generationOptions();

@@ -11,6 +11,7 @@ import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts
 import {
   buildEqualFixture,
   buildLegalSimulationTeam,
+  buildRolesTeam,
   buildSimulationPlayer,
   buildStrongMediumFixture,
   buildStrongWeakFixture,
@@ -167,6 +168,20 @@ function main(): void {
     home: base,
     away: base,
     variantParameters: { league3PARate: 0.35 },
+  });
+
+  // Role-differentiated lineup for the player-role calibration gates
+  // (spec/06): one primary creator, one floor spacer, one secondary
+  // creator, one post presence, and one rim runner.
+  const roleTeam = buildRolesTeam();
+
+  write('roles.json', {
+    schemaVersion: 1,
+    fixtureId: 'roles',
+    description:
+      'Role-differentiated lineup (creator, spacer, secondary, post, rim runner) against itself; player-role calibration gates.',
+    home: roleTeam,
+    away: { ...roleTeam, teamId: 'roles-away', displayName: 'Roles Lineup Away' },
   });
 }
 
