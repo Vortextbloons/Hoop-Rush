@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { Home } from '@lucide/svelte';
+  import { Home, Users } from '@lucide/svelte';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
   import { Toaster } from 'svelte-sonner';
@@ -13,10 +13,13 @@
 
   // Route IDs (not resolved paths): BottomNav resolves them at render time,
   // which keeps relative-base static builds correct.
-  const navItems: BottomNavItem[] = [{ id: 'home', label: 'Home', href: '/', icon: Home }];
+  const navItems: BottomNavItem[] = [
+    { id: 'home', label: 'Home', href: '/', icon: Home },
+    { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
+  ];
 
   const pathname = $derived(page.url.pathname);
-  const showBottomNav = $derived(pathname === '/');
+  const showBottomNav = $derived(pathname === '/' || pathname === '/roster');
 </script>
 
 <svelte:head>
