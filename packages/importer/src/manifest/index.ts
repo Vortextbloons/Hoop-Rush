@@ -60,6 +60,51 @@ function sortedJsonFiles(dir: string): string[] {
   }
 }
 
+/**
+ * Rebuilds players-index.json from schema-valid packaged pools and returns the
+ * manifest index entry (url + content hash). Skips invalid pool files with a
+ * warning instead of failing the whole build.
+ */
+export function rebuildPlayersIndex(dataDir = PUBLIC_DATA): { url: string; contentHash: string } | null {
+  const poolsDir = join(dataDir, 'pools');
+  const poolFiles = sortedJsonFiles(poolsDir);
+  const indexPlayers: ReturnType<typeof peakPlayerToIndexEntry>[] = [];
+  for (const name of poolFiles) {
+    try {
+      const validated = parsePool(readJson(join(poolsDir, name)));
+      for (const player of validated.players) {
+        indexPlayers.push(peakPlayerToIndexEntry(player));
+      }
+    } catch (error) {
+      console.warn(`skipped pool ${name} for players index: ${(error as Error).message}`);
+    }
+  }
+  if (indexPlayers.length === 0) return null;
+  const indexPath = join(dataDir, 'players-index.json');
+  const index = parsePlayersIndex({
+    schemaVersion: ARTIFACT_SCHEMA_VERSION,
+    dataVersion: DATA_VERSION,
+    players: indexPlayers,
+  });
+  writeJsonRetry(indexPath, index, true);
+  return {
+    url: 'players-index.json',
+    contentHash: sha256File(indexPath),
+  };
+}
+
+/** Refreshes the players index artifact and updates manifest.json in place. */
+export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
+  const entry = rebuildPlayersIndex(dataDir);
+  if (entry === null) return;
+  const manifestPath = join(dataDir, 'manifest.json');
+  if (!fileExists(manifestPath)) return;
+  const manifest = readJson(manifestPath) as Manifest;
+  manifest['playersIndex'] = entry;
+  writeJsonRetry(manifestPath, manifest, true);
+  console.log(`updated players index (${entry.contentHash.slice(0, 8)}…)`);
+}
+
 /** Rebuilds the complete v2 manifest from packaged artifacts. */
 export function run(dataDir = PUBLIC_DATA): void {
   const manifestPath = join(dataDir, 'manifest.json');
@@ -115,30 +160,9 @@ export function run(dataDir = PUBLIC_DATA): void {
   }
   manifest['pools'] = poolEntries;
 
-  // Global players index: schema-valid peak player-seasons across packaged pools.
-  const indexPlayers: ReturnType<typeof peakPlayerToIndexEntry>[] = [];
-  for (const name of poolFiles) {
-    try {
-      const validated = parsePool(readJson(join(poolsDir, name)));
-      for (const player of validated.players) {
-        indexPlayers.push(peakPlayerToIndexEntry(player));
-      }
-    } catch (error) {
-      console.warn(`skipped pool ${name} for players index: ${(error as Error).message}`);
-    }
-  }
-  if (indexPlayers.length > 0) {
-    const indexPath = join(dataDir, 'players-index.json');
-    const index = parsePlayersIndex({
-      schemaVersion: ARTIFACT_SCHEMA_VERSION,
-      dataVersion: DATA_VERSION,
-      players: indexPlayers,
-    });
-    writeJsonRetry(indexPath, index, true);
-    manifest['playersIndex'] = {
-      url: 'players-index.json',
-      contentHash: sha256File(indexPath),
-    };
+  const playersIndexEntry = rebuildPlayersIndex(dataDir);
+  if (playersIndexEntry !== null) {
+    manifest['playersIndex'] = playersIndexEntry;
   }
 
   // Complete availability matrix: every slot x era combination, from the
