@@ -362,8 +362,8 @@ describe('run contracts', () => {
     difficulty: {
       profileVersion: 'medium-v1',
       name: 'medium',
-      leagueMedianPercentileBand: [0.45, 0.6],
-      teamPercentileBand: [0.3, 0.7],
+      leagueMedianPercentileBand: [0.4, 0.55],
+      teamPercentileBand: [0.25, 0.65],
     },
     bracket: {
       bracketVersion: 'bracket-v1',
@@ -876,8 +876,8 @@ function buildMinimalRun() {
     difficulty: {
       profileVersion: 'medium-v1',
       name: 'medium',
-      leagueMedianPercentileBand: [0.45, 0.6],
-      teamPercentileBand: [0.3, 0.7],
+      leagueMedianPercentileBand: [0.4, 0.55],
+      teamPercentileBand: [0.25, 0.65],
     },
     bracket: {
       bracketVersion: 'bracket-v1',

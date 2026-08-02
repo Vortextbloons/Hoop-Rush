@@ -8,7 +8,7 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v5';
+export const ENGINE_VERSION = 'm3-engine-v6';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -46,18 +46,20 @@ export const ENGINE_CONSTANTS = {
    * Player skill deviates make chance by at most this much around the 70
    * anchor. Calibrated down from 0.18 so lineup-strength gaps do not turn
    * into guaranteed winners: elite teams still shoot better, but plausible
-   * upsets survive.
+   * upset survival. m3-engine-v6: nudged from 0.08 so elite lineups convert
+   * slightly more reliably against weak defenses.
    */
-  skillRange: 0.08,
+  skillRange: 0.09,
   /**
    * Defensive contest moves make chance by at most this much. The contest is
    * zero-centered at the population-mean contest rating (contestRatioPivot):
    * an average defender leaves anchored efficiency intact, elite defenders
    * subtract, weak defenders add. Without the zero-center, the always-
    * negative contest silently depressed every anchored player below their
-   * own observed season rate.
+   * own observed season rate. m3-engine-v6: nudged from 0.10 for a slightly
+   * steeper defensive contest response on mismatches.
    */
-  contestMax: 0.1,
+  contestMax: 0.105,
   /** Contest can help the shooter by at most this much (weak-defender boost). */
   contestMin: -0.05,
   /** Contest ratio pivots here (the packaged pool's usage-weighted mean

@@ -243,7 +243,7 @@ describe('generateBracket (propose-review-freeze)', () => {
     const bracket = fixtureBracket();
     expect(bracket.generation.generationVersion).toBe('bracket-m3-v1');
     expect(bracket.generation.dataVersion).toBe('data-v1');
-    expect(bracket.generation.targetBands.teamPercentileBand).toEqual([0.3, 0.7]);
+    expect(bracket.generation.targetBands.teamPercentileBand).toEqual([0.25, 0.65]);
     expect(bracket.bracketVersion).toBe('bracket-m3-v1');
     expect(bracket.scheduleVersion).toBe('schedule-v1');
     expect(bracket.difficulty.name).toBe('medium');

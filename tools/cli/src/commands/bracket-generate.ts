@@ -217,8 +217,8 @@ function anchorsFromStats(
     fieldGoalPct: shrunkRatio(stats.fgm, stats.fga, 0.45),
     threePointPct: stats.tpa > 0 ? shrunkRatio(stats.tpm, stats.tpa, 0.34) : null,
     freeThrowPct: shrunkRatio(stats.ftm, stats.fta, 0.75),
-    threePointAttemptRate: ratio(stats.tpa, stats.fga, 0),
-    freeThrowAttemptRate: ratio(stats.fta, stats.fga, 0.2),
+    threePointAttemptRate: Math.min(1, ratio(stats.tpa, stats.fga, 0)),
+    freeThrowAttemptRate: Math.min(1, ratio(stats.fta, stats.fga, 0.2)),
   };
 }
 
@@ -458,10 +458,10 @@ export function bracketGenerate(args: {
   const openingOpponent: OpponentTeam = openingParsed.data;
 
   const difficulty: DifficultyProfile = {
-    profileVersion: 'm3-medium-v2',
+    profileVersion: 'm3-medium-v3',
     name: 'medium',
-    leagueMedianPercentileBand: [0.45, 0.6],
-    teamPercentileBand: [0.3, 0.7],
+    leagueMedianPercentileBand: [0.4, 0.55],
+    teamPercentileBand: [0.25, 0.65],
   };
 
   let bracket: OpponentBracket;
