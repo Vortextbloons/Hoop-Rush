@@ -28,10 +28,10 @@ MANIFEST_PATH = PUBLIC_DATA / "manifest.json"
 
 SCHEMA_VERSION = 1
 POSITION_NORMALIZATION_VERSION = "position-v1"
-RATINGS_VERSION = "ratings-v7-simulation-anchors"
+RATINGS_VERSION = "ratings-v8-production-overall"
 SELECTION_SCORE_VERSION = "selection-v1"
 MIN_TEAM_GAMES = 40
-DATA_VERSION = "m1.6"
+DATA_VERSION = "m1.7"
 
 # ---------------------------------------------------------------------------
 # Position normalization (spec/02)

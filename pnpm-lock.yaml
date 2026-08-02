@@ -45,6 +45,9 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
+      '@hoop-rush/test-fixtures':
+        specifier: workspace:*
+        version: link:../../packages/test-fixtures
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1

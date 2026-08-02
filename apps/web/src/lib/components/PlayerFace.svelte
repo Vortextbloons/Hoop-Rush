@@ -1,9 +1,5 @@
 <script lang="ts">
-  import {
-    isNbaCdnHeadshotUrl,
-    resolveHeadshotUrls,
-    type HoopRushManifest,
-  } from '@hoop-rush/data-contracts';
+  import { resolveHeadshotUrls, type HoopRushManifest } from '@hoop-rush/data-contracts';
   import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
 
   type PeakPlayer = FranchiseEraPool['players'][number];
@@ -37,7 +33,6 @@
 
   const src = $derived(urls[attempt] ?? '');
   const showInitials = $derived(!src || attempt >= urls.length);
-  const useAnonymousCors = $derived(src !== '' && !isNbaCdnHeadshotUrl(src));
 
   /**
    * A request that hangs (e.g. a reset connection that never errors) would
@@ -84,7 +79,6 @@
         class="h-full w-full origin-top scale-[1.2] object-cover object-top"
         loading="lazy"
         decoding="async"
-        crossorigin={useAnonymousCors ? 'anonymous' : undefined}
         referrerpolicy="no-referrer"
         onerror={onError}
       />

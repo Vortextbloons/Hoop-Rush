@@ -130,21 +130,20 @@ def blend_to_mean(value: float, weight: float, mean: float) -> float:
     return value * w + mean * (1 - w)
 
 
-def _is_big_profile(ratings: dict[str, int], position: str) -> bool:
+def _is_big_profile(position: str, height_inches: int | None = None) -> bool:
     """Detect big-man profile. Cs and PFs are always bigs.
-    SFs qualify with a big defensive profile."""
+    SFs qualify only with genuine frontcourt height (6'10"+). Raw NBA roster
+    labels are unreliable for eras past (Duncan is listed as an SF), but
+    defensive-attribute thresholds alone misclassify athletic wings — LeBron,
+    Kawhi, Pippen, and Marion all clear them and were capped as centers."""
     if position in ("C", "PF"):
         return True
     if position == "SF":
-        return (
-            ratings.get("interiorDefense", 0) >= 65
-            and ratings.get("defensiveRebound", 0) >= 70
-            and ratings.get("block", 0) >= 55
-        )
+        return (height_inches or 0) >= 82
     return False
 
 
-def compute_overall(ratings: dict[str, int], position: str) -> int:
+def compute_overall(ratings: dict[str, int], position: str, height_inches: int | None = None) -> int:
     weights = OVERALL_WEIGHTS.get(position, OVERALL_WEIGHTS["SF"])
     total = 0.0
     for key, weight in weights.items():
@@ -153,7 +152,7 @@ def compute_overall(ratings: dict[str, int], position: str) -> int:
     if total <= 50:
         return int(round(total))
     deviation = total - 50
-    is_big = _is_big_profile(ratings, position)
+    is_big = _is_big_profile(position, height_inches)
     divisor = 120 if is_big else 85
     return int(min(99, round(50 + deviation * (1 + deviation / divisor))))
 
@@ -276,8 +275,8 @@ def compute_production_impact(stats: dict[str, Any]) -> float:
     return clamp(impact, 55, 99)
 
 
-def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str, Any]) -> int:
-    skill_overall = compute_overall(ratings, position)
+def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str, Any], height_inches: int | None = None) -> int:
+    skill_overall = compute_overall(ratings, position, height_inches)
     production_impact = compute_production_impact(stats)
     if production_impact == 0:
         return skill_overall
@@ -362,7 +361,13 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
     # his usage is below a heliocentric threshold. Kobe's 1999-00 season is the
     # motivating case: 38.2 MPG, 21.1 PPG, 19.1 PER, and +3.2 BPM at 26.1% usage.
     # This is a mechanism-based production floor, not a player-name override.
-    is_big = _is_big_profile(ratings, position)
+    #
+    # Big vs wing uses the defensive-attribute heuristic: the raw NBA roster
+    # position label is unreliable for eras past (Duncan is listed as an SF),
+    # and a big-profile player must not fall into the wing scoring caps. The
+    # ladder below is what keeps the band sane — a big-profile wing such as
+    # Marion is capped by the same ladder instead of escaping every cap.
+    is_big = _is_big_profile(position, height_inches)
     two_way_star = (
         not is_big
         and gp >= 50
@@ -392,8 +397,15 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
         boosted = max(boosted, 91)
 
     # --- Big-man profile caps (matches TS) ---
-    if is_big and usage < 28:
-        if ppg < 12:
+    # The cap ladder is games-played aware so a brilliant half-season cannot
+    # reach the all-time band. 25+ ppg bigs previously escaped every cap and
+    # could tie the absolute peaks (Cousins 2017-18 reached 100 in 48 games).
+    if is_big:
+        if ppg >= 25:
+            boosted = min(boosted, 97 if gp >= 55 else 92)
+        elif usage >= 28:
+            boosted = min(boosted, 91)
+        elif ppg < 12:
             boosted = min(boosted, 82)
         elif ppg < 17:
             # Strong defensive impact can raise a low-volume big, but should
@@ -401,13 +413,10 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
             boosted = min(boosted, 86 if bpm >= 3 else 83)
         elif ppg < 20:
             boosted = min(boosted, 88 if bpm >= 3 else 82)
-        elif ppg < 25 and bpm < 3:
+        elif ppg < 23:
             boosted = min(boosted, 91)
-        elif ppg < 25:
+        else:
             boosted = min(boosted, 94)
-
-    if is_big and usage >= 28 and ppg < 25:
-        boosted = min(boosted, 89)
 
     # --- High-usage non-big caps (matches TS) ---
     if not is_big and usage >= 28 and bpm < 3:
@@ -433,6 +442,18 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
     if not is_big and ppg >= 20 and usage < 26 and bpm < 1.5:
         boosted = min(boosted, 82)
 
+    # High-usage guards/wings at 25+ ppg previously escaped every wing cap too
+    # (Maxey 2025-26 reached 95 without the impact metrics of the all-time band).
+    if not is_big and ppg >= 25:
+        if gp < 55:
+            boosted = min(boosted, 90)
+        elif bpm >= 4:
+            boosted = min(boosted, 96)
+        elif bpm >= 3:
+            boosted = min(boosted, 93)
+        else:
+            boosted = min(boosted, 90)
+
     # A regular-minute season with weak overall impact should not remain in the
     # upper-80s solely because the derived skill profile is broad. Apply a
     # smooth, position-neutral penalty so low-impact role players separate
@@ -446,16 +467,19 @@ def compute_real_overall(ratings: dict[str, int], position: str, stats: dict[str
     )
 
     # --- Final boost (matches TS) ---
+    # Reduced so the top of the distribution is no longer lifted 2-6 points on
+    # top of the capped blend; the all-time band now sits at 97-99 instead of
+    # saturating at 100, while the 96-cluster role players fall below the stars.
     if boosted < 65:
-        final_boost = 6.0
+        final_boost = 5.0
     elif boosted < 72:
-        final_boost = 6.0
-    elif boosted < 78:
-        final_boost = 6.0
-    elif boosted < 85:
         final_boost = 4.0
-    else:
+    elif boosted < 78:
+        final_boost = 3.0
+    elif boosted < 85:
         final_boost = 2.0
+    else:
+        final_boost = 1.0
 
     final_overall = clamp_rating(boosted + final_boost)
     if low_impact_rotation:
@@ -477,14 +501,14 @@ def map_position(raw: str) -> str:
 # ---------------------------------------------------------------------------
 # Rating derivation (ported from playerRatingEngine.ts)
 # ---------------------------------------------------------------------------
-def derive_ratings(stats: dict[str, Any], position: str, season: str, rng: random.Random) -> dict[str, int]:
+def derive_ratings(stats: dict[str, Any], position: str, season: str, rng: random.Random, height_inches: int | None = None) -> dict[str, int]:
     """Derive 23 ratings from real season stats."""
     era = get_era(season)
     gp = int(stats.get("gamesPlayed", 0) or 0)
     minutes = float(stats.get("minutes", 0) or 0)
 
     if gp == 0 or minutes == 0:
-        return _default_ratings(position, rng)
+        return _default_ratings(position, rng, height_inches)
 
     ppg = float(stats.get("points", 0) or 0) / max(1, gp)
     rpg = float(stats.get("rebounds", 0) or 0) / max(1, gp)
@@ -596,11 +620,11 @@ def derive_ratings(stats: dict[str, Any], position: str, season: str, rng: rando
         potential_raw -= 5
     ratings["potential"] = clamp_rating(potential_raw)
 
-    ratings["overall"] = compute_real_overall(ratings, position, stats)
+    ratings["overall"] = compute_real_overall(ratings, position, stats, height_inches)
     return ratings
 
 
-def _default_ratings(position: str, rng: random.Random) -> dict[str, int]:
+def _default_ratings(position: str, rng: random.Random, height_inches: int | None = None) -> dict[str, int]:
     """Replacement-level ratings for players with no stats."""
     base = {
         "insideScoring": 50, "closeShot": 50, "midrange": 50, "threePoint": 50,
@@ -621,7 +645,7 @@ def _default_ratings(position: str, rng: random.Random) -> dict[str, int]:
 
     for k in base:
         base[k] = clamp_rating(base[k] + rng.gauss(0, 1))
-    base["overall"] = compute_overall(base, position)
+    base["overall"] = compute_overall(base, position, height_inches)
     return base
 
 
@@ -864,7 +888,7 @@ def compute_for_season(season: str, force: bool = False) -> None:
         stats = stats_by_id.get(ext_id, {})
 
         # Derive all fields
-        player["ratings"] = derive_ratings(stats, pos, season, rng)
+        player["ratings"] = derive_ratings(stats, pos, season, rng, player.get("heightInches"))
         player["tendencies"] = derive_tendencies(stats, player["ratings"], pos, rng)
         player["summaryRatings"] = compute_summary_ratings(player["ratings"], player["tendencies"])
         player["traits"] = derive_traits(player["ratings"], stats, pos, rng)
