@@ -32,7 +32,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.js';
 import { refreshPlayersIndexInManifest } from '../manifest/index.js';
-import { fileExists, safeFloat, safeInt, sha256File, writeJson, writeJsonRetry } from '../json.js';
+import { fileExists, safeFloat, safeInt, sha256File, writeJson, writeJsonRetry, clamp, clampUnitInterval } from '../json.js';
 import { normalizePositionLabels } from './positions.js';
 import {
   LINEAGE_SEGMENTS,
@@ -276,6 +276,16 @@ export function buildStats(seasonStats: Record<string, unknown>): PoolStats {
     const value = nullableValue(seasonStats, key);
     return value === null ? null : Math.trunc(value);
   };
+  const fieldGoalsAttempted = Math.trunc(num(seasonStats, 'fga'));
+  const fieldGoalsMade = Math.min(Math.trunc(num(seasonStats, 'fgm')), fieldGoalsAttempted);
+  const freeThrowsAttempted = Math.trunc(num(seasonStats, 'fta'));
+  const freeThrowsMade = Math.min(Math.trunc(num(seasonStats, 'ftm')), freeThrowsAttempted);
+  const threesAttempted = truncNullable('tpa');
+  const threesMadeRaw = truncNullable('tpm');
+  const threesMade =
+    threesAttempted !== null && threesMadeRaw !== null
+      ? Math.min(threesMadeRaw, threesAttempted)
+      : threesMadeRaw;
   return {
     gamesPlayed: Math.trunc(num(seasonStats, 'gamesPlayed')),
     minutes: Math.trunc(num(seasonStats, 'minutes')),
@@ -287,18 +297,38 @@ export function buildStats(seasonStats: Record<string, unknown>): PoolStats {
     steals: truncNullable('steals'),
     blocks: truncNullable('blocks'),
     turnovers: truncNullable('turnovers'),
-    fieldGoalsMade: Math.trunc(num(seasonStats, 'fgm')),
-    fieldGoalsAttempted: Math.trunc(num(seasonStats, 'fga')),
-    threesMade: truncNullable('tpm'),
-    threesAttempted: truncNullable('tpa'),
-    freeThrowsMade: Math.trunc(num(seasonStats, 'ftm')),
-    freeThrowsAttempted: Math.trunc(num(seasonStats, 'fta')),
+    fieldGoalsMade,
+    fieldGoalsAttempted,
+    threesMade,
+    threesAttempted,
+    freeThrowsMade,
+    freeThrowsAttempted,
     per: nullableValue(seasonStats, 'per'),
     boxPlusMinus: nullableValue(seasonStats, 'boxPlusMinus'),
     usageRate: nullableValue(seasonStats, 'usageRate'),
-    tsPct: nullableValue(seasonStats, 'tsPct'),
-    efgPct: nullableValue(seasonStats, 'efgPct'),
+    tsPct: clampUnitInterval(nullableValue(seasonStats, 'tsPct')),
+    efgPct: clampUnitInterval(nullableValue(seasonStats, 'efgPct')),
   };
+}
+
+const ANCHOR_UNIT_FIELDS = [
+  'fieldGoalPct',
+  'threePointPct',
+  'freeThrowPct',
+  'threePointAttemptRate',
+  'freeThrowAttemptRate',
+] as const;
+
+/** Clamp packaged anchor rates to the 0..1 contract when stint totals are inconsistent. */
+export function sanitizeAnchors(anchors: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...anchors };
+  for (const field of ANCHOR_UNIT_FIELDS) {
+    const value = out[field];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      out[field] = clamp(value, 0, 1);
+    }
+  }
+  return out;
 }
 
 export interface SummaryRatingsRaw {
@@ -781,7 +811,7 @@ export function computePool(
         tendenciesOut[key] = n;
       }
     }
-    const anchorsOut = player.anchors as Record<string, unknown>;
+    const anchorsOut = sanitizeAnchors(player.anchors as Record<string, unknown>);
     const provenanceOut = (player.provenance ?? {}) as Record<string, HistoricalValueProvenance>;
     if (identityFailures.length > 0) {
       continue;

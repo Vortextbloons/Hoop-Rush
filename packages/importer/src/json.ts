@@ -93,3 +93,9 @@ export function clampRating(value: number): number {
   // Python's clamp_rating is int(clamp(v, 0, 100)): truncation, not rounding.
   return clamp(Math.trunc(value), 0, 100);
 }
+
+/** Clamp a rate or percentage stored on the 0..1 scale. Non-finite values become null. */
+export function clampUnitInterval(value: number | null): number | null {
+  if (value === null || !Number.isFinite(value)) return null;
+  return clamp(value, 0, 1);
+}

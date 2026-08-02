@@ -111,6 +111,30 @@ def clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
+def clamp_unit(v: float | None) -> float | None:
+    if v is None:
+        return None
+    if math.isnan(v) or math.isinf(v):
+        return None
+    return clamp(v, 0.0, 1.0)
+
+
+def sanitize_shooting_totals(t: dict[str, Any]) -> None:
+    """Stint aggregation can yield made > attempted; cap before deriving rates."""
+    fga = float(t.get("fga") or 0.0)
+    if fga > 0:
+        t["fgm"] = min(float(t.get("fgm") or 0.0), fga)
+    fta = float(t.get("fta") or 0.0)
+    if fta > 0:
+        t["ftm"] = min(float(t.get("ftm") or 0.0), fta)
+    tpa = t.get("tpa")
+    tpm = t.get("tpm")
+    if tpa is not None and tpm is not None:
+        tpa_f = float(tpa)
+        if tpa_f > 0:
+            t["tpm"] = min(float(tpm), tpa_f)
+
+
 def jsonable_rows(df: Any) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for _, row in df.iterrows():
@@ -277,6 +301,7 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
         gp = int(t.get("gamesPlayed") or 0)
         if gp == 0:
             continue
+        sanitize_shooting_totals(t)
         minutes = t.get("minutes", 0.0)
         fga = t.get("fga", 0.0)
         fta = t.get("fta", 0.0)
@@ -286,8 +311,8 @@ def stats_from_stints(season: str) -> list[dict[str, Any]]:
         stl = t.get("steals")
         blk = t.get("blocks")
         tov = t.get("turnovers")
-        efg = ((t.get("fgm", 0.0) + 0.5 * (tpm or 0.0)) / fga) if fga > 0 else None
-        ts = (pts / (2 * (fga + 0.44 * fta))) if (fga + fta) > 0 else None
+        efg = clamp_unit(((t.get("fgm", 0.0) + 0.5 * (tpm or 0.0)) / fga) if fga > 0 else None)
+        ts = clamp_unit((pts / (2 * (fga + 0.44 * fta))) if (fga + fta) > 0 else None)
         out.append(
             {
                 "playerExternalId": pid,

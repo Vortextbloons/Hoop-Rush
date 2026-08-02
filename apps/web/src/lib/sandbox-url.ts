@@ -14,6 +14,8 @@ export interface SandboxUrlState {
   franchiseId: string;
   /** Selected decade (pool era and simulation environment era). */
   eraId: string;
+  /** Five drafted player ids in slot order; re-validated against the pool. */
+  slots?: string[];
   seed?: Seed;
 }
 
@@ -35,6 +37,9 @@ export function buildSandboxUrl(state: SandboxUrlState): SandboxHref {
   const params = new URLSearchParams();
   params.set('franchise', state.franchiseId);
   params.set('era', state.eraId);
+  if (state.slots !== undefined && state.slots.length > 0) {
+    params.set('slots', state.slots.join(','));
+  }
   if (state.seed !== undefined) params.set('seed', state.seed);
   return `/sandbox?${params.toString()}`;
 }
@@ -75,10 +80,22 @@ export function parseSandboxUrl(
     }
     seed = seedParam;
   }
+  let slots: string[] | undefined;
+  const slotsParam = url.searchParams.get('slots');
+  if (slotsParam !== null) {
+    const parts = slotsParam.split(',');
+    if (parts.length !== 5 || parts.some((part) => part === '')) {
+      return { ok: false, state: null, error: 'A lineup needs exactly five players.' };
+    }
+    if (new Set(parts).size !== 5) {
+      return { ok: false, state: null, error: 'A lineup cannot repeat a player.' };
+    }
+    slots = parts;
+  }
 
   return {
     ok: true,
-    state: { franchiseId, eraId, seed },
+    state: { franchiseId, eraId, slots, seed },
     error: null,
   };
 }

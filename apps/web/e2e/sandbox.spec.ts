@@ -1,42 +1,31 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * Sandbox draft journey (spec/01): the draft browses a global players index
- * with optional Franchise and Decade filters (single-select dropdowns),
- * position chips, and name search. Nothing is required except five legal
- * picks from any franchise/era combination; the run simulates in a fixed
- * 2010s environment.
+ * Sandbox draft journey (spec/01, spec/12): the draft requires exactly one
+ * franchise and one decade; the corresponding pool loads only after both
+ * selectors are chosen. Disabled franchise-era combinations stay visible
+ * with a factual reason. The run simulates in the selected decade.
  */
 
-/** Narrow the global players index to the Lakers 1990s pool. */
-async function filterLakers1990s(page: Page) {
-  await page.goto('/sandbox');
+/** Select a franchise/decade pair and wait for the pool heading. */
+async function selectPool(page: Page, franchise: string, decade: string, heading: RegExp) {
   await page.getByRole('button', { name: 'Franchise' }).click();
-  await page.getByRole('option', { name: /Los Angeles Lakers/ }).click();
+  await page.getByRole('option', { name: new RegExp(franchise) }).click();
   await page.getByRole('button', { name: 'Decade' }).click();
-  await page.getByRole('option', { name: '1990s', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /LAL · 1990s/ })).toBeVisible();
-}
-
-async function setFranchise(page: Page, option: string) {
-  await page.getByRole('button', { name: 'Franchise' }).click();
-  await page.getByRole('option', { name: new RegExp(option) }).click();
-}
-
-async function setDecade(page: Page, option: string) {
-  await page.getByRole('button', { name: 'Decade' }).click();
-  await page.getByRole('option', { name: option, exact: true }).click();
+  await page.getByRole('option', { name: decade, exact: true }).click();
+  await expect(page.getByRole('heading', { name: heading })).toBeVisible();
 }
 
 test.describe('sandbox draft journey', () => {
-  test('chooses a position for each drafted player', async ({ page }) => {
-    await filterLakers1990s(page);
-    await expect(page.getByText(/44 players/)).toBeVisible();
+  test('loads the Lakers 1990s pool after both selectors are chosen', async ({ page }) => {
+    await page.goto('/sandbox');
+    await expect(page.getByText('Choose a franchise and decade')).toBeVisible();
 
-    // Players are listed by overall rating first (Shaq is the top-rated Laker of the 1990s).
-    await expect(page.locator('ul').first().locator('button').first()).toContainText(
-      /Shaquille O'Neal/,
-    );
+    await selectPool(page, 'Los Angeles Lakers', '1990s', /LAL · 1990s/);
+
+    // Pool header: player count, 40-game rule, coverage band, historical aliases.
+    await expect(page.getByText(/players · 40-game rule/)).toBeVisible();
+    await expect(page.getByText('complete-box-derived')).toBeVisible();
 
     // Each pool pick opens a position popup; the player lands in the chosen slot.
     await page.getByRole('button', { name: /Nick Van Exel/ }).click();
@@ -74,7 +63,8 @@ test.describe('sandbox draft journey', () => {
   });
 
   test('displaces a movable incumbent to fit a better player', async ({ page }) => {
-    await filterLakers1990s(page);
+    await page.goto('/sandbox');
+    await selectPool(page, 'Los Angeles Lakers', '1990s', /LAL · 1990s/);
 
     await page.getByRole('button', { name: /Nick Van Exel/ }).click();
     await page
@@ -124,7 +114,8 @@ test.describe('sandbox draft journey', () => {
   });
 
   test('moves a drafted player between positions they can play', async ({ page }) => {
-    await filterLakers1990s(page);
+    await page.goto('/sandbox');
+    await selectPool(page, 'Los Angeles Lakers', '1990s', /LAL · 1990s/);
 
     await page.getByRole('button', { name: /Kobe Bryant/ }).click();
     await page
@@ -147,69 +138,31 @@ test.describe('sandbox draft journey', () => {
     ).toBeVisible();
   });
 
-  test('mixes players from different franchises and decades in one lineup', async ({ page }) => {
+  test('keeps disabled combinations visible with a factual reason', async ({ page }) => {
     await page.goto('/sandbox');
 
-    // Bulls 1990s: Michael Jordan runs the point.
-    await setFranchise(page, 'Chicago Bulls');
-    await setDecade(page, '1990s');
-    await expect(page.getByRole('heading', { name: /CHI · 1990s/ })).toBeVisible();
-    const jordanCard = page.getByRole('button', { name: /Michael Jordan/ });
-    await expect(jordanCard).toBeVisible();
-    await jordanCard.click();
-    await page
-      .getByRole('button', { name: 'Place Michael Jordan at Point Guard slot 1', exact: true })
-      .click();
-
-    // Clear both filters, then switch to Cavaliers 2010s: LeBron at small forward.
-    await setDecade(page, 'Any decade');
-    await setFranchise(page, 'Any franchise');
-    await setFranchise(page, 'Cleveland Cavaliers');
-    await setDecade(page, '2010s');
-    await expect(page.getByRole('heading', { name: /CLE · 2010s/ })).toBeVisible();
-    await page.getByRole('button', { name: /LeBron James/ }).click();
-    await page
-      .getByRole('button', { name: 'Place LeBron James at Small Forward slot 3', exact: true })
-      .click();
-
-    // Back to the Bulls pool for the shooting guard and power forward.
-    await setFranchise(page, 'Chicago Bulls');
-    await setDecade(page, '1990s');
-    await page.getByRole('button', { name: /B\.J\. Armstrong/ }).click();
-    await page
-      .getByRole('button', { name: 'Place B.J. Armstrong at Shooting Guard slot 2', exact: true })
-      .click();
-    await page.getByRole('button', { name: /Dennis Rodman/ }).click();
-    await page
-      .getByRole('button', { name: 'Place Dennis Rodman at Power Forward slot 4', exact: true })
-      .click();
-
-    // The Cavaliers pool closes the lineup at center.
-    await setFranchise(page, 'Cleveland Cavaliers');
-    await setDecade(page, '2010s');
-    await page.getByRole('button', { name: /Timofey Mozgov/ }).click();
-    await page
-      .getByRole('button', { name: 'Place Timofey Mozgov at Center slot 5', exact: true })
-      .click();
-
-    // Two players from different teams and decades share one legal lineup.
-    await expect(page.getByText('5/5', { exact: true })).toBeVisible();
-    await expect(page.getByText('Lineup ready.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Remove Michael Jordan' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Remove LeBron James' })).toBeVisible();
+    // The Pelicans did not exist before 2002-03: no-franchise-history in the 1980s.
+    await selectPool(page, 'New Orleans Pelicans', '1980s', /NOP · 1980s/);
+    await expect(page.getByText(/No franchise history in this decade/)).toBeVisible();
+    await expect(page.getByText('first supported season 2002-03')).toBeVisible();
   });
 
-  test('shows each player at their peak season', async ({ page }) => {
-    await filterLakers1990s(page);
+  test('shows each player at their peak season with historical identity', async ({ page }) => {
+    await page.goto('/sandbox');
+    await selectPool(page, 'Oklahoma City Thunder', '1980s', /OKC · 1980s/);
 
-    await expect(
-      page.getByRole('button', { name: /Magic Johnson/ }).getByText('1990-91'),
-    ).toBeVisible();
+    // The Thunder pool carries Seattle SuperSonics history in the 1980s.
+    await expect(page.getByText(/Seattle SuperSonics/).first()).toBeVisible();
+    await page.getByRole('button', { name: /Gary Payton/ }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog').getByText(/Seattle SuperSonics/)).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
   });
 
   test('mobile layout keeps the lineup within reach', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await filterLakers1990s(page);
+    await page.goto('/sandbox');
+    await selectPool(page, 'Los Angeles Lakers', '1990s', /LAL · 1990s/);
 
     // Sticky bottom bar shows lineup progress while the pool scrolls.
     const bar = page.getByRole('link', { name: /Your five/ });

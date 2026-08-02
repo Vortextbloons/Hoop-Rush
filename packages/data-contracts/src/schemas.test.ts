@@ -431,7 +431,7 @@ describe('run contracts', () => {
     players: fivePlayers,
     runSeed: 'abcd1234abcd1234abcd1234abcd1234',
     versions: {
-      saveSchemaVersion: 3,
+      saveSchemaVersion: 2,
       dataVersion: 'data-v1',
       ratingVersion: 'ratings-v1',
       positionNormalizationVersion: 'position-v2',
@@ -983,7 +983,7 @@ function buildMinimalRun() {
     })),
     runSeed: 'abcd1234abcd1234abcd1234abcd1234',
     versions: {
-      saveSchemaVersion: 3,
+      saveSchemaVersion: 2,
       dataVersion: 'data-v1',
       ratingVersion: 'ratings-v1',
       positionNormalizationVersion: 'position-v2',

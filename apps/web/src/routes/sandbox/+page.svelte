@@ -67,7 +67,7 @@
     };
   });
 
-  /** Restores a draft carried in the URL (franchise + era only). */
+  /** Restores a draft carried in the URL (franchise, era, and five picks). */
   function restoreUrlState(m: HoopRushManifest) {
     if (franchiseId || eraId) return;
     if (typeof window === 'undefined') return;
@@ -75,7 +75,11 @@
     if (!result.ok || !result.state) return;
     franchiseId = result.state.franchiseId;
     eraId = result.state.eraId;
+    pendingUrlSlots = result.state.slots ?? null;
   }
+
+  /** Five player ids from the URL, applied once the pool finishes loading. */
+  let pendingUrlSlots: string[] | null = null;
 
   const franchise = $derived(
     manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId) ?? null,
@@ -154,6 +158,15 @@
         if (cancelled) return;
         pool = p;
         loadingPool = false;
+        // Restore URL-drafted picks once the pool is available.
+        if (pendingUrlSlots !== null && slots.every((s) => s === null)) {
+          const byId = new Map(p.players.map((player) => [player.playerId, player]));
+          const restored = pendingUrlSlots.map((id) => byId.get(id) ?? null);
+          if (restored.every((player) => player !== null)) {
+            slots = restored as PeakPlayer[];
+          }
+          pendingUrlSlots = null;
+        }
       },
       (error: unknown) => {
         if (cancelled) return;

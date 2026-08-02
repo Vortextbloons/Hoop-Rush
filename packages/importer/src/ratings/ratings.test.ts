@@ -157,6 +157,16 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(derived.provenance['offensiveRebound']?.kind).toBe('derived');
   });
 
+  it('caps three-point anchor rate when made exceeds attempts', () => {
+    const derived = derivePlayerRecord(
+      input(
+        '1985-86',
+        starterStats({ tpm: 3, tpa: 2 }),
+      ),
+    );
+    expect(derived.anchors.threePointPct).toBe(1);
+  });
+
   it('summary overall uses production-aware real overall, not only the skill blend', () => {
     const derived = derivePlayerRecord(
       input(

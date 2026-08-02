@@ -29,7 +29,7 @@ import {
   type SimulationTendencies,
   type SummaryRatings,
 } from '@hoop-rush/data-contracts';
-import { clamp, clampRating, safeFloat } from '../json.js';
+import { clamp, clampRating, clampUnitInterval, safeFloat } from '../json.js';
 import { FIELD_AVAILABILITY } from '../config.js';
 import { computeSummaryRatings, computeRealOverall } from './summary.js';
 import type { StatsRow } from './stats.js';
@@ -302,11 +302,16 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
   const tpa = totals.threesAttempted;
   const tpm = totals.threesMade;
 
-  const fgPct = fgm !== null && fga !== null && fga > 0 ? fgm / fga : null;
-  const ftPct = ftm !== null && fta !== null && fta > 0 ? ftm / fta : null;
-  const threePct = tpm !== null && tpa !== null && tpa > 0 ? tpm / tpa : null;
-  const tsPct = totals.tsPct;
-  const efgPct = totals.efgPct;
+  const fgPct =
+    fgm !== null && fga !== null && fga > 0 ? clampUnitInterval(fgm / fga) : null;
+  const ftPct =
+    ftm !== null && fta !== null && fta > 0 ? clampUnitInterval(ftm / fta) : null;
+  const threePct =
+    tpm !== null && tpa !== null && tpa > 0
+      ? clampUnitInterval(Math.min(tpm, tpa) / tpa)
+      : null;
+  const tsPct = clampUnitInterval(totals.tsPct);
+  const efgPct = clampUnitInterval(totals.efgPct);
   const per = totals.per;
   const bpm = totals.boxPlusMinus;
   const usage = totals.usageRate;
@@ -562,8 +567,8 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
     fieldGoalPct: fgPct ?? 0.45,
     threePointPct: threePct,
     freeThrowPct: ftPct ?? 0.75,
-    threePointAttemptRate,
-    freeThrowAttemptRate: Math.min(1, freeThrowAttemptRate),
+    threePointAttemptRate: clampUnitInterval(threePointAttemptRate) ?? 0,
+    freeThrowAttemptRate: clampUnitInterval(Math.min(1, freeThrowAttemptRate)) ?? 0,
   };
 
   const skillSummary = computeSummaryRatings(

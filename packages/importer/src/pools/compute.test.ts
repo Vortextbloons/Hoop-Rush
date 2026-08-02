@@ -24,6 +24,7 @@ import {
   SELECTION_SCORE_VERSION,
   allPoolTargets,
   buildStats,
+  sanitizeAnchors,
   candidateKey,
   computePool,
   loadBbrefIds,
@@ -556,6 +557,41 @@ describe('buildStats', () => {
     const bad = buildStats({ per: 'not-a-number', boxPlusMinus: Number.NaN });
     expect(bad.per).toBeNull();
     expect(bad.boxPlusMinus).toBeNull();
+  });
+
+  it('caps inconsistent shooting totals and clamps advanced percentages to 0..1', () => {
+    const stats = buildStats({
+      gamesPlayed: 78,
+      minutes: 403,
+      points: 739,
+      rebounds: 158,
+      assists: 21,
+      fgm: 294,
+      fga: 272,
+      ftm: 151,
+      fta: 200,
+      tpm: 3,
+      tpa: 2,
+      tsPct: 1.026,
+      efgPct: 1.081,
+    });
+    expect(stats.fieldGoalsMade).toBe(272);
+    expect(stats.threesMade).toBe(2);
+    expect(stats.tsPct).toBe(1);
+    expect(stats.efgPct).toBe(1);
+  });
+});
+
+describe('sanitizeAnchors', () => {
+  it('clamps packaged anchor rates to the 0..1 contract', () => {
+    const out = sanitizeAnchors({
+      fieldGoalPct: 1.08,
+      threePointPct: 1.5,
+      freeThrowAttemptRate: 1.2,
+    });
+    expect(out.fieldGoalPct).toBe(1);
+    expect(out.threePointPct).toBe(1);
+    expect(out.freeThrowAttemptRate).toBe(1);
   });
 });
 

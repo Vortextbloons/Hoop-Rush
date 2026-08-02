@@ -238,6 +238,7 @@
     return buildSandboxUrl({
       franchiseId: currentRun.franchiseId,
       eraId: currentRun.eraId,
+      slots: currentRun.playerIds,
     }) as RouteId;
   });
 </script>
