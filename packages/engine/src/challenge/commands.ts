@@ -15,6 +15,7 @@ import {
   challengeRunSchema,
   RUN_SCHEMA_VERSION,
   SAVE_SCHEMA_VERSION,
+  type RunPlayerSelection,
   seedSchema,
 } from '@hoop-rush/data-contracts';
 import { validateLineup } from '../domain/lineup.js';
@@ -36,15 +37,16 @@ import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.js';
 export interface ChallengeCreation {
   runId: string;
   mode: 'sandbox';
-  /** The selected modern franchise slot (required; spec/12 challenge contract). */
-  franchiseId: string;
-  /** The selected decade: pool era and simulation environment era. */
+  /** Null for free-form sandbox lineups; otherwise the selected franchise slot. */
+  franchiseId: string | null;
   eraId: string;
   homeDisplayName: string;
   /** Legal G,G,F,F,C assignment validated by this command. */
   lineup: Lineup;
   /** Five distinct pool players matching the lineup assignments, in slot order. */
   players: SimulationPlayer[];
+  /** Per-player pool provenance in slot order (always exactly five). */
+  selections: RunPlayerSelection[];
   runSeed: Seed;
   dataVersion: string;
   ratingVersion: string;
@@ -168,11 +170,8 @@ export function validateSchedule(bracket: OpponentBracket): string[] {
 function validateCreationInput(input: ChallengeCreation): string[] {
   const failures: string[] = [];
 
-  if (!input.franchiseId || input.franchiseId.trim() === '') {
-    failures.push('challenge requires a selected franchise');
-  }
   if (!input.eraId || input.eraId.trim() === '') {
-    failures.push('challenge requires a selected decade');
+    failures.push('challenge requires a simulation decade');
   }
   if (input.profile.eraId !== input.eraId) {
     failures.push('eraId must match the era profile era');
@@ -185,6 +184,9 @@ function validateCreationInput(input: ChallengeCreation): string[] {
   }
   if (input.players.length !== 5) {
     failures.push('challenge requires exactly five player snapshots');
+  }
+  if (input.selections.length !== 5) {
+    failures.push('challenge requires exactly five selections');
   }
   const snapshotIds = input.players.map((p) => p.playerId);
   if (new Set(snapshotIds).size !== snapshotIds.length) {
@@ -226,6 +228,7 @@ export function createChallenge(input: ChallengeCreation): ChallengeRun {
     eraId: input.eraId,
     homeDisplayName: input.homeDisplayName,
     playerIds: input.players.map((p) => p.playerId),
+    selections: input.selections,
     lineup: input.lineup,
     players: input.players,
     runSeed: input.runSeed,

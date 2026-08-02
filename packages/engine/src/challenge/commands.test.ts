@@ -25,6 +25,18 @@ import { addGameToAggregates, zeroRunAggregates } from './aggregates.js';
 
 const context = createEngineContext();
 
+function defaultSelections(
+  players: SimulationPlayer[],
+  franchiseId = 'lakers',
+  eraId = '1990s',
+): RunPlayerSelection[] {
+  return players.map((player) => ({
+    playerId: player.playerId,
+    franchiseId,
+    eraId,
+  }));
+}
+
 function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeCreation {
   const bracket = buildFixtureBracket();
   const team = buildUserTeam();
@@ -43,6 +55,7 @@ function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeC
       })),
     },
     players: team.players,
+    selections: defaultSelections(team.players),
     runSeed: seedFromString('fixture-run-1'),
     dataVersion: 'data-v1',
     ratingVersion: 'ratings-v1',
