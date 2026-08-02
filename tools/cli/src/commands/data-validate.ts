@@ -4,6 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateBracketContent, scheduleInvariants } from '@hoop-rush/engine';
+import { pools } from '@hoop-rush/importer';
 import {
   eraSimulationProfileSchema,
   franchiseEraPoolSchema,
@@ -381,23 +382,13 @@ function auditPoolContent(
   }
 
   // Peak reproducibility: selectionScore recomputed from packaged fields.
-  const structure = ['G', 'G', 'F', 'F', 'C'];
-  void structure;
   for (const player of pool.players) {
-    const usage = Math.min(Math.max(player.stats.usageRate ?? 0, 0), 40);
-    const mpg = Math.min(
-      player.eligibility.teamMinutes / Math.max(1, player.eligibility.teamGames),
-      48,
+    const recomputed = pools.selectionScore(
+      player.summaryRatings,
+      player.stats.usageRate,
+      player.eligibility.teamMinutes,
+      player.eligibility.teamGames,
     );
-    const recomputed =
-      Math.round(
-        (0.5 * player.summaryRatings.overallRating +
-          0.3 * player.summaryRatings.offenseRating +
-          0.2 * player.summaryRatings.defenseRating +
-          0.05 * usage +
-          0.02 * mpg) *
-          1000,
-      ) / 1000;
     if (Math.abs(recomputed - player.selectionScore) > 1e-9) {
       failures.push(
         `pools: ${key} ${player.displayName} selectionScore not reproducible (packaged ${String(player.selectionScore)}, recomputed ${String(recomputed)})`,
