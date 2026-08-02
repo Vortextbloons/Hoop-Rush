@@ -106,6 +106,11 @@ export function simChallenge(args: {
     homeDisplayName: team.displayName,
     lineup,
     players,
+    selections: players.map((player) => ({
+      playerId: player.playerId,
+      franchiseId: 'lakers',
+      eraId: '1990s',
+    })),
     runSeed: seed,
     dataVersion: profile.dataVersion,
     ratingVersion: samplePlayer?.source.ratingsVersion ?? 'unknown',

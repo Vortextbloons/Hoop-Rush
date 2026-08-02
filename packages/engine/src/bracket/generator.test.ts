@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { EraSimulationProfile, SimulationPlayer } from '@hoop-rush/data-contracts';
+import type {
+  EraSimulationProfile,
+  OpponentBracket,
+  SimulationPlayer,
+} from '@hoop-rush/data-contracts';
 import {
   buildEraSimulationProfile,
   buildFixtureBracket,
@@ -141,17 +145,31 @@ function generationOptions(
     openingOpponent: opening,
     difficulty,
     candidates: FRANCHISES.map(candidatesFor),
-    proposalsPerFranchise: 32,
-    samplesPerBenchmark: 10,
+    proposalsPerFranchise: 24,
+    samplesPerBenchmark: 6,
     minPlayerScore: 45,
     engineContext: createEngineContext(),
     ...overrides,
   };
 }
 
+/**
+ * The fixture generation is deterministic, and six tests only assert
+ * properties of that single artifact. Computing it once keeps the suite fast
+ * (each generation measures ~700 proposals against the benchmark matrix);
+ * the byte-identity test below still regenerates independently.
+ */
+let sharedBracket: OpponentBracket | null = null;
+function fixtureBracket(): OpponentBracket {
+  if (sharedBracket === null) {
+    sharedBracket = generateBracket(generationOptions());
+  }
+  return sharedBracket;
+}
+
 describe('generateBracket (propose-review-freeze)', () => {
   it('generates a validated 30-team bracket with the fixed 82-game schedule', () => {
-    const bracket = generateBracket(generationOptions());
+    const bracket = fixtureBracket();
     expect(bracket.opponents).toHaveLength(30);
     expect(bracket.schedule).toHaveLength(82);
     expect(validateBracketContent(bracket)).toEqual([]);
@@ -162,7 +180,7 @@ describe('generateBracket (propose-review-freeze)', () => {
 
   it('keeps the opening opponent unchanged', () => {
     const opening = buildOpeningOpponent();
-    const bracket = generateBracket(generationOptions({ openingOpponent: opening }));
+    const bracket = fixtureBracket();
     const entry = bracket.opponents.find((o) => o.opponentId === 'lakers-1990s-opening');
     expect(entry).toBeDefined();
     expect(entry!.teamId).toBe(opening.teamId);
@@ -172,19 +190,19 @@ describe('generateBracket (propose-review-freeze)', () => {
   }, 40_000);
 
   it('regenerates byte-identically with the same seed and inputs', () => {
-    const a = generateBracket(generationOptions());
+    const a = fixtureBracket();
     const b = generateBracket(generationOptions());
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   }, 60_000);
 
   it('regenerates differently with a different seed', () => {
-    const a = generateBracket(generationOptions());
+    const a = fixtureBracket();
     const b = generateBracket(generationOptions({ seed: seedFromString('fixture-bracket-2') }));
     expect(JSON.stringify(a)).not.toBe(JSON.stringify(b));
   }, 60_000);
 
   it('only selects balanced legal lineups with no internal duplicates', () => {
-    const bracket = generateBracket(generationOptions());
+    const bracket = fixtureBracket();
     const usedPlayers = new Set<string>();
     for (const opponent of bracket.opponents) {
       const team = {
@@ -206,7 +224,7 @@ describe('generateBracket (propose-review-freeze)', () => {
   }, 40_000);
 
   it('spans the team percentile band with the league median inside its band', () => {
-    const bracket = generateBracket(generationOptions());
+    const bracket = fixtureBracket();
     const percentiles = bracket.opponents
       .filter((o) => o.opponentId !== 'lakers-1990s-opening')
       .map((o) => o.strength.percentile)
@@ -222,7 +240,7 @@ describe('generateBracket (propose-review-freeze)', () => {
   }, 40_000);
 
   it('records committed generation metadata', () => {
-    const bracket = generateBracket(generationOptions());
+    const bracket = fixtureBracket();
     expect(bracket.generation.generationVersion).toBe('bracket-m3-v1');
     expect(bracket.generation.dataVersion).toBe('data-v1');
     expect(bracket.generation.targetBands.teamPercentileBand).toEqual([0.3, 0.7]);

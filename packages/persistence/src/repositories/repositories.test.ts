@@ -42,6 +42,11 @@ function indexFor(runId = 'run-1'): CompletedRunIndex {
     franchiseId: 'lakers',
     eraId: '1990s',
     playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
+    selections: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'].map((playerId) => ({
+      playerId,
+      franchiseId: 'lakers',
+      eraId: '1990s',
+    })),
     runSeed: 'abcd1234abcd1234abcd1234abcd1234',
     wins: 82,
     losses: 0,
@@ -287,6 +292,35 @@ describe.each([
     const history = await repo.listCompletedRuns();
     expect(history).toHaveLength(1);
     expect(history[0]?.outcome).toBe('perfect');
+  });
+
+  it('promotes and lists a free-form completed run with selections', async () => {
+    const { repo } = makeAdapter();
+    const freeFormSelections = ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'].map((playerId) => ({
+      playerId,
+      franchiseId: 'lakers',
+      eraId: '1990s',
+    }));
+    const record = {
+      ...finishedRecord('run-free'),
+      run: buildChallengeRun({
+        runId: 'run-free',
+        status: 'finished',
+        outcome: 'perfect',
+        firstLossGameNumber: null,
+        franchiseId: null,
+        selections: freeFormSelections,
+      }),
+    };
+    await repo.saveActiveRun(record);
+    await repo.promoteActiveToCompleted(record, { ...indexFor('run-free'), franchiseId: null });
+    const loaded = await repo.loadCompletedRun('run-free');
+    expect(loaded?.run.franchiseId).toBeNull();
+    expect(loaded?.run.selections).toEqual(freeFormSelections);
+    const history = await repo.listCompletedRuns();
+    expect(history).toHaveLength(1);
+    expect(history[0]?.franchiseId).toBeNull();
+    expect(history[0]?.selections).toEqual(freeFormSelections);
   });
 
   it('promotion removes the checkpoint and game rows', async () => {

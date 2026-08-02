@@ -7,6 +7,7 @@ import type {
   Lineup,
   OpponentBracket,
   RunAggregates,
+  RunPlayerSelection,
   Seed,
   SimulationPlayer,
   SimulationTeam,
@@ -31,13 +32,16 @@ import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.js';
 export interface ChallengeCreation {
   runId: string;
   mode: 'sandbox';
-  franchiseId: string;
+  /** Selected franchise, or null for free-form lineups from any franchise/era pool. */
+  franchiseId: string | null;
   eraId: string;
   homeDisplayName: string;
   /** Legal G,G,F,F,C assignment validated by this command. */
   lineup: Lineup;
   /** Five distinct pool players matching the lineup assignments, in slot order. */
   players: SimulationPlayer[];
+  /** Per-player pool provenance in slot order (always exactly five). */
+  selections: RunPlayerSelection[];
   runSeed: Seed;
   dataVersion: string;
   ratingVersion: string;
@@ -170,6 +174,9 @@ function validateCreationInput(input: ChallengeCreation): string[] {
   if (input.players.length !== 5) {
     failures.push('challenge requires exactly five player snapshots');
   }
+  if (input.selections.length !== 5) {
+    failures.push('challenge requires exactly five selections');
+  }
   const snapshotIds = input.players.map((p) => p.playerId);
   if (new Set(snapshotIds).size !== snapshotIds.length) {
     failures.push('player snapshots must be distinct');
@@ -210,6 +217,7 @@ export function createChallenge(input: ChallengeCreation): ChallengeRun {
     eraId: input.eraId,
     homeDisplayName: input.homeDisplayName,
     playerIds: input.players.map((p) => p.playerId),
+    selections: input.selections,
     lineup: input.lineup,
     players: input.players,
     runSeed: input.runSeed,

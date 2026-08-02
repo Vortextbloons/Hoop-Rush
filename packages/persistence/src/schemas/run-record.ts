@@ -9,6 +9,7 @@ import {
   playerIdSchema,
   runAggregatesSchema,
   runModeSchema,
+  runPlayerSelectionSchema,
   runVersionBoundariesSchema,
   seedSchema,
   simulationPlayerSchema,
@@ -49,11 +50,15 @@ export const activeRunCheckpointSchema = z.object({
   saveSchemaVersion: z.literal(3),
   runId: z.string().min(1).max(64),
   mode: runModeSchema,
-  franchiseId: franchiseIdSchema,
+  /** Null for free-form sandbox lineups drawn from any franchise/era pool. */
+  franchiseId: franchiseIdSchema.nullable(),
+  /** Simulation environment era (fixed '2010s' for sandbox). */
   eraId: z.string().min(1).max(24),
   /** Display name for the user's lineup (resolved from lineage at creation). */
   homeDisplayName: z.string().min(1).max(96),
   playerIds: z.array(playerIdSchema).length(5),
+  /** Per-player pool provenance in slot order; absent on legacy runs. */
+  selections: z.array(runPlayerSelectionSchema).length(5).optional(),
   lineup: lineupSchema,
   players: z.array(simulationPlayerSchema).length(5),
   runSeed: seedSchema,
@@ -106,6 +111,7 @@ export function checkpointFromRun(record: StoredRunRecord): ActiveRunCheckpoint 
     eraId: validated.run.eraId,
     homeDisplayName: validated.run.homeDisplayName,
     playerIds: validated.run.playerIds,
+    selections: validated.run.selections,
     lineup: validated.run.lineup,
     players: validated.run.players,
     runSeed: validated.run.runSeed,
@@ -134,6 +140,7 @@ export function runFromCheckpoint(
     eraId: validated.eraId,
     homeDisplayName: validated.homeDisplayName,
     playerIds: validated.playerIds,
+    selections: validated.selections,
     lineup: validated.lineup,
     players: validated.players,
     runSeed: validated.runSeed,
@@ -153,10 +160,13 @@ export const completedRunIndexSchema = z.object({
   recordId: z.string().min(1).max(64),
   runId: z.string().min(1).max(64),
   mode: z.enum(['sandbox', 'classic']),
-  franchiseId: z.string().min(1).max(64),
+  /** Null for free-form sandbox lineups drawn from any franchise/era pool. */
+  franchiseId: z.string().min(1).max(64).nullable(),
   eraId: z.string().min(1).max(24),
   /** Five player ids in slot order; names resolve through the manifest/pool. */
   playerIds: z.array(playerIdSchema).length(5),
+  /** Per-player pool provenance in slot order; absent on legacy runs. */
+  selections: z.array(runPlayerSelectionSchema).length(5).optional(),
   runSeed: seedSchema,
   wins: z.number().int().nonnegative(),
   losses: z.number().int().nonnegative(),

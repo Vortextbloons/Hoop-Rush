@@ -98,19 +98,43 @@ export const runAggregatesSchema = z.object({
 });
 export type RunAggregates = z.infer<typeof runAggregatesSchema>;
 
+/**
+ * Provenance of one lineup slot: which franchise/era pool the selected
+ * peak player-season was drawn from. Present on runs whose lineup mixes
+ * players from any franchise/era pool (free-form sandbox).
+ */
+export const runPlayerSelectionSchema = z.object({
+  playerId: playerIdSchema,
+  franchiseId: franchiseIdSchema,
+  eraId: z.string().min(1).max(24),
+});
+export type RunPlayerSelection = z.infer<typeof runPlayerSelectionSchema>;
+
 export const challengeRunSchema = z.object({
   schemaVersion: z.literal(1),
   runId: z.string().min(1).max(64),
   mode: runModeSchema,
   /** Immutable after creation; present only for classic mode. */
   variant: classicVariantSchema.optional(),
-  /** Sandbox selection. */
-  franchiseId: franchiseIdSchema,
+  /**
+   * Sandbox selection. Null for free-form sandbox lineups drawn from any
+   * franchise/era pool; otherwise the selected franchise.
+   */
+  franchiseId: franchiseIdSchema.nullable(),
+  /**
+   * Simulation environment era: the era profile every accepted game result
+   * must report. Fixed to '2010s' for sandbox.
+   */
   eraId: z.string().min(1).max(24),
   /** Display name for the user's lineup (resolved from lineage at creation). */
   homeDisplayName: z.string().min(1).max(96),
   /** Exactly five distinct selected peak player-seasons, in slot order. */
   playerIds: z.array(playerIdSchema).length(5),
+  /**
+   * Per-player pool provenance in slot order; present for free-form sandbox
+   * lineups. Absent on legacy single-franchise runs.
+   */
+  selections: z.array(runPlayerSelectionSchema).length(5).optional(),
   /** Legal G,G,F,F,C assignment validated at creation. */
   lineup: lineupSchema,
   /** Five immutable SimulationPlayer snapshots matching the lineup. */

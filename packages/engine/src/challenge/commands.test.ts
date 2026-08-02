@@ -43,6 +43,11 @@ function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeC
       })),
     },
     players: team.players,
+    selections: team.players.map((player) => ({
+      playerId: player.playerId,
+      franchiseId: 'lakers',
+      eraId: '1990s',
+    })),
     runSeed: seedFromString('fixture-run-1'),
     dataVersion: 'data-v1',
     ratingVersion: 'ratings-v1',
@@ -67,6 +72,23 @@ describe('challenge commands', () => {
     expect(run.versions.seedDerivationVersion).toBe('seed-v1');
     expect(run.bracket.opponents).toHaveLength(30);
     expect(run.bracket.schedule).toHaveLength(82);
+  });
+
+  it('carries per-player selections in slot order', () => {
+    const run = createChallenge(fixtureCreation());
+    expect(run.selections).toHaveLength(5);
+    expect(run.selections?.map((s) => s.playerId)).toEqual(run.playerIds);
+    expect(run.selections?.[0]).toEqual({
+      playerId: 'p-1',
+      franchiseId: 'lakers',
+      eraId: '1990s',
+    });
+  });
+
+  it('accepts a null franchiseId for free-form lineups', () => {
+    const run = createChallenge(fixtureCreation({ franchiseId: null }));
+    expect(run.franchiseId).toBeNull();
+    expect(challengeRunSchema.safeParse(run).success).toBe(true);
   });
 
   it('rejects an illegal lineup', () => {
