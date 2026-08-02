@@ -366,6 +366,11 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
       })),
     },
     players,
+    selections: players.map((player) => ({
+      playerId: player.playerId,
+      franchiseId: 'lakers',
+      eraId: '1990s',
+    })),
     runSeed: seedFromString('fixture-run-1'),
     versions: {
       saveSchemaVersion: 2,

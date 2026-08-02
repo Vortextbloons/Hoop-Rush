@@ -34,6 +34,8 @@ function row(partial: Partial<PlayersIndexEntry> & { playerId: string }): Player
       minutes: 2400,
       points: 1600,
       rebounds: 800,
+      offensiveRebounds: null,
+      defensiveRebounds: null,
       assists: 400,
       steals: 80,
       blocks: 40,

@@ -6,7 +6,7 @@ import {
   buildUserTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import type { ChallengeRun, GameResult } from '@hoop-rush/data-contracts';
+import type { ChallengeRun, GameResult, RunPlayerSelection, SimulationPlayer } from '@hoop-rush/data-contracts';
 import { challengeRunSchema } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.js';
 import { simulateGame } from '../sim/game.js';
@@ -82,9 +82,15 @@ describe('challenge commands', () => {
     expect(run.bracket.schedule).toHaveLength(82);
   });
 
-  it('requires the selected franchise', () => {
-    expect(() => createChallenge(fixtureCreation({ franchiseId: '' }))).toThrow(
-      /requires a selected franchise/,
+  it('accepts a free-form run with null franchiseId and selections', () => {
+    const run = createChallenge(fixtureCreation({ franchiseId: null }));
+    expect(run.franchiseId).toBeNull();
+    expect(run.selections).toHaveLength(5);
+  });
+
+  it('requires five selections', () => {
+    expect(() => createChallenge(fixtureCreation({ selections: [] }))).toThrow(
+      /requires exactly five selections/,
     );
   });
 

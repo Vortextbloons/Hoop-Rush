@@ -17,7 +17,7 @@
   import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
-  import { loadRunPlayersById } from '$lib/sandbox-lineup';
+  import { loadRunPlayersById, lineupPlayersFromRun } from '$lib/sandbox-lineup';
 
   /**
    * Challenge progress (spec/08): a full-screen dialog driven by the paced
@@ -39,6 +39,10 @@
   let announcedCount = 0;
 
   const ANNOUNCEMENT_EVERY = 10;
+
+  function franchiseLabel(franchiseId: string | null): string {
+    return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
+  }
 
   $effect(() => {
     if (!browser) return;
@@ -246,7 +250,7 @@
         class="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-center px-4 py-8 sm:px-6"
       >
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-          Sandbox · {franchiseAbbreviation(run.franchiseId)} · {run.eraId}
+          Sandbox · {franchiseLabel(run.franchiseId)} · {run.eraId}
         </p>
         <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
           {#if phase === 'paused'}
@@ -279,7 +283,7 @@
                 {run.homeDisplayName}
               </p>
               <p class="font-mono text-[10px] text-muted-foreground">
-                {franchiseAbbreviation(run.franchiseId)} · {run.eraId}
+                {franchiseLabel(run.franchiseId)} · {run.eraId}
               </p>
             </div>
           </div>

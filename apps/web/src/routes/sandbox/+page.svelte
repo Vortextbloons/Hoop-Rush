@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { ArrowRight, Check, ChevronDown, Lock, Plus, Search, X } from '@lucide/svelte';
-  import { Dialog, Select } from 'bits-ui';
+  import { ArrowRight, Check, Lock, Plus, Search, X } from '@lucide/svelte';
+  import { Dialog } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
   import type {
     HoopRushManifest,
@@ -16,7 +16,6 @@
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
   import { startSandboxRun } from '$lib/sandbox-run';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
 
   type IndexRow = PlayersIndexEntry;
@@ -40,9 +39,6 @@
   let index = $state.raw<PlayersIndex | null>(null);
   let indexError: string | null = $state(null);
   let runError: string | null = $state(null);
-
-  let franchiseId = $state('');
-  let eraId = $state('');
 
   let starting = $state(false);
 
@@ -107,27 +103,6 @@
     );
   }
 
-  const franchise = $derived(
-    manifest?.franchiseLineage.find((e) => e.franchiseId === franchiseId) ?? null,
-  );
-  const era = $derived(manifest?.eras.find((e) => e.eraId === eraId) ?? null);
-
-  const franchiseItems = $derived([
-    { value: '', label: 'Any franchise' },
-    ...(manifest?.franchiseLineage ?? []).map((entry) => ({
-      value: entry.franchiseId,
-      label: entry.displayName,
-    })),
-  ]);
-
-  const eraItems = $derived([
-    { value: '', label: 'Any decade' },
-    ...(manifest?.eras ?? []).map((e) => ({
-      value: e.eraId,
-      label: e.label,
-    })),
-  ]);
-
   const eraLabel = $derived(new Map((manifest?.eras ?? []).map((e) => [e.eraId, e.label])));
 
   const sortedRows = $derived.by(() => {
@@ -137,16 +112,8 @@
     );
   });
 
-  /** Index rows narrowed to the selected franchise/era pool. */
-  const poolRows = $derived.by(() => {
-    let list = sortedRows;
-    if (franchiseId) list = list.filter((p) => p.franchiseId === franchiseId);
-    if (eraId) list = list.filter((p) => p.eraId === eraId);
-    return list;
-  });
-
   const filteredRows = $derived.by(() => {
-    let list = poolRows;
+    let list = sortedRows;
     if (positionFilter !== null) {
       const requirement = slotRequirement(positionFilter);
       list = list.filter((p) => p.positionsCanonical.includes(requirement));
@@ -157,24 +124,6 @@
     }
     return list;
   });
-
-  const poolHeading = $derived(
-    franchise && era
-      ? `${franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
-      : franchise
-        ? franchiseAbbreviation(franchise.franchiseId)
-        : era
-          ? era.label
-          : 'All players',
-  );
-
-  function selectFranchise(id: string) {
-    franchiseId = id;
-  }
-
-  function selectEra(id: string) {
-    eraId = id;
-  }
 
   function canFillSlot(player: IndexRow, slotIndex: number): boolean {
     return canPlay(player.positionsCanonical, slotRequirement(slotIndex as SlotIndex));
@@ -360,7 +309,12 @@
     runError = null;
     try {
       const picked = slots.filter((p): p is IndexRow => p !== null);
-      const resolved = await resolveRefsToPlayers(picked);
+      const refs = picked.map((p) => ({
+        playerId: p.playerId,
+        franchiseId: p.franchiseId,
+        eraId: p.eraId,
+      }));
+      const resolved = await resolveRefsToPlayers(refs);
       await startSandboxRun(resolved, generateSeed());
     } catch (e) {
       runError = e instanceof Error ? e.message : String(e);
@@ -402,178 +356,6 @@
   {:else if !manifest}
     <p class="mt-8 font-mono text-sm text-muted-foreground">Loading data…</p>
   {:else}
-    <div class="mt-8 grid gap-6 sm:grid-cols-2">
-      <div>
-        <h2
-          id="sandbox-franchise-label"
-          class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
-        >
-          Franchise
-        </h2>
-        <Select.Root
-          type="single"
-          value={franchiseId}
-          onValueChange={selectFranchise}
-          items={franchiseItems}
-        >
-          <Select.Trigger
-            aria-labelledby="sandbox-franchise-label"
-            class="mt-3 flex h-12 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Select.Value placeholder="Choose a franchise…">
-              {#snippet children(props)}
-                {#if franchise}
-                  <span class="flex min-w-0 items-center gap-2.5">
-                    <TeamLogo
-                      manifest={manifest!}
-                      franchiseId={franchise.franchiseId}
-                      teamExternalId={franchise.teamExternalId}
-                    />
-                    <span class="truncate" title={franchise.displayName}>
-                      {franchiseAbbreviation(franchise.franchiseId)}
-                    </span>
-                  </span>
-                {:else}
-                  <span class="font-normal text-muted-foreground">{props.placeholder}</span>
-                {/if}
-              {/snippet}
-            </Select.Value>
-            <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content
-              side="bottom"
-              sideOffset={6}
-              align="start"
-              collisionPadding={12}
-              class="z-50 min-w-64 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
-            >
-              <Select.Viewport
-                class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
-              >
-                <Select.Item
-                  value=""
-                  label="Any franchise"
-                  aria-label="Any franchise"
-                  class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                >
-                  {#snippet children({ selected })}
-                    <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                      <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-                        Any franchise
-                      </span>
-                      {#if selected}
-                        <Check class="h-4 w-4 shrink-0 text-primary" />
-                      {/if}
-                    </span>
-                  {/snippet}
-                </Select.Item>
-                {#each manifest.franchiseLineage as entry (entry.franchiseId)}
-                  <Select.Item
-                    value={entry.franchiseId}
-                    label={entry.displayName}
-                    aria-label={`${franchiseAbbreviation(entry.franchiseId)} — ${entry.displayName}`}
-                    class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                  >
-                    {#snippet children({ selected })}
-                      <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                        <TeamLogo
-                          manifest={manifest!}
-                          franchiseId={entry.franchiseId}
-                          teamExternalId={entry.teamExternalId}
-                        />
-                        <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-                          {franchiseAbbreviation(entry.franchiseId)}
-                        </span>
-                        {#if selected}
-                          <Check class="h-4 w-4 shrink-0 text-primary" />
-                        {/if}
-                      </span>
-                    {/snippet}
-                  </Select.Item>
-                {/each}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
-      </div>
-
-      <div>
-        <h2
-          id="sandbox-decade-label"
-          class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase"
-        >
-          Decade
-        </h2>
-        <Select.Root type="single" value={eraId} onValueChange={selectEra} items={eraItems}>
-          <Select.Trigger
-            aria-labelledby="sandbox-decade-label"
-            class="mt-3 flex h-12 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <Select.Value placeholder="Choose a decade…">
-              {#snippet children(props)}
-                {#if era}
-                  <span class="truncate font-mono">{era.label}</span>
-                {:else}
-                  <span class="font-normal text-muted-foreground">{props.placeholder}</span>
-                {/if}
-              {/snippet}
-            </Select.Value>
-            <ChevronDown class="h-4 w-4 shrink-0 text-muted-foreground" />
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content
-              side="bottom"
-              sideOffset={6}
-              align="start"
-              collisionPadding={12}
-              class="z-50 min-w-48 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-popover p-1 shadow-2xl shadow-black/30"
-            >
-              <Select.Viewport
-                class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
-              >
-                <Select.Item
-                  value=""
-                  label="Any decade"
-                  aria-label="Any decade"
-                  class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                >
-                  {#snippet children({ selected })}
-                    <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                      <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-                        Any decade
-                      </span>
-                      {#if selected}
-                        <Check class="h-4 w-4 shrink-0 text-primary" />
-                      {/if}
-                    </span>
-                  {/snippet}
-                </Select.Item>
-                {#each manifest.eras as e (e.eraId)}
-                  <Select.Item
-                    value={e.eraId}
-                    label={e.label}
-                    class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
-                  >
-                    {#snippet children({ selected })}
-                      <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                        <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-                          {e.label}
-                        </span>
-                        {#if selected}
-                          <Check class="h-4 w-4 shrink-0 text-primary" />
-                        {/if}
-                      </span>
-                    {/snippet}
-                  </Select.Item>
-                {/each}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
-      </div>
-    </div>
-
     {#if indexError}
       <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
         Failed to load players: {indexError}
@@ -585,12 +367,12 @@
         <div class="rounded-xl border border-border bg-card">
           <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">
-              {poolHeading}
+              All players
             </h2>
             <span
               class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
             >
-              {poolRows.length} players
+              {sortedRows.length} players · sorted by OVER
             </span>
           </div>
           <div class="flex flex-col gap-2 border-b border-border p-2">
@@ -636,7 +418,7 @@
                 </button>
               {/each}
               <span class="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">
-                {filteredRows.length}/{poolRows.length}
+                {filteredRows.length}/{sortedRows.length}
               </span>
             </div>
           </div>

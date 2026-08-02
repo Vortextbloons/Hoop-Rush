@@ -50,11 +50,16 @@
     };
   });
 
-  function franchiseName(franchiseId: string): string {
+  function franchiseName(franchiseId: string | null): string {
+    if (!franchiseId) return 'Mixed lineup';
     return (
       manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId)?.displayName ??
       franchiseId
     );
+  }
+
+  function franchiseLabel(franchiseId: string | null): string {
+    return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
   }
 
   function eraName(eraId: string): string {
@@ -139,7 +144,7 @@
                 {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
               </span>
               <span class="block font-mono text-[10px] text-muted-foreground">
-                {row.playerIds.length} players · {franchiseAbbreviation(row.franchiseId)} · seed
+                {row.playerIds.length} players · {franchiseLabel(row.franchiseId)} · seed
                 {row.runSeed.slice(0, 8)}
               </span>
             </span>

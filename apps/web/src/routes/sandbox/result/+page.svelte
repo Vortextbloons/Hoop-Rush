@@ -104,6 +104,10 @@
     };
   });
 
+  function franchiseLabel(franchiseId: string | null): string {
+    return franchiseId ? franchiseAbbreviation(franchiseId) : 'Mixed';
+  }
+
   const franchise = $derived(
     manifest?.modernFranchiseSlots.find((e) => e.franchiseId === run?.franchiseId) ?? null,
   );
@@ -214,13 +218,12 @@
     running = true;
     try {
       const resolved = await loadRunPlayersById(currentRun, m);
-      const players = currentRun.playerIds.map((id) => resolved.get(id));
-      const complete = players.filter((p): p is PeakPlayer => p !== undefined);
-      if (complete.length !== 5) {
+      const players = lineupPlayersFromRun(currentRun, resolved);
+      if (!players) {
         error = 'This lineup cannot be replayed because its player pool is unavailable.';
         return;
       }
-      await startSandboxRun(complete, generateSeed());
+      await startSandboxRun(players, generateSeed());
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -235,11 +238,14 @@
   const editHref = $derived.by(() => {
     const currentRun = run;
     if (!currentRun) return null;
-    return buildSandboxUrl({
-      franchiseId: currentRun.franchiseId,
-      eraId: currentRun.eraId,
-      slots: currentRun.playerIds,
-    }) as RouteId;
+    const slots =
+      currentRun.selections ??
+      currentRun.playerIds.map((playerId) => ({
+        playerId,
+        franchiseId: currentRun.franchiseId ?? 'lakers',
+        eraId: currentRun.eraId,
+      }));
+    return buildSandboxUrl({ slots }) as RouteId;
   });
 </script>
 
@@ -298,7 +304,7 @@
               {run.homeDisplayName}
             </p>
             <p class="font-mono text-[10px] text-muted-foreground">
-              {franchiseAbbreviation(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no
+              {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no
               bench
             </p>
           </div>
