@@ -107,11 +107,17 @@ const baseTeam = buildLegalSimulationTeam({ teamId: 'sens-base', displayName: 'S
 describe('sensitivity: shooting and finishing', () => {
   it('higher insideScoring increases points and field-goal percentage', () => {
     const changed = mutateAllRatings(baseTeam, 'insideScoring', 15);
-    const points = compare('inside', baseTeam, changed, (r) => r.home.box.points);
+    // Both sides are measured: the home side of a paired seeded batch is
+    // systematically offset by RNG consumption order, so a one-sided
+    // selector makes the magnitude estimate noisy.
+    const points = compare('inside', baseTeam, changed, (r) => {
+      return (r.home.box.points + r.away.box.points) / 2;
+    });
     expectDirection('points', points.base, points.changed, 1, 0.6, 0.025);
     const fg = compare('inside-fg', baseTeam, changed, (r) => {
-      const b = r.home.box.fieldGoals;
-      return b.made / Math.max(1, b.attempted);
+      const h = r.home.box.fieldGoals;
+      const a = r.away.box.fieldGoals;
+      return (h.made + a.made) / Math.max(1, h.attempted + a.attempted);
     });
     expectDirection('fgpct', fg.base, fg.changed, 1);
   });

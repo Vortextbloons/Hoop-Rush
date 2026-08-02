@@ -77,13 +77,14 @@ export function spacingWeight(player: SimulationPlayer): number {
 }
 
 /**
- * Shot responsibility on passed possessions: high-usage players keep the
- * ball when the offense swings (they get the second look), while low-usage
- * role players shoot only the open ones. Scales catch-and-shoot weight so
- * box-score usage keeps a real hierarchy alongside spacing.
+ * Shot responsibility on passed possessions. The band is intentionally
+ * narrow: catch-and-shoot selection is driven by shot volume, spacing, and
+ * the pass location (the action type), not by usage concentration. Usage
+ * already shapes initiation; applying it again here made stars absorb every
+ * possession class and inflated extreme scoring lines.
  */
 export function usagePull(player: SimulationPlayer): number {
-  return 0.5 + Math.min(1, player.tendencies.usageRate / 32);
+  return 0.8 + 0.2 * Math.min(1, player.tendencies.usageRate / 36);
 }
 
 /**
@@ -218,14 +219,14 @@ function defenderWeight(
   shooter: SimulationPlayer,
   zone: ShotZone,
 ): number {
-  const positionMatch = defender.positions.some((p) => shooter.positions.includes(p)) ? 1.6 : 1;
+  const positionMatch = defender.positions.some((p) => shooter.positions.includes(p)) ? 1.35 : 1;
   const zoneRating =
     zone === 'rim' || zone === 'shortMid'
       ? defender.ratings.interiorDefense
       : zone === 'longMid'
         ? (defender.ratings.interiorDefense + defender.ratings.perimeterDefense) / 2
         : defender.ratings.perimeterDefense;
-  const ability = Math.max(0.25, (zoneRating - 40) / 40);
+  const ability = Math.max(0.25, (zoneRating - 45) / 35);
   return positionMatch * ability;
 }
 
@@ -243,6 +244,54 @@ export function pickDefender(
 }
 
 const ZONES: readonly ShotZone[] = ['rim', 'shortMid', 'longMid', 'cornerThree', 'aboveBreakThree'];
+
+/**
+ * Target three-point share for one player, from the recorded season volume
+ * when available. Three rules keep era growth honest:
+ *
+ * - No observed three-point attempts: the player never shoots threes. Era
+ *   three-point growth must not manufacture a jump shot for a center.
+ * - Very low observed volume: the observed rate stays, era growth adds only
+ *   a tightly capped share.
+ * - Established volume: the observed share anchors, and era growth moves the
+ *   residual in bounded steps.
+ *
+ * Players without anchors (authored opponents, fixtures) fall back to the
+ * threePointRate tendency blended toward the era rate.
+ */
+export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulationProfile): number {
+  const f = shooter.tendencies;
+  const eraThreeRate = profile.parameters.league3PARate;
+  const observedRate = shooter.anchors?.threePointAttemptRate;
+  const observedPct = shooter.anchors?.threePointPct;
+  if (observedRate === undefined) {
+    return Math.min(
+      0.65,
+      Math.max(
+        0.01,
+        (f.threePointRate / 100) * ENGINE_CONSTANTS.threePointRateWeight +
+          eraThreeRate * (1 - ENGINE_CONSTANTS.threePointRateWeight),
+      ),
+    );
+  }
+  if (observedPct === null || observedRate < ENGINE_CONSTANTS.threePointEvidenceMinimum) {
+    return 0;
+  }
+  if (observedRate < ENGINE_CONSTANTS.threePointLowVolumeThreshold) {
+    return Math.min(
+      ENGINE_CONSTANTS.threePointLowVolumeCap,
+      Math.max(0, observedRate + eraThreeRate * ENGINE_CONSTANTS.threePointLowVolumeEraPull),
+    );
+  }
+  return Math.min(
+    0.65,
+    Math.max(
+      0.01,
+      observedRate * (1 - ENGINE_CONSTANTS.threePointEraPull) +
+        eraThreeRate * ENGINE_CONSTANTS.threePointEraPull,
+    ),
+  );
+}
 
 /**
  * Selects the shot zone from the shooter's frequency tendencies, blended
@@ -277,25 +326,9 @@ export function pickZone(
     (value, index) => value * (1 - blend) + (tendencyMix[index] ?? 0) * blend,
   );
 
-  // Historical three-point volume is a strong role anchor. A player with no
-  // recorded three-point attempts should not become a modern floor-spacer just
-  // because the era has a nonzero league average.
-  const observedRate = shooter.anchors?.threePointAttemptRate;
-  const observedPct = shooter.anchors?.threePointPct;
-  const eraThreeRate = profile.parameters.league3PARate;
-  const targetThreeRate =
-    observedRate !== undefined
-      ? observedPct === null
-        ? Math.min(0.03, eraThreeRate * 0.25)
-        : Math.min(0.65, Math.max(0.01, observedRate * 0.7 + eraThreeRate * 0.3))
-      : Math.min(
-          0.65,
-          Math.max(
-            0.01,
-            (f.threePointRate / 100) * ENGINE_CONSTANTS.threePointRateWeight +
-              eraThreeRate * (1 - ENGINE_CONSTANTS.threePointRateWeight),
-          ),
-        );
+  // Historical three-point volume is a strong role anchor (see
+  // threePointTarget): the era rate never manufactures a jump shot.
+  const targetThreeRate = threePointTarget(shooter, profile);
   const currentThree = (weights[3] ?? 0) + (weights[4] ?? 0);
   const currentTwo = Math.max(
     1e-9,
@@ -308,8 +341,10 @@ export function pickZone(
     weights[index] = (weights[index] ?? 0) * (index < 3 ? twoScale : threeScale);
   }
 
-  weights[0] = (weights[0] ?? 0) * (action === 'transition' ? 1.2 : action === 'postUp' ? 1.1 : 1);
-  weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.15 : 1);
+  // Play-type zone pulls stay modest so they refine the shot profile instead
+  // of dragging the whole league toward the paint.
+  weights[0] = (weights[0] ?? 0) * (action === 'transition' ? 1.1 : action === 'postUp' ? 1.02 : 1);
+  weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
   return rng.weightedPick(ZONES, weights);
 }
 

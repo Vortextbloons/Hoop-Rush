@@ -66,6 +66,58 @@ export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): numb
   return ratio * ENGINE_CONSTANTS.contestMax;
 }
 
+/**
+ * Observed two-point make rate from the season anchors (null when the
+ * anchors cannot support a split). Derived from field-goal percentage with
+ * the three-point share removed, clamped to a plausible band.
+ */
+export function observedTwoPointPct(shooter: SimulationPlayer): number | null {
+  const anchors = shooter.anchors;
+  if (!anchors) return null;
+  const threeRate = anchors.threePointAttemptRate;
+  const twoShare = 1 - threeRate;
+  if (twoShare < 1e-6) return null;
+  const threePct = anchors.threePointPct ?? anchors.fieldGoalPct;
+  const twoPct = (anchors.fieldGoalPct - threeRate * threePct) / twoShare;
+  return Math.min(0.62, Math.max(0.32, twoPct));
+}
+
+/**
+ * Soft two-point efficiency anchor (null when the player has no reliable
+ * season data). The ratio of the player's observed two-point percentage to
+ * the expected conversion at the zone bases for their shot mix. Zone
+ * differentiation stays intact because every zone scales by the same
+ * factor; the anchor keeps overall two-point efficiency tied to the real
+ * season instead of drifting to zone-skill extremes beside elite creators
+ * and spacing. The factor is clamped so context still matters.
+ */
+export function twoPointAnchorFactor(shooter: SimulationPlayer): number | null {
+  const observed = observedTwoPointPct(shooter);
+  if (observed === null) return null;
+  const t = shooter.tendencies;
+  const shares = [t.rimFrequency, t.shortMidFrequency, t.longMidFrequency];
+  const bases = [
+    ENGINE_CONSTANTS.zoneBaseMake.rim,
+    ENGINE_CONSTANTS.zoneBaseMake.shortMid,
+    ENGINE_CONSTANTS.zoneBaseMake.longMid,
+  ];
+  let weighted = 0;
+  let total = 0;
+  for (let i = 0; i < shares.length; i += 1) {
+    const share = shares[i] ?? 0;
+    weighted += share * (bases[i] ?? 0);
+    total += share;
+  }
+  if (total <= 0) return null;
+  const expected = weighted / total;
+  if (expected <= 0) return null;
+  const factor = observed / expected;
+  return Math.min(
+    ENGINE_CONSTANTS.twoPointAnchorMax,
+    Math.max(ENGINE_CONSTANTS.twoPointAnchorMin, factor),
+  );
+}
+
 /** Probability a shot is blocked, by zone and defender (V1 revalidated). */
 export function blockProbability(
   defender: SimulationPlayer,
@@ -103,20 +155,27 @@ export function makeProbability(
 ): number {
   const threePointZone = isThreePointZone(context.zone);
   const observedThreePointPct = threePointZone ? shooter.anchors?.threePointPct : null;
-  const base =
-    observedThreePointPct === null || observedThreePointPct === undefined
-      ? ENGINE_CONSTANTS.zoneBaseMake[context.zone]
-      : observedThreePointPct * ENGINE_CONSTANTS.observedThreePointBlend +
-        profile.targets.threePointPct.value * (1 - ENGINE_CONSTANTS.observedThreePointBlend);
-  const skill =
-    observedThreePointPct === null || observedThreePointPct === undefined
-      ? ((zoneSkillRating(shooter, context.zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange
-      : ((zoneSkillRating(shooter, context.zone) - 70) / 100) * 0.05;
+  const hasObservedThree = observedThreePointPct !== null && observedThreePointPct !== undefined;
+  const twoAnchor = threePointZone ? null : twoPointAnchorFactor(shooter);
+  const anchoredTwo = twoAnchor !== null;
+  const base = threePointZone
+    ? hasObservedThree
+      ? observedThreePointPct * ENGINE_CONSTANTS.observedThreePointBlend +
+        profile.targets.threePointPct.value * (1 - ENGINE_CONSTANTS.observedThreePointBlend)
+      : ENGINE_CONSTANTS.zoneBaseMake[context.zone]
+    : ENGINE_CONSTANTS.zoneBaseMake[context.zone] * (twoAnchor ?? 1);
+  const skill = threePointZone
+    ? hasObservedThree
+      ? ((zoneSkillRating(shooter, context.zone) - 70) / 100) * 0.05
+      : ((zoneSkillRating(shooter, context.zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange
+    : ((zoneSkillRating(shooter, context.zone) - 70) / 30) *
+      ENGINE_CONSTANTS.skillRange *
+      (anchoredTwo ? ENGINE_CONSTANTS.twoPointAnchorSkillScale : 1);
   const contest = -contestPenalty(defender, context.zone);
   const era =
-    observedThreePointPct === null || observedThreePointPct === undefined
-      ? (profile.parameters.leagueTsPct - 0.55) * ENGINE_CONSTANTS.eraEfficiencyWeight
-      : 0;
+    anchoredTwo || hasObservedThree
+      ? 0
+      : (profile.parameters.leagueTsPct - 0.55) * ENGINE_CONSTANTS.eraEfficiencyWeight;
   // Lineup spacing raises two-point conversion for spaced teams and
   // compresses it for clogged ones; three-pointers are unaffected.
   const spacing = threePointZone

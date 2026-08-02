@@ -19,6 +19,7 @@
     slotRequirement,
     toSimulationPlayer,
     validateLineup,
+    type ChallengeCreation,
   } from '@hoop-rush/engine';
   import { getBracket, getEraSimulationProfile, getManifest, getPool } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
@@ -401,9 +402,9 @@
       const players = slots.filter((p): p is PeakPlayer => p !== null);
       const sample = players[0];
       const context = createEngineContext();
-      const creation = {
+      const creation: ChallengeCreation = {
         runId: crypto.randomUUID(),
-        mode: 'sandbox' as const,
+        mode: 'sandbox',
         franchiseId,
         eraId,
         homeDisplayName: franchise.displayName,

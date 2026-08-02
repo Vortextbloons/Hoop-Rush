@@ -46,9 +46,7 @@ export function deriveGameSeed(runSeed: Seed, gameNumber: number): Seed {
  */
 export function deriveAttemptSeed(runSeed: Seed, attemptIndex: number): Seed {
   if (!Number.isInteger(attemptIndex) || attemptIndex < 0) {
-    throw new Error(
-      `attemptIndex must be a nonnegative integer (got ${String(attemptIndex)})`,
-    );
+    throw new Error(`attemptIndex must be a nonnegative integer (got ${String(attemptIndex)})`);
   }
   const material = `hoop-rush:${SEED_DERIVATION_VERSION}:${runSeed}:attempt-${String(attemptIndex)}`;
   const high = fnv1a32(material, FNV_OFFSET_32);

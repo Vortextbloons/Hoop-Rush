@@ -8,8 +8,12 @@ import { ENGINE_CONSTANTS } from './constants.js';
 
 /**
  * Ball security versus defensive pressure resolves turnovers and optional
- * steals (spec/03 pipeline stage 3). The formula is the revalidated V1
- * turnoverModel with its fatigue/strategy/chemistry layers removed.
+ * steals (spec/03 pipeline stage 3). Turnover probability is anchored to the
+ * era's turnover-per-possession baseline: a handler at the population-mean
+ * reference converts at the era rate, and player turnover tendency, ball
+ * handling, passing, and defensive pressure move the probability in bounded
+ * steps. Era differences therefore flow through the model instead of living
+ * in a hardcoded intercept.
  */
 
 /** Defensive pressure for one defender: perimeter, steal, and IQ blend. */
@@ -28,18 +32,19 @@ export function turnoverProbability(
   defense: SimulationTeam,
   profile: EraSimulationProfile,
 ): number {
+  const eraBase = profile.parameters.turnoverPerPossession;
+  const c = ENGINE_CONSTANTS;
   const tendency = handler.tendencies.turnoverRate / 100;
   const pressure =
     defense.players.reduce((sum, d) => sum + defenderPressure(d), 0) / defense.players.length;
   const handling = (handler.ratings.ballHandling - 50) / 50;
   const passing = (handler.ratings.passing - 50) / 100;
-  const c = ENGINE_CONSTANTS;
   const raw =
-    c.turnoverBase +
-    tendency * c.turnoverTendencyWeight +
-    pressure * c.turnoverPressureWeight -
-    handling * c.turnoverHandlingWeight -
-    passing * c.turnoverPassingWeight;
+    eraBase +
+    (tendency - c.turnoverNeutralTendency) * c.turnoverTendencyWeight +
+    (pressure - c.turnoverNeutralPressure) * c.turnoverPressureWeight -
+    (handling - c.turnoverNeutralHandling) * c.turnoverHandlingWeight -
+    (passing - c.turnoverNeutralPassing) * c.turnoverPassingWeight;
   return Math.min(c.turnoverMax, Math.max(c.turnoverMin, raw));
 }
 

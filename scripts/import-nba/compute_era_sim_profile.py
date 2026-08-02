@@ -97,7 +97,7 @@ def derive_league_aggregates(seasons: list[str]):
     }
 
 
-def pool_shot_mix_and_anchors(era_id: str):
+def pool_shot_mix_and_anchors(era_id: str, league_three_rate: float):
     pool_path = POOLS_DIR / f"lakers-{era_id}.json"
     if not pool_path.exists():
         raise SystemExit(f"anchor pool missing: {pool_path} (run compute_pools first)")
@@ -109,12 +109,33 @@ def pool_shot_mix_and_anchors(era_id: str):
     weighted = {z: sum(p["tendencies"].get(z, 0) * p["tendencies"].get("usageRate", 0) for p in players) / total_usage for z in zones}
     total = sum(weighted.values()) or 1.0
     mix = {
-        "rim": round(weighted["rimFrequency"] / total, 4),
-        "shortMid": round(weighted["shortMidFrequency"] / total, 4),
-        "longMid": round(weighted["longMidFrequency"] / total, 4),
-        "cornerThree": round(weighted["cornerThreeFrequency"] / total, 4),
-        "aboveBreakThree": round(weighted["aboveBreakThreeFrequency"] / total, 4),
+        "rim": weighted["rimFrequency"] / total,
+        "shortMid": weighted["shortMidFrequency"] / total,
+        "longMid": weighted["longMidFrequency"] / total,
+        "cornerThree": weighted["cornerThreeFrequency"] / total,
+        "aboveBreakThree": weighted["aboveBreakThreeFrequency"] / total,
     }
+    # The pool mix's three-point share reflects rating-derived tendency
+    # priors for one franchise, not the league's actual three-point volume.
+    # Normalize the three-point component to the league 3PA rate (from the
+    # packaged stints) so the zone-mix gates stay consistent with the
+    # league three-point-rate parameter. Two-point ratios are preserved and
+    # rescaled so the mix still sums to one.
+    pool_three = mix["cornerThree"] + mix["aboveBreakThree"]
+    if pool_three > 0:
+        three_scale = league_three_rate / pool_three
+        corner = mix["cornerThree"] * three_scale
+        above = mix["aboveBreakThree"] * three_scale
+        current_two = mix["rim"] + mix["shortMid"] + mix["longMid"]
+        two_scale = (1.0 - league_three_rate) / max(1e-9, current_two)
+        mix = {
+            "rim": mix["rim"] * two_scale,
+            "shortMid": mix["shortMid"] * two_scale,
+            "longMid": mix["longMid"] * two_scale,
+            "cornerThree": corner,
+            "aboveBreakThree": above,
+        }
+    mix = {z: round(v, 4) for z, v in mix.items()}
     ft_mean = sum(p["detailedRatings"].get("freeThrow", 50) for p in players) / len(players)
     pass_mean = sum(p["detailedRatings"].get("passing", 50) for p in players) / len(players)
     return mix, round(ft_mean), round(pass_mean)
@@ -131,14 +152,14 @@ def compute_era_profile(era: dict[str, str]) -> dict[str, object]:
         raise SystemExit(f"no packaged seasons for era {era_id}")
 
     a = derive_league_aggregates(seasons)
-    mix, ft_anchor, pass_anchor = pool_shot_mix_and_anchors(era_id)
+    three_rate = a["tpa"] / max(1.0, a["fga"])
+    mix, ft_anchor, pass_anchor = pool_shot_mix_and_anchors(era_id, three_rate)
 
     pace = a["possessions"] / a["team_games"]  # per team per game
     ppg = a["points"] / a["team_games"]
     ts_pct = a["points"] / (2.0 * a["possessions"])
     fg_pct = a["fgm"] / max(1.0, a["fga"])
     efg_pct = (a["fgm"] + 0.5 * a["tpm"]) / max(1.0, a["fga"])
-    three_rate = a["tpa"] / max(1.0, a["fga"])
     three_pct = a["tpm"] / max(1.0, a["tpa"])
     fta_per_fga = a["fta"] / max(1.0, a["fga"])
     ft_pct = a["ftm"] / max(1.0, a["fta"])
@@ -176,7 +197,7 @@ def compute_era_profile(era: dict[str, str]) -> dict[str, object]:
             "freeThrowAnchorRating": ft_anchor,
             "assistAnchorRating": pass_anchor,
             "zoneMix": mix,
-            "source": f"packaged stints {first}..{last} + Lakers {era_id} pool rating anchors",
+            "source": f"packaged stints {first}..{last} + Lakers {era_id} pool rating anchors; zone-mix three-point share normalized to the league 3P rate",
         },
         "targets": {
             "possessionsPerGame": target(pace, 3),

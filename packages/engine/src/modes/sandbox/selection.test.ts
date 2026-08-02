@@ -7,14 +7,13 @@ import {
 } from '@hoop-rush/test-fixtures';
 import type { ChallengeRun } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/context.js';
-import { createChallenge, simulateChallenge, type ChallengeCreation } from '../../challenge/commands.js';
-import { deriveAttemptSeed } from '../../challenge/seeds.js';
 import {
-  BEST_OF_ATTEMPTS,
-  chooseBestRun,
-  scoreRun,
-  simulateChallengeBestOf,
-} from './selection.js';
+  createChallenge,
+  simulateChallenge,
+  type ChallengeCreation,
+} from '../../challenge/commands.js';
+import { deriveAttemptSeed } from '../../challenge/seeds.js';
+import { BEST_OF_ATTEMPTS, chooseBestRun, scoreRun, simulateChallengeBestOf } from './selection.js';
 
 const context = createEngineContext();
 
@@ -105,9 +104,8 @@ describe('sandbox selection', () => {
   it('chooses one of the derived attempt seeds', () => {
     const creation = fixtureCreation();
     const chosen = simulateChallengeBestOf(creation, creation.profile, context);
-    const attemptSeeds = Array.from(
-      { length: BEST_OF_ATTEMPTS },
-      (_, attempt) => deriveAttemptSeed(creation.runSeed, attempt),
+    const attemptSeeds = Array.from({ length: BEST_OF_ATTEMPTS }, (_, attempt) =>
+      deriveAttemptSeed(creation.runSeed, attempt),
     );
     expect(attemptSeeds).toContain(chosen.runSeed);
   });

@@ -1,5 +1,9 @@
 import type { ChallengeRun, EraSimulationProfile } from '@hoop-rush/data-contracts';
-import { createChallenge, simulateChallenge, type ChallengeCreation } from '../../challenge/commands.js';
+import {
+  createChallenge,
+  simulateChallenge,
+  type ChallengeCreation,
+} from '../../challenge/commands.js';
 import { deriveAttemptSeed } from '../../challenge/seeds.js';
 import type { EngineContext } from '../../sim/context.js';
 
@@ -40,20 +44,19 @@ export function chooseBestRun(runs: readonly ChallengeRun[]): ChallengeRun {
   if (!first) {
     throw new Error('chooseBestRun requires at least one attempt run');
   }
-  let bestIndex = 0;
-  let best = scoreRun(first);
-  rest.forEach((candidate, offset) => {
-    const index = offset + 1;
+  let best: ChallengeRun = first;
+  let bestScore = scoreRun(first);
+  for (const candidate of rest) {
     const candidateScore = scoreRun(candidate);
-    const winsBetter = candidateScore.wins > best.wins;
-    const winsTied = candidateScore.wins === best.wins;
-    const differentialBetter = candidateScore.differential > best.differential;
+    const winsBetter = candidateScore.wins > bestScore.wins;
+    const winsTied = candidateScore.wins === bestScore.wins;
+    const differentialBetter = candidateScore.differential > bestScore.differential;
     if (winsBetter || (winsTied && differentialBetter)) {
-      bestIndex = index;
-      best = candidateScore;
+      best = candidate;
+      bestScore = candidateScore;
     }
-  });
-  return runs[bestIndex];
+  }
+  return best;
 }
 
 /**

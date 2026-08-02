@@ -14,6 +14,7 @@
   import type { RouteId } from '$app/types';
   import { createChallenge, createEngineContext, toSimulationPlayer } from '@hoop-rush/engine';
   import { BEST_OF_ATTEMPTS, simulateChallengeBestOf } from '@hoop-rush/engine';
+  import type { ChallengeCreation } from '@hoop-rush/engine';
   import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
   import { getBracket, getEraSimulationProfile, getManifest, getPool } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
@@ -221,9 +222,9 @@
     const players = currentRun.playerIds.map((id) => byId.get(id)!);
     const sample = players[0];
     const context = createEngineContext();
-    const creation = {
+    const creation: ChallengeCreation = {
       runId: crypto.randomUUID(),
-      mode: 'sandbox' as const,
+      mode: 'sandbox',
       franchiseId: currentRun.franchiseId,
       eraId: currentRun.eraId,
       homeDisplayName: currentRun.homeDisplayName,
@@ -247,11 +248,11 @@
     // Sandbox keeps the best of BEST_OF_ATTEMPTS derived whole-run attempts;
     // the chosen attempt's seed is persisted so the reveal reproduces it.
     const chosen = simulateChallengeBestOf(creation, profile, context);
-    const run = createChallenge({ ...creation, runSeed: chosen.runSeed });
+    const active = createChallenge({ ...creation, runSeed: chosen.runSeed });
     await challengeRepository.saveActiveRun({
       recordId: 'active',
       saveSchemaVersion: 2,
-      run,
+      run: active,
     });
     void goto(resolve('/sandbox/challenge'));
   }
@@ -369,8 +370,8 @@
           </a>
         {/if}
         <span class="ml-auto font-mono text-[10px] text-muted-foreground">
-          seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion} ·
-          bracket {run.versions.bracketVersion} · schedule {run.versions.scheduleVersion}
+          seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion} · bracket
+          {run.versions.bracketVersion} · schedule {run.versions.scheduleVersion}
         </span>
       </div>
     </div>

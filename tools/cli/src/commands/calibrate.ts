@@ -238,7 +238,11 @@ export function calibrateRun(args: {
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile();
 
-  const pool = data.pool('lakers', '1990s');
+  // The calibration fixtures must match the era under test: the harness
+  // builds its league-average and strong/weak lineups from the packaged
+  // pool for the profile's own era, so era comparisons measure the era, not
+  // a hardcoded 1990s pool.
+  const pool = data.pool('lakers', profile.eraId);
   const average = leagueAverageTeam(pool);
   const { strong, weak } = poolStrengthLineups(pool);
   const bracket = data.bracket();
@@ -275,7 +279,9 @@ export function calibrateRun(args: {
   }
 
   // Opening opponent vs a strong user lineup (informational difficulty probe).
-  const openingOpponent = bracket.opponents.find((o) => o.opponentId === 'lakers-1990s-opening');
+  const openingOpponent = bracket.opponents.find(
+    (o) => o.opponentId === `lakers-${profile.eraId}-opening`,
+  );
   let openingWinRateVsStrongUser: number | null = null;
   if (openingOpponent) {
     let wins = 0;
@@ -336,7 +342,7 @@ export function calibrateRun(args: {
       runId: `calibrate-run-${String(i)}`,
       mode: 'sandbox',
       franchiseId: 'lakers',
-      eraId: '1990s',
+      eraId: profile.eraId,
       homeDisplayName: 'User Lineup',
       lineup: userLineup.lineup,
       players: userLineup.players,
