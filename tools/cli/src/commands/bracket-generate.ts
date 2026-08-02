@@ -192,14 +192,16 @@ function anchorsFromStats(
 ): SimulationAnchors | undefined {
   if (!stats || stats.gamesPlayed <= 0) return undefined;
   const games = Math.max(1, stats.gamesPlayed);
+  const offensive = stats.offensiveRebounds;
+  const defensive = stats.defensiveRebounds;
   const hasReliableSplit =
-    stats.offensiveRebounds !== undefined &&
-    stats.defensiveRebounds !== undefined &&
-    (stats.offensiveRebounds > 0 ||
+    offensive !== undefined &&
+    defensive !== undefined &&
+    (offensive > 0 ||
       (!positions.includes('C') && !(positions.includes('F') && stats.rebounds / games > 2.5)));
-  const offensiveRebounds = hasReliableSplit ? stats.offensiveRebounds! : stats.rebounds * 0.2;
+  const offensiveRebounds = hasReliableSplit ? offensive : stats.rebounds * 0.2;
   const defensiveRebounds = hasReliableSplit
-    ? stats.defensiveRebounds!
+    ? defensive
     : Math.max(0, stats.rebounds - offensiveRebounds);
   return {
     gamesPlayed: stats.gamesPlayed,

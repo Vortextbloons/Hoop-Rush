@@ -14,12 +14,13 @@ import {
 
 /**
  * Main-thread challenge orchestration (spec/04 state ownership). The worker
- * computes ahead; this runner owns the accepted run, queues results for the
- * paced presentation, validates every result through the challenge command,
- * persists the candidate state before exposing it as accepted UI state, and
- * discards buffered results after cancellation. A worker crash, invalid
- * result, or persistence failure stops presentation without advancing beyond
- * the last successfully saved game.
+ * computes ahead and posts results in batches; this runner owns the accepted
+ * run, queues results for the paced presentation, validates every result
+ * through the challenge command, appends each accepted game to the active run
+ * (one game row plus the updated checkpoint) before exposing it as accepted
+ * UI state, and discards buffered results after cancellation. A worker crash,
+ * invalid result, or persistence failure stops presentation without advancing
+ * beyond the last successfully saved game.
  */
 
 /** Minimum presentation duration: one committed reveal roughly every 36 ms. */
@@ -55,6 +56,8 @@ export class ChallengeRunner {
   private run: ChallengeRun | null = null;
   private profile: EraSimulationProfile | null = null;
   private queue: Array<{ gameNumber: number; result: GameResult }> = [];
+  /** Index of the next unconsumed queue entry; compaction avoids shift(). */
+  private queueHead = 0;
   private expectedNext = 1;
   private nextRevealAt = 0;
   private reducedMotion = false;
@@ -93,6 +96,7 @@ export class ChallengeRunner {
     this.reducedMotion = options.reducedMotion;
     this.expectedNext = run.games.length + 1;
     this.queue = [];
+    this.queueHead = 0;
     this.lastError = null;
     this.requestId = crypto.randomUUID();
     this.phase = 'running';
@@ -129,6 +133,7 @@ export class ChallengeRunner {
     this.phase = 'paused';
     this.pumpToken += 1;
     this.queue = [];
+    this.queueHead = 0;
     if (this.worker && this.requestId) {
       this.worker.postMessage(
         workerRequestSchema.parse({
@@ -147,6 +152,7 @@ export class ChallengeRunner {
     this.disposed = true;
     this.pumpToken += 1;
     this.queue = [];
+    this.queueHead = 0;
     this.teardownWorker();
   }
 
@@ -166,8 +172,10 @@ export class ChallengeRunner {
     const message = parsed.data;
     if (this.requestId === null || message.requestId !== this.requestId) return; // stale
     switch (message.type) {
-      case 'result':
-        this.queue.push({ gameNumber: message.gameNumber, result: message.result });
+      case 'results':
+        for (const result of message.results) {
+          this.queue.push({ gameNumber: result.gameNumber, result });
+        }
         break;
       case 'error':
         this.fail(message.message);
@@ -191,10 +199,15 @@ export class ChallengeRunner {
         await sleep(20);
         continue;
       }
-      const next = this.queue.shift();
+      const next = this.queue[this.queueHead];
       if (!next) {
         await sleep(10);
         continue;
+      }
+      this.queueHead += 1;
+      if (this.queueHead > 64) {
+        this.queue.splice(0, this.queueHead);
+        this.queueHead = 0;
       }
       if (next.gameNumber !== this.expectedNext) {
         this.fail(
@@ -219,14 +232,15 @@ export class ChallengeRunner {
         this.fail(`invalid game result: ${error instanceof Error ? error.message : String(error)}`);
         return;
       }
-      const record: StoredRunRecord = {
-        recordId: 'active',
-        saveSchemaVersion: 2,
-        run: accepted,
-        updatedAtIso: new Date().toISOString(),
-      };
       try {
-        await this.repo.saveActiveRun(record);
+        await this.repo.appendActiveGame({
+          runId: run.runId,
+          gameNumber: next.result.gameNumber,
+          result: next.result,
+          aggregates: accepted.aggregates,
+          status: accepted.status === 'finished' ? 'finished' : 'active',
+          firstLossGameNumber: accepted.firstLossGameNumber,
+        });
       } catch (error) {
         this.fail(
           `could not save the game: ${error instanceof Error ? error.message : String(error)}`,

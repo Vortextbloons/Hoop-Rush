@@ -70,7 +70,11 @@ export function passProbability(initiator: SimulationPlayer, action: ActionType)
             ? 0.28
             : 0.2;
   const passingFactor = 0.65 + initiator.tendencies.passRate / 100;
-  return Math.min(0.97, Math.max(0.05, actionBase * 1.2 * passingFactor));
+  const creationFactor = 1.1 - initiator.tendencies.usageRate / 200;
+  return Math.min(
+    0.97,
+    Math.max(0.05, actionBase * 1.2 * passingFactor * Math.max(0.7, creationFactor)),
+  );
 }
 
 /**

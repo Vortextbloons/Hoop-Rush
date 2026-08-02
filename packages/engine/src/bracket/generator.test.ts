@@ -38,7 +38,7 @@ function candidatePlayer(
   });
   // Scale the possession ratings with the score so proposals span the
   // strength spectrum (the score alone only drives proposal sampling).
-  const delta = Math.max(-20, Math.min(20, score - 65));
+  const delta = score - 65;
   const shifted = Object.fromEntries(
     Object.entries(sim.ratings).map(([key, value]) => [
       key,

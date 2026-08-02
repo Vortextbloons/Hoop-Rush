@@ -8,6 +8,9 @@
 
   type PeakPlayer = FranchiseEraPool['players'][number];
 
+  /** Seconds before a pending headshot request is treated as stalled. */
+  const HEADSHOT_TIMEOUT_MS = 8000;
+
   let {
     player,
     manifest,
@@ -22,6 +25,7 @@
 
   const urls = $derived(resolveHeadshotUrls(manifest, player));
   let attempt = $state(0);
+  let imgEl = $state<HTMLImageElement | null>(null);
 
   let lastPlayerId = '';
   $effect(() => {
@@ -34,6 +38,22 @@
   const src = $derived(urls[attempt] ?? '');
   const showInitials = $derived(!src || attempt >= urls.length);
   const useAnonymousCors = $derived(src !== '' && !isNbaCdnHeadshotUrl(src));
+
+  /**
+   * A request that hangs (e.g. a reset connection that never errors) would
+   * otherwise stall the fallback chain; advance past any src that has not
+   * completed within the timeout.
+   */
+  $effect(() => {
+    const current = src;
+    if (!current) return;
+    const timer = setTimeout(() => {
+      if (imgEl && !imgEl.complete && imgEl.naturalWidth === 0) {
+        onError();
+      }
+    }, HEADSHOT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  });
 
   function onError() {
     if (attempt < urls.length - 1) {
@@ -57,6 +77,7 @@
     {#key src}
       <img
         {src}
+        bind:this={imgEl}
         alt=""
         width={size === 'sm' ? 36 : 48}
         height={size === 'sm' ? 36 : 48}

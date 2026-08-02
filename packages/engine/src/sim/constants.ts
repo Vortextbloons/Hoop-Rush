@@ -49,7 +49,7 @@ export const ENGINE_CONSTANTS = {
    * drag the raw foulsPerPossession rate below the league value, so the base
    * is scaled to restore the league average at population-mean inputs.
    */
-  shootingFoulScale: 1.45,
+  shootingFoulScale: 1.3,
   /** Fouled shots convert less often: contact lowers the make chance. */
   fouledShotMakeScale: 0.75,
 

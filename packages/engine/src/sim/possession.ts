@@ -104,10 +104,10 @@ function assistProbability(passer: SimulationPlayer, profile: EraSimulationProfi
     ? 0.75 + Math.min(1, passer.anchors.assistsPerGame / 8) * 0.25
     : 1;
   return Math.min(
-    0.95,
+    0.99,
     Math.max(
       0.1,
-      profile.parameters.assistRate * 1.45 * roleFactor * (factor(passer) / Math.max(1e-9, anchor)),
+      profile.parameters.assistRate * 1.4 * roleFactor * (factor(passer) / Math.max(1e-9, anchor)),
     ),
   );
 }

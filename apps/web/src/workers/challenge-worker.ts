@@ -4,42 +4,31 @@ import {
   simulateGame,
   type EngineContext,
 } from '@hoop-rush/engine';
+import type { GameResult } from '@hoop-rush/data-contracts';
 import {
-  workerMessageSchema,
   workerRequestSchema,
+  type WorkerCompleteMessage,
   type WorkerErrorMessage,
-  type WorkerResultMessage,
+  type WorkerResultsMessage,
 } from '@hoop-rush/data-contracts';
 
 /**
  * Challenge worker entry (spec/04 static deployment and workers). Receives
  * runtime-validated, versioned requests; simulates games from the start game
- * through game 82 through the authoritative challenge command path, and
- * posts runtime-validated results. It never writes IndexedDB and holds no
- * domain state: results are a pure function of the request.
+ * through game 82 through the authoritative challenge command path, and posts
+ * results in batches of up to BATCH_SIZE games. It never writes IndexedDB and
+ * holds no domain state: results are a pure function of the request. The main
+ * thread validates every message once at its boundary.
  */
+
+/** Results posted per message; keeps the post count near 82 / BATCH_SIZE. */
+const BATCH_SIZE = 4;
 
 let currentRequestId: string | null = null;
 let requestToken = 0;
 
-function post(
-  message:
-    | WorkerResultMessage
-    | WorkerErrorMessage
-    | {
-        schemaVersion: 1;
-        type: 'complete';
-        requestId: string;
-        gamesDelivered: number;
-        cancelled: boolean;
-      },
-): void {
-  const parsed = workerMessageSchema.safeParse(message);
-  if (!parsed.success) {
-    postError(currentRequestId ?? 'unknown', 'worker produced an invalid message');
-    return;
-  }
-  self.postMessage(parsed.data);
+function post(message: WorkerResultsMessage | WorkerErrorMessage | WorkerCompleteMessage): void {
+  self.postMessage(message);
 }
 
 function postError(requestId: string, message: string): void {
@@ -79,20 +68,24 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
       for (
         let gameNumber = request.startGameNumber;
         gameNumber <= 82 && token === requestToken;
-        gameNumber += 1
+        gameNumber += BATCH_SIZE
       ) {
-        const input = createGameInput(request.run, request.profile, gameNumber);
-        const result = simulateGame(input, context);
-        delivered += 1;
-        const message: WorkerResultMessage = {
+        const results: GameResult[] = [];
+        const last = Math.min(gameNumber + BATCH_SIZE - 1, 82);
+        for (let n = gameNumber; n <= last; n += 1) {
+          const input = createGameInput(request.run, request.profile, n);
+          results.push(simulateGame(input, context));
+          delivered += 1;
+        }
+        if (token !== requestToken) break;
+        post({
           schemaVersion: 1,
-          type: 'result',
+          type: 'results',
           requestId: request.requestId,
-          gameNumber,
-          result,
-        };
-        post(message);
-        // Yield between games so the main thread stays responsive on slower
+          fromGameNumber: gameNumber,
+          results,
+        });
+        // Yield once per batch so the main thread stays responsive on slower
         // devices; pacing of the presentation is the main thread's job.
         await sleep(0);
       }

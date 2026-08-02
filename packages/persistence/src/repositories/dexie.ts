@@ -1,7 +1,14 @@
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { type EntityTable, type Table } from 'dexie';
 import {
+  activeGameRowSchema,
+  activeRunCheckpointSchema,
+  checkpointFromRun,
   completedRunIndexSchema,
+  runFromCheckpoint,
   storedRunRecordSchema,
+  type ActiveGameAppend,
+  type ActiveRunCheckpoint,
+  type ActiveGameRow,
   type ChallengeRepository,
   type CompletedRunIndex,
   type StoredRunRecord,
@@ -9,15 +16,18 @@ import {
 
 /**
  * Concrete IndexedDB challenge repository (spec/04, spec/07 reduced reuse).
- * One active run, full completed records, and a compact history index. Reads
- * validate every record through the stored schemas; the active-to-completed
- * promotion is one atomic transaction.
+ * The active run is append-only: one checkpoint row plus one row per accepted
+ * game, so per-game persistence never rewrites the growing run. Completed
+ * runs keep the full record plus a compact history index. Reads validate
+ * every record through the stored schemas; the active-to-completed promotion
+ * is one atomic transaction.
  */
 
 const ACTIVE_RECORD_ID = 'active';
 
 class HoopRushDatabase extends Dexie {
-  active!: EntityTable<StoredRunRecord, 'recordId'>;
+  active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
+  activeGames!: Table<ActiveGameRow, [string, number]>;
   completed!: EntityTable<StoredRunRecord, 'recordId'>;
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
 
@@ -28,6 +38,35 @@ class HoopRushDatabase extends Dexie {
       completed: 'recordId',
       history: 'recordId',
     });
+    this.version(2)
+      .stores({
+        active: 'recordId',
+        activeGames: '[runId+gameNumber], runId',
+        completed: 'recordId',
+        history: 'recordId',
+      })
+      .upgrade(async (tx) => {
+        // Legacy v1 active row: the full run record at recordId 'active'.
+        // Split it into the checkpoint plus one game row per accepted game.
+        const legacy = await tx.table<StoredRunRecord, string>('active').get(ACTIVE_RECORD_ID);
+        if (legacy === undefined) return;
+        const validated = storedRunRecordSchema.parse(legacy);
+        await tx.table('activeGames').bulkPut(
+          validated.run.games.map((result) => ({
+            runId: validated.run.runId,
+            gameNumber: result.gameNumber,
+            result,
+            updatedAtIso: validated.updatedAtIso,
+          })),
+        );
+        const { games: _games, schemaVersion: _schemaVersion, ...run } = validated.run;
+        await tx.table('active').put({
+          recordId: ACTIVE_RECORD_ID,
+          saveSchemaVersion: 3,
+          ...run,
+          updatedAtIso: validated.updatedAtIso,
+        });
+      });
   }
 }
 
@@ -39,18 +78,61 @@ export class DexieChallengeRepository implements ChallengeRepository {
   }
 
   async saveActiveRun(record: StoredRunRecord): Promise<void> {
-    const validated = storedRunRecordSchema.parse(record);
-    await this.db.active.put({ ...validated, recordId: ACTIVE_RECORD_ID });
+    const checkpoint = checkpointFromRun(record);
+    await this.db.transaction('rw', this.db.active, this.db.activeGames, async () => {
+      await this.db.activeGames.clear();
+      await this.db.active.put(checkpoint);
+    });
+  }
+
+  async appendActiveGame(input: ActiveGameAppend): Promise<void> {
+    const row = activeGameRowSchema.parse({
+      runId: input.runId,
+      gameNumber: input.gameNumber,
+      result: input.result,
+    });
+    const checkpointUpdate = activeRunCheckpointSchema
+      .pick({ status: true, firstLossGameNumber: true, aggregates: true })
+      .parse(input);
+    const updatedAtIso = new Date().toISOString();
+    await this.db.transaction('rw', this.db.active, this.db.activeGames, async () => {
+      const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
+      if (checkpoint === undefined) {
+        throw new Error('appendActiveGame: no active run checkpoint to update');
+      }
+      const validated = activeRunCheckpointSchema.parse(checkpoint);
+      if (validated.runId !== row.runId) {
+        throw new Error('appendActiveGame: runId does not match the active checkpoint');
+      }
+      await this.db.activeGames.put({ ...row, updatedAtIso });
+      await this.db.active.put({ ...validated, ...checkpointUpdate, updatedAtIso });
+    });
   }
 
   async loadActiveRun(): Promise<StoredRunRecord | null> {
-    const record = await this.db.active.get(ACTIVE_RECORD_ID);
-    if (record === undefined) return null;
-    return storedRunRecordSchema.parse(record);
+    const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
+    if (checkpoint === undefined) return null;
+    const validatedCheckpoint = activeRunCheckpointSchema.parse(checkpoint);
+    const rows = await this.db.activeGames
+      .where('runId')
+      .equals(validatedCheckpoint.runId)
+      .toArray();
+    const results = rows
+      .map((row) => activeGameRowSchema.parse(row).result)
+      .sort((a, b) => a.gameNumber - b.gameNumber);
+    return storedRunRecordSchema.parse({
+      recordId: ACTIVE_RECORD_ID,
+      saveSchemaVersion: 2,
+      run: runFromCheckpoint(validatedCheckpoint, results),
+      updatedAtIso: validatedCheckpoint.updatedAtIso,
+    });
   }
 
   async clearActiveRun(): Promise<void> {
-    await this.db.active.delete(ACTIVE_RECORD_ID);
+    await this.db.transaction('rw', this.db.active, this.db.activeGames, async () => {
+      await this.db.active.delete(ACTIVE_RECORD_ID);
+      await this.db.activeGames.clear();
+    });
   }
 
   async promoteActiveToCompleted(
@@ -68,10 +150,12 @@ export class DexieChallengeRepository implements ChallengeRepository {
     await this.db.transaction(
       'rw',
       this.db.active,
+      this.db.activeGames,
       this.db.completed,
       this.db.history,
       async () => {
         await this.db.active.delete(ACTIVE_RECORD_ID);
+        await this.db.activeGames.clear();
         await this.db.completed.put({ ...validatedRun, recordId: validatedIndex.runId });
         await this.db.history.put({ ...validatedIndex, recordId: validatedIndex.runId });
       },

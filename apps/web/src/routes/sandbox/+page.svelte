@@ -734,12 +734,6 @@
                         <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
                           O {player.detailedRatings.overall ?? 0}
                         </span>
-                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Offense">
-                          A {player.summaryRatings.offenseRating}
-                        </span>
-                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Defense">
-                          D {player.summaryRatings.defenseRating}
-                        </span>
                         {#if cardState === 'displace' && card.displace}
                           <span
                             class="rounded bg-accent/25 px-1.5 py-0.5 font-bold text-accent"
@@ -776,8 +770,6 @@
                     <span class="mt-2 block h-2.5 w-20 rounded bg-surface-3"></span>
                   </span>
                   <span class="flex shrink-0 gap-1">
-                    <span class="h-4 w-9 rounded bg-surface-3"></span>
-                    <span class="h-4 w-9 rounded bg-surface-3"></span>
                     <span class="h-4 w-9 rounded bg-surface-3"></span>
                   </span>
                 </li>

@@ -596,14 +596,14 @@ describe('worker message contracts (M3)', () => {
     expect(workerRequestSchema.safeParse(request).success).toBe(false);
   });
 
-  it('accepts result, complete, and error worker messages', () => {
+  it('accepts results, complete, and error worker messages', () => {
     expect(
       workerMessageSchema.safeParse({
         schemaVersion: 1,
-        type: 'result',
+        type: 'results',
         requestId: 'req-1',
-        gameNumber: 5,
-        result: gameResultFixture(5),
+        fromGameNumber: 5,
+        results: [gameResultFixture(5), gameResultFixture(6)],
       }).success,
     ).toBe(true);
     expect(
@@ -625,13 +625,34 @@ describe('worker message contracts (M3)', () => {
     ).toBe(true);
   });
 
-  it('rejects a result message with a missing request id', () => {
+  it('rejects a results message with a missing request id', () => {
     expect(
       workerMessageSchema.safeParse({
         schemaVersion: 1,
-        type: 'result',
-        gameNumber: 5,
-        result: gameResultFixture(5),
+        type: 'results',
+        fromGameNumber: 5,
+        results: [gameResultFixture(5)],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a results message with an empty or oversized batch', () => {
+    expect(
+      workerMessageSchema.safeParse({
+        schemaVersion: 1,
+        type: 'results',
+        requestId: 'req-1',
+        fromGameNumber: 5,
+        results: [],
+      }).success,
+    ).toBe(false);
+    expect(
+      workerMessageSchema.safeParse({
+        schemaVersion: 1,
+        type: 'results',
+        requestId: 'req-1',
+        fromGameNumber: 5,
+        results: Array.from({ length: 9 }, (_, i) => gameResultFixture(5 + i)),
       }).success,
     ).toBe(false);
   });

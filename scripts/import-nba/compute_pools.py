@@ -66,7 +66,10 @@ def normalize_position_labels(labels: set[str]) -> tuple[list[str], list[str], l
 # Career position unions (cached; scans every packaged roster once)
 # ---------------------------------------------------------------------------
 def load_career_position_labels() -> dict[str, set[str]]:
-    cache_path = RAW_CACHE / "career-position-labels.json"
+    # The cache is derived from the packaged roster snapshot. Version the
+    # filename so older imports cannot silently erase positions for players
+    # added in a later snapshot.
+    cache_path = RAW_CACHE / "career-position-labels-v2.json"
     if cache_path.exists():
         return {
             pid: set(labels)
@@ -305,7 +308,7 @@ def compute_pool(
         stint = best["stint"]
         stats = best["stats"]
         summary = player["summaryRatings"]
-        labels = career_labels.get(pid, set())
+        labels = career_labels.get(pid, set()) or {str(player.get("position", ""))}
         canonical, known_labels, unknown_labels = normalize_position_labels(labels)
         if unknown_labels:
             print(f"  [WARN] {player.get('firstName', '')} {player.get('lastName', '')} ({pid}) unknown position labels: {unknown_labels}")

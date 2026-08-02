@@ -100,7 +100,7 @@ export const simulationPlayerSchema = z.object({
   displayName: z.string().min(1).max(96),
   /** Career-wide canonical position union; slot legality was validated upstream. */
   positions: positionUnionSchema,
-  heightInches: z.number().int().min(60).max(90).nullable(),
+  heightInches: z.number().int().min(60).max(96).nullable(),
   weightLbs: z.number().int().min(120).max(400).nullable(),
   ratings: simulationRatingsSchema,
   tendencies: simulationTendenciesSchema,

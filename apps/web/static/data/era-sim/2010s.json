@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "eraId": "2010s",
+  "profileVersion": "m3-2010s-v1",
+  "dataVersion": "m1.6",
+  "seasons": [
+    "2010-11",
+    "2011-12",
+    "2012-13",
+    "2013-14",
+    "2014-15",
+    "2015-16",
+    "2016-17",
+    "2017-18",
+    "2018-19",
+    "2019-20"
+  ],
+  "baselineReport": "derived from packaged 2010-11..2019-20 stints; targets frozen after calibration baseline",
+  "parameters": {
+    "pace": 92.987,
+    "league3PARate": 0.2915,
+    "leagueTsPct": 0.528,
+    "leagueFtaPerFga": 0.2719,
+    "leagueFtPct": 0.761,
+    "turnoverPerPossession": 0.1406,
+    "stealShareOfTurnovers": 0.5585,
+    "offensiveReboundRate": 0.2447,
+    "assistRate": 0.5866,
+    "foulsPerPossession": 0.2074,
+    "shootingFoulShare": 0.55,
+    "freeThrowAnchorRating": 75,
+    "assistAnchorRating": 62,
+    "zoneMix": {
+      "rim": 0.377,
+      "shortMid": 0.1956,
+      "longMid": 0.1274,
+      "cornerThree": 0.1102,
+      "aboveBreakThree": 0.1898
+    },
+    "source": "packaged stints 2010-11..2019-20 + Lakers 2010s pool rating anchors"
+  },
+  "targets": {
+    "possessionsPerGame": {
+      "value": 92.987,
+      "tolerance": 3,
+      "minimumSample": 200
+    },
+    "pointsPerGame": {
+      "value": 98.1864,
+      "tolerance": 5,
+      "minimumSample": 200
+    },
+    "offensiveRating": {
+      "value": 105.5915,
+      "tolerance": 5,
+      "minimumSample": 200
+    },
+    "fieldGoalPct": {
+      "value": 0.4554,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "efgPct": {
+      "value": 0.5074,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "tsPct": {
+      "value": 0.528,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "threePointRate": {
+      "value": 0.2915,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "threePointPct": {
+      "value": 0.3565,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "freeThrowsAttemptedPerGame": {
+      "value": 21.8533,
+      "tolerance": 3,
+      "minimumSample": 200
+    },
+    "freeThrowPct": {
+      "value": 0.761,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "turnoversPerGame": {
+      "value": 13.0704,
+      "tolerance": 1.5,
+      "minimumSample": 200
+    },
+    "turnoversPerPossession": {
+      "value": 0.1406,
+      "tolerance": 0.012,
+      "minimumSample": 200
+    },
+    "offensiveReboundsPerGame": {
+      "value": 10.0639,
+      "tolerance": 1.5,
+      "minimumSample": 200
+    },
+    "offensiveReboundRate": {
+      "value": 0.2447,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "assistsPerGame": {
+      "value": 21.4709,
+      "tolerance": 2.5,
+      "minimumSample": 200
+    },
+    "assistRate": {
+      "value": 0.5866,
+      "tolerance": 0.03,
+      "minimumSample": 200
+    },
+    "personalFoulsPerGame": {
+      "value": 19.2812,
+      "tolerance": 2.5,
+      "minimumSample": 200
+    },
+    "zoneMix": {
+      "rim": {
+        "value": 0.377,
+        "tolerance": 0.02,
+        "minimumSample": 200
+      },
+      "shortMid": {
+        "value": 0.1956,
+        "tolerance": 0.02,
+        "minimumSample": 200
+      },
+      "longMid": {
+        "value": 0.1274,
+        "tolerance": 0.02,
+        "minimumSample": 200
+      },
+      "cornerThree": {
+        "value": 0.1102,
+        "tolerance": 0.015,
+        "minimumSample": 200
+      },
+      "aboveBreakThree": {
+        "value": 0.1898,
+        "tolerance": 0.02,
+        "minimumSample": 200
+      }
+    },
+    "closeGameRate": {
+      "value": 0.18,
+      "tolerance": 0.04,
+      "minimumSample": 2000
+    },
+    "blowoutRate": {
+      "value": 0.12,
+      "tolerance": 0.04,
+      "minimumSample": 2000
+    },
+    "overtimeRate": {
+      "value": 0.06,
+      "tolerance": 0.02,
+      "minimumSample": 2000
+    },
+    "strongVsWeakWinRate": {
+      "value": 0.88,
+      "tolerance": 0.07,
+      "minimumSample": 2000
+    },
+    "equalLineupHomeWinRate": {
+      "value": 0.5,
+      "tolerance": 0.05,
+      "minimumSample": 2000
+    }
+  }
+}

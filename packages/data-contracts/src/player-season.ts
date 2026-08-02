@@ -144,7 +144,7 @@ export const peakPlayerSeasonSchema = z.object({
     canonical: positionUnionSchema,
     normalizationVersion: positionNormalizationVersionSchema,
   }),
-  heightInches: z.number().int().min(60).max(90).nullable(),
+  heightInches: z.number().int().min(60).max(96).nullable(),
   weightLbs: z.number().int().min(120).max(400).nullable(),
   /** Team-stint eligibility facts for the selected season. */
   eligibility: z.object({

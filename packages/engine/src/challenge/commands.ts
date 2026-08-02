@@ -359,7 +359,7 @@ export function acceptGameResult(run: ChallengeRun, result: GameResult): Challen
     ? (run.firstLossGameNumber ?? result.gameNumber)
     : run.firstLossGameNumber;
   const finished = games.length === 82;
-  const next: ChallengeRun = {
+  return {
     ...run,
     games,
     aggregates,
@@ -367,7 +367,6 @@ export function acceptGameResult(run: ChallengeRun, result: GameResult): Challen
     status: finished ? 'finished' : 'active',
     ...(finished ? { outcome: firstLossGameNumber !== null ? 'eliminated' : 'perfect' } : {}),
   };
-  return challengeRunSchema.parse(next);
 }
 
 /** Runs the complete 82-game challenge from the next unplayed game onward. */

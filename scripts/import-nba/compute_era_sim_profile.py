@@ -1,9 +1,8 @@
 """Build-time derivation of era simulation profiles.
 
-Each profile is derived from the era's packaged source data
-(`raw-data/nba/<season>/stints.json` per season, plus the packaged
-Lakers pool for that era, which provides population anchor ratings and shot-mix
-priors).
+Each profile is derived from the era's raw packaged season data
+(`raw-data/nba/<season>/stints.json` per season), plus the packaged Lakers pool
+for that era, which provides population anchor ratings and shot-mix priors.
 
 Output: `apps/web/static/data/era-sim/<era>.json` (EraSimulationProfile).
 
@@ -20,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "apps" / "web" / "static" / "data"
 OUT_DIR = DATA_DIR / "era-sim"
-NBA_DIR = DATA_DIR / "nba"
+NBA_DIR = ROOT / "raw-data" / "nba"
 POOLS_DIR = DATA_DIR / "pools"
 MANIFEST_PATH = DATA_DIR / "manifest.json"
 PROFILE_VERSION_PREFIX = "m3"

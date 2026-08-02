@@ -67,7 +67,7 @@ export const workerErrorMessageSchema = z.object({
 export type WorkerErrorMessage = z.infer<typeof workerErrorMessageSchema>;
 
 export const workerMessageSchema = z.discriminatedUnion('type', [
-  workerResultMessageSchema,
+  workerResultsMessageSchema,
   workerCompleteMessageSchema,
   workerErrorMessageSchema,
 ]);
