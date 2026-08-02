@@ -31,7 +31,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { clamp, clampRating, safeFloat } from '../json.js';
 import { FIELD_AVAILABILITY } from '../config.js';
-import { computeSummaryRatings } from './summary.js';
+import { computeSummaryRatings, computeRealOverall } from './summary.js';
 import type { StatsRow } from './stats.js';
 
 /** League context used for era-relative translation (spec/12 environment). */
@@ -566,10 +566,20 @@ const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
     freeThrowAttemptRate: Math.min(1, freeThrowAttemptRate),
   };
 
-  const summaryRatings: SummaryRatings = computeSummaryRatings(
+  const skillSummary = computeSummaryRatings(
     ratings as unknown as Record<string, number>,
     tendencies as unknown as Record<string, number>,
   );
+  const summaryRatings: SummaryRatings = {
+    offenseRating: skillSummary.offenseRating,
+    defenseRating: skillSummary.defenseRating,
+    overallRating: computeRealOverall(
+      ratings as unknown as Record<string, number>,
+      position,
+      input.stats,
+      input.heightInches,
+    ),
+  };
 
   return {
     ratings,

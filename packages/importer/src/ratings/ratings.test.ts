@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { derivePlayerRecord, fieldPublished, type DerivationInput } from './v2.js';
+import { computeSummaryRatings } from './summary.js';
 import type { StatsRow } from './stats.js';
 
 const MODERN = { leaguePpg: 110, league3PARate: 0.36, pace: 99 };
@@ -156,12 +157,25 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(derived.provenance['offensiveRebound']?.kind).toBe('derived');
   });
 
-  it('summary ratings stay UI-facing and in range', () => {
-    const derived = derivePlayerRecord(input('1996-97', starterStats()));
-    expect(derived.summaryRatings.overallRating).toBeGreaterThanOrEqual(0);
-    expect(derived.summaryRatings.overallRating).toBeLessThanOrEqual(100);
-    expect(derived.summaryRatings.offenseRating).toBeGreaterThanOrEqual(0);
-    expect(derived.summaryRatings.defenseRating).toBeGreaterThanOrEqual(0);
+  it('summary overall uses production-aware real overall, not only the skill blend', () => {
+    const derived = derivePlayerRecord(
+      input(
+        '1996-97',
+        starterStats({
+          points: 2400,
+          per: 28,
+          boxPlusMinus: 8,
+          usageRate: 32,
+          tsPct: 0.62,
+        }),
+        'SG',
+      ),
+    );
+    const skillOnly = computeSummaryRatings(
+      derived.ratings as unknown as Record<string, number>,
+      derived.tendencies as unknown as Record<string, number>,
+    );
+    expect(derived.summaryRatings.overallRating).toBeGreaterThan(skillOnly.overallRating);
   });
 
   it('fieldPublished follows the source availability table (inclusive first season)', () => {
