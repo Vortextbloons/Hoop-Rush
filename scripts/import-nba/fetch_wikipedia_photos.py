@@ -15,6 +15,7 @@ rejected so a wrong face is never packaged.
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from typing import Any
@@ -37,6 +38,11 @@ HEADERS = {
 
 DISAMBIG_RE = re.compile(r"\s*\(.*?\)\s*$")
 
+# Wikipedia requests anonymous clients to about one request per second.
+# Override for resumable bulk re-annotation runs that accept a slightly higher
+# burst rate: HOOP_RUSH_WIKI_PACE_SECONDS=0.25
+WIKI_PACE_SECONDS = float(os.environ.get("HOOP_RUSH_WIKI_PACE_SECONDS", "1.0"))
+
 
 def _load(path: Any) -> dict[str, str]:
     if path.exists():
@@ -53,7 +59,7 @@ def _save(path: Any, value: dict[str, str]) -> None:
 
 def _pace() -> None:
     """Wikipedia requests anonymous clients to about one request per second."""
-    time.sleep(1.0)
+    time.sleep(WIKI_PACE_SECONDS)
 
 
 def bbref_image_status(external_id: str, bbref_id: str | None) -> str:
