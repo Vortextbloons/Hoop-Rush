@@ -219,6 +219,8 @@ describe('data asset loading with a stale manifest', () => {
             minutes: 2796,
             points: 1765,
             rebounds: 581,
+            offensiveRebounds: null,
+            defensiveRebounds: null,
             assists: 989,
             steals: 132,
             blocks: 36,

@@ -20,3 +20,4 @@ export * from './loaders/pool.js';
 export * from './loaders/assets.js';
 export * from './loaders/simulation.js';
 export * from './loaders/bracket.js';
+export * from './loaders/players-index.js';

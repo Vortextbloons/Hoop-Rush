@@ -1,0 +1,329 @@
+{
+  "schemaVersion": 1,
+  "eraId": "1970s",
+  "profileVersion": "m3-1970s-v1",
+  "dataVersion": "m3.5",
+  "seasons": [
+    "1970-71",
+    "1971-72",
+    "1972-73",
+    "1973-74",
+    "1974-75",
+    "1975-76",
+    "1976-77",
+    "1977-78",
+    "1978-79",
+    "1979-80"
+  ],
+  "baselineReport": "derived from packaged 1970-71..1979-80 stints; targets frozen after calibration baseline",
+  "parameters": {
+    "pace": 115,
+    "league3PARate": 0,
+    "leagueTsPct": 0.5282,
+    "leagueFtaPerFga": 0.3105,
+    "leagueFtPct": 0.7556,
+    "turnoverPerPossession": 0.1174,
+    "stealShareOfTurnovers": 0.5945,
+    "offensiveReboundRate": 0.3179,
+    "assistRate": 0.5458,
+    "foulsPerPossession": 0.2274,
+    "shootingFoulShare": 0.55,
+    "freeThrowAnchorRating": 79,
+    "assistAnchorRating": 64,
+    "zoneMix": {
+      "rim": 0.5619,
+      "shortMid": 0.2628,
+      "longMid": 0.1752,
+      "cornerThree": 0,
+      "aboveBreakThree": 0
+    },
+    "source": "packaged stints 1970-71..1979-80 + Lakers 1970s pool rating anchors; zone-mix three-point share normalized to the league 3P rate",
+    "parameterProvenance": {
+      "pace": {
+        "kind": "estimated",
+        "confidence": "low",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "prior"
+        ],
+        "sourceStatus": "unavailable"
+      },
+      "league3PARate": {
+        "kind": "derived",
+        "confidence": "high",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "prior"
+        ],
+        "sourceStatus": "not-applicable",
+        "notesCode": "league-rule-no-three-point-line"
+      },
+      "leagueTsPct": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "points",
+          "fga",
+          "fta",
+          "oreb",
+          "tov"
+        ]
+      },
+      "leagueFtaPerFga": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "fta",
+          "fga"
+        ]
+      },
+      "leagueFtPct": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "ftm",
+          "fta"
+        ]
+      },
+      "turnoverPerPossession": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "tov",
+          "possessions"
+        ]
+      },
+      "stealShareOfTurnovers": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "stl",
+          "tov"
+        ]
+      },
+      "offensiveReboundRate": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "oreb",
+          "dreb"
+        ]
+      },
+      "assistRate": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "ast",
+          "fgm"
+        ]
+      },
+      "foulsPerPossession": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "pf",
+          "possessions"
+        ]
+      },
+      "shootingFoulShare": {
+        "kind": "estimated",
+        "confidence": "low",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "prior"
+        ],
+        "sourceStatus": "unavailable",
+        "notesCode": "not-derivable-from-box-scores"
+      },
+      "freeThrowAnchorRating": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "lakers-pool",
+          "stints"
+        ]
+      },
+      "assistAnchorRating": {
+        "kind": "derived",
+        "confidence": "medium",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "lakers-pool",
+          "stints"
+        ]
+      },
+      "zoneMix": {
+        "kind": "derived",
+        "confidence": "high",
+        "methodVersion": "derive-v1",
+        "sourceVersion": "source-v1",
+        "sourceFields": [
+          "prior"
+        ],
+        "sourceStatus": "not-applicable",
+        "notesCode": "league-rule-no-three-point-line"
+      }
+    }
+  },
+  "targets": {
+    "possessionsPerGame": {
+      "value": 106.95,
+      "tolerance": 3,
+      "minimumSample": 200
+    },
+    "pointsPerGame": {
+      "value": 110.0445,
+      "tolerance": 5,
+      "minimumSample": 200
+    },
+    "offensiveRating": {
+      "value": 95.6909,
+      "tolerance": 5,
+      "minimumSample": 200
+    },
+    "fieldGoalPct": {
+      "value": 0.4826,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "efgPct": {
+      "value": 0.4826,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "tsPct": {
+      "value": 0.5282,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "threePointRate": {
+      "value": 0,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "threePointPct": {
+      "value": 0,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "freeThrowsAttemptedPerGame": {
+      "value": 28.4561,
+      "tolerance": 3,
+      "minimumSample": 200
+    },
+    "freeThrowPct": {
+      "value": 0.7556,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "turnoversPerGame": {
+      "value": 19.55,
+      "tolerance": 1.5,
+      "minimumSample": 200
+    },
+    "turnoversPerPossession": {
+      "value": 0.1092,
+      "tolerance": 0.012,
+      "minimumSample": 200
+    },
+    "offensiveReboundsPerGame": {
+      "value": 16.1,
+      "tolerance": 1.5,
+      "minimumSample": 200
+    },
+    "offensiveReboundRate": {
+      "value": 0.3179,
+      "tolerance": 0.02,
+      "minimumSample": 200
+    },
+    "assistsPerGame": {
+      "value": 24.141,
+      "tolerance": 2.5,
+      "minimumSample": 200
+    },
+    "assistRate": {
+      "value": 0.5458,
+      "tolerance": 0.03,
+      "minimumSample": 200
+    },
+    "personalFoulsPerGame": {
+      "value": 23.6865,
+      "tolerance": 2.5,
+      "minimumSample": 200
+    },
+    "zoneMix": {
+      "rim": {
+        "value": 0.5619,
+        "tolerance": 0.02,
+        "minimumSample": 200
+      },
+      "shortMid": {
+        "value": 0.2628,
+        "tolerance": 0.02,
+        "minimumSample": 200
+      },
+      "longMid": {
+        "value": 0.1752,
+        "tolerance": 0.02,
+        "minimumSample": 200
+      },
+      "cornerThree": {
+        "value": 0,
+        "tolerance": 0.015,
+        "minimumSample": 200
+      },
+      "aboveBreakThree": {
+        "value": 0,
+        "tolerance": 0.02,
+        "minimumSample": 200
+      }
+    },
+    "closeGameRate": {
+      "value": 0.28,
+      "tolerance": 0.04,
+      "minimumSample": 2000
+    },
+    "blowoutRate": {
+      "value": 0.19,
+      "tolerance": 0.04,
+      "minimumSample": 2000
+    },
+    "overtimeRate": {
+      "value": 0.027,
+      "tolerance": 0.012,
+      "minimumSample": 2000
+    },
+    "strongVsWeakWinRate": {
+      "value": 0.88,
+      "tolerance": 0.07,
+      "minimumSample": 2000
+    },
+    "equalLineupHomeWinRate": {
+      "value": 0.5,
+      "tolerance": 0.05,
+      "minimumSample": 2000
+    }
+  }
+}

@@ -188,3 +188,45 @@ export const franchiseEraPoolSchema = z.object({
   players: z.array(peakPlayerSeasonSchema).min(1),
 });
 export type FranchiseEraPool = z.infer<typeof franchiseEraPoolSchema>;
+
+/**
+ * Lightweight roster-browser row: one peak player-season with summary ratings
+ * flattened for fast filtering and sorting without loading full pool artifacts.
+ */
+export const playersIndexAltIdsSchema = z
+  .object({
+    bbref: bbrefIdSchema.nullable().optional(),
+    nbaHeadshotAvailable: z.boolean().optional(),
+    photoUrl: z.string().url().nullable().optional(),
+  })
+  .nullable();
+export type PlayersIndexAltIds = z.infer<typeof playersIndexAltIdsSchema>;
+
+export const playersIndexEntrySchema = z.object({
+  playerId: playerIdSchema,
+  franchiseId: franchiseIdSchema,
+  eraId: z.string().min(1).max(24),
+  seasonKey: seasonKeySchema,
+  firstName: z.string().min(1).max(64),
+  lastName: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(96),
+  playerExternalId: playerExternalIdSchema,
+  altIds: playersIndexAltIdsSchema.optional(),
+  positionsCanonical: positionUnionSchema,
+  overall: z.number().int().min(0).max(100),
+  offense: z.number().int().min(0).max(100),
+  defense: z.number().int().min(0).max(100),
+  selectionScore: z.number().min(0).max(999),
+  heightInches: z.number().int().min(60).max(96).nullable(),
+  weightLbs: z.number().int().min(120).max(400).nullable(),
+  stats: playerSeasonStatsSchema,
+});
+export type PlayersIndexEntry = z.infer<typeof playersIndexEntrySchema>;
+
+/** Global players index: every packaged peak player-season in one asset. */
+export const playersIndexSchema = z.object({
+  schemaVersion: z.literal(2),
+  dataVersion: z.string().min(1).max(64),
+  players: z.array(playersIndexEntrySchema).min(1),
+});
+export type PlayersIndex = z.infer<typeof playersIndexSchema>;

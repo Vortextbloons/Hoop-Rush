@@ -13,13 +13,14 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PUBLIC_DATA } from '../config.js';
 import { fileExists, readJson, sha256File, writeJsonRetry } from '../json.js';
-import { LINEAGE_RULE_VERSION, ARTIFACT_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import { LINEAGE_RULE_VERSION, ARTIFACT_SCHEMA_VERSION, parsePlayersIndex } from '@hoop-rush/data-contracts';
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.js';
 import {
   classifyUnattempted,
   loadCoverageReport,
   loadManifest,
   type Pool,
+  type PoolPlayer,
 } from '../pools/compute.js';
 
 type Manifest = Record<string, unknown>;
@@ -27,6 +28,28 @@ type Manifest = Record<string, unknown>;
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
 
 export const DATA_VERSION = 'm3.5';
+
+function poolPlayerToIndexEntry(player: PoolPlayer) {
+  return {
+    playerId: player.playerId,
+    franchiseId: player.franchiseId,
+    eraId: player.eraId,
+    seasonKey: player.seasonKey,
+    firstName: player.firstName,
+    lastName: player.lastName,
+    displayName: player.displayName,
+    playerExternalId: player.playerExternalId,
+    altIds: player.altIds,
+    positionsCanonical: player.positions.canonical,
+    overall: player.summaryRatings.overallRating,
+    offense: player.summaryRatings.offenseRating,
+    defense: player.summaryRatings.defenseRating,
+    selectionScore: player.selectionScore,
+    heightInches: player.heightInches,
+    weightLbs: player.weightLbs,
+    stats: player.stats,
+  };
+}
 
 function sortedJsonFiles(dir: string): string[] {
   try {

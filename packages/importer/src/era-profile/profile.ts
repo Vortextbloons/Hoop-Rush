@@ -250,8 +250,7 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
   }
 
   const paceRaw = a.possessions !== null ? a.possessions / a.teamGames : null;
-  const pace =
-    paceRaw !== null ? paceRaw : eraRulePace(seasons[0] as string);
+  const pace = paceRaw !== null ? paceRaw : eraRulePace(seasons[0] as string);
   const tripPace = pace * ESTIMATE_TO_TRIPS_FACTOR;
   const ppg = a.points / a.teamGames;
   const standardPossessions = a.fga + 0.44 * a.fta;
@@ -264,13 +263,22 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
   const threePct = a.tpm !== null && a.tpa !== null ? a.tpm / Math.max(1.0, a.tpa) : 0;
   const ftaPerFga = a.fta / Math.max(1.0, a.fga);
   const ftPct = a.ftm / Math.max(1.0, a.fta);
+  // Ratio families derive over their common-support seasons (spec/12):
+  // mixed-support eras (steals from 1973-74, turnovers from 1977-78) never
+  // distort a ratio; absent support falls back to documented estimates.
   const tovPerPoss =
-    a.tov !== null && a.possessions !== null ? a.tov / Math.max(1.0, a.possessions) : null;
+    a.pairs.turnoverPerPossession !== null
+      ? a.pairs.turnoverPerPossession.tov / Math.max(1.0, a.pairs.turnoverPerPossession.possessions)
+      : null;
   const tovPerTrip = tovPerPoss !== null ? tovPerPoss / ESTIMATE_TO_TRIPS_FACTOR : null;
   const stealShare =
-    a.stl !== null && a.tov !== null && a.tov > 0 ? a.stl / a.tov : null;
+    a.pairs.stealShare !== null && a.pairs.stealShare.tov > 0
+      ? a.pairs.stealShare.stl / a.pairs.stealShare.tov
+      : null;
   const orebRate =
-    a.oreb !== null && a.dreb !== null ? a.oreb / Math.max(1.0, a.oreb + a.dreb) : null;
+    a.pairs.reboundSplit !== null
+      ? a.pairs.reboundSplit.oreb / Math.max(1.0, a.pairs.reboundSplit.oreb + a.pairs.reboundSplit.dreb)
+      : null;
   const assistRate = a.ast / Math.max(1.0, a.fgm);
   const foulsPerPoss =
     a.possessions !== null

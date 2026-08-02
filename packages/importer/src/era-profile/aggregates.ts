@@ -2,11 +2,13 @@
  * League stint aggregates for era simulation profiles (spec/12 provenance).
  *
  * Field families that are absent across an entire era stay `null`
- * (unavailable) instead of being converted to zero; a family with partial
- * per-row missingness sums the present rows and reports its sample coverage.
+ * (unavailable) instead of being converted to zero. Per-season aggregation
+ * keeps family support separate: a family only contributes to era aggregates
+ * in seasons where the league published it (spec/12 availability table) and
+ * its rows actually carry values.
  */
 import { join } from 'node:path';
-import { NBA_ROOT } from '../config.js';
+import { NBA_ROOT, fieldAvailableFrom } from '../config.js';
 import { readJson, safeFloat } from '../json.js';
 
 export interface LeagueAggregates {
@@ -32,6 +34,17 @@ export interface LeagueAggregates {
   coverage: Record<string, number>;
   /** Total rows scanned. */
   rows: number;
+  /**
+   * Common-support pair sums: ratio families derive only over seasons where
+   * BOTH inputs are published and present, so mixed-support eras (e.g. steals
+   * from 1973-74, turnovers from 1977-78) never distort a ratio. Null when no
+   * season has common support.
+   */
+  pairs: {
+    stealShare: { stl: number; tov: number; seasons: number } | null;
+    reboundSplit: { oreb: number; dreb: number; seasons: number } | null;
+    turnoverPerPossession: { tov: number; possessions: number; seasons: number } | null;
+  };
 }
 
 /** One stint row; only the fields summed here are read (rest are ignored). */
@@ -65,13 +78,30 @@ function accumulate(sum: Sum, value: unknown): void {
   sum.rows += 1;
 }
 
-function fin(value: number | null, sum: Sum): number | null {
+function fin(sum: Sum): number | null {
   if (sum.rows === 0) return null;
   return sum.total;
 }
 
-/** Pure derivation over stint rows (exposed for tests; `deriveLeagueAggregates` loads them). */
-export function deriveLeagueAggregatesFromStints(stints: readonly StintRow[]): LeagueAggregates {
+/** Field family -> stint output key used for availability checks. */
+const FAMILY_KEY: Record<string, string> = {
+  tpa: 'tpa',
+  tpm: 'tpm',
+  oreb: 'offensiveRebounds',
+  dreb: 'defensiveRebounds',
+  stl: 'steals',
+  tov: 'turnovers',
+};
+
+/**
+ * Pure derivation over stint rows for one season. Families the league did
+ * not publish in the season (fieldAvailableFrom) or that no row carries stay
+ * null.
+ */
+export function deriveSeasonAggregatesFromStints(
+  season: string,
+  stints: readonly StintRow[],
+): LeagueAggregates {
   const sums: Record<string, Sum> = {};
   const key = (name: string): Sum => {
     let sum = sums[name];
@@ -100,17 +130,17 @@ export function deriveLeagueAggregatesFromStints(stints: readonly StintRow[]): L
     playerGames += Math.max(0, Math.trunc(safeFloat(stint.gamesPlayed)));
   }
 
-  // Each game contributes ~20 player-games (ten players per team), so
-  // player_games / 10 approximates the number of NBA team-games. Total
-  // possessions per team-game is the league pace; per-game totals use the
-  // same denominator.
   const teamGames = Math.max(1.0, playerGames / 10.0);
   const fga = sums['fga']?.total ?? 0;
   const fta = sums['fta']?.total ?? 0;
-  const oreb = fin(0, sums['oreb'] ?? { total: 0, rows: 0 });
-  const tov = fin(0, sums['tov'] ?? { total: 0, rows: 0 });
-  const possessions =
-    oreb === null || tov === null ? null : fga + 0.44 * fta - oreb + tov;
+  // Availability: published by the league AND present in the rows.
+  const family = (name: string): number | null => {
+    if (!fieldAvailableFrom(FAMILY_KEY[name] ?? name, season)) return null;
+    return fin(sums[name] ?? { total: 0, rows: 0 });
+  };
+  const oreb = family('oreb');
+  const tov = family('tov');
+  const possessions = oreb === null || tov === null ? null : fga + 0.44 * fta - oreb + tov;
   const coverage: Record<string, number> = {};
   for (const [name, sum] of Object.entries(sums)) {
     coverage[name] = sum.rows;
@@ -121,27 +151,152 @@ export function deriveLeagueAggregatesFromStints(stints: readonly StintRow[]): L
     points: sums['pts']?.total ?? 0,
     fga,
     fgm: sums['fgm']?.total ?? 0,
-    tpa: fin(0, sums['tpa'] ?? { total: 0, rows: 0 }),
-    tpm: fin(0, sums['tpm'] ?? { total: 0, rows: 0 }),
+    tpa: family('tpa'),
+    tpm: family('tpm'),
     fta,
     ftm: sums['ftm']?.total ?? 0,
     oreb,
-    dreb: fin(0, sums['dreb'] ?? { total: 0, rows: 0 }),
+    dreb: family('dreb'),
     ast: sums['ast']?.total ?? 0,
-    stl: fin(0, sums['stl'] ?? { total: 0, rows: 0 }),
+    stl: family('stl'),
     tov,
     pf: sums['pf']?.total ?? 0,
     coverage,
     rows: stints.length,
+    pairs: {
+      stealShare: null,
+      reboundSplit: null,
+      turnoverPerPossession: null,
+    },
   };
 }
 
-/** Sum every packaged stints.json row across the given seasons. */
+/**
+ * Combined era aggregates: each family sums only over seasons where it is
+ * published and present; ratio pairs derive over their common support.
+ */
 export function deriveLeagueAggregates(seasons: readonly string[]): LeagueAggregates {
-  const rows: StintRow[] = [];
+  const combined: LeagueAggregates = {
+    teamGames: 0,
+    possessions: 0,
+    points: 0,
+    fga: 0,
+    fgm: 0,
+    tpa: 0,
+    tpm: 0,
+    fta: 0,
+    ftm: 0,
+    oreb: 0,
+    dreb: 0,
+    ast: 0,
+    stl: 0,
+    tov: 0,
+    pf: 0,
+    coverage: {},
+    rows: 0,
+    pairs: {
+      stealShare: null,
+      reboundSplit: null,
+      turnoverPerPossession: null,
+    },
+  };
+  let first: LeagueAggregates | null = null;
+  const pairSeasons = {
+    stealShare: { stl: 0, tov: 0, count: 0 },
+    reboundSplit: { oreb: 0, dreb: 0, count: 0 },
+    turnoverPerPossession: { tov: 0, possessions: 0, count: 0 },
+  };
   for (const season of seasons) {
     const stints = readJson(join(NBA_ROOT, season, 'stints.json')) as StintRow[];
-    rows.push(...stints);
+    const a = deriveSeasonAggregatesFromStints(season, stints);
+    if (first === null) first = a;
+    for (const key of [
+      'points',
+      'fga',
+      'fgm',
+      'tpa',
+      'tpm',
+      'fta',
+      'ftm',
+      'oreb',
+      'dreb',
+      'ast',
+      'stl',
+      'tov',
+      'pf',
+    ] as const) {
+      const value = a[key];
+      combined[key] += value ?? 0;
+    }
+    combined.teamGames += a.teamGames;
+    combined.rows += a.rows;
+    for (const [name, count] of Object.entries(a.coverage)) {
+      combined.coverage[name] = (combined.coverage[name] ?? 0) + count;
+    }
+    // Common-support pairs for ratio families.
+    if (a.stl !== null && a.tov !== null) {
+      pairSeasons.stealShare.stl += a.stl;
+      pairSeasons.stealShare.tov += a.tov;
+      pairSeasons.stealShare.count += 1;
+    }
+    if (a.oreb !== null && a.dreb !== null) {
+      pairSeasons.reboundSplit.oreb += a.oreb;
+      pairSeasons.reboundSplit.dreb += a.dreb;
+      pairSeasons.reboundSplit.count += 1;
+    }
+    if (a.tov !== null && a.possessions !== null) {
+      pairSeasons.turnoverPerPossession.tov += a.tov;
+      pairSeasons.turnoverPerPossession.possessions += a.possessions;
+      pairSeasons.turnoverPerPossession.count += 1;
+    }
   }
-  return deriveLeagueAggregatesFromStints(rows);
+  // Family-level availability across the era: published and present in every
+  // packaged season of the era.
+  const family = (key: keyof LeagueAggregates): number | null => {
+    const value = first === null ? null : (first[key] as number | null);
+    if (value === null) return null;
+    return combined[key] as number;
+  };
+  combined.tpa = family('tpa');
+  combined.tpm = family('tpm');
+  combined.oreb = family('oreb');
+  combined.dreb = family('dreb');
+  combined.stl = family('stl');
+  combined.tov = family('tov');
+  const oreb = combined.oreb;
+  const tov = combined.tov;
+  combined.possessions =
+    oreb === null || tov === null ? null : combined.fga + 0.44 * combined.fta - oreb + tov;
+  combined.pairs = {
+    stealShare:
+      pairSeasons.stealShare.count > 0
+        ? {
+            stl: pairSeasons.stealShare.stl,
+            tov: pairSeasons.stealShare.tov,
+            seasons: pairSeasons.stealShare.count,
+          }
+        : null,
+    reboundSplit:
+      pairSeasons.reboundSplit.count > 0
+        ? {
+            oreb: pairSeasons.reboundSplit.oreb,
+            dreb: pairSeasons.reboundSplit.dreb,
+            seasons: pairSeasons.reboundSplit.count,
+          }
+        : null,
+    turnoverPerPossession:
+      pairSeasons.turnoverPerPossession.count > 0
+        ? {
+            tov: pairSeasons.turnoverPerPossession.tov,
+            possessions: pairSeasons.turnoverPerPossession.possessions,
+            seasons: pairSeasons.turnoverPerPossession.count,
+          }
+        : null,
+  };
+  return combined;
+}
+
+/** Backward-compatible pure derivation (no season availability context). */
+export function deriveLeagueAggregatesFromStints(stints: readonly StintRow[]): LeagueAggregates {
+  return deriveSeasonAggregatesFromStints('2099-00', stints);
 }
