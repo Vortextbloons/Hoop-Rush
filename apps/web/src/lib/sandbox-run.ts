@@ -1,0 +1,92 @@
+import { goto } from '$app/navigation';
+import { resolve } from '$app/paths';
+import type { PeakPlayerSeason, RunPlayerSelection, Seed } from '@hoop-rush/data-contracts';
+import {
+  createChallenge,
+  createEngineContext,
+  simulateChallengeBestOf,
+  toSimulationPlayer,
+  type ChallengeCreation,
+} from '@hoop-rush/engine';
+import { challengeRepository } from '$lib/challenge-repo';
+import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
+
+/**
+ * The single authoritative path from a resolved five-player lineup to an
+ * active saved sandbox run (spec/01 sandbox loop). The draft page picks any
+ * five peak player-seasons from the global index; the run always simulates
+ * in the fixed '2010s' environment era.
+ */
+
+/** Fixed simulation environment era for every sandbox run. */
+export const FIXED_SANDBOX_ERA = '2010s';
+
+const LINEUP_STRUCTURE = ['G', 'G', 'F', 'F', 'C'] as const;
+
+/**
+ * Creates the 82-game run for the given five players, saves it as the active
+ * run, and navigates to the challenge page. Throws on any failure so the
+ * caller can surface the error.
+ */
+export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): Promise<void> {
+  if (players.length !== 5) {
+    throw new Error('A lineup needs exactly five players.');
+  }
+  const manifest = await getManifest();
+  const profileEntry = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SANDBOX_ERA);
+  if (!profileEntry) {
+    throw new Error('The decade simulation profile is unavailable.');
+  }
+  if (!manifest.bracket) {
+    throw new Error('The opponent bracket is unavailable.');
+  }
+  const [profile, bracket] = await Promise.all([
+    getEraSimulationProfile(profileEntry),
+    getBracket(manifest.bracket),
+  ]);
+  const selections: RunPlayerSelection[] = players.map((p) => ({
+    playerId: p.playerId,
+    franchiseId: p.franchiseId,
+    eraId: p.eraId,
+  }));
+  const sample = players[0];
+  const context = createEngineContext();
+  const creation: ChallengeCreation = {
+    runId: crypto.randomUUID(),
+    mode: 'sandbox',
+    franchiseId: null,
+    eraId: FIXED_SANDBOX_ERA,
+    homeDisplayName: players
+      .map((p) => p.displayName)
+      .join(' · ')
+      .slice(0, 96),
+    lineup: {
+      structure: [...LINEUP_STRUCTURE],
+      assignments: players.map((player, slotIndex) => ({
+        slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+        playerId: player.playerId,
+        positions: player.positions.canonical,
+      })),
+    },
+    players: players.map((player) => toSimulationPlayer(player)),
+    selections,
+    runSeed: seed,
+    dataVersion: profile.dataVersion,
+    ratingVersion: sample?.source.ratingsVersion ?? 'unknown',
+    positionNormalizationVersion: sample?.positions.normalizationVersion ?? 'position-v1',
+    engineVersion: context.engineVersion,
+    profile,
+    bracket,
+  };
+  // Sandbox simulates the complete season twice from derived attempt seeds
+  // and keeps the best record; the chosen attempt's seed becomes the
+  // persisted run seed so the paced reveal reproduces exactly those games.
+  const chosen = simulateChallengeBestOf(creation, profile, context);
+  const run = createChallenge({ ...creation, runSeed: chosen.runSeed });
+  await challengeRepository.saveActiveRun({
+    recordId: 'active',
+    saveSchemaVersion: 2,
+    run,
+  });
+  void goto(resolve('/sandbox/challenge'));
+}

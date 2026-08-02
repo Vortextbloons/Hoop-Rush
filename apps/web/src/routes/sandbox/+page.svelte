@@ -1,34 +1,28 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { ArrowRight, Check, ChevronDown, Lock, Plus, Search, X } from '@lucide/svelte';
   import { Dialog, Select } from 'bits-ui';
+  import { SvelteMap } from 'svelte/reactivity';
   import type {
-    EraSimulationProfile,
-    FranchiseEraPool,
     HoopRushManifest,
-    OpponentBracket,
+    PeakPlayerSeason,
+    PlayersIndex,
+    PlayersIndexEntry,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import {
-    canPlay,
-    createChallenge,
-    createEngineContext,
-    simulateChallengeBestOf,
-    slotRequirement,
-    toSimulationPlayer,
-    validateLineup,
-    type ChallengeCreation,
-  } from '@hoop-rush/engine';
-  import { getBracket, getEraSimulationProfile, getManifest, getPool } from '$lib/data';
-  import { challengeRepository } from '$lib/challenge-repo';
-  import { generateSeed } from '$lib/sandbox-url';
+  import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
+  import { getManifest, getPlayersIndex, getPool } from '$lib/data';
+  import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
+  import { startSandboxRun } from '$lib/sandbox-run';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
 
-  type PeakPlayer = FranchiseEraPool['players'][number];
+  type IndexRow = PlayersIndexEntry;
+
+  /** One slot ref: enough to locate a peak player-season in the index and pools. */
+  type SlotRef = { playerId: string; franchiseId: string; eraId: string };
 
   const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
   const SLOT_REQUIREMENTS = ['G', 'G', 'F', 'F', 'C'] as const;
@@ -43,19 +37,17 @@
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
+  let index = $state.raw<PlayersIndex | null>(null);
+  let indexError: string | null = $state(null);
+  let runError: string | null = $state(null);
 
   let franchiseId = $state('');
   let eraId = $state('');
 
-  let pool = $state.raw<FranchiseEraPool | null>(null);
-  let poolError: string | null = $state(null);
-
-  let profile = $state.raw<EraSimulationProfile | null>(null);
-  let bracket = $state.raw<OpponentBracket | null>(null);
   let starting = $state(false);
 
-  let slots = $state<(PeakPlayer | null)[]>([null, null, null, null, null]);
-  let pickerPlayer = $state<PeakPlayer | null>(null);
+  let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
+  let pickerPlayer = $state<IndexRow | null>(null);
   let search = $state('');
   let positionFilter = $state<SlotIndex | null>(null);
 
@@ -63,10 +55,18 @@
     let cancelled = false;
     getManifest().then(
       (m) => {
-        if (!cancelled) {
-          manifest = m;
-          restoreUrlState(m);
-        }
+        if (cancelled) return;
+        manifest = m;
+        getPlayersIndex().then(
+          (ix) => {
+            if (cancelled) return;
+            index = ix;
+            restoreUrlState(m, ix);
+          },
+          (error: unknown) => {
+            if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
+          },
+        );
       },
       (error: unknown) => {
         if (!cancelled) manifestError = error instanceof Error ? error.message : String(error);
@@ -77,50 +77,28 @@
     };
   });
 
-  $effect(() => {
-    if (!manifest || !eraId) return;
-    const profileEntry = manifest.eraSimulationProfiles.find((p) => p.eraId === eraId);
-    if (!profileEntry) return;
-    let cancelled = false;
-    getEraSimulationProfile(profileEntry).then(
-      (p) => {
-        if (!cancelled) profile = p;
-      },
-      () => {
-        if (!cancelled) poolError = 'The decade simulation profile is unavailable.';
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  });
-
   /**
-   * Restores a draft carried in the URL (franchise, era, and five slot
-   * assignments) so "edit lineup" returns to the exact same draft.
+   * Restores a draft carried in the URL (five player selections plus an
+   * optional seed) so "edit lineup" returns to the exact same draft. The
+   * selections are re-validated against the manifest and the players index;
+   * the underlying pools are loaded so full records are available for Play.
    */
-  function restoreUrlState(m: HoopRushManifest) {
-    if (franchiseId || eraId || slots.some((p) => p !== null)) return;
+  function restoreUrlState(m: HoopRushManifest, ix: PlayersIndex) {
+    if (slots.some((p) => p !== null)) return;
     if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const nextFranchise = params.get('franchise');
-    const nextEra = params.get('era');
-    const nextSlots = params.get('slots');
-    if (!nextFranchise || !nextEra || !nextSlots) return;
-    if (!m.franchiseLineage.some((e) => e.franchiseId === nextFranchise)) return;
-    if (!m.eras.some((e) => e.eraId === nextEra)) return;
-    const poolEntry = m.pools.find((p) => p.franchiseId === nextFranchise && p.eraId === nextEra);
-    if (!poolEntry) return;
-    franchiseId = nextFranchise;
-    eraId = nextEra;
-    loadPoolFor(nextFranchise, nextEra);
-    getPool(poolEntry).then(
-      (p) => {
-        if (p === null) return;
-        const byId = new Map(p.players.map((player) => [player.playerId, player]));
-        const ids = nextSlots.split(',');
-        if (ids.length !== 5 || new Set(ids).size !== 5) return;
-        slots = ids.map((id) => byId.get(id) ?? null);
+    const result = parseSandboxUrl(new URL(window.location.href), m, ix);
+    if (!result.ok || !result.state) return;
+    const rows = result.state.slots.map((sel) =>
+      ix.players.find(
+        (p) =>
+          p.playerId === sel.playerId && p.franchiseId === sel.franchiseId && p.eraId === sel.eraId,
+      ),
+    );
+    if (rows.some((row) => row === undefined)) return;
+    const filled = rows.filter((row): row is IndexRow => row !== undefined);
+    resolveRefsToPlayers(result.state.slots).then(
+      () => {
+        slots = filled;
         pickerPlayer = null;
       },
       () => {
@@ -134,41 +112,44 @@
   );
   const era = $derived(manifest?.eras.find((e) => e.eraId === eraId) ?? null);
 
-  function franchiseAvailableIn(eraTo: string, firstNba: string | undefined): boolean {
-    return firstNba === undefined || firstNba <= eraTo;
-  }
-
-  const franchiseItems = $derived(
-    (manifest?.franchiseLineage ?? []).map((entry) => ({
+  const franchiseItems = $derived([
+    { value: '', label: 'Any franchise' },
+    ...(manifest?.franchiseLineage ?? []).map((entry) => ({
       value: entry.franchiseId,
       label: entry.displayName,
-      disabled: era !== null && !franchiseAvailableIn(era.toSeasonKey, entry.firstNbaSeasonKey),
     })),
-  );
+  ]);
 
-  const eraItems = $derived(
-    (manifest?.eras ?? []).map((e) => ({
+  const eraItems = $derived([
+    { value: '', label: 'Any decade' },
+    ...(manifest?.eras ?? []).map((e) => ({
       value: e.eraId,
       label: e.label,
-      disabled:
-        franchise !== null && !franchiseAvailableIn(e.toSeasonKey, franchise.firstNbaSeasonKey),
     })),
-  );
+  ]);
 
-  const sortedPlayers = $derived.by(() => {
-    if (!pool) return [] as PeakPlayer[];
-    return [...pool.players].sort(
-      (a, b) =>
-        (b.detailedRatings.overall ?? 0) - (a.detailedRatings.overall ?? 0) ||
-        a.displayName.localeCompare(b.displayName),
+  const eraLabel = $derived(new Map((manifest?.eras ?? []).map((e) => [e.eraId, e.label])));
+
+  const sortedRows = $derived.by(() => {
+    if (!index) return [] as IndexRow[];
+    return [...index.players].sort(
+      (a, b) => b.overall - a.overall || a.displayName.localeCompare(b.displayName),
     );
   });
 
-  const filteredPlayers = $derived.by(() => {
-    let list = sortedPlayers;
+  /** Index rows narrowed to the selected franchise/era pool. */
+  const poolRows = $derived.by(() => {
+    let list = sortedRows;
+    if (franchiseId) list = list.filter((p) => p.franchiseId === franchiseId);
+    if (eraId) list = list.filter((p) => p.eraId === eraId);
+    return list;
+  });
+
+  const filteredRows = $derived.by(() => {
+    let list = poolRows;
     if (positionFilter !== null) {
       const requirement = slotRequirement(positionFilter);
-      list = list.filter((p) => p.positions.canonical.includes(requirement));
+      list = list.filter((p) => p.positionsCanonical.includes(requirement));
     }
     const query = search.trim().toLowerCase();
     if (query) {
@@ -177,63 +158,26 @@
     return list;
   });
 
+  const poolHeading = $derived(
+    franchise && era
+      ? `${franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
+      : franchise
+        ? franchiseAbbreviation(franchise.franchiseId)
+        : era
+          ? era.label
+          : 'All players',
+  );
+
   function selectFranchise(id: string) {
     franchiseId = id;
-    const nextFranchise = manifest?.franchiseLineage.find((e) => e.franchiseId === id) ?? null;
-    if (
-      era &&
-      nextFranchise &&
-      !franchiseAvailableIn(era.toSeasonKey, nextFranchise.firstNbaSeasonKey)
-    ) {
-      eraId = '';
-    }
-    resetPool();
-    void loadPoolFor(franchiseId, eraId);
   }
 
   function selectEra(id: string) {
     eraId = id;
-    const nextEra = manifest?.eras.find((e) => e.eraId === id) ?? null;
-    if (
-      franchise &&
-      nextEra &&
-      !franchiseAvailableIn(nextEra.toSeasonKey, franchise.firstNbaSeasonKey)
-    ) {
-      franchiseId = '';
-    }
-    resetPool();
-    void loadPoolFor(franchiseId, eraId);
   }
 
-  function resetPool() {
-    pool = null;
-    poolError = null;
-    slots = [null, null, null, null, null];
-    pickerPlayer = null;
-    search = '';
-    positionFilter = null;
-  }
-
-  function loadPoolFor(franchise: string | null, era: string | null) {
-    if (!franchise || !era) return;
-    poolError = null;
-    const entry = manifest?.pools.find((p) => p.franchiseId === franchise && p.eraId === era);
-    if (!entry) {
-      poolError = 'Pool unavailable.';
-      return;
-    }
-    getPool(entry).then(
-      (p) => {
-        pool = p;
-      },
-      (error: unknown) => {
-        poolError = error instanceof Error ? error.message : String(error);
-      },
-    );
-  }
-
-  function canFillSlot(player: PeakPlayer, slotIndex: number): boolean {
-    return canPlay(player.positions.canonical, slotRequirement(slotIndex as SlotIndex));
+  function canFillSlot(player: IndexRow, slotIndex: number): boolean {
+    return canPlay(player.positionsCanonical, slotRequirement(slotIndex as SlotIndex));
   }
 
   /**
@@ -242,7 +186,7 @@
    * incumbent cannot move anywhere.
    */
   function displacementTargetFor(
-    incumbent: PeakPlayer,
+    incumbent: IndexRow,
     targetSlot: number,
     subjectSlot: number,
   ): number | null {
@@ -257,7 +201,7 @@
 
   type PickerOption = {
     index: number;
-    incumbent: PeakPlayer | null;
+    incumbent: IndexRow | null;
     state: 'open' | 'self' | 'displace' | 'blocked' | 'cant-play';
     moveTarget: number | null;
     ariaLabel: string;
@@ -318,7 +262,7 @@
   });
 
   /** Place the player at a slot, moving any movable incumbent out of the way. */
-  function placePlayer(subject: PeakPlayer, slotIndex: number) {
+  function placePlayer(subject: IndexRow, slotIndex: number) {
     const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
     const incumbent = slots[slotIndex];
     if (incumbent && incumbent.playerId !== subject.playerId) {
@@ -331,7 +275,7 @@
     pickerPlayer = null;
   }
 
-  function openPicker(player: PeakPlayer) {
+  function openPicker(player: IndexRow) {
     pickerPlayer = player;
   }
 
@@ -340,7 +284,7 @@
   type PoolCardInfo = {
     state: PoolCardState;
     /** Who gets moved and where when this card's take-over is used. */
-    displace: { incumbent: PeakPlayer; targetSlot: number } | null;
+    displace: { incumbent: IndexRow; targetSlot: number } | null;
   };
 
   /**
@@ -348,7 +292,7 @@
    * "place" whenever any eligible slot is open; the displace highlight is
    * reserved for the case where displacement is the only option.
    */
-  function poolCardInfoFor(player: PeakPlayer): PoolCardInfo {
+  function poolCardInfoFor(player: IndexRow): PoolCardInfo {
     if (slots.some((p) => p !== null && p.playerId === player.playerId)) {
       return { state: 'lineup', displace: null };
     }
@@ -380,64 +324,46 @@
       assignments: slots.map((player, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: player!.playerId,
-        positions: player!.positions.canonical,
+        positions: player!.positionsCanonical,
       })),
     }).ok;
   });
 
-  const ready = $derived(
-    lineupIsLegal && manifest !== null && pool !== null && profile !== null && franchise !== null,
-  );
+  const ready = $derived(lineupIsLegal && manifest !== null && index !== null);
 
-  /** Creates and persists the active 82-game run, then starts it immediately. */
-  async function play82() {
-    if (!ready || !pool || !profile || !franchise || !manifest) return;
-    if (!manifest.bracket) {
-      poolError = 'The opponent bracket is unavailable.';
-      return;
+  /**
+   * Loads the full peak records behind the picked index rows via their
+   * franchise-era pools, in slot order.
+   */
+  async function resolveRefsToPlayers(refs: SlotRef[]): Promise<PeakPlayerSeason[]> {
+    const byKey = new SvelteMap<string, SvelteMap<string, PeakPlayerSeason>>();
+    for (const key of new Set(refs.map((r) => `${r.franchiseId}/${r.eraId}`))) {
+      const slash = key.indexOf('/');
+      const poolEntry = manifest?.pools.find(
+        (p) => p.franchiseId === key.slice(0, slash) && p.eraId === key.slice(slash + 1),
+      );
+      if (!poolEntry) throw new Error(`Pool unavailable for ${key}.`);
+      const pool = await getPool(poolEntry);
+      byKey.set(key, new SvelteMap(pool.players.map((p) => [p.playerId, p])));
     }
+    return refs.map((ref) => {
+      const player = byKey.get(`${ref.franchiseId}/${ref.eraId}`)?.get(ref.playerId);
+      if (!player) throw new Error(`Drafted player ${ref.playerId} is unavailable.`);
+      return player;
+    });
+  }
+
+  /** Resolves the picked players, then starts and persists the 82-game run. */
+  async function play82() {
+    if (!ready || !index || !manifest) return;
     starting = true;
+    runError = null;
     try {
-      bracket = await getBracket(manifest.bracket);
-      const players = slots.filter((p): p is PeakPlayer => p !== null);
-      const sample = players[0];
-      const context = createEngineContext();
-      const creation: ChallengeCreation = {
-        runId: crypto.randomUUID(),
-        mode: 'sandbox',
-        franchiseId,
-        eraId,
-        homeDisplayName: franchise.displayName,
-        lineup: {
-          structure: [...SLOT_REQUIREMENTS],
-          assignments: players.map((player, slotIndex) => ({
-            slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
-            playerId: player.playerId,
-            positions: player.positions.canonical,
-          })),
-        },
-        players: players.map((player) => toSimulationPlayer(player)),
-        runSeed: generateSeed(),
-        dataVersion: profile.dataVersion,
-        ratingVersion: sample?.source.ratingsVersion ?? 'unknown',
-        positionNormalizationVersion: sample?.positions.normalizationVersion ?? 'position-v1',
-        engineVersion: context.engineVersion,
-        profile,
-        bracket,
-      };
-      // Sandbox simulates the complete season twice from derived attempt seeds
-      // and keeps the best record; the chosen attempt's seed becomes the
-      // persisted run seed so the paced reveal reproduces exactly those games.
-      const chosen = simulateChallengeBestOf(creation, profile, context);
-      const run = createChallenge({ ...creation, runSeed: chosen.runSeed });
-      await challengeRepository.saveActiveRun({
-        recordId: 'active',
-        saveSchemaVersion: 2,
-        run,
-      });
-      void goto(resolve('/sandbox/challenge'));
+      const picked = slots.filter((p): p is IndexRow => p !== null);
+      const resolved = await resolveRefsToPlayers(picked);
+      await startSandboxRun(resolved, generateSeed());
     } catch (e) {
-      poolError = e instanceof Error ? e.message : String(e);
+      runError = e instanceof Error ? e.message : String(e);
       starting = false;
     }
   }
@@ -454,8 +380,12 @@
       <h1
         class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
       >
-        Choose a franchise and decade
+        Draft any five
       </h1>
+      <p class="mt-3 max-w-xl text-sm text-muted-foreground">
+        Five players, any franchise, any era. Build a lineup from every peak player-season and take
+        it 82-0.
+      </p>
     </div>
     <a
       href={resolve('/')}
@@ -521,15 +451,28 @@
               <Select.Viewport
                 class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
               >
+                <Select.Item
+                  value=""
+                  label="Any franchise"
+                  aria-label="Any franchise"
+                  class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
+                >
+                  {#snippet children({ selected })}
+                    <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
+                      <span class="min-w-0 flex-1 truncate text-sm font-semibold">
+                        Any franchise
+                      </span>
+                      {#if selected}
+                        <Check class="h-4 w-4 shrink-0 text-primary" />
+                      {/if}
+                    </span>
+                  {/snippet}
+                </Select.Item>
                 {#each manifest.franchiseLineage as entry (entry.franchiseId)}
-                  {@const available =
-                    era === null || franchiseAvailableIn(era.toSeasonKey, entry.firstNbaSeasonKey)}
                   <Select.Item
                     value={entry.franchiseId}
                     label={entry.displayName}
                     aria-label={`${franchiseAbbreviation(entry.franchiseId)} — ${entry.displayName}`}
-                    disabled={!available}
-                    aria-disabled={!available ? 'true' : undefined}
                     class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
                   >
                     {#snippet children({ selected })}
@@ -542,13 +485,7 @@
                         <span class="min-w-0 flex-1 truncate text-sm font-semibold">
                           {franchiseAbbreviation(entry.franchiseId)}
                         </span>
-                        {#if !available}
-                          <span
-                            class="shrink-0 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase"
-                          >
-                            Not in NBA yet
-                          </span>
-                        {:else if selected}
+                        {#if selected}
                           <Check class="h-4 w-4 shrink-0 text-primary" />
                         {/if}
                       </span>
@@ -595,15 +532,27 @@
               <Select.Viewport
                 class="max-h-[min(20rem,55vh)] overflow-y-auto overscroll-contain p-0.5"
               >
+                <Select.Item
+                  value=""
+                  label="Any decade"
+                  aria-label="Any decade"
+                  class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
+                >
+                  {#snippet children({ selected })}
+                    <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
+                      <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
+                        Any decade
+                      </span>
+                      {#if selected}
+                        <Check class="h-4 w-4 shrink-0 text-primary" />
+                      {/if}
+                    </span>
+                  {/snippet}
+                </Select.Item>
                 {#each manifest.eras as e (e.eraId)}
-                  {@const available =
-                    franchise === null ||
-                    franchiseAvailableIn(e.toSeasonKey, franchise.firstNbaSeasonKey)}
                   <Select.Item
                     value={e.eraId}
                     label={e.label}
-                    disabled={!available}
-                    aria-disabled={!available ? 'true' : undefined}
                     class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
                   >
                     {#snippet children({ selected })}
@@ -611,13 +560,7 @@
                         <span class="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
                           {e.label}
                         </span>
-                        {#if !available}
-                          <span
-                            class="shrink-0 font-mono text-[10px] tracking-[0.08em] text-muted-foreground uppercase"
-                          >
-                            No seasons yet
-                          </span>
-                        {:else if selected}
+                        {#if selected}
                           <Check class="h-4 w-4 shrink-0 text-primary" />
                         {/if}
                       </span>
@@ -631,155 +574,134 @@
       </div>
     </div>
 
-    {#if poolError}
+    {#if indexError}
       <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-        {poolError}
+        Failed to load players: {indexError}
       </p>
-    {:else if franchise && era}
+    {:else if !index}
+      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading players…</p>
+    {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">
         <div class="rounded-xl border border-border bg-card">
           <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">
-              {franchiseAbbreviation(franchise.franchiseId)} · {era.label}
+              {poolHeading}
             </h2>
             <span
               class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
             >
-              {#if pool}
-                {pool.players.length} players
-              {:else}
-                Loading players…
-              {/if}
+              {poolRows.length} players
             </span>
           </div>
-          {#if pool}
-            <div class="flex flex-col gap-2 border-b border-border p-2">
-              <div class="relative">
-                <Search
-                  class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <input
-                  type="search"
-                  bind:value={search}
-                  placeholder="Search players…"
-                  aria-label="Search players by name"
-                  class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              </div>
-              <div
-                class="flex items-center gap-1 overflow-x-auto pb-0.5"
-                role="group"
-                aria-label="Filter by position"
+          <div class="flex flex-col gap-2 border-b border-border p-2">
+            <div class="relative">
+              <Search
+                class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                type="search"
+                bind:value={search}
+                placeholder="Search players…"
+                aria-label="Search players by name"
+                class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <div
+              class="flex items-center gap-1 overflow-x-auto pb-0.5"
+              role="group"
+              aria-label="Filter by position"
+            >
+              <button
+                type="button"
+                aria-pressed={positionFilter === null}
+                onclick={() => (positionFilter = null)}
+                class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
+                null
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
               >
+                All
+              </button>
+              {#each SLOT_INDEXES as i (i)}
                 <button
                   type="button"
-                  aria-pressed={positionFilter === null}
-                  onclick={() => (positionFilter = null)}
+                  aria-pressed={positionFilter === i}
+                  onclick={() => (positionFilter = positionFilter === i ? null : i)}
                   class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
-                  null
+                  i
                     ? 'border-primary bg-primary text-primary-foreground'
                     : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
                 >
-                  All
+                  {SLOT_LABELS[i]}
                 </button>
-                {#each SLOT_INDEXES as i (i)}
-                  <button
-                    type="button"
-                    aria-pressed={positionFilter === i}
-                    onclick={() => (positionFilter = positionFilter === i ? null : i)}
-                    class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
-                    i
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
-                  >
-                    {SLOT_LABELS[i]}
-                  </button>
-                {/each}
-                <span class="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">
-                  {filteredPlayers.length}/{pool.players.length}
-                </span>
-              </div>
+              {/each}
+              <span class="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">
+                {filteredRows.length}/{poolRows.length}
+              </span>
             </div>
-            {#if filteredPlayers.length === 0}
-              <p class="p-6 text-center font-mono text-xs text-muted-foreground">
-                No players match.
-              </p>
-            {:else}
-              <ul
-                class="grid max-h-[55vh] gap-1 overflow-y-auto p-2 sm:max-h-[560px] sm:grid-cols-2 xl:grid-cols-3"
-              >
-                {#each filteredPlayers as player (player.playerId)}
-                  {@const card = poolCardInfoFor(player)}
-                  {@const cardState = card.state}
-                  <li>
-                    <button
-                      type="button"
-                      disabled={cardState === 'blocked'}
-                      aria-disabled={cardState === 'blocked' ? 'true' : undefined}
-                      onclick={() => openPicker(player)}
-                      class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left {cardState ===
-                      'lineup'
-                        ? 'border-primary/50 bg-primary/10 opacity-60'
-                        : cardState === 'displace'
-                          ? 'border-accent/50 bg-accent/10 opacity-90 shadow-[0_0_8px_hsl(42_91%_61%/0.15)] hover:bg-accent/20 hover:opacity-100'
-                          : cardState === 'blocked'
-                            ? 'border-transparent opacity-40 disabled:cursor-not-allowed'
-                            : 'border-transparent hover:border-border hover:bg-surface-2'}"
-                    >
-                      <PlayerFace
-                        {player}
-                        {manifest}
-                        size="md"
-                        fallbackInitials={player.firstName[0]! + player.lastName[0]!}
-                      />
-                      <span class="min-w-0 flex-1">
-                        <span class="block truncate text-sm font-bold">{player.displayName}</span>
-                        <span class="block font-mono text-[10px] text-muted-foreground">
-                          {player.seasonKey} · {player.positions.sourceLabels.join('/')}
-                        </span>
-                      </span>
-                      <span class="flex shrink-0 gap-1 font-mono text-[10px]">
-                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
-                          O {player.detailedRatings.overall ?? 0}
-                        </span>
-                        {#if cardState === 'displace' && card.displace}
-                          <span
-                            class="rounded bg-accent/25 px-1.5 py-0.5 font-bold text-accent"
-                            title={`Moves ${card.displace.incumbent.displayName} to ${SLOT_NAMES[card.displace.targetSlot]}`}
-                          >
-                            Moves {card.displace.incumbent.displayName.split(' ').pop()}
-                          </span>
-                        {:else if cardState === 'blocked'}
-                          <span
-                            class="rounded bg-surface-3 px-1.5 py-0.5 text-muted-foreground"
-                            title="No open or movable position"
-                          >
-                            No slot
-                          </span>
-                        {/if}
-                      </span>
-                    </button>
-                  </li>
-                {/each}
-              </ul>
-            {/if}
+          </div>
+          {#if runError}
+            <p class="border-b border-border/60 p-4 text-sm text-destructive">{runError}</p>
+          {/if}
+          {#if filteredRows.length === 0}
+            <p class="p-6 text-center font-mono text-xs text-muted-foreground">No players match.</p>
           {:else}
             <ul
-              aria-hidden="true"
-              class="grid max-h-[55vh] gap-1 overflow-y-auto p-2 sm:max-h-[560px] sm:grid-cols-2"
+              class="grid max-h-[55vh] gap-1 overflow-y-auto p-2 sm:max-h-[560px] sm:grid-cols-2 xl:grid-cols-3"
             >
-              {#each Array(8) as _, i (i)}
-                <li
-                  class="flex w-full animate-pulse items-center gap-3 rounded-lg border border-transparent px-3 py-2.5"
-                >
-                  <span class="h-12 w-12 shrink-0 rounded-lg bg-surface-3"></span>
-                  <span class="min-w-0 flex-1">
-                    <span class="block h-3.5 w-32 rounded bg-surface-3"></span>
-                    <span class="mt-2 block h-2.5 w-20 rounded bg-surface-3"></span>
-                  </span>
-                  <span class="flex shrink-0 gap-1">
-                    <span class="h-4 w-9 rounded bg-surface-3"></span>
-                  </span>
+              {#each filteredRows as player (player.franchiseId + '/' + player.eraId + '/' + player.playerId)}
+                {@const card = poolCardInfoFor(player)}
+                {@const cardState = card.state}
+                <li>
+                  <button
+                    type="button"
+                    disabled={cardState === 'blocked'}
+                    aria-disabled={cardState === 'blocked' ? 'true' : undefined}
+                    onclick={() => openPicker(player)}
+                    class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left {cardState ===
+                    'lineup'
+                      ? 'border-primary/50 bg-primary/10 opacity-60'
+                      : cardState === 'displace'
+                        ? 'border-accent/50 bg-accent/10 opacity-90 shadow-[0_0_8px_hsl(42_91%_61%/0.15)] hover:bg-accent/20 hover:opacity-100'
+                        : cardState === 'blocked'
+                          ? 'border-transparent opacity-40 disabled:cursor-not-allowed'
+                          : 'border-transparent hover:border-border hover:bg-surface-2'}"
+                  >
+                    <PlayerFace
+                      {player}
+                      {manifest}
+                      size="md"
+                      fallbackInitials={player.firstName[0]! + player.lastName[0]!}
+                    />
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-sm font-bold">{player.displayName}</span>
+                      <span class="block font-mono text-[10px] text-muted-foreground">
+                        {player.seasonKey} · {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(
+                          player.eraId,
+                        ) ?? player.eraId} · {player.positionsCanonical.join('/')}
+                      </span>
+                    </span>
+                    <span class="flex shrink-0 gap-1 font-mono text-[10px]">
+                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
+                        O {player.overall}
+                      </span>
+                      {#if cardState === 'displace' && card.displace}
+                        <span
+                          class="rounded bg-accent/25 px-1.5 py-0.5 font-bold text-accent"
+                          title={`Moves ${card.displace.incumbent.displayName} to ${SLOT_NAMES[card.displace.targetSlot]}`}
+                        >
+                          Moves {card.displace.incumbent.displayName.split(' ').pop()}
+                        </span>
+                      {:else if cardState === 'blocked'}
+                        <span
+                          class="rounded bg-surface-3 px-1.5 py-0.5 text-muted-foreground"
+                          title="No open or movable position"
+                        >
+                          No slot
+                        </span>
+                      {/if}
+                    </span>
+                  </button>
                 </li>
               {/each}
             </ul>
@@ -872,8 +794,8 @@
                   {subject.displayName}
                 </Dialog.Title>
                 <p class="font-mono text-[10px] text-muted-foreground">
-                  {subject.seasonKey} · {subject.positions.canonical.join('/')} · O
-                  {subject.detailedRatings.overall ?? 0}
+                  {subject.seasonKey} · {subject.positionsCanonical.join('/')} · O
+                  {subject.overall}
                 </p>
               </div>
             </div>
@@ -918,7 +840,7 @@
                       {opt.incumbent.displayName}
                     </span>
                     <span class="block font-mono text-[10px] text-muted-foreground">
-                      {opt.incumbent.seasonKey} · {opt.incumbent.positions.canonical.join('/')}
+                      {opt.incumbent.seasonKey} · {opt.incumbent.positionsCanonical.join('/')}
                     </span>
                   {:else}
                     <span class="block truncate text-sm font-semibold">Open {label} slot</span>

@@ -23,7 +23,7 @@ export function resolveHeadshotUrl(
  */
 export function resolveSecondaryHeadshotUrl(
   manifest: HoopRushManifest,
-  player: PeakPlayerSeason,
+  player: Pick<PeakPlayerSeason, 'playerExternalId' | 'altIds'>,
 ): string | null {
   const template = manifest.assets.headshotUrlTemplateSecondary;
   const bbrefId = player.altIds?.bbref ?? null;
@@ -33,7 +33,7 @@ export function resolveSecondaryHeadshotUrl(
 /** Ordered headshot candidates: primary NBA CDN, then secondary, then direct photo, then none. */
 export function resolveHeadshotUrls(
   manifest: HoopRushManifest,
-  player: PeakPlayerSeason,
+  player: Pick<PeakPlayerSeason, 'playerExternalId' | 'altIds'>,
 ): string[] {
   const urls: string[] = [];
   const primary = resolveHeadshotUrl(manifest, player.playerExternalId);

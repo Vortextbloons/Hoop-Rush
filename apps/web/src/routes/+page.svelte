@@ -18,7 +18,7 @@
     {
       code: '01',
       name: 'Sandbox',
-      line: 'Pick a franchise and a decade, draft five peak seasons, and face all 30 teams on a fixed schedule.',
+      line: 'Draft any five peak seasons from any franchise and any era, then face all 30 teams on a fixed schedule.',
       status: 'available',
       cta: 'Start sandbox',
       href: '/sandbox' as RouteId,
@@ -216,12 +216,15 @@
                 <span
                   class="font-display block truncate text-base font-extrabold tracking-tight uppercase"
                 >
-                  {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
+                  {#if row.franchiseId !== null}
+                    {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
+                  {:else}
+                    {eraName(row.eraId)} · 5-player lineup
+                  {/if}
                 </span>
                 <span class="block font-mono text-[10px] text-muted-foreground">
-                  {franchiseAbbreviation(row.franchiseId)} · completed {new Date(
-                    row.completedAtIso,
-                  ).toLocaleDateString()}
+                  {#if row.franchiseId !== null}{franchiseAbbreviation(row.franchiseId)} ·
+                  {/if}completed {new Date(row.completedAtIso).toLocaleDateString()}
                 </span>
                 <span class="font-display text-xl font-extrabold tracking-tight">
                   {row.wins}<span class="text-muted-foreground">–</span>{row.losses}

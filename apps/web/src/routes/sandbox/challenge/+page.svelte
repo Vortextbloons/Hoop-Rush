@@ -7,6 +7,7 @@
     ChallengeRun,
     EraSimulationProfile,
     HoopRushManifest,
+    PeakPlayerSeason,
   } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
@@ -14,8 +15,10 @@
   import { getEraSimulationProfile, getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
+  import FreeformTeamRoster from '$lib/components/FreeformTeamRoster.svelte';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import { loadRunPlayersById, lineupPlayersFromRun } from '$lib/sandbox-lineup';
 
   /**
    * Challenge progress (spec/08): a full-screen dialog driven by the paced
@@ -29,6 +32,8 @@
   let profile = $state.raw<EraSimulationProfile | null>(null);
   let run = $state.raw<ChallengeRun | null>(null);
   let loadError = $state<string | null>(null);
+  /** playerId → peak season for free-form lineup headshots. */
+  let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
 
   let phase = $state<RunnerPhase>('idle');
   let runnerError = $state<string | null>(null);
@@ -160,6 +165,31 @@
   const franchise = $derived(
     manifest?.franchiseLineage.find((e) => e.franchiseId === run?.franchiseId) ?? null,
   );
+  const era = $derived(manifest?.eras.find((e) => e.eraId === run?.eraId) ?? null);
+
+  $effect(() => {
+    const currentRun = run;
+    const m = manifest;
+    if (!browser || !currentRun || !m || currentRun.franchiseId !== null) return;
+    let cancelled = false;
+    loadRunPlayersById(currentRun, m).then(
+      (map) => {
+        if (!cancelled) byId = map;
+      },
+      () => {
+        if (!cancelled) byId = new Map();
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  const lineupPlayers = $derived.by(() => {
+    const currentRun = run;
+    if (!currentRun || !byId) return null;
+    return lineupPlayersFromRun(currentRun, byId);
+  });
 
   function cancel() {
     runner?.cancel();
@@ -217,7 +247,11 @@
         class="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-center px-4 py-8 sm:px-6"
       >
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-          Sandbox · {franchiseAbbreviation(run.franchiseId)} · {run.eraId}
+          {#if run.franchiseId !== null}
+            Sandbox · {franchiseAbbreviation(run.franchiseId)} · {run.eraId}
+          {:else}
+            Sandbox · {era?.label ?? run.eraId}
+          {/if}
         </p>
         <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
           {#if phase === 'paused'}
@@ -234,25 +268,51 @@
           class="mt-6 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-line-strong bg-card p-4 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:p-6"
         >
           <div class="flex min-w-0 items-center gap-2 sm:gap-3">
-            {#if franchise && manifest}
-              <TeamLogo
-                {manifest}
-                franchiseId={franchise.franchiseId}
-                teamExternalId={franchise.teamExternalId}
-                alt=""
-                className="h-7 w-7 sm:h-8 sm:w-8"
-              />
+            {#if run.franchiseId === null}
+              {#if lineupPlayers && manifest}
+                <FreeformTeamRoster
+                  players={lineupPlayers}
+                  {manifest}
+                  simulationEraLabel={era?.label ?? run.eraId}
+                  variant="strip"
+                />
+              {:else}
+                <div class="min-w-0">
+                  <p
+                    class="font-display truncate text-sm font-extrabold tracking-tight uppercase sm:text-base"
+                  >
+                    Your five
+                  </p>
+                  <p class="font-mono text-[10px] text-muted-foreground">
+                    {era?.label ?? run.eraId}
+                  </p>
+                </div>
+              {/if}
+            {:else}
+              {#if franchise && manifest}
+                <TeamLogo
+                  {manifest}
+                  franchiseId={franchise.franchiseId}
+                  teamExternalId={franchise.teamExternalId}
+                  alt=""
+                  className="h-7 w-7 sm:h-8 sm:w-8"
+                />
+              {/if}
+              <div class="min-w-0">
+                <p
+                  class="font-display truncate text-sm font-extrabold tracking-tight uppercase sm:text-base"
+                >
+                  {run.homeDisplayName}
+                </p>
+                <p class="font-mono text-[10px] text-muted-foreground">
+                  {#if run.franchiseId !== null}
+                    {franchiseAbbreviation(run.franchiseId)} · {run.eraId}
+                  {:else}
+                    {era?.label ?? run.eraId}
+                  {/if}
+                </p>
+              </div>
             {/if}
-            <div class="min-w-0">
-              <p
-                class="font-display truncate text-sm font-extrabold tracking-tight uppercase sm:text-base"
-              >
-                {run.homeDisplayName}
-              </p>
-              <p class="font-mono text-[10px] text-muted-foreground">
-                {franchiseAbbreviation(run.franchiseId)} · {run.eraId}
-              </p>
-            </div>
           </div>
           <div class="flex flex-col items-center gap-1">
             <p class="font-display text-4xl font-extrabold tracking-tight sm:text-6xl">

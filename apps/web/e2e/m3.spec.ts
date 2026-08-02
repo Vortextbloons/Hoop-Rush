@@ -4,23 +4,17 @@ import { expect, test, type Page } from '@playwright/test';
  * M3 journeys (spec/08, spec/06): draft five → Play → animated 82-game
  * overlay → completed summary → reload → history → reopen result, plus
  * cancellation/resume, mobile layout, keyboard control, screen-reader
- * landmarks, image fallbacks, and reduced motion.
+ * landmarks, image fallbacks, and reduced motion. The draft browses a global
+ * players index with optional Franchise/Decade filters; every run simulates
+ * in the fixed 2010s environment era.
  */
-
-async function pickFranchise(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Franchise' }).click();
-  await page.getByRole('option', { name: new RegExp(name) }).click();
-}
-
-async function pickEra(page: Page, label: string) {
-  await page.getByRole('button', { name: 'Decade' }).click();
-  await page.getByRole('option', { name: label, exact: true }).click();
-}
 
 async function draftFive(page: Page) {
   await page.goto('/sandbox');
-  await pickFranchise(page, 'Los Angeles Lakers');
-  await pickEra(page, '1990s');
+  await page.getByRole('button', { name: 'Franchise' }).click();
+  await page.getByRole('option', { name: /Los Angeles Lakers/ }).click();
+  await page.getByRole('button', { name: 'Decade' }).click();
+  await page.getByRole('option', { name: '1990s', exact: true }).click();
   await expect(page.getByRole('heading', { name: /LAL · 1990s/ })).toBeVisible();
   for (const [name, slotLabel] of [
     ['Nick Van Exel', 'Point Guard slot 1'],
@@ -96,10 +90,12 @@ test.describe('m3: draft to 82-game season journey', () => {
       'true',
     );
 
-    // History reopens the stored summary.
+    // History reopens the stored summary. Sandbox runs no longer carry a
+    // franchise-era label (every run simulates in the fixed 2010s era), so
+    // the row is identified by its record instead.
     await page.goto('/sandbox/history');
     await expect(page.getByRole('heading', { name: 'Challenge history' })).toBeVisible();
-    const row = page.getByRole('link', { name: /Los Angeles Lakers · 1990s/ });
+    const row = page.getByRole('link', { name: new RegExp(recordText) });
     await expect(row).toBeVisible();
     await row.click();
     await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
@@ -109,7 +105,26 @@ test.describe('m3: draft to 82-game season journey', () => {
     // The start page lists the completed challenge.
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Recent challenges' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Los Angeles Lakers · 1990s/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: new RegExp(recordText) })).toBeVisible();
+  });
+
+  test('result actions: Retry and Edit team replace the replay controls', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await reachPlaying(page);
+    await expectSeasonReport(page);
+
+    // Exactly two actions on the report: Retry (same five, new seed) and
+    // Edit team (back to the draft with the lineup restored).
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Edit team' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Replay this seed' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'New seed' })).toHaveCount(0);
+
+    // Edit team returns to the draft with the five restored.
+    await page.getByRole('link', { name: 'Edit team' }).click();
+    await expect(page).toHaveURL(/\/sandbox\?.*slots=/);
+    await expect(page.getByText('5/5', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove Nick Van Exel' })).toBeVisible();
   });
 
   test('cancel pauses at the persisted prefix and continue finishes the same run', async ({
@@ -188,9 +203,8 @@ test.describe('m3: accessibility and mobile', () => {
     await expect(page.getByRole('heading', { name: 'Best performance' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Per game' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Replay this seed' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'New seed' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Edit lineup' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Edit team' })).toBeVisible();
   });
 
   test('image fallbacks never block the challenge flow', async ({ page }) => {

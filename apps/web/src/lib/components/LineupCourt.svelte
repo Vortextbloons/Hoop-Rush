@@ -1,8 +1,9 @@
-<script lang="ts">
-  import type { FranchiseEraPool, HoopRushManifest } from '@hoop-rush/data-contracts';
+<script
+  lang="ts"
+  generics="T extends Pick<PeakPlayerSeason, 'playerId' | 'displayName' | 'firstName' | 'lastName' | 'playerExternalId' | 'altIds'>"
+>
+  import type { HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
   import PlayerFace from './PlayerFace.svelte';
-
-  type PeakPlayer = FranchiseEraPool['players'][number];
 
   const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
   const SLOT_NAMES = [
@@ -28,10 +29,10 @@
     onmove,
     onremove,
   }: {
-    slots: (PeakPlayer | null)[];
+    slots: (T | null)[];
     manifest: HoopRushManifest;
     ready: boolean;
-    onmove: (player: PeakPlayer) => void;
+    onmove: (player: T) => void;
     onremove: (index: number) => void;
   } = $props();
 

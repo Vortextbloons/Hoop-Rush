@@ -1,25 +1,36 @@
 import { expect, test, type Page } from '@playwright/test';
 
-async function pickFranchise(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Franchise' }).click();
-  await page.getByRole('option', { name: new RegExp(name) }).click();
-}
+/**
+ * Sandbox draft journey (spec/01): the draft browses a global players index
+ * with optional Franchise and Decade filters (single-select dropdowns),
+ * position chips, and name search. Nothing is required except five legal
+ * picks from any franchise/era combination; the run simulates in a fixed
+ * 2010s environment.
+ */
 
-async function pickEra(page: Page, label: string) {
-  await page.getByRole('button', { name: 'Decade' }).click();
-  await page.getByRole('option', { name: label, exact: true }).click();
-}
-
-async function draftLakers1990s(page: Page) {
+/** Narrow the global players index to the Lakers 1990s pool. */
+async function filterLakers1990s(page: Page) {
   await page.goto('/sandbox');
-  await pickFranchise(page, 'Los Angeles Lakers');
-  await pickEra(page, '1990s');
+  await page.getByRole('button', { name: 'Franchise' }).click();
+  await page.getByRole('option', { name: /Los Angeles Lakers/ }).click();
+  await page.getByRole('button', { name: 'Decade' }).click();
+  await page.getByRole('option', { name: '1990s', exact: true }).click();
   await expect(page.getByRole('heading', { name: /LAL · 1990s/ })).toBeVisible();
+}
+
+async function setFranchise(page: Page, option: string) {
+  await page.getByRole('button', { name: 'Franchise' }).click();
+  await page.getByRole('option', { name: new RegExp(option) }).click();
+}
+
+async function setDecade(page: Page, option: string) {
+  await page.getByRole('button', { name: 'Decade' }).click();
+  await page.getByRole('option', { name: option, exact: true }).click();
 }
 
 test.describe('sandbox draft journey', () => {
   test('chooses a position for each drafted player', async ({ page }) => {
-    await draftLakers1990s(page);
+    await filterLakers1990s(page);
     await expect(page.getByText(/44 players/)).toBeVisible();
 
     // Players are listed by overall rating first (Shaq is the top-rated Laker of the 1990s).
@@ -63,7 +74,7 @@ test.describe('sandbox draft journey', () => {
   });
 
   test('displaces a movable incumbent to fit a better player', async ({ page }) => {
-    await draftLakers1990s(page);
+    await filterLakers1990s(page);
 
     await page.getByRole('button', { name: /Nick Van Exel/ }).click();
     await page
@@ -113,7 +124,7 @@ test.describe('sandbox draft journey', () => {
   });
 
   test('moves a drafted player between positions they can play', async ({ page }) => {
-    await draftLakers1990s(page);
+    await filterLakers1990s(page);
 
     await page.getByRole('button', { name: /Kobe Bryant/ }).click();
     await page
@@ -136,20 +147,60 @@ test.describe('sandbox draft journey', () => {
     ).toBeVisible();
   });
 
-  test('blocks ineligible franchise-era combinations', async ({ page }) => {
+  test('mixes players from different franchises and decades in one lineup', async ({ page }) => {
     await page.goto('/sandbox');
 
-    // Charlotte Hornets (founded 2004-05) cannot play the 1960s.
-    await pickEra(page, '1960s');
-    await page.getByRole('button', { name: 'Franchise' }).click();
-    await expect(page.getByRole('option', { name: /Charlotte Hornets/ })).toBeDisabled();
+    // Bulls 1990s: Michael Jordan runs the point.
+    await setFranchise(page, 'Chicago Bulls');
+    await setDecade(page, '1990s');
+    await expect(page.getByRole('heading', { name: /CHI · 1990s/ })).toBeVisible();
+    const jordanCard = page.getByRole('button', { name: /Michael Jordan/ });
+    await expect(jordanCard).toBeVisible();
+    await jordanCard.click();
+    await page
+      .getByRole('button', { name: 'Place Michael Jordan at Point Guard slot 1', exact: true })
+      .click();
 
-    // Lakers (founded 1948-49) can.
-    await expect(page.getByRole('option', { name: /Los Angeles Lakers/ })).toBeEnabled();
+    // Clear both filters, then switch to Cavaliers 2010s: LeBron at small forward.
+    await setDecade(page, 'Any decade');
+    await setFranchise(page, 'Any franchise');
+    await setFranchise(page, 'Cleveland Cavaliers');
+    await setDecade(page, '2010s');
+    await expect(page.getByRole('heading', { name: /CLE · 2010s/ })).toBeVisible();
+    await page.getByRole('button', { name: /LeBron James/ }).click();
+    await page
+      .getByRole('button', { name: 'Place LeBron James at Small Forward slot 3', exact: true })
+      .click();
+
+    // Back to the Bulls pool for the shooting guard and power forward.
+    await setFranchise(page, 'Chicago Bulls');
+    await setDecade(page, '1990s');
+    await page.getByRole('button', { name: /B\.J\. Armstrong/ }).click();
+    await page
+      .getByRole('button', { name: 'Place B.J. Armstrong at Shooting Guard slot 2', exact: true })
+      .click();
+    await page.getByRole('button', { name: /Dennis Rodman/ }).click();
+    await page
+      .getByRole('button', { name: 'Place Dennis Rodman at Power Forward slot 4', exact: true })
+      .click();
+
+    // The Cavaliers pool closes the lineup at center.
+    await setFranchise(page, 'Cleveland Cavaliers');
+    await setDecade(page, '2010s');
+    await page.getByRole('button', { name: /Timofey Mozgov/ }).click();
+    await page
+      .getByRole('button', { name: 'Place Timofey Mozgov at Center slot 5', exact: true })
+      .click();
+
+    // Two players from different teams and decades share one legal lineup.
+    await expect(page.getByText('5/5', { exact: true })).toBeVisible();
+    await expect(page.getByText('Lineup ready.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove Michael Jordan' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove LeBron James' })).toBeVisible();
   });
 
   test('shows each player at their peak season', async ({ page }) => {
-    await draftLakers1990s(page);
+    await filterLakers1990s(page);
 
     await expect(
       page.getByRole('button', { name: /Magic Johnson/ }).getByText('1990-91'),
@@ -158,7 +209,7 @@ test.describe('sandbox draft journey', () => {
 
   test('mobile layout keeps the lineup within reach', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await draftLakers1990s(page);
+    await filterLakers1990s(page);
 
     // Sticky bottom bar shows lineup progress while the pool scrolls.
     const bar = page.getByRole('link', { name: /Your five/ });

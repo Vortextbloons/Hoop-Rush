@@ -108,8 +108,12 @@
       <div class="mt-8 rounded-xl border border-line-strong bg-surface-2 p-5">
         <p class="font-display text-lg font-extrabold tracking-tight uppercase">Active challenge</p>
         <p class="mt-1 text-sm text-muted-foreground">
-          {franchiseName(active.run.franchiseId)} · {eraName(active.run.eraId)} · game {active.run
-            .games.length + 1} of 82 · {active.run.aggregates.team.wins}-
+          {#if active.run.franchiseId !== null}
+            {franchiseName(active.run.franchiseId)} · {eraName(active.run.eraId)}
+          {:else}
+            5 players · {eraName(active.run.eraId)}
+          {/if}
+          · game {active.run.games.length + 1} of 82 · {active.run.aggregates.team.wins}-
           {active.run.aggregates.team.losses}
         </p>
         <a
@@ -136,13 +140,17 @@
               <span
                 class="font-display block truncate text-base font-extrabold tracking-tight uppercase"
               >
-                {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
+                {#if row.franchiseId !== null}
+                  {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
+                {:else}
+                  5 players · {eraName(row.eraId)}
+                {/if}
               </span>
               <span class="block font-mono text-[10px] text-muted-foreground">
-                {row.playerIds.length} players · {franchiseAbbreviation(row.franchiseId)} · seed {row.runSeed.slice(
-                  0,
-                  8,
-                )}
+                {row.playerIds.length} players · {#if row.franchiseId !== null}{franchiseAbbreviation(
+                    row.franchiseId,
+                  )} ·
+                {/if}seed {row.runSeed.slice(0, 8)}
               </span>
             </span>
             <span class="font-display text-xl font-extrabold tracking-tight">

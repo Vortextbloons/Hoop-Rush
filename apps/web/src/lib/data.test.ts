@@ -1,8 +1,13 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
-import type { FranchiseEraPool, HoopRushManifest, PoolIndexEntry } from '@hoop-rush/data-contracts';
-import { getPool, clearDataLoaderCaches, getManifest } from './data';
+import type {
+  FranchiseEraPool,
+  HoopRushManifest,
+  PlayersIndex,
+  PoolIndexEntry,
+} from '@hoop-rush/data-contracts';
+import { getPool, clearDataLoaderCaches, getManifest, getPlayersIndex } from './data';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 
 vi.mock('./pool-cache', () => ({
@@ -184,6 +189,83 @@ describe('data asset loading with a stale manifest', () => {
     const result: FranchiseEraPool = await getPool(entry);
 
     expect(result).toBe(pool);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers when the players index was regenerated after the manifest was loaded', async () => {
+    const indexV1: PlayersIndex = {
+      schemaVersion: 2,
+      dataVersion: 'data-v1',
+      players: [
+        {
+          playerId: 'lakers-1990s-a',
+          franchiseId: 'lakers',
+          eraId: '1990s',
+          seasonKey: '1990-91',
+          firstName: 'Magic',
+          lastName: 'Johnson',
+          displayName: 'Magic Johnson',
+          playerExternalId: '101',
+          altIds: { bbref: 'johnsma01' },
+          positionsCanonical: ['G'],
+          overall: 90,
+          offense: 92,
+          defense: 80,
+          selectionScore: 900,
+          heightInches: 81,
+          weightLbs: 220,
+          stats: {
+            gamesPlayed: 79,
+            minutes: 2796,
+            points: 1765,
+            rebounds: 581,
+            assists: 989,
+            steals: 132,
+            blocks: 36,
+            turnovers: 299,
+            fieldGoalsMade: 650,
+            fieldGoalsAttempted: 1195,
+            threesMade: 0,
+            threesAttempted: 1,
+            freeThrowsMade: 465,
+            freeThrowsAttempted: 531,
+            per: 26.2,
+            boxPlusMinus: 7.5,
+            usageRate: 27.5,
+            tsPct: 0.653,
+            efgPct: 0.544,
+          },
+        },
+      ],
+    };
+    const indexV2: PlayersIndex = { ...indexV1, dataVersion: 'data-v2' };
+    const staleHash = sha256(JSON.stringify(indexV1));
+    const freshHash = sha256(JSON.stringify(indexV2));
+    const staleManifest: HoopRushManifest = buildManifest({
+      playersIndex: { url: 'players-index.json', contentHash: staleHash },
+    });
+    const freshManifest: HoopRushManifest = buildManifest({
+      dataVersion: 'data-v2',
+      playersIndex: { url: 'players-index.json', contentHash: freshHash },
+    });
+
+    routes.set('/data/players-index.json', JSON.stringify(indexV2));
+    routes.set('/data/manifest.json', JSON.stringify(staleManifest));
+    await getManifest();
+
+    routes.set('/data/manifest.json', JSON.stringify(freshManifest));
+
+    const index = await getPlayersIndex();
+
+    expect(index.dataVersion).toBe('data-v2');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it('fails when the manifest has no players index', async () => {
+    routes.set('/data/manifest.json', JSON.stringify(buildManifest()));
+    await getManifest();
+
+    await expect(getPlayersIndex()).rejects.toThrow('The global players index is unavailable.');
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

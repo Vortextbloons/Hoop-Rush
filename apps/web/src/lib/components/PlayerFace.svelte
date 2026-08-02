@@ -1,8 +1,8 @@
 <script lang="ts">
   import { resolveHeadshotUrls, type HoopRushManifest } from '@hoop-rush/data-contracts';
-  import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
+  import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
 
-  type PeakPlayer = FranchiseEraPool['players'][number];
+  type HeadshotPlayer = Pick<PeakPlayerSeason, 'playerId' | 'playerExternalId' | 'altIds'>;
 
   /** Seconds before a pending headshot request is treated as stalled. */
   const HEADSHOT_TIMEOUT_MS = 8000;
@@ -13,7 +13,7 @@
     size = 'md',
     fallbackInitials,
   }: {
-    player: PeakPlayer;
+    player: HeadshotPlayer;
     manifest: HoopRushManifest;
     size?: 'sm' | 'md' | 'court';
     fallbackInitials: string;

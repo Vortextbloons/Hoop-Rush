@@ -3,6 +3,7 @@ import {
   loadPool,
   loadEraSimulationProfile,
   loadOpponentBracket,
+  loadPlayersIndex,
   type HoopRushManifest,
   type FranchiseEraPool,
   type PoolIndexEntry,
@@ -10,6 +11,7 @@ import {
   type OpponentIndexEntry,
   type EraSimulationProfile,
   type OpponentBracket,
+  type PlayersIndex,
 } from '@hoop-rush/data-contracts';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 
@@ -29,8 +31,7 @@ function manifestUrl(): string {
   return `${siteRoot()}data/manifest.json`;
 }
 
-const CONTENT_HASH_MISMATCH =
-  /content hash mismatch: expected ([0-9a-f]{64}), got ([0-9a-f]{64})/;
+const CONTENT_HASH_MISMATCH = /content hash mismatch: expected ([0-9a-f]{64}), got ([0-9a-f]{64})/;
 
 /** Pool URLs are relative to the manifest directory (e.g. pools/lakers-1990s.json). */
 function resolveAssetUrl(url: string): string {
@@ -40,7 +41,7 @@ function resolveAssetUrl(url: string): string {
 
 function cacheBustedUrl(url: string): string {
   const separator = url.includes('?') ? '&' : '?';
-  return `${url}${separator}v=${Date.now()}`;
+  return `${url}${separator}v=${String(Date.now())}`;
 }
 
 const manifestRequestInit: RequestInit = { cache: 'no-store' };
@@ -217,10 +218,48 @@ export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> 
   return promise;
 }
 
+let playersIndexPromise: Promise<PlayersIndex> | null = null;
+
+/** Load, hash-verify, and validate the global players index asset. */
+export function getPlayersIndex(): Promise<PlayersIndex> {
+  if (!playersIndexPromise) {
+    playersIndexPromise = loadPlayersIndexFor();
+    // A failed load must not poison the cache: the next request retries.
+    playersIndexPromise.catch(() => {
+      playersIndexPromise = null;
+    });
+  }
+  return playersIndexPromise;
+}
+
+async function loadPlayersIndexFor(): Promise<PlayersIndex> {
+  const manifest = await getManifest();
+  const entry = manifest.playersIndex;
+  if (!entry) {
+    throw new Error('The global players index is unavailable.');
+  }
+  const load = (url: string, contentHash: string, bustCache = false) =>
+    loadPlayersIndex(
+      bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url),
+      contentHash,
+    );
+  try {
+    return await load(entry.url, entry.contentHash);
+  } catch (error) {
+    return retryWithFreshManifest(
+      error,
+      entry.contentHash,
+      (fresh) => fresh.playersIndex ?? null,
+      (url, contentHash) => load(url, contentHash, true),
+    );
+  }
+}
+
 /** @internal Resets memoized loaders between unit tests. */
 export function clearDataLoaderCaches(): void {
   manifestPromise = null;
   poolCache.clear();
   profileCache.clear();
   bracketCache.clear();
+  playersIndexPromise = null;
 }

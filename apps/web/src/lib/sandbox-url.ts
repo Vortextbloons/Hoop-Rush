@@ -1,8 +1,8 @@
 import type {
-  FranchiseEraPool,
   HoopRushManifest,
-  Lineup,
-  PeakPlayerSeason,
+  PlayersIndex,
+  PlayersIndexEntry,
+  RunPlayerSelection,
   Seed,
 } from '@hoop-rush/data-contracts';
 import { seedSchema } from '@hoop-rush/data-contracts';
@@ -10,16 +10,15 @@ import { validateLineup } from '@hoop-rush/engine';
 
 /**
  * Validated URL state shared by the sandbox draft (spec/08). The draft page
- * carries franchise, era, slot assignments, and player IDs through the URL so
- * drafts survive refresh without persistence; every value is re-validated
- * against the manifest and pool at load time.
+ * carries five player selections (player + franchise/era pool provenance)
+ * and an optional seed through the URL so drafts survive refresh without
+ * persistence; every value is re-validated against the manifest and the
+ * global players index at load time.
  */
 
 export interface SandboxUrlState {
-  franchiseId: string;
-  eraId: string;
-  /** Five player IDs in slot order 0..4. */
-  playerIds: string[];
+  /** Five player selections in slot order 0..4. */
+  slots: RunPlayerSelection[];
   seed?: Seed;
 }
 
@@ -33,60 +32,54 @@ export interface UrlStateValidation {
 /** Route template literal so callers can pass the result through resolve(). */
 export type SandboxUrlTarget = `/sandbox?${string}`;
 
-/** The query-string portion of a sandbox URL (combined with resolve() by pages). */
-export function buildSandboxQuery(state: SandboxUrlState): string {
-  const params = new URLSearchParams({
-    franchise: state.franchiseId,
-    era: state.eraId,
-    slots: state.playerIds.join(','),
-  });
-  if (state.seed !== undefined) params.set('seed', state.seed);
-  return params.toString();
-}
-
 /** Typed sandbox hrefs: members of the app's route union, so resolve() accepts them. */
 export type SandboxHref = `/sandbox?${string}`;
 
+const SLOT_PATTERN = /^([^@]+)@([^/]+)\/([^/]+)$/;
+
 /** Full sandbox href for the draft route (callers pass it through resolve()). */
 export function buildSandboxUrl(state: SandboxUrlState): SandboxHref {
-  return `/sandbox?${buildSandboxQuery(state)}`;
+  const params = new URLSearchParams();
+  params.set(
+    'slots',
+    state.slots.map((slot) => `${slot.playerId}@${slot.franchiseId}/${slot.eraId}`).join(','),
+  );
+  if (state.seed !== undefined) params.set('seed', state.seed);
+  return `/sandbox?${params.toString()}`;
 }
 
 export function parseSandboxUrl(
   url: URL,
   manifest: HoopRushManifest | null,
-  pool: FranchiseEraPool | null,
+  index: PlayersIndex | null,
 ): UrlStateValidation {
-  const franchiseId = url.searchParams.get('franchise');
-  const eraId = url.searchParams.get('era');
-  const slotsParam = url.searchParams.get('slots');
-  const seedParam = url.searchParams.get('seed');
-
-  if (!franchiseId || !eraId || !slotsParam) {
-    return {
-      ok: false,
-      state: null,
-      error: 'Missing franchise, era, or slots in the URL.',
-    };
-  }
-  if (manifest === null) {
+  if (manifest === null && index === null) {
     return { ok: false, state: null, error: 'Data is still loading.' };
   }
-  const franchise = manifest.franchiseLineage.find((e) => e.franchiseId === franchiseId);
-  if (!franchise) {
-    return { ok: false, state: null, error: `Unknown franchise "${franchiseId}".` };
+  const slotsParam = url.searchParams.get('slots');
+  if (slotsParam === null) {
+    return { ok: false, state: null, error: 'Missing slots in the URL.' };
   }
-  if (!manifest.eras.some((e) => e.eraId === eraId)) {
-    return { ok: false, state: null, error: `Unknown decade "${eraId}".` };
-  }
-  const playerIds = slotsParam.split(',');
-  if (playerIds.length !== 5 || playerIds.some((id) => id.length === 0)) {
+  const parts = slotsParam.split(',');
+  if (parts.length !== 5) {
     return { ok: false, state: null, error: 'A lineup needs exactly five players.' };
   }
-  if (new Set(playerIds).size !== 5) {
+  const slots: RunPlayerSelection[] = [];
+  for (const part of parts) {
+    const match = SLOT_PATTERN.exec(part);
+    const playerId = match?.[1];
+    const franchiseId = match?.[2];
+    const eraId = match?.[3];
+    if (!playerId || !franchiseId || !eraId) {
+      return { ok: false, state: null, error: `Invalid slot "${part}" in the URL.` };
+    }
+    slots.push({ playerId, franchiseId, eraId });
+  }
+  if (new Set(slots.map((s) => s.playerId)).size !== 5) {
     return { ok: false, state: null, error: 'A lineup cannot repeat a player.' };
   }
   let seed: Seed | undefined;
+  const seedParam = url.searchParams.get('seed');
   if (seedParam !== null) {
     if (!seedSchema.safeParse(seedParam).success) {
       return { ok: false, state: null, error: 'The seed in the URL is invalid.' };
@@ -94,28 +87,43 @@ export function parseSandboxUrl(
     seed = seedParam;
   }
 
-  if (pool !== null) {
-    const byId = new Map(pool.players.map((p) => [p.playerId, p]));
-    const missing = playerIds.filter((id) => !byId.has(id));
-    if (missing.length > 0) {
-      return {
-        ok: false,
-        state: null,
-        error: `Some drafted players are not in this pool: ${missing.join(', ')}.`,
-      };
+  if (manifest !== null) {
+    for (const slot of slots) {
+      if (!manifest.franchiseLineage.some((e) => e.franchiseId === slot.franchiseId)) {
+        return { ok: false, state: null, error: `Unknown franchise "${slot.franchiseId}".` };
+      }
+      if (!manifest.eras.some((e) => e.eraId === slot.eraId)) {
+        return { ok: false, state: null, error: `Unknown decade "${slot.eraId}".` };
+      }
     }
-    const players = playerIds
-      .map((id) => byId.get(id))
-      .filter((p): p is PeakPlayerSeason => p !== undefined);
-    const lineup: Lineup = {
+  }
+
+  if (index !== null) {
+    const rows: PlayersIndexEntry[] = [];
+    for (const slot of slots) {
+      const entry = index.players.find(
+        (p) =>
+          p.playerId === slot.playerId &&
+          p.franchiseId === slot.franchiseId &&
+          p.eraId === slot.eraId,
+      );
+      if (!entry) {
+        return {
+          ok: false,
+          state: null,
+          error: `Some drafted players are not in the players index: ${slot.playerId}.`,
+        };
+      }
+      rows.push(entry);
+    }
+    const validation = validateLineup({
       structure: ['G', 'G', 'F', 'F', 'C'],
-      assignments: players.map((player, slotIndex) => ({
+      assignments: rows.map((row, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
-        playerId: player.playerId,
-        positions: player.positions.canonical,
+        playerId: row.playerId,
+        positions: row.positionsCanonical,
       })),
-    };
-    const validation = validateLineup(lineup);
+    });
     if (!validation.ok) {
       const issue = validation.issues[0];
       return {
@@ -128,7 +136,7 @@ export function parseSandboxUrl(
 
   return {
     ok: true,
-    state: { franchiseId, eraId, playerIds, seed },
+    state: { slots, seed },
     error: null,
   };
 }

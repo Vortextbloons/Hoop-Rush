@@ -15,11 +15,11 @@
   // which keeps relative-base static builds correct.
   const navItems: BottomNavItem[] = [
     { id: 'home', label: 'Home', href: '/', icon: Home },
-    { id: 'roster', label: 'Roster', href: null, icon: Users },
+    { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
   ];
 
   const pathname = $derived(page.url.pathname);
-  const showBottomNav = $derived(pathname === '/');
+  const showBottomNav = $derived(pathname === '/' || pathname === '/roster');
 </script>
 
 <svelte:head>

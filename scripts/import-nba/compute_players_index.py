@@ -1,4 +1,4 @@
-"""Build the compact global players index (Sandbox search asset).
+"""Build the compact global players index (Sandbox search + Roster browser).
 
 Pipeline:
   manifest.json (pool index) + packaged FranchiseEraPool JSON
@@ -7,9 +7,9 @@ Pipeline:
   -> manifest playersIndex entry with content hash + dataVersion bump
 
 The index lets the browser search every franchise-era pool (118 files,
-~18 MB) with a single compact asset. Rows only carry the fields the Sandbox
-search and lineup builder need: identity, canonical positions, summary
-ratings, and selectionScore.
+~18 MB) with a single compact asset. Rows carry identity, canonical
+positions, summary ratings, selectionScore, and the selected season's
+stats (per-game values are derived in the browser).
 
 Usage:
     python -m scripts.import-nba.compute_players_index
@@ -30,8 +30,8 @@ POOLS_DIR = PUBLIC_DATA / "pools"
 MANIFEST_PATH = PUBLIC_DATA / "manifest.json"
 INDEX_PATH = PUBLIC_DATA / "players-index.json"
 
-SCHEMA_VERSION = 1
-DATA_VERSION = "m1.8"
+SCHEMA_VERSION = 2
+DATA_VERSION = "m1.9"
 INDEX_FILENAME = "players-index.json"
 
 CANONICAL_POSITIONS = {"G", "F", "C"}
@@ -79,7 +79,10 @@ def build_row(player: dict[str, Any], franchise_id: str, era_id: str) -> dict[st
         )
         return None
     try:
-        overall = int(ratings["overallRating"])
+        # Overall: prefer the detailed per-skill overall the draft has always
+        # displayed, falling back to the balanced summary shorthand.
+        detailed = player.get("detailedRatings") or {}
+        overall = int(detailed.get("overall", ratings["overallRating"]))
         offense = int(ratings["offenseRating"])
         defense = int(ratings["defenseRating"])
     except (KeyError, TypeError, ValueError):
@@ -88,6 +91,39 @@ def build_row(player: dict[str, Any], franchise_id: str, era_id: str) -> dict[st
             "summaryRatings invalid"
         )
         return None
+
+    stats = player.get("stats")
+    if not isinstance(stats, dict):
+        print(
+            f"  [WARN] {franchise_id}/{era_id} {player['firstName']} {player['lastName']} "
+            "stats missing"
+        )
+        return None
+    # Pass through the packaged counting stats and advanced metrics verbatim;
+    # per-game values are derived by the browser.
+    stats_block = {
+        "gamesPlayed": stats["gamesPlayed"],
+        "minutes": stats["minutes"],
+        "points": stats["points"],
+        "rebounds": stats["rebounds"],
+        "offensiveRebounds": stats.get("offensiveRebounds"),
+        "defensiveRebounds": stats.get("defensiveRebounds"),
+        "assists": stats["assists"],
+        "steals": stats["steals"],
+        "blocks": stats["blocks"],
+        "turnovers": stats["turnovers"],
+        "fieldGoalsMade": stats["fieldGoalsMade"],
+        "fieldGoalsAttempted": stats["fieldGoalsAttempted"],
+        "threesMade": stats["threesMade"],
+        "threesAttempted": stats["threesAttempted"],
+        "freeThrowsMade": stats["freeThrowsMade"],
+        "freeThrowsAttempted": stats["freeThrowsAttempted"],
+        "per": stats["per"],
+        "boxPlusMinus": stats["boxPlusMinus"],
+        "usageRate": stats["usageRate"],
+        "tsPct": stats["tsPct"],
+        "efgPct": stats["efgPct"],
+    }
 
     return {
         "playerId": player["playerId"],
@@ -104,6 +140,9 @@ def build_row(player: dict[str, Any], franchise_id: str, era_id: str) -> dict[st
         "offense": offense,
         "defense": defense,
         "selectionScore": player["selectionScore"],
+        "heightInches": player.get("heightInches"),
+        "weightLbs": player.get("weightLbs"),
+        "stats": stats_block,
     }
 
 

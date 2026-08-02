@@ -6,6 +6,7 @@ import {
   playerIdSchema,
   seasonKeySchema,
 } from './ids.js';
+import { playerSeasonStatsSchema } from './player-season.js';
 import { positionUnionSchema } from './positions.js';
 
 /**
@@ -40,18 +41,28 @@ export const playersIndexEntrySchema = z.object({
     .optional(),
   /** Career-wide playable positions (spec/02). */
   positionsCanonical: positionUnionSchema,
-  /** Summary shorthand ratings on a 0-100 scale. */
+  /**
+   * Overall on the 0-100 scale the draft displays: the detailed per-skill
+   * overall when the packaged pool carries it, else the summary shorthand.
+   */
   overall: z.number().int().min(0).max(100),
+  /** Balanced summary offense shorthand on a 0-100 scale. */
   offense: z.number().int().min(0).max(100),
+  /** Balanced summary defense shorthand on a 0-100 scale. */
   defense: z.number().int().min(0).max(100),
   /** Deterministic peak-selection score (spec/02). */
   selectionScore: z.number().min(0).max(999),
+  /** Physical measurements, when published. */
+  heightInches: z.number().int().min(60).max(96).nullable(),
+  weightLbs: z.number().int().min(120).max(400).nullable(),
+  /** The selected season's counting statistics and advanced metrics. */
+  stats: playerSeasonStatsSchema,
 });
 export type PlayersIndexEntry = z.infer<typeof playersIndexEntrySchema>;
 
 /** Versioned global index of every eligible peak player-season. */
 export const playersIndexSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   dataVersion: z.string().min(1).max(64),
   players: z.array(playersIndexEntrySchema),
 });

@@ -1,0 +1,19 @@
+# Hoop Rush Codex provider: OpenCode Go is available as an alternate profile.
+# The default provider remains OpenAI. The Go token is read at runtime from
+# OpenCode's local credential store.
+
+[model_providers.opencode-go]
+name = "OpenCode Go"
+base_url = "https://opencode.ai/zen/go/v1"
+wire_api = "responses"
+requires_openai_auth = false
+
+[model_providers.opencode-go.auth]
+command = "powershell.exe"
+args = ["-NoProfile", "-NonInteractive", "-Command", "$a = Get-Content -Raw \"$env:USERPROFILE/.local/share/opencode/auth.json\" | ConvertFrom-Json; [Console]::Out.Write($a.psobject.Properties.Get_Item('opencode-go').Value.key)"]
+refresh_interval_ms = 300000
+timeout_ms = 5000
+
+[profiles.opencode-go]
+model = "gpt-5.6-luna"
+model_provider = "opencode-go"

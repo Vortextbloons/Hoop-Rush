@@ -6,6 +6,7 @@ async function draftLakers1990s(page: import('@playwright/test').Page) {
   await page.getByRole('option', { name: /Los Angeles Lakers/ }).click();
   await page.getByRole('button', { name: 'Decade' }).click();
   await page.getByRole('option', { name: '1990s', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /LAL · 1990s/ })).toBeVisible();
   await expect(page.getByText(/44 players/)).toBeVisible();
 }
 

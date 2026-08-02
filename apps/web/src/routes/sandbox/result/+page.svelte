@@ -1,26 +1,26 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { Dices, Pencil, RotateCcw } from '@lucide/svelte';
+  import { Pencil, RotateCcw } from '@lucide/svelte';
   import type {
     ChallengeRun,
     HoopRushManifest,
     MadeAttempted,
+    PeakPlayerSeason,
     PlayerSeasonAggregate,
     RunAggregates,
+    RunPlayerSelection,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
-  import { createChallenge, createEngineContext, toSimulationPlayer } from '@hoop-rush/engine';
-  import { BEST_OF_ATTEMPTS, simulateChallengeBestOf } from '@hoop-rush/engine';
-  import type { ChallengeCreation } from '@hoop-rush/engine';
-  import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
-  import { getBracket, getEraSimulationProfile, getManifest, getPool } from '$lib/data';
+  import { BEST_OF_ATTEMPTS, perGamePlayer } from '@hoop-rush/engine';
+  import { getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
-  import { generateSeed } from '$lib/sandbox-url';
-  import { perGamePlayer } from '@hoop-rush/engine';
+  import { buildSandboxUrl, generateSeed } from '$lib/sandbox-url';
+  import { loadRunPlayersById, lineupPlayersFromRun } from '$lib/sandbox-lineup';
+  import { startSandboxRun } from '$lib/sandbox-run';
+  import FreeformTeamRoster from '$lib/components/FreeformTeamRoster.svelte';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
@@ -29,22 +29,21 @@
   /**
    * Challenge result (spec/08): final record and 82-0 outcome, first-loss
    * explanation when applicable, the full game strip, aggregate shooting,
-   * turnover, rebound, free-throw, and possession facts, and the user's
-   * five-player season table immediately below the record. Per-game values
-   * are derived from the actual 82 games played, with an accessible
-   * totals/per-game switch.
+   * turnover, rebound, free-throw, and possession facts, the user's
+   * five-player season table, and best single-game performance.
    */
 
-  type PeakPlayer = FranchiseEraPool['players'][number];
+  type PeakPlayer = PeakPlayerSeason;
 
   const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 
   let manifest = $state<HoopRushManifest | null>(null);
-  let pool = $state<FranchiseEraPool | null>(null);
+  /** playerId → peak season across the run's loaded pools (slot provenance). */
+  let byId = $state<Map<string, PeakPlayer> | null>(null);
   let run = $state<ChallengeRun | null>(null);
   let error = $state<string | null>(null);
   let totalsMode = $state(false);
-  let replaying = $state(false);
+  let running = $state(false);
 
   const { url } = $derived(page);
 
@@ -76,19 +75,6 @@
             return;
           }
           run = record.run;
-          const entry = manifest?.pools.find(
-            (p) => p.franchiseId === record.run.franchiseId && p.eraId === record.run.eraId,
-          );
-          if (entry) {
-            getPool(entry).then(
-              (p) => {
-                if (!cancelled) pool = p;
-              },
-              () => {
-                // The season table renders from run snapshots regardless.
-              },
-            );
-          }
         },
         (e: unknown) => {
           if (!cancelled) error = e instanceof Error ? e.message : String(e);
@@ -96,6 +82,25 @@
       );
     };
     loadRun(runId);
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  /** Resolves the run's player pools (selections when present, legacy single pool otherwise). */
+  $effect(() => {
+    const currentRun = run;
+    const m = manifest;
+    if (!browser || !currentRun || !m) return;
+    let cancelled = false;
+    loadRunPlayersById(currentRun, m).then(
+      (map) => {
+        if (!cancelled) byId = map;
+      },
+      () => {
+        if (!cancelled) byId = new Map();
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -112,16 +117,16 @@
   /** The user's five in slot order with their packaged names. */
   const seasonTable = $derived.by(() => {
     const currentRun = run;
-    if (!currentRun || !pool) {
+    if (!currentRun || !byId) {
       return [] as Array<{ player: PeakPlayer; aggregate: PlayerSeasonAggregate }>;
     }
-    const byId = new Map(pool.players.map((p) => [p.playerId, p]));
+    const playersById = byId;
     return currentRun.players
       .map((snapshot) => {
         const aggregate = currentRun.aggregates.players.find(
           (p) => p.playerId === snapshot.playerId,
         );
-        const player = byId.get(snapshot.playerId);
+        const player = playersById.get(snapshot.playerId);
         if (!aggregate || !player) return null;
         return { player, aggregate };
       })
@@ -161,9 +166,8 @@
   });
 
   const bestPlayerName = $derived.by(() => {
-    if (!bestPerformance || !pool) return bestPerformance?.playerId ?? null;
-    const byId = new Map(pool.players.map((p) => [p.playerId, p]));
-    return byId.get(bestPerformance.playerId)?.displayName ?? bestPerformance.playerId;
+    if (!bestPerformance) return null;
+    return byId?.get(bestPerformance.playerId)?.displayName ?? bestPerformance.playerId;
   });
 
   function pct(made: number, attempted: number): string {
@@ -197,95 +201,60 @@
     return totalsMode ? String(value) : value.toFixed(1);
   }
 
-  /** Recreates the run with the same seed and plays it again. */
-  async function replaySameSeed() {
-    if (!run || !pool || replaying) return;
-    replaying = true;
-    try {
-      await createAndStart({ seed: run.runSeed });
-    } finally {
-      replaying = false;
-    }
-  }
-
-  /** Creates a brand-new run with a fresh seed. */
-  async function playNewSeed() {
-    if (!run || !pool || replaying) return;
-    replaying = true;
-    try {
-      await createAndStart({ seed: generateSeed() });
-    } finally {
-      replaying = false;
-    }
-  }
-
-  async function createAndStart({ seed }: { seed: string }) {
+  /** The run's five players in slot order once their pools have resolved. */
+  const lineupPlayers = $derived.by(() => {
     const currentRun = run;
-    if (!currentRun || !pool || !manifest) return;
-    const entry = manifest.pools.find(
-      (p) => p.franchiseId === currentRun.franchiseId && p.eraId === currentRun.eraId,
-    );
-    if (!entry) {
-      error = 'This matchup is not packaged yet.';
-      return;
+    if (!currentRun || !byId) return null;
+    return lineupPlayersFromRun(currentRun, byId);
+  });
+
+  /** Replays the same five players with a brand-new seed. */
+  async function retryRun() {
+    const currentRun = run;
+    const m = manifest;
+    if (!currentRun || !m || running) return;
+    running = true;
+    try {
+      const resolved = await loadRunPlayersById(currentRun, m);
+      const players = currentRun.selections
+        ? currentRun.selections.map((s) => resolved.get(s.playerId))
+        : currentRun.playerIds.map((id) => resolved.get(id));
+      const complete = players.filter((p): p is PeakPlayer => p !== undefined);
+      if (complete.length !== 5) {
+        error = 'This lineup cannot be replayed because one of its player pools is unavailable.';
+        return;
+      }
+      await startSandboxRun(complete, generateSeed());
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      running = false;
     }
-    const profileEntry = manifest.eraSimulationProfiles.find((p) => p.eraId === currentRun.eraId);
-    if (!profileEntry) {
-      error = 'The decade simulation profile is unavailable.';
-      return;
-    }
-    const [profile, bracket] = await Promise.all([
-      getEraSimulationProfile(profileEntry),
-      manifest.bracket ? getBracket(manifest.bracket) : Promise.reject(new Error('no bracket')),
-    ]);
-    const byId = new Map(pool.players.map((p) => [p.playerId, p]));
-    const players = currentRun.playerIds.map((id) => byId.get(id)!);
-    const sample = players[0];
-    const context = createEngineContext();
-    const creation: ChallengeCreation = {
-      runId: crypto.randomUUID(),
-      mode: 'sandbox',
-      franchiseId: currentRun.franchiseId,
-      eraId: currentRun.eraId,
-      homeDisplayName: currentRun.homeDisplayName,
-      lineup: {
-        structure: ['G', 'G', 'F', 'F', 'C'],
-        assignments: players.map((player, slotIndex) => ({
-          slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
-          playerId: player.playerId,
-          positions: player.positions.canonical,
-        })),
-      },
-      players: players.map((player) => toSimulationPlayer(player)),
-      runSeed: seed,
-      dataVersion: profile.dataVersion,
-      ratingVersion: sample?.source.ratingsVersion ?? 'unknown',
-      positionNormalizationVersion: sample?.positions.normalizationVersion ?? 'position-v1',
-      engineVersion: context.engineVersion,
-      profile,
-      bracket,
-    };
-    // Sandbox keeps the best of BEST_OF_ATTEMPTS derived whole-run attempts;
-    // the chosen attempt's seed is persisted so the reveal reproduces it.
-    const chosen = simulateChallengeBestOf(creation, profile, context);
-    const active = createChallenge({ ...creation, runSeed: chosen.runSeed });
-    await challengeRepository.saveActiveRun({
-      recordId: 'active',
-      saveSchemaVersion: 2,
-      run: active,
-    });
-    void goto(resolve('/sandbox/challenge'));
   }
 
   function toggleMode() {
     totalsMode = !totalsMode;
   }
 
-  const editHref = $derived(
-    run
-      ? (`/sandbox?franchise=${run.franchiseId}&era=${run.eraId}&slots=${run.playerIds.join(',')}` as RouteId)
-      : null,
-  );
+  const editHref = $derived.by(() => {
+    const currentRun = run;
+    if (!currentRun) return null;
+    let slots: RunPlayerSelection[] | null;
+    if (currentRun.selections) {
+      slots = currentRun.selections;
+    } else if (currentRun.franchiseId) {
+      const franchiseId = currentRun.franchiseId;
+      slots = currentRun.playerIds.map((playerId) => ({
+        playerId,
+        franchiseId,
+        eraId: currentRun.eraId,
+      }));
+    } else {
+      slots = null;
+    }
+    if (!slots) return null;
+    return buildSandboxUrl({ slots }) as RouteId;
+  });
 </script>
 
 <svelte:head>
@@ -326,29 +295,51 @@
       class="mt-8 rounded-2xl border border-line-strong bg-card p-6 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:p-8"
     >
       <div
-        class="flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between sm:text-left"
+        class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
       >
-        <div class="flex items-center gap-3">
-          {#if franchise && manifest}
-            <TeamLogo
-              {manifest}
-              franchiseId={franchise.franchiseId}
-              teamExternalId={franchise.teamExternalId}
-              alt=""
-              className="h-10 w-10"
-            />
+        {#if run.franchiseId === null}
+          {#if lineupPlayers && manifest}
+            <div class="min-w-0 flex-1">
+              <FreeformTeamRoster
+                players={lineupPlayers}
+                {manifest}
+                simulationEraLabel={era?.label ?? run.eraId}
+              />
+            </div>
+          {:else}
+            <div class="min-w-0 flex-1">
+              <p class="font-display text-lg font-extrabold tracking-tight uppercase sm:text-xl">
+                Your five
+              </p>
+              <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+                {era?.label ?? run.eraId} · five players, no bench
+              </p>
+              <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading lineup…</p>
+            </div>
           {/if}
-          <div>
-            <p class="font-display text-xl font-extrabold tracking-tight uppercase">
-              {run.homeDisplayName}
-            </p>
-            <p class="font-mono text-[10px] text-muted-foreground">
-              {franchiseAbbreviation(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no
-              bench
-            </p>
+        {:else}
+          <div class="flex items-center gap-3">
+            {#if franchise && manifest}
+              <TeamLogo
+                {manifest}
+                franchiseId={franchise.franchiseId}
+                teamExternalId={franchise.teamExternalId}
+                alt=""
+                className="h-10 w-10"
+              />
+            {/if}
+            <div>
+              <p class="font-display text-xl font-extrabold tracking-tight uppercase">
+                {run.homeDisplayName}
+              </p>
+              <p class="font-mono text-[10px] text-muted-foreground">
+                {franchiseAbbreviation(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no
+                bench
+              </p>
+            </div>
           </div>
-        </div>
-        <div class="text-center sm:text-right">
+        {/if}
+        <div class="shrink-0 text-center sm:text-right">
           <p class="font-display text-5xl font-extrabold tracking-tight sm:text-6xl">
             {record.wins}<span class="text-muted-foreground">–</span>{record.losses}
           </p>
@@ -364,21 +355,12 @@
       <div class="mt-5 flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onclick={replaySameSeed}
-          disabled={replaying}
+          onclick={retryRun}
+          disabled={running}
           class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
         >
           <RotateCcw class="h-4 w-4" />
-          Replay this seed
-        </button>
-        <button
-          type="button"
-          onclick={playNewSeed}
-          disabled={replaying}
-          class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-        >
-          <Dices class="h-4 w-4" />
-          New seed
+          Retry
         </button>
         {#if editHref}
           <a
@@ -386,7 +368,7 @@
             class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Pencil class="h-4 w-4" />
-            Edit lineup
+            Edit team
           </a>
         {/if}
         <span class="ml-auto font-mono text-[10px] text-muted-foreground">
@@ -435,7 +417,7 @@
           </button>
         </div>
       </div>
-      {#if displayAggregates && seasonTable.length > 0}
+      {#if displayAggregates}
         <div class="mt-4 overflow-x-auto">
           <table class="w-full min-w-[1080px] border-collapse text-sm">
             <thead>
@@ -541,11 +523,9 @@
             </tbody>
           </table>
         </div>
-        <p class="mt-3 font-mono text-[10px] text-muted-foreground">
-          Per-game values divide exact season totals by the actual games played ({record.gamesPlayed}).
-          TS% is points per (2·(FGA + 0.44·FTA)); USG% is the player's FGA + 0.44·FTA + TOV share of
-          the team's five-player total.
-        </p>
+        {#if byId === null}
+          <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>
+        {/if}
       {:else}
         <p class="mt-4 animate-pulse text-sm text-muted-foreground">Loading season table…</p>
       {/if}
