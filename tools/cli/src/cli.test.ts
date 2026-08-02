@@ -449,6 +449,9 @@ describe('cli: sim challenge', () => {
     expect(payload.invariantFailures).toBe(0);
     expect(payload.bracketVersion).toMatch(/^bracket-m3/);
     expect(payload.playerTotals).toHaveLength(5);
+    expect(payload.attempts).toBe(2);
+    expect(payload.chosenSeed).toMatch(/^[0-9a-f]{16,64}$/);
+    expect(payload.chosenSeed).not.toBe(payload.seed);
     if (payload.outcome === 'eliminated') {
       expect(payload.firstLossGameNumber).toBeGreaterThanOrEqual(1);
       expect(payload.firstLossGameNumber).toBeLessThanOrEqual(82);

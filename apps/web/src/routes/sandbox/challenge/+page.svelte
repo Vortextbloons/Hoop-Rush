@@ -10,6 +10,7 @@
   } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { BEST_OF_ATTEMPTS } from '@hoop-rush/engine';
   import { getEraSimulationProfile, getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
@@ -367,8 +368,8 @@
         </div>
 
         <p class="mt-4 font-mono text-[10px] text-muted-foreground">
-          seed {run.runSeed} · engine {run.versions.engineVersion} · bracket {run.versions
-            .bracketVersion}
+          seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion}
+          · bracket {run.versions.bracketVersion}
           · schedule {run.versions.scheduleVersion}
         </p>
       </div>

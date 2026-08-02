@@ -15,6 +15,7 @@
     canPlay,
     createChallenge,
     createEngineContext,
+    simulateChallengeBestOf,
     slotRequirement,
     toSimulationPlayer,
     validateLineup,
@@ -399,9 +400,10 @@
       bracket = await getBracket(manifest.bracket);
       const players = slots.filter((p): p is PeakPlayer => p !== null);
       const sample = players[0];
-      const run = createChallenge({
+      const context = createEngineContext();
+      const creation = {
         runId: crypto.randomUUID(),
-        mode: 'sandbox',
+        mode: 'sandbox' as const,
         franchiseId,
         eraId,
         homeDisplayName: franchise.displayName,
@@ -418,10 +420,15 @@
         dataVersion: profile.dataVersion,
         ratingVersion: sample?.source.ratingsVersion ?? 'unknown',
         positionNormalizationVersion: sample?.positions.normalizationVersion ?? 'position-v1',
-        engineVersion: createEngineContext().engineVersion,
+        engineVersion: context.engineVersion,
         profile,
         bracket,
-      });
+      };
+      // Sandbox simulates the complete season twice from derived attempt seeds
+      // and keeps the best record; the chosen attempt's seed becomes the
+      // persisted run seed so the paced reveal reproduces exactly those games.
+      const chosen = simulateChallengeBestOf(creation, profile, context);
+      const run = createChallenge({ ...creation, runSeed: chosen.runSeed });
       await challengeRepository.saveActiveRun({
         recordId: 'active',
         saveSchemaVersion: 2,

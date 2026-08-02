@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import {
-  createChallenge,
+  BEST_OF_ATTEMPTS,
   createEngineContext,
-  simulateChallenge,
+  simulateChallengeBestOf,
   type ChallengeCreation,
 } from '@hoop-rush/engine';
 import {
@@ -118,16 +118,11 @@ export function simChallenge(args: {
   const started = performance.now();
   let run: ChallengeRun;
   try {
-    run = createChallenge(creation);
+    // Sandbox mode simulates the complete season BEST_OF_ATTEMPTS times from
+    // derived attempt seeds and keeps the best record; the chosen attempt's
+    // seed becomes the reported run seed.
+    run = simulateChallengeBestOf(creation, profile, context);
   } catch (error) {
-    throw new UsageError(`challenge creation rejected: ${(error as Error).message}`);
-  }
-
-  const invariantFailures = 0;
-  try {
-    run = simulateChallenge(run, profile, context);
-  } catch (error) {
-    // A simulation failure is a data/engine failure, not an argument error.
     throw new Error(`challenge simulation failed: ${(error as Error).message}`);
   }
   const timingMs = performance.now() - started;
@@ -137,6 +132,8 @@ export function simChallenge(args: {
     command: 'sim challenge',
     lineup: lineupId,
     seed,
+    chosenSeed: run.runSeed,
+    attempts: BEST_OF_ATTEMPTS,
     engineVersion: context.engineVersion,
     dataVersion: run.versions.dataVersion,
     profileVersion: run.eraProfileVersion,
@@ -164,12 +161,13 @@ export function simChallenge(args: {
     })),
     teamPossessions: run.aggregates.team.possessions,
     timingMs: Math.round(timingMs * 1000) / 1000,
-    invariantFailures,
+    invariantFailures: 0,
   });
 
   const details = [
     `record ${String(payload.record.wins)}-${String(payload.record.losses)} · outcome ${payload.outcome}${payload.firstLossGameNumber !== null ? ` · first loss game ${String(payload.firstLossGameNumber)}` : ''}`,
     `engine ${payload.engineVersion} · data ${payload.dataVersion} · profile ${payload.profileVersion} · bracket ${payload.bracketVersion} · schedule ${payload.scheduleVersion} · seed ${seed}`,
+    `best of ${String(payload.attempts)} attempts · chosen seed ${payload.chosenSeed}`,
     `team: ${String(payload.record.gamesPlayed)} games · ${String(payload.teamPossessions)} possessions · ${String(payload.record.gamesPlayed)} played`,
     ...payload.playerTotals.map(
       (p) =>

@@ -38,3 +38,20 @@ export function deriveGameSeed(runSeed: Seed, gameNumber: number): Seed {
   const low = fnv1a32(`${material}:tail`, FNV_OFFSET_32 ^ high);
   return `${hex32(high)}${hex32(low)}` as Seed;
 }
+
+/**
+ * Derives the seed of a whole-run attempt `attemptIndex` (0-based) for
+ * sandbox best-of-N selection. Attempt seeds share the versioned derivation
+ * contract so a rule change deterministically invalidates every attempt.
+ */
+export function deriveAttemptSeed(runSeed: Seed, attemptIndex: number): Seed {
+  if (!Number.isInteger(attemptIndex) || attemptIndex < 0) {
+    throw new Error(
+      `attemptIndex must be a nonnegative integer (got ${String(attemptIndex)})`,
+    );
+  }
+  const material = `hoop-rush:${SEED_DERIVATION_VERSION}:${runSeed}:attempt-${String(attemptIndex)}`;
+  const high = fnv1a32(material, FNV_OFFSET_32);
+  const low = fnv1a32(`${material}:tail`, FNV_OFFSET_32 ^ high);
+  return `${hex32(high)}${hex32(low)}` as Seed;
+}

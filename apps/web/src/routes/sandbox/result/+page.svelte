@@ -13,6 +13,7 @@
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
   import { createChallenge, createEngineContext, toSimulationPlayer } from '@hoop-rush/engine';
+  import { BEST_OF_ATTEMPTS, simulateChallengeBestOf } from '@hoop-rush/engine';
   import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
   import { getBracket, getEraSimulationProfile, getManifest, getPool } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
@@ -219,9 +220,10 @@
     const byId = new Map(pool.players.map((p) => [p.playerId, p]));
     const players = currentRun.playerIds.map((id) => byId.get(id)!);
     const sample = players[0];
-    const created = createChallenge({
+    const context = createEngineContext();
+    const creation = {
       runId: crypto.randomUUID(),
-      mode: 'sandbox',
+      mode: 'sandbox' as const,
       franchiseId: currentRun.franchiseId,
       eraId: currentRun.eraId,
       homeDisplayName: currentRun.homeDisplayName,
@@ -238,14 +240,18 @@
       dataVersion: profile.dataVersion,
       ratingVersion: sample?.source.ratingsVersion ?? 'unknown',
       positionNormalizationVersion: sample?.positions.normalizationVersion ?? 'position-v1',
-      engineVersion: createEngineContext().engineVersion,
+      engineVersion: context.engineVersion,
       profile,
       bracket,
-    });
+    };
+    // Sandbox keeps the best of BEST_OF_ATTEMPTS derived whole-run attempts;
+    // the chosen attempt's seed is persisted so the reveal reproduces it.
+    const chosen = simulateChallengeBestOf(creation, profile, context);
+    const run = createChallenge({ ...creation, runSeed: chosen.runSeed });
     await challengeRepository.saveActiveRun({
       recordId: 'active',
       saveSchemaVersion: 2,
-      run: created,
+      run,
     });
     void goto(resolve('/sandbox/challenge'));
   }
@@ -363,8 +369,8 @@
           </a>
         {/if}
         <span class="ml-auto font-mono text-[10px] text-muted-foreground">
-          seed {run.runSeed} · engine {run.versions.engineVersion} · bracket {run.versions
-            .bracketVersion} · schedule {run.versions.scheduleVersion}
+          seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion} ·
+          bracket {run.versions.bracketVersion} · schedule {run.versions.scheduleVersion}
         </span>
       </div>
     </div>

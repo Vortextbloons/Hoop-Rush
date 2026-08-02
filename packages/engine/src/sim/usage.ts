@@ -41,13 +41,14 @@ export interface ShotSelection {
  * Initiation weight: usage tendency scaled by creation ability, with a
  * bounded creation-burden bonus for high-usage initiators on weak-creating
  * lineups (their teammates cannot initiate instead, so the offense leans on
- * them). The usage exponent steepens the hierarchy so a high-usage creator
- * concentrates possession starts without rating boosts. All deterministic
- * and bounded to keep matchups meaningful.
+ * them). The usage exponent is deliberately soft (1.1): a high-usage creator
+ * concentrates possession starts without monopolizing every possession
+ * class, so usage is not double-counted through initiation and catch-and-
+ * shoot pull. All deterministic and bounded to keep matchups meaningful.
  */
 export function initiatorWeight(player: SimulationPlayer, team: SimulationTeam): number {
   const usage = Math.max(0.5, player.tendencies.usageRate);
-  const usagePower = Math.pow(usage / 10, 1.5);
+  const usagePower = Math.pow(usage / 10, ENGINE_CONSTANTS.usageExponent);
   const creationMod = 0.75 + 0.5 * creationScore(player);
   return usagePower * creationMod * creationBurden(player, team);
 }

@@ -203,6 +203,10 @@ export const simChallengeReportSchema = z.object({
   command: z.literal('sim challenge'),
   lineup: z.string().min(1).max(96),
   seed: z.string().min(1).max(64),
+  /** Run seed of the chosen best-of-N attempt (the authoritative replay seed). */
+  chosenSeed: z.string().min(1).max(64),
+  /** Number of whole-run attempts simulated and compared. */
+  attempts: z.number().int().positive(),
   engineVersion: z.string().min(1).max(64),
   dataVersion: z.string().min(1).max(64),
   profileVersion: z.string().min(1).max(64),

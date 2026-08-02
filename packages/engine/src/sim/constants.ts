@@ -8,7 +8,7 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v3';
+export const ENGINE_VERSION = 'm3-engine-v4';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -22,15 +22,33 @@ export const ENGINE_CONSTANTS = {
     aboveBreakThree: 0.49,
   } as const satisfies Record<ShotZone, number>,
 
-  /** Player skill deviates make chance by at most this much around the 70 anchor. */
-  skillRange: 0.18,
-  /** Defensive contest can reduce make chance by at most this much. */
-  contestMax: 0.18,
+  /**
+   * Player skill deviates make chance by at most this much around the 70
+   * anchor. Calibrated down from 0.18 so lineup-strength gaps do not turn
+   * into guaranteed winners: elite teams still shoot better, but plausible
+   * upsets survive.
+   */
+  skillRange: 0.12,
+  /**
+   * Defensive contest can reduce make chance by at most this much. Sized
+   * with skillRange so contests compress blowouts without silencing
+   * perimeter-defense sensitivity.
+   */
+  contestMax: 0.15,
   /** Era efficiency anchor blends league TS% into the final make chance. */
   eraEfficiencyWeight: 0.35,
 
-  /** Turnover probability coefficients (V1 turnoverModel, revalidated). */
-  turnoverBase: 0.038,
+  /**
+   * Turnover probability coefficients around the era turnover-per-possession
+   * baseline (security.ts). A handler at the documented neutral reference
+   * (tendency 0.12, team pressure 0.62, handling offset 0.4, passing offset
+   * 0.2) converts at the era rate; deviations move the probability in bounded
+   * steps. These neutral references match the packaged pool population means.
+   */
+  turnoverNeutralTendency: 0.12,
+  turnoverNeutralPressure: 0.62,
+  turnoverNeutralHandling: 0.4,
+  turnoverNeutralPassing: 0.2,
   turnoverTendencyWeight: 0.18,
   turnoverPressureWeight: 0.18,
   turnoverHandlingWeight: 0.06,
@@ -80,6 +98,41 @@ export const ENGINE_CONSTANTS = {
   observedFreeThrowBlend: 0.8,
 
   /**
+   * Three-point volume evidence gates (usage.ts pickZone). A player with no
+   * recorded three-point attempts never takes threes; players with very low
+   * observed volume receive a tightly capped rate; era-wide three-point
+   * growth applies only to players with meaningful shooting evidence.
+   */
+  /** Observed 3PA/FGA below this means the player never shoots threes. */
+  threePointEvidenceMinimum: 0.02,
+  /** Observed 3PA/FGA below this is "very low volume" (tight cap, weak era pull). */
+  threePointLowVolumeThreshold: 0.06,
+  /** Hard cap on the three-point rate for very-low-volume players. */
+  threePointLowVolumeCap: 0.08,
+  /** Era pull for very-low-volume players with some shooting evidence. */
+  threePointLowVolumeEraPull: 0.05,
+  /** Era pull for players with established three-point volume. */
+  threePointEraPull: 0.3,
+
+  /**
+   * Usage hierarchy (usage.ts). The initiation exponent is soft (1.1 instead
+   * of 1.5) so a high-usage star concentrates possession starts without
+   * monopolizing every possession class.
+   */
+  usageExponent: 1.1,
+
+  /**
+   * Two-point efficiency anchor (shooting.ts). The player's observed
+   * two-point percentage is a soft prior scaled against the expected
+   * zone-base conversion for their shot mix; the factor is clamped so shot
+   * zone, defender quality, spacing, and shot quality stay meaningful.
+   */
+  twoPointAnchorMin: 0.82,
+  twoPointAnchorMax: 1.18,
+  /** Residual zone-skill term for anchored two-point shots. */
+  twoPointAnchorSkillScale: 0.3,
+
+  /**
    * Shot-quality bonuses by action and zone (two-point shots only). These
    * translate play-type reality into conversion: transition and cut finishes
    * convert better than isolation pull-ups. Bounded so skill and contest stay
@@ -95,9 +148,10 @@ export const ENGINE_CONSTANTS = {
   } as const,
   /**
    * Lineup spacing moves two-point conversion by at most this much per unit
-   * of team spacing above/below 0.5 (see shooting.ts teamSpacing).
+   * of team spacing above/below 0.5 (see shooting.ts teamSpacing). Softened
+   * from 0.12 so spacing stays a lineup lever without inflating blowouts.
    */
-  spacingBonusScale: 0.12,
+  spacingBonusScale: 0.09,
 
   /** Rebounds: offensive rebound probability coefficient around team ratings. */
   offensiveReboundScale: 0.05,
