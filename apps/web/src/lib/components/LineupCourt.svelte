@@ -39,9 +39,47 @@
   } = $props();
 
   const filledCount = $derived(slots.filter((p) => p !== null).length);
+  let announcement = $state('');
+  let previousSlots = $state<(string | null)[] | null>(null);
+
+  $effect(() => {
+    const current = slots.map((player) => (player ? player.playerId : null));
+    if (previousSlots === null) {
+      previousSlots = current;
+      return;
+    }
+    const moved = current.findIndex(
+      (playerId, index) =>
+        playerId !== null &&
+        playerId !== previousSlots![index] &&
+        previousSlots!.includes(playerId),
+    );
+    if (moved >= 0) {
+      const playerId = current[moved]!;
+      const from = previousSlots.indexOf(playerId);
+      const player = slots[moved];
+      if (player && from >= 0) {
+        announcement = `Moved ${player.displayName} from ${SLOT_LABELS[from]} to ${SLOT_LABELS[moved]}.`;
+      }
+    } else {
+      const added = current.findIndex(
+        (playerId, index) => playerId !== null && previousSlots![index] === null,
+      );
+      const removed = previousSlots.findIndex(
+        (playerId, index) => playerId !== null && current[index] === null,
+      );
+      if (added >= 0 && slots[added]) {
+        announcement = `Placed ${slots[added]!.displayName} at ${SLOT_LABELS[added]}.`;
+      } else if (removed >= 0) {
+        announcement = `Removed player from ${SLOT_LABELS[removed]}.`;
+      }
+    }
+    previousSlots = current;
+  });
 </script>
 
 <div id="your-five" class="scroll-mt-4 rounded-xl border border-border bg-card">
+  <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
   <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
     <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h2>
     <span class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">

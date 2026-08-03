@@ -38,9 +38,11 @@ Commands:
   bracket generate       (dev) Author the frozen bracket from packaged NBA data and
                          commit it with the manifest. Deterministic under --seed.
                          --seed <hex> --proposals N --samples N --min-score N
-  benchmark              Measure warm single-game and 82-game throughput.
+  benchmark              Measure pool cold/cached, warm single-game, and 82-game throughput.
                          --fixture <id> (default equal) --samples N (default 50)
                          --seed-from N --workers N
+                         --baseline <path> Compare matched fingerprints at 125% + noise.
+                         --write-baseline <path> Write a versioned JSON baseline.
   replay                 Reproduce a saved game input and compare with an expected result.
                          --input <game-input.json> --expected <game-result.json>
   calibrate run          Compare seeded batches against the frozen era profile targets.

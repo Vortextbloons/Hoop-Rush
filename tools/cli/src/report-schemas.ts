@@ -279,13 +279,14 @@ export const bracketAuditReportSchema = z.object({
 export type BracketAuditReport = z.infer<typeof bracketAuditReportSchema>;
 
 export const benchmarkReportSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   command: z.literal('benchmark'),
   environment: z.object({
     node: z.string().min(1).max(64),
     platform: z.string().min(1).max(64),
     arch: z.string().min(1).max(64),
     cpus: z.number().int().positive(),
+    fingerprint: z.string().min(1).max(256),
   }),
   engineVersion: z.string().min(1).max(64),
   dataVersion: z.string().min(1).max(64),
@@ -295,6 +296,20 @@ export const benchmarkReportSchema = z.object({
   fixture: z.string().min(1).max(64),
   samples: z.number().int().nonnegative(),
   workers: z.number().int().min(1),
+  poolCold: z.object({
+    sampleCount: z.number().int().nonnegative(),
+    medianMs: z.number().nonnegative(),
+    p95Ms: z.number().nonnegative(),
+    minMs: z.number().nonnegative(),
+    maxMs: z.number().nonnegative(),
+  }),
+  poolCached: z.object({
+    sampleCount: z.number().int().nonnegative(),
+    medianMs: z.number().nonnegative(),
+    p95Ms: z.number().nonnegative(),
+    minMs: z.number().nonnegative(),
+    maxMs: z.number().nonnegative(),
+  }),
   singleGame: z.object({
     sampleCount: z.number().int().nonnegative(),
     medianMs: z.number().nonnegative(),
@@ -310,6 +325,11 @@ export const benchmarkReportSchema = z.object({
     maxMs: z.number().nonnegative(),
   }),
   heapUsedMb: z.number().nonnegative(),
+  heap: z.object({
+    beforeMb: z.number().nonnegative(),
+    afterMb: z.number().nonnegative(),
+    deltaMb: z.number(),
+  }),
 });
 export type BenchmarkReport = z.infer<typeof benchmarkReportSchema>;
 

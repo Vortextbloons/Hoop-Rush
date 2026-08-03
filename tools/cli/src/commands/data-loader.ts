@@ -56,6 +56,8 @@ export function loadPackagedData(manifestPath: string = DEFAULT_MANIFEST_PATH): 
 }
 
 export class PackagedData {
+  private readonly poolCache = new Map<string, FranchiseEraPool>();
+
   constructor(
     readonly manifest: HoopRushManifest,
     readonly dir: string,
@@ -80,6 +82,9 @@ export class PackagedData {
   }
 
   pool(franchiseId: string, eraId: string): FranchiseEraPool {
+    const cacheKey = `${franchiseId}/${eraId}`;
+    const cached = this.poolCache.get(cacheKey);
+    if (cached) return cached;
     const entry = this.manifest.pools.find(
       (p) => p.franchiseId === franchiseId && p.eraId === eraId,
     );
@@ -88,6 +93,7 @@ export class PackagedData {
     verifyHash(path, entry.contentHash);
     const parsed = franchiseEraPoolSchema.safeParse(read());
     if (!parsed.success) throw new Error(`pool ${path} fails validation`);
+    this.poolCache.set(cacheKey, parsed.data);
     return parsed.data;
   }
 

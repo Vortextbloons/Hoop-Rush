@@ -170,6 +170,8 @@ const COMMANDS: Record<string, CommandDef> = {
         'seed-to': getOptionString(args, 'seed-to') ?? undefined,
         workers: getOptionString(args, 'workers') ?? undefined,
         profile: getOptionString(args, 'profile') ?? undefined,
+        baseline: getOptionString(args, 'baseline') ?? undefined,
+        'write-baseline': getOptionString(args, 'write-baseline') ?? undefined,
       }),
   },
   replay: {

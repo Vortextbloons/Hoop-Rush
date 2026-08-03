@@ -228,7 +228,13 @@
     </div>
   {/if}
   {#if error}
-    <p class="border-b border-border/60 p-4 text-sm text-destructive">{error}</p>
+    <p
+      class="border-b border-border/60 p-4 text-sm text-destructive"
+      role="alert"
+      aria-live="assertive"
+    >
+      {error}
+    </p>
   {/if}
   {#if filteredRows.length === 0}
     <p class="p-6 text-center font-mono text-xs text-muted-foreground">{emptyMessage}</p>

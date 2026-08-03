@@ -12,7 +12,7 @@
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
-  import { getManifest, getPlayersIndex, getPool } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
   import { startSandboxRun } from '$lib/sandbox-run';
   import { poolSortLabel, sortDraftRows } from '$lib/draft-presentation';
@@ -20,6 +20,7 @@
   import LineupCourt from '$lib/components/LineupCourt.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
+  import AsyncState from '$lib/components/AsyncState.svelte';
 
   type IndexRow = PlayersIndexEntry;
 
@@ -51,7 +52,11 @@
   let franchiseFilter = $state('');
   let eraFilter = $state('');
 
-  $effect(() => {
+  function loadSandboxData() {
+    manifestError = null;
+    indexError = null;
+    manifest = null;
+    index = null;
     let cancelled = false;
     getManifest().then(
       (m) => {
@@ -75,7 +80,14 @@
     return () => {
       cancelled = true;
     };
-  });
+  }
+
+  $effect(() => loadSandboxData());
+
+  function retrySandboxData() {
+    clearDataLoaderCaches();
+    loadSandboxData();
+  }
 
   /**
    * Restores a draft carried in the URL (five player selections plus an
@@ -288,18 +300,36 @@
   </div>
 
   {#if manifestError}
-    <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      Failed to load data: {manifestError}
-    </p>
+    <div class="mt-8">
+      <AsyncState
+        kind="error"
+        title="Data unavailable"
+        message={`Failed to load data: ${manifestError}`}
+        retry={retrySandboxData}
+      />
+    </div>
   {:else if !manifest}
-    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading data…</p>
+    <div class="mt-8">
+      <AsyncState
+        kind="loading"
+        title="Loading sandbox data"
+        message="Preparing the player index…"
+      />
+    </div>
   {:else}
     {#if indexError}
-      <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-        Failed to load players: {indexError}
-      </p>
+      <div class="mt-8">
+        <AsyncState
+          kind="error"
+          title="Players unavailable"
+          message={`Failed to load players: ${indexError}`}
+          retry={retrySandboxData}
+        />
+      </div>
     {:else if !index}
-      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading players…</p>
+      <div class="mt-8">
+        <AsyncState kind="loading" title="Loading player index" message="One moment…" />
+      </div>
     {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">
         <div class="grid gap-4 sm:grid-cols-2">
@@ -481,10 +511,20 @@
           {manifest}
           presentation="sandbox"
           filtersEditable
-          error={runError}
+          error={null}
           emptyMessage="No players match."
           onpick={openPicker}
         />
+
+        {#if runError}
+          <AsyncState
+            kind="error"
+            title="Run could not start"
+            message={runError}
+            retry={play82}
+            retryLabel="Try again"
+          />
+        {/if}
 
         <LineupCourt
           {slots}

@@ -1,16 +1,17 @@
+import { readFileSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
+import { isAbsolute, resolve } from 'node:path';
 import { createChallenge, createEngineContext, simulateChallenge } from '@hoop-rush/engine';
-import { makeReport, type CliReport } from '../report.js';
-import { benchmarkReportSchema } from '../report-schemas.js';
-import { loadPackagedData, PackagedData } from './data-loader.js';
+import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.js';
+import { benchmarkReportSchema, type BenchmarkReport } from '../report-schemas.js';
+import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.js';
 import { lineupForTeam, resolveUserTeam } from './challenge.js';
 import { buildInput, loadFixture, runSingleGame, UsageError } from './sim.js';
 
 /**
- * `benchmark` (spec/09 target): measures warm single-game and complete
- * 82-game simulation throughput and reports environment, versions, sample
- * size, median, p95, and memory. Output is evidence; stable reference-hardware
- * thresholds become CI gates later.
+ * Measures pool loading, warm single-game, and complete 82-game throughput.
+ * Baseline comparisons are deliberately conservative: a matched environment
+ * must exceed both 125% of the stored value and the absolute noise floor.
  */
 
 export const BENCHMARK_OPTIONS: Record<string, boolean> = {
@@ -20,6 +21,8 @@ export const BENCHMARK_OPTIONS: Record<string, boolean> = {
   'seed-to': true,
   workers: true,
   profile: true,
+  baseline: true,
+  'write-baseline': true,
   format: true,
   verbose: false,
 };
@@ -60,6 +63,58 @@ function stats(samples: readonly number[]): {
   };
 }
 
+function resolveBaselinePath(value: string): string {
+  return isAbsolute(value) ? value : resolve(REPO_ROOT, value);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+type TimedMetric = {
+  sampleCount: number;
+  medianMs: number;
+  p95Ms: number;
+  minMs: number;
+  maxMs: number;
+};
+
+function compareBaseline(
+  current: BenchmarkReport,
+  baseline: BenchmarkReport,
+  details: string[],
+): string[] {
+  if (baseline.environment.fingerprint !== current.environment.fingerprint) {
+    details.push('baseline comparison skipped: environment fingerprint does not match');
+    return [];
+  }
+  details.push('baseline environment fingerprint matched');
+  const comparisons: Array<{
+    id: 'poolCold' | 'poolCached' | 'singleGame' | 'challenge82';
+    label: string;
+    noiseMs: number;
+  }> = [
+    { id: 'poolCold', label: 'pool cold', noiseMs: 2 },
+    { id: 'poolCached', label: 'pool cached', noiseMs: 2 },
+    { id: 'singleGame', label: 'warm single game', noiseMs: 2 },
+    { id: 'challenge82', label: '82-game run', noiseMs: 50 },
+  ];
+  const failures: string[] = [];
+  for (const comparison of comparisons) {
+    const currentMetric = current[comparison.id] as TimedMetric;
+    const baselineMetric = baseline[comparison.id] as TimedMetric;
+    for (const metric of ['medianMs', 'p95Ms'] as const) {
+      const increase = currentMetric[metric] - baselineMetric[metric];
+      if (currentMetric[metric] > baselineMetric[metric] * 1.25 && increase > comparison.noiseMs) {
+        failures.push(
+          `${comparison.label} ${metric} regressed from ${baselineMetric[metric].toFixed(2)} ms to ${currentMetric[metric].toFixed(2)} ms`,
+        );
+      }
+    }
+  }
+  return failures;
+}
+
 export function benchmark(args: {
   fixture?: string;
   samples?: string;
@@ -67,6 +122,8 @@ export function benchmark(args: {
   'seed-to'?: string;
   workers?: string;
   profile?: string;
+  baseline?: string;
+  'write-baseline'?: string;
 }): CliReport {
   const fixtureId = args.fixture ?? 'equal';
   const samples = parseCount(args.samples, '--samples', 50);
@@ -79,6 +136,24 @@ export function benchmark(args: {
   const profile = data.eraProfile();
   const bracket = data.bracket();
   const fixture = loadFixture(fixtureId);
+  const heapBeforeMb = process.memoryUsage().heapUsed / 1024 / 1024;
+
+  const poolColdSamples: number[] = [];
+  for (let i = 0; i < samples; i += 1) {
+    const coldData = new PackagedData(packaged.manifest, packaged.dir);
+    const started = performance.now();
+    coldData.pool('lakers', '1990s');
+    poolColdSamples.push(performance.now() - started);
+  }
+
+  const cachedData = new PackagedData(packaged.manifest, packaged.dir);
+  cachedData.pool('lakers', '1990s');
+  const poolCachedSamples: number[] = [];
+  for (let i = 0; i < samples; i += 1) {
+    const started = performance.now();
+    cachedData.pool('lakers', '1990s');
+    poolCachedSamples.push(performance.now() - started);
+  }
 
   // Warm-up: JIT and module initialization settle before measurement.
   for (let i = 0; i < 20; i += 1) {
@@ -135,35 +210,103 @@ export function benchmark(args: {
 
   const single = stats(singleSamples);
   const challenge = stats(challengeSamples);
-  const memoryMb = process.memoryUsage().heapUsed / 1024 / 1024;
+  const heapAfterMb = process.memoryUsage().heapUsed / 1024 / 1024;
+  const fingerprint = [
+    process.version,
+    process.platform,
+    process.arch,
+    String(cpus().length),
+    context.engineVersion,
+    packaged.manifest.dataVersion,
+    profile.profileVersion,
+    bracket.bracketVersion,
+    bracket.scheduleVersion,
+  ].join('|');
   const payload = benchmarkReportSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     command: 'benchmark',
     environment: {
       node: process.version,
       platform: process.platform,
       arch: process.arch,
       cpus: cpus().length,
+      fingerprint,
     },
     engineVersion: context.engineVersion,
-    dataVersion: profile.dataVersion,
+    dataVersion: packaged.manifest.dataVersion,
     profileVersion: profile.profileVersion,
     bracketVersion: bracket.bracketVersion,
     scheduleVersion: bracket.scheduleVersion,
     fixture: fixtureId,
     samples,
     workers,
+    poolCold: { ...stats(poolColdSamples), sampleCount: samples },
+    poolCached: { ...stats(poolCachedSamples), sampleCount: samples },
     singleGame: { ...single, sampleCount: samples },
     challenge82: { ...challenge, sampleCount: samples },
-    heapUsedMb: Math.round(memoryMb * 100) / 100,
+    heapUsedMb: Math.round(heapAfterMb * 100) / 100,
+    heap: {
+      beforeMb: Math.round(heapBeforeMb * 100) / 100,
+      afterMb: Math.round(heapAfterMb * 100) / 100,
+      deltaMb: heapAfterMb - heapBeforeMb,
+    },
   });
 
   const details = [
     `environment: node ${payload.environment.node} · ${payload.environment.platform}/${payload.environment.arch} · ${String(payload.environment.cpus)} cpus`,
+    `environment fingerprint: ${payload.environment.fingerprint}`,
     `engine ${payload.engineVersion} · data ${payload.dataVersion} · profile ${payload.profileVersion} · bracket ${payload.bracketVersion} · schedule ${payload.scheduleVersion}`,
+    `pool cold (${String(samples)} samples): median ${payload.poolCold.medianMs.toFixed(2)} ms · p95 ${payload.poolCold.p95Ms.toFixed(2)} ms`,
+    `pool cached (${String(samples)} samples): median ${payload.poolCached.medianMs.toFixed(2)} ms · p95 ${payload.poolCached.p95Ms.toFixed(2)} ms`,
     `single game (${String(samples)} warm samples): median ${single.medianMs.toFixed(2)} ms · p95 ${single.p95Ms.toFixed(2)} ms · min ${single.minMs.toFixed(2)} · max ${single.maxMs.toFixed(2)}`,
     `82-game run (${String(samples)} samples): median ${challenge.medianMs.toFixed(2)} ms · p95 ${challenge.p95Ms.toFixed(2)} ms · min ${challenge.minMs.toFixed(2)} · max ${challenge.maxMs.toFixed(2)}`,
-    `heap used ${String(payload.heapUsedMb)} MB`,
+    `heap used ${String(payload.heapUsedMb)} MB · delta ${payload.heap.deltaMb.toFixed(2)} MB`,
   ];
-  return makeReport('benchmark', { fixture: fixtureId, samples, workers }, { details, payload });
+
+  if (args['write-baseline']) {
+    const path = resolveBaselinePath(args['write-baseline']);
+    try {
+      writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+      details.push(`baseline written to ${path}`);
+    } catch (error) {
+      return makeReport(
+        'benchmark',
+        { fixture: fixtureId, samples, workers },
+        {
+          details,
+          failures: [`cannot write baseline ${path}: ${errorMessage(error)}`],
+          exitCode: EXIT_USAGE_OR_DATA_ERROR,
+          payload,
+        },
+      );
+    }
+  }
+
+  let failures: string[] = [];
+  if (args.baseline) {
+    const path = resolveBaselinePath(args.baseline);
+    try {
+      const baseline = benchmarkReportSchema.parse(
+        JSON.parse(readFileSync(path, 'utf8')) as unknown,
+      );
+      failures = compareBaseline(payload, baseline, details);
+    } catch (error) {
+      return makeReport(
+        'benchmark',
+        { fixture: fixtureId, samples, workers, baseline: path },
+        {
+          details,
+          failures: [`cannot read benchmark baseline ${path}: ${errorMessage(error)}`],
+          exitCode: EXIT_USAGE_OR_DATA_ERROR,
+          payload,
+        },
+      );
+    }
+  }
+
+  return makeReport(
+    'benchmark',
+    { fixture: fixtureId, samples, workers, ...(args.baseline ? { baseline: args.baseline } : {}) },
+    { details, failures, payload },
+  );
 }
