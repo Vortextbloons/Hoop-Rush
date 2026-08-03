@@ -23,16 +23,10 @@ import {
   calibrateRunReportSchema,
   calibrateSensitivityReportSchema,
 } from '../report-schemas.js';
-import {
-  buildInput,
-  fixtureSeed,
-  loadFixture,
-  runSingleGame,
-  UsageError,
-  loadProfileFile,
-} from './sim.js';
+import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from './sim.js';
 import { lineupForTeam } from './challenge.js';
-import { loadPackagedData, PackagedData } from './data-loader.js';
+import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.js';
+import { parseCount } from '../args.js';
 
 /**
  * `calibrate run` and `calibrate sensitivity` (spec/09, spec/06). Calibration
@@ -59,15 +53,6 @@ export const CALIBRATE_OPTIONS: Record<string, boolean> = {
   format: true,
   verbose: false,
 };
-
-function parseCount(value: string | undefined, option: string, fallback: number): number {
-  if (value === undefined) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
-  }
-  return parsed;
-}
 
 /** Builds a league-average team from the packaged pool (usage-weighted means). */
 export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {

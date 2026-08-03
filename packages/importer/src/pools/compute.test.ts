@@ -33,7 +33,6 @@ import {
   parsePoolTargets,
   partitionPoolTargets,
   run,
-  seasonToEra,
   selectionScore,
   type Candidate,
   type Manifest,
@@ -55,7 +54,6 @@ vi.mock('../config.js', () => ({
   get RAW_CACHE() {
     return env.cache;
   },
-  TEAM_FOUNDING_SEASON: { '1610612747': '1948-49' },
 }));
 
 // ---------------------------------------------------------------------------
@@ -629,18 +627,6 @@ describe('selectionScore', () => {
     expect(
       selectionScore({ overallRating: 60, offenseRating: 60, defenseRating: 60 }, 10, 30, 0),
     ).toBe(58.656);
-  });
-});
-
-describe('seasonToEra', () => {
-  const eras = fixtureManifest().eras;
-  it('maps inclusive era boundaries', () => {
-    expect(seasonToEra(eras, '1990-91')).toBe('1990s');
-    expect(seasonToEra(eras, '1999-00')).toBe('1990s');
-    expect(seasonToEra(eras, '2000-01')).toBe('2000s');
-  });
-  it('returns null outside every era', () => {
-    expect(seasonToEra(eras, '1989-90')).toBeNull();
   });
 });
 

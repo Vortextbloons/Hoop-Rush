@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import { LINEUP_STRUCTURE, playableSlotGroups } from '@hoop-rush/data-contracts';
-import {
-  assignLineup,
-  canFillSlot,
-  normalizePositionUnion,
-  slotRequirement,
-  validateLineup,
-} from '../index.js';
+import { assignLineup, canFillSlot, slotRequirement, validateLineup } from './lineup.js';
+import { normalizePositionUnion } from './positions.js';
 
 const positionArb = fc.constantFrom('PG', 'SG', 'SF', 'PF', 'C');
 const unionArb = fc.array(positionArb, { minLength: 1, maxLength: 3 });

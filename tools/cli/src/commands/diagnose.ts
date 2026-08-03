@@ -4,6 +4,7 @@ import { makeReport, type CliReport } from '../report.js';
 import { simDiagnoseReportSchema, simSeasonReportSchema } from '../report-schemas.js';
 import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from './sim.js';
 import { loadPackagedData, PackagedData } from './data-loader.js';
+import { parseCount } from '../args.js';
 
 /**
  * `sim diagnose` and `sim season` (spec/09). Opportunity-level diagnostics for
@@ -30,15 +31,6 @@ export const SEASON_OPTIONS: Record<string, boolean> = {
   format: true,
   verbose: false,
 };
-
-function parseCount(value: string | undefined, option: string, fallback: number): number {
-  if (value === undefined) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
-  }
-  return parsed;
-}
 
 function loadProfile(): {
   profile: ReturnType<PackagedData['eraProfile']>;

@@ -70,10 +70,6 @@ Commands:
                          (annotation itself stays in Python: reannotate_assets.py)
   import era-profile     Derive era simulation profiles from packaged stints +
                          Lakers pool anchors. --era 1990s,1980s (default all)
-  import era-config      Compute per-season era-config.json league averages.
-                         --seasons 2024-25,2023-24 (comma-separated)
-  import careers         Compute per-season career-stats.json from season stats.
-                         --seasons 2024-25,2023-24 (comma-separated)
   import manifest        Refresh manifest content hashes for pools, era profiles,
                          opponents, and the bracket artifact
   import opponent        Author the lakers-1990s opening opponent artifact
@@ -81,11 +77,11 @@ Commands:
                          --report <calibrate-report.json>  (required)
                          --era <eraId> (default 1990s)
   import run-all         Full pipeline: Python fetch layer (rosters, stints,
-                         season stats, schedule, bbref ids) then native ratings,
-                         careers, pools.
+                         season stats, schedule, bbref ids) then native ratings
+                         and pools.
                          --seasons 2024-25,2023-24  --workers N (default 6)
                          --include-schedule  --force-stints  --force-ratings
-                         --skip-careers  --skip-bbref  --pools lakers/1990s
+                         --skip-bbref  --pools lakers/1990s
   help                   Show this help
 
 Fixtures:

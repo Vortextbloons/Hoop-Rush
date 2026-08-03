@@ -1,4 +1,5 @@
 import type { ExplanationFact, GameResult, TeamResult } from '@hoop-rush/data-contracts';
+import { usageOf } from './recorder.js';
 
 /**
  * Structured evidence for decisive margins (spec/01 feedback, spec/03 outputs).
@@ -107,7 +108,7 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
   // share; the fallback re-derives it for legacy records without diagnostics.
   function playerUsage(player: TeamResult['players'][number]): number {
     if (player.diagnostics) return player.diagnostics.usage;
-    return player.fieldGoals.attempted + 0.44 * player.freeThrows.attempted + player.turnovers;
+    return usageOf(player.fieldGoals.attempted, player.freeThrows.attempted, player.turnovers);
   }
   const topUsage = [...winner.players].sort((a, b) => playerUsage(b) - playerUsage(a))[0];
   const teamUsage = winner.players.reduce((sum, player) => sum + playerUsage(player), 0);

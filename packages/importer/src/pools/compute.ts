@@ -180,15 +180,6 @@ export function loadManifest(): Manifest {
   return readJsonLoose(manifestPath()) as Manifest;
 }
 
-export function seasonToEra(eras: readonly EraEntry[], season: string): string | null {
-  for (const era of eras) {
-    if (era.fromSeasonKey <= season && season <= era.toSeasonKey) {
-      return era.eraId;
-    }
-  }
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 // Per-season loading
 // ---------------------------------------------------------------------------
@@ -312,12 +303,6 @@ function sortedJsonFiles(dir: string): string[] {
   } catch {
     return [];
   }
-}
-
-/** @internal Clears the per-run season cache (determinism tests). */
-export function clearSeasonDataCache(): void {
-  seasonDataCache.clear();
-  fallbackRosterCache = null;
 }
 
 /** Default pool worker count: one per era, capped by the machine's cores. */
@@ -1459,46 +1444,6 @@ export function classifyUnattempted(
     return failure('source-incomplete', `no packaged seasons for era ${eraId}`);
   }
   return failure('insufficient-players', 'not attempted in the last coverage build');
-}
-
-/** Written into the manifest availability matrix (runtime-validated by CLI). */
-export function availabilityEntryFor(
-  franchiseId: string,
-  eraId: string,
-  manifest: Manifest,
-  poolFile: Pool | null,
-): Record<string, unknown> {
-  if (poolFile !== null) {
-    return {
-      franchiseId,
-      eraId,
-      status: 'available',
-      url: `pools/${franchiseId}-${eraId}.json`,
-      contentHash: sha256File(join(poolDir(), `${franchiseId}-${eraId}.json`)),
-      playerCount: poolFile.players.length,
-      coverageSummary: poolFile.coverageSummary,
-    };
-  }
-  const computed = computePool(franchiseId, eraId, manifest, undefined, false);
-  if ('reason' in computed) {
-    return {
-      franchiseId,
-      eraId,
-      status: 'unavailable',
-      reason: computed.reason,
-      detail: computed.detail,
-      ...(computed.firstSupportedSeason !== undefined
-        ? { firstSupportedSeason: computed.firstSupportedSeason }
-        : {}),
-    };
-  }
-  return {
-    franchiseId,
-    eraId,
-    status: 'unavailable',
-    reason: 'source-incomplete',
-    detail: 'no packaged pool asset',
-  };
 }
 
 export function updateManifest(

@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { canPlay, slotRequirement } from '@hoop-rush/engine';
   import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
   import { lowercaseName } from '$lib/roster-browser';
@@ -10,19 +9,17 @@
     type DraftPresentation,
     type RatingBadgeLabel,
   } from '$lib/draft-presentation';
+  import {
+    SLOT_INDEXES,
+    SLOT_LABELS,
+    SLOT_NAMES,
+    canFillSlot,
+    displacementTargetFor,
+  } from '$lib/draft-slots';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
 
   type IndexRow = PlayersIndexEntry;
 
-  const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-  const SLOT_NAMES = [
-    'Point Guard',
-    'Shooting Guard',
-    'Small Forward',
-    'Power Forward',
-    'Center',
-  ] as const;
-  const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
   const PAGE_SIZE = 48;
 
   /** Typing delay before the pool list re-filters the players index. */
@@ -77,9 +74,9 @@
   const filteredRows = $derived.by(() => {
     if (!filtersEditable) return rows;
     let list = rows;
-    if (positionFilter !== null) {
-      const requirement = slotRequirement(positionFilter);
-      list = list.filter((p) => canPlay(p.positionsPlayable, requirement));
+    const position = positionFilter;
+    if (position !== null) {
+      list = list.filter((p) => canFillSlot(p, position));
     }
     const query = search.trim().toLowerCase();
     if (query) {
@@ -110,29 +107,6 @@
     if (visible !== PAGE_SIZE) visibleCount = PAGE_SIZE;
   });
 
-  function canFillSlot(player: IndexRow, slotIndex: number): boolean {
-    return canPlay(player.positionsPlayable, slotRequirement(slotIndex as SlotIndex));
-  }
-
-  /**
-   * Where a displaced incumbent can land: the first open slot it can fill,
-   * including the slot the incoming player is vacating. Returns null when the
-   * incumbent cannot move anywhere.
-   */
-  function displacementTargetFor(
-    incumbent: IndexRow,
-    targetSlot: number,
-    subjectSlot: number,
-  ): number | null {
-    for (const i of SLOT_INDEXES) {
-      if (i === targetSlot) continue;
-      const willBeOpen = i === subjectSlot || slots[i] === null;
-      if (!willBeOpen) continue;
-      if (canFillSlot(incumbent, i)) return i;
-    }
-    return null;
-  }
-
   type PoolCardState = 'lineup' | 'place' | 'displace' | 'blocked';
 
   type PoolCardInfo = {
@@ -156,7 +130,7 @@
       const incumbent = slots[i] ?? null;
       if (!incumbent) return { state: 'place', displace: null };
       if (displace === null) {
-        const target = displacementTargetFor(incumbent, i, -1);
+        const target = displacementTargetFor(slots, incumbent, i, -1);
         if (target !== null) displace = { incumbent, targetSlot: target };
       }
     }

@@ -6,7 +6,8 @@ import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.
 import { benchmarkReportSchema, type BenchmarkReport } from '../report-schemas.js';
 import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.js';
 import { lineupForTeam, resolveUserTeam } from './challenge.js';
-import { buildInput, loadFixture, runSingleGame, UsageError } from './sim.js';
+import { buildInput, chunkRange, fixtureSeed, loadFixture, runSingleGame } from './sim.js';
+import { parseCount } from '../args.js';
 
 /**
  * Measures pool loading, warm single-game, and complete 82-game throughput.
@@ -26,25 +27,6 @@ export const BENCHMARK_OPTIONS: Record<string, boolean> = {
   format: true,
   verbose: false,
 };
-
-function parseCount(value: string | undefined, option: string, fallback: number): number {
-  if (value === undefined) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
-  }
-  return parsed;
-}
-
-function seedFor(prefix: string, index: number): string {
-  let hash = 0x811c9dc5;
-  const value = `${prefix}-${String(index)}`;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0').repeat(4);
-}
 
 function stats(samples: readonly number[]): {
   medianMs: number;
@@ -181,18 +163,13 @@ export function benchmark(args: {
 
   // Warm-up: JIT and module initialization settle before measurement.
   for (let i = 0; i < 20; i += 1) {
-    void runSingleGame(buildInput(fixture, profile, seedFor('bench-warm', i), false));
+    void runSingleGame(buildInput(fixture, profile, fixtureSeed('bench-warm', i), false));
   }
 
   const singleSamples: number[] = [];
-  const chunkSize = Math.ceil(samples / workers);
-  const chunks: Array<{ from: number; to: number }> = [];
-  for (let from = seedFrom; from < seedFrom + samples; from += chunkSize) {
-    chunks.push({ from, to: Math.min(seedFrom + samples - 1, from + chunkSize - 1) });
-  }
-  for (const chunk of chunks) {
+  for (const chunk of chunkRange(seedFrom, seedFrom + samples - 1, workers)) {
     for (let i = chunk.from; i <= chunk.to; i += 1) {
-      const input = buildInput(fixture, profile, seedFor('bench-game', i), false);
+      const input = buildInput(fixture, profile, fixtureSeed('bench-game', i), false);
       const started = performance.now();
       runSingleGame(input);
       singleSamples.push(performance.now() - started);
@@ -220,7 +197,7 @@ export function benchmark(args: {
         franchiseId: 'lakers',
         eraId: '1990s',
       })),
-      runSeed: seedFor('bench-challenge', i),
+      runSeed: fixtureSeed('bench-challenge', i),
       dataVersion: profile.dataVersion,
       ratingVersion: samplePlayer?.source.ratingsVersion ?? 'unknown',
       positionNormalizationVersion: samplePlayer?.positions.normalizationVersion ?? 'position-v1',

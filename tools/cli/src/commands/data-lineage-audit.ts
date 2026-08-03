@@ -1,12 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
+import { DEFAULT_MANIFEST } from './data-loader.js';
 
 /**
  * `hoop-rush data lineage-audit`: proves historical team ranges map to
@@ -16,16 +16,13 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
  * (spec/09, spec/12).
  */
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
-const DEFAULT_MANIFEST = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
-
 export const DATA_LINEAGE_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
   verbose: false,
 };
 
-export interface LineageAuditPayload {
+interface LineageAuditPayload {
   dataVersion: string;
   slotCount: number;
   segmentCount: number;

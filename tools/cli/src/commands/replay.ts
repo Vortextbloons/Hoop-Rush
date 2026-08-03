@@ -43,7 +43,7 @@ function readInputJson<T>(
 }
 
 /** First structured difference between two serializable values, as a path. */
-export function firstDifference(expected: unknown, actual: unknown): string | null {
+function firstDifference(expected: unknown, actual: unknown): string | null {
   if (Object.is(expected, actual)) return null;
   if (typeof expected !== typeof actual) return '(type)';
   if (expected === null || actual === null) return '(value)';

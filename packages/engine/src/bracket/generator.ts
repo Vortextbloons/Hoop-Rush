@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   BracketOpponent,
   DifficultyProfile,
   EraSimulationProfile,
@@ -14,7 +14,7 @@
 } from '@hoop-rush/data-contracts';
 import { opponentBracketSchema } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.js';
-import { createRng } from '../sim/rng.js';
+import { createRng, shuffle } from '../sim/rng.js';
 import { validateBracketContent } from '../challenge/commands.js';
 import { evaluateLineupBalance, evaluateLineupStrength } from '../challenge/lineup-eval.js';
 import { BENCHMARK_VERSION } from '../challenge/benchmarks.js';
@@ -70,15 +70,6 @@ export interface BracketGenerationOptions {
   /** Minimum player quality score for a proposal to be considered. */
   minPlayerScore?: number;
   engineContext: EngineContext;
-}
-
-export interface BracketSelectionReport {
-  franchiseId: string;
-  opponentId: string;
-  winRate: number;
-  percentile: number;
-  targetPercentile: number;
-  balance: ReturnType<typeof evaluateLineupBalance>;
 }
 
 const DEFAULT_PROPOSALS = 32;
@@ -574,25 +565,6 @@ function pickFive(
   return chosen;
 }
 
-/** Swap two indexed positions; throws when either index is out of bounds. */
-function swapAt(values: unknown[], a: number, b: number): void {
-  const va = values[a];
-  const vb = values[b];
-  if (va === undefined || vb === undefined) {
-    throw new Error(`shuffle: index out of range (${String(a)}, ${String(b)})`);
-  }
-  values[a] = vb;
-  values[b] = va;
-}
-
-function shuffle<T>(items: readonly T[], rng: ReturnType<typeof createRng>): T[] {
-  const result = [...items];
-  for (let i = result.length - 1; i > 0; i -= 1) {
-    swapAt(result, i, rng.nextInt(0, i));
-  }
-  return result;
-}
-
 function medianOf(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
@@ -633,5 +605,3 @@ function bracketPercentileList(
     ...[...selected.values()].map((s) => percentileOf(s.proposal.strength, population)),
   ];
 }
-
-export { DEFAULT_PROPOSALS, DEFAULT_SAMPLES, DEFAULT_MIN_PLAYER_SCORE };

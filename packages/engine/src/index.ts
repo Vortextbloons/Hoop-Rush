@@ -2,32 +2,42 @@
  * Domain model and possession engine for Hoop Rush. Pure TypeScript: no
  * Svelte, no persistence, no DOM, no clocks, no platform randomness. Types
  * come from the validated @hoop-rush/data-contracts schemas.
+ *
+ * This entry exports only the surface consumed by the web app and CLI; the
+ * sim plumbing (possession, shooting, fouls, rebounding, usage, recorder,
+ * facts, timing, constants, seeds) stays internal to the package.
  */
-export * from './domain/positions.js';
-export * from './domain/lineup.js';
-export * from './domain/zones.js';
-export * from './domain/archetypes.js';
-export * from './sim/simulate.js';
-export * from './sim/timing.js';
-export * from './sim/usage.js';
-export * from './sim/security.js';
-export * from './sim/shooting.js';
-export * from './sim/fouls.js';
-export * from './sim/rebounding.js';
-export * from './sim/recorder.js';
-export * from './sim/possession.js';
-export * from './sim/game.js';
-export * from './challenge/seeds.js';
-export * from './challenge/benchmarks.js';
-export * from './challenge/lineup-eval.js';
-export * from './challenge/aggregates.js';
-export * from './challenge/explain.js';
-export * from './challenge/mvp.js';
-export * from './challenge/commands.js';
-export * from './bracket/schedule.js';
-export * from './bracket/generator.js';
-export * from './modes/sandbox/adapters.js';
-export * from './modes/sandbox/selection.js';
+export { canPlay, type SlotGroup } from './domain/positions.js';
+export { slotRequirement, validateLineup } from './domain/lineup.js';
+export { classifyArchetype } from './domain/archetypes.js';
+export { createEngineContext, type EngineContext } from './sim/context.js';
+export { fnv1a32, hex32 } from './sim/rng.js';
+export { simulateGame } from './sim/game.js';
+export { checkGameResult, gameResultDigest } from './sim/invariants.js';
+export { evaluateLineupStrength } from './challenge/lineup-eval.js';
+export { explainSeason } from './challenge/explain.js';
+export { leagueMvp } from './challenge/mvp.js';
+export { perGamePlayer } from './challenge/aggregates.js';
+export {
+  acceptGameResult,
+  createChallenge,
+  createGameInput,
+  simulateChallenge,
+  validateBracketContent,
+  type ChallengeCreation,
+} from './challenge/commands.js';
+export { generateSchedule, scheduleInvariants } from './bracket/schedule.js';
+export {
+  generateBracket,
+  type BracketCandidatePlayer,
+  type FranchiseCandidates,
+} from './bracket/generator.js';
+export { toSimulationPlayer } from './modes/sandbox/adapters.js';
+export {
+  BEST_OF_ATTEMPTS,
+  chooseBestRunSeed,
+  simulateChallengeBestOf,
+} from './modes/sandbox/selection.js';
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
 export * as classic from './modes/classic/draft.js';

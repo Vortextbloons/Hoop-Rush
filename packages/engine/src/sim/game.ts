@@ -18,7 +18,7 @@ export function simulateGame(input: GameSimulationInput, context: EngineContext)
   const rng = context.rngFactory(input.seed);
   const profile = input.profile;
   const teams: [SimulationTeam, SimulationTeam] = [input.home, input.away];
-  const recorder = new GameRecorder([input.home.displayName, input.away.displayName]);
+  const recorder = new GameRecorder();
   const state = createGameState();
   const tripContext = createTripContext(rng, recorder, state, profile, teams);
 
@@ -52,8 +52,8 @@ export function simulateGame(input: GameSimulationInput, context: EngineContext)
   }
 
   const overtimePeriods = Math.max(0, recorder.sides[0].periodPoints.length - 4);
-  const minutesPerPlayer = 48 + overtimePeriods * 5;
-  recorder.assignMinutes(minutesPerPlayer);
+  // No substitutions (sandbox v1): everyone plays all 48+OT minutes.
+  recorder.assignMinutes(48 + overtimePeriods * 5);
 
   const homeScore = recorder.sides[0].points;
   const awayScore = recorder.sides[1].points;
@@ -97,9 +97,4 @@ export function simulateGame(input: GameSimulationInput, context: EngineContext)
   };
   result.facts = buildFacts(result);
   return result;
-}
-
-/** Resolves player minutes with no substitutions (sandbox v1): everyone plays all 48+OT. */
-export function fullGameMinutes(overtimePeriods: number): number {
-  return 48 + overtimePeriods * 5;
 }

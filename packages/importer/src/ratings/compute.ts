@@ -16,7 +16,6 @@ import { deriveTraits } from './traits.js';
 import { deriveContract } from './contracts.js';
 import { derivePlayerRecord, fieldPublished, type SeasonContext } from './v2.js';
 import { getEra } from './era.js';
-import { mapPosition } from './derive.js';
 import { canonicalPlayerName } from '../identity.js';
 import { positionOverrideFor } from '../positions/overrides.js';
 import type { StatsRow } from './stats.js';
@@ -58,12 +57,27 @@ export function readJsonLoose(path: string): unknown {
   return parseJsonLoose(readFileSync(path, 'utf8'));
 }
 
+/** Source position-label normalization used when no override table entry exists. */
+const POS_MAP: Record<string, string> = {
+  G: 'SG',
+  F: 'SF',
+  C: 'C',
+  PG: 'PG',
+  SG: 'SG',
+  SF: 'SF',
+  PF: 'PF',
+};
+
+function mapPosition(raw: string): string {
+  return POS_MAP[raw] ?? 'SF';
+}
+
 function safeHeight(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return Math.trunc(value);
 }
 
-/** League context for era-relative translation, from era-config.json when present. */
+/** League context for era-relative translation (versioned era table). */
 function seasonContext(season: string): SeasonContext {
   const era = getEra(season);
   return { leaguePpg: era.leaguePpg, league3PARate: era.league3PARate, pace: era.pace };

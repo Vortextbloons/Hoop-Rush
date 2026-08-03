@@ -1,5 +1,5 @@
 import type { BracketScheduleEntry, Seed } from '@hoop-rush/data-contracts';
-import { createRng } from '../sim/rng.js';
+import { createRng, swapAt } from '../sim/rng.js';
 
 /**
  * Fixed schedule generation (spec/01 challenge schedule). One seeded,
@@ -10,17 +10,6 @@ import { createRng } from '../sim/rng.js';
  */
 
 export const SCHEDULE_GENERATION_VERSION = 'schedule-v1';
-
-/** Swap two indexed positions; throws if either index is out of bounds. */
-function swapAt(values: string[], a: number, b: number): void {
-  const va = values[a];
-  const vb = values[b];
-  if (va === undefined || vb === undefined) {
-    throw new Error(`schedule swap out of range (${String(a)}, ${String(b)})`);
-  }
-  values[a] = vb;
-  values[b] = va;
-}
 
 /** Counts assignment: which opponents appear twice instead of three times. */
 export function pickTwoGameOpponents(opponentIds: readonly string[], seed: Seed): Set<string> {

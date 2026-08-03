@@ -35,13 +35,13 @@ export function seedFromString(value: string): Seed {
   return (hash >>> 0).toString(16).padStart(8, '0').repeat(4);
 }
 
-export const DEFAULT_SUMMARY_RATINGS: SummaryRatings = {
+const DEFAULT_SUMMARY_RATINGS: SummaryRatings = {
   overallRating: 90,
   offenseRating: 92,
   defenseRating: 84,
 };
 
-export const DEFAULT_PLAYER_STATS: PlayerSeasonStats = {
+const DEFAULT_PLAYER_STATS: PlayerSeasonStats = {
   gamesPlayed: 79,
   minutes: 2860,
   points: 1920,
@@ -195,7 +195,7 @@ export function buildPool(
   };
 }
 
-export const DEFAULT_DIFFICULTY: DifficultyProfile = {
+const DEFAULT_DIFFICULTY: DifficultyProfile = {
   profileVersion: 'm3-medium-v3',
   name: 'medium',
   leagueMedianPercentileBand: [0.4, 0.55],
@@ -243,7 +243,7 @@ const ALL_FRANCHISE_SLOTS: ReadonlyArray<{
   { franchiseId: 'wizards', displayName: 'Washington Wizards', teamExternalId: '1610612764' },
 ];
 
-export function buildModernFranchiseSlots(): ModernFranchiseSlot[] {
+function buildModernFranchiseSlots(): ModernFranchiseSlot[] {
   return ALL_FRANCHISE_SLOTS.map((slot) => ({ ...slot }));
 }
 
@@ -395,22 +395,15 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
 
 /** Five fixture players in legal G,G,F,F,C slot order (fixture team content). */
 export function buildUserTeam(): SimulationTeam {
-  const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
-  return {
+  return buildLegalSimulationTeam({
     teamId: 'user',
     displayName: 'Los Angeles Lakers',
-    players: positions.map((position, i) =>
-      buildSimulationPlayer({
-        playerId: `p-${String(i + 1)}`,
-        displayName: `Fixture ${String(i + 1)}`,
-        positions: position,
-      }),
-    ),
-  };
+    players: legalFive('p-'),
+  });
 }
 
 /** Zeroed season aggregates for the five fixture players. */
-export function zeroAggregates(players: readonly SimulationPlayer[]): RunAggregates {
+function zeroAggregates(players: readonly SimulationPlayer[]): RunAggregates {
   const zero = () => ({ made: 0, attempted: 0 });
   return {
     team: {
@@ -448,7 +441,7 @@ export function zeroAggregates(players: readonly SimulationPlayer[]): RunAggrega
 }
 
 /** One parametrized bracket opponent with a legal lineup and measured strength. */
-export function buildBracketOpponent(
+function buildBracketOpponent(
   franchiseId: string,
   opponentId: string,
   index: number,
@@ -495,7 +488,7 @@ export function buildBracketOpponent(
  * opponent (the opening opponent) plays game one, the first eight appear
  * twice, the remaining 22 three times.
  */
-export function buildFixtureSchedule(opponentIds: readonly string[]): BracketScheduleEntry[] {
+function buildFixtureSchedule(opponentIds: readonly string[]): BracketScheduleEntry[] {
   if (opponentIds.length !== 30) {
     throw new Error(`fixture schedule needs 30 opponents (got ${String(opponentIds.length)})`);
   }
@@ -548,7 +541,7 @@ export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): O
  * fixture lineups vary only along the dimensions tests care about.
  */
 
-export const DEFAULT_SIM_RATINGS: SimulationRatings = {
+const DEFAULT_SIM_RATINGS: SimulationRatings = {
   insideScoring: 78,
   closeShot: 70,
   midrange: 68,
@@ -569,7 +562,7 @@ export const DEFAULT_SIM_RATINGS: SimulationRatings = {
   vertical: 66,
 };
 
-export const DEFAULT_SIM_TENDENCIES = {
+const DEFAULT_SIM_TENDENCIES = {
   usageRate: 20,
   passRate: 30,
   shotRate: 25,
@@ -608,21 +601,32 @@ export function buildSimulationPlayer(overrides: Partial<SimulationPlayer> = {})
   };
 }
 
-/** A five-player lineup with a legal G,G,F,F,C position spread. */
-export function buildLegalSimulationTeam(overrides: Partial<SimulationTeam> = {}): SimulationTeam {
+/** Five players in legal G,G,F,F,C slot order; ids use the given prefix. */
+function legalFive(prefix: string, centerInteriorDefense?: number): SimulationPlayer[] {
   const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
-  const players = positions.map((position, i) =>
+  return positions.map((position, i) =>
     buildSimulationPlayer({
-      playerId: `p-fixture-${String(i + 1)}`,
+      playerId: `${prefix}${String(i + 1)}`,
       displayName: `Fixture ${String(i + 1)}`,
       positions: position,
-      ratings: { ...DEFAULT_SIM_RATINGS, interiorDefense: position[0] === 'C' ? 75 : 62 },
+      ...(centerInteriorDefense !== undefined
+        ? {
+            ratings: {
+              ...DEFAULT_SIM_RATINGS,
+              interiorDefense: position[0] === 'C' ? centerInteriorDefense : 62,
+            },
+          }
+        : {}),
     }),
   );
+}
+
+/** A five-player lineup with a legal G,G,F,F,C position spread. */
+export function buildLegalSimulationTeam(overrides: Partial<SimulationTeam> = {}): SimulationTeam {
   return {
     teamId: 'fixture-home',
     displayName: 'Fixture Home',
-    players,
+    players: legalFive('p-fixture-', 75),
     ...overrides,
   };
 }
@@ -774,40 +778,40 @@ export function buildEqualFixture(): { home: SimulationTeam; away: SimulationTea
   };
 }
 
-export function buildStrongWeakFixture(): {
-  strong: SimulationTeam;
-  weak: SimulationTeam;
-} {
+/** One strong lineup plus a second at the given center rating. */
+function strengthPair(
+  secondCenter: number,
+  secondTeamId: string,
+  secondDisplayName: string,
+): { strong: SimulationTeam; second: SimulationTeam } {
   return {
     strong: buildLegalSimulationTeam({
       teamId: 'fixture-strong',
       displayName: 'Fixture Strong',
       players: Array.from({ length: 5 }, fixtureScale(85)),
     }),
-    weak: buildLegalSimulationTeam({
-      teamId: 'fixture-weak',
-      displayName: 'Fixture Weak',
-      players: Array.from({ length: 5 }, fixtureScale(48)),
+    second: buildLegalSimulationTeam({
+      teamId: secondTeamId,
+      displayName: secondDisplayName,
+      players: Array.from({ length: 5 }, fixtureScale(secondCenter)),
     }),
   };
+}
+
+export function buildStrongWeakFixture(): {
+  strong: SimulationTeam;
+  weak: SimulationTeam;
+} {
+  const { strong, second } = strengthPair(48, 'fixture-weak', 'Fixture Weak');
+  return { strong, weak: second };
 }
 
 export function buildStrongMediumFixture(): {
   strong: SimulationTeam;
   medium: SimulationTeam;
 } {
-  return {
-    strong: buildLegalSimulationTeam({
-      teamId: 'fixture-strong',
-      displayName: 'Fixture Strong',
-      players: Array.from({ length: 5 }, fixtureScale(85)),
-    }),
-    medium: buildLegalSimulationTeam({
-      teamId: 'fixture-medium',
-      displayName: 'Fixture Medium',
-      players: Array.from({ length: 5 }, fixtureScale(65)),
-    }),
-  };
+  const { strong, second } = strengthPair(65, 'fixture-medium', 'Fixture Medium');
+  return { strong, medium: second };
 }
 
 function fixtureTargets(): EraSimulationProfile['targets'] {

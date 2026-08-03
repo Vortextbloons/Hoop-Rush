@@ -22,7 +22,7 @@ import {
   classicDraftCatalogSchema,
 } from '@hoop-rush/data-contracts';
 import { canPlay, slotGroupOf } from '../../domain/positions.js';
-import { validateLineup } from '../../domain/lineup.js';
+import { slotRequirement as lineupSlotRequirement, validateLineup } from '../../domain/lineup.js';
 import type { EngineContext } from '../../sim/context.js';
 import type { ClassicChallengeCreation } from '../../challenge/commands.js';
 
@@ -61,16 +61,12 @@ export function sortClassicCatalog(catalog: ClassicDraftCatalog): ClassicDraftCa
   );
 }
 
-/** Slot requirement (slot group) for a slot index. */
+/** Slot requirement (slot group) for a slot index (domain/lineup authority). */
 export function slotRequirement(slotIndex: number): SlotGroup {
   if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 4) {
     throw new Error(`slot index must be an integer in 0..4 (got ${String(slotIndex)})`);
   }
-  const requirement = LINEUP_STRUCTURE[slotIndex];
-  if (requirement === undefined) {
-    throw new Error(`no slot requirement for index ${String(slotIndex)}`);
-  }
-  return requirement;
+  return lineupSlotRequirement(slotIndex);
 }
 
 const SLOT_INDEXES: SlotIndex[] = [0, 1, 2, 3, 4];

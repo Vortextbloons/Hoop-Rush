@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
-import { checkGameResult, createEngineContext, simulateGame } from '@hoop-rush/engine';
 import {
-  eraSimulationProfileSchema,
+  checkGameResult,
+  createEngineContext,
+  fnv1a32,
+  hex32,
+  simulateGame,
+} from '@hoop-rush/engine';
+import {
   gameSimulationInputSchema,
   seedSchema,
   type EraSimulationProfile,
@@ -11,7 +16,10 @@ import {
 import { makeReport, type CliReport } from '../report.js';
 import { simBatchReportSchema, simGameReportSchema } from '../report-schemas.js';
 import { simFixtureSchema, type SimFixture } from '../fixture-schema.js';
-import { loadPackagedData, PackagedData } from './data-loader.js';
+import { parseCount, UsageError } from '../args.js';
+import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.js';
+
+export { UsageError };
 
 /**
  * `sim game` and `sim batch` (spec/09). Commands call the authoritative
@@ -19,8 +27,6 @@ import { loadPackagedData, PackagedData } from './data-loader.js';
  * Seed assignment depends only on the requested seed range and the fixture
  * id, never on worker scheduling.
  */
-
-export class UsageError extends Error {}
 
 export const SIM_OPTIONS: Record<string, boolean> = {
   input: true,
@@ -75,25 +81,25 @@ export function listFixtureIds(): string[] {
 
 /** Derives the game seed for a fixture and sample index (worker-independent). */
 export function fixtureSeed(fixtureId: string, index: number): string {
-  let hash = 0x811c9dc5;
-  const value = `${fixtureId}-${String(index)}`;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0').repeat(4);
+  return hex32(fnv1a32(`${fixtureId}-${String(index)}`)).repeat(4);
 }
 
-function eraProfileFromFile(path: string): EraSimulationProfile {
-  const parsed = eraSimulationProfileSchema.safeParse(
-    JSON.parse(readFileSync(path, 'utf8')) as unknown,
-  );
-  if (!parsed.success) {
-    throw new UsageError(
-      `profile ${path} fails validation: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
+/**
+ * Partitions the inclusive seed range [from..to] into worker-sized chunks.
+ * Every game is a pure function of (fixture, seed, profile), so chunking
+ * never changes results or seed assignment (spec/09).
+ */
+export function chunkRange(
+  from: number,
+  to: number,
+  workers: number,
+): Array<{ from: number; to: number }> {
+  const chunkSize = Math.ceil((to - from + 1) / workers);
+  const chunks: Array<{ from: number; to: number }> = [];
+  for (let start = from; start <= to; start += chunkSize) {
+    chunks.push({ from: start, to: Math.min(to, start + chunkSize - 1) });
   }
-  return parsed.data;
+  return chunks;
 }
 
 export function buildInput(
@@ -200,11 +206,7 @@ export async function simBatch(args: {
   // Partition the seed range into worker-sized chunks; every game is a pure
   // function of (fixture, seed, profile), so worker counts never change
   // results or seed assignment. Chunks run as interleaved microtasks.
-  const chunkSize = Math.ceil(count / workers);
-  const chunks: Array<{ from: number; to: number }> = [];
-  for (let from = seedFrom; from <= seedTo; from += chunkSize) {
-    chunks.push({ from, to: Math.min(seedTo, from + chunkSize - 1) });
-  }
+  const chunks = chunkRange(seedFrom, seedTo, workers);
 
   const aggregate = {
     games: 0,
@@ -268,10 +270,6 @@ export async function simBatch(args: {
   );
 }
 
-export function loadProfileFile(path: string): EraSimulationProfile {
-  return eraProfileFromFile(path);
-}
-
 function renderBoxLines(result: GameResult): string[] {
   const lines: string[] = [];
   for (const side of [result.home, result.away]) {
@@ -286,13 +284,4 @@ function renderBoxLines(result: GameResult): string[] {
     }
   }
   return lines;
-}
-
-function parseCount(value: string | undefined, option: string, fallback: number): number {
-  if (value === undefined) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
-  }
-  return parsed;
 }

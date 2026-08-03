@@ -10,7 +10,6 @@ import {
 } from '@hoop-rush/test-fixtures';
 import type { GameResult, RunAggregates } from '@hoop-rush/data-contracts';
 import { DexieChallengeRepository } from './dexie.js';
-import { InMemoryChallengeRepository } from './memory.js';
 import type { StoredClassicDraft } from '../schemas/classic-draft-record.js';
 import type {
   ActiveGameAppend,
@@ -197,21 +196,13 @@ class TestDatabase extends Dexie {
   }
 }
 
-const adapters: [
-  () => { repo: ChallengeRepository; db?: TestDatabase },
-  () => { repo: ChallengeRepository; db?: TestDatabase },
-] = [
-  () => ({ repo: new InMemoryChallengeRepository() }),
-  () => {
-    const db = new TestDatabase(`test-${String(Math.random())}`);
-    return { repo: new DexieChallengeRepository(db), db };
-  },
-];
+/** Fresh Dexie-backed repository with one isolated database per test. */
+function makeAdapter(): { repo: ChallengeRepository; db: TestDatabase } {
+  const db = new TestDatabase(`test-${String(Math.random())}`);
+  return { repo: new DexieChallengeRepository(db), db };
+}
 
-describe.each([
-  ['in-memory', adapters[0]],
-  ['dexie', adapters[1]],
-] as const)('challenge repository (%s)', (_name, makeAdapter) => {
+describe('challenge repository (dexie)', () => {
   it('saves and reloads the active run', async () => {
     const { repo } = makeAdapter();
     const record = { ...finishedRecord(), run: buildChallengeRun() };
@@ -301,17 +292,8 @@ describe.each([
     });
     await repo.clearActiveRun();
     expect(await repo.loadActiveRun()).toBeNull();
-    if (db) {
-      expect(await db.active.count()).toBe(0);
-      expect(await db.activeGames.count()).toBe(0);
-    } else {
-      const memory = repo as unknown as {
-        active: unknown;
-        activeGames: Map<number, GameResult>;
-      };
-      expect(memory.active).toBeNull();
-      expect(memory.activeGames.size).toBe(0);
-    }
+    expect(await db.active.count()).toBe(0);
+    expect(await db.activeGames.count()).toBe(0);
   });
 
   it('promotes active to completed and history atomically', async () => {
@@ -367,17 +349,8 @@ describe.each([
     await repo.promoteActiveToCompleted(finishedRecord('run-x'), indexFor('run-x'));
     expect(await repo.loadActiveRun()).toBeNull();
     expect((await repo.loadCompletedRun('run-x'))?.run.runId).toBe('run-x');
-    if (db) {
-      expect(await db.active.count()).toBe(0);
-      expect(await db.activeGames.count()).toBe(0);
-    } else {
-      const memory = repo as unknown as {
-        active: unknown;
-        activeGames: Map<number, GameResult>;
-      };
-      expect(memory.active).toBeNull();
-      expect(memory.activeGames.size).toBe(0);
-    }
+    expect(await db.active.count()).toBe(0);
+    expect(await db.activeGames.count()).toBe(0);
   });
 
   it('rejects promotion of an unfinished run', async () => {
@@ -424,20 +397,8 @@ describe.each([
     const { repo, db } = makeAdapter();
     await repo.saveActiveRun(finishedRecord('run-c'));
     await repo.promoteActiveToCompleted(finishedRecord('run-c'), indexFor('run-c'));
-    if (db) {
-      await db.completed.put({ recordId: 'run-c', run: { corrupted: true } } as never);
-      await expect(repo.loadCompletedRun('run-c')).rejects.toThrow();
-    } else {
-      const memory = repo as unknown as {
-        completed: Map<string, unknown>;
-      };
-      memory.completed.set('run-c', {
-        recordId: 'run-c',
-        saveSchemaVersion: 2,
-        run: { corrupted: true },
-      });
-      await expect(repo.loadCompletedRun('run-c')).rejects.toThrow();
-    }
+    await db.completed.put({ recordId: 'run-c', run: { corrupted: true } } as never);
+    await expect(repo.loadCompletedRun('run-c')).rejects.toThrow();
   });
 
   it('saves and reloads a partial drafting classic draft state', async () => {
@@ -485,22 +446,12 @@ describe.each([
   it('surfaces a corrupt classic draft record instead of returning it', async () => {
     const { repo, db } = makeAdapter();
     await repo.saveClassicDraft(draftRecord());
-    if (db) {
-      await db.classicDrafts.put({
-        recordId: 'classic-draft',
-        saveSchemaVersion: 1,
-        draft: { corrupted: true },
-      } as never);
-      await expect(repo.loadClassicDraft()).rejects.toThrow();
-    } else {
-      const memory = repo as unknown as { classicDraft: unknown };
-      memory.classicDraft = {
-        recordId: 'classic-draft',
-        saveSchemaVersion: 1,
-        draft: { corrupted: true },
-      };
-      await expect(repo.loadClassicDraft()).rejects.toThrow();
-    }
+    await db.classicDrafts.put({
+      recordId: 'classic-draft',
+      saveSchemaVersion: 1,
+      draft: { corrupted: true },
+    } as never);
+    await expect(repo.loadClassicDraft()).rejects.toThrow();
   });
 
   it('promotes a classic draft into the active run and clears the draft', async () => {

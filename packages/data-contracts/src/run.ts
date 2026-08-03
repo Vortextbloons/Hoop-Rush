@@ -1,14 +1,12 @@
 import { z } from 'zod';
-import { franchiseIdSchema, playerIdSchema, seedSchema } from './ids.js';
+import { franchiseIdSchema, eraIdSchema, playerIdSchema, seedSchema } from './ids.js';
 import { difficultyProfileSchema } from './difficulty.js';
 import { lineupSchema } from './lineup.js';
 import { simulationPlayerSchema } from './simulation.js';
-import { madeAttemptedSchema, gameResultSchema } from './result.js';
+import { gameResultSchema, playerBoxScoreSchema, teamBoxScoreSchema } from './result.js';
 import { opponentBracketCoreSchema } from './bracket.js';
 import { RUN_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from './versions.js';
 import { classicCompletedDraftSchema, classicVariantSchema } from './classic.js';
-
-export { classicVariantSchema, type ClassicVariant } from './classic.js';
 
 /**
  * Accepted challenge-run state (spec/04 minimal run state). The domain shape
@@ -48,49 +46,19 @@ export const runOutcomeSchema = z.enum(['perfect', 'eliminated']);
 export type RunOutcome = z.infer<typeof runOutcomeSchema>;
 
 /** Exact season totals for one user player, accumulated from accepted results. */
-export const playerSeasonAggregateSchema = z.object({
-  playerId: playerIdSchema,
-  gamesPlayed: z.number().int().nonnegative(),
-  minutes: z.number().int().nonnegative(),
-  points: z.number().int().nonnegative(),
-  fieldGoals: madeAttemptedSchema,
-  threes: madeAttemptedSchema,
-  freeThrows: madeAttemptedSchema,
-  rebounds: z.object({
-    total: z.number().int().nonnegative(),
-    offensive: z.number().int().nonnegative(),
-    defensive: z.number().int().nonnegative(),
-  }),
-  assists: z.number().int().nonnegative(),
-  steals: z.number().int().nonnegative(),
-  blocks: z.number().int().nonnegative(),
-  turnovers: z.number().int().nonnegative(),
-  fouls: z.number().int().nonnegative(),
-});
+export const playerSeasonAggregateSchema = playerBoxScoreSchema
+  .omit({ diagnostics: true })
+  .extend({ gamesPlayed: z.number().int().nonnegative() });
 export type PlayerSeasonAggregate = z.infer<typeof playerSeasonAggregateSchema>;
 
 /** Exact season totals for the user's team, accumulated from accepted results. */
-export const teamAggregateSchema = z.object({
-  wins: z.number().int().nonnegative(),
-  losses: z.number().int().nonnegative(),
-  gamesPlayed: z.number().int().nonnegative(),
-  points: z.number().int().nonnegative(),
-  fieldGoals: madeAttemptedSchema,
-  threes: madeAttemptedSchema,
-  freeThrows: madeAttemptedSchema,
-  rebounds: z.object({
-    total: z.number().int().nonnegative(),
-    offensive: z.number().int().nonnegative(),
-    defensive: z.number().int().nonnegative(),
-    team: z.number().int().nonnegative(),
-  }),
-  assists: z.number().int().nonnegative(),
-  steals: z.number().int().nonnegative(),
-  blocks: z.number().int().nonnegative(),
-  turnovers: z.number().int().nonnegative(),
-  fouls: z.number().int().nonnegative(),
-  possessions: z.number().int().nonnegative(),
-});
+export const teamAggregateSchema = teamBoxScoreSchema
+  .omit({ teamId: true, diagnostics: true })
+  .extend({
+    wins: z.number().int().nonnegative(),
+    losses: z.number().int().nonnegative(),
+    gamesPlayed: z.number().int().nonnegative(),
+  });
 export type TeamAggregate = z.infer<typeof teamAggregateSchema>;
 
 export const runAggregatesSchema = z.object({
@@ -106,7 +74,7 @@ export type RunAggregates = z.infer<typeof runAggregatesSchema>;
 export const runPlayerSelectionSchema = z.object({
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
-  eraId: z.string().min(1).max(24),
+  eraId: eraIdSchema,
 });
 export type RunPlayerSelection = z.infer<typeof runPlayerSelectionSchema>;
 
@@ -127,7 +95,7 @@ export const challengeRunSchema = z.object({
    * Simulation environment era: the era profile every accepted game result
    * must report. Fixed to '2010s' for cross-franchise sandbox.
    */
-  eraId: z.string().min(1).max(24),
+  eraId: eraIdSchema,
   /** Display name for the user's lineup (resolved from lineage at creation). */
   homeDisplayName: z.string().min(1).max(96),
   /** Exactly five distinct selected peak player-seasons, in slot order. */

@@ -30,9 +30,6 @@ import {
 /** Minimum presentation duration: one committed reveal roughly every 36 ms. */
 export const REVEAL_INTERVAL_MS = 36;
 
-/** Target minimum presentation duration for a full 82-game reveal. */
-export const MIN_PRESENTATION_MS = 82 * REVEAL_INTERVAL_MS;
-
 export type RunnerPhase = 'idle' | 'starting' | 'running' | 'paused' | 'finished' | 'error';
 
 export interface RunnerCallbacks {

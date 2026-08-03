@@ -26,7 +26,7 @@ export const DATA_DERIVE_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-export interface DeriveTracePayload {
+interface DeriveTracePayload {
   playerExternalId: string;
   season: string;
   franchiseId: string;

@@ -7,6 +7,11 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { SHOT_ZONES } from '../domain/zones.js';
 
+/** Usage identity FGA + 0.44*FTA + TOV (spec/03 diagnostics, invariant-checked). */
+export function usageOf(fga: number, fta: number, tov: number): number {
+  return fga + fta * 0.44 + tov;
+}
+
 /**
  * Authoritative box-score recorder (spec/03). Every possession event flows
  * through this single stream: period scores, team totals, shot-zone facts,
@@ -113,7 +118,7 @@ export class GameRecorder {
   readonly players: [RecorderPlayer[], RecorderPlayer[]];
   readonly sides: [RecorderSide, RecorderSide];
 
-  constructor(public readonly sideNames: [string, string]) {
+  constructor() {
     const makePlayers = (): RecorderPlayer[] =>
       Array.from({ length: 5 }, () => ({
         minutes: 0,
@@ -306,7 +311,7 @@ export class GameRecorder {
       turnovers: p.turnovers,
       fouls: p.fouls,
       diagnostics: {
-        usage: p.fieldGoalAttempts + p.freeThrowAttempts * 0.44 + p.turnovers,
+        usage: usageOf(p.fieldGoalAttempts, p.freeThrowAttempts, p.turnovers),
         shotZones: zoneSummaryArray(p.zoneAttempts, p.zoneMakes),
         assistOpportunities: p.assistOpportunities,
         offensiveReboundChances: p.offensiveReboundChances,

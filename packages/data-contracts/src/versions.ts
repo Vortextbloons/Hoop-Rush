@@ -46,18 +46,6 @@ export const POSITION_NORMALIZATION_VERSION = 'position-v3';
 /** Reviewed per-player position override table version (importer input). */
 export const POSITION_OVERRIDES_VERSION = 'position-overrides-v1';
 
-/** Possession engine version (injected through EngineContext). */
-export const ENGINE_VERSION = 'm3-engine-v6';
-
-/** Fixed opponent bracket content version. */
-export const BRACKET_VERSION = 'bracket-m3-v3';
-
-/** Shared 82-game schedule version. */
-export const SCHEDULE_VERSION = 'schedule-v1';
-
-/** Per-game seed derivation version. */
-export const SEED_DERIVATION_VERSION = 'seed-derivation-v1';
-
 /** Accepted classic draft state schema layout (M4). */
 export const CLASSIC_DRAFT_SCHEMA_VERSION = 1;
 

@@ -7,13 +7,10 @@ import { playerIdSchema } from './ids.js';
  * UI and CLI never re-derive them from simulation internals.
  */
 
-export const shotZoneSchema = z.enum([
-  'rim',
-  'shortMid',
-  'longMid',
-  'cornerThree',
-  'aboveBreakThree',
-]);
+/** Frozen ordered list of shot zones (spec/03). */
+export const SHOT_ZONES = ['rim', 'shortMid', 'longMid', 'cornerThree', 'aboveBreakThree'] as const;
+
+export const shotZoneSchema = z.enum(SHOT_ZONES);
 export type ShotZone = z.infer<typeof shotZoneSchema>;
 
 export const madeAttemptedSchema = z.object({

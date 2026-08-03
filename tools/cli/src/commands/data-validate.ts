@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { validateBracketContent, scheduleInvariants } from '@hoop-rush/engine';
 import { pools } from '@hoop-rush/importer';
 import {
@@ -19,6 +18,7 @@ import {
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
+import { DEFAULT_MANIFEST } from './data-loader.js';
 
 /**
  * `hoop-rush data validate`: validates the v2 manifest and every referenced
@@ -35,8 +35,6 @@ export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
 };
 
 /** Repo-root path of the shipped manifest, independent of the invocation cwd. */
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
-const DEFAULT_MANIFEST = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
 
 interface AuditResult {
   ok: boolean;

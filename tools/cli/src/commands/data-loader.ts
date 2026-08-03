@@ -12,6 +12,7 @@ import {
   type HoopRushManifest,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
+import { UsageError } from '../args.js';
 
 /**
  * Loads packaged static artifacts from the repo (spec/09: commands read
@@ -20,7 +21,7 @@ import {
  */
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
-export const DEFAULT_MANIFEST_PATH = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
+export const DEFAULT_MANIFEST = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
 
 function readJson(path: string): unknown {
   try {
@@ -42,7 +43,7 @@ function resolveArtifact(manifestDir: string, url: string): string {
 }
 
 /** Loads the manifest plus its directory for artifact resolution. */
-export function loadPackagedData(manifestPath: string = DEFAULT_MANIFEST_PATH): {
+export function loadPackagedData(manifestPath: string = DEFAULT_MANIFEST): {
   manifest: HoopRushManifest;
   dir: string;
 } {
@@ -107,4 +108,28 @@ export class PackagedData {
     if (!parsed.success) throw new Error(`bracket ${path} fails validation`);
     return parsed.data;
   }
+}
+
+/** Validates a standalone era-profile file (used by sim/calibrate/challenge). */
+export function loadProfileFile(path: string): EraSimulationProfile {
+  const parsed = eraSimulationProfileSchema.safeParse(
+    JSON.parse(readFileSync(path, 'utf8')) as unknown,
+  );
+  if (!parsed.success) {
+    throw new UsageError(
+      `profile ${path} fails validation: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+  }
+  return parsed.data;
+}
+
+/** Validates a standalone bracket file (used by sim challenge). */
+export function loadBracketFile(path: string): OpponentBracket {
+  const parsed = opponentBracketSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')) as unknown);
+  if (!parsed.success) {
+    throw new UsageError(
+      `bracket ${path} fails validation: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+  }
+  return parsed.data;
 }

@@ -7,10 +7,9 @@
     PeakPlayerSeason,
     PlayersIndex,
     PlayersIndexEntry,
-    SlotIndex,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
+  import { franchiseAbbreviation, LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
+  import { validateLineup } from '@hoop-rush/engine';
   import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
@@ -22,22 +21,18 @@
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
   import AsyncState from '$lib/components/AsyncState.svelte';
+  import {
+    SLOT_INDEXES,
+    SLOT_LABELS,
+    SLOT_NAMES,
+    canFillSlot,
+    displacementTargetFor,
+  } from '$lib/draft-slots';
 
   type IndexRow = PlayersIndexEntry;
 
   /** One slot ref: enough to locate a peak player-season in the index and pools. */
   type SlotRef = { playerId: string; franchiseId: string; eraId: string };
-
-  const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-  const SLOT_REQUIREMENTS = ['G', 'G', 'F', 'F', 'C'] as const;
-  const SLOT_NAMES = [
-    'Point Guard',
-    'Shooting Guard',
-    'Small Forward',
-    'Power Forward',
-    'Center',
-  ] as const;
-  const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
@@ -185,29 +180,6 @@
     eraFilter = id;
   }
 
-  function canFillSlot(player: IndexRow, slotIndex: number): boolean {
-    return canPlay(player.positionsPlayable, slotRequirement(slotIndex as SlotIndex));
-  }
-
-  /**
-   * Where a displaced incumbent can land: the first open slot it can fill,
-   * including the slot the incoming player is vacating. Returns null when the
-   * incumbent cannot move anywhere.
-   */
-  function displacementTargetFor(
-    incumbent: IndexRow,
-    targetSlot: number,
-    subjectSlot: number,
-  ): number | null {
-    for (const i of SLOT_INDEXES) {
-      if (i === targetSlot) continue;
-      const willBeOpen = i === subjectSlot || slots[i] === null;
-      if (!willBeOpen) continue;
-      if (canFillSlot(incumbent, i)) return i;
-    }
-    return null;
-  }
-
   /**
    * Place the player at a slot, moving any movable incumbent out of the way.
    * The placed player's pool is prefetched (fire-and-forget; getPool is
@@ -217,7 +189,7 @@
     const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
     const incumbent = slots[slotIndex];
     if (incumbent && incumbent.playerId !== subject.playerId) {
-      const target = displacementTargetFor(incumbent, slotIndex, subjectSlot);
+      const target = displacementTargetFor(slots, incumbent, slotIndex, subjectSlot);
       if (target === null) return;
       slots[target] = incumbent;
     }
@@ -265,7 +237,7 @@
   const lineupIsLegal = $derived.by(() => {
     if (slots.some((p) => p === null)) return false;
     return validateLineup({
-      structure: [...SLOT_REQUIREMENTS],
+      structure: [...LINEUP_STRUCTURE],
       assignments: slots.map((player, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: player!.playerId,

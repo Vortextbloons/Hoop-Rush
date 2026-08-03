@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
-  import { canPlay, slotRequirement } from '@hoop-rush/engine';
+  import type { HoopRushManifest, PlayersIndexEntry } from '@hoop-rush/data-contracts';
   import { ArrowRight, Check, Lock, Plus, X } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import {
@@ -8,19 +7,16 @@
     type DraftPresentation,
     type RatingBadgeLabel,
   } from '$lib/draft-presentation';
+  import {
+    SLOT_INDEXES,
+    SLOT_LABELS,
+    SLOT_NAMES,
+    canFillSlot,
+    displacementTargetFor,
+  } from '$lib/draft-slots';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
 
   type IndexRow = PlayersIndexEntry;
-
-  const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-  const SLOT_NAMES = [
-    'Point Guard',
-    'Shooting Guard',
-    'Small Forward',
-    'Power Forward',
-    'Center',
-  ] as const;
-  const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
 
   const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
     O: 'Overall',
@@ -43,29 +39,6 @@
     onplace: (player: IndexRow, slotIndex: number) => void;
     onclose: () => void;
   } = $props();
-
-  function canFillSlot(player: IndexRow, slotIndex: number): boolean {
-    return canPlay(player.positionsPlayable, slotRequirement(slotIndex as SlotIndex));
-  }
-
-  /**
-   * Where a displaced incumbent can land: the first open slot it can fill,
-   * including the slot the incoming player is vacating. Returns null when the
-   * incumbent cannot move anywhere.
-   */
-  function displacementTargetFor(
-    incumbent: IndexRow,
-    targetSlot: number,
-    subjectSlot: number,
-  ): number | null {
-    for (const i of SLOT_INDEXES) {
-      if (i === targetSlot) continue;
-      const willBeOpen = i === subjectSlot || slots[i] === null;
-      if (!willBeOpen) continue;
-      if (canFillSlot(incumbent, i)) return i;
-    }
-    return null;
-  }
 
   type PickerOption = {
     index: number;
@@ -109,7 +82,7 @@
           ariaLabel: `${subject.displayName} already at ${slotName}`,
         };
       }
-      const target = displacementTargetFor(incumbent, i, subjectSlot);
+      const target = displacementTargetFor(slots, incumbent, i, subjectSlot);
       if (allowDisplacement && target !== null) {
         return {
           index: i,

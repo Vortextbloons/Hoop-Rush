@@ -304,6 +304,14 @@ const benchmarkBaselineComparisonSchema = z.object({
   regressions: z.array(benchmarkRegressionSchema),
 });
 
+const timingStatsSchema = z.object({
+  sampleCount: z.number().int().nonnegative(),
+  medianMs: z.number().nonnegative(),
+  p95Ms: z.number().nonnegative(),
+  minMs: z.number().nonnegative(),
+  maxMs: z.number().nonnegative(),
+});
+
 export const benchmarkReportSchema = z.object({
   schemaVersion: z.literal(2),
   command: z.literal('benchmark'),
@@ -322,34 +330,10 @@ export const benchmarkReportSchema = z.object({
   fixture: z.string().min(1).max(64),
   samples: z.number().int().nonnegative(),
   workers: z.number().int().min(1),
-  poolCold: z.object({
-    sampleCount: z.number().int().nonnegative(),
-    medianMs: z.number().nonnegative(),
-    p95Ms: z.number().nonnegative(),
-    minMs: z.number().nonnegative(),
-    maxMs: z.number().nonnegative(),
-  }),
-  poolCached: z.object({
-    sampleCount: z.number().int().nonnegative(),
-    medianMs: z.number().nonnegative(),
-    p95Ms: z.number().nonnegative(),
-    minMs: z.number().nonnegative(),
-    maxMs: z.number().nonnegative(),
-  }),
-  singleGame: z.object({
-    sampleCount: z.number().int().nonnegative(),
-    medianMs: z.number().nonnegative(),
-    p95Ms: z.number().nonnegative(),
-    minMs: z.number().nonnegative(),
-    maxMs: z.number().nonnegative(),
-  }),
-  challenge82: z.object({
-    sampleCount: z.number().int().nonnegative(),
-    medianMs: z.number().nonnegative(),
-    p95Ms: z.number().nonnegative(),
-    minMs: z.number().nonnegative(),
-    maxMs: z.number().nonnegative(),
-  }),
+  poolCold: timingStatsSchema,
+  poolCached: timingStatsSchema,
+  singleGame: timingStatsSchema,
+  challenge82: timingStatsSchema,
   heapUsedMb: z.number().nonnegative(),
   heap: z.object({
     beforeMb: z.number().nonnegative(),

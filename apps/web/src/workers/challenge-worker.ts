@@ -1,4 +1,5 @@
 import {
+  chooseBestRunSeed,
   createEngineContext,
   createGameInput,
   simulateGame,
@@ -6,13 +7,13 @@ import {
 } from '@hoop-rush/engine';
 import type { GameResult } from '@hoop-rush/data-contracts';
 import {
+  workerMessageSchema,
   workerRequestSchema,
   type WorkerCompleteMessage,
   type WorkerErrorMessage,
   type WorkerResultsMessage,
   type WorkerStartResultMessage,
 } from '@hoop-rush/data-contracts';
-import { chooseBestRunFromRun } from '../lib/best-of';
 
 /**
  * Challenge worker entry (spec/04 static deployment and workers). Receives
@@ -35,6 +36,10 @@ function post(
   message:
     WorkerResultsMessage | WorkerErrorMessage | WorkerCompleteMessage | WorkerStartResultMessage,
 ): void {
+  // The pinned wire contract is enforced at its only emission point (the
+  // main thread keeps a cheap shape check; acceptGameResult stays the
+  // authoritative per-game validator).
+  workerMessageSchema.parse(message);
   self.postMessage(message);
 }
 
@@ -71,7 +76,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
 
   if (request.type === 'start') {
     try {
-      const chosen = chooseBestRunFromRun(request.run, request.profile, context);
+      const chosen = chooseBestRunSeed(request.run, request.profile, context);
       if (token !== requestToken) return;
       post({
         schemaVersion: 1,

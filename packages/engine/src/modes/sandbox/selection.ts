@@ -1,10 +1,12 @@
-import type { ChallengeRun, EraSimulationProfile } from '@hoop-rush/data-contracts';
+import type { ChallengeRun, EraSimulationProfile, Seed } from '@hoop-rush/data-contracts';
 import {
   createChallenge,
+  createGameInput,
   simulateChallenge,
   type ChallengeCreation,
 } from '../../challenge/commands.js';
 import { deriveAttemptSeed } from '../../challenge/seeds.js';
+import { simulateGame } from '../../sim/game.js';
 import type { EngineContext } from '../../sim/context.js';
 
 /**
@@ -38,6 +40,14 @@ export function scoreRun(run: ChallengeRun): RunScore {
   return { wins: run.aggregates.team.wins, differential };
 }
 
+/** Wins first, then differential; ties resolve to the earlier attempt. */
+function isBetterScore(candidate: RunScore, current: RunScore): boolean {
+  const winsBetter = candidate.wins > current.wins;
+  const winsTied = candidate.wins === current.wins;
+  const differentialBetter = candidate.differential > current.differential;
+  return winsBetter || (winsTied && differentialBetter);
+}
+
 /** Returns the run with the highest score; ties resolve to the earlier attempt. */
 export function chooseBestRun(runs: readonly ChallengeRun[]): ChallengeRun {
   const [first, ...rest] = runs;
@@ -48,10 +58,7 @@ export function chooseBestRun(runs: readonly ChallengeRun[]): ChallengeRun {
   let bestScore = scoreRun(first);
   for (const candidate of rest) {
     const candidateScore = scoreRun(candidate);
-    const winsBetter = candidateScore.wins > bestScore.wins;
-    const winsTied = candidateScore.wins === bestScore.wins;
-    const differentialBetter = candidateScore.differential > bestScore.differential;
-    if (winsBetter || (winsTied && differentialBetter)) {
+    if (isBetterScore(candidateScore, bestScore)) {
       best = candidate;
       bestScore = candidateScore;
     }
@@ -79,4 +86,52 @@ export function simulateChallengeBestOf(
     attempts.push(simulateChallenge(attemptRun, profile, context));
   }
   return chooseBestRun(attempts);
+}
+
+export interface BestOfChoice {
+  chosenRunSeed: Seed;
+  chosenWins: number;
+  chosenLosses: number;
+  chosenDifferential: number;
+}
+
+/**
+ * Whole-run best-of selection for the challenge worker: simulates every
+ * attempt of the complete 82-game season from derived attempt seeds and
+ * reports the chosen attempt's seed and record. Games are not recorded (the
+ * main thread re-saves the chosen seed before the paced reveal), so the rule
+ * is identical to chooseBestRun (spec/01) without materializing 82 results.
+ */
+export function chooseBestRunSeed(
+  run: ChallengeRun,
+  profile: EraSimulationProfile,
+  context: EngineContext,
+): BestOfChoice {
+  let best: { seed: Seed; score: RunScore } | null = null;
+  for (let attempt = 0; attempt < BEST_OF_ATTEMPTS; attempt += 1) {
+    const attemptSeed = deriveAttemptSeed(run.runSeed, attempt);
+    const attemptRun = { ...run, runSeed: attemptSeed };
+    let wins = 0;
+    let differential = 0;
+    for (let gameNumber = 1; gameNumber <= 82; gameNumber += 1) {
+      const input = createGameInput(attemptRun, profile, gameNumber);
+      const result = simulateGame(input, context);
+      const pointsDiff = result.home.box.points - result.away.box.points;
+      if (pointsDiff > 0) wins += 1;
+      differential += pointsDiff;
+    }
+    const score: RunScore = { wins, differential };
+    if (best === null || isBetterScore(score, best.score)) {
+      best = { seed: attemptSeed, score };
+    }
+  }
+  if (best === null) {
+    throw new Error('chooseBestRunSeed requires at least one attempt');
+  }
+  return {
+    chosenRunSeed: best.seed,
+    chosenWins: best.score.wins,
+    chosenLosses: 82 - best.score.wins,
+    chosenDifferential: best.score.differential,
+  };
 }

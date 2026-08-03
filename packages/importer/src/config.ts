@@ -4,21 +4,17 @@
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { foundingSeasonByTeamExternalId } from './lineage.js';
 
 // …/packages/importer/src/ -> repo root is three levels up.
 const SRC_DIR = dirname(fileURLToPath(import.meta.url));
-export const PACKAGE_ROOT = resolve(SRC_DIR, '..');
+const PACKAGE_ROOT = resolve(SRC_DIR, '..');
 export const REPO_ROOT = resolve(PACKAGE_ROOT, '..', '..');
 
 export const PUBLIC_DATA =
   process.env.HOOP_RUSH_PUBLIC_DATA ?? join(REPO_ROOT, 'apps', 'web', 'static', 'data');
 export const NBA_ROOT = process.env.HOOP_RUSH_NBA_ROOT ?? join(REPO_ROOT, 'raw-data', 'nba');
-export const SHARED_ROOT = join(PUBLIC_DATA, 'shared');
 export const RAW_CACHE = join(REPO_ROOT, '.raw_nba_cache');
 mkdirSync(RAW_CACHE, { recursive: true });
-
-export const CURRENT_SEASON_END_YEAR = 2026; // 2025-26 season
 
 /**
  * Versioned supported-season configuration (spec/12): the 1960-61 through
@@ -94,19 +90,6 @@ export const DEFAULT_SEASONS = [
 ];
 
 /**
- * Earliest NBA season per source team id, derived from the authoritative
- * lineage table (spec/12). Rosters are only fetched for teams that existed
- * in the season; ABA and predecessor-league rows are excluded.
- */
-export const TEAM_FOUNDING_SEASON: Record<string, string> = foundingSeasonByTeamExternalId();
-
-export function teamExistsInSeason(teamExternalId: string, season: string): boolean {
-  const founding = TEAM_FOUNDING_SEASON[teamExternalId];
-  if (founding === undefined) return true;
-  return season >= founding;
-}
-
-/**
  * Source availability boundaries (spec/12): the first NBA season in which a
  * field family is a validated observation. Earlier values are `null` with
  * `not-applicable` or `unavailable` source status — never converted zeros.
@@ -129,7 +112,7 @@ export function fieldAvailableFrom(field: string, season: string): boolean {
   return season >= boundary;
 }
 
-export function outputDir(season: string): string {
+function outputDir(season: string): string {
   return join(NBA_ROOT, season);
 }
 

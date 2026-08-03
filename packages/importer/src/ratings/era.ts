@@ -2,8 +2,7 @@
  * Era configs (port of compute_ratings.py ERA_CONFIGS / src/game/models/eraConfig.ts).
  *
  * The 1960-61 through 1989-90 rows are documented league averages used as a
- * deterministic fallback before the fetched era-config.json aggregates exist;
- * the fetch pipeline overrides these from validated league evidence.
+ * deterministic fallback before the era-profile derivation packages stints.
  */
 export interface EraConfig {
   leaguePpg: number;
@@ -12,7 +11,6 @@ export interface EraConfig {
 }
 
 export const MODERN_PPG = 114.7;
-export const MODERN_3PA_RATE = 0.39;
 
 export const ERA_CONFIGS: Record<string, EraConfig> = {
   '1960-61': { leaguePpg: 118.1, league3PARate: 0, pace: 122.0 },

@@ -606,15 +606,6 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
   },
 ];
 
-/** Season key ordering helper: '1960-61' < '1969-70' compares directly. */
-export function seasonKeyAtLeast(season: string, bound: string): boolean {
-  return season >= bound;
-}
-
-export function seasonKeyAtMost(season: string, bound: string): boolean {
-  return season <= bound;
-}
-
 /** First NBA season of a modern slot (for unavailable-combination display). */
 export function firstSupportedSeason(franchiseId: string): string | null {
   const first = LINEAGE_SEGMENTS.find((s) => s.modernFranchiseId === franchiseId);
@@ -638,22 +629,6 @@ export function resolveHistoricalIdentity(
   return null;
 }
 
-/** Resolves a source team-season row to exactly one modern slot, or null. */
-export function resolveModernFranchise(teamExternalId: string, season: string): string | null {
-  const segment = LINEAGE_SEGMENTS.find(
-    (s) =>
-      s.historicalTeamId === teamExternalId &&
-      season >= s.validFromSeasonKey &&
-      (s.validThroughSeasonKey === undefined || season <= s.validThroughSeasonKey),
-  );
-  return segment?.modernFranchiseId ?? null;
-}
-
-/** True when the modern slot had an NBA team in the season. */
-export function slotExistsInSeason(franchiseId: string, season: string): boolean {
-  return resolveHistoricalIdentity(franchiseId, season) !== null;
-}
-
 /** Map of teamExternalId -> first NBA season (fetch-layer planning). */
 export function foundingSeasonByTeamExternalId(): Record<string, string> {
   const map: Record<string, string> = {};
@@ -664,48 +639,4 @@ export function foundingSeasonByTeamExternalId(): Record<string, string> {
     }
   }
   return map;
-}
-
-/** Validates the lineage table: 30 slots, no overlaps, no gaps inside ranges. */
-export function auditLineageTable(): string[] {
-  const failures: string[] = [];
-  const slots = new Set(MODERN_SLOTS.map((s) => s.franchiseId));
-  if (slots.size !== 30) failures.push('modern slots must be exactly 30');
-  const slotIds = new Set<string>();
-  for (const slot of MODERN_SLOTS) {
-    if (slotIds.has(slot.franchiseId)) failures.push(`duplicate modern slot ${slot.franchiseId}`);
-    slotIds.add(slot.franchiseId);
-  }
-  const bySlot = new Map<string, LineageSegment[]>();
-  for (const segment of LINEAGE_SEGMENTS) {
-    if (!slotIds.has(segment.modernFranchiseId)) {
-      failures.push(`lineage references unknown slot ${segment.modernFranchiseId}`);
-    }
-    const list = bySlot.get(segment.modernFranchiseId) ?? [];
-    list.push(segment);
-    bySlot.set(segment.modernFranchiseId, list);
-  }
-  for (const [franchiseId, segments] of bySlot) {
-    const sorted = [...segments].sort((a, b) =>
-      a.validFromSeasonKey.localeCompare(b.validFromSeasonKey),
-    );
-    for (let i = 0; i < sorted.length; i += 1) {
-      const current = sorted[i];
-      if (current === undefined) continue;
-      if (current.validFromSeasonKey > (current.validThroughSeasonKey ?? '9999-99')) {
-        failures.push(`${franchiseId}: inverted range ${current.validFromSeasonKey}`);
-      }
-      const next = sorted[i + 1];
-      if (!next) continue;
-      if (
-        current.validThroughSeasonKey !== undefined &&
-        current.validThroughSeasonKey >= next.validFromSeasonKey
-      ) {
-        failures.push(
-          `${franchiseId}: overlapping ranges ${current.validThroughSeasonKey} vs ${next.validFromSeasonKey}`,
-        );
-      }
-    }
-  }
-  return failures;
 }

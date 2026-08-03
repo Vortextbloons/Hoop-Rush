@@ -13,7 +13,7 @@ import {
   type ChallengeCreation,
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
-import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
+import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
 
 /**
  * The single authoritative path from a resolved five-player lineup to an
@@ -21,9 +21,6 @@ import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
  * five peak player-seasons from the global index; the run always simulates
  * in the fixed '2010s' environment era.
  */
-
-/** Fixed simulation environment era for every sandbox run. */
-export const FIXED_SANDBOX_ERA = '2010s';
 
 /**
  * Creates the 82-game run for the given five players, saves it as the active
@@ -34,18 +31,7 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
   if (players.length !== 5) {
     throw new Error('A lineup needs exactly five players.');
   }
-  const manifest = await getManifest();
-  const profileEntry = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SANDBOX_ERA);
-  if (!profileEntry) {
-    throw new Error('The decade simulation profile is unavailable.');
-  }
-  if (!manifest.bracket) {
-    throw new Error('The opponent bracket is unavailable.');
-  }
-  const [profile, bracket] = await Promise.all([
-    getEraSimulationProfile(profileEntry),
-    getBracket(manifest.bracket),
-  ]);
+  const { profile, bracket } = await loadRunPreamble();
   const selections: RunPlayerSelection[] = players.map((p) => ({
     playerId: p.playerId,
     franchiseId: p.franchiseId,

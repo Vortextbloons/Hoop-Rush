@@ -7,19 +7,15 @@ import {
   type ChallengeCreation,
 } from '@hoop-rush/engine';
 import {
-  eraSimulationProfileSchema,
-  opponentBracketSchema,
   seedSchema,
   simulationTeamSchema,
   type ChallengeRun,
-  type EraSimulationProfile,
-  type OpponentBracket,
   type SimulationPlayer,
   type SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import { makeReport, type CliReport } from '../report.js';
 import { simChallengeReportSchema } from '../report-schemas.js';
-import { loadPackagedData, PackagedData } from './data-loader.js';
+import { loadPackagedData, PackagedData, loadBracketFile, loadProfileFile } from './data-loader.js';
 import { loadFixture, UsageError } from './sim.js';
 
 /**
@@ -181,26 +177,4 @@ export function simChallenge(args: {
     `${timingMs.toFixed(1)} ms`,
   ];
   return makeReport('sim challenge', { lineup: lineupId, seed }, { details, payload });
-}
-
-function loadProfileFile(path: string): EraSimulationProfile {
-  const parsed = eraSimulationProfileSchema.safeParse(
-    JSON.parse(readFileSync(path, 'utf8')) as unknown,
-  );
-  if (!parsed.success) {
-    throw new UsageError(
-      `profile ${path} fails validation: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-  }
-  return parsed.data;
-}
-
-function loadBracketFile(path: string): OpponentBracket {
-  const parsed = opponentBracketSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')) as unknown);
-  if (!parsed.success) {
-    throw new UsageError(
-      `bracket ${path} fails validation: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
-    );
-  }
-  return parsed.data;
 }

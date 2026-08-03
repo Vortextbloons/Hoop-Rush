@@ -1,20 +1,11 @@
 import { z } from 'zod';
 import {
   challengeRunSchema,
-  classicCompletedDraftSchema,
   classicVariantSchema,
-  difficultyProfileSchema,
-  franchiseIdSchema,
   gameResultSchema,
-  lineupSchema,
-  opponentBracketCoreSchema,
   playerIdSchema,
-  runAggregatesSchema,
-  runModeSchema,
   runPlayerSelectionSchema,
-  runVersionBoundariesSchema,
   seedSchema,
-  simulationPlayerSchema,
   type ChallengeRun,
   type GameResult,
   type RunAggregates,
@@ -48,42 +39,20 @@ export type StoredRunRecord = z.infer<typeof storedRunRecordSchema>;
  * games array, plus the progress-carrying fields kept current by every
  * append. The games array is reconstructed on load from active game rows.
  */
-export const activeRunCheckpointSchema = z.object({
-  recordId: z.literal('active'),
-  saveSchemaVersion: z.literal(3),
-  runId: z.string().min(1).max(64),
-  mode: runModeSchema,
-  /** Immutable; present only for classic runs. */
-  variant: classicVariantSchema.optional(),
-  /** Frozen completed draft snapshot; present only for classic runs. */
-  classicDraft: classicCompletedDraftSchema.optional(),
-  /** Null for free-form sandbox lineups drawn from any franchise/era pool. */
-  franchiseId: franchiseIdSchema.nullable(),
-  /** Simulation environment era (fixed '2010s' for sandbox). */
-  eraId: z.string().min(1).max(24),
-  /** Display name for the user's lineup (resolved from lineage at creation). */
-  homeDisplayName: z.string().min(1).max(96),
-  playerIds: z.array(playerIdSchema).length(5),
-  /** Per-player pool provenance in slot order; absent on legacy runs. */
-  selections: z.array(runPlayerSelectionSchema).length(5).optional(),
-  lineup: lineupSchema,
-  players: z.array(simulationPlayerSchema).length(5),
-  runSeed: seedSchema,
-  versions: runVersionBoundariesSchema,
-  eraProfileVersion: z.string().min(1).max(64),
-  difficulty: difficultyProfileSchema,
-  bracket: opponentBracketCoreSchema,
-  status: z.enum(['active', 'finished']),
-  /** First loss game number (1-82), or null while the run is undefeated. */
-  firstLossGameNumber: z.number().int().min(1).max(82).nullable(),
-  /**
-   * Number of accepted games, kept current by every append. Absent on legacy
-   * checkpoints; loaders fall back to counting game rows.
-   */
-  gamesPlayed: z.number().int().min(0).max(82).optional(),
-  aggregates: runAggregatesSchema,
-  updatedAtIso: z.iso.datetime().optional(),
-});
+export const activeRunCheckpointSchema = challengeRunSchema
+  .omit({ schemaVersion: true, games: true, outcome: true })
+  .extend({
+    recordId: z.literal('active'),
+    saveSchemaVersion: z.literal(3),
+    /** Narrowed: an abandoned run is never stored as the active checkpoint. */
+    status: z.enum(['active', 'finished']),
+    /**
+     * Number of accepted games, kept current by every append. Absent on legacy
+     * checkpoints; loaders fall back to counting game rows.
+     */
+    gamesPlayed: z.number().int().min(0).max(82).optional(),
+    updatedAtIso: z.iso.datetime().optional(),
+  });
 export type ActiveRunCheckpoint = z.infer<typeof activeRunCheckpointSchema>;
 
 /** One accepted game in the active run, keyed by (runId, gameNumber). */

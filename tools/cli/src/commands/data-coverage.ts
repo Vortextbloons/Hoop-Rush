@@ -1,6 +1,4 @@
 import { readFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   hoopRushManifestSchema,
   type CoverageSummary,
@@ -8,6 +6,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { FIELD_AVAILABILITY } from '@hoop-rush/importer';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
+import { DEFAULT_MANIFEST } from './data-loader.js';
 
 /**
  * `hoop-rush data coverage`: field availability, provenance, confidence,
@@ -15,9 +14,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
  * (spec/09, spec/12). Reads the packaged manifest and its availability
  * matrix plus the persisted coverage report; never scans raw records.
  */
-
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
-const DEFAULT_MANIFEST = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
 
 export const DATA_COVERAGE_OPTIONS: Record<string, boolean> = {
   input: true,
@@ -28,7 +24,7 @@ export const DATA_COVERAGE_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-export interface CoverageRow {
+interface CoverageRow {
   franchiseId: string;
   eraId: string;
   status: 'available' | 'unavailable';
@@ -38,7 +34,7 @@ export interface CoverageRow {
   coverageSummary?: CoverageSummary;
 }
 
-export interface CoverageReportPayload {
+interface CoverageReportPayload {
   dataVersion: string;
   matrixSize: number;
   available: number;

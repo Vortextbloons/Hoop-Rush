@@ -474,5 +474,3 @@ export function abandonChallenge(run: ChallengeRun): ChallengeRun {
   }
   return { ...run, status: 'abandoned' };
 }
-
-export { SEED_DERIVATION_VERSION, deriveGameSeed };

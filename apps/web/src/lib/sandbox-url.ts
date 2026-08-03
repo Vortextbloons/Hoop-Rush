@@ -30,9 +30,6 @@ export interface UrlStateValidation {
 }
 
 /** Route template literal so callers can pass the result through resolve(). */
-export type SandboxUrlTarget = `/sandbox?${string}`;
-
-/** Typed sandbox hrefs: members of the app's route union, so resolve() accepts them. */
 export type SandboxHref = `/sandbox?${string}`;
 
 const SLOT_PATTERN = /^([^@]+)@([^/]+)\/([^/]+)$/;

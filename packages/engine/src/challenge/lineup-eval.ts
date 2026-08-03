@@ -1,7 +1,8 @@
 import type { EraSimulationProfile, GameResult, SimulationTeam } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.js';
 import { simulateGame } from '../sim/game.js';
-import { BENCHMARK_VERSION, BENCHMARK_WEIGHTS } from './benchmarks.js';
+import { fnv1a32, hex32 } from '../sim/rng.js';
+import { BENCHMARK_WEIGHTS } from './benchmarks.js';
 
 /**
  * Lineup evaluation (spec/01 authored opponent requirements, spec/06
@@ -149,13 +150,6 @@ export function evaluateLineupStrength(
 
 /** Deterministic seed for one measurement game (worker-count independent). */
 export function strengthSeed(seedBase: string, benchmarkId: string, index: number): string {
-  let hash = 0x811c9dc5;
   const value = `${seedBase}|${benchmarkId}|${String(index)}`;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0').repeat(4);
+  return hex32(fnv1a32(value)).repeat(4);
 }
-
-export { BENCHMARK_VERSION };

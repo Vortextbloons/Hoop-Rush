@@ -15,8 +15,6 @@ import { replay, REPLAY_OPTIONS } from './commands/replay.js';
 import { combineDocs, COMBINE_DOCS_OPTIONS } from './commands/docs-combine.js';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.js';
 import {
-  importCareers,
-  importEraConfig,
   importEraProfile,
   importFreeze,
   importManifest,
@@ -24,8 +22,6 @@ import {
   importPools,
   importRatings,
   importRunAll,
-  IMPORT_CAREERS_OPTIONS,
-  IMPORT_ERA_CONFIG_OPTIONS,
   IMPORT_ERA_PROFILE_OPTIONS,
   IMPORT_FREEZE_OPTIONS,
   IMPORT_MANIFEST_OPTIONS,
@@ -237,14 +233,6 @@ const COMMANDS: Record<string, CommandDef> = {
     options: IMPORT_ERA_PROFILE_OPTIONS,
     run: (args) => importEraProfile({ era: getOptionString(args, 'era') }),
   },
-  'import era-config': {
-    options: IMPORT_ERA_CONFIG_OPTIONS,
-    run: (args) => importEraConfig({ seasons: getOptionString(args, 'seasons') }),
-  },
-  'import careers': {
-    options: IMPORT_CAREERS_OPTIONS,
-    run: (args) => importCareers({ seasons: getOptionString(args, 'seasons') }),
-  },
   'import manifest': {
     options: IMPORT_MANIFEST_OPTIONS,
     run: () => importManifest(),
@@ -270,7 +258,6 @@ const COMMANDS: Record<string, CommandDef> = {
         forceStints: hasOption(args, 'force-stints'),
         forceRatings: hasOption(args, 'force-ratings'),
         workers: getOptionString(args, 'workers'),
-        skipCareers: hasOption(args, 'skip-careers'),
         skipBbref: hasOption(args, 'skip-bbref'),
         pools: getOptionString(args, 'pools'),
       }),

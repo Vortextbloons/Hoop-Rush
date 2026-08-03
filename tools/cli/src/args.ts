@@ -5,6 +5,16 @@
 
 export class UsageError extends Error {}
 
+/** Parses an optional count option; absent falls back, malformed throws. */
+export function parseCount(value: string | undefined, option: string, fallback: number): number {
+  if (value === undefined) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
+  }
+  return parsed;
+}
+
 export interface ParsedArgs {
   /** Command words, e.g. ["data", "validate"]. */
   command: string[];

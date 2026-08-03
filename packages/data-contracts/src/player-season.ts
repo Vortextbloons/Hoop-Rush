@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   bbrefIdSchema,
+  eraIdSchema,
   franchiseIdSchema,
   playerExternalIdSchema,
   playerIdSchema,
@@ -81,22 +82,6 @@ export const playerSeasonStatsSchema = z.object({
 });
 export type PlayerSeasonStats = z.infer<typeof playerSeasonStatsSchema>;
 
-/**
- * One player-season-team row. Eligibility for a franchise/decade pool is
- * evaluated on the team stint, never on league-wide totals (spec/12 keeps
- * the stint row separate from league-total rows).
- */
-export const teamStintSchema = z.object({
-  playerId: playerIdSchema,
-  franchiseId: franchiseIdSchema,
-  seasonKey: seasonKeySchema,
-  /** Games played for this franchise in this season. */
-  teamGames: z.number().int().nonnegative(),
-  /** Minutes played for this franchise in this season. */
-  teamMinutes: z.number().int().nonnegative(),
-});
-export type TeamStint = z.infer<typeof teamStintSchema>;
-
 /** Summary ratings shown in the draft UI. Never possession inputs (spec/11). */
 export const summaryRatingsSchema = z.object({
   /** Balanced shorthand for comparison on a 0-100 scale. */
@@ -121,17 +106,29 @@ export const sourceMetadataSchema = z.object({
 });
 export type SourceMetadata = z.infer<typeof sourceMetadataSchema>;
 
+/** Optional secondary external IDs that resolve fallback assets (headshots). */
+export const playersIndexAltIdsSchema = z
+  .object({
+    bbref: bbrefIdSchema.nullable().optional(),
+    /** When false, the NBA CDN only serves the generic silhouette for this player. */
+    nbaHeadshotAvailable: z.boolean().optional(),
+    /** Direct fallback image URL (e.g. a Wikipedia thumbnail), used as a final candidate. */
+    photoUrl: z.url().nullable().optional(),
+  })
+  .nullable();
+export type PlayersIndexAltIds = z.infer<typeof playersIndexAltIdsSchema>;
+
 /**
- * One packaged peak player-season: the representative version of a player
- * within a franchise/decade pool. Detailed ratings and tendencies are the
- * strict engine contracts (no open records, no silent runtime defaults);
- * packaged simulation anchors preserve the season's observable production.
+ * Peak player-season record (spec/02). One versioned row per franchise-era
+ * pool: eligibility, peak selection, packaged ratings, tendencies, anchors,
+ * provenance, and summary UI ratings. Validation is strict so packaging
+ * failures surface at build time, never in the browser.
  */
 export const peakPlayerSeasonSchema = z.object({
   schemaVersion: z.literal(3),
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
-  eraId: z.string().min(1).max(24),
+  eraId: eraIdSchema,
   /** Season key of the selected peak season. */
   seasonKey: seasonKeySchema,
   firstName: z.string().min(1).max(64),
@@ -140,17 +137,7 @@ export const peakPlayerSeasonSchema = z.object({
   /** External NBA ID used to resolve a headshot URL. */
   playerExternalId: playerExternalIdSchema,
   /** Optional secondary external IDs that resolve fallback assets (headshots). */
-  altIds: z
-    .object({
-      /** Basketball-Reference player ID, substituted into the secondary headshot template. */
-      bbref: bbrefIdSchema.nullable().optional(),
-      /** When false, the NBA CDN only serves the generic silhouette for this player. */
-      nbaHeadshotAvailable: z.boolean().optional(),
-      /** Direct fallback image URL (e.g. a Wikipedia thumbnail), used as a final candidate. */
-      photoUrl: z.url().nullable().optional(),
-    })
-    .nullable()
-    .optional(),
+  altIds: playersIndexAltIdsSchema.optional(),
   /** Career-wide playable positions (spec/02). */
   positions: z.object({
     /** Reviewed authoritative primary position (PG/SG/SF/PF/C). */
@@ -196,7 +183,7 @@ export const franchiseEraPoolSchema = z.object({
   schemaVersion: z.literal(3),
   dataVersion: z.string().min(1).max(64),
   franchiseId: franchiseIdSchema,
-  eraId: z.string().min(1).max(24),
+  eraId: eraIdSchema,
   eligibility: z.object({ minimumTeamGames: z.literal(40) }),
   /** Compact coverage label for the whole pool (spec/12). */
   coverageSummary: coverageSummarySchema,
@@ -211,19 +198,10 @@ export type FranchiseEraPool = z.infer<typeof franchiseEraPoolSchema>;
  * positions, and image identifiers only; season statistics and
  * height/weight live in the separate roster-details asset.
  */
-export const playersIndexAltIdsSchema = z
-  .object({
-    bbref: bbrefIdSchema.nullable().optional(),
-    nbaHeadshotAvailable: z.boolean().optional(),
-    photoUrl: z.url().nullable().optional(),
-  })
-  .nullable();
-export type PlayersIndexAltIds = z.infer<typeof playersIndexAltIdsSchema>;
-
 export const playersIndexEntrySchema = z.object({
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
-  eraId: z.string().min(1).max(24),
+  eraId: eraIdSchema,
   seasonKey: seasonKeySchema,
   firstName: z.string().min(1).max(64),
   lastName: z.string().min(1).max(64),
@@ -262,7 +240,7 @@ export type PlayersIndex = z.infer<typeof playersIndexSchema>;
 export const rosterDetailsEntrySchema = z.object({
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
-  eraId: z.string().min(1).max(24),
+  eraId: eraIdSchema,
   seasonKey: seasonKeySchema,
   heightInches: z.number().int().min(60).max(96).nullable(),
   weightLbs: z.number().int().min(120).max(400).nullable(),

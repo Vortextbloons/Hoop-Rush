@@ -14,7 +14,13 @@ import {
   type ChallengeCreationBase,
 } from '../../challenge/commands.js';
 import { deriveAttemptSeed } from '../../challenge/seeds.js';
-import { BEST_OF_ATTEMPTS, chooseBestRun, scoreRun, simulateChallengeBestOf } from './selection.js';
+import {
+  BEST_OF_ATTEMPTS,
+  chooseBestRun,
+  chooseBestRunSeed,
+  scoreRun,
+  simulateChallengeBestOf,
+} from './selection.js';
 
 const context = createEngineContext();
 
@@ -138,5 +144,43 @@ describe('sandbox selection', () => {
       expect(direct.games[i]?.home.box.points).toBe(chosen.games[i]?.home.box.points);
       expect(direct.games[i]?.away.box.points).toBe(chosen.games[i]?.away.box.points);
     }
+  });
+});
+
+describe('chooseBestRunSeed (worker best-of)', () => {
+  it('is deterministic: the same run and profile choose the same attempt', () => {
+    const creation = fixtureCreation();
+    const run = createChallenge(creation);
+    const first = chooseBestRunSeed(run, creation.profile, context);
+    const second = chooseBestRunSeed(run, creation.profile, context);
+    expect(second).toEqual(first);
+  });
+
+  it('chooses one of the derived attempt seeds', () => {
+    const creation = fixtureCreation();
+    const run = createChallenge(creation);
+    const chosen = chooseBestRunSeed(run, creation.profile, context);
+    const attemptSeeds = Array.from({ length: BEST_OF_ATTEMPTS }, (_, attempt) =>
+      deriveAttemptSeed(run.runSeed, attempt),
+    );
+    expect(attemptSeeds).toContain(chosen.chosenRunSeed);
+  });
+
+  it('matches simulateChallengeBestOf for the same creation', () => {
+    const creation = fixtureCreation();
+    const engineChosen = simulateChallengeBestOf(creation, creation.profile, context);
+    const chosen = chooseBestRunSeed(
+      createChallenge({ ...creation, runSeed: creation.runSeed }),
+      creation.profile,
+      context,
+    );
+    expect(chosen.chosenRunSeed).toBe(engineChosen.runSeed);
+    expect(chosen.chosenWins).toBe(engineChosen.aggregates.team.wins);
+    expect(chosen.chosenLosses).toBe(engineChosen.aggregates.team.losses);
+    let differential = 0;
+    for (const game of engineChosen.games) {
+      differential += game.home.box.points - game.away.box.points;
+    }
+    expect(chosen.chosenDifferential).toBe(differential);
   });
 });

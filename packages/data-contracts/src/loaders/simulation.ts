@@ -32,20 +32,3 @@ export async function loadEraSimulationProfile(
 export function parseOpponentTeam(value: unknown): OpponentTeam {
   return opponentTeamSchema.parse(value);
 }
-
-/** Fetches and hash-verifies an OpponentTeam artifact. */
-export async function loadOpponentTeam(
-  url: string,
-  expectedHash?: string,
-  init?: RequestInit,
-): Promise<OpponentTeam> {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    throw new Error(`failed to load opponent from ${url}: HTTP ${String(response.status)}`);
-  }
-  const bytes = await response.arrayBuffer();
-  if (expectedHash !== undefined) {
-    await verifySha256(bytes, expectedHash);
-  }
-  return parseOpponentTeam(JSON.parse(new TextDecoder().decode(bytes)));
-}

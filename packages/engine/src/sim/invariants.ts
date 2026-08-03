@@ -1,4 +1,5 @@
 import type { GameResult, PlayerBoxScore, TeamBoxScore } from '@hoop-rush/data-contracts';
+import { usageOf } from './recorder.js';
 
 /**
  * Pure invariant checker (spec/06 exact invariants). Used by tests, the CLI,
@@ -149,7 +150,7 @@ export function checkGameResult(result: GameResult): string[] {
       for (const p of players) {
         if (!p.diagnostics) continue;
         const d = p.diagnostics;
-        const usageIdentity = p.fieldGoals.attempted + p.freeThrows.attempted * 0.44 + p.turnovers;
+        const usageIdentity = usageOf(p.fieldGoals.attempted, p.freeThrows.attempted, p.turnovers);
         if (Math.abs(d.usage - usageIdentity) > 0.6) {
           failures.push(
             `${side}: usage ${d.usage.toFixed(2)} != fga + 0.44*fta + tov (${usageIdentity.toFixed(2)})`,

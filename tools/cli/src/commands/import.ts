@@ -1,12 +1,10 @@
 /**
- * Import pipeline commands: ratings, pools, era profiles/configs, careers,
- * manifest refresh, opponent authoring, calibration freeze, and the full
- * run-all orchestrator (Python fetch layer + TS compute).
+ * Import pipeline commands: ratings, pools, era profiles, manifest refresh,
+ * opponent authoring, calibration freeze, and the full run-all orchestrator
+ * (Python fetch layer + TS compute).
  */
 import {
-  careers,
   DEFAULT_SEASONS,
-  eraConfig,
   eraProfile,
   freeze,
   manifest,
@@ -150,50 +148,6 @@ export function importEraProfile(args: { era?: string | null }): CliReport {
   );
 }
 
-export const IMPORT_ERA_CONFIG_OPTIONS: Record<string, boolean> = {
-  seasons: true,
-  format: true,
-  verbose: false,
-};
-
-export function importEraConfig(args: { seasons?: string | null }): CliReport {
-  const seasons = splitList(args.seasons ?? null) ?? DEFAULT_SEASONS;
-  try {
-    eraConfig.run(seasons);
-  } catch (error) {
-    return usageFailure('import era-config', { seasons }, (error as Error).message);
-  }
-  return makeReport(
-    'import era-config',
-    { seasons },
-    {
-      details: [`wrote ${String(seasons.length)} era-config.json`],
-    },
-  );
-}
-
-export const IMPORT_CAREERS_OPTIONS: Record<string, boolean> = {
-  seasons: true,
-  format: true,
-  verbose: false,
-};
-
-export function importCareers(args: { seasons?: string | null }): CliReport {
-  const seasons = splitList(args.seasons ?? null) ?? DEFAULT_SEASONS;
-  try {
-    careers.run(seasons);
-  } catch (error) {
-    return usageFailure('import careers', { seasons }, (error as Error).message);
-  }
-  return makeReport(
-    'import careers',
-    { seasons },
-    {
-      details: [`computed careers for ${String(seasons.length)} season(s)`],
-    },
-  );
-}
-
 export const IMPORT_MANIFEST_OPTIONS: Record<string, boolean> = {
   format: true,
   verbose: false,
@@ -260,7 +214,6 @@ export const IMPORT_RUN_ALL_OPTIONS: Record<string, boolean> = {
   'force-stints': false,
   'force-ratings': false,
   workers: true,
-  'skip-careers': false,
   'skip-bbref': false,
   pools: true,
   format: true,
@@ -269,7 +222,7 @@ export const IMPORT_RUN_ALL_OPTIONS: Record<string, boolean> = {
 
 /**
  * Full pipeline: Python fetch layer (rosters, stints, season stats, schedule,
- * bbref ids) then native ratings, careers, pools, and manifest updates.
+ * bbref ids) then native ratings, pools, and manifest updates.
  */
 export async function importRunAll(args: {
   seasons?: string | null;
@@ -277,7 +230,6 @@ export async function importRunAll(args: {
   forceStints?: boolean;
   forceRatings?: boolean;
   workers?: string | null;
-  skipCareers?: boolean;
   skipBbref?: boolean;
   pools?: string | null;
 }): Promise<CliReport> {
@@ -307,15 +259,6 @@ export async function importRunAll(args: {
       details.push(`ratings: ${String(seasons.length)} season(s)`);
     } catch (error) {
       failures.push(`ratings failed: ${(error as Error).message}`);
-    }
-  }
-
-  if (!(args.skipCareers ?? false) && failures.length === 0) {
-    try {
-      careers.run(seasons);
-      details.push('careers: computed');
-    } catch (error) {
-      failures.push(`careers failed: ${(error as Error).message}`);
     }
   }
 

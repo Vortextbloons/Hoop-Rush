@@ -4,6 +4,7 @@ import type {
   ShotZone,
   ShotZoneSummary,
 } from '@hoop-rush/data-contracts';
+import { usageOf } from '../sim/recorder.js';
 
 /**
  * Season explanation evidence (spec/01 feedback, spec/03 outputs). Derives
@@ -196,12 +197,15 @@ export function explainSeason(run: ChallengeRun): SeasonExplanation {
   );
 
   let usageLeader: UsageLeader | null = null;
-  const teamUsage = team.fieldGoals.attempted + 0.44 * team.freeThrows.attempted + team.turnovers;
+  const teamUsage = usageOf(team.fieldGoals.attempted, team.freeThrows.attempted, team.turnovers);
   if (teamUsage > 0) {
     let leader: { playerId: string; usage: number } | null = null;
     for (const player of run.aggregates.players) {
-      const usage =
-        player.fieldGoals.attempted + 0.44 * player.freeThrows.attempted + player.turnovers;
+      const usage = usageOf(
+        player.fieldGoals.attempted,
+        player.freeThrows.attempted,
+        player.turnovers,
+      );
       if (leader === null || usage > leader.usage) {
         leader = { playerId: player.playerId, usage };
       }

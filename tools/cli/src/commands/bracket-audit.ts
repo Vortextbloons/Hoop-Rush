@@ -47,7 +47,7 @@ function median(values: readonly number[]): number {
 }
 
 /** Compares the opening opponent entry against the frozen preview artifact. */
-export function openingOpponentUnchanged(bracket: OpponentBracket, previewPath: string): string[] {
+function openingOpponentUnchanged(bracket: OpponentBracket, previewPath: string): string[] {
   const failures: string[] = [];
   const preview = readJson(previewPath);
   const parsed = opponentTeamSchema.safeParse(preview);

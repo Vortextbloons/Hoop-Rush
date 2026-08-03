@@ -4,7 +4,6 @@
 export * from './era.js';
 export * from './weights.js';
 export * from './summary.js';
-export * from './derive.js';
 export * from './v2.js';
 export * from './traits.js';
 export * from './contracts.js';

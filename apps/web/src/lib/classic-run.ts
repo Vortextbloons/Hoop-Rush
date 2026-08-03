@@ -9,9 +9,8 @@ import {
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
 import { setClassicGuardBypass } from '$lib/classic-nav-guard';
-import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
 import { resolvePlayerRefs } from '$lib/player-refs';
-import { FIXED_SANDBOX_ERA } from '$lib/sandbox-run';
+import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
 
 /**
  * The single authoritative path from a completed classic draft to an active
@@ -29,18 +28,7 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
   if (draft.picks.length !== 5) {
     throw new Error('A classic draft needs exactly five picks.');
   }
-  const manifest = await getManifest();
-  const profileEntry = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SANDBOX_ERA);
-  if (!profileEntry) {
-    throw new Error('The decade simulation profile is unavailable.');
-  }
-  if (!manifest.bracket) {
-    throw new Error('The opponent bracket is unavailable.');
-  }
-  const [profile, bracket] = await Promise.all([
-    getEraSimulationProfile(profileEntry),
-    getBracket(manifest.bracket),
-  ]);
+  const { manifest, profile, bracket } = await loadRunPreamble();
   // Resolve the five picks to full peak records in slot order. Draft picks are
   // unique franchise/era pairs, so load each distinct pool exactly once and in
   // parallel (pools are cached by the data layer anyway).

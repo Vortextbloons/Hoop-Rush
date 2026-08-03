@@ -12,7 +12,6 @@ import {
   buildEqualFixture,
   buildLegalSimulationTeam,
   buildRolesTeam,
-  buildSimulationPlayer,
   buildStrongMediumFixture,
   buildStrongWeakFixture,
 } from '@hoop-rush/test-fixtures';
@@ -185,7 +184,4 @@ function main(): void {
   });
 }
 
-void buildSimulationPlayer;
-void buildLegalSimulationTeam;
-void buildEqualFixture;
 main();

@@ -73,7 +73,7 @@ export interface PriorTable {
   threePointRatePrior: number;
 }
 
-export const POSITION_PRIORS: Readonly<Record<string, Readonly<PriorTable>>> = {
+const POSITION_PRIORS: Readonly<Record<string, Readonly<PriorTable>>> = {
   G: {
     stealsPer36: 1.5,
     blocksPer36: 0.4,
@@ -100,8 +100,6 @@ export const POSITION_PRIORS: Readonly<Record<string, Readonly<PriorTable>>> = {
   },
 };
 
-export const PRIOR_VERSION = 'priors-v1';
-
 /** Whether the source publishes the field for this season (spec/12 table). */
 export function fieldPublished(field: string, season: string): boolean {
   const boundary = FIELD_AVAILABILITY[field];
@@ -121,7 +119,7 @@ function confidenceFor(kind: ProvenanceKind): Confidence {
 }
 
 /** Null-preserving season totals. */
-export interface SeasonTotals {
+interface SeasonTotals {
   gamesPlayed: number;
   minutes: number;
   points: number | null;
@@ -146,7 +144,7 @@ export interface SeasonTotals {
   efgPct: number | null;
 }
 
-export function seasonTotals(stats: StatsRow): SeasonTotals {
+function seasonTotals(stats: StatsRow): SeasonTotals {
   const maybe = (key: string): number | null => {
     const value = stats[key];
     if (value === null || value === undefined) return null;

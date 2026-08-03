@@ -225,8 +225,3 @@ export function makeProbability(
   const raw = base + skill + contest + era + spacing + quality + latePenalty;
   return Math.min(0.97, Math.max(ENGINE_CONSTANTS.zoneMakeFloor[zone], Math.max(0.03, raw)));
 }
-
-/** Points for a made field goal at a zone. */
-export function madePoints(zone: ShotZone): number {
-  return isThreePointZone(zone) ? 3 : 2;
-}

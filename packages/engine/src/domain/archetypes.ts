@@ -16,15 +16,6 @@ import type { SimulationPlayer } from '@hoop-rush/data-contracts';
 export type Archetype =
   'primaryCreator' | 'secondaryCreator' | 'floorSpacer' | 'rimRunner' | 'postAnchor' | 'glue';
 
-export const ARCHETYPE_NAMES: readonly Archetype[] = [
-  'primaryCreator',
-  'secondaryCreator',
-  'floorSpacer',
-  'rimRunner',
-  'postAnchor',
-  'glue',
-];
-
 /** Creation ability (0..1): handling, passing, and offensive IQ. */
 export function creationScore(player: SimulationPlayer): number {
   const r = player.ratings;

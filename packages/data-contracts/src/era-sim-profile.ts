@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { eraIdSchema } from './ids.js';
 import { historicalValueProvenanceSchema } from './provenance.js';
+import { SHOT_ZONES } from './result.js';
 
 /**
  * Versioned era simulation profile (spec/03, spec/06). One artifact per decade,
@@ -13,13 +14,12 @@ import { historicalValueProvenanceSchema } from './provenance.js';
  * they become gates and the profile version advances.
  */
 
-export const eraZoneMixSchema = z.object({
-  rim: z.number().min(0).max(1),
-  shortMid: z.number().min(0).max(1),
-  longMid: z.number().min(0).max(1),
-  cornerThree: z.number().min(0).max(1),
-  aboveBreakThree: z.number().min(0).max(1),
-});
+type ZoneKeys = (typeof SHOT_ZONES)[number];
+
+const zoneRecord = <T extends z.ZodType>(value: T): z.ZodObject<Record<ZoneKeys, T>> =>
+  z.object(Object.fromEntries(SHOT_ZONES.map((zone) => [zone, value])) as Record<ZoneKeys, T>);
+
+export const eraZoneMixSchema = zoneRecord(z.number().min(0).max(1));
 export type EraZoneMix = z.infer<typeof eraZoneMixSchema>;
 
 /** Simulation parameters derived from the decade's source data (spec/03 pace,
@@ -99,13 +99,7 @@ export const eraCalibrationTargetsSchema = z.object({
   assistsPerGame: calibrationTargetSchema,
   assistRate: calibrationTargetSchema,
   personalFoulsPerGame: calibrationTargetSchema,
-  zoneMix: z.object({
-    rim: calibrationTargetSchema,
-    shortMid: calibrationTargetSchema,
-    longMid: calibrationTargetSchema,
-    cornerThree: calibrationTargetSchema,
-    aboveBreakThree: calibrationTargetSchema,
-  }),
+  zoneMix: zoneRecord(calibrationTargetSchema),
   /** Share of games decided by 5 points or fewer. */
   closeGameRate: calibrationTargetSchema,
   /** Share of games decided by 20+ points. */

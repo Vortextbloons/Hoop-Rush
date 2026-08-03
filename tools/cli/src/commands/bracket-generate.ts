@@ -23,6 +23,7 @@ import { bracketGenerateReportSchema } from '../report-schemas.js';
 import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.js';
 import { pools } from '@hoop-rush/importer';
 import { UsageError } from './sim.js';
+import { parseCount } from '../args.js';
 
 /**
  * `bracket generate` (dev tool, spec/01): authors the frozen 30-team bracket
@@ -522,13 +523,4 @@ export function bracketGenerate(args: {
     ),
   ];
   return makeReport('bracket generate', { seed }, { details: reportDetails, payload });
-}
-
-function parseCount(value: string | undefined, option: string, fallback: number): number {
-  if (value === undefined) return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new UsageError(`${option} must be a nonnegative integer (got "${value}")`);
-  }
-  return parsed;
 }
