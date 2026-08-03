@@ -95,6 +95,16 @@ def write_pool(path: Path, pool: dict[str, Any]) -> None:
             tmp.write_text(text, encoding="utf-8")
             os.replace(tmp, path)
             return
+        except PermissionError:
+            # Windows can deny replacing a file that a watcher has open even
+            # when the target already contains the exact bytes we generated.
+            # Treat that as success and remove only our redundant temp file.
+            if path.exists() and tmp.exists() and path.read_bytes() == tmp.read_bytes():
+                tmp.unlink(missing_ok=True)
+                return
+            if attempt == 11:
+                raise
+            time.sleep(0.2 * (attempt + 1))
         except OSError:
             if attempt == 11:
                 raise
@@ -234,6 +244,11 @@ def main() -> int:
         action="store_true",
         help="retry empty Wikipedia cache entries and add cached Wikipedia photos even when other fallbacks exist",
     )
+    parser.add_argument(
+        "--use-wikipedia-cache",
+        action="store_true",
+        help="merge usable cached Wikipedia photos without retrying empty cache entries",
+    )
     args = parser.parse_args()
 
     if args.targets:
@@ -288,20 +303,27 @@ def main() -> int:
                 f"{len(missing_marker)} marker annotations, {applied} bbref ids applied"
             )
 
-    # Phase 2 (network, concurrent): resolve photoUrl.
+    # Phase 2 (network/cache, concurrent): resolve photoUrl.
+    status_cache = load_bbref_status()
+    photo_cache = load_wikipedia_photos()
     pending: list[tuple[str, dict[str, Any]]] = []
     for path in targets:
         pool = pools.get(path.name)
         if not pool:
             continue
         for player in pool.get("players", []):
-            if args.retry_wikipedia or (player.get("altIds") or {}).get("photoUrl") is None:
+            external_id = str(player.get("playerExternalId", ""))
+            has_cached_photo = bool(photo_cache.get(external_id))
+            missing_photo = (player.get("altIds") or {}).get("photoUrl") is None
+            if (
+                args.retry_wikipedia
+                or (args.use_wikipedia_cache and has_cached_photo)
+                or (not args.use_wikipedia_cache and missing_photo)
+            ):
                 pending.append((path.name, player))
     print(f"  [OK] {len(pending)} players need photoUrl ({args.workers} workers)")
 
     if pending:
-        status_cache = load_bbref_status()
-        photo_cache = load_wikipedia_photos()
         cache_lock = threading.Lock()
         done = 0
         interrupt = False
