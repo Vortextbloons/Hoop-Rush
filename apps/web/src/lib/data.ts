@@ -13,18 +13,14 @@ import {
   type OpponentBracket,
   type PlayersIndex,
 } from '@hoop-rush/data-contracts';
+import { base } from '$app/paths';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 
 let manifestPromise: Promise<HoopRushManifest> | null = null;
 
-/**
- * Site root for packaged assets. The static build sets a relative base
- * (`./`), which would resolve nested routes like /sandbox/game to
- * /sandbox/data/...; assets always live at the site root.
- */
+/** Absolute site root for packaged JSON assets (respects GitHub Pages base path). */
 function siteRoot(): string {
-  const base = import.meta.env.BASE_URL;
-  return base.startsWith('/') ? base : '/';
+  return base ? `${base}/` : '/';
 }
 
 function manifestUrl(): string {
