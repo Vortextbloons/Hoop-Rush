@@ -35,8 +35,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
@@ -76,8 +78,27 @@ def pool_path(franchise_id: str, era_id: str) -> Path:
     return POOLS_DIR / f"{franchise_id}-{era_id}.json"
 
 
+def ensure_alt_ids(player: dict[str, Any]) -> dict[str, Any]:
+    """Return a mutable altIds dict; packaged pools may carry altIds: null."""
+    alt_ids = player.get("altIds")
+    if not isinstance(alt_ids, dict):
+        alt_ids = {}
+        player["altIds"] = alt_ids
+    return alt_ids
+
+
 def write_pool(path: Path, pool: dict[str, Any]) -> None:
-    path.write_text(json.dumps(pool, indent=2) + "\n", encoding="utf-8")
+    text = json.dumps(pool, indent=2) + "\n"
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    for attempt in range(12):
+        try:
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, path)
+            return
+        except OSError:
+            if attempt == 11:
+                raise
+            time.sleep(0.2 * (attempt + 1))
 
 
 def load_bbref_index() -> list[dict[str, Any]]:
@@ -186,7 +207,7 @@ def match_bbref_ids(
 
         if candidate is not None:
             mapping[external_id] = candidate["id"]
-            player.setdefault("altIds", {})["bbref"] = candidate["id"]
+            ensure_alt_ids(player)["bbref"] = candidate["id"]
             matched += 1
         else:
             ambiguous += 1
@@ -250,10 +271,10 @@ def main() -> int:
                 continue
             record_id = mapping.get(str(player.get("playerExternalId", "")))
             if record_id:
-                player.setdefault("altIds", {})["bbref"] = record_id
+                ensure_alt_ids(player)["bbref"] = record_id
                 applied += 1
         if missing_marker:
-            annotate_nba_headshots(players)
+            annotate_nba_headshots(players, workers=args.workers)
         total_players += len(players)
         total_markers += len(missing_marker)
         if applied or missing_marker:
@@ -290,7 +311,7 @@ def main() -> int:
                 photo_cache,
                 cache_lock,
             )
-            player.setdefault("altIds", {})["photoUrl"] = photo
+            ensure_alt_ids(player)["photoUrl"] = photo
 
         executor = ThreadPoolExecutor(max_workers=max(1, args.workers))
         try:

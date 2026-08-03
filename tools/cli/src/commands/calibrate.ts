@@ -65,7 +65,7 @@ function parseCount(value: string | undefined, option: string, fallback: number)
 
 /** Builds a league-average team from the packaged pool (usage-weighted means). */
 export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
-  const usage = pool.players.map((p) => Math.max(0.01, p.tendencies.usageRate ?? 0.01));
+  const usage = pool.players.map((p) => Math.max(0.01, p.tendencies.usageRate));
   const totalUsage = usage.reduce((a, b) => a + b, 0);
   const meanRatings: Record<string, number> = {};
   const meanTendencies: Record<string, number> = {};

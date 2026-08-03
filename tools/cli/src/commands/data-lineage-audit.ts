@@ -79,8 +79,7 @@ export async function dataLineageAudit(args: { input?: string | null }): Promise
     const sorted = [...segments].sort((a, b) =>
       a.validFromSeasonKey.localeCompare(b.validFromSeasonKey),
     );
-    for (let i = 0; i < sorted.length; i += 1) {
-      const current = sorted[i]!;
+    for (const [i, current] of sorted.entries()) {
       const next = sorted[i + 1];
       if (
         next &&

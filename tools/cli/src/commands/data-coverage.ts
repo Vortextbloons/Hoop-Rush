@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   hoopRushManifestSchema,
@@ -140,7 +140,7 @@ export async function dataCoverage(args: {
   for (const row of available.slice(0, 10)) {
     const summary = row.coverageSummary;
     details.push(
-      `${row.franchiseId}/${row.eraId}: ${String(row.playerCount)} players · ${summary?.coverageBand} · lowConfidence ${String(summary?.lowConfidenceShare)}`,
+      `${row.franchiseId}/${row.eraId}: ${String(row.playerCount)} players · ${summary?.coverageBand ?? 'n/a'} · lowConfidence ${String(summary?.lowConfidenceShare)}`,
     );
   }
   return makeReport(

@@ -4,7 +4,9 @@ export default defineConfig({
   test: {
     // Integration tests spawn the real CLI through tsx; under full parallel
     // package execution the spawned processes contend for CPU, so the
-    // default 5s per-test budget is too tight.
+    // default 5s per-test budget is too tight. Workers are capped so the
+    // subprocess-heavy suite does not oversubscribe the machine.
+    maxWorkers: 6,
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },

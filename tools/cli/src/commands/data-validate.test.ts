@@ -34,18 +34,20 @@ function legalPool(altIds: PeakPlayerSeason['altIds'] = null): ReturnType<typeof
     ['C'],
   ];
   return buildPool(
-    positions.map((position, index) =>
-      buildPlayerSeason({
-        playerId: `p-fixture-${index + 1}`,
-        displayName: `Fixture ${index + 1}`,
+    positions.map((position, index) => {
+      const label = position[0];
+      if (label === undefined) throw new Error('fixture position label missing');
+      return buildPlayerSeason({
+        playerId: `p-fixture-${String(index + 1)}`,
+        displayName: `Fixture ${String(index + 1)}`,
         positions: {
-          sourceLabels: [position[0]!],
+          sourceLabels: [label],
           canonical: position,
           normalizationVersion: 'position-v2',
         },
         altIds,
-      }),
-    ),
+      });
+    }),
   );
 }
 

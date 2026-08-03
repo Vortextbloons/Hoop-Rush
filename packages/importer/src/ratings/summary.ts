@@ -258,9 +258,18 @@ export function computeRealOverall(
   // naturally instead of collapsing onto one hard cap.
   const lowImpactRotation = gp >= 40 && mpg >= 20 && ppg < 16 && per < 14 && bpm < 1;
   // A low-minute reserve with very little production and negative impact should
-  // not inherit a starter-level overall from broad derived skills. This is
-  // deliberately stat-based so useful bench specialists can still rate well.
+  // not inherit a starter-level overall from broad derived skills. Apply a
+  // smooth penalty from the size of the statistical shortfall; there is no
+  // hard ceiling, and useful bench specialists are left alone.
   const lowImpactBench = gp >= 40 && mpg < 20 && ppg < 8 && per < 10 && bpm < 0;
+  const lowImpactBenchPenalty = lowImpactBench
+    ? Math.round(
+        Math.max(0, 8 - ppg) * 0.8 +
+          Math.max(0, 10 - per) * 0.9 +
+          Math.max(0, -bpm) * 1.1 +
+          Math.max(0, 20 - mpg) * 0.25,
+      )
+    : 0;
 
   // --- Final boost (matches TS) ---
   // Reduced so the top of the distribution is no longer lifted 2-6 points on
@@ -284,6 +293,6 @@ export function computeRealOverall(
     const impactPenalty = Math.round(Math.max(0, (14 - per) * 0.5 + (1 - bpm)));
     finalOverall = Math.max(0, finalOverall - impactPenalty);
   }
-  if (lowImpactBench) finalOverall = Math.min(finalOverall, 58);
+  if (lowImpactBench) finalOverall = Math.max(0, finalOverall - lowImpactBenchPenalty);
   return finalOverall;
 }

@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   DERIVATION_METHOD_VERSION,
   LINEAGE_RULE_VERSION,
@@ -59,11 +58,11 @@ export interface DeriveTracePayload {
   provenance: Record<string, unknown>;
 }
 
-export async function dataDerive(args: {
+export function dataDerive(args: {
   player?: string | null;
   season?: string | null;
   franchise?: string | null;
-}): Promise<CliReport> {
+}): CliReport {
   const player = args.player ?? null;
   const season = args.season ?? null;
   const franchise = args.franchise ?? null;
@@ -145,7 +144,7 @@ export async function dataDerive(args: {
     league3PARate: era.league3PARate,
     pace: era.pace,
   };
-  const position = String(roster.position ?? 'SF');
+  const position = typeof roster.position === 'string' ? roster.position : 'SF';
   const derived = ratings.derivePlayerRecord({
     season,
     position,
@@ -183,12 +182,12 @@ export async function dataDerive(args: {
     methods: derived.methods,
     unclamped: derived.unclamped,
     final: {
-      ratings: derived.ratings as unknown as Record<string, number>,
-      tendencies: derived.tendencies as unknown as Record<string, number>,
-      anchors: derived.anchors as unknown as Record<string, unknown>,
+      ratings: derived.ratings,
+      tendencies: derived.tendencies,
+      anchors: derived.anchors,
       summaryRatings: derived.summaryRatings,
     },
-    provenance: derived.provenance as unknown as Record<string, unknown>,
+    provenance: derived.provenance,
   };
 
   const estimatedCount = Object.values(derived.methods).filter((m) => m === 'estimated').length;
