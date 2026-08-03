@@ -162,11 +162,14 @@
 
   $effect(() => {
     const key = spinKey;
-    if (firstRun) {
-      firstRun = false;
-      return;
+    const isFirst = firstRun;
+    firstRun = false;
+    // A resumed draft mounts with spinKey 0 and never replays. A freshly
+    // created draft mounts with spinKey > 0 (the parent increments it for the
+    // very first roll), so the modal spins on mount.
+    if (!isFirst || key > 0) {
+      startSpin(key);
     }
-    startSpin(key);
     return () => {
       clearTimers();
     };

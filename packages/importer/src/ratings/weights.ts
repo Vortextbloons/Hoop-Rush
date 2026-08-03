@@ -110,6 +110,11 @@ export function computeOverall(
   }
   const deviation = total - 50;
   const isBig = isBigProfile(position, heightInches);
-  const divisor = isBig ? 120 : 85;
+  // Keep the curve mildly positive without turning a good weighted profile
+  // into an automatic 97-99. The previous divisors (120/85) made a center
+  // with a weighted skill of roughly 84 look like a 97 before production was
+  // considered; that is how ordinary All-NBA seasons such as Towns' 2016-17
+  // season reached the same band as all-time peaks.
+  const divisor = isBig ? 240 : 170;
   return Math.min(99, Math.round(50 + deviation * (1 + deviation / divisor)));
 }

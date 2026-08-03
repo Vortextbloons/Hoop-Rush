@@ -359,11 +359,16 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     'fta',
   ]);
 
+  // Scoring production is evidence of interior offense, but it is not the
+  // same thing as a 100-rated rim finisher. The former coefficients pushed
+  // nearly every efficient 20+ PPG big to the clamp, then the possession
+  // engine used that same clamp for rim skill. Keep elite finishers high while
+  // leaving room for matchup, spacing, and observed two-point efficiency.
   const insideRaw =
-    60 +
-    ((ppgNorm ?? 10) - 14) * 2.2 +
-    (tsPct ?? 0.48) * 35 +
-    (position === 'C' || position === 'F' ? 4 : -2);
+    58 +
+    ((ppgNorm ?? 10) - 14) * 1.5 +
+    ((tsPct ?? 0.48) - 0.5) * 25 +
+    (position === 'C' || position === 'F' ? 3 : -2);
   record('insideScoring', blend(insideRaw, 54), ppg !== null ? 'derived' : 'estimated', [
     'points',
     'tsPct',
@@ -396,20 +401,21 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     ['assists', 'usageRate', 'per'],
   );
 
-  const rebRaw = 60 + ((rpg ?? 4) - 4) * 5;
   // Before rebound splits were published, total rebounds are still strong
   // evidence. The old path discarded them and shrank elite rebounders toward
   // a generic prior, badly understating Russell-era centers.
   const reboundEvidence = rpg !== null && (oreb.kind !== 'observed' || dreb.kind !== 'observed');
+  const offensiveReboundRaw = 50 + (oreb.value - 1.5) * 8 + Math.max(0, (rpg ?? 4) - 4) * 0.8;
+  const defensiveReboundRaw = 55 + (dreb.value - 4) * 5 + Math.max(0, (rpg ?? 4) - 4) * 0.4;
   record(
     'offensiveRebound',
-    blend(rebRaw * 0.7, 45),
+    blend(offensiveReboundRaw, 45),
     oreb.kind === 'observed' ? 'derived' : oreb.kind,
     reboundEvidence ? ['rebounds', ...oreb.fields] : oreb.fields,
   );
   record(
     'defensiveRebound',
-    blend(rebRaw * 1.1, 59),
+    blend(defensiveReboundRaw, 59),
     dreb.kind === 'observed' ? 'derived' : dreb.kind,
     reboundEvidence ? ['rebounds', ...dreb.fields] : dreb.fields,
   );
@@ -450,17 +456,22 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     bpm !== null ? ['boxPlusMinus', 'rebounds'] : ['rebounds', 'prior'],
   );
 
-  const ath = 60 + ((usage ?? 18) - 18) * 0.5 + mpg * 0.5 + (per ?? 12) * 0.7;
+  // PER, usage, and minutes describe opportunity and production, not running
+  // speed. Use a conservative activity signal for speed and reserve size and
+  // height for strength so high-production centers do not become 100-rated
+  // athletes by construction.
+  const activity = 58 + ((usage ?? 18) - 18) * 0.2 + mpg * 0.3 + (per ?? 12) * 0.25;
+  const heightSignal = input.heightInches === null ? 0 : Math.max(0, input.heightInches - 72) * 1.7;
   record(
     'speed',
-    blend(ath + (position === 'G' ? 5 : 0), 59),
+    blend(activity + (position === 'G' ? 4 : 0), 59),
     usage !== null ? 'derived' : 'estimated',
     ['usageRate', 'minutes'],
   );
   record(
     'strength',
     blend(
-      position === 'C' || position === 'F' ? ath + 5 : ath,
+      53 + heightSignal + (position === 'C' ? 4 : 0) + (per ?? 12) * 0.2,
       position === 'C' || position === 'F' ? 64 : 54,
     ),
     usage !== null ? 'derived' : 'estimated',
@@ -605,7 +616,12 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const summaryRatings: SummaryRatings = {
     offenseRating: skillSummary.offenseRating,
     defenseRating: skillSummary.defenseRating,
-    overallRating: computeRealOverall(ratings, position, input.stats, input.heightInches),
+    // `position` above is the coarse G/F/C prior used for missing-data
+    // reconstruction. Overall weights and big-man detection need the actual
+    // detailed roster label: Duncan is listed as SF but is a genuine big
+    // profile by height, while guards need guard weights rather than the SF
+    // fallback.
+    overallRating: computeRealOverall(ratings, detailPos, input.stats, input.heightInches),
   };
 
   return {

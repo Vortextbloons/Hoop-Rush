@@ -76,23 +76,28 @@ export function computeProductionImpact(stats: StatsRow): number {
   const usage = safeFloat(stats.usageRate);
   const tsPct = safeFloat(stats.tsPct);
 
+  // Production is a second signal, not a second copy of the skill score.
+  // The old coefficients routinely pushed every high-minute star to the 99
+  // clamp, removing the distinction between Curry, Duncan, and Towns. These
+  // softer, rate-based contributions keep the impact band useful while still
+  // rewarding sustained scoring, efficiency, creation, and two-way value.
   let impact =
-    62 +
-    (ppg - 10) * 1.0 +
-    (rpg - 4) * 0.7 +
-    (apg - 3) * 0.95 +
-    (per - 15) * 0.9 +
-    bpm * 1.5 +
-    (usage - 20) * 0.35 +
-    (mpg - 24) * 0.35 +
-    (tsPct - 0.57) * 50;
+    60 +
+    (ppg - 15) * 0.65 +
+    (rpg - 5) * 0.3 +
+    (apg - 3) * 0.45 +
+    (per - 15) * 0.6 +
+    bpm * 0.8 +
+    (usage - 20) * 0.15 +
+    (mpg - 24) * 0.15 +
+    (tsPct - 0.55) * 35;
   if (ppg >= 24 && tsPct >= 0.59) {
-    impact += 3.5;
+    impact += 2.5;
   } else if (ppg >= 24 && tsPct >= 0.56) {
-    impact += 2;
+    impact += 1.25;
   }
-  if (apg >= 6 && usage >= 26) impact += 2;
-  if (ppg >= 20 && per >= 20) impact += 1.5;
+  if (apg >= 6 && usage >= 26) impact += 1.25;
+  if (ppg >= 20 && per >= 20) impact += 1;
   return clamp(impact, 55, 99);
 }
 
@@ -199,6 +204,13 @@ export function computeRealOverall(
     // ppg branch ignored efficiency and impact.
     const eliteBigImpact =
       per >= 23 || (bpm >= 5 && per >= 22) || (per >= 20 && tsPct >= 0.58 && bpm >= 2);
+    // A high-minute big with both All-NBA efficiency and strong impact should
+    // not be held to the generic 23-25 PPG floor. This is intentionally
+    // mechanism-based, so it also applies to Robinson, Hakeem, and similar
+    // seasons without a player-name exception.
+    if (gp >= 55 && mpg >= 30 && ppg >= 22 && per >= 22 && bpm >= 4) {
+      boosted = Math.max(boosted, 92);
+    }
     if (ppg >= 25) {
       boosted = Math.min(boosted, eliteBigImpact ? (gp >= 55 ? 97 : 92) : gp >= 55 ? 92 : 89);
     } else if (usage >= 28) {
@@ -248,7 +260,12 @@ export function computeRealOverall(
   // (Maxey 2025-26 reached 95 without the impact metrics of the all-time band).
   if (!isBig && ppg >= 25) {
     if (gp < 55) boosted = Math.min(boosted, 90);
-    else if (bpm >= 4) boosted = Math.min(boosted, 96);
+    else if (bpm >= 3 && ppg >= 28 && tsPct >= 0.62 && per >= 22) {
+      // Elite efficiency turns high usage into positive offensive value. The
+      // former BPM-only ladder treated Curry's 30.1 PPG / 66.9 TS% season as
+      // ordinary volume and capped it below less efficient two-way wings.
+      boosted = Math.max(boosted, 95);
+    } else if (bpm >= 4) boosted = Math.min(boosted, 96);
     else if (bpm >= 3) boosted = Math.min(boosted, 93);
     else boosted = Math.min(boosted, 90);
   }

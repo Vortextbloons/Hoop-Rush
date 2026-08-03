@@ -181,11 +181,15 @@
           <dl class="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs text-muted-foreground">
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">MVP score</dt>
-              <dd class="font-bold text-foreground">{mvp.averageGameScore.toFixed(1)}</dd>
+              <dd class="font-bold text-foreground">{mvp.mvpScore.toFixed(1)}</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">PTS</dt>
               <dd class="font-bold text-foreground">{mvp.averagePoints.toFixed(1)}</dd>
+            </div>
+            <div>
+              <dt class="text-[9px] tracking-[0.14em] uppercase">TS%</dt>
+              <dd class="font-bold text-foreground">{(mvp.averageEfficiency * 100).toFixed(1)}%</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">REB</dt>
@@ -202,6 +206,10 @@
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">BLK</dt>
               <dd class="font-bold text-foreground">{mvp.averageBlocks.toFixed(1)}</dd>
+            </div>
+            <div>
+              <dt class="text-[9px] tracking-[0.14em] uppercase">Consistency</dt>
+              <dd class="font-bold text-foreground">{mvp.consistency.toFixed(1)}</dd>
             </div>
           </dl>
         </section>

@@ -6,7 +6,7 @@ import type {
   PlayerBoxScore,
   TeamResult,
 } from '@hoop-rush/data-contracts';
-import { gameScore, leagueMvp } from './mvp.js';
+import { gameScore, leagueMvp, mvpValue } from './mvp.js';
 
 /**
  * A full box score with known values: 25 pts, 10/20 FG, 5/6 FT, 4 ORB, 6 DRB,
@@ -97,6 +97,7 @@ function gameResultFixture(args: {
   homePlayers?: PlayerBoxScore[];
   awayPlayers?: PlayerBoxScore[];
   gameNumber?: number;
+  winner?: 'home' | 'away';
 }): GameResult {
   const homeTeamId = args.homeTeamId ?? 'user';
   const awayTeamId = args.awayTeamId ?? 'hawks';
@@ -119,7 +120,7 @@ function gameResultFixture(args: {
       args.awayPlayers ?? [],
     ),
     periodScores: { home: [0, 0, 0, 0], away: [0, 0, 0, 0] },
-    winner: 'home',
+    winner: args.winner ?? 'home',
     overtimePeriods: 0,
     facts: [],
   };
@@ -237,7 +238,7 @@ describe('league mvp', () => {
     expect(mvp!.averageGameScore).toBe(40);
   });
 
-  it('breaks score ties by average points', () => {
+  it('breaks mvp-score and game-score ties by average points', () => {
     const games = [
       gameResultFixture({
         awayTeamId: 'hawks',
@@ -268,7 +269,9 @@ describe('league mvp', () => {
     expect(mvp!.averagePoints).toBe(24);
   });
 
-  it('breaks score and points ties by combined per appearance', () => {
+  it('separates equal game scores with the defense bonus', () => {
+    // Both candidates carry a 20 Game Score; p-2's steals earn a defense
+    // bonus, so the composite (not a tie-break) decides.
     const games = [
       gameResultFixture({
         awayTeamId: 'hawks',
@@ -301,6 +304,8 @@ describe('league mvp', () => {
   });
 
   it('breaks full ties by team then player identity', () => {
+    // Alternating winners give both sides one win and one loss, so the
+    // team-context bonus cancels and every ranking key ties.
     const acrossTeams = leagueMvp(
       runFixture([
         gameResultFixture({
@@ -308,6 +313,14 @@ describe('league mvp', () => {
           homePlayers: [scoringBox(20, 'p-1')],
           awayPlayers: [scoringBox(20, 'p-opp-1-0')],
           gameNumber: 1,
+          winner: 'home',
+        }),
+        gameResultFixture({
+          awayTeamId: 'celtics',
+          homePlayers: [scoringBox(20, 'p-1')],
+          awayPlayers: [scoringBox(20, 'p-opp-1-0')],
+          gameNumber: 2,
+          winner: 'away',
         }),
       ]),
     );
@@ -320,6 +333,14 @@ describe('league mvp', () => {
           homePlayers: [scoringBox(20, 'p-1'), scoringBox(20, 'p-2')],
           awayPlayers: [scoringBox(0, 'p-opp-0-0')],
           gameNumber: 1,
+          winner: 'home',
+        }),
+        gameResultFixture({
+          awayTeamId: 'hawks',
+          homePlayers: [scoringBox(20, 'p-1'), scoringBox(20, 'p-2')],
+          awayPlayers: [scoringBox(0, 'p-opp-0-0')],
+          gameNumber: 2,
+          winner: 'away',
         }),
       ]),
     );
@@ -373,5 +394,208 @@ describe('league mvp', () => {
       }),
     );
     expect(leagueMvp(runFixture(games))).toEqual(leagueMvp(runFixture(games)));
+  });
+});
+
+describe('mvp composite', () => {
+  it('adds efficiency, defense, playmaking, and win bonuses to game score', () => {
+    const box = playerBox();
+    // Game Score 20.8 (hand-computed). True shooting = 25/(2*(20 + 0.44*6))
+    // ≈ 0.5521, so the efficiency bonus with baseline 0.5 on 22.64 shots is
+    // ≈ 1.18. Defense 0.6*2 + 0.6*1 + 0.15*6 = 2.7, playmaking 0.5*3 = 1.5,
+    // and the win bonus 0.75.
+    expect(mvpValue(box, 0.5, true)).toBeCloseTo(20.8 + 1.18 + 2.7 + 1.5 + 0.75, 2);
+  });
+
+  it('penalizes losses and credits diagnostics when present', () => {
+    const box = playerBox({
+      diagnostics: {
+        usage: 0,
+        shotZones: [
+          { zone: 'rim', attempts: 0, makes: 0 },
+          { zone: 'shortMid', attempts: 0, makes: 0 },
+          { zone: 'longMid', attempts: 0, makes: 0 },
+          { zone: 'cornerThree', attempts: 0, makes: 0 },
+          { zone: 'aboveBreakThree', attempts: 0, makes: 0 },
+        ],
+        assistOpportunities: 4,
+        offensiveReboundChances: 0,
+        defensiveReboundChances: 0,
+        contestedShots: 5,
+      },
+    });
+    // Same composite as above: loss bonus (−0.75 instead of +0.75), plus
+    // 0.25*4 created assists and 0.04*5 contests.
+    expect(mvpValue(box, 0.5, false)).toBeCloseTo(20.8 + 1.18 + 2.7 + 1.5 - 0.75 + 1 + 0.2, 2);
+  });
+
+  it('rewards efficient scoring over equal production on more shots', () => {
+    const games = [
+      gameResultFixture({
+        awayTeamId: 'celtics',
+        homePlayers: [
+          playerBox({
+            playerId: 'p-1',
+            minutes: 36,
+            points: 24,
+            fieldGoals: { made: 10, attempted: 15 },
+            threes: { made: 0, attempted: 0 },
+            freeThrows: { made: 4, attempted: 4 },
+            rebounds: { total: 0, offensive: 0, defensive: 0 },
+            assists: 0,
+            steals: 0,
+            blocks: 0,
+            turnovers: 0,
+            fouls: 0,
+          }),
+          playerBox({
+            playerId: 'p-2',
+            minutes: 36,
+            points: 24,
+            fieldGoals: { made: 12, attempted: 30 },
+            threes: { made: 0, attempted: 0 },
+            freeThrows: { made: 0, attempted: 0 },
+            rebounds: { total: 0, offensive: 0, defensive: 0 },
+            assists: 0,
+            steals: 0,
+            blocks: 0,
+            turnovers: 0,
+            fouls: 0,
+          }),
+        ],
+        awayPlayers: [scoringBox(0, 'p-opp-0-0')],
+        gameNumber: 1,
+      }),
+    ];
+    const mvp = leagueMvp(runFixture(games));
+    expect(mvp!.playerId).toBe('p-1');
+    expect(mvp!.averageEfficiency).toBeCloseTo(24 / (2 * (15 + 0.44 * 4)), 5);
+  });
+
+  it('lets defense and playmaking beat higher raw scoring', () => {
+    const games = [
+      gameResultFixture({
+        awayTeamId: 'celtics',
+        homePlayers: [
+          scoringBox(22, 'p-1'),
+          playerBox({
+            playerId: 'p-2',
+            minutes: 36,
+            points: 20,
+            fieldGoals: { made: 8, attempted: 16 },
+            threes: { made: 0, attempted: 0 },
+            freeThrows: { made: 0, attempted: 0 },
+            rebounds: { total: 0, offensive: 0, defensive: 0 },
+            assists: 4,
+            steals: 2,
+            blocks: 0,
+            turnovers: 0,
+            fouls: 0,
+          }),
+        ],
+        // An inefficient away shooter drags the league baseline to 0.4375,
+        // so p-2's 62.5% shooting earns an efficiency bonus on top of the
+        // defense and playmaking terms.
+        awayPlayers: [
+          playerBox({
+            playerId: 'p-opp-1-0',
+            minutes: 36,
+            points: 8,
+            fieldGoals: { made: 4, attempted: 16 },
+            threes: { made: 0, attempted: 0 },
+            freeThrows: { made: 0, attempted: 0 },
+            rebounds: { total: 0, offensive: 0, defensive: 0 },
+            assists: 0,
+            steals: 0,
+            blocks: 0,
+            turnovers: 0,
+            fouls: 0,
+          }),
+        ],
+        gameNumber: 1,
+      }),
+    ];
+    const mvp = leagueMvp(runFixture(games));
+    expect(mvp!.playerId).toBe('p-2');
+    expect(mvp!.averageGameScore).toBe(16.8);
+  });
+
+  it('penalizes boom-and-bust consistency', () => {
+    const games = [1, 2, 3].map((gameNumber) =>
+      gameResultFixture({
+        awayTeamId: 'celtics',
+        homePlayers: [scoringBox(30, 'p-1'), scoringBox(gameNumber === 2 ? 40 : 20, 'p-2')],
+        awayPlayers: [scoringBox(0, 'p-opp-1-0')],
+        gameNumber,
+      }),
+    );
+    const mvp = leagueMvp(runFixture(games));
+    expect(mvp!.playerId).toBe('p-1');
+    expect(mvp!.consistency).toBe(0);
+  });
+
+  it('applies the small team-context tilt for wins', () => {
+    const games = [
+      gameResultFixture({
+        awayTeamId: 'celtics',
+        homePlayers: [scoringBox(20, 'p-1')],
+        awayPlayers: [scoringBox(20, 'p-opp-1-0')],
+        gameNumber: 1,
+      }),
+    ];
+    const mvp = leagueMvp(runFixture(games));
+    expect(mvp!.isUserTeam).toBe(true);
+    expect(mvp!.mvpScore).toBeCloseTo(20.75, 5);
+  });
+
+  it('adapts the efficiency baseline to the run', () => {
+    const buildRun = (filler: PlayerBoxScore) =>
+      runFixture([
+        gameResultFixture({
+          awayTeamId: 'celtics',
+          homePlayers: [
+            playerBox({
+              playerId: 'p-1',
+              minutes: 36,
+              points: 20,
+              fieldGoals: { made: 8, attempted: 16 },
+              threes: { made: 0, attempted: 0 },
+              freeThrows: { made: 0, attempted: 0 },
+              rebounds: { total: 0, offensive: 0, defensive: 0 },
+              assists: 0,
+              steals: 0,
+              blocks: 0,
+              turnovers: 0,
+              fouls: 0,
+            }),
+          ],
+          awayPlayers: [filler],
+          gameNumber: 1,
+        }),
+      ]);
+    const efficientLeague = buildRun(scoringBox(0, 'p-opp-1-0'));
+    const inefficientLeague = buildRun(
+      playerBox({
+        playerId: 'p-opp-1-0',
+        minutes: 36,
+        points: 10,
+        fieldGoals: { made: 5, attempted: 20 },
+        threes: { made: 0, attempted: 0 },
+        freeThrows: { made: 0, attempted: 0 },
+        rebounds: { total: 0, offensive: 0, defensive: 0 },
+        assists: 0,
+        steals: 0,
+        blocks: 0,
+        turnovers: 0,
+        fouls: 0,
+      }),
+    );
+    const inEfficient = leagueMvp(efficientLeague)!;
+    const inInefficient = leagueMvp(inefficientLeague)!;
+    // The 62.5% shooter earns a larger bonus when the rest of the run drags
+    // the league baseline down, while keeping the same raw box score.
+    expect(inEfficient.playerId).toBe('p-1');
+    expect(inInefficient.playerId).toBe('p-1');
+    expect(inInefficient.mvpScore).toBeGreaterThan(inEfficient.mvpScore);
   });
 });

@@ -106,6 +106,13 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await page.getByRole('button', { name: 'Start Ratings draft' }).click();
     await expect(roundHeading(page, 1)).toBeVisible();
 
+    // The very first roll animates too: the modal opens with the spinning
+    // reels, then closes on the landed pair.
+    await expect(page.locator('.roll-overlay')).toBeVisible();
+    await expect(page.locator('[data-axis="franchise"]')).toBeVisible();
+    await expect(page.locator('[data-axis="era"]')).toBeVisible();
+    await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+
     // The initial roll shows the franchise + era indicators.
     await expect(page.locator('[data-indicator="franchise"]')).toBeVisible();
     await expect(page.locator('[data-indicator="era"]')).toBeVisible();
@@ -188,6 +195,11 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await page.goto('/classic');
     await page.getByRole('button', { name: 'Start Ratings draft' }).click();
     await expect(roundHeading(page, 1)).toBeVisible();
+
+    // The initial roll spins on fresh creation; wait for it to settle so the
+    // reroll buttons are usable and the indicators hold the landed pair.
+    await expect(page.locator('.roll-overlay')).toBeVisible();
+    await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
 
     const franchiseIndicator = page.locator('[data-indicator="franchise"]');
     const eraIndicator = page.locator('[data-indicator="era"]');

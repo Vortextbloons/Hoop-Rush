@@ -68,6 +68,22 @@ describe('ClassicRollReel', () => {
     expect(onSettled).not.toHaveBeenCalled();
   });
 
+  it('spins on mount when spinKey starts above zero (fresh creation)', async () => {
+    const { container, onSettled } = renderReel({ spinKey: 1 });
+
+    expect(container.querySelector(OVERLAY)).not.toBeNull();
+    const franchiseStrip = container.querySelector(FRANCHISE_STRIP);
+    const eraStrip = container.querySelector(ERA_STRIP);
+    expect(franchiseStrip?.classList.contains('reel-spinning')).toBe(true);
+    expect(eraStrip?.classList.contains('reel-spinning')).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(950);
+    expect(container.querySelector(RESULT)).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(850);
+    expect(container.querySelector(OVERLAY)).toBeNull();
+    expect(onSettled).toHaveBeenCalledTimes(1);
+  });
+
   it('opens the modal, spins both reels, shows the result indicator, then closes', async () => {
     const { container, rerender, onSettled } = renderReel();
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DERIVATION_METHOD_VERSION } from '@hoop-rush/data-contracts';
 import { derivePlayerRecord, fieldPublished, type DerivationInput } from './v2.js';
-import { computeRealOverall, computeSummaryRatings } from './summary.js';
+import { computeProductionImpact, computeRealOverall, computeSummaryRatings } from './summary.js';
 
 const MODERN = { leaguePpg: 110, league3PARate: 0.36, pace: 99 };
 
@@ -183,6 +183,114 @@ describe('derivePlayerRecord (field-method registry)', () => {
     );
     const skillOnly = computeSummaryRatings(derived.ratings, derived.tendencies);
     expect(derived.summaryRatings.overallRating).toBeGreaterThan(skillOnly.overallRating);
+  });
+
+  it('keeps elite guard efficiency above ordinary high-volume caps', () => {
+    const curryLike = derivePlayerRecord(
+      input(
+        '2015-16',
+        starterStats({
+          gamesPlayed: 79,
+          minutes: 2701.8,
+          points: 2377.9,
+          rebounds: 426.6,
+          assists: 529.3,
+          steals: 165.9,
+          blocks: 15.8,
+          fgm: 805.8,
+          fga: 1595.8,
+          tpm: 402.9,
+          tpa: 884.8,
+          ftm: 363.4,
+          fta: 402.9,
+          per: 23.14,
+          boxPlusMinus: 3.592,
+          usageRate: 31.4,
+          tsPct: 0.669,
+        }),
+        'SG',
+        { heightInches: 75 },
+      ),
+    );
+
+    expect(curryLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(95);
+    expect(curryLike.summaryRatings.overallRating).toBeLessThanOrEqual(99);
+    expect(computeProductionImpact(starterStats())).toBeLessThan(99);
+  });
+
+  it('does not turn a strong center into an automatic 98 overall', () => {
+    const townsLike = derivePlayerRecord(
+      input(
+        '2016-17',
+        starterStats({
+          gamesPlayed: 82,
+          minutes: 3034,
+          points: 2058.2,
+          rebounds: 1008.6,
+          offensiveRebounds: 295.2,
+          defensiveRebounds: 713.4,
+          assists: 221.4,
+          steals: 57.4,
+          blocks: 106.6,
+          turnovers: 213.2,
+          fgm: 803.6,
+          fga: 1476,
+          tpm: 98.4,
+          tpa: 278.8,
+          ftm: 352.6,
+          fta: 426.4,
+          per: 22.005,
+          boxPlusMinus: 3.177,
+          usageRate: 27.1,
+          tsPct: 0.618,
+        }),
+        'C',
+        { heightInches: 84 },
+      ),
+    );
+
+    expect(townsLike.summaryRatings.overallRating).toBeLessThan(95);
+    expect(townsLike.summaryRatings.offenseRating).toBeLessThan(85);
+    expect(townsLike.summaryRatings.defenseRating).toBeLessThan(85);
+    expect(townsLike.ratings.insideScoring).toBeLessThan(95);
+    expect(townsLike.ratings.defensiveRebound).toBeLessThan(95);
+    expect(townsLike.ratings.speed).toBeLessThan(90);
+    expect(townsLike.ratings.strength).toBeLessThan(90);
+  });
+
+  it('uses the detailed roster position for overall weights and big detection', () => {
+    const duncanLikeStats = starterStats({
+      gamesPlayed: 81,
+      minutes: 3183.3,
+      points: 1887.3,
+      rebounds: 1044.9,
+      offensiveRebounds: 259.2,
+      defensiveRebounds: 785.7,
+      assists: 315.9,
+      steals: 56.7,
+      blocks: 234.9,
+      turnovers: 251.1,
+      fgm: 712.8,
+      fga: 1393.2,
+      tpm: 8.1,
+      tpa: 24.3,
+      ftm: 453.6,
+      fta: 631.8,
+      per: 23.59,
+      boxPlusMinus: 5.821,
+      usageRate: 27.6,
+      tsPct: 0.564,
+    });
+    const duncanLike = derivePlayerRecord(
+      input('2002-03', duncanLikeStats, 'SF', { heightInches: 84 }),
+    );
+
+    expect(duncanLike.summaryRatings.overallRating).toBe(
+      computeRealOverall(duncanLike.ratings, 'SF', duncanLikeStats, 84),
+    );
+    expect(duncanLike.summaryRatings.overallRating).toBeGreaterThan(
+      computeRealOverall(duncanLike.ratings, 'F', duncanLikeStats, 84),
+    );
   });
 
   it('smoothly penalizes sustained low-impact bench seasons', () => {

@@ -214,8 +214,6 @@
     setupError = null;
     actionError = null;
     launchError = null;
-    spinning = false;
-    spinKey = 0;
     try {
       const next = classic.createClassicDraft(
         {
@@ -228,6 +226,12 @@
         createEngineContext(),
       );
       draft = await persist(next);
+      // The very first roll animates too: the reel mounts with spinKey > 0
+      // and spins on mount. A resumed draft always mounts with spinKey 0 and
+      // never replays.
+      reelAxis = 'both';
+      spinKey += 1;
+      spinning = true;
     } catch (error) {
       setupError = error instanceof Error ? error.message : String(error);
     }
