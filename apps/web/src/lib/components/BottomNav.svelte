@@ -13,12 +13,12 @@
 
   let { items }: { items: BottomNavItem[] } = $props();
 
-  const pathname = $derived(page.url.pathname);
+  const routeId = $derived(page.route.id);
 
   function isActive(item: BottomNavItem): boolean {
     if (item.href === null) return false;
-    if (item.href === '/') return pathname === '/';
-    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+    if (item.href === '/') return routeId === '/';
+    return routeId === item.href || routeId.startsWith(`${item.href}/`);
   }
 </script>
 

@@ -18,8 +18,8 @@
     { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
   ];
 
-  const pathname = $derived(page.url.pathname);
-  const showBottomNav = $derived(pathname === '/' || pathname === '/roster');
+  const routeId = $derived(page.route.id);
+  const showBottomNav = $derived(routeId === '/' || routeId === '/roster');
 </script>
 
 <svelte:head>
