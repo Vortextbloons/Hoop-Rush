@@ -70,8 +70,10 @@ export function slotRequirement(slotIndex: number): 'G' | 'F' | 'C' {
 /**
  * Candidate pairs for a roll, filtered to pairs containing a player who is
  * not yet drafted AND can legally fill an open slot, then sorted canonically.
- * For 'franchise-reroll' excludes the current roll's franchise; for
- * 'era-reroll' excludes the current roll's era.
+ * Rerolls filter on a single axis (spec/01): a 'franchise-reroll' preserves
+ * the current roll's era and requires a different eligible franchise; an
+ * 'era-reroll' preserves the current roll's franchise and requires a
+ * different eligible era. Pairs that differ on both axes are never eligible.
  */
 export function classicRollCandidates(
   catalog: ClassicDraftCatalog,
@@ -93,11 +95,13 @@ export function classicRollCandidates(
   }
   return sortClassicCatalog(
     catalog.filter((entry) => {
-      if (kind === 'franchise-reroll' && entry.franchiseId === state.roll!.franchiseId) {
-        return false;
+      if (kind === 'franchise-reroll') {
+        if (entry.eraId !== state.roll!.eraId) return false;
+        if (entry.franchiseId === state.roll!.franchiseId) return false;
       }
-      if (kind === 'era-reroll' && entry.eraId === state.roll!.eraId) {
-        return false;
+      if (kind === 'era-reroll') {
+        if (entry.franchiseId !== state.roll!.franchiseId) return false;
+        if (entry.eraId === state.roll!.eraId) return false;
       }
       return entry.players.some(
         (player) =>

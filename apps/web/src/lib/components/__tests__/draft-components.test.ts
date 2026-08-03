@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
 import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
@@ -84,20 +84,61 @@ function renderPoolBrowser(
 }
 
 describe('DraftPoolBrowser parity', () => {
-  it('ratings presentation shows Overall, Offense, and Defense badges', () => {
-    const { getByTitle } = renderPoolBrowser({ presentation: 'ratings' });
+  it('ratings presentation shows only the Overall badge', () => {
+    const { getByTitle, queryByTitle } = renderPoolBrowser({ presentation: 'ratings' });
 
     expect(getByTitle('Overall').textContent).toBe('O 90');
-    expect(getByTitle('Offense').textContent).toBe('OFF 70');
-    expect(getByTitle('Defense').textContent).toBe('DEF 70');
+    expect(queryByTitle('Offense')).toBeNull();
+    expect(queryByTitle('Defense')).toBeNull();
   });
 
-  it('ball-knowledge hides Overall but keeps Offense and Defense', () => {
-    const { queryByTitle, getByTitle } = renderPoolBrowser({ presentation: 'ball-knowledge' });
+  it('sandbox presentation shows only the Overall badge', () => {
+    const { getByTitle, queryByTitle } = renderPoolBrowser({ presentation: 'sandbox' });
+
+    expect(getByTitle('Overall').textContent).toBe('O 90');
+    expect(queryByTitle('Offense')).toBeNull();
+    expect(queryByTitle('Defense')).toBeNull();
+  });
+
+  it('ball-knowledge shows no rating badges', () => {
+    const { queryByTitle, getByText } = renderPoolBrowser({ presentation: 'ball-knowledge' });
 
     expect(queryByTitle('Overall')).toBeNull();
-    expect(getByTitle('Offense').textContent).toBe('OFF 70');
-    expect(getByTitle('Defense').textContent).toBe('DEF 70');
+    expect(queryByTitle('Offense')).toBeNull();
+    expect(queryByTitle('Defense')).toBeNull();
+    expect(getByText('Aaron A')).not.toBeNull();
+    expect(getByText(/1996-97 ·/)).not.toBeNull();
+  });
+
+  it('resets local filters when a new pool scope is revealed', async () => {
+    const rowsA = [
+      row({ playerId: 'a', displayName: 'Aaron A', overall: 90 }),
+      row({ playerId: 'b', displayName: 'Bob B', overall: 80 }),
+    ];
+    const rowsB = [
+      row({ playerId: 'c', displayName: 'Cara C', overall: 95 }),
+      row({ playerId: 'd', displayName: 'Dan D', overall: 75 }),
+    ];
+    const { container, rerender } = renderPoolBrowser({
+      presentation: 'ratings',
+      filtersEditable: true,
+      rows: rowsA,
+    });
+
+    const searchbox = container.querySelector('input[type="search"]') as HTMLInputElement;
+    await fireEvent.input(searchbox, { target: { value: 'bob' } });
+
+    await vi.waitFor(() => {
+      expect(container.querySelectorAll('li')).toHaveLength(1);
+    });
+    expect(container.textContent).toContain('Bob B');
+
+    await rerender({ rows: rowsB, filtersEditable: true, presentation: 'ratings' });
+
+    expect(searchbox.value).toBe('');
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+    expect(container.textContent).toContain('Cara C');
+    expect(container.textContent).toContain('Dan D');
   });
 
   it('filtersEditable=false renders no search box', () => {

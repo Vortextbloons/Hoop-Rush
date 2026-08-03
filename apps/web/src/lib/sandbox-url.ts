@@ -37,17 +37,6 @@ export type SandboxHref = `/sandbox?${string}`;
 
 const SLOT_PATTERN = /^([^@]+)@([^/]+)\/([^/]+)$/;
 
-/** Full sandbox href for the draft route (callers pass it through resolve()). */
-export function buildSandboxUrl(state: SandboxUrlState): SandboxHref {
-  const params = new URLSearchParams();
-  params.set(
-    'slots',
-    state.slots.map((slot) => `${slot.playerId}@${slot.franchiseId}/${slot.eraId}`).join(','),
-  );
-  if (state.seed !== undefined) params.set('seed', state.seed);
-  return `/sandbox?${params.toString()}`;
-}
-
 export function parseSandboxUrl(
   url: URL,
   manifest: HoopRushManifest | null,

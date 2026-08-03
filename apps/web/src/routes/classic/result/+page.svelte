@@ -7,17 +7,15 @@
   import { variantLabel } from '$lib/draft-presentation';
   import { getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
-  import { draftStateFromCompletedDraft, saveClassicDraftState } from '$lib/classic-draft';
-  import { startClassicRun } from '$lib/classic-run';
+  import { clearClassicDraftState } from '$lib/classic-draft';
   import { loadRunPlayersById } from '$lib/sandbox-lineup';
-  import { generateSeed } from '$lib/sandbox-url';
   import SeasonReport from '$lib/components/SeasonReport.svelte';
 
   /**
    * Classic challenge result: the shared SeasonReport record with classic
-   * mode identity. Retry replays the same five draft picks with a brand-new
-   * seed through the classic run path; Edit team restores the completed
-   * draft so the five can be repositioned before the next season.
+   * mode identity and the League MVP spotlight. The single Run again action
+   * clears any draft state and returns to the Classic variant picker for a
+   * fresh seed and five new rounds.
    */
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -92,39 +90,12 @@
     run ? `Classic · ${variantLabel(run.variant ?? 'ratings')}` : 'Classic',
   );
 
-  /** Replays the same five draft picks with a brand-new seed. */
-  async function retryClassic() {
-    const currentRun = run;
-    const m = manifest;
-    if (!currentRun || !m || running) return;
+  /** Fresh start: clears any draft state and returns to the variant picker. */
+  async function runAgain() {
+    if (running) return;
     running = true;
     try {
-      if (!currentRun.classicDraft) {
-        error = 'This classic run has no draft snapshot.';
-        return;
-      }
-      const draft = draftStateFromCompletedDraft(currentRun.classicDraft, m.dataVersion);
-      await startClassicRun(draft, generateSeed());
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-    } finally {
-      running = false;
-    }
-  }
-
-  /** Restores the completed draft so the five can be repositioned. */
-  async function editClassicTeam() {
-    const currentRun = run;
-    const m = manifest;
-    if (!currentRun || !m || running) return;
-    running = true;
-    try {
-      if (!currentRun.classicDraft) {
-        error = 'This classic run has no draft snapshot.';
-        return;
-      }
-      const draft = draftStateFromCompletedDraft(currentRun.classicDraft, m.dataVersion);
-      await saveClassicDraftState(draft);
+      await clearClassicDraftState();
       void goto(resolve('/classic'));
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -167,15 +138,6 @@
       </p>
     </div>
   {:else}
-    <SeasonReport
-      {manifest}
-      {run}
-      {byId}
-      {modeLabel}
-      retrying={running}
-      onRetry={retryClassic}
-      editHref={null}
-      onEditTeam={editClassicTeam}
-    />
+    <SeasonReport {manifest} {run} {byId} {modeLabel} {running} onRunAgain={runAgain} />
   {/if}
 </section>

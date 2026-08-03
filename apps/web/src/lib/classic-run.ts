@@ -9,6 +9,7 @@ import {
   toSimulationPlayer,
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
+import { setClassicGuardBypass } from '$lib/classic-nav-guard';
 import { getBracket, getEraSimulationProfile, getManifest, getPool } from '$lib/data';
 import { FIXED_SANDBOX_ERA } from '$lib/sandbox-run';
 
@@ -95,5 +96,8 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
     { recordId: 'active', saveSchemaVersion: 2, run },
     draft.draftId,
   );
+  // The automatic launch is not a user navigation: mark the bypass so the
+  // draft navigation guard lets the transition through without a prompt.
+  setClassicGuardBypass(true);
   void goto(resolve('/classic/challenge'));
 }

@@ -24,8 +24,6 @@
 
   const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
     O: 'Overall',
-    OFF: 'Offense',
-    DEF: 'Defense',
   };
 
   let {

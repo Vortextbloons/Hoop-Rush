@@ -182,6 +182,83 @@ function completeFixture(overrides: Partial<ClassicDraftState> = {}): ClassicDra
   };
 }
 
+/**
+ * Decoy catalog pinned to a lakers/1990s roll: lakers/1980s and lakers/2000s
+ * share the franchise (era-reroll candidates only), bulls/1990s and
+ * celtics/1990s share the era (franchise-reroll candidates only), and every
+ * other pair changes both axes and must never be rerolled onto. Position
+ * unions interact with the player filter: the same-era franchise candidates
+ * are guard-only and the era candidates bracket the center-only open slot.
+ */
+function decoyFixture(): ClassicDraftCatalog {
+  return [
+    {
+      franchiseId: 'bulls',
+      eraId: '1990s',
+      players: [{ playerId: 'decoy-bulls-1990s', positions: ['G'] }],
+    },
+    {
+      franchiseId: 'bulls',
+      eraId: '2010s',
+      players: [{ playerId: 'decoy-bulls-2010s', positions: ['G', 'F'] }],
+    },
+    {
+      franchiseId: 'celtics',
+      eraId: '1980s',
+      players: [{ playerId: 'decoy-celtics-1980s', positions: ['G', 'F', 'C'] }],
+    },
+    {
+      franchiseId: 'celtics',
+      eraId: '1990s',
+      players: [{ playerId: 'decoy-celtics-1990s', positions: ['G'] }],
+    },
+    {
+      franchiseId: 'heat',
+      eraId: '2000s',
+      players: [{ playerId: 'decoy-heat-2000s', positions: ['G'] }],
+    },
+    {
+      franchiseId: 'knicks',
+      eraId: '2010s',
+      players: [{ playerId: 'decoy-knicks-2010s', positions: ['G'] }],
+    },
+    {
+      franchiseId: 'lakers',
+      eraId: '1980s',
+      players: [{ playerId: 'decoy-lakers-1980s', positions: ['G', 'F'] }],
+    },
+    {
+      franchiseId: 'lakers',
+      eraId: '1990s',
+      players: [{ playerId: 'decoy-lakers-1990s', positions: ['G', 'F', 'C'] }],
+    },
+    {
+      franchiseId: 'lakers',
+      eraId: '2000s',
+      players: [{ playerId: 'decoy-lakers-2000s', positions: ['C'] }],
+    },
+    {
+      franchiseId: 'spurs',
+      eraId: '1980s',
+      players: [{ playerId: 'decoy-spurs-1980s', positions: ['G', 'F', 'C'] }],
+    },
+  ];
+}
+
+/** Round-1 drafting state pinned to the lakers/1990s roll over the decoy catalog. */
+function decoyState(overrides: Partial<ClassicDraftState> = {}): ClassicDraftState {
+  return {
+    ...draftFixture(),
+    seed: seedFromString('decoy-fixture'),
+    round: 1,
+    status: 'drafting',
+    roll: { franchiseId: 'lakers', eraId: '1990s' },
+    picks: [],
+    rerolls: { franchiseSpent: false, eraSpent: false },
+    ...overrides,
+  };
+}
+
 describe('classic roll seeds', () => {
   it('are byte-identical for the same inputs and distinct otherwise', () => {
     const seed = seedFromString('seed-a');
@@ -535,6 +612,213 @@ describe('classic rerolls', () => {
   });
 });
 
+describe('classic reroll single-axis candidates', () => {
+  it('franchise reroll preserves the era and changes the franchise across seeds', () => {
+    const catalog = decoyFixture();
+    for (let i = 0; i < 20; i += 1) {
+      const state = decoyState({ seed: seedFromString(`decoy-franchise-${i}`) });
+      const rolled = rerollClassicFranchise(state, catalog, context);
+      expect(rolled.roll?.eraId).toBe('1990s');
+      expect(rolled.roll?.franchiseId).not.toBe('lakers');
+    }
+  });
+
+  it('era reroll preserves the franchise and changes the era across seeds', () => {
+    const catalog = decoyFixture();
+    for (let i = 0; i < 20; i += 1) {
+      const state = decoyState({ seed: seedFromString(`decoy-era-${i}`) });
+      const rolled = rerollClassicEra(state, catalog, context);
+      expect(rolled.roll?.franchiseId).toBe('lakers');
+      expect(rolled.roll?.eraId).not.toBe('1990s');
+    }
+  });
+
+  it('excludes pairs that change both axes from either reroll', () => {
+    const state = decoyState();
+    const franchiseCandidates = classicRollCandidates(decoyFixture(), state, 'franchise-reroll');
+    const eraCandidates = classicRollCandidates(decoyFixture(), state, 'era-reroll');
+    const franchiseKeys = new Set(
+      franchiseCandidates.map((entry) => `${entry.franchiseId}/${entry.eraId}`),
+    );
+    const eraKeys = new Set(eraCandidates.map((entry) => `${entry.franchiseId}/${entry.eraId}`));
+    for (const entry of franchiseCandidates) {
+      expect(entry.eraId).toBe('1990s');
+      expect(entry.franchiseId).not.toBe('lakers');
+    }
+    for (const entry of eraCandidates) {
+      expect(entry.franchiseId).toBe('lakers');
+      expect(entry.eraId).not.toBe('1990s');
+    }
+    for (const key of ['heat/2000s', 'knicks/2010s', 'spurs/1980s']) {
+      expect(franchiseKeys.has(key)).toBe(false);
+      expect(eraKeys.has(key)).toBe(false);
+    }
+    expect(franchiseKeys).toEqual(new Set(['bulls/1990s', 'celtics/1990s']));
+    expect(eraKeys).toEqual(new Set(['lakers/1980s', 'lakers/2000s']));
+  });
+
+  it('drops same-axis entries whose only player is already drafted', () => {
+    const franchiseState = decoyState({
+      picks: [
+        {
+          round: 1,
+          playerId: 'decoy-celtics-1990s',
+          franchiseId: 'celtics',
+          eraId: '1990s',
+          slotIndex: 0,
+        },
+      ],
+    });
+    const franchiseKeys = new Set(
+      classicRollCandidates(decoyFixture(), franchiseState, 'franchise-reroll').map(
+        (entry) => `${entry.franchiseId}/${entry.eraId}`,
+      ),
+    );
+    expect(franchiseKeys.has('celtics/1990s')).toBe(false);
+    expect(franchiseKeys.has('bulls/1990s')).toBe(true);
+
+    const eraState = decoyState({
+      picks: [
+        {
+          round: 1,
+          playerId: 'decoy-lakers-1980s',
+          franchiseId: 'lakers',
+          eraId: '1980s',
+          slotIndex: 0,
+        },
+      ],
+    });
+    const eraKeys = new Set(
+      classicRollCandidates(decoyFixture(), eraState, 'era-reroll').map(
+        (entry) => `${entry.franchiseId}/${entry.eraId}`,
+      ),
+    );
+    expect(eraKeys.has('lakers/1980s')).toBe(false);
+    expect(eraKeys.has('lakers/2000s')).toBe(true);
+  });
+
+  it('rerolls derive byte-identical states from the same seed', () => {
+    const catalog = decoyFixture();
+    const franchiseA = rerollClassicFranchise(decoyState(), catalog, context);
+    const franchiseB = rerollClassicFranchise(decoyState(), catalog, context);
+    expect(franchiseB).toEqual(franchiseA);
+    expect(franchiseB.roll).toEqual(franchiseA.roll);
+    const eraA = rerollClassicEra(decoyState(), catalog, context);
+    const eraB = rerollClassicEra(decoyState(), catalog, context);
+    expect(eraB).toEqual(eraA);
+    expect(eraB.roll).toEqual(eraA.roll);
+  });
+
+  it('franchise reroll spends only its token and leaves the era reroll usable', () => {
+    const catalog = decoyFixture();
+    const rolled = rerollClassicFranchise(decoyState(), catalog, context);
+    expect(rolled.rerolls).toEqual({
+      franchiseSpent: true,
+      franchiseRound: 1,
+      eraSpent: false,
+    });
+    expect(() => rerollClassicFranchise(rolled, catalog, context)).toThrow(/already spent/);
+    const eraAfter = rerollClassicEra(rolled, catalog, context);
+    expect(eraAfter.rerolls.eraSpent).toBe(true);
+    expect(eraAfter.roll?.franchiseId).toBe(rolled.roll?.franchiseId);
+    expect(eraAfter.roll?.eraId).not.toBe('1990s');
+  });
+
+  it('era reroll spends only its token and leaves the franchise reroll usable', () => {
+    const catalog = decoyFixture();
+    const rolled = rerollClassicEra(decoyState(), catalog, context);
+    expect(rolled.rerolls).toEqual({
+      franchiseSpent: false,
+      eraSpent: true,
+      eraRound: 1,
+    });
+    expect(() => rerollClassicEra(rolled, catalog, context)).toThrow(/already spent/);
+    const franchiseAfter = rerollClassicFranchise(rolled, catalog, context);
+    expect(franchiseAfter.rerolls.franchiseSpent).toBe(true);
+    expect(franchiseAfter.roll?.eraId).toBe(rolled.roll?.eraId);
+    expect(franchiseAfter.roll?.franchiseId).not.toBe('lakers');
+  });
+
+  it('rejects an axis reroll with no alternative on that axis without spending', () => {
+    const catalog: ClassicDraftCatalog = [
+      {
+        franchiseId: 'knicks',
+        eraId: '2010s',
+        players: [{ playerId: 'decoy-knicks-2010s', positions: ['G', 'F', 'C'] }],
+      },
+      {
+        franchiseId: 'heat',
+        eraId: '2000s',
+        players: [{ playerId: 'decoy-heat-2000s', positions: ['G', 'F', 'C'] }],
+      },
+    ];
+    const state = decoyState({ roll: { franchiseId: 'knicks', eraId: '2010s' } });
+    expect(classicRerollAvailable(state, 'franchise', catalog)).toBe(false);
+    expect(classicRerollAvailable(state, 'era', catalog)).toBe(false);
+    expect(() => rerollClassicFranchise(state, catalog, context)).toThrow(
+      /no alternative franchise for era 2010s in round 1/,
+    );
+    expect(() => rerollClassicEra(state, catalog, context)).toThrow(
+      /no alternative era for franchise knicks in round 1/,
+    );
+    expect(state.rerolls).toEqual({ franchiseSpent: false, eraSpent: false });
+    expect(state.roll).toEqual({ franchiseId: 'knicks', eraId: '2010s' });
+  });
+
+  it('reroll candidates respect the open slots of the current round', () => {
+    const state = decoyState({
+      round: 5,
+      picks: [
+        {
+          round: 1,
+          playerId: 'decoy-lakers-1990s',
+          franchiseId: 'lakers',
+          eraId: '1990s',
+          slotIndex: 0,
+        },
+        {
+          round: 2,
+          playerId: 'decoy-bulls-1990s',
+          franchiseId: 'bulls',
+          eraId: '1990s',
+          slotIndex: 1,
+        },
+        {
+          round: 3,
+          playerId: 'decoy-celtics-1990s',
+          franchiseId: 'celtics',
+          eraId: '1990s',
+          slotIndex: 2,
+        },
+        {
+          round: 4,
+          playerId: 'decoy-lakers-1980s',
+          franchiseId: 'lakers',
+          eraId: '1980s',
+          slotIndex: 3,
+        },
+      ],
+    });
+    // Only slot 4 (C) is open: the guard-only same-era entries drop out, so
+    // the franchise reroll has no legal target and must not spend.
+    const franchiseCandidates = classicRollCandidates(decoyFixture(), state, 'franchise-reroll');
+    expect(franchiseCandidates).toEqual([]);
+    expect(classicRerollAvailable(state, 'franchise', decoyFixture())).toBe(false);
+    expect(() => rerollClassicFranchise(state, decoyFixture(), context)).toThrow(
+      /no alternative franchise/,
+    );
+    // The era reroll keeps lakers/2000s (a center) and drops lakers/1980s.
+    const eraCandidates = classicRollCandidates(decoyFixture(), state, 'era-reroll');
+    expect(eraCandidates.map((entry) => `${entry.franchiseId}/${entry.eraId}`)).toEqual([
+      'lakers/2000s',
+    ]);
+    const rolled = rerollClassicEra(state, decoyFixture(), context);
+    expect(rolled.roll).toEqual({ franchiseId: 'lakers', eraId: '2000s' });
+    expect(rolled.rerolls.eraSpent).toBe(true);
+    expect(rolled.rerolls.franchiseSpent).toBe(false);
+  });
+});
+
 describe('classic candidate filtering and picks', () => {
   it('excludes entries whose remaining players cannot fill any open slot', () => {
     const state: ClassicDraftState = {
@@ -780,6 +1064,7 @@ describe('classic draft command sequences (property)', () => {
               expect(state.rerolls.franchiseSpent).toBe(true);
               expect(state.rerolls.franchiseRound).toBe(state.round);
               expect(state.roll?.franchiseId).not.toBe(before?.franchiseId);
+              expect(state.roll?.eraId).toBe(before?.eraId);
               break;
             }
             case 'era-reroll': {
@@ -789,6 +1074,7 @@ describe('classic draft command sequences (property)', () => {
               expect(state.rerolls.eraSpent).toBe(true);
               expect(state.rerolls.eraRound).toBe(state.round);
               expect(state.roll?.eraId).not.toBe(before?.eraId);
+              expect(state.roll?.franchiseId).toBe(before?.franchiseId);
               break;
             }
             case 'pick': {

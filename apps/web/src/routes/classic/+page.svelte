@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { ArrowRight } from '@lucide/svelte';
+  import { X } from '@lucide/svelte';
   import type {
     ClassicDraftState,
     ClassicPick,
@@ -11,21 +12,28 @@
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { classic, createEngineContext } from '@hoop-rush/engine';
+  import { Dialog } from 'bits-ui';
   import { getManifest, getPlayersIndex } from '$lib/data';
   import {
     buildClassicCatalog,
     classicDraftSeed,
     classicPoolRows,
+    clearClassicDraftState,
     loadClassicDraftState,
     saveClassicDraftState,
   } from '$lib/classic-draft';
+  import {
+    registerClassicDraftNavigationGuard,
+    setClassicGuardBypass,
+    type ClassicGuardTarget,
+  } from '$lib/classic-nav-guard';
   import { startClassicRun } from '$lib/classic-run';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
-  import TeamLogo from '$lib/components/TeamLogo.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
+  import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
 
   type IndexRow = PlayersIndexEntry;
   type Variant = 'ratings' | 'ball-knowledge';
@@ -42,7 +50,28 @@
   let setupError: string | null = $state(null);
   let actionError: string | null = $state(null);
   let pickerPlayer = $state<IndexRow | null>(null);
+  let spinning = $state(false);
+  let spinKey = $state(0);
+  let reelAxis = $state<'both' | 'franchise' | 'era'>('both');
+  let guardOpen = $state(false);
+  let guardTarget = $state<ClassicGuardTarget | null>(null);
   let starting = $state(false);
+  let launchError: string | null = $state(null);
+
+  let unregister: (() => void) | null = null;
+  $effect(() => {
+    unregister = registerClassicDraftNavigationGuard(
+      () => draft,
+      (target) => {
+        guardTarget = target;
+        guardOpen = true;
+      },
+    );
+    return () => {
+      unregister?.();
+      unregister = null;
+    };
+  });
 
   $effect(() => {
     let cancelled = false;
@@ -111,6 +140,14 @@
 
   const countLabel = $derived(`${rollRows.length} players · ${poolSortLabel(presentation)}`);
 
+  const reelAnnouncement = $derived(
+    roll
+      ? `Round ${draft!.round} of 5 · ${rollFranchise?.displayName ?? roll.franchiseId} · ${
+          rollEra?.label ?? roll.eraId
+        }`
+      : '',
+  );
+
   function rowForPick(pick: ClassicPick): IndexRow | null {
     if (!index) return null;
     return (
@@ -148,11 +185,36 @@
     return next;
   }
 
+  /**
+   * Persists a fresh roll and triggers the reel animation for it. Callers
+   * lock interactions (spinning = true) BEFORE awaiting: the engine result is
+   * synchronous, but the persist is async, so the stale pool must be hidden
+   * the moment the command is issued. spinKey only changes here, after the
+   * persisted state already matches the reels, so a resumed saved state never
+   * re-animates.
+   */
+  async function applyRoll(next: ClassicDraftState, axis: 'both' | 'franchise' | 'era') {
+    draft = await persist(next);
+    if (next.roll) {
+      reelAxis = axis;
+      spinKey += 1;
+      launchError = null;
+    }
+  }
+
+  /** The reels settled: the pool for the new roll is ready to browse. */
+  function onReelSettled() {
+    spinning = false;
+  }
+
   /** Starts a fresh draft in the chosen immutable variant. */
   async function startDraft(variant: Variant) {
     if (!manifest || !index) return;
     setupError = null;
     actionError = null;
+    launchError = null;
+    spinning = false;
+    spinKey = 0;
     try {
       const next = classic.createClassicDraft(
         {
@@ -171,21 +233,27 @@
   }
 
   async function rerollFranchise() {
-    if (!draft || catalog.length === 0) return;
+    if (!draft || catalog.length === 0 || spinning || starting) return;
     actionError = null;
     try {
-      draft = await persist(classic.rerollClassicFranchise(draft, catalog, createEngineContext()));
+      const next = classic.rerollClassicFranchise(draft, catalog, createEngineContext());
+      spinning = true;
+      await applyRoll(next, 'franchise');
     } catch (error) {
+      spinning = false;
       actionError = error instanceof Error ? error.message : String(error);
     }
   }
 
   async function rerollEra() {
-    if (!draft || catalog.length === 0) return;
+    if (!draft || catalog.length === 0 || spinning || starting) return;
     actionError = null;
     try {
-      draft = await persist(classic.rerollClassicEra(draft, catalog, createEngineContext()));
+      const next = classic.rerollClassicEra(draft, catalog, createEngineContext());
+      spinning = true;
+      await applyRoll(next, 'era');
     } catch (error) {
+      spinning = false;
       actionError = error instanceof Error ? error.message : String(error);
     }
   }
@@ -198,10 +266,13 @@
    * Slot choice from the picker. A drafted player repositions (swapping when
    * the target is occupied and both sides can fill each other's slots); a new
    * player is drafted into the open slot. The engine throws precise reasons
-   * for invalid placements, surfaced inline.
+   * for invalid placements, surfaced inline. The fifth pick auto-launches the
+   * season (no reel spin — the draft is done); every other successful
+   * placement rolls the next round through the reels. Interactions lock
+   * before the async persist so the stale pool can never be clicked again.
    */
   async function placePlayer(player: IndexRow, slotIndex: number) {
-    if (!draft || catalog.length === 0) return;
+    if (!draft || catalog.length === 0 || spinning || starting) return;
     actionError = null;
     try {
       const alreadyDrafted = draft.picks.some((p) => p.playerId === player.playerId);
@@ -216,23 +287,50 @@
             { playerId: player.playerId, slotIndex: slotIndex as SlotIndex },
             createEngineContext(),
           );
-      draft = await persist(next);
-      pickerPlayer = null;
+      if (next.status === 'complete' && !alreadyDrafted) {
+        starting = true;
+        pickerPlayer = null;
+        draft = await persist(next);
+        void launchRun(next);
+      } else {
+        spinning = true;
+        pickerPlayer = null;
+        await applyRoll(next, 'both');
+      }
     } catch (error) {
+      spinning = false;
+      starting = false;
       actionError = error instanceof Error ? error.message : String(error);
     }
   }
 
-  async function play82() {
-    if (!draft || draft.status !== 'complete') return;
+  /**
+   * The single path into the season: promotes the completed draft to an active
+   * run and navigates to the challenge. On failure the persisted draft is
+   * retained (promotion only clears it on success), so the page stays and
+   * shows the recovery UI with the error.
+   */
+  async function launchRun(draftToRun: ClassicDraftState) {
     starting = true;
-    actionError = null;
+    launchError = null;
     try {
-      await startClassicRun(draft, classicDraftSeed());
+      await startClassicRun(draftToRun, classicDraftSeed());
     } catch (error) {
-      actionError = error instanceof Error ? error.message : String(error);
+      launchError = error instanceof Error ? error.message : String(error);
       starting = false;
     }
+  }
+
+  /** Leaves the draft: clears the saved state and navigates to the blocked target. */
+  async function discardAndLeave() {
+    const target = guardTarget;
+    guardOpen = false;
+    setClassicGuardBypass(true);
+    await clearClassicDraftState();
+    // The target pathname comes from the navigation URL, which already carries
+    // the base path, so resolve() must not be applied on top of it.
+    // eslint-disable-next-line svelte/no-navigation-without-resolve
+    void goto(target ? `${target.pathname}${target.search}` : '/');
   }
 </script>
 
@@ -308,7 +406,7 @@
           >
             <h3 class="font-display text-4xl font-extrabold tracking-tight uppercase">Ratings</h3>
             <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-              Peak season with Overall, Offense, and Defense. Draft on the numbers.
+              Peak season with Overall. Draft on the numbers.
             </p>
             <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
               Start Ratings draft
@@ -328,7 +426,8 @@
               Ball Knowledge
             </h3>
             <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-              The same draft with Overall hidden and the pool sorted by name. Draft on reputation.
+              The same draft with every rating badge hidden and the pool sorted by name. Draft on
+              reputation.
             </p>
             <span class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary">
               Start Ball Knowledge draft
@@ -370,37 +469,22 @@
                 {/each}
               </span>
             </div>
-            <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div class="flex flex-wrap items-center gap-2">
-                <span
-                  class="flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-3 py-2"
-                >
-                  {#if rollFranchise}
-                    <TeamLogo
-                      {manifest}
-                      franchiseId={rollFranchise.franchiseId}
-                      teamExternalId={rollFranchise.teamExternalId}
-                    />
-                  {/if}
-                  <span class="font-mono text-xs font-bold">
-                    {franchiseAbbreviation(roll.franchiseId)}
-                  </span>
-                  {#if rollFranchise}
-                    <span class="hidden text-xs text-muted-foreground sm:inline">
-                      {rollFranchise.displayName}
-                    </span>
-                  {/if}
-                </span>
-                <span
-                  class="flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-3 py-2"
-                >
-                  <span class="font-mono text-xs font-bold">{rollEra?.label ?? roll.eraId}</span>
-                </span>
-              </div>
+            <div class="flex flex-col gap-3 p-4">
+              <ClassicRollReel
+                {manifest}
+                franchiseId={roll.franchiseId}
+                eraId={roll.eraId}
+                franchiseOptions={manifest.modernFranchiseSlots.map((f) => f.franchiseId)}
+                eraOptions={manifest.eras.map((e) => e.eraId)}
+                axis={reelAxis}
+                {spinKey}
+                announceText={reelAnnouncement}
+                onSettled={onReelSettled}
+              />
               <div class="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  disabled={!franchiseRerollAvailable}
+                  disabled={spinning || starting || !franchiseRerollAvailable}
                   title={franchiseRerollAvailable
                     ? 'Roll a different franchise'
                     : draft.rerolls.franchiseSpent
@@ -420,7 +504,7 @@
                 </button>
                 <button
                   type="button"
-                  disabled={!eraRerollAvailable}
+                  disabled={spinning || starting || !eraRerollAvailable}
                   title={eraRerollAvailable
                     ? 'Roll a different era'
                     : draft.rerolls.eraSpent
@@ -441,12 +525,12 @@
               </div>
             </div>
           </div>
-          <p class="font-mono text-xs text-muted-foreground">
-            Pick one player from this pool to advance.
-          </p>
+          {#if spinning}
+            <p class="font-mono text-xs text-muted-foreground">Picking the next pool…</p>
+          {/if}
         {/if}
 
-        {#if draft.status === 'drafting' && roll}
+        {#if draft.status === 'drafting' && roll && !spinning && !starting}
           <DraftPoolBrowser
             heading={poolHeading}
             rows={rollRows}
@@ -454,17 +538,34 @@
             {countLabel}
             {manifest}
             {presentation}
-            filtersEditable={false}
+            filtersEditable={true}
             allowDisplacement={false}
             error={actionError}
             emptyMessage="No players in this pool."
             onpick={openPicker}
           />
         {:else if draft.status === 'complete'}
+          {@const completeDraft = draft}
+          {#if starting}
+            <p class="font-mono text-xs text-muted-foreground">Starting the season…</p>
+          {/if}
+          {#if launchError}
+            <div class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+              <p class="font-semibold">The season could not start</p>
+              <p class="mt-1 text-muted-foreground">{launchError}</p>
+            </div>
+          {/if}
+          {#if actionError}
+            <p
+              class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+            >
+              {actionError}
+            </p>
+          {/if}
           <div class="rounded-xl border border-border bg-card">
             <div class="border-b border-border px-4 py-3">
               <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
-                Draft complete
+                Your five
               </h3>
             </div>
             <ul class="flex flex-col divide-y divide-border/60">
@@ -499,6 +600,19 @@
               {/each}
             </ul>
           </div>
+          <div>
+            <button
+              type="button"
+              onclick={() => launchRun(completeDraft)}
+              disabled={starting}
+              class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Retry starting the simulation
+            </button>
+          </div>
+          <p class="font-mono text-[10px] text-muted-foreground">
+            seed {draft.seed} · draft {draft.draftId}
+          </p>
         {/if}
 
         <LineupCourt
@@ -509,30 +623,6 @@
           onmove={openPicker}
           onremove={() => undefined}
         />
-
-        {#if draft.status === 'complete'}
-          {#if actionError}
-            <p
-              class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-            >
-              {actionError}
-            </p>
-          {/if}
-          <div>
-            <button
-              type="button"
-              onclick={play82}
-              disabled={starting}
-              class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {starting ? 'Starting…' : 'Play 82 games'}
-              <ArrowRight class="h-4 w-4" />
-            </button>
-          </div>
-          <p class="font-mono text-[10px] text-muted-foreground">
-            seed {draft.seed} · draft {draft.draftId}
-          </p>
-        {/if}
       </div>
     {/if}
   {/if}
@@ -546,4 +636,52 @@
     onplace={placePlayer}
     onclose={() => (pickerPlayer = null)}
   />
+
+  <Dialog.Root
+    open={guardOpen}
+    onOpenChange={(open) => {
+      if (!open) guardOpen = false;
+    }}
+  >
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+      <Dialog.Content
+        class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <Dialog.Title
+            class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
+          >
+            Leave the draft?
+          </Dialog.Title>
+          <Dialog.Close
+            aria-label="Cancel"
+            class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X class="h-4 w-4" />
+          </Dialog.Close>
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Leaving now discards this draft and its rerolls. Refresh or closing the tab keeps it for
+          later.
+        </p>
+        <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onclick={() => (guardOpen = false)}
+            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            onclick={discardAndLeave}
+            class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Leave and discard
+          </button>
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
 </section>

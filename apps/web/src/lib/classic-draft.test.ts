@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PlayersIndex, PlayersIndexEntry, PoolIndexEntry } from '@hoop-rush/data-contracts';
 import { classicDraftCatalogSchema } from '@hoop-rush/data-contracts';
-import {
-  buildClassicCatalog,
-  classicPoolRows,
-  draftStateFromCompletedDraft,
-} from './classic-draft';
-import { buildClassicCompletedDraft, buildManifest } from '@hoop-rush/test-fixtures';
+import { buildClassicCatalog, classicPoolRows } from './classic-draft';
+import { buildManifest } from '@hoop-rush/test-fixtures';
 
 function poolEntry(franchiseId: string, eraId: string): PoolIndexEntry {
   return {
@@ -182,29 +178,5 @@ describe('classicPoolRows', () => {
     classicPoolRows(index, pair, 'ball-knowledge');
     classicPoolRows(index, pair, 'ratings');
     expect(index.players.map((r) => r.playerId)).toEqual(before);
-  });
-});
-
-describe('draftStateFromCompletedDraft', () => {
-  it('rebuilds the complete state from a run snapshot', () => {
-    const snapshot = buildClassicCompletedDraft();
-    const state = draftStateFromCompletedDraft(snapshot, 'data-v2');
-
-    expect(state.round).toBe(5);
-    expect(state.status).toBe('complete');
-    expect(state.roll).toBeNull();
-    expect(state.rerolls).toEqual({ franchiseSpent: true, eraSpent: true });
-    expect(state.picks).toEqual(snapshot.picks);
-    expect(state.draftId).toBe(snapshot.draftId);
-    expect(state.variant).toBe(snapshot.variant);
-    expect(state.seed).toBe(snapshot.seed);
-    expect(state.dataVersion).toBe('data-v2');
-    expect(state.picks.map((p) => p.playerId)).toEqual([
-      'p-lal-g',
-      'p-bos-g',
-      'p-lal-f',
-      'p-chi-f',
-      'p-lal-c',
-    ]);
   });
 });

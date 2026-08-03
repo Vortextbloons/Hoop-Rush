@@ -64,13 +64,13 @@ test.describe('m3: draft to 82-game season journey', () => {
     // The overlay completes and navigates to the season report.
     await expectSeasonReport(page);
 
-    // Season facts: final record, strip, facts, and the five-player table.
+    // Season facts: final record, strip, League MVP, and the five-player table.
     await expect(
       page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
     ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Best performance' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
     const strip = page.getByLabel('82-game strip');
     await expect(strip.locator('li')).toHaveCount(82);
@@ -107,23 +107,28 @@ test.describe('m3: draft to 82-game season journey', () => {
     await expect(page.getByRole('link', { name: new RegExp(recordText) })).toBeVisible();
   });
 
-  test('result actions: Retry and Edit team replace the replay controls', async ({ page }) => {
+  test('result actions: Run again returns to a cleared draft', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await reachPlaying(page);
     await expectSeasonReport(page);
 
-    // Exactly two actions on the report: Retry (same five, new seed) and
-    // Edit team (back to the draft with the lineup restored).
-    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Edit team' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Replay this seed' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'New seed' })).toHaveCount(0);
+    // Exactly one action on the report: Run again (fresh start, same mode).
+    await expect(page.getByRole('button', { name: 'Run again' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Edit team' })).toHaveCount(0);
 
-    // Edit team returns to the draft with the five restored.
-    await page.getByRole('link', { name: 'Edit team' }).click();
-    await expect(page).toHaveURL(/\/sandbox\/?\?.*slots=/);
-    await expect(page.getByText('5/5', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Remove Nick Van Exel' })).toBeVisible();
+    // Run again returns to a completely cleared sandbox draft.
+    const recordText = await page.getByText(/^\d+–\d+$/).innerText();
+    await page.getByRole('button', { name: 'Run again' }).click();
+    await expect(page).toHaveURL(/\/sandbox\/?$/);
+    await expect(page.getByText('Picked 0 of 5')).toBeVisible();
+    await expect(page.getByText('5/5', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Remove Nick Van Exel' })).toHaveCount(0);
+
+    // Completed history remains intact.
+    await page.goto('/sandbox/history');
+    await expect(page.getByRole('heading', { name: 'Challenge history' })).toBeVisible();
+    await expect(page.getByRole('link', { name: new RegExp(recordText) })).toBeVisible();
   });
 
   test('cancel pauses at the persisted prefix and continue finishes the same run', async ({
@@ -197,13 +202,12 @@ test.describe('m3: accessibility and mobile', () => {
   test('screen reader: key regions carry labelled landmarks', async ({ page }) => {
     await reachPlaying(page);
     await expectSeasonReport(page);
+    await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Best performance' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Per game' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Edit team' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run again' })).toBeVisible();
   });
 
   test('image fallbacks never block the challenge flow', async ({ page }) => {

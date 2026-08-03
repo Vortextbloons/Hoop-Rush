@@ -119,27 +119,28 @@ describe('sortDraftRows', () => {
 describe('ratingBadges', () => {
   const player = row({ playerId: 'x', overall: 92, offense: 90, defense: 88 });
 
-  it('shows Overall, Offense, and Defense for sandbox', () => {
-    expect(ratingBadges(player, 'sandbox')).toEqual([
-      { label: 'O', value: 92 },
-      { label: 'OFF', value: 90 },
-      { label: 'DEF', value: 88 },
-    ]);
+  it('shows only Overall for sandbox', () => {
+    expect(ratingBadges(player, 'sandbox')).toEqual([{ label: 'O', value: 92 }]);
   });
 
-  it('shows Overall, Offense, and Defense for ratings', () => {
-    expect(ratingBadges(player, 'ratings')).toEqual([
-      { label: 'O', value: 92 },
-      { label: 'OFF', value: 90 },
-      { label: 'DEF', value: 88 },
-    ]);
+  it('shows only Overall for ratings', () => {
+    expect(ratingBadges(player, 'ratings')).toEqual([{ label: 'O', value: 92 }]);
   });
 
-  it('hides only Overall for ball-knowledge', () => {
-    expect(ratingBadges(player, 'ball-knowledge')).toEqual([
-      { label: 'OFF', value: 90 },
-      { label: 'DEF', value: 88 },
-    ]);
+  it('shows no rating badges for ball-knowledge', () => {
+    expect(ratingBadges(player, 'ball-knowledge')).toEqual([]);
+  });
+
+  it('never reads or emits offense/defense values (presentation-only claim)', () => {
+    const pristine = row({ playerId: 'y', overall: 71, offense: 55, defense: 44 });
+    const snapshot = { ...pristine };
+    ratingBadges(pristine, 'sandbox');
+    ratingBadges(pristine, 'ratings');
+    ratingBadges(pristine, 'ball-knowledge');
+    expect(pristine).toEqual(snapshot);
+    expect(snapshot.offense).toBe(55);
+    expect(snapshot.defense).toBe(44);
+    expect(ratingBadges(pristine, 'ratings')).toEqual([{ label: 'O', value: 71 }]);
   });
 });
 

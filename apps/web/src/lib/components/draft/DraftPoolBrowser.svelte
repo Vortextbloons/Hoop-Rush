@@ -29,8 +29,6 @@
 
   const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
     O: 'Overall',
-    OFF: 'Offense',
-    DEF: 'Defense',
   };
 
   let {
@@ -93,9 +91,14 @@
   const hasMore = $derived(filteredRows.length > visibleCount);
   const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
 
-  // Reset pagination whenever the pool scope or ordering changes.
+  // Reset the draft's local filters whenever the pool scope or editability
+  // changes so a new rolled pool (Classic) or a new franchise/era scope
+  // (Sandbox) always starts with an unfiltered, fresh list.
   $effect(() => {
-    void [rows, positionFilter, search, filtersEditable];
+    void [rows, filtersEditable];
+    searchInput = '';
+    search = '';
+    positionFilter = null;
     visibleCount = PAGE_SIZE;
   });
 

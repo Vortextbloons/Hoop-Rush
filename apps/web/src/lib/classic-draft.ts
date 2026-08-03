@@ -1,5 +1,4 @@
 import type {
-  ClassicCompletedDraft,
   ClassicDraftCatalog,
   ClassicDraftState,
   HoopRushManifest,
@@ -7,7 +6,6 @@ import type {
   PlayersIndexEntry,
   Seed,
 } from '@hoop-rush/data-contracts';
-import { CLASSIC_DRAFT_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { challengeRepository } from '$lib/challenge-repo';
 import { sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
 import { generateSeed } from '$lib/sandbox-url';
@@ -61,27 +59,9 @@ export async function loadClassicDraftState(): Promise<ClassicDraftState | null>
   return record?.draft ?? null;
 }
 
-/**
- * Rebuilds the full state of a completed draft from its run snapshot. The
- * snapshot carries no dataVersion (rolls are already frozen into the picks),
- * so the caller supplies the current manifest dataVersion.
- */
-export function draftStateFromCompletedDraft(
-  snapshot: ClassicCompletedDraft,
-  dataVersion: string,
-): ClassicDraftState {
-  return {
-    schemaVersion: CLASSIC_DRAFT_SCHEMA_VERSION,
-    draftId: snapshot.draftId,
-    variant: snapshot.variant,
-    seed: snapshot.seed,
-    dataVersion,
-    round: 5,
-    status: 'complete',
-    roll: null,
-    rerolls: { franchiseSpent: true, eraSpent: true },
-    picks: snapshot.picks.map((pick) => ({ ...pick })),
-  };
+/** Discards the persisted draft (leave-and-discard) so the next visit starts fresh. */
+export async function clearClassicDraftState(): Promise<void> {
+  await challengeRepository.clearClassicDraft();
 }
 
 /** Fresh seed for a classic draft at the UI boundary. */

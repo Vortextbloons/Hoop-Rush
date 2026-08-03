@@ -9,7 +9,7 @@ import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
 
 export type DraftPresentation = 'sandbox' | 'ratings' | 'ball-knowledge';
 
-export type RatingBadgeLabel = 'O' | 'OFF' | 'DEF';
+export type RatingBadgeLabel = 'O';
 
 export interface RatingBadge {
   label: RatingBadgeLabel;
@@ -45,24 +45,16 @@ export function sortDraftRows(
 }
 
 /**
- * Rating badges shown beside a player. Ball Knowledge hides Overall only;
- * every other badge is identical across presentations.
+ * Rating badges shown beside a player. Sandbox and Ratings cards show only
+ * Overall; Ball Knowledge shows no rating badges at all. Offense and Defense
+ * stay engine/data-only — this policy never emits them. Presentation only.
  */
 export function ratingBadges(
   player: PlayersIndexEntry,
   presentation: DraftPresentation,
 ): RatingBadge[] {
-  if (presentation === 'ball-knowledge') {
-    return [
-      { label: 'OFF', value: player.offense },
-      { label: 'DEF', value: player.defense },
-    ];
-  }
-  return [
-    { label: 'O', value: player.overall },
-    { label: 'OFF', value: player.offense },
-    { label: 'DEF', value: player.defense },
-  ];
+  if (presentation === 'ball-knowledge') return [];
+  return [{ label: 'O', value: player.overall }];
 }
 
 /** Pool subtitle describing the sort, e.g. "181 players · sorted by OVER". */

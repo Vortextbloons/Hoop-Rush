@@ -1,24 +1,20 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { ChallengeRun, HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
-  import type { RouteId } from '$app/types';
   import { getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
-  import { buildSandboxUrl, generateSeed } from '$lib/sandbox-url';
-  import { loadRunPlayersById, lineupPlayersFromRun } from '$lib/sandbox-lineup';
-  import { startSandboxRun } from '$lib/sandbox-run';
+  import { loadRunPlayersById } from '$lib/sandbox-lineup';
   import SeasonReport from '$lib/components/SeasonReport.svelte';
 
   /**
-   * Challenge result (spec/08): final record and 82-0 outcome, first-loss
-   * explanation when applicable, the full game strip, aggregate shooting,
-   * turnover, rebound, free-throw, and possession facts, the user's
-   * five-player season table, and best single-game performance. The shared
-   * SeasonReport presents the record; this route owns loading and the
-   * sandbox-specific Retry (same five, new seed) and Edit team (draft URL)
-   * actions.
+   * Challenge result (spec/08): final record and 82-0 outcome with the League
+   * MVP spotlight, the full game strip, aggregate facts, and the user's
+   * five-player season table. The shared SeasonReport presents the report;
+   * this route owns loading and the single Run again action, which returns
+   * to a completely cleared sandbox draft.
    */
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -89,39 +85,16 @@
     };
   });
 
-  /** Replays the same five players with a brand-new seed. */
-  async function retryRun() {
-    const currentRun = run;
-    const m = manifest;
-    if (!currentRun || !m || running) return;
+  /** Fresh start: back to a completely cleared sandbox draft. */
+  async function runAgain() {
+    if (running) return;
     running = true;
     try {
-      const resolved = await loadRunPlayersById(currentRun, m);
-      const players = lineupPlayersFromRun(currentRun, resolved);
-      if (!players) {
-        error = 'This lineup cannot be replayed because its player pool is unavailable.';
-        return;
-      }
-      await startSandboxRun(players, generateSeed());
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
+      void goto(resolve('/sandbox'));
     } finally {
       running = false;
     }
   }
-
-  const editHref = $derived.by(() => {
-    const currentRun = run;
-    if (!currentRun) return null;
-    const slots =
-      currentRun.selections ??
-      currentRun.playerIds.map((playerId) => ({
-        playerId,
-        franchiseId: currentRun.franchiseId ?? 'lakers',
-        eraId: currentRun.eraId,
-      }));
-    return buildSandboxUrl({ slots }) as RouteId;
-  });
 </script>
 
 <svelte:head>
@@ -162,9 +135,8 @@
       {run}
       {byId}
       modeLabel="Sandbox · Result"
-      retrying={running}
-      onRetry={retryRun}
-      {editHref}
+      {running}
+      onRunAgain={runAgain}
     />
   {/if}
 </section>

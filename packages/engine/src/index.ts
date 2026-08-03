@@ -21,6 +21,7 @@ export * from './challenge/seeds.js';
 export * from './challenge/benchmarks.js';
 export * from './challenge/lineup-eval.js';
 export * from './challenge/aggregates.js';
+export * from './challenge/mvp.js';
 export * from './challenge/commands.js';
 export * from './bracket/schedule.js';
 export * from './bracket/generator.js';
