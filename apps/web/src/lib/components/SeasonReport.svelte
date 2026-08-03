@@ -2,6 +2,8 @@
   import { RotateCcw, Pencil, RefreshCw } from '@lucide/svelte';
   import type {
     ChallengeRun,
+    ExplanationFact,
+    GameResult,
     HoopRushManifest,
     MadeAttempted,
     PeakPlayerSeason,
@@ -106,6 +108,55 @@
       players: aggregates.players.map((p) => (totalsMode ? p : perGamePlayer(p))),
     } satisfies RunAggregates;
   });
+
+  const gamesPlayed = $derived(Math.max(1, record?.gamesPlayed ?? run.games.length));
+  const opponentPoints = $derived(
+    run.games.reduce((total, game) => total + game.away.box.points, 0),
+  );
+  const opponentPointsPerGame = $derived(opponentPoints / gamesPlayed);
+  const pointDifferential = $derived((record?.points ?? 0) - opponentPoints);
+  const firstLoss = $derived.by((): { game: GameResult; opponentName: string } | null => {
+    const gameNumber = run.firstLossGameNumber;
+    if (gameNumber === null) return null;
+    const game = run.games.find((candidate) => candidate.gameNumber === gameNumber);
+    if (!game) return null;
+    const scheduled = run.bracket.schedule[gameNumber - 1];
+    const opponent = run.bracket.opponents.find(
+      (candidate) => candidate.opponentId === scheduled?.opponentId,
+    );
+    return { game, opponentName: opponent?.displayName ?? game.away.displayName };
+  });
+
+  function teamName(teamId: string, opponentName: string): string {
+    return teamId === 'user' ? 'Your five' : opponentName;
+  }
+
+  function factCopy(fact: ExplanationFact, opponentName: string, game: GameResult): string {
+    const team = teamName(fact.teamId, opponentName);
+    const evidence = fact.evidence;
+    switch (fact.kind) {
+      case 'turnoverMargin':
+        return `${team} won the turnover margin ${String(evidence.margin)} (${String(evidence.teamTurnovers)}–${String(evidence.opponentTurnovers)}).`;
+      case 'shotEfficiency':
+        return `${team} led effective FG% ${(Number(evidence.efgPct) * 100).toFixed(1)}–${(Number(evidence.opponentEfgPct) * 100).toFixed(1)}.`;
+      case 'offensiveRebounds':
+        return `${team} won offensive rebounds ${String(evidence.teamOffensiveRebounds)}–${String(evidence.opponentOffensiveRebounds)}.`;
+      case 'freeThrows':
+        return `${team} had ${String(evidence.teamFreeThrowAttempts)} free-throw attempts to ${String(evidence.opponentFreeThrowAttempts)}.`;
+      case 'usage': {
+        const player = game[fact.teamId === 'user' ? 'home' : 'away'].players.find(
+          (candidate) => candidate.playerId === fact.playerIds[0],
+        );
+        const playerName = seasonTable.find((row) => row.aggregate.playerId === player?.playerId)
+          ?.player.displayName;
+        return player
+          ? `${playerName ?? player.playerId} scored ${String(evidence.playerPoints)} of ${String(evidence.teamPoints)} team points.`
+          : `${team} concentrated ${Math.round(Number(evidence.usageShare) * 100)}% of scoring in one player.`;
+      }
+      case 'overtime':
+        return `${team} won the overtime period ${String(evidence.homeOvertimePoints)}–${String(evidence.awayOvertimePoints)}.`;
+    }
+  }
 
   function pct(made: number, attempted: number): string {
     return attempted === 0 ? '—' : `${((made / attempted) * 100).toFixed(1)}%`;
@@ -239,6 +290,107 @@
     <GameStrip {run} games={run.games} compact />
   </div>
 
+  <section
+    aria-labelledby="season-snapshot-heading"
+    class="mt-5 rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
+  >
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2
+        id="season-snapshot-heading"
+        class="font-display text-xl font-extrabold tracking-tight uppercase"
+      >
+        Season snapshot
+      </h2>
+      <span class="font-mono text-[10px] text-muted-foreground"
+        >Recorded over {gamesPlayed} games</span
+      >
+    </div>
+    <dl class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div class="rounded-lg border border-border bg-card p-3">
+        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Your PPG</dt>
+        <dd class="mt-1 font-display text-xl font-extrabold">
+          {perGameValue(record!.points, gamesPlayed)}
+        </dd>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-3">
+        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Opponent PPG</dt>
+        <dd class="mt-1 font-display text-xl font-extrabold">{opponentPointsPerGame.toFixed(1)}</dd>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-3">
+        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Point diff</dt>
+        <dd class="mt-1 font-display text-xl font-extrabold">
+          {pointDifferential >= 0 ? '+' : ''}{perGameValue(pointDifferential, gamesPlayed)}
+        </dd>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-3">
+        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Pace</dt>
+        <dd class="mt-1 font-display text-xl font-extrabold">
+          {perGameValue(record!.possessions, gamesPlayed)}
+        </dd>
+      </div>
+      <div class="rounded-lg border border-border bg-card p-3">
+        <dt class="font-mono text-[10px] text-muted-foreground uppercase">Rebounds/G</dt>
+        <dd class="mt-1 font-display text-xl font-extrabold">
+          {perGameValue(record!.rebounds.total, gamesPlayed)}
+        </dd>
+      </div>
+    </dl>
+    <div class="mt-3 grid gap-2 font-mono text-xs sm:grid-cols-4">
+      <p>
+        <span class="text-muted-foreground">FG</span>
+        {pct(record!.fieldGoals.made, record!.fieldGoals.attempted)}
+      </p>
+      <p>
+        <span class="text-muted-foreground">3P</span>
+        {pct(record!.threes.made, record!.threes.attempted)}
+      </p>
+      <p>
+        <span class="text-muted-foreground">FT</span>
+        {pct(record!.freeThrows.made, record!.freeThrows.attempted)}
+      </p>
+      <p>
+        <span class="text-muted-foreground">TOV/G</span>
+        {perGameValue(record!.turnovers, gamesPlayed)}
+      </p>
+    </div>
+  </section>
+
+  {#if firstLoss}
+    <section
+      aria-labelledby="first-loss-heading"
+      class="mt-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 sm:p-5"
+    >
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <h2
+          id="first-loss-heading"
+          class="font-display text-xl font-extrabold tracking-tight uppercase"
+        >
+          First loss
+        </h2>
+        <span class="font-mono text-[10px] text-muted-foreground"
+          >Game {firstLoss.game.gameNumber}</span
+        >
+      </div>
+      <p class="mt-2 text-sm font-semibold">
+        {firstLoss.opponentName} won {firstLoss.game.away.box.points}–{firstLoss.game.home.box
+          .points}.
+      </p>
+      {#if firstLoss.game.facts.length > 0}
+        <ul class="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+          {#each firstLoss.game.facts as fact (fact.kind)}
+            <li class="rounded-lg border border-border bg-card p-3">
+              {factCopy(fact, firstLoss.opponentName, firstLoss.game)}
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="mt-3 text-xs text-muted-foreground">
+          No thresholded deciding factor was recorded for this game.
+        </p>
+      {/if}
+    </section>
+  {/if}
+
   <div class="mt-5 flex flex-wrap items-center gap-2">
     {#if onRetrySameTeam}
       <button
@@ -312,7 +464,7 @@
     </div>
   </div>
   {#if displayAggregates}
-    <div class="mt-4 overflow-x-auto">
+    <div class="mt-4 hidden overflow-x-auto sm:block">
       <table class="w-full min-w-[1080px] border-collapse text-sm">
         <thead>
           <tr
@@ -412,6 +564,81 @@
           {/each}
         </tbody>
       </table>
+    </div>
+    <div class="mt-4 grid gap-2 sm:hidden">
+      {#each displayAggregates.players as aggregate, index (aggregate.playerId)}
+        {@const row = seasonTable[index]}
+        {@const raw = aggregates!.players.find((p) => p.playerId === aggregate.playerId)!}
+        <article class="rounded-lg border border-border bg-surface-1 p-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="truncate text-sm font-bold">
+                {row?.player.displayName ?? aggregate.playerId}
+              </p>
+              <p class="font-mono text-[10px] text-muted-foreground">
+                {SLOT_LABELS[index]} · {aggregate.gamesPlayed} games
+              </p>
+            </div>
+            <p class="font-mono text-sm font-bold">{formatAggregateStat(aggregate.points)} PTS</p>
+          </div>
+          <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">FGA</dt>
+              <dd class="font-mono">{formatAggregateStat(aggregate.fieldGoals.attempted)}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">FG%</dt>
+              <dd class="font-mono">{pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">3PA / 3P%</dt>
+              <dd class="font-mono">
+                {formatAggregateStat(aggregate.threes.attempted)} / {pct(
+                  raw.threes.made,
+                  raw.threes.attempted,
+                )}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">FTA / FT%</dt>
+              <dd class="font-mono">
+                {formatAggregateStat(aggregate.freeThrows.attempted)} / {pct(
+                  raw.freeThrows.made,
+                  raw.freeThrows.attempted,
+                )}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">TS%</dt>
+              <dd class="font-mono">
+                {trueShootingPct(raw.points, raw.fieldGoals.attempted, raw.freeThrows.attempted)}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">USG%</dt>
+              <dd class="font-mono">{usagePct(raw, aggregates!.team)}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">REB</dt>
+              <dd class="font-mono">{formatAggregateStat(aggregate.rebounds.total)}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">AST</dt>
+              <dd class="font-mono">{formatAggregateStat(aggregate.assists)}</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">STL / BLK</dt>
+              <dd class="font-mono">
+                {formatAggregateStat(aggregate.steals)} / {formatAggregateStat(aggregate.blocks)}
+              </dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-muted-foreground">TOV</dt>
+              <dd class="font-mono">{formatAggregateStat(aggregate.turnovers)}</dd>
+            </div>
+          </dl>
+        </article>
+      {/each}
     </div>
     {#if byId === null}
       <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>

@@ -33,7 +33,10 @@
   }
 
   function openComparison() {
-    lastTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : compareButton ?? null;
+    lastTrigger =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : (compareButton ?? null);
     open = true;
   }
 
@@ -228,10 +231,10 @@
             </div>
             <div class="mt-3 flex flex-wrap gap-1.5 font-mono text-[10px]">
               <span class="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary"
-                >O {player.overall}</span
+                >Overall {player.overall}</span
               >
-              <span class="rounded bg-surface-3 px-1.5 py-0.5">OF {player.offense}</span>
-              <span class="rounded bg-surface-3 px-1.5 py-0.5">DF {player.defense}</span>
+              <span class="rounded bg-surface-3 px-1.5 py-0.5">Offense {player.offense}</span>
+              <span class="rounded bg-surface-3 px-1.5 py-0.5">Defense {player.defense}</span>
             </div>
             <dl class="mt-3 space-y-1.5 text-[11px]">
               <div class="flex justify-between gap-2">

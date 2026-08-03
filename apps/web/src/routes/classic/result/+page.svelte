@@ -178,13 +178,8 @@
       </a>
     </div>
   {:else if loading || !run}
-    <div class="mt-8 grid place-items-center rounded-xl border border-border bg-card p-16">
-      <div
-        class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
-      ></div>
-      <p class="mt-4 font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase">
-        Loading result…
-      </p>
+    <div class="mt-8">
+      <AsyncState kind="loading" title="Loading result" message="Reading the completed run…" />
     </div>
   {:else}
     <SeasonReport {manifest} {run} {byId} {indexById} {modeLabel} {running} onRunAgain={runAgain} />

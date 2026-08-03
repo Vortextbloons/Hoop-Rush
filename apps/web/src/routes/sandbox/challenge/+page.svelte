@@ -9,12 +9,12 @@
     PeakPlayerSeason,
   } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
-import { clearDataLoaderCaches, getEraSimulationProfile, getManifest } from '$lib/data';
+  import { clearDataLoaderCaches, getEraSimulationProfile, getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
   import ChallengeOverlay from '$lib/components/ChallengeOverlay.svelte';
-import { loadRunPlayersById } from '$lib/sandbox-lineup';
-import AsyncState from '$lib/components/AsyncState.svelte';
+  import { loadRunPlayersById } from '$lib/sandbox-lineup';
+  import AsyncState from '$lib/components/AsyncState.svelte';
 
   /**
    * Challenge progress (spec/08): a full-screen dialog driven by the paced
@@ -220,8 +220,6 @@ import AsyncState from '$lib/components/AsyncState.svelte';
         message={loadError}
         retry={retryChallenge}
       />
-      <p class="font-semibold">Challenge unavailable</p>
-      <p class="mt-1 text-muted-foreground">{loadError}</p>
       <a
         href={draftHref}
         class="mt-3 inline-flex rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground"
@@ -230,14 +228,8 @@ import AsyncState from '$lib/components/AsyncState.svelte';
       </a>
     </div>
   {:else if !run}
-    <AsyncState kind="loading" title="Loading challenge" message="Restoring the active run…" />
-    <div class="mt-8 grid place-items-center rounded-xl border border-border bg-card p-16">
-      <div
-        class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
-      ></div>
-      <p class="mt-4 font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase">
-        Loading challenge…
-      </p>
+    <div class="mt-8">
+      <AsyncState kind="loading" title="Loading challenge" message="Restoring the active run…" />
     </div>
   {:else}
     <ChallengeOverlay

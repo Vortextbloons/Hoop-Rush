@@ -83,10 +83,18 @@ function compareBaseline(
   current: BenchmarkReport,
   baseline: BenchmarkReport,
   details: string[],
-): string[] {
+): { failures: string[]; comparison: BenchmarkReport['baselineComparison'] } {
   if (baseline.environment.fingerprint !== current.environment.fingerprint) {
     details.push('baseline comparison skipped: environment fingerprint does not match');
-    return [];
+    return {
+      failures: [],
+      comparison: {
+        status: 'skipped-fingerprint',
+        fingerprintMatched: false,
+        baselineFingerprint: baseline.environment.fingerprint,
+        regressions: [],
+      },
+    };
   }
   details.push('baseline environment fingerprint matched');
   const comparisons: Array<{
@@ -100,19 +108,35 @@ function compareBaseline(
     { id: 'challenge82', label: '82-game run', noiseMs: 50 },
   ];
   const failures: string[] = [];
+  const regressions: BenchmarkReport['baselineComparison']['regressions'] = [];
   for (const comparison of comparisons) {
     const currentMetric: TimedMetric = current[comparison.id];
     const baselineMetric: TimedMetric = baseline[comparison.id];
     for (const metric of ['medianMs', 'p95Ms'] as const) {
       const increase = currentMetric[metric] - baselineMetric[metric];
       if (currentMetric[metric] > baselineMetric[metric] * 1.25 && increase > comparison.noiseMs) {
+        regressions.push({
+          metric,
+          measurement: comparison.id,
+          baselineMs: baselineMetric[metric],
+          currentMs: currentMetric[metric],
+          noiseAllowanceMs: comparison.noiseMs,
+        });
         failures.push(
           `${comparison.label} ${metric} regressed from ${baselineMetric[metric].toFixed(2)} ms to ${currentMetric[metric].toFixed(2)} ms`,
         );
       }
     }
   }
-  return failures;
+  return {
+    failures,
+    comparison: {
+      status: regressions.length > 0 ? 'regressed' : 'matched',
+      fingerprintMatched: true,
+      baselineFingerprint: baseline.environment.fingerprint,
+      regressions,
+    },
+  };
 }
 
 export function benchmark(args: {
@@ -250,6 +274,12 @@ export function benchmark(args: {
       afterMb: Math.round(heapAfterMb * 100) / 100,
       deltaMb: heapAfterMb - heapBeforeMb,
     },
+    baselineComparison: {
+      status: 'not-requested',
+      fingerprintMatched: false,
+      baselineFingerprint: null,
+      regressions: [],
+    },
   });
 
   const details = [
@@ -289,7 +319,9 @@ export function benchmark(args: {
       const baseline = benchmarkReportSchema.parse(
         JSON.parse(readFileSync(path, 'utf8')) as unknown,
       );
-      failures = compareBaseline(payload, baseline, details);
+      const comparison = compareBaseline(payload, baseline, details);
+      payload.baselineComparison = comparison.comparison;
+      failures = comparison.failures;
     } catch (error) {
       return makeReport(
         'benchmark',
@@ -302,6 +334,12 @@ export function benchmark(args: {
         },
       );
     }
+  }
+
+  if (payload.singleGame.p95Ms >= 10) {
+    failures.push(
+      `warm single game p95 ${payload.singleGame.p95Ms.toFixed(2)} ms exceeds the hard 10 ms gate`,
+    );
   }
 
   return makeReport(

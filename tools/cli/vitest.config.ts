@@ -6,7 +6,7 @@ export default defineConfig({
     // package execution the spawned processes contend for CPU, so the
     // default 5s per-test budget is too tight. Workers are capped so the
     // subprocess-heavy suite does not oversubscribe the machine.
-    maxWorkers: 6,
+    maxWorkers: 4,
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },

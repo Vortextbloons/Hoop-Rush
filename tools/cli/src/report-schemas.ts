@@ -278,6 +278,21 @@ export const bracketAuditReportSchema = z.object({
 });
 export type BracketAuditReport = z.infer<typeof bracketAuditReportSchema>;
 
+const benchmarkRegressionSchema = z.object({
+  metric: z.enum(['medianMs', 'p95Ms']),
+  measurement: z.enum(['poolCold', 'poolCached', 'singleGame', 'challenge82']),
+  baselineMs: z.number().nonnegative(),
+  currentMs: z.number().nonnegative(),
+  noiseAllowanceMs: z.number().nonnegative(),
+});
+
+const benchmarkBaselineComparisonSchema = z.object({
+  status: z.enum(['not-requested', 'matched', 'skipped-fingerprint', 'regressed']),
+  fingerprintMatched: z.boolean(),
+  baselineFingerprint: z.string().nullable(),
+  regressions: z.array(benchmarkRegressionSchema),
+});
+
 export const benchmarkReportSchema = z.object({
   schemaVersion: z.literal(2),
   command: z.literal('benchmark'),
@@ -330,6 +345,7 @@ export const benchmarkReportSchema = z.object({
     afterMb: z.number().nonnegative(),
     deltaMb: z.number(),
   }),
+  baselineComparison: benchmarkBaselineComparisonSchema,
 });
 export type BenchmarkReport = z.infer<typeof benchmarkReportSchema>;
 

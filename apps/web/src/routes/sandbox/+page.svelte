@@ -48,6 +48,8 @@
 
   let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
   let pickerPlayer = $state<IndexRow | null>(null);
+  let pickerTrigger = $state<HTMLElement | null>(null);
+  let pickerFallbackId = $state<string | null>(null);
   /** Empty string means no filter (show all teams/decades). */
   let franchiseFilter = $state('');
   let eraFilter = $state('');
@@ -203,15 +205,33 @@
     }
     slots[slotIndex] = subject;
     if (subjectSlot !== -1 && subjectSlot !== slotIndex) slots[subjectSlot] = null;
-    pickerPlayer = null;
+    closePicker();
   }
 
   function openPicker(player: IndexRow) {
+    pickerTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    pickerFallbackId = pickerTrigger?.closest<HTMLElement>('[id^="court-slot-"]')?.id ?? null;
     pickerPlayer = player;
+  }
+
+  function closePicker() {
+    pickerPlayer = null;
+    const trigger = pickerTrigger;
+    const fallback = pickerFallbackId;
+    pickerTrigger = null;
+    pickerFallbackId = null;
+    queueMicrotask(() => {
+      if (trigger?.isConnected) {
+        trigger.focus();
+      } else if (fallback) {
+        document.getElementById(fallback)?.focus();
+      }
+    });
   }
 
   function removePlayer(slotIndex: number) {
     slots[slotIndex] = null;
+    queueMicrotask(() => document.getElementById(`court-slot-${String(slotIndex)}`)?.focus());
   }
 
   const pickedCount = $derived(slots.filter((p) => p !== null).length);
@@ -591,6 +611,6 @@
     presentation="sandbox"
     allowDisplacement
     onplace={placePlayer}
-    onclose={() => (pickerPlayer = null)}
+    onclose={closePicker}
   />
 </section>

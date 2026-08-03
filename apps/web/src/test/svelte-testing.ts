@@ -1,4 +1,3 @@
-import { cleanup } from '@testing-library/svelte';
 import { afterEach, vi } from 'vitest';
 
 /**
@@ -25,8 +24,14 @@ import { afterEach, vi } from 'vitest';
  * every test run. `vi.doMock` registrations apply to modules imported after
  * the call, so call the helper before anything pulls in `$app/*`.
  */
-afterEach(() => {
-  cleanup();
+afterEach(async () => {
+  // The static `@testing-library/svelte` import would load a testing-library
+  // module graph into every worker, including the pure-node ones that never
+  // render. It is only needed when a DOM exists, so pull it in lazily.
+  if (typeof globalThis.document !== 'undefined') {
+    const { cleanup } = await import('@testing-library/svelte');
+    cleanup();
+  }
 });
 
 /**

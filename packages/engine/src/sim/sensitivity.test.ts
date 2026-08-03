@@ -262,8 +262,6 @@ describe('sensitivity: era pace and shot mix', () => {
   it.concurrent('higher era pace increases possessions per game', () => {
     const fast = profileWith({ pace: 115 });
     const slow = profileWith({ pace: 80 });
-    const fastPoss = compare('pace', baseTeam, baseTeam, (r) => r.home.box.possessions).base;
-    void fastPoss;
     let fastTotal = 0;
     let slowTotal = 0;
     for (let i = 0; i < SEEDS; i += 1) {

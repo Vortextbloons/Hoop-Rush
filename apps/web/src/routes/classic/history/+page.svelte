@@ -3,9 +3,9 @@
   import { resolve } from '$app/paths';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-import { clearDataLoaderCaches, getManifest } from '$lib/data';
-import { challengeRepository } from '$lib/challenge-repo';
-import AsyncState from '$lib/components/AsyncState.svelte';
+  import { clearDataLoaderCaches, getManifest } from '$lib/data';
+  import { challengeRepository } from '$lib/challenge-repo';
+  import AsyncState from '$lib/components/AsyncState.svelte';
   import HistoryList from '$lib/components/HistoryList.svelte';
 
   /**
@@ -25,7 +25,11 @@ import AsyncState from '$lib/components/AsyncState.svelte';
     loading = true;
     error = null;
     let cancelled = false;
-    Promise.all([getManifest(), challengeRepository.listCompletedRuns(), challengeRepository.loadActiveRunCheckpoint()]).then(
+    Promise.all([
+      getManifest(),
+      challengeRepository.listCompletedRuns(),
+      challengeRepository.loadActiveRunCheckpoint(),
+    ]).then(
       ([m, history, activeCheckpoint]) => {
         if (cancelled) return;
         manifest = m;

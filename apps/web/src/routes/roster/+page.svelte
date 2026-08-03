@@ -241,9 +241,13 @@
   }
 
   function toggleCompare(player: IndexRow) {
-    const existing = compareSelection.findIndex((entry) => comparisonKey(entry) === comparisonKey(player));
+    const existing = compareSelection.findIndex(
+      (entry) => comparisonKey(entry) === comparisonKey(player),
+    );
     if (existing >= 0) {
-      compareSelection = compareSelection.filter((entry) => comparisonKey(entry) !== comparisonKey(player));
+      compareSelection = compareSelection.filter(
+        (entry) => comparisonKey(entry) !== comparisonKey(player),
+      );
       return;
     }
     if (compareSelection.length < 2) compareSelection = [...compareSelection, player];
@@ -776,7 +780,9 @@
                           aria-label={`${isCompared(player) ? 'Remove' : 'Add'} ${player.displayName} ${compareSelection.length >= 2 && !isCompared(player) ? '(comparison full)' : ''}`}
                           disabled={compareSelection.length >= 2 && !isCompared(player)}
                           onclick={() => toggleCompare(player)}
-                          class="rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(player)
+                          class="rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(
+                            player,
+                          )
                             ? 'border-primary bg-primary/10 text-primary'
                             : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
                         >
@@ -848,7 +854,9 @@
                       aria-label={`${isCompared(player) ? 'Remove' : 'Add'} ${player.displayName} ${compareSelection.length >= 2 && !isCompared(player) ? '(comparison full)' : ''}`}
                       disabled={compareSelection.length >= 2 && !isCompared(player)}
                       onclick={() => toggleCompare(player)}
-                      class="shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(player)
+                      class="shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(
+                        player,
+                      )
                         ? 'border-primary bg-primary/10 text-primary'
                         : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
                     >

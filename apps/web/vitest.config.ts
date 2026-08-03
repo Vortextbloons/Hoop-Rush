@@ -34,5 +34,24 @@ export default defineConfig({
     exclude: [...defaultExclude, 'e2e/**'],
     // No testable units yet beyond the journeys; keep the gate green.
     passWithNoTests: true,
+    // The suite is dominated by Vite/SvelteKit transform+import overhead, not
+    // by test execution (~1s of ~50s wall). Sharing one module registry per
+    // worker (isolate: false) transforms each module once instead of once per
+    // test file, which cuts most of that overhead. State is scoped per file
+    // (setups, mocks, jsdom envs), so no leakage is expected; the component
+    // tests still clean up the DOM via afterEach.
+    isolate: false,
+    // Fewer workers means fewer duplicated transform passes over the same
+    // module graph; with the shared module registry the 8 small files still
+    // parallelize fine on 2 workers, and the wall time is set by how many
+    // times the SvelteKit graph is built, not by test execution.
+    maxWorkers: 2,
+    // The suite is dominated by the SvelteKit module graph (35s+ of
+    // transform/import per worker for ~0.6s of actual test execution).
+    // Persisting transformed modules to disk makes cold-start reruns reuse
+    // the graph instead of rebuilding it per worker.
+    experimental: {
+      fsModuleCache: true,
+    },
   },
 });
