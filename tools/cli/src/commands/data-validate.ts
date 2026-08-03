@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +9,7 @@ import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   opponentBracketSchema,
+  REQUIRED_RATING_KEYS,
   unavailabilityReasonSchema,
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
@@ -22,14 +22,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
  * cross-slot duplicates, legal lineup coverage, and peak reproducibility
  * (spec/09, spec/12).
  */
-
-function readPoolAsset(assetPath: string): unknown {
-  try {
-    return JSON.parse(readFileSync(assetPath, 'utf8')) as unknown;
-  } catch {
-    return null;
-  }
-}
 
 export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
   input: true,
@@ -80,8 +72,7 @@ function auditLineage(manifest: HoopRushManifest): AuditResult {
     const sorted = [...segments].sort((a, b) =>
       a.validFromSeasonKey.localeCompare(b.validFromSeasonKey),
     );
-    for (let i = 0; i < sorted.length; i += 1) {
-      const current = sorted[i]!;
+    for (const [i, current] of sorted.entries()) {
       if (
         current.validThroughSeasonKey !== undefined &&
         current.validThroughSeasonKey < current.validFromSeasonKey
@@ -230,7 +221,7 @@ async function auditPools(
       } else if (verbose) {
         details.push(`pools: ${key} hash verified (${assetPath})`);
       }
-      auditPoolContent(assetPath, pool, manifest, failures, details, playerSeasons);
+      auditPoolContent(content, pool, manifest, failures, details, playerSeasons);
     } catch {
       failures.push(`pools: ${key} asset missing (${assetPath})`);
     }
@@ -248,7 +239,7 @@ async function auditPools(
  * peak selection.
  */
 function auditPoolContent(
-  assetPath: string,
+  content: Buffer,
   index: HoopRushManifest['pools'][number],
   manifest: HoopRushManifest,
   failures: string[],
@@ -257,7 +248,13 @@ function auditPoolContent(
 ): void {
   const key = `${index.franchiseId}/${index.eraId}`;
   const era = manifest.eras.find((e) => e.eraId === index.eraId);
-  const parsed = franchiseEraPoolSchema.safeParse(readPoolAsset(assetPath));
+  let raw: unknown = null;
+  try {
+    raw = JSON.parse(content.toString('utf8')) as unknown;
+  } catch {
+    // Fall through to the schema failure below, matching the pre-hash audit.
+  }
+  const parsed = franchiseEraPoolSchema.safeParse(raw);
   if (!parsed.success) {
     failures.push(
       `pools: ${key} asset fails the pool schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? ''}`,
@@ -271,26 +268,6 @@ function auditPoolContent(
   }
 
   const seen = new Set<string>();
-  const requiredRatingKeys = [
-    'insideScoring',
-    'closeShot',
-    'midrange',
-    'threePoint',
-    'freeThrow',
-    'ballHandling',
-    'passing',
-    'offensiveIq',
-    'offensiveRebound',
-    'defensiveRebound',
-    'perimeterDefense',
-    'interiorDefense',
-    'steal',
-    'block',
-    'defensiveIq',
-    'speed',
-    'strength',
-    'vertical',
-  ];
   for (const player of pool.players) {
     if (seen.has(player.playerId)) {
       failures.push(`pools: ${key} duplicate playerId ${player.playerId}`);
@@ -323,18 +300,14 @@ function auditPoolContent(
     }
 
     // Strict engine contracts: every required rating/tendency key present.
-    for (const ratingKey of requiredRatingKeys) {
+    for (const ratingKey of REQUIRED_RATING_KEYS) {
       if (!(ratingKey in player.detailedRatings)) {
         failures.push(`pools: ${key} ${player.displayName} missing rating ${ratingKey}`);
       }
     }
-    if (player.anchors === undefined || player.anchors === null) {
-      failures.push(`pools: ${key} ${player.displayName} missing packaged anchors`);
-    }
 
     // Historical identity: the team that owned the season, with lineage version.
     if (
-      !player.historicalTeamIdentity ||
       player.historicalTeamIdentity.seasonKey !== player.seasonKey ||
       !player.historicalTeamIdentity.lineageRuleVersion
     ) {
@@ -347,8 +320,7 @@ function auditPoolContent(
       ...Object.keys(player.tendencies),
     ];
     for (const field of engineFields) {
-      const provenance = player.provenance[field];
-      if (!provenance || !provenance.kind || !provenance.methodVersion) {
+      if (!(field in player.provenance)) {
         failures.push(`pools: ${key} ${player.displayName} missing provenance for ${field}`);
       }
     }

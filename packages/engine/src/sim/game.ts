@@ -6,7 +6,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { EngineContext } from './context.js';
 import { GameRecorder, type SideIndex } from './recorder.js';
-import { createGameState, resolveTrip } from './possession.js';
+import { createGameState, createTripContext, resolveTrip } from './possession.js';
 import { buildFacts } from './facts.js';
 
 /**
@@ -25,6 +25,7 @@ export function simulateGame(input: GameSimulationInput, context: EngineContext)
   const teams: [SimulationTeam, SimulationTeam] = [input.home, input.away];
   const recorder = new GameRecorder([input.home.displayName, input.away.displayName]);
   const state = createGameState(profile, input.home, input.away);
+  const tripContext = createTripContext(rng, recorder, state, profile, teams);
 
   // Neutral-site tip: the opening possession is a fair coin.
   let offense: SideIndex = rng.chance(0.5) ? 0 : 1;
@@ -45,7 +46,7 @@ export function simulateGame(input: GameSimulationInput, context: EngineContext)
 
     while (secondsRemaining > 0) {
       state.secondsRemaining = secondsRemaining;
-      const result = resolveTrip(rng, recorder, state, profile, teams, offense);
+      const result = resolveTrip(tripContext, offense);
       secondsRemaining = state.secondsRemaining;
       if (result.ended) offense = (1 - offense) as SideIndex;
       if (!result.ended && result.secondsElapsed === 0 && secondsRemaining > 0) {

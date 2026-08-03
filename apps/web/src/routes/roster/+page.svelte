@@ -45,6 +45,9 @@
   const POSITION_OPTIONS = ['G', 'F', 'C'] as const;
   const PAGE_SIZE = 120;
 
+  /** Typing delay before the filter/sort pipeline re-runs on the full index. */
+  const SEARCH_DEBOUNCE_MS = 200;
+
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
   let index = $state.raw<PlayersIndex | null>(null);
@@ -53,11 +56,21 @@
   let franchiseId = $state('');
   let eraId = $state('');
   let positionFilter = $state<'G' | 'F' | 'C' | null>(null);
+  /** Raw input value; `search` below is the debounced query the pipeline reads. */
+  let searchInput = $state('');
   let search = $state('');
   let sortId = $state<RosterSortId>('none');
   let sortDir = $state<RosterSortDirection>('asc');
   let visibleCount = $state(PAGE_SIZE);
   let dialogPlayer = $state<IndexRow | null>(null);
+
+  $effect(() => {
+    const raw = searchInput;
+    const timeout = setTimeout(() => {
+      search = raw;
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  });
 
   $effect(() => {
     let cancelled = false;
@@ -511,7 +524,7 @@
             />
             <input
               type="search"
-              bind:value={search}
+              bind:value={searchInput}
               placeholder="Search players…"
               aria-label="Search players by name"
               class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"

@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import { parsePool, type FranchiseEraPool } from '@hoop-rush/data-contracts';
+import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
 
 /**
  * Best-effort IndexedDB cache for franchise-era pools (web adapter layer).
@@ -38,8 +38,10 @@ export async function readCachedPool(
 ): Promise<FranchiseEraPool | null> {
   try {
     const record = await db.pools.get(key);
+    // The pool was schema-validated before caching and is trusted only when
+    // the content hash still matches the manifest, so no re-parse is needed.
     if (!record || record.contentHash !== expectedHash) return null;
-    return parsePool(record.pool);
+    return record.pool;
   } catch {
     return null;
   }

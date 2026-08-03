@@ -39,8 +39,8 @@ export class InMemoryChallengeRepository implements ChallengeRepository {
       result: input.result,
     });
     const checkpointUpdate = activeRunCheckpointSchema
-      .pick({ status: true, firstLossGameNumber: true, aggregates: true })
-      .parse(input);
+      .pick({ status: true, firstLossGameNumber: true, gamesPlayed: true, aggregates: true })
+      .parse({ ...input, gamesPlayed: input.gameNumber });
     if (this.active === null) {
       throw new Error('appendActiveGame: no active run checkpoint to update');
     }
@@ -49,6 +49,14 @@ export class InMemoryChallengeRepository implements ChallengeRepository {
     }
     this.activeGames.set(row.gameNumber, row.result);
     this.active = { ...this.active, ...checkpointUpdate, updatedAtIso: new Date().toISOString() };
+  }
+
+  async loadActiveRunCheckpoint(): Promise<ActiveRunCheckpoint | null> {
+    if (this.active === null) return null;
+    if (this.active.gamesPlayed === undefined) {
+      return { ...this.active, gamesPlayed: this.activeGames.size };
+    }
+    return this.active;
   }
 
   async loadActiveRun(): Promise<StoredRunRecord | null> {

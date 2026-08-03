@@ -161,6 +161,9 @@ class TestDatabase extends Dexie {
       completed: 'recordId',
       history: 'recordId',
     });
+    this.version(3).stores({
+      history: 'recordId, completedAtIso',
+    });
   }
 }
 

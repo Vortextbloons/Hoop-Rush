@@ -257,6 +257,10 @@ export function computeRealOverall(
   // smooth, position-neutral penalty so low-impact role players separate
   // naturally instead of collapsing onto one hard cap.
   const lowImpactRotation = gp >= 40 && mpg >= 20 && ppg < 16 && per < 14 && bpm < 1;
+  // A low-minute reserve with very little production and negative impact should
+  // not inherit a starter-level overall from broad derived skills. This is
+  // deliberately stat-based so useful bench specialists can still rate well.
+  const lowImpactBench = gp >= 40 && mpg < 20 && ppg < 8 && per < 10 && bpm < 0;
 
   // --- Final boost (matches TS) ---
   // Reduced so the top of the distribution is no longer lifted 2-6 points on
@@ -280,5 +284,6 @@ export function computeRealOverall(
     const impactPenalty = Math.round(Math.max(0, (14 - per) * 0.5 + (1 - bpm)));
     finalOverall = Math.max(0, finalOverall - impactPenalty);
   }
+  if (lowImpactBench) finalOverall = Math.min(finalOverall, 58);
   return finalOverall;
 }

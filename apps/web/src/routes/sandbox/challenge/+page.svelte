@@ -174,6 +174,9 @@
     const currentRun = run;
     const m = manifest;
     if (!browser || !currentRun || !m) return;
+    // `run` reassigns on every paced reveal; the pool map is already built, so
+    // bail out early instead of re-resolving pools per reveal.
+    if (byId !== null) return;
     let cancelled = false;
     loadRunPlayersById(currentRun, m).then(
       (map) => {

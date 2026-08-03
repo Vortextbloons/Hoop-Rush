@@ -28,18 +28,17 @@ export interface ReboundResult {
 
 /**
  * Probability an offensive rebound follows a miss at the zone, anchored to the
- * era rate at equal team rebounding.
+ * era rate at equal team rebounding. The team mean ratings are precomputed per
+ * game by the caller.
  */
 export function offensiveReboundProbability(
-  offense: SimulationTeam,
-  defense: SimulationTeam,
+  offMean: number,
+  defMean: number,
   zone: ShotZone,
   profile: EraSimulationProfile,
 ): number {
   const c = ENGINE_CONSTANTS;
-  const off = teamMean(offense, 'offensiveRebound');
-  const def = teamMean(defense, 'defensiveRebound');
-  const ratio = (off - def) / c.offensiveReboundRange;
+  const ratio = (offMean - defMean) / c.offensiveReboundRange;
   const zoneAdjust =
     zone === 'rim' || zone === 'shortMid'
       ? c.offensiveReboundRimBonus
@@ -55,42 +54,43 @@ export function offensiveReboundProbability(
  */
 export function resolveRebound(
   rng: Rng,
-  offense: SimulationTeam,
-  defense: SimulationTeam,
+  offMean: number,
+  defMean: number,
   zone: ShotZone,
   profile: EraSimulationProfile,
   deadBall: boolean,
 ): ReboundResult {
   if (deadBall) return { offensive: false, team: true };
-  const p = offensiveReboundProbability(offense, defense, zone, profile);
+  const p = offensiveReboundProbability(offMean, defMean, zone, profile);
   if (rng.chance(p)) return { offensive: true, team: false };
   return { offensive: false, team: false };
 }
 
-/** The rebounder, weighted by the relevant rebound rating plus vertical reach. */
+/** Rebound attribution weights for a team, in team index order. */
+export function rebounderWeights(team: SimulationTeam, offensive: boolean): number[] {
+  const rating = offensive ? 'offensiveRebound' : 'defensiveRebound';
+  return team.players.map((p) => {
+    const historical = offensive
+      ? (p.anchors?.offensiveReboundsPerGame ?? 0)
+      : (p.anchors?.defensiveReboundsPerGame ?? 0);
+    const heightContribution = p.heightInches === null ? 0 : Math.max(0, p.heightInches - 72) * 0.8;
+    const weightContribution = p.weightLbs === null ? 0 : Math.max(0, p.weightLbs - 180) * 0.03;
+    return Math.max(
+      0.5,
+      p.ratings[rating] +
+        p.ratings.vertical * 0.25 +
+        historical * ENGINE_CONSTANTS.observedReboundWeight +
+        heightContribution +
+        weightContribution,
+    );
+  });
+}
+
+/** The rebounder against precomputed rebound-rating weights. */
 export function pickRebounder(
-  team: SimulationTeam,
-  offensive: boolean,
+  players: readonly SimulationPlayer[],
+  weights: readonly number[],
   rng: Rng,
 ): SimulationPlayer {
-  const rating = offensive ? 'offensiveRebound' : 'defensiveRebound';
-  return rng.weightedPick(
-    team.players,
-    team.players.map((p) => {
-      const historical = offensive
-        ? (p.anchors?.offensiveReboundsPerGame ?? 0)
-        : (p.anchors?.defensiveReboundsPerGame ?? 0);
-      const heightContribution =
-        p.heightInches === null ? 0 : Math.max(0, p.heightInches - 72) * 0.8;
-      const weightContribution = p.weightLbs === null ? 0 : Math.max(0, p.weightLbs - 180) * 0.03;
-      return Math.max(
-        0.5,
-        p.ratings[rating] +
-          p.ratings.vertical * 0.25 +
-          historical * ENGINE_CONSTANTS.observedReboundWeight +
-          heightContribution +
-          weightContribution,
-      );
-    }),
-  );
+  return rng.weightedPick(players, weights);
 }

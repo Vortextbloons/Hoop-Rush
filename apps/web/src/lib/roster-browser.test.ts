@@ -6,6 +6,7 @@ import {
   formatPct,
   formatPerGame,
   groupRoster,
+  lowercaseName,
   paginateItems,
   perGame,
   shotPct,
@@ -194,6 +195,18 @@ describe('filterRoster', () => {
         query: '',
       }).length,
     ).toBe(3);
+  });
+});
+
+describe('lowercaseName', () => {
+  it('case-folds the display name and memoizes per row object', () => {
+    const player = row({
+      playerId: 'a',
+      displayName: "Shaquille O'Neal",
+    });
+    expect(lowercaseName(player)).toBe("shaquille o'neal");
+    expect(lowercaseName(player)).toBe("shaquille o'neal");
+    expect(lowercaseName(row({ playerId: 'b', displayName: 'MAGIC' }))).toBe('magic');
   });
 });
 

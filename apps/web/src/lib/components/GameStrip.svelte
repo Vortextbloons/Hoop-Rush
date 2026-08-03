@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import type { ChallengeRun, GameResult } from '@hoop-rush/data-contracts';
 
   /**
@@ -20,9 +21,13 @@
 
   const firstLoss = $derived(run.firstLossGameNumber);
 
-  /** Opponent display names keyed by opponentId; the bracket is fixed per run. */
+  /**
+   * Opponent display names keyed by opponentId. The bracket is fixed for the
+   * mounted run, so this is built once via untrack: during the paced reveal
+   * the run prop reassigns every reveal but the bracket never changes.
+   */
   const opponentNames = $derived(
-    new Map(run.bracket.opponents.map((o) => [o.opponentId, o.displayName])),
+    untrack(() => new Map(run.bracket.opponents.map((o) => [o.opponentId, o.displayName]))),
   );
 
   const cells = $derived.by(() => {

@@ -35,10 +35,10 @@
 
   const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 
-  let manifest = $state<HoopRushManifest | null>(null);
+  let manifest = $state.raw<HoopRushManifest | null>(null);
   /** playerId → peak season across the run's loaded pools (slot provenance). */
   let byId = $state<Map<string, PeakPlayer> | null>(null);
-  let run = $state<ChallengeRun | null>(null);
+  let run = $state.raw<ChallengeRun | null>(null);
   let error = $state<string | null>(null);
   let totalsMode = $state(false);
   let running = $state(false);

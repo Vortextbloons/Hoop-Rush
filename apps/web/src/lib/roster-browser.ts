@@ -45,6 +45,18 @@ export interface RosterFilters {
 
 const POSITION_ORDER: Readonly<Record<string, number>> = { G: 0, F: 1, C: 2 };
 
+const lowercaseNameCache = new WeakMap<PlayersIndexEntry, string>();
+
+/** Case-folded display name, memoized per row object (the index is immutable). */
+export function lowercaseName(row: PlayersIndexEntry): string {
+  let folded = lowercaseNameCache.get(row);
+  if (folded === undefined) {
+    folded = row.displayName.toLowerCase();
+    lowercaseNameCache.set(row, folded);
+  }
+  return folded;
+}
+
 /** The year a season key starts in ("1990-91" -> 1990). */
 function seasonStartYear(seasonKey: string): number {
   return Number.parseInt(seasonKey, 10);
@@ -124,7 +136,7 @@ export function filterRoster(
   if (position) list = list.filter((r) => r.positionsCanonical.includes(position));
   const query = filters.query.trim().toLowerCase();
   if (query) {
-    list = list.filter((r) => r.displayName.toLowerCase().includes(query));
+    list = list.filter((r) => lowercaseName(r).includes(query));
   }
   return list;
 }

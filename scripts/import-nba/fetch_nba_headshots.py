@@ -10,6 +10,7 @@ altIds.nbaHeadshotAvailable so the UI can prefer NBA when a real photo exists.
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from .config import RAW_CACHE
@@ -38,10 +39,12 @@ def _load() -> dict[str, bool]:
 
 
 def _save(cache: dict[str, bool]) -> None:
-    NBA_HEADSHOT_STATUS_PATH.write_text(
+    tmp = NBA_HEADSHOT_STATUS_PATH.with_suffix(".json.tmp")
+    tmp.write_text(
         json.dumps(cache, indent=2, sort_keys=True),
         encoding="utf-8",
     )
+    os.replace(tmp, NBA_HEADSHOT_STATUS_PATH)
 
 
 def nba_headshot_available(external_id: str) -> bool:

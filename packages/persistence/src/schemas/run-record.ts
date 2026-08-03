@@ -69,6 +69,11 @@ export const activeRunCheckpointSchema = z.object({
   status: z.enum(['active', 'finished']),
   /** First loss game number (1-82), or null while the run is undefeated. */
   firstLossGameNumber: z.number().int().min(1).max(82).nullable(),
+  /**
+   * Number of accepted games, kept current by every append. Absent on legacy
+   * checkpoints; loaders fall back to counting game rows.
+   */
+  gamesPlayed: z.number().int().min(0).max(82).optional(),
   aggregates: runAggregatesSchema,
   updatedAtIso: z.string().datetime().optional(),
 });
@@ -93,65 +98,73 @@ export interface ActiveGameAppend {
   firstLossGameNumber: number | null;
 }
 
-/** Reduces a fresh full run record (empty games array) to a checkpoint. */
+/**
+ * Reduces a fresh full run record (empty games array) to a checkpoint. The
+ * record is already a validated `StoredRunRecord` at this boundary; only the
+ * append-only preconditions are checked here.
+ */
 export function checkpointFromRun(record: StoredRunRecord): ActiveRunCheckpoint {
-  const validated = storedRunRecordSchema.parse(record);
-  if (validated.run.games.length !== 0) {
+  if (record.run.games.length !== 0) {
     throw new Error('saveActiveRun: active run must start with no accepted games');
   }
-  if (validated.run.status !== 'active' && validated.run.status !== 'finished') {
-    throw new Error(`cannot store an active run in status ${validated.run.status}`);
+  const run = record.run;
+  if (run.status !== 'active' && run.status !== 'finished') {
+    throw new Error(`cannot store an active run in status ${run.status}`);
   }
   return {
     recordId: 'active',
     saveSchemaVersion: 3,
-    runId: validated.run.runId,
-    mode: validated.run.mode,
-    franchiseId: validated.run.franchiseId,
-    eraId: validated.run.eraId,
-    homeDisplayName: validated.run.homeDisplayName,
-    playerIds: validated.run.playerIds,
-    selections: validated.run.selections,
-    lineup: validated.run.lineup,
-    players: validated.run.players,
-    runSeed: validated.run.runSeed,
-    versions: validated.run.versions,
-    eraProfileVersion: validated.run.eraProfileVersion,
-    difficulty: validated.run.difficulty,
-    bracket: validated.run.bracket,
-    status: validated.run.status,
-    firstLossGameNumber: validated.run.firstLossGameNumber,
-    aggregates: validated.run.aggregates,
-    updatedAtIso: validated.updatedAtIso,
+    runId: run.runId,
+    mode: run.mode,
+    franchiseId: run.franchiseId,
+    eraId: run.eraId,
+    homeDisplayName: run.homeDisplayName,
+    playerIds: run.playerIds,
+    selections: run.selections,
+    lineup: run.lineup,
+    players: run.players,
+    runSeed: run.runSeed,
+    versions: run.versions,
+    eraProfileVersion: run.eraProfileVersion,
+    difficulty: run.difficulty,
+    bracket: run.bracket,
+    status: run.status,
+    firstLossGameNumber: run.firstLossGameNumber,
+    gamesPlayed: run.games.length,
+    aggregates: run.aggregates,
+    updatedAtIso: record.updatedAtIso,
   };
 }
 
-/** Assembles a ChallengeRun from a validated checkpoint and its game rows. */
+/**
+ * Assembles a ChallengeRun from an already-validated checkpoint and its game
+ * rows. Read-time schema validation happens once at the adapter boundary
+ * (activeRunCheckpointSchema / storedRunRecordSchema), never here.
+ */
 export function runFromCheckpoint(
   checkpoint: ActiveRunCheckpoint,
   results: GameResult[],
 ): ChallengeRun {
-  const validated = activeRunCheckpointSchema.parse(checkpoint);
   return {
     schemaVersion: 1,
-    runId: validated.runId,
-    mode: validated.mode,
-    franchiseId: validated.franchiseId,
-    eraId: validated.eraId,
-    homeDisplayName: validated.homeDisplayName,
-    playerIds: validated.playerIds,
-    selections: validated.selections,
-    lineup: validated.lineup,
-    players: validated.players,
-    runSeed: validated.runSeed,
-    versions: validated.versions,
-    eraProfileVersion: validated.eraProfileVersion,
-    difficulty: validated.difficulty,
-    bracket: validated.bracket,
-    status: validated.status,
-    firstLossGameNumber: validated.firstLossGameNumber,
+    runId: checkpoint.runId,
+    mode: checkpoint.mode,
+    franchiseId: checkpoint.franchiseId,
+    eraId: checkpoint.eraId,
+    homeDisplayName: checkpoint.homeDisplayName,
+    playerIds: checkpoint.playerIds,
+    selections: checkpoint.selections,
+    lineup: checkpoint.lineup,
+    players: checkpoint.players,
+    runSeed: checkpoint.runSeed,
+    versions: checkpoint.versions,
+    eraProfileVersion: checkpoint.eraProfileVersion,
+    difficulty: checkpoint.difficulty,
+    bracket: checkpoint.bracket,
+    status: checkpoint.status,
+    firstLossGameNumber: checkpoint.firstLossGameNumber,
     games: results,
-    aggregates: validated.aggregates,
+    aggregates: checkpoint.aggregates,
   };
 }
 
@@ -195,6 +208,11 @@ export interface ChallengeRepository {
   appendActiveGame(input: ActiveGameAppend): Promise<void>;
   /** Reconstructs the full active run from checkpoint plus game rows, or null. */
   loadActiveRun(): Promise<StoredRunRecord | null>;
+  /**
+   * Loads only the active run checkpoint (status, first loss, aggregates)
+   * without the game rows. Cheap for pages that render run progress.
+   */
+  loadActiveRunCheckpoint(): Promise<ActiveRunCheckpoint | null>;
   clearActiveRun(): Promise<void>;
   /** Atomically moves the active run into the completed table and history index. */
   promoteActiveToCompleted(completed: StoredRunRecord, index: CompletedRunIndex): Promise<void>;

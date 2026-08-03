@@ -14,6 +14,28 @@ import { eraSimulationProfileSchema } from './era-sim-profile.js';
  * `SimulationTeam` instance even when the same playerId appears on both teams.
  */
 
+/** Frozen rating keys required on every packaged player (strict engine contract). */
+export const REQUIRED_RATING_KEYS = [
+  'insideScoring',
+  'closeShot',
+  'midrange',
+  'threePoint',
+  'freeThrow',
+  'ballHandling',
+  'passing',
+  'offensiveIq',
+  'offensiveRebound',
+  'defensiveRebound',
+  'perimeterDefense',
+  'interiorDefense',
+  'steal',
+  'block',
+  'defensiveIq',
+  'speed',
+  'strength',
+  'vertical',
+] as const;
+
 /** The frozen set of possession-relevant ratings the engine may consume (0-100). */
 export const simulationRatingsSchema = z
   .object({

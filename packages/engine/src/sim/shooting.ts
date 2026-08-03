@@ -5,7 +5,13 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import { ENGINE_CONSTANTS } from './constants.js';
-import { isThreePointZone, twoPointZoneShares, zoneSkillRating, type ActionType } from './usage.js';
+import {
+  blendedZoneWeights,
+  isThreePointZone,
+  twoPointZoneSharesFromBlend,
+  zoneSkillRating,
+  type ActionType,
+} from './usage.js';
 
 /**
  * Zone skill, defender selection, perimeter/interior pressure, and era
@@ -16,10 +22,11 @@ import { isThreePointZone, twoPointZoneShares, zoneSkillRating, type ActionType 
  * measurably matter.
  */
 
-export interface ShotContext {
-  zone: ShotZone;
-  action: ActionType;
-  secondsRemainingAtShot: number;
+export interface ShotPrep {
+  /** Lineup spacing (0..1) of the offensive team, precomputed per game. */
+  spacing: number;
+  /** Two-point anchor factor for the shooter, precomputed per game (null when unanchored). */
+  twoPointAnchor: number | null;
 }
 
 /**
@@ -108,10 +115,11 @@ export function observedTwoPointPct(shooter: SimulationPlayer): number | null {
 export function twoPointAnchorFactor(
   shooter: SimulationPlayer,
   profile: EraSimulationProfile,
+  blend: readonly number[] = blendedZoneWeights(shooter, profile),
 ): number | null {
   const observed = observedTwoPointPct(shooter);
   if (observed === null) return null;
-  const shares = twoPointZoneShares(shooter, profile);
+  const shares = twoPointZoneSharesFromBlend(blend);
   const bases = [
     ENGINE_CONSTANTS.zoneBaseMake.rim,
     ENGINE_CONSTANTS.zoneBaseMake.shortMid,
@@ -177,49 +185,45 @@ export function blockProbability(
 export function makeProbability(
   shooter: SimulationPlayer,
   defender: SimulationPlayer,
-  offense: SimulationTeam,
   profile: EraSimulationProfile,
-  context: ShotContext,
+  zone: ShotZone,
+  action: ActionType,
   periodSecondsRemaining: number,
+  prep: ShotPrep,
 ): number {
-  const threePointZone = isThreePointZone(context.zone);
+  const threePointZone = isThreePointZone(zone);
   const observedThreePointPct = threePointZone ? shooter.anchors?.threePointPct : null;
   const hasObservedThree = observedThreePointPct !== null && observedThreePointPct !== undefined;
-  const twoAnchor = threePointZone ? null : twoPointAnchorFactor(shooter, profile);
+  const twoAnchor = threePointZone ? null : prep.twoPointAnchor;
   const anchoredTwo = twoAnchor !== null;
   const base = threePointZone
     ? hasObservedThree
       ? observedThreePointPct * ENGINE_CONSTANTS.observedThreePointBlend +
         profile.targets.threePointPct.value * (1 - ENGINE_CONSTANTS.observedThreePointBlend)
-      : ENGINE_CONSTANTS.zoneBaseMake[context.zone]
-    : ENGINE_CONSTANTS.zoneBaseMake[context.zone] * (twoAnchor ?? 1);
+      : ENGINE_CONSTANTS.zoneBaseMake[zone]
+    : ENGINE_CONSTANTS.zoneBaseMake[zone] * (twoAnchor ?? 1);
   const skill = threePointZone
     ? hasObservedThree
-      ? ((zoneSkillRating(shooter, context.zone) - 70) / 100) * 0.05
-      : ((zoneSkillRating(shooter, context.zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange
-    : ((zoneSkillRating(shooter, context.zone) - 70) / 30) *
+      ? ((zoneSkillRating(shooter, zone) - 70) / 100) * 0.05
+      : ((zoneSkillRating(shooter, zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange
+    : ((zoneSkillRating(shooter, zone) - 70) / 30) *
       ENGINE_CONSTANTS.skillRange *
       (anchoredTwo ? ENGINE_CONSTANTS.twoPointAnchorSkillScale : 1);
-  const contest = -contestPenalty(defender, context.zone);
+  const contest = -contestPenalty(defender, zone);
   const era =
     anchoredTwo || hasObservedThree
       ? 0
       : (profile.parameters.leagueTsPct - 0.55) * ENGINE_CONSTANTS.eraEfficiencyWeight;
   // Lineup spacing raises two-point conversion for spaced teams and
   // compresses it for clogged ones; three-pointers are unaffected.
-  const spacing = threePointZone
-    ? 0
-    : (teamSpacing(offense) - 0.5) * ENGINE_CONSTANTS.spacingBonusScale;
-  const quality = threePointZone ? 0 : shotQualityBonus(context.action, context.zone);
+  const spacing = threePointZone ? 0 : (prep.spacing - 0.5) * ENGINE_CONSTANTS.spacingBonusScale;
+  const quality = threePointZone ? 0 : shotQualityBonus(action, zone);
   const latePenalty =
     periodSecondsRemaining <= 4
       ? -(0.04 + Math.min(1, Math.max(0, (4 - periodSecondsRemaining) / 4)) * 0.06)
       : 0;
   const raw = base + skill + contest + era + spacing + quality + latePenalty;
-  return Math.min(
-    0.97,
-    Math.max(ENGINE_CONSTANTS.zoneMakeFloor[context.zone], Math.max(0.03, raw)),
-  );
+  return Math.min(0.97, Math.max(ENGINE_CONSTANTS.zoneMakeFloor[zone], Math.max(0.03, raw)));
 }
 
 /** Points for a made field goal at a zone. */

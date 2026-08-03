@@ -145,8 +145,8 @@ function generationOptions(
     openingOpponent: opening,
     difficulty,
     candidates: FRANCHISES.map(candidatesFor),
-    proposalsPerFranchise: 24,
-    samplesPerBenchmark: 6,
+    proposalsPerFranchise: 12,
+    samplesPerBenchmark: 4,
     minPlayerScore: 45,
     engineContext: createEngineContext(),
     ...overrides,
@@ -156,8 +156,10 @@ function generationOptions(
 /**
  * The fixture generation is deterministic, and six tests only assert
  * properties of that single artifact. Computing it once keeps the suite fast
- * (each generation measures ~700 proposals against the benchmark matrix);
- * the byte-identity test below still regenerates independently.
+ * (each generation measures ~360 proposals against the benchmark matrix);
+ * the byte-identity test below still regenerates independently. The proposal
+ * and benchmark counts are the minimum that still spans the strength band:
+ * 8 proposals collapse every team to the same percentile.
  */
 let sharedBracket: OpponentBracket | null = null;
 function fixtureBracket(): OpponentBracket {

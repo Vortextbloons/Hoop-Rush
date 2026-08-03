@@ -23,6 +23,7 @@ import {
   LINEAGE_RULE_VERSION,
   POSITION_NORMALIZATION_VERSION,
   RATINGS_VERSION,
+  REQUIRED_RATING_KEYS,
   SELECTION_SCORE_VERSION,
   SOURCE_VERSION,
   type Confidence,
@@ -736,6 +737,10 @@ export function computePool(
     }
   }
 
+  // The cache exists to memoize season JSON within one pool scan; every
+  // season is reloadable from disk, so drop it before the next target.
+  seasonDataCache.clear();
+
   if (missingStints.length > 0) {
     console.log(`  [WARN] no stints for ${franchiseId} in: ${missingStints.join(', ')}`);
   }
@@ -780,26 +785,6 @@ export function computePool(
       }
     }
     // Strict engine contracts: incomplete players fail packaging.
-    const requiredRatingKeys = [
-      'insideScoring',
-      'closeShot',
-      'midrange',
-      'threePoint',
-      'freeThrow',
-      'ballHandling',
-      'passing',
-      'offensiveIq',
-      'offensiveRebound',
-      'defensiveRebound',
-      'perimeterDefense',
-      'interiorDefense',
-      'steal',
-      'block',
-      'defensiveIq',
-      'speed',
-      'strength',
-      'vertical',
-    ];
     const requiredTendencyKeys = [
       'usageRate',
       'passRate',
@@ -825,7 +810,7 @@ export function computePool(
       'blockAttemptRate',
       'crashOffensiveGlassRate',
     ];
-    for (const key of requiredRatingKeys) {
+    for (const key of REQUIRED_RATING_KEYS) {
       if (!(key in detailedRatings)) {
         identityFailures.push(`${pid} missing rating ${key} in ${best.season}`);
       }

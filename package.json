@@ -11,9 +11,9 @@
     "lint": "pnpm -r lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "pnpm -r test",
-    "test:run": "pnpm -r test:run",
-    "test:quick": "pnpm -r exec vitest run --exclude **/generator.test.ts"
+    "test": "pnpm --parallel -r test",
+    "test:run": "pnpm --parallel -r test:run",
+    "test:quick": "pnpm --parallel -r exec vitest run --exclude **/generator.test.ts"
   },
   "devDependencies": {
     "prettier": "^3.9.6",

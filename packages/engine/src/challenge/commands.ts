@@ -12,7 +12,6 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import {
-  challengeRunSchema,
   RUN_SCHEMA_VERSION,
   SAVE_SCHEMA_VERSION,
   type RunPlayerSelection,
@@ -20,7 +19,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { validateLineup } from '../domain/lineup.js';
 import type { EngineContext } from '../sim/context.js';
-import { simulateGameWithCheck } from '../sim/simulate.js';
+import { simulateGame } from '../sim/game.js';
 import { checkGameResult } from '../sim/invariants.js';
 import { addGameToAggregates, zeroRunAggregates } from './aggregates.js';
 import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.js';
@@ -255,7 +254,7 @@ export function createChallenge(input: ChallengeCreation): ChallengeRun {
     games: [],
     aggregates,
   };
-  return challengeRunSchema.parse(run);
+  return run;
 }
 
 /** Resolves the opponent for a game number against the frozen schedule. */
@@ -398,7 +397,8 @@ export function simulateChallenge(
   while (current.status === 'active') {
     const input = createNextGameInput(current, profile);
     if (!input) break;
-    const result = simulateGameWithCheck(input, context);
+    // The authoritative check runs once, inside acceptGameResult below.
+    const result = simulateGame(input, context);
     current = acceptGameResult(current, result);
   }
   return current;
@@ -409,7 +409,7 @@ export function abandonChallenge(run: ChallengeRun): ChallengeRun {
   if (run.status !== 'active') {
     throw new Error(`cannot abandon a run in status ${run.status}`);
   }
-  return challengeRunSchema.parse({ ...run, status: 'abandoned' });
+  return { ...run, status: 'abandoned' };
 }
 
 export { SEED_DERIVATION_VERSION, deriveGameSeed };

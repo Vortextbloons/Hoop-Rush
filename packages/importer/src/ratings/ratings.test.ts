@@ -185,6 +185,39 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(derived.summaryRatings.overallRating).toBeGreaterThan(skillOnly.overallRating);
   });
 
+  it('keeps sustained low-impact bench seasons near replacement level', () => {
+    const derived = derivePlayerRecord(
+      input(
+        '2005-06',
+        starterStats({
+          gamesPlayed: 71,
+          minutes: 937,
+          points: 205,
+          rebounds: 113,
+          offensiveRebounds: 28,
+          defensiveRebounds: 85,
+          assists: 49,
+          steals: 21,
+          blocks: 21,
+          turnovers: 49,
+          fgm: 71,
+          fga: 191,
+          tpm: 28,
+          tpa: 85,
+          ftm: 28,
+          fta: 35,
+          per: 3.01,
+          boxPlusMinus: -2.682,
+          usageRate: 12.6,
+          tsPct: 0.491,
+          efgPct: 0.464,
+        }),
+        'SF',
+      ),
+    );
+    expect(derived.summaryRatings.overallRating).toBe(58);
+  });
+
   it('fieldPublished follows the source availability table (inclusive first season)', () => {
     expect(fieldPublished('steals', '1972-73')).toBe(false);
     expect(fieldPublished('steals', '1973-74')).toBe(true);

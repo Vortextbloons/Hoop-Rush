@@ -111,7 +111,7 @@ function expectDirection(
 const baseTeam = buildLegalSimulationTeam({ teamId: 'sens-base', displayName: 'Sens Base' });
 
 describe('sensitivity: shooting and finishing', () => {
-  it('higher insideScoring increases points and field-goal percentage', () => {
+  it.concurrent('higher insideScoring increases points and field-goal percentage', () => {
     const changed = mutateAllRatings(baseTeam, 'insideScoring', 15);
     // Both sides are measured: the home side of a paired seeded batch is
     // systematically offset by RNG consumption order, so a one-sided
@@ -128,7 +128,7 @@ describe('sensitivity: shooting and finishing', () => {
     expectDirection('fgpct', fg.base, fg.changed, 1, 0.6, 0.01);
   });
 
-  it('higher threePoint increases three-point percentage and three attempts', () => {
+  it.concurrent('higher threePoint increases three-point percentage and three attempts', () => {
     const changed = mutateAllRatings(baseTeam, 'threePoint', 15);
     const threePct = compare('three-pct', baseTeam, changed, (r) => {
       const t = r.home.box.threes;
@@ -137,7 +137,7 @@ describe('sensitivity: shooting and finishing', () => {
     expectDirection('threePct', threePct.base, threePct.changed, 1);
   });
 
-  it('higher threePointRate tendency raises three-point attempt share', () => {
+  it.concurrent('higher threePointRate tendency raises three-point attempt share', () => {
     const changed = mutateAllTendencies(baseTeam, 'threePointRate', 25);
     const share = compare('three-share', baseTeam, changed, (r) => {
       const b = r.home.box;
@@ -146,7 +146,7 @@ describe('sensitivity: shooting and finishing', () => {
     expectDirection('threeShare', share.base, share.changed, 1);
   });
 
-  it('higher freeThrow rating raises free-throw percentage', () => {
+  it.concurrent('higher freeThrow rating raises free-throw percentage', () => {
     const changed = mutateAllRatings(baseTeam, 'freeThrow', 15);
     const ftPct = compare('ft-pct', baseTeam, changed, (r) => {
       const t = r.home.box.freeThrows;
@@ -157,7 +157,7 @@ describe('sensitivity: shooting and finishing', () => {
 });
 
 describe('sensitivity: creation and usage', () => {
-  it('higher usageRate concentrates shot attempts on that player', () => {
+  it.concurrent('higher usageRate concentrates shot attempts on that player', () => {
     const star = mutatePlayers(baseTeam, (p) =>
       p.playerId === 'p-fixture-1'
         ? { ...p, tendencies: { ...p.tendencies, usageRate: p.tendencies.usageRate + 35 } }
@@ -171,7 +171,7 @@ describe('sensitivity: creation and usage', () => {
     expectDirection('usageShare', result.base, result.changed, 1);
   });
 
-  it('higher passing raises assists per game', () => {
+  it.concurrent('higher passing raises assists per game', () => {
     const changed = mutateAllRatings(baseTeam, 'passing', 15);
     const assists = compare('passing', baseTeam, changed, (r) => r.home.box.assists);
     expectDirection('assists', assists.base, assists.changed, 1);
@@ -179,7 +179,7 @@ describe('sensitivity: creation and usage', () => {
 });
 
 describe('sensitivity: ball security', () => {
-  it('higher ballHandling reduces turnovers', () => {
+  it.concurrent('higher ballHandling reduces turnovers', () => {
     const changed = mutateAllRatings(baseTeam, 'ballHandling', 15);
     const tov = compare('handling', baseTeam, changed, (r) => r.home.box.turnovers);
     // Fewer turnovers with better handling.
@@ -187,7 +187,7 @@ describe('sensitivity: ball security', () => {
     expect(tov.base - tov.changed).toBeGreaterThan(0);
   });
 
-  it('higher turnoverRate tendency increases turnovers', () => {
+  it.concurrent('higher turnoverRate tendency increases turnovers', () => {
     const changed = mutateAllTendencies(baseTeam, 'turnoverRate', 15);
     const tov = compare('tov-tend', baseTeam, changed, (r) => r.home.box.turnovers);
     // m3-engine-v5 made the observed turnover tendency the primary anchor
@@ -198,7 +198,7 @@ describe('sensitivity: ball security', () => {
 });
 
 describe('sensitivity: defense', () => {
-  it('higher perimeterDefense lowers opponent points', () => {
+  it.concurrent('higher perimeterDefense lowers opponent points', () => {
     const changed = mutateAllRatings(baseTeam, 'perimeterDefense', 15);
     const oppPts = compare('perim', baseTeam, changed, (r) => r.away.box.points);
     // The calibrated contest slope (m3-engine-v5, zero-centered) trades magnitude for
@@ -209,7 +209,7 @@ describe('sensitivity: defense', () => {
     );
   });
 
-  it('higher interiorDefense lowers opponent field-goal percentage', () => {
+  it.concurrent('higher interiorDefense lowers opponent field-goal percentage', () => {
     const changed = mutateAllRatings(baseTeam, 'interiorDefense', 15);
     const oppFg = compare('interior', baseTeam, changed, (r) => {
       const b = r.away.box.fieldGoals;
@@ -218,7 +218,7 @@ describe('sensitivity: defense', () => {
     expect(oppFg.changed).toBeLessThan(oppFg.base * 0.97);
   });
 
-  it('higher steal raises steals and opponent turnovers', () => {
+  it.concurrent('higher steal raises steals and opponent turnovers', () => {
     const changed = mutateAllRatings(baseTeam, 'steal', 15);
     const steals = compare('steal', baseTeam, changed, (r) => r.home.box.steals);
     expectDirection('steals', steals.base, steals.changed, 1);
@@ -228,7 +228,7 @@ describe('sensitivity: defense', () => {
     expectDirection('oppTurnovers', oppTov.base, oppTov.changed, 1, 0.6, 0.02);
   });
 
-  it('higher block raises blocks', () => {
+  it.concurrent('higher block raises blocks', () => {
     const changed = mutateAllRatings(baseTeam, 'block', 15);
     const blocks = compare('block', baseTeam, changed, (r) => r.home.box.blocks);
     // Blocks are rare per game, so the relative swing is naturally large.
@@ -237,13 +237,13 @@ describe('sensitivity: defense', () => {
 });
 
 describe('sensitivity: rebounding', () => {
-  it('higher offensiveRebound raises offensive rebounds', () => {
+  it.concurrent('higher offensiveRebound raises offensive rebounds', () => {
     const changed = mutateAllRatings(baseTeam, 'offensiveRebound', 15);
     const oreb = compare('oreb', baseTeam, changed, (r) => r.home.box.rebounds.offensive);
     expectDirection('offensiveRebounds', oreb.base, oreb.changed, 1);
   });
 
-  it('higher defensiveRebound lowers opponent offensive rebounds', () => {
+  it.concurrent('higher defensiveRebound lowers opponent offensive rebounds', () => {
     const changed = mutateAllRatings(baseTeam, 'defensiveRebound', 15);
     const oppOreb = compare('dreb', baseTeam, changed, (r) => r.away.box.rebounds.offensive);
     expect(oppOreb.changed).toBeLessThan(oppOreb.base * 0.975);
@@ -251,7 +251,7 @@ describe('sensitivity: rebounding', () => {
 });
 
 describe('sensitivity: fouls and free throws', () => {
-  it('higher freeThrowRate tendency draws more free throws', () => {
+  it.concurrent('higher freeThrowRate tendency draws more free throws', () => {
     const changed = mutateAllTendencies(baseTeam, 'freeThrowRate', 15);
     const fta = compare('ft-draw', baseTeam, changed, (r) => r.home.box.freeThrows.attempted);
     expectDirection('freeThrowsAttempted', fta.base, fta.changed, 1);
@@ -259,7 +259,7 @@ describe('sensitivity: fouls and free throws', () => {
 });
 
 describe('sensitivity: era pace and shot mix', () => {
-  it('higher era pace increases possessions per game', () => {
+  it.concurrent('higher era pace increases possessions per game', () => {
     const fast = profileWith({ pace: 115 });
     const slow = profileWith({ pace: 80 });
     const fastPoss = compare('pace', baseTeam, baseTeam, (r) => r.home.box.possessions).base;
@@ -282,7 +282,7 @@ describe('sensitivity: era pace and shot mix', () => {
     expect(fastMean).toBeGreaterThan(slowMean * 1.15);
   });
 
-  it('higher league three-point rate raises three-point attempt share', () => {
+  it.concurrent('higher league three-point rate raises three-point attempt share', () => {
     const threeHeavy = profileWith({ league3PARate: 0.35 });
     const threeLight = profileWith({ league3PARate: 0.05 });
     let heavyShare = 0;

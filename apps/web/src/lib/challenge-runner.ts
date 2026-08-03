@@ -1,7 +1,6 @@
 import { acceptGameResult } from '@hoop-rush/engine';
 import {
   workerRequestSchema,
-  workerMessageSchema,
   type ChallengeRun,
   type EraSimulationProfile,
   type GameResult,
@@ -48,6 +47,50 @@ export interface RunnerOptions {
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+type WorkerMessageEnvelope =
+  | { requestId: string; type: 'results'; results: GameResult[] }
+  | { requestId: string; type: 'error'; message: string }
+  | { requestId: string; type: 'complete' };
+
+/**
+ * Cheap boundary shape check for worker messages. The engine's
+ * acceptGameResult is the authoritative validator: it re-verifies the game
+ * number, derived seed, frozen versions, scheduled opponent, and exact
+ * accounting invariants per game before anything is persisted. This guard
+ * only keeps well-formed envelopes from reaching the queue (schema version,
+ * request id, and a literal type), so a bad batch can never crash the pump or
+ * skip the engine's checks.
+ */
+function parseWorkerMessageEnvelope(raw: unknown): WorkerMessageEnvelope | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const message = raw as Record<string, unknown>;
+  if (message.schemaVersion !== 1) return null;
+  if (typeof message.requestId !== 'string' || message.requestId.length === 0) return null;
+  if (message.type === 'error') {
+    if (typeof message.message !== 'string' || message.message.length === 0) return null;
+    return { requestId: message.requestId, type: 'error', message: message.message };
+  }
+  if (message.type === 'complete') {
+    return { requestId: message.requestId, type: 'complete' };
+  }
+  if (message.type !== 'results') return null;
+  const rawResults: unknown = message.results;
+  const results: unknown[] = Array.isArray(rawResults) ? (rawResults as unknown[]) : [];
+  if (results.length === 0) return null;
+  for (const result of results) {
+    if (typeof result !== 'object' || result === null) return null;
+    const candidate = result as Record<string, unknown>;
+    if (typeof candidate.gameNumber !== 'number' || !Number.isInteger(candidate.gameNumber)) {
+      return null;
+    }
+  }
+  return {
+    requestId: message.requestId,
+    type: 'results',
+    results: results as GameResult[],
+  };
+}
 
 export class ChallengeRunner {
   private worker: Worker | null = null;
@@ -164,21 +207,22 @@ export class ChallengeRunner {
   }
 
   private handleMessage(raw: unknown): void {
-    const parsed = workerMessageSchema.safeParse(raw);
-    if (!parsed.success) {
+    const envelope = parseWorkerMessageEnvelope(raw);
+    if (!envelope) {
       this.fail('the simulation worker returned an invalid message');
       return;
     }
-    const message = parsed.data;
-    if (this.requestId === null || message.requestId !== this.requestId) return; // stale
-    switch (message.type) {
+    if (this.requestId === null || envelope.requestId !== this.requestId) return; // stale
+    switch (envelope.type) {
       case 'results':
-        for (const result of message.results) {
+        for (const result of envelope.results) {
           this.queue.push({ gameNumber: result.gameNumber, result });
         }
         break;
       case 'error':
-        this.fail(message.message);
+        this.fail(envelope.message);
+        break;
+      case 'complete':
         break;
     }
   }

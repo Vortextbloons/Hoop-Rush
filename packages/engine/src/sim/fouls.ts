@@ -4,6 +4,7 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import type { Rng } from './rng.js';
 import { ENGINE_CONSTANTS } from './constants.js';
 import { isThreePointZone } from './usage.js';
 
@@ -50,14 +51,26 @@ export function nonShootingFoulProbability(profile: EraSimulationProfile): numbe
   return Math.min(0.3, Math.max(0.01, p.foulsPerPossession * (1 - p.shootingFoulShare)));
 }
 
-/** The fouler, weighted slightly by interior activity and matchup. */
+/** Fouler weights for a team, in team index order (interior activity and matchup). */
+export function foulerWeights(defense: SimulationTeam): number[] {
+  return defense.players.map((d) =>
+    Math.max(0.5, (d.ratings.strength + d.ratings.interiorDefense) / 2),
+  );
+}
+
+/** The fouler against precomputed fouler weights. */
 export function pickFouler(
-  defense: SimulationTeam,
-  rng: { weightedPick<T>(items: readonly T[], weights: readonly number[]): T },
+  players: readonly SimulationPlayer[],
+  weights: readonly number[],
+  rng: Rng,
 ): SimulationPlayer {
-  return rng.weightedPick(
-    defense.players,
-    defense.players.map((d) => Math.max(0.5, (d.ratings.strength + d.ratings.interiorDefense) / 2)),
+  return rng.weightedPick(players, weights);
+}
+
+/** Free-throw shooter weights for a team, in team index order. */
+export function freeThrowShooterWeights(team: SimulationTeam): number[] {
+  return team.players.map(
+    (p) => Math.max(0.5, p.tendencies.freeThrowRate) * (0.6 + 0.8 * (p.ratings.freeThrow / 100)),
   );
 }
 
@@ -66,15 +79,11 @@ export function pickFouler(
  * well from the line get the attempts (deterministic role behavior).
  */
 export function pickFreeThrowShooter(
-  team: SimulationTeam,
-  rng: { weightedPick<T>(items: readonly T[], weights: readonly number[]): T },
+  players: readonly SimulationPlayer[],
+  weights: readonly number[],
+  rng: Rng,
 ): SimulationPlayer {
-  return rng.weightedPick(
-    team.players,
-    team.players.map(
-      (p) => Math.max(0.5, p.tendencies.freeThrowRate) * (0.6 + 0.8 * (p.ratings.freeThrow / 100)),
-    ),
-  );
+  return rng.weightedPick(players, weights);
 }
 
 /** Number of free throws awarded for a shooting foul at a zone (plus and-one handled by caller). */

@@ -2,7 +2,7 @@
   import { browser } from '$app/environment';
   import { resolve } from '$app/paths';
   import { Trophy } from '@lucide/svelte';
-  import type { CompletedRunIndex, StoredRunRecord } from '@hoop-rush/persistence';
+  import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest } from '$lib/data';
@@ -17,8 +17,8 @@
    */
 
   let manifest = $state<HoopRushManifest | null>(null);
-  let rows = $state<CompletedRunIndex[]>([]);
-  let active = $state<StoredRunRecord | null>(null);
+  let rows = $state.raw<CompletedRunIndex[]>([]);
+  let active = $state.raw<ActiveRunCheckpoint | null>(null);
   let error = $state<string | null>(null);
 
   $effect(() => {
@@ -34,12 +34,12 @@
     );
     Promise.all([
       challengeRepository.listCompletedRuns(),
-      challengeRepository.loadActiveRun(),
+      challengeRepository.loadActiveRunCheckpoint(),
     ]).then(
-      ([history, activeRecord]) => {
+      ([history, activeCheckpoint]) => {
         if (cancelled) return;
         rows = history;
-        active = activeRecord;
+        active = activeCheckpoint;
       },
       (e: unknown) => {
         if (!cancelled) error = e instanceof Error ? e.message : String(e);
@@ -109,13 +109,13 @@
       </a>
     </div>
   {:else}
-    {#if active && active.run.status === 'active'}
+    {#if active && active.status === 'active'}
       <div class="mt-8 rounded-xl border border-line-strong bg-surface-2 p-5">
         <p class="font-display text-lg font-extrabold tracking-tight uppercase">Active challenge</p>
         <p class="mt-1 text-sm text-muted-foreground">
-          {franchiseName(active.run.franchiseId)} · {eraName(active.run.eraId)} · game
-          {active.run.games.length + 1} of 82 · {active.run.aggregates.team.wins}-
-          {active.run.aggregates.team.losses}
+          {franchiseName(active.franchiseId)} · {eraName(active.eraId)} · game
+          {(active.gamesPlayed ?? 0) + 1} of 82 · {active.aggregates.team.wins}-
+          {active.aggregates.team.losses}
         </p>
         <a
           href={resolve('/sandbox/challenge')}

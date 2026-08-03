@@ -13,6 +13,7 @@
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
   import { getManifest, getPlayersIndex, getPool } from '$lib/data';
+  import { lowercaseName } from '$lib/roster-browser';
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
   import { startSandboxRun } from '$lib/sandbox-run';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
@@ -34,6 +35,10 @@
     'Center',
   ] as const;
   const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
+  const PAGE_SIZE = 120;
+
+  /** Typing delay before the pool list re-filters the full players index. */
+  const SEARCH_DEBOUNCE_MS = 200;
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
@@ -45,11 +50,22 @@
 
   let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
   let pickerPlayer = $state<IndexRow | null>(null);
+  /** Raw input value; `search` below is the debounced query the pool reads. */
+  let searchInput = $state('');
   let search = $state('');
   let positionFilter = $state<SlotIndex | null>(null);
   /** Empty string means no filter (show all teams/decades). */
   let franchiseFilter = $state('');
   let eraFilter = $state('');
+  let visibleCount = $state(PAGE_SIZE);
+
+  $effect(() => {
+    const raw = searchInput;
+    const timeout = setTimeout(() => {
+      search = raw;
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timeout);
+  });
 
   $effect(() => {
     let cancelled = false;
@@ -162,9 +178,19 @@
     }
     const query = search.trim().toLowerCase();
     if (query) {
-      list = list.filter((p) => p.displayName.toLowerCase().includes(query));
+      list = list.filter((p) => lowercaseName(p).includes(query));
     }
     return list;
+  });
+
+  const visibleRows = $derived(filteredRows.slice(0, visibleCount));
+  const hasMore = $derived(filteredRows.length > visibleCount);
+  const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
+
+  // Reset pagination whenever the pool scope or ordering changes.
+  $effect(() => {
+    void [franchiseFilter, eraFilter, positionFilter, search];
+    visibleCount = PAGE_SIZE;
   });
 
   function selectFranchise(id: string) {
@@ -309,6 +335,17 @@
       ? { state: 'displace', displace }
       : { state: 'blocked', displace: null };
   }
+
+  /**
+   * Card eligibility for every index row, keyed by playerId. The cards only
+   * depend on the lineup slots (plus each player's positions), so the map is
+   * rebuilt once per slot change and looked up in the template instead of
+   * recomputing per rendered row.
+   */
+  const poolCardInfo = $derived.by(
+    (): ReadonlyMap<string, PoolCardInfo> =>
+      new Map(sortedRows.map((player) => [player.playerId, poolCardInfoFor(player)])),
+  );
 
   function removePlayer(slotIndex: number) {
     slots[slotIndex] = null;
@@ -471,7 +508,8 @@
                     >
                       {#snippet children({ selected })}
                         <span class="flex w-full items-center gap-2.5 py-1 pr-1 pl-0.5">
-                          <span class="min-w-0 flex-1 truncate text-sm font-semibold">Any team</span>
+                          <span class="min-w-0 flex-1 truncate text-sm font-semibold">Any team</span
+                          >
                           {#if selected}
                             <Check class="h-4 w-4 shrink-0 text-primary" />
                           {/if}
@@ -515,12 +553,7 @@
             >
               Decade
             </h2>
-            <Select.Root
-              type="single"
-              value={eraFilter}
-              onValueChange={selectEra}
-              items={eraItems}
-            >
+            <Select.Root type="single" value={eraFilter} onValueChange={selectEra} items={eraItems}>
               <Select.Trigger
                 aria-labelledby="sandbox-decade-label"
                 class="mt-2 flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
@@ -607,7 +640,7 @@
               />
               <input
                 type="search"
-                bind:value={search}
+                bind:value={searchInput}
                 placeholder="Search players…"
                 aria-label="Search players by name"
                 class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
@@ -656,8 +689,11 @@
             <ul
               class="grid max-h-[55vh] gap-1 overflow-y-auto p-2 sm:max-h-[560px] sm:grid-cols-2 xl:grid-cols-3"
             >
-              {#each filteredRows as player (player.franchiseId + '/' + player.eraId + '/' + player.playerId)}
-                {@const card = poolCardInfoFor(player)}
+              {#each visibleRows as player (player.franchiseId + '/' + player.eraId + '/' + player.playerId)}
+                {@const card = poolCardInfo.get(player.playerId) ?? {
+                  state: 'blocked',
+                  displace: null,
+                }}
                 {@const cardState = card.state}
                 <li>
                   <button
@@ -712,6 +748,21 @@
                 </li>
               {/each}
             </ul>
+            {#if hasMore}
+              <div class="flex items-center justify-between gap-3 px-1 pb-1">
+                <span class="font-mono text-[10px] text-muted-foreground">
+                  Showing {visiblePlayers.toLocaleString()} of
+                  {filteredRows.length.toLocaleString()} players
+                </span>
+                <button
+                  type="button"
+                  onclick={() => (visibleCount += PAGE_SIZE)}
+                  class="rounded-md border border-border px-3 py-1.5 font-mono text-[11px] font-bold text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+                >
+                  Show {PAGE_SIZE} more
+                </button>
+              </div>
+            {/if}
           {/if}
         </div>
 

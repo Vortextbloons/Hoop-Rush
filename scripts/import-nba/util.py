@@ -20,6 +20,27 @@ _network_requests = 0
 _cache_hits = 0
 
 
+class RateLimiter:
+    """Thread-safe minimum-interval limiter shared across concurrent workers.
+
+    Enforces a per-host request budget so N workers never exceed the intended
+    requests-per-second of a single client.
+    """
+
+    def __init__(self, interval: float) -> None:
+        self._interval = max(0.0, float(interval))
+        self._lock = threading.Lock()
+        self._next_at = 0.0
+
+    def wait(self) -> None:
+        with self._lock:
+            now = time.monotonic()
+            if now < self._next_at:
+                time.sleep(self._next_at - now)
+                now = time.monotonic()
+            self._next_at = now + self._interval
+
+
 def _global_rate_wait() -> None:
     """Thread-safe: wait at least RATE_LIMIT_SECONDS between requests."""
     global _last_request_time
@@ -60,11 +81,12 @@ def write_cache(name: str, value: Any, **params: Any) -> None:
     p.write_text(json.dumps(value, default=str), encoding="utf-8")
 
 
-def with_retry(fn: Callable[[], T]) -> T:
+def with_retry(fn: Callable[[], T], *, paced: bool = True) -> T:
     last_err: Exception | None = None
     for attempt in range(MAX_RETRIES):
         try:
-            _global_rate_wait()
+            if paced:
+                _global_rate_wait()
             global _network_requests
             with _metrics_lock:
                 _network_requests += 1

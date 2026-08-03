@@ -14,7 +14,7 @@ import {
 import { createEngineContext } from './context.js';
 import { simulateGame } from './game.js';
 import { freeThrowProbability } from './fouls.js';
-import { makeProbability } from './shooting.js';
+import { makeProbability, teamSpacing } from './shooting.js';
 
 const context = createEngineContext();
 
@@ -129,11 +129,6 @@ describe('observed player anchors', () => {
     const defender = buildSimulationPlayer({
       ratings: { ...buildSimulationPlayer().ratings, perimeterDefense: 62 },
     });
-    const shotContext = {
-      zone: 'aboveBreakThree' as const,
-      action: 'spotUp' as const,
-      secondsRemainingAtShot: 300,
-    };
     const kobeLike = buildSimulationPlayer({
       ratings: { ...buildSimulationPlayer().ratings, threePoint: 66 },
       anchors: { ...shaquilleAnchors, threePointPct: 0.317, threePointAttemptRate: 0.123 },
@@ -150,18 +145,20 @@ describe('observed player anchors', () => {
     const kobeProbability = makeProbability(
       kobeLike,
       defender,
-      teamOf(kobeLike),
       profile,
-      shotContext,
+      'aboveBreakThree',
+      'spotUp',
       300,
+      { spacing: teamSpacing(teamOf(kobeLike)), twoPointAnchor: null },
     );
     const ceballosProbability = makeProbability(
       ceballosLike,
       defender,
-      teamOf(ceballosLike),
       profile,
-      shotContext,
+      'aboveBreakThree',
+      'spotUp',
       300,
+      { spacing: teamSpacing(teamOf(ceballosLike)), twoPointAnchor: null },
     );
     expect(kobeProbability).toBeGreaterThan(0.28);
     expect(kobeProbability).toBeLessThan(0.4);

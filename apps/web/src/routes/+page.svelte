@@ -7,7 +7,7 @@
   import { getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
-  import type { CompletedRunIndex, StoredRunRecord } from '@hoop-rush/persistence';
+  import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
 
   const sandboxHref = resolve('/sandbox');
   const historyHref = resolve('/sandbox/history');
@@ -40,8 +40,8 @@
   ] as const;
 
   let manifest = $state<HoopRushManifest | null>(null);
-  let active = $state<StoredRunRecord | null>(null);
-  let recent = $state<CompletedRunIndex[]>([]);
+  let active = $state.raw<ActiveRunCheckpoint | null>(null);
+  let recent = $state.raw<CompletedRunIndex[]>([]);
 
   $effect(() => {
     if (!browser) return;
@@ -55,12 +55,12 @@
       },
     );
     Promise.all([
-      challengeRepository.loadActiveRun(),
+      challengeRepository.loadActiveRunCheckpoint(),
       challengeRepository.listCompletedRuns(),
     ]).then(
-      ([activeRecord, rows]) => {
+      ([activeCheckpoint, rows]) => {
         if (cancelled) return;
-        active = activeRecord;
+        active = activeCheckpoint;
         recent = rows.slice(0, 3);
       },
       () => {
@@ -121,13 +121,13 @@
         {/each}
       </div>
     </div>
-    {#if active && active.run.status === 'active'}
+    {#if active && active.status === 'active'}
       <a
         href={resolve('/sandbox/challenge')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
-        Continue: game {active.run.games.length + 1} of 82 · {active.run.aggregates.team.wins}-
-        {active.run.aggregates.team.losses}
+        Continue: game {(active.gamesPlayed ?? 0) + 1} of 82 · {active.aggregates.team.wins}-
+        {active.aggregates.team.losses}
       </a>
     {/if}
   </div>

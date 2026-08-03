@@ -64,16 +64,14 @@ export function eraPossEstimatePerTrip(profile: EraSimulationProfile): number | 
  */
 export function turnoverProbability(
   handler: SimulationPlayer,
-  defense: SimulationTeam,
+  pressure: number,
+  possEstimatePerTrip: number,
   profile: EraSimulationProfile,
 ): number {
   const c = ENGINE_CONSTANTS;
   const eraBase = profile.parameters.turnoverPerPossession;
   const tendency = handler.tendencies.turnoverRate / 100;
-  const possEstimatePerTrip = eraPossEstimatePerTrip(profile) ?? 1;
   const tendencyPerTrip = tendency * possEstimatePerTrip;
-  const pressure =
-    defense.players.reduce((sum, d) => sum + defenderPressure(d), 0) / defense.players.length;
   const handling = (handler.ratings.ballHandling - 50) / 50;
   const passing = (handler.ratings.passing - 50) / 100;
   const raw =
@@ -91,19 +89,23 @@ export function turnoverProbability(
  * (steal-rating neutral) converts turnovers into steals at exactly the era
  * share, and above-average ball pressure earns a bounded bonus.
  */
-export function isSteal(rng: Rng, defense: SimulationTeam, profile: EraSimulationProfile): boolean {
-  const stealAbility =
-    defense.players.reduce((sum, d) => sum + d.ratings.steal, 0) / defense.players.length;
+export function isSteal(rng: Rng, stealAbility: number, profile: EraSimulationProfile): boolean {
   const p =
     profile.parameters.stealShareOfTurnovers *
     (1 + (stealAbility - ENGINE_CONSTANTS.stealNeutralAbility) / 100);
   return rng.chance(Math.min(0.9, Math.max(0.3, p)));
 }
 
-/** Credits the stealer, weighted by steal rating. */
-export function pickStealer(defense: SimulationTeam, rng: Rng): SimulationPlayer {
-  return rng.weightedPick(
-    defense.players,
-    defense.players.map((d) => Math.max(0.5, d.ratings.steal)),
-  );
+/** Steal attribution weights for a team, in team index order. */
+export function stealerWeights(defense: SimulationTeam): number[] {
+  return defense.players.map((d) => Math.max(0.5, d.ratings.steal));
+}
+
+/** Credits the stealer against precomputed steal-rating weights. */
+export function pickStealer(
+  players: readonly SimulationPlayer[],
+  weights: readonly number[],
+  rng: Rng,
+): SimulationPlayer {
+  return rng.weightedPick(players, weights);
 }

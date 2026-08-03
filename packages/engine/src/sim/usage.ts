@@ -63,12 +63,18 @@ export function creationBurden(player: SimulationPlayer, team: SimulationTeam): 
   return 1 + Math.min(0.2, 0.08 + 0.12 * shortfall);
 }
 
-/** Selects the possession initiator, weighted by creation-scaled usage. */
-export function pickInitiator(team: SimulationTeam, rng: Rng): SimulationPlayer {
-  return rng.weightedPick(
-    team.players,
-    team.players.map((p) => initiatorWeight(p, team)),
-  );
+/** Precomputed initiator weights for a team, in the team's immutable index order. */
+export function teamInitiatorWeights(team: SimulationTeam): number[] {
+  return team.players.map((p) => initiatorWeight(p, team));
+}
+
+/** Selects the possession initiator against precomputed creation-scaled usage weights. */
+export function pickInitiator(
+  team: SimulationTeam,
+  weights: readonly number[],
+  rng: Rng,
+): SimulationPlayer {
+  return rng.weightedPick(team.players, weights);
 }
 
 /** Spacing weight for catch-and-shoot targets (0.55..1.45 around the shotRate). */
@@ -88,13 +94,13 @@ export function usagePull(player: SimulationPlayer): number {
 }
 
 /**
- * Selects the play type from the initiator's action tendencies. Speed raises
- * the transition rate: faster lineups run more (physical trait mechanism).
- * High-usage initiators run ball-dominant actions (isolation, pick-and-roll,
- * post-up) at a higher rate: their shot responsibilities come from creation,
- * not spot-up volume.
+ * Action tendency weights for one initiator (pure function of the player).
+ * Speed raises the transition rate: faster lineups run more (physical trait
+ * mechanism). High-usage initiators run ball-dominant actions (isolation,
+ * pick-and-roll, post-up) at a higher rate: their shot responsibilities come
+ * from creation, not spot-up volume.
  */
-export function pickAction(initiator: SimulationPlayer, rng: Rng): ActionType {
+export function actionWeights(initiator: SimulationPlayer): number[] {
   const t = initiator.tendencies;
   const ballDominance = Math.min(1, t.usageRate / 36);
   const transitionWeight = t.transitionRate * (0.5 + initiator.ratings.speed / 100);
@@ -102,7 +108,7 @@ export function pickAction(initiator: SimulationPlayer, rng: Rng): ActionType {
   const pnr = t.pickAndRollBallHandlerRate * (1 + 0.5 * ballDominance);
   const post = t.postUpRate * (1 + 0.4 * ballDominance);
   const passiveScale = 1 - 0.3 * ballDominance;
-  return rng.weightedPick(ACTION_TYPES, [
+  return [
     iso,
     pnr,
     t.pickAndRollRollManRate,
@@ -110,7 +116,16 @@ export function pickAction(initiator: SimulationPlayer, rng: Rng): ActionType {
     t.spotUpRate * passiveScale,
     t.cutRate * passiveScale,
     transitionWeight * passiveScale,
-  ]);
+  ];
+}
+
+/** Selects the play type from the initiator's precomputed action weights. */
+export function pickAction(
+  initiator: SimulationPlayer,
+  weights: readonly number[],
+  rng: Rng,
+): ActionType {
+  return rng.weightedPick(ACTION_TYPES, weights);
 }
 
 /** Probability that an action produces a pass before the shot. */
@@ -134,45 +149,40 @@ export function passProbability(initiator: SimulationPlayer, action: ActionType)
   );
 }
 
+/** Precomputed teammate shot weights for one initiator and action class. */
+export interface TeammateShotWeights {
+  teammates: SimulationPlayer[];
+  weights: number[];
+}
+
+/** Roll and pass variants of the teammate shot weights for one initiator. */
+export interface TeammateShots {
+  roll: TeammateShotWeights;
+  pass: TeammateShotWeights;
+}
+
 /**
- * Selects the shooter. Spot-up, cut, and transition possessions pass toward a
- * teammate; isolation, pick-and-roll, and post-up end with the initiator.
- * Catch-and-shoot targets are weighted by shot volume times spacing, so
- * floor spacers draw the perimeter looks.
+ * Teammate shot weights for one initiator and action class, in team index
+ * order minus the initiator. The pass variant is shared by every non-roll
+ * action because the weight formula branches only on pickAndRollRoll.
  */
-export function pickShooter(
+export function teammateShotWeights(
   team: SimulationTeam,
   initiator: SimulationPlayer,
   action: ActionType,
-  rng: Rng,
-): SimulationPlayer {
-  if (action === 'spotUp' || action === 'cut' || action === 'transition') {
-    return rng.weightedPick(
-      team.players,
-      team.players.map((p) =>
-        p.playerId === initiator.playerId
-          ? 0.35
-          : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * usagePull(p)),
-      ),
-    );
-  }
-  if (action === 'pickAndRollRoll') {
-    return rng.weightedPick(
-      team.players,
-      team.players.map((p) =>
-        p.playerId === initiator.playerId
-          ? 0.5
-          : Math.max(0.5, p.tendencies.pickAndRollRollManRate) *
-            (0.6 + 0.8 * interiorScoringScore(p)),
-      ),
-    );
-  }
-  return initiator;
+): TeammateShotWeights {
+  const teammates = team.players.filter((p) => p.playerId !== initiator.playerId);
+  const weights = teammates.map((p) =>
+    action === 'pickAndRollRoll'
+      ? Math.max(0.5, p.tendencies.pickAndRollRollManRate) * (0.6 + 0.8 * interiorScoringScore(p))
+      : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * usagePull(p)),
+  );
+  return { teammates, weights };
 }
 
 /** Selects whether the initiator passes and, if so, a teammate shooter. */
 export function pickShot(
-  team: SimulationTeam,
+  shots: TeammateShots,
   initiator: SimulationPlayer,
   action: ActionType,
   rng: Rng,
@@ -180,14 +190,13 @@ export function pickShot(
   if (!rng.chance(passProbability(initiator, action))) {
     return { shooter: initiator, initiator, passed: false };
   }
-  const teammates = team.players.filter((p) => p.playerId !== initiator.playerId);
-  if (teammates.length === 0) return { shooter: initiator, initiator, passed: false };
-  const weights = teammates.map((p) =>
-    action === 'pickAndRollRoll'
-      ? Math.max(0.5, p.tendencies.pickAndRollRollManRate) * (0.6 + 0.8 * interiorScoringScore(p))
-      : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * usagePull(p)),
-  );
-  return { shooter: rng.weightedPick(teammates, weights), initiator, passed: true };
+  const selected = action === 'pickAndRollRoll' ? shots.roll : shots.pass;
+  if (selected.teammates.length === 0) return { shooter: initiator, initiator, passed: false };
+  return {
+    shooter: rng.weightedPick(selected.teammates, selected.weights),
+    initiator,
+    passed: true,
+  };
 }
 
 /** Selects a plausible passer while preventing self-assists. */
@@ -329,16 +338,31 @@ export function blendedZoneWeights(
 }
 
 /**
- * Normalized two-point (rim / short-mid / long-mid) share of the blended
- * zone mix. These are the exact relative two-point weights pickZone uses:
- * the three-point rescaling and play-type pulls scale all two-point zones
- * by the same factor, so the proportions are identical.
+ * Per-player zone preparation: the unmutated era-blended zone mix plus the
+ * three-point volume target. Both are pure functions of the player and
+ * profile, so they are computed once per game. `pickZone` copies the blend
+ * before mutating it; callers must never mutate the cached array.
  */
-export function twoPointZoneShares(
-  shooter: SimulationPlayer,
-  profile: EraSimulationProfile,
-): [number, number, number] {
-  const weights = blendedZoneWeights(shooter, profile);
+export interface ZonePrep {
+  blend: number[];
+  threePointTarget: number;
+}
+
+/** Computes the pristine zone prep for one player. */
+export function zonePrep(shooter: SimulationPlayer, profile: EraSimulationProfile): ZonePrep {
+  return {
+    blend: blendedZoneWeights(shooter, profile),
+    threePointTarget: threePointTarget(shooter, profile),
+  };
+}
+
+/**
+ * Normalized two-point (rim / short-mid / long-mid) share of a blended zone
+ * mix. These are the exact relative two-point weights pickZone uses: the
+ * three-point rescaling and play-type pulls scale all two-point zones by the
+ * same factor, so the proportions are identical.
+ */
+export function twoPointZoneSharesFromBlend(weights: readonly number[]): [number, number, number] {
   const total = (weights[0] ?? 0) + (weights[1] ?? 0) + (weights[2] ?? 0) || 1;
   return [
     (weights[0] ?? 0) / Math.max(1e-9, total),
@@ -348,20 +372,28 @@ export function twoPointZoneShares(
 }
 
 /**
- * Selects the shot zone from the shooter's frequency tendencies, blended
- * toward the era's three-point rate and modulated by three-point tendency.
+ * Normalized two-point share of the player's blended zone mix (the
+ * un-mutated mix pickZone shoots; twoPointZoneSharesFromBlend keeps the
+ * share math identical for cached blends).
  */
-export function pickZone(
+export function twoPointZoneShares(
   shooter: SimulationPlayer,
-  action: ActionType,
   profile: EraSimulationProfile,
-  rng: Rng,
-): ShotZone {
-  const weights = blendedZoneWeights(shooter, profile);
+): [number, number, number] {
+  return twoPointZoneSharesFromBlend(blendedZoneWeights(shooter, profile));
+}
+
+/**
+ * Selects the shot zone from the precomputed era-blended mix, rescaled to the
+ * three-point target and modulated by the play type. The cached blend is
+ * copied so the per-game cache stays pristine across trips.
+ */
+export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
+  const weights = prep.blend.slice();
 
   // Historical three-point volume is a strong role anchor (see
   // threePointTarget): the era rate never manufactures a jump shot.
-  const targetThreeRate = threePointTarget(shooter, profile);
+  const targetThreeRate = prep.threePointTarget;
   const currentThree = (weights[3] ?? 0) + (weights[4] ?? 0);
   const currentTwo = Math.max(
     1e-9,

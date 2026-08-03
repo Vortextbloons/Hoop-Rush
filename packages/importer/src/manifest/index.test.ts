@@ -130,9 +130,9 @@ describe('manifest run', () => {
       const pelicans = manifest.availability.find(
         (entry) => entry['franchiseId'] === 'pelicans',
       ) as Record<string, unknown>;
-      expect(pelicans?.['status'] ?? null).toBe('unavailable');
-      expect(pelicans?.['reason'] ?? null).toBe('no-franchise-history');
-      expect(pelicans?.['firstSupportedSeason'] ?? null).toBe('2002-03');
+      expect(pelicans['status'] ?? null).toBe('unavailable');
+      expect(pelicans['reason'] ?? null).toBe('no-franchise-history');
+      expect(pelicans['firstSupportedSeason'] ?? null).toBe('2002-03');
       // Era profile and frozen bracket entries.
       expect(manifest.eraSimulationProfiles).toEqual([
         {

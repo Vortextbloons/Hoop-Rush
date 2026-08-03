@@ -6,7 +6,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import type { Rng } from './rng.js';
 import { GameRecorder, type SideIndex } from './recorder.js';
-import { sampleTripSeconds } from './timing.js';
+import { meanTripSeconds, sampleTripSeconds } from './timing.js';
 import {
   pickAction,
   pickDefender,
@@ -18,8 +18,8 @@ import {
   zoneSkillRating,
   type ActionType,
 } from './usage.js';
-import { isSteal, pickStealer, turnoverProbability } from './security.js';
-import { blockProbability, makeProbability, type ShotContext } from './shooting.js';
+import { eraPossEstimatePerTrip, isSteal, pickStealer, turnoverProbability } from './security.js';
+import { blockProbability, makeProbability, type ShotPrep } from './shooting.js';
 import {
   freeThrowsForZone,
   freeThrowProbability,
@@ -29,6 +29,7 @@ import {
   shootingFoulProbability,
 } from './fouls.js';
 import { pickRebounder, resolveRebound } from './rebounding.js';
+import { prepareTeam, type TeamPrep } from './prepare.js';
 import { ENGINE_CONSTANTS } from './constants.js';
 import { creationScore } from '../domain/archetypes.js';
 
@@ -67,22 +68,44 @@ export function createGameState(
   };
 }
 
-interface TripContext {
+/**
+ * Shared per-game trip context. Constructed once per game and passed by
+ * reference: the RNG, recorder, state, teams, and all per-team preparation
+ * tables are game-stable, so no trip rebuilds them.
+ */
+export interface TripContext {
   rng: Rng;
   recorder: GameRecorder;
   state: GameState;
   profile: EraSimulationProfile;
   teams: [SimulationTeam, SimulationTeam];
+  /** Per-team per-game weight and lookup tables, in side order. */
+  preps: [TeamPrep, TeamPrep];
+  /** Hoisted game scalars (pure functions of the profile). */
+  meanTripSeconds: number;
+  eraPossEstimatePerTrip: number;
+  passingAnchorFactor: number;
 }
 
-function ctxFor(
+/** Builds the shared per-game trip context (state mutates in place; the rest is stable). */
+export function createTripContext(
   rng: Rng,
   recorder: GameRecorder,
   state: GameState,
   profile: EraSimulationProfile,
   teams: [SimulationTeam, SimulationTeam],
 ): TripContext {
-  return { rng, recorder, state, profile, teams };
+  return {
+    rng,
+    recorder,
+    state,
+    profile,
+    teams,
+    preps: [prepareTeam(teams[0], profile), prepareTeam(teams[1], profile)],
+    meanTripSeconds: meanTripSeconds(profile),
+    eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
+    passingAnchorFactor: 0.5 + (profile.parameters.assistAnchorRating - 50) / 100,
+  };
 }
 
 function freeThrowProbabilityFor(ctx: TripContext, shooter: SimulationPlayer): number {
@@ -102,19 +125,17 @@ function consumeTime(state: GameState, seconds: number): number {
  * rate, then modulated by creation ability, the play type (rolls, cuts, and
  * transition finishes are real passes; post-ups and isolations rarely earn
  * an assist), the shot zone (rim finishes off passes convert as assists),
- * and the shooter's finishing at the zone.
+ * and the shooter's finishing at the zone. The anchor factor is hoisted per
+ * game (a pure function of the profile).
  */
 function assistProbability(
+  ctx: TripContext,
   passer: SimulationPlayer,
-  profile: EraSimulationProfile,
   action: ActionType,
   zone: ShotZone,
   shooter: SimulationPlayer,
 ): number {
-  const factor = (p: SimulationPlayer) => 0.5 + (p.ratings.passing - 50) / 100;
-  const anchor = factor({
-    ratings: { passing: profile.parameters.assistAnchorRating },
-  } as SimulationPlayer);
+  const factor = 0.5 + (passer.ratings.passing - 50) / 100;
   const roleFactor = passer.anchors
     ? 0.75 + Math.min(1, passer.anchors.assistsPerGame / 8) * 0.25
     : 1;
@@ -150,14 +171,14 @@ function assistProbability(
     0.99,
     Math.max(
       0.05,
-      profile.parameters.assistRate *
+      ctx.profile.parameters.assistRate *
         0.95 *
         roleFactor *
         creation *
         actionFactor *
         zoneFactor *
         finishing *
-        (factor(passer) / Math.max(1e-9, anchor)),
+        (factor / Math.max(1e-9, ctx.passingAnchorFactor)),
     ),
   );
 }
@@ -178,10 +199,10 @@ function creditAssist(
   if (!passed) return;
   const passer = pickAssister(team, shooter, initiator, ctx.rng);
   if (!passer) return;
-  const slot = team.players.findIndex((p) => p.playerId === passer.playerId);
+  const slot = ctx.preps[offenseSide].slotByPlayerId.get(passer.playerId) ?? -1;
   if (slot < 0) return;
   ctx.recorder.assistOpportunity(offenseSide, slot);
-  if (!ctx.rng.chance(assistProbability(passer, ctx.profile, action, zone, shooter))) return;
+  if (!ctx.rng.chance(assistProbability(ctx, passer, action, zone, shooter))) return;
   ctx.recorder.assist(offenseSide, slot);
 }
 
@@ -201,8 +222,8 @@ function reboundFromMissedFreeThrow(
   reboundChances(ctx, offenseSide, defenseSide);
   const result = resolveRebound(
     ctx.rng,
-    ctx.teams[offenseSide],
-    ctx.teams[defenseSide],
+    ctx.preps[offenseSide].offensiveReboundMean,
+    ctx.preps[defenseSide].defensiveReboundMean,
     'rim',
     ctx.profile,
     deadBall,
@@ -212,9 +233,11 @@ function reboundFromMissedFreeThrow(
     return;
   }
   const offensive = result.offensive;
-  const team = ctx.teams[offensive ? offenseSide : defenseSide];
-  const rebounder = pickRebounder(team, offensive, ctx.rng);
-  const slot = team.players.findIndex((p) => p.playerId === rebounder.playerId);
+  const side = offensive ? offenseSide : defenseSide;
+  const team = ctx.teams[side];
+  const prep = ctx.preps[side];
+  const rebounder = pickRebounder(team.players, prep.rebounderWeights[offensive ? 0 : 1], ctx.rng);
+  const slot = prep.slotByPlayerId.get(rebounder.playerId) ?? -1;
   if (offensive) {
     ctx.recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
   } else {
@@ -267,31 +290,33 @@ function resolveShot(
 ): boolean {
   const { rng, recorder, state, profile } = ctx;
   const team = ctx.teams[offenseSide];
+  const teamPrep = ctx.preps[offenseSide];
   const defense = ctx.teams[defenseSide];
+  const defensePrep = ctx.preps[defenseSide];
 
-  const initiator = pickInitiator(team, rng);
-  const action = pickAction(initiator, rng);
-  const shot = pickShot(team, initiator, action, rng);
+  const initiator = pickInitiator(team, teamPrep.initiatorWeights, rng);
+  const action = pickAction(initiator, teamPrep.actionWeights.get(initiator.playerId)!, rng);
+  const shot = pickShot(teamPrep.teammateShots.get(initiator.playerId)!, initiator, action, rng);
   const shooter = shot.shooter;
-  const zone = pickZone(shooter, action, profile, rng);
+  const zone = pickZone(action, teamPrep.zonePrep.get(shooter.playerId)!, rng);
   const defender = pickDefender(defense, shooter, zone, rng);
 
-  const shooterSlot = team.players.findIndex((p) => p.playerId === shooter.playerId);
+  const shooterSlot = teamPrep.slotByPlayerId.get(shooter.playerId) ?? -1;
   const three = isThreePointZone(zone);
-  const defenderSlot = defense.players.findIndex((p) => p.playerId === defender.playerId);
+  const defenderSlot = defensePrep.slotByPlayerId.get(defender.playerId) ?? -1;
   if (defenderSlot >= 0) recorder.contest(defenseSide, defenderSlot);
+
+  const shotPrep: ShotPrep = {
+    spacing: teamPrep.spacing,
+    twoPointAnchor: teamPrep.twoPointAnchor.get(shooter.playerId) ?? null,
+  };
 
   // Shooting foul check (zone-aware, ability-aware).
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
   if (rng.chance(foulP)) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
-    const shotContext: ShotContext = {
-      zone,
-      action,
-      secondsRemainingAtShot: state.secondsRemaining,
-    };
     const shotP =
-      makeProbability(shooter, defender, team, profile, shotContext, state.secondsRemaining) *
+      makeProbability(shooter, defender, profile, zone, action, state.secondsRemaining, shotPrep) *
       ENGINE_CONSTANTS.fouledShotMakeScale;
     const made = rng.chance(shotP);
     recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
@@ -325,14 +350,14 @@ function resolveShot(
   }
 
   // Shot resolution.
-  const shotContext: ShotContext = { zone, action, secondsRemainingAtShot: state.secondsRemaining };
   const shotP = makeProbability(
     shooter,
     defender,
-    team,
     profile,
-    shotContext,
+    zone,
+    action,
     state.secondsRemaining,
+    shotPrep,
   );
   const made = rng.chance(shotP);
   recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
@@ -355,8 +380,8 @@ function reboundAfterMiss(
   reboundChances(ctx, offenseSide, defenseSide);
   const result = resolveRebound(
     rng,
-    ctx.teams[offenseSide],
-    ctx.teams[defenseSide],
+    ctx.preps[offenseSide].offensiveReboundMean,
+    ctx.preps[defenseSide].defensiveReboundMean,
     zone,
     ctx.profile,
     deadBall,
@@ -366,13 +391,15 @@ function reboundAfterMiss(
     return false;
   }
   if (result.offensive) {
-    const rebounder = pickRebounder(ctx.teams[offenseSide], true, rng);
-    const slot = ctx.teams[offenseSide].players.findIndex((p) => p.playerId === rebounder.playerId);
+    const prep = ctx.preps[offenseSide];
+    const rebounder = pickRebounder(ctx.teams[offenseSide].players, prep.rebounderWeights[0], rng);
+    const slot = prep.slotByPlayerId.get(rebounder.playerId) ?? -1;
     recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
     return true;
   }
-  const rebounder = pickRebounder(ctx.teams[defenseSide], false, rng);
-  const slot = ctx.teams[defenseSide].players.findIndex((p) => p.playerId === rebounder.playerId);
+  const prep = ctx.preps[defenseSide];
+  const rebounder = pickRebounder(ctx.teams[defenseSide].players, prep.rebounderWeights[1], rng);
+  const slot = prep.slotByPlayerId.get(rebounder.playerId) ?? -1;
   recorder.defensiveRebound(defenseSide, slot >= 0 ? slot : 0);
   return false;
 }
@@ -389,33 +416,33 @@ function teamInBonus(foulsInPeriod: number, overtime: boolean): boolean {
  * Resolves one offensive trip for `offenseSide`. Consumes clock through the
  * shared game state and reports consumed seconds and possession change.
  */
-export function resolveTrip(
-  rng: Rng,
-  recorder: GameRecorder,
-  state: GameState,
-  profile: EraSimulationProfile,
-  teams: [SimulationTeam, SimulationTeam],
-  offenseSide: SideIndex,
-): TripResolution {
+export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResolution {
+  const { rng, recorder, state, profile, teams, preps } = ctx;
   const defenseSide = (1 - offenseSide) as SideIndex;
   const defense = teams[defenseSide];
+  const defensePrep = preps[defenseSide];
   const team = teams[offenseSide];
+  const teamPrep = preps[offenseSide];
   const overtime = state.periodIndex >= 4;
   const startedRemaining = state.secondsRemaining;
 
-  const sampled = sampleTripSeconds(rng, profile, state.secondsRemaining);
+  const sampled = sampleTripSeconds(rng, profile, state.secondsRemaining, ctx.meanTripSeconds);
   if (sampled === null) return { secondsElapsed: 0, ended: false };
   const consumedBase = consumeTime(state, sampled);
   const deadBall = consumedBase >= startedRemaining - ENGINE_CONSTANTS.minimumStartSeconds;
 
   // Ball security check.
-  const handler = pickInitiator(team, rng);
-  const handlerSlot = team.players.findIndex((p) => p.playerId === handler.playerId);
-  if (rng.chance(turnoverProbability(handler, defense, profile))) {
+  const handler = pickInitiator(team, teamPrep.initiatorWeights, rng);
+  const handlerSlot = teamPrep.slotByPlayerId.get(handler.playerId) ?? -1;
+  if (
+    rng.chance(
+      turnoverProbability(handler, defensePrep.pressure, ctx.eraPossEstimatePerTrip, profile),
+    )
+  ) {
     recorder.turnover(offenseSide, handlerSlot >= 0 ? handlerSlot : 0);
-    if (isSteal(rng, defense, profile)) {
-      const stealer = pickStealer(defense, rng);
-      const stealerSlot = defense.players.findIndex((p) => p.playerId === stealer.playerId);
+    if (isSteal(rng, defensePrep.stealAbility, profile)) {
+      const stealer = pickStealer(defense.players, defensePrep.stealerWeights, rng);
+      const stealerSlot = defensePrep.slotByPlayerId.get(stealer.playerId) ?? -1;
       recorder.steal(defenseSide, stealerSlot >= 0 ? stealerSlot : 0);
     }
     recorder.possession(offenseSide);
@@ -425,16 +452,15 @@ export function resolveTrip(
   // Non-shooting foul checks stay inside the same trip: a non-bonus foul
   // consumes inbound seconds and the possession continues without a new
   // duration sample or an extra possession count.
-  const ctx = ctxFor(rng, recorder, state, profile, teams);
   for (let guard = 0; guard < 4; guard += 1) {
     if (!rng.chance(nonShootingFoulProbability(profile))) break;
-    const fouler = pickFouler(defense, rng);
-    const foulerSlot = defense.players.findIndex((p) => p.playerId === fouler.playerId);
+    const fouler = pickFouler(defense.players, defensePrep.foulerWeights, rng);
+    const foulerSlot = defensePrep.slotByPlayerId.get(fouler.playerId) ?? -1;
     recorder.foul(defenseSide, foulerSlot >= 0 ? foulerSlot : 0);
     state.periodFouls[defenseSide] += 1;
     if (teamInBonus(state.periodFouls[defenseSide], overtime)) {
-      const shooter = pickFreeThrowShooter(team, rng);
-      const shooterSlot = team.players.findIndex((p) => p.playerId === shooter.playerId);
+      const shooter = pickFreeThrowShooter(team.players, teamPrep.freeThrowShooterWeights, rng);
+      const shooterSlot = teamPrep.slotByPlayerId.get(shooter.playerId) ?? -1;
       resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 2, deadBall);
       recorder.possession(offenseSide);
       return { secondsElapsed: startedRemaining - state.secondsRemaining, ended: true };
