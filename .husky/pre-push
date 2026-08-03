@@ -1,1 +1,16 @@
-pnpm check && pnpm lint && pnpm test:quick
+if command -v pnpm >/dev/null 2>&1; then
+  PNPM_PKG_DIR="$(dirname "$(command -v pnpm)")"
+  if command -v cygpath >/dev/null 2>&1; then
+    export PATH="node_modules/.bin:$(cygpath -w "$PNPM_PKG_DIR"):$PATH"
+  fi
+  PNPM_ENTRY="$PNPM_PKG_DIR/node_modules/pnpm/bin/pnpm.mjs"
+  if [ -f "$PNPM_ENTRY" ]; then
+    PNPM_NODE_PATH="$PNPM_ENTRY"
+  fi
+fi
+
+run_pnpm() {
+  if [ -n "$PNPM_NODE_PATH" ]; then node "$PNPM_NODE_PATH" "$@"; else pnpm "$@"; fi
+}
+
+run_pnpm check && run_pnpm lint && run_pnpm test:quick
