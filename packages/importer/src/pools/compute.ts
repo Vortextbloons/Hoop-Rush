@@ -85,7 +85,7 @@ export function manifestPath(): string {
 
 export const SCHEMA_VERSION = ARTIFACT_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm3.5';
+export const DATA_VERSION = 'm5';
 /** Confidence policy v1: maximum allowed low-confidence share of required fields. */
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
