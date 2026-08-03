@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { RotateCcw } from '@lucide/svelte';
+  import { RotateCcw, Pencil, RefreshCw } from '@lucide/svelte';
   import type {
     ChallengeRun,
     HoopRushManifest,
@@ -10,7 +10,9 @@
     RunAggregates,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import type { SandboxHref } from '$lib/sandbox-url';
   import { BEST_OF_ATTEMPTS, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
+  import { resolve } from '$app/paths';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
@@ -35,6 +37,8 @@
     modeLabel,
     running,
     onRunAgain,
+    onRetrySameTeam = null,
+    editTeamHref = null,
   }: {
     manifest: HoopRushManifest | null;
     run: ChallengeRun;
@@ -44,6 +48,10 @@
     modeLabel: string;
     running: boolean;
     onRunAgain: () => void;
+    /** Sandbox only: simulate the same lineup again with a fresh seed. */
+    onRetrySameTeam?: (() => void) | null;
+    /** Sandbox only: return to the draft with this lineup pre-filled. */
+    editTeamHref?: SandboxHref | null;
   } = $props();
 
   let totalsMode = $state(false);
@@ -232,6 +240,17 @@
   </div>
 
   <div class="mt-5 flex flex-wrap items-center gap-2">
+    {#if onRetrySameTeam}
+      <button
+        type="button"
+        onclick={onRetrySameTeam}
+        disabled={running || byId === null}
+        class="inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:border-primary/60 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+      >
+        <RefreshCw class="h-4 w-4" />
+        Retry with same team
+      </button>
+    {/if}
     <button
       type="button"
       onclick={onRunAgain}
@@ -241,6 +260,15 @@
       <RotateCcw class="h-4 w-4" />
       Run again
     </button>
+    {#if editTeamHref}
+      <a
+        href={resolve(editTeamHref)}
+        class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface-1 px-4 py-2 text-sm font-semibold transition-colors hover:border-line-strong outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Pencil class="h-4 w-4" />
+        Edit team
+      </a>
+    {/if}
     <span class="ml-auto font-mono text-[10px] text-muted-foreground">
       seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion} · bracket
       {run.versions.bracketVersion} · schedule {run.versions.scheduleVersion}

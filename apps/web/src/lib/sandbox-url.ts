@@ -130,6 +130,16 @@ export function parseSandboxUrl(
   };
 }
 
+/** Encodes a completed sandbox lineup into a draft URL the sandbox page can restore. */
+export function buildSandboxHref(slots: RunPlayerSelection[]): SandboxHref {
+  const params = new URLSearchParams();
+  params.set(
+    'slots',
+    slots.map((slot) => `${slot.playerId}@${slot.franchiseId}/${slot.eraId}`).join(','),
+  );
+  return `/sandbox?${params.toString()}`;
+}
+
 /** Generates a fresh game seed at the UI boundary (never in domain logic). */
 export function generateSeed(): Seed {
   if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {

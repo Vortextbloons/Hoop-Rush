@@ -112,10 +112,10 @@ test.describe('m3: draft to 82-game season journey', () => {
     await reachPlaying(page);
     await expectSeasonReport(page);
 
-    // Exactly one action on the report: Run again (fresh start, same mode).
+    // Sandbox shows retry, edit, and run-again actions.
+    await expect(page.getByRole('button', { name: 'Retry with same team' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Run again' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Edit team' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Edit team' })).toBeVisible();
 
     // Run again returns to a completely cleared sandbox draft.
     const recordText = await page.getByText(/^\d+–\d+$/).innerText();
@@ -129,6 +129,32 @@ test.describe('m3: draft to 82-game season journey', () => {
     await page.goto('/sandbox/history');
     await expect(page.getByRole('heading', { name: 'Challenge history' })).toBeVisible();
     await expect(page.getByRole('link', { name: new RegExp(recordText) })).toBeVisible();
+  });
+
+  test('result actions: Retry with same team starts a new run immediately', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await reachPlaying(page);
+    await expectSeasonReport(page);
+
+    await page.getByRole('button', { name: 'Retry with same team' }).click();
+    await expect(page).toHaveURL(/\/sandbox\/challenge\/?$/);
+    await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible({
+      timeout: 15000,
+    });
+    await expectSeasonReport(page);
+  });
+
+  test('result actions: Edit team restores the completed lineup on the draft', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await reachPlaying(page);
+    await expectSeasonReport(page);
+
+    await page.getByRole('link', { name: 'Edit team' }).click();
+    await expect(page).toHaveURL(/\/sandbox\?slots=/);
+    await expect(page.getByText('5/5', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove Nick Van Exel' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove Vlade Divac' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play 82 games' })).toBeEnabled();
   });
 
   test('cancel pauses at the persisted prefix and continue finishes the same run', async ({
@@ -207,7 +233,9 @@ test.describe('m3: accessibility and mobile', () => {
     await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Per game' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry with same team' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Run again' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Edit team' })).toBeVisible();
   });
 
   test('image fallbacks never block the challenge flow', async ({ page }) => {

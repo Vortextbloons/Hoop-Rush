@@ -15,7 +15,9 @@
  * of silently receiving neutral values.
  */
 import { readdirSync, readFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { basename, join } from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { parsePool } from '@hoop-rush/data-contracts';
 import {
   ARTIFACT_SCHEMA_VERSION,
@@ -230,6 +232,112 @@ export function clearSeasonDataCache(): void {
   seasonDataCache.clear();
 }
 
+/** Default pool worker count: one per era, capped by the machine's cores. */
+export function defaultPoolWorkers(): number {
+  // Unit tests mock config paths; real worker threads would read the real
+  // raw-data dirs, so the parallel default stays off under vitest.
+  if (process.env.NODE_ENV === 'test') return 1;
+  return Math.min(7, availableParallelism());
+}
+
+// ---------------------------------------------------------------------------
+// Worker-thread pool orchestration
+// ---------------------------------------------------------------------------
+export interface PoolWorkerResult {
+  results: TargetBuildResult[];
+}
+
+export interface PoolWorkerData {
+  targets: Array<[string, string]>;
+  manifest: Manifest;
+  bbrefIds: Record<string, string>;
+  careerLabels: Map<string, string[]> | null;
+  withAssets: boolean;
+}
+
+/**
+ * Splits targets into at most `workers` chunks so each chunk's season data is
+ * disjoint: targets are grouped by era (one era = one season set), and the
+ * largest groups are split deterministically in half until the chunk count is
+ * reached. Output order is deterministic regardless of worker scheduling.
+ */
+export function partitionPoolTargets(
+  targets: ReadonlyArray<[string, string]>,
+  workers: number,
+): Array<Array<[string, string]>> {
+  const count = Math.max(1, Math.trunc(workers));
+  if (count <= 1 || targets.length <= 1) {
+    return [[...targets]];
+  }
+  const byEra = new Map<string, Array<[string, string]>>();
+  for (const target of targets) {
+    let group = byEra.get(target[1]);
+    if (group === undefined) {
+      group = [];
+      byEra.set(target[1], group);
+    }
+    group.push(target);
+  }
+  const chunks = [...byEra.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([, group]) => group.slice());
+  while (chunks.length < count) {
+    let largest = -1;
+    let largestSize = 0;
+    for (let i = 0; i < chunks.length; i += 1) {
+      const size = chunks[i]?.length ?? 0;
+      if (size > largestSize) {
+        largest = i;
+        largestSize = size;
+      }
+    }
+    if (largestSize < 2) break;
+    const chunk = chunks[largest];
+    if (chunk === undefined) break;
+    const mid = Math.ceil(chunk.length / 2);
+    chunks.splice(largest, 1, chunk.slice(0, mid), chunk.slice(mid));
+  }
+  return chunks;
+}
+
+/** Runs one target chunk in a worker thread and resolves with its results. */
+function runPoolChunk(
+  chunk: Array<[string, string]>,
+  manifest: Manifest,
+  bbrefIds: Record<string, string>,
+  careerLabels: Map<string, Set<string>>,
+  withAssets: boolean,
+): Promise<PoolWorkerResult> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./pool-worker.js', import.meta.url), {
+      workerData: {
+        targets: chunk,
+        manifest,
+        bbrefIds,
+        careerLabels: [...careerLabels.entries()].map(([pid, labels]) => [pid, [...labels]]),
+        withAssets,
+      } satisfies PoolWorkerData,
+    });
+    let settled = false;
+    worker.once('message', (result: PoolWorkerResult) => {
+      settled = true;
+      void worker.terminate();
+      resolve(result);
+    });
+    worker.once('error', (error) => {
+      if (settled) return;
+      settled = true;
+      void worker.terminate();
+      reject(error);
+    });
+    worker.once('exit', (code) => {
+      if (settled || code === 0) return;
+      settled = true;
+      reject(new Error(`pool worker exited with code ${String(code)}`));
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Record building
 // ---------------------------------------------------------------------------
@@ -435,6 +543,34 @@ export function loadBbrefIds(): Record<string, string> {
     return {};
   }
   return readJsonLoose(path) as Record<string, string>;
+}
+
+/**
+ * Asset altIds from the previously packaged pool (playerExternalId -> altIds).
+ * Only the reannotate_assets.py markers (nbaHeadshotAvailable, photoUrl) are
+ * backfilled; a missing or unreadable pool file yields an empty map.
+ */
+export function loadExistingAssetAltIds(
+  franchiseId: string,
+  eraId: string,
+): Map<string, Record<string, unknown>> {
+  const path = join(poolDir(), `${franchiseId}-${eraId}.json`);
+  if (!fileExists(path)) {
+    return new Map();
+  }
+  try {
+    const pool = readJsonLoose(path) as Pool;
+    const byExternalId = new Map<string, Record<string, unknown>>();
+    for (const player of pool.players) {
+      if (player.altIds !== null && typeof player.altIds === 'object') {
+        byExternalId.set(player.playerExternalId, player.altIds);
+      }
+    }
+    return byExternalId;
+  } catch (error) {
+    console.log(`  [WARN] cannot read previous pool ${basename(path)}: ${(error as Error).message}`);
+    return new Map();
+  }
 }
 
 export interface PoolPlayer {
@@ -646,6 +782,8 @@ export function computePool(
   manifest: Manifest,
   bbrefIds?: Record<string, string>,
   withAssets = true,
+  careerLabels?: Map<string, Set<string>> | null,
+  keepSeasonCache = false,
 ): Pool | PoolBuildFailure {
   if (bbrefIds === undefined) {
     bbrefIds = loadBbrefIds();
@@ -685,7 +823,8 @@ export function computePool(
   }
 
   console.log(`[${franchiseId} ${eraId}] scanning ${String(seasons.length)} seasons`);
-  const careerLabels = loadCareerPositionLabels();
+  const careerLabelsMap = careerLabels ?? loadCareerPositionLabels();
+  const existingAssetAltIds = loadExistingAssetAltIds(franchiseId, eraId);
 
   const eligible = new Map<string, Candidate[]>();
   const missingStints: string[] = [];
@@ -738,8 +877,11 @@ export function computePool(
   }
 
   // The cache exists to memoize season JSON within one pool scan; every
-  // season is reloadable from disk, so drop it before the next target.
-  seasonDataCache.clear();
+  // season is reloadable from disk, so drop it before the next target unless
+  // the caller (a worker owning a single era's targets) asks to keep it.
+  if (!keepSeasonCache) {
+    seasonDataCache.clear();
+  }
 
   if (missingStints.length > 0) {
     console.log(`  [WARN] no stints for ${franchiseId} in: ${missingStints.join(', ')}`);
@@ -759,7 +901,7 @@ export function computePool(
     const stats = best.stats;
     const summary = player.summaryRatings as SummaryRatingsRaw | undefined;
     const ownLabels = new Set([str(player.position)]);
-    const career = careerLabels.get(pid);
+    const career = careerLabelsMap.get(pid);
     const labels = career !== undefined && career.size > 0 ? career : ownLabels;
     const { canonical, sourceLabels, unknownLabels } = normalizePositionLabels(labels);
     if (unknownLabels.length > 0) {
@@ -836,6 +978,22 @@ export function computePool(
       str(player.firstName),
       str(player.lastName),
     );
+    const altIds: Record<string, unknown> = {};
+    if (Object.hasOwn(bbrefIds, pid)) {
+      altIds.bbref = bbrefIds[pid];
+    }
+    // Preserve the asset markers reannotate_assets.py wrote into the previous
+    // build; regenerating a pool must never wipe nbaHeadshotAvailable/photoUrl
+    // (the UI then regresses to CDN silhouettes). bbref stays cache-authoritative.
+    const previous = existingAssetAltIds.get(pid);
+    if (previous !== undefined) {
+      if (Object.hasOwn(previous, 'nbaHeadshotAvailable')) {
+        altIds.nbaHeadshotAvailable = previous.nbaHeadshotAvailable;
+      }
+      if (Object.hasOwn(previous, 'photoUrl')) {
+        altIds.photoUrl = previous.photoUrl;
+      }
+    }
     playersOut.push({
       schemaVersion: SCHEMA_VERSION,
       playerId: `p-${pid}`,
@@ -846,7 +1004,7 @@ export function computePool(
       lastName,
       displayName: `${firstName} ${lastName}`.trim(),
       playerExternalId: pid,
-      altIds: Object.hasOwn(bbrefIds, pid) ? { bbref: bbrefIds[pid] as string } : null,
+      altIds: Object.keys(altIds).length > 0 ? altIds : null,
       positions: {
         sourceLabels,
         canonical,
@@ -1013,20 +1171,36 @@ export function allPoolTargets(manifest: Manifest = loadManifest()): Array<[stri
   return targets;
 }
 
-export function run(targets: Array<[string, string]> | null = null, withAssets = true): void {
-  if (targets === null) {
-    targets = [['lakers', '1990s']];
-  }
-  const manifest = loadManifest();
-  const bbrefIds = loadBbrefIds();
-  const entries: Array<{ franchiseId: string; eraId: string; url: string; contentHash: string }> =
-    [];
-  const coverage: CoverageReportEntry[] = [];
-  for (const [franchiseId, eraId] of targets) {
-    const pool = computePool(franchiseId, eraId, manifest, bbrefIds, withAssets);
-    if ('reason' in pool) {
-      console.log(`  [UNAVAILABLE] ${franchiseId} ${eraId}: ${pool.reason} (${pool.detail})`);
-      coverage.push({
+/** One target's build outcome: the manifest entry when available, plus the coverage row. */
+export interface TargetBuildResult {
+  entry: { franchiseId: string; eraId: string; url: string; contentHash: string } | null;
+  coverage: CoverageReportEntry;
+}
+
+/** Shared by the sequential path and worker threads; never duplicates rules. */
+export function buildPoolForTarget(
+  franchiseId: string,
+  eraId: string,
+  manifest: Manifest,
+  bbrefIds: Record<string, string>,
+  withAssets: boolean,
+  careerLabels: Map<string, Set<string>> | null,
+  keepSeasonCache = false,
+): TargetBuildResult {
+  const pool = computePool(
+    franchiseId,
+    eraId,
+    manifest,
+    bbrefIds,
+    withAssets,
+    careerLabels,
+    keepSeasonCache,
+  );
+  if ('reason' in pool) {
+    console.log(`  [UNAVAILABLE] ${franchiseId} ${eraId}: ${pool.reason} (${pool.detail})`);
+    return {
+      entry: null,
+      coverage: {
         franchiseId,
         eraId,
         status: 'unavailable',
@@ -1035,27 +1209,65 @@ export function run(targets: Array<[string, string]> | null = null, withAssets =
         ...(pool.firstSupportedSeason !== undefined
           ? { firstSupportedSeason: pool.firstSupportedSeason }
           : {}),
-      });
-      continue;
-    }
-    logPoolValidation(pool);
-    const digest = writePool(pool);
-    entries.push({
+      },
+    };
+  }
+  logPoolValidation(pool);
+  const digest = writePool(pool);
+  return {
+    entry: {
       franchiseId,
       eraId,
       url: `pools/${franchiseId}-${eraId}.json`,
       contentHash: digest,
-    });
-    coverage.push({
+    },
+    coverage: {
       franchiseId,
       eraId,
       status: 'available',
       playerCount: pool.players.length,
       coverageSummary: pool.coverageSummary,
-    });
+    },
+  };
+}
+
+export async function run(
+  targets: Array<[string, string]> | null = null,
+  withAssets = true,
+  workers?: number,
+): Promise<void> {
+  if (targets === null) {
+    targets = [['lakers', '1990s']];
   }
+  const manifest = loadManifest();
+  const bbrefIds = loadBbrefIds();
+  const careerLabels = loadCareerPositionLabels();
+  const workerCount =
+    workers === undefined ? defaultPoolWorkers() : Math.max(1, Math.trunc(workers));
+
+  let results: TargetBuildResult[];
+  if (workerCount <= 1 || targets.length <= 1) {
+    results = [];
+    for (const [franchiseId, eraId] of targets) {
+      results.push(
+        buildPoolForTarget(franchiseId, eraId, manifest, bbrefIds, withAssets, careerLabels),
+      );
+    }
+  } else {
+    const chunks = partitionPoolTargets(targets, workerCount);
+    const workerResults = await Promise.all(
+      chunks.map((chunk) =>
+        runPoolChunk(chunk, manifest, bbrefIds, careerLabels, withAssets),
+      ),
+    );
+    results = workerResults.flatMap((chunkResult) => chunkResult.results);
+  }
+
+  const entries = results
+    .map((result) => result.entry)
+    .filter((entry): entry is { franchiseId: string; eraId: string; url: string; contentHash: string } => entry !== null);
   updateManifest(entries);
-  recordCoverageReport(coverage);
+  recordCoverageReport(results.map((result) => result.coverage));
   refreshPlayersIndexInManifest();
 }
 

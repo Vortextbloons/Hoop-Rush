@@ -276,17 +276,24 @@ export function computeRealOverall(
   // tier is reserved for an exceptional skill profile plus near-max impact;
   // it is what makes a 100 possible without making 100 common.
   const eliteNonBigPeak =
-    !isBig && gp >= 55 && mpg >= 30 && ppg >= 28 && per >= 22 && bpm >= 3 && tsPct >= 0.58;
+    !isBig && gp >= 55 && mpg >= 30 && ppg >= 29 && per >= 23 && bpm >= 3.5 && tsPct >= 0.6;
   const eliteBigPeak =
-    isBig && gp >= 55 && mpg >= 30 && ppg >= 27 && per >= 25 && bpm >= 5 && tsPct >= 0.56;
+    isBig && gp >= 55 && mpg >= 30 && ppg >= 28 && per >= 26 && bpm >= 5 && tsPct >= 0.56;
   const premiumNonBigPeak =
-    !isBig && gp >= 55 && mpg >= 30 && ppg >= 28 && per >= 23 && bpm >= 3.5 && tsPct >= 0.6;
+    !isBig && gp >= 55 && mpg >= 30 && ppg >= 30 && per >= 23 && bpm >= 3.5 && tsPct >= 0.62;
   const premiumBigPeak =
-    isBig && gp >= 55 && mpg >= 30 && ppg >= 28 && per >= 27 && bpm >= 6 && tsPct >= 0.56;
+    isBig && gp >= 55 && mpg >= 30 && ppg >= 29 && per >= 28 && bpm >= 6 && tsPct >= 0.58;
+  const nearEliteNonBigPeak =
+    !isBig && gp >= 55 && mpg >= 30 && ppg >= 26 && per >= 20 && bpm >= 2 && tsPct >= 0.55;
+  const nearEliteBigPeak =
+    isBig && gp >= 55 && mpg >= 30 && ppg >= 27 && per >= 24 && bpm >= 4 && tsPct >= 0.54;
   const historicPeak = gp >= 55 && mpg >= 30 && skillOverall >= 92 && productionImpact >= 98;
+  const elitePeak = eliteNonBigPeak || eliteBigPeak;
+  const premiumPeak = premiumNonBigPeak || premiumBigPeak;
   if (historicPeak) boosted = Math.max(boosted, 97);
-  else if (premiumNonBigPeak || premiumBigPeak) boosted = Math.max(boosted, 96);
-  else if (eliteNonBigPeak || eliteBigPeak) boosted = Math.max(boosted, 95);
+  else if (premiumPeak) boosted = Math.max(boosted, 96);
+  else if (elitePeak) boosted = Math.max(boosted, 95);
+  else if (nearEliteNonBigPeak || nearEliteBigPeak) boosted = Math.max(boosted, 94);
 
   // A regular-minute season with weak overall impact should not remain in the
   // upper-80s solely because the derived skill profile is broad. Apply a
@@ -309,8 +316,9 @@ export function computeRealOverall(
     : 0;
 
   // --- Final boost (matches TS) ---
-  // Keep ordinary players close to the capped blend, but give the elite tier
-  // enough headroom for 98-99 and reserve 100 for the historic peak tier.
+  // Keep ordinary players close to the capped blend. Elite tiers get one extra
+  // point of headroom, but non-elite seasons at the same raw level do not jump
+  // into the 98-100 band. This preserves a smooth 95-100 ladder.
   let finalBoost: number;
   if (boosted < 65) {
     finalBoost = 5.0;
@@ -324,8 +332,10 @@ export function computeRealOverall(
     finalBoost = 1.0;
   } else if (boosted < 95) {
     finalBoost = 2.0;
-  } else {
+  } else if (historicPeak || premiumPeak || elitePeak) {
     finalBoost = 3.0;
+  } else {
+    finalBoost = 2.0;
   }
 
   let finalOverall = clampRating(boosted + finalBoost);

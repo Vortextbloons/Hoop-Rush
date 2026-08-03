@@ -11,15 +11,17 @@
   } from '@hoop-rush/data-contracts';
   import { getManifest, getPlayersIndex } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
-  import { loadRunPlayersById } from '$lib/sandbox-lineup';
+  import { lineupPlayersFromRun, loadRunPlayersById } from '$lib/sandbox-lineup';
+  import { startSandboxRun } from '$lib/sandbox-run';
+  import { buildSandboxHref, generateSeed } from '$lib/sandbox-url';
   import SeasonReport from '$lib/components/SeasonReport.svelte';
 
   /**
    * Challenge result (spec/08): final record and 82-0 outcome with the League
    * MVP spotlight, the full game strip, aggregate facts, and the user's
    * five-player season table. The shared SeasonReport presents the report;
-   * this route owns loading and the single Run again action, which returns
-   * to a completely cleared sandbox draft.
+   * this route owns loading, Run again (fresh draft), Edit team (restore the
+   * completed lineup on the sandbox draft page), and Retry with same team.
    */
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -32,6 +34,10 @@
   let running = $state(false);
 
   const { url } = $derived(page);
+
+  const editTeamHref = $derived(
+    run?.mode === 'sandbox' && run.selections ? buildSandboxHref(run.selections) : null,
+  );
 
   $effect(() => {
     if (!browser) return;
@@ -112,6 +118,26 @@
       running = false;
     }
   }
+
+  /** Same five, new seed: start another sandbox run immediately. */
+  async function retrySameTeam() {
+    const currentRun = run;
+    const playersById = byId;
+    if (running || !currentRun || !playersById) return;
+    const players = lineupPlayersFromRun(currentRun, playersById);
+    if (!players) {
+      error = 'Could not restore the lineup for another run.';
+      return;
+    }
+    running = true;
+    error = null;
+    try {
+      await startSandboxRun(players, generateSeed());
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+      running = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -155,6 +181,8 @@
       modeLabel="Sandbox · Result"
       {running}
       onRunAgain={runAgain}
+      onRetrySameTeam={retrySameTeam}
+      {editTeamHref}
     />
   {/if}
 </section>

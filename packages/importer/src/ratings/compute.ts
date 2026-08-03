@@ -8,6 +8,8 @@
  * pure function of versioned inputs.
  */
 import { readFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
+import { Worker } from 'node:worker_threads';
 import { DEFAULT_SEASONS, ensureOutputDir } from '../config.js';
 import { fileExists, readJson, safeFloat, writeJsonRetry } from '../json.js';
 import { deriveTraits } from './traits.js';
@@ -193,12 +195,68 @@ export function computeForSeason(season: string, force = false): void {
   console.log(`  [OK] computed ratings for ${String(computed)} players in ${season}`);
 }
 
-export function run(seasons?: string[], force = false): void {
+/** Default ratings worker count, capped by the machine's cores. */
+export function defaultRatingsWorkers(): number {
+  // Unit tests mock config paths; real worker threads would read the real
+  // raw-data dirs, so the parallel default stays off under vitest.
+  if (process.env.NODE_ENV === 'test') return 1;
+  return Math.min(8, availableParallelism());
+}
+
+/** Splits a list into at most `workers` deterministic contiguous chunks. */
+function chunkList<T>(items: readonly T[], workers: number): T[][] {
+  const count = Math.max(1, Math.trunc(workers));
+  if (count <= 1 || items.length <= 1) {
+    return [[...items]];
+  }
+  const size = Math.ceil(items.length / count);
+  const chunks: T[][] = [];
+  for (let start = 0; start < items.length; start += size) {
+    chunks.push(items.slice(start, start + size));
+  }
+  return chunks;
+}
+
+/** Runs one season chunk in a worker thread; resolves when it finishes. */
+function runRatingsChunk(seasons: readonly string[], force: boolean): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./ratings-worker.js', import.meta.url), {
+      workerData: { seasons: [...seasons], force },
+    });
+    let settled = false;
+    worker.once('message', () => {
+      settled = true;
+      void worker.terminate();
+      resolve();
+    });
+    worker.once('error', (error) => {
+      if (settled) return;
+      settled = true;
+      void worker.terminate();
+      reject(error);
+    });
+    worker.once('exit', (code) => {
+      if (settled || code === 0) return;
+      settled = true;
+      reject(new Error(`ratings worker exited with code ${String(code)}`));
+    });
+  });
+}
+
+export async function run(seasons?: string[], force = false, workers?: number): Promise<void> {
   const target = seasons ?? DEFAULT_SEASONS;
   console.log('[ratings] deriving ratings from real stats');
-  for (const season of target) {
-    computeForSeason(season, force);
+  const workerCount =
+    workers === undefined ? defaultRatingsWorkers() : Math.max(1, Math.trunc(workers));
+  if (workerCount <= 1 || target.length <= 1) {
+    for (const season of target) {
+      computeForSeason(season, force);
+    }
+    return;
   }
+  await Promise.all(
+    chunkList(target, workerCount).map((chunk) => runRatingsChunk(chunk, force)),
+  );
 }
 
 export { fieldPublished };

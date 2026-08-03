@@ -362,7 +362,9 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
 
     // The result shows exactly one action button: Run again.
     await expect(page.getByRole('button', { name: 'Run again' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Retry' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Retry with same team', exact: true })).toHaveCount(
+      0,
+    );
     await expect(page.getByRole('button', { name: 'Edit team' })).toHaveCount(0);
 
     // MVP spotlight: the League MVP heading, the winner's name, and the side.
