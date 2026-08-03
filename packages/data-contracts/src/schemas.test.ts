@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   challengeRunSchema,
+  classicCompletedDraftSchema,
+  classicDraftStateSchema,
   franchiseAbbreviation,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
@@ -1131,6 +1133,78 @@ function buildMinimalRun() {
     },
   };
 }
+
+describe('classic draft contracts (M4)', () => {
+  const baseDraft = {
+    schemaVersion: 1,
+    draftId: 'draft-1',
+    variant: 'ratings',
+    seed: 'abcd1234abcd1234abcd1234abcd1234',
+    dataVersion: 'data-v1',
+    round: 2,
+    status: 'drafting',
+    roll: { franchiseId: 'lakers', eraId: '1990s' },
+    rerolls: { franchiseSpent: false, eraSpent: false },
+    picks: [],
+  };
+
+  const pick = (round: number, playerId: string, slotIndex: number) => ({
+    round,
+    playerId,
+    franchiseId: 'lakers',
+    eraId: '1990s',
+    slotIndex,
+  });
+
+  it('accepts a valid minimal drafting state', () => {
+    expect(classicDraftStateSchema.safeParse(baseDraft).success).toBe(true);
+  });
+
+  it('rejects more than five picks', () => {
+    const picks = Array.from({ length: 6 }, (_, i) => pick((i % 5) + 1, `p-${i + 1}`, i % 5));
+    expect(classicDraftStateSchema.safeParse({ ...baseDraft, picks }).success).toBe(false);
+  });
+
+  it('rejects an invalid variant', () => {
+    expect(
+      classicDraftStateSchema.safeParse({ ...baseDraft, variant: 'draft-order' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a non-hex seed', () => {
+    expect(classicDraftStateSchema.safeParse({ ...baseDraft, seed: 'not-a-seed' }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a null roll while drafting and accepts one once complete', () => {
+    expect(classicDraftStateSchema.safeParse({ ...baseDraft, roll: null }).success).toBe(false);
+    expect(
+      classicDraftStateSchema.safeParse({ ...baseDraft, status: 'complete', roll: null }).success,
+    ).toBe(true);
+  });
+
+  it('duplicate slot indexes stay structural (uniqueness is a command concern)', () => {
+    const picks = [pick(1, 'p-1', 0), pick(2, 'p-2', 0)];
+    expect(classicDraftStateSchema.safeParse({ ...baseDraft, picks }).success).toBe(true);
+  });
+
+  it('accepts a completed draft snapshot and rejects short pick lists', () => {
+    const picks = [0, 1, 2, 3, 4].map((slotIndex) =>
+      pick(slotIndex + 1, `p-${slotIndex + 1}`, slotIndex),
+    );
+    const snapshot = {
+      draftId: 'draft-1',
+      variant: 'ratings',
+      seed: 'abcd1234abcd1234abcd1234abcd1234',
+      picks,
+    };
+    expect(classicCompletedDraftSchema.safeParse(snapshot).success).toBe(true);
+    expect(
+      classicCompletedDraftSchema.safeParse({ ...snapshot, picks: picks.slice(0, 4) }).success,
+    ).toBe(false);
+  });
+});
 
 describe('franchise abbreviations', () => {
   it('uses standard three-letter codes for every current NBA franchise', () => {

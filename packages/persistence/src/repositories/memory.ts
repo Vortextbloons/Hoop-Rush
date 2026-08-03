@@ -1,5 +1,9 @@
 import type { GameResult } from '@hoop-rush/data-contracts';
 import {
+  classicDraftRecordSchema,
+  type StoredClassicDraft,
+} from '../schemas/classic-draft-record.js';
+import {
   activeGameRowSchema,
   activeRunCheckpointSchema,
   checkpointFromRun,
@@ -16,9 +20,9 @@ import {
 /**
  * In-memory challenge repository for tests and non-browser environments. It
  * mirrors the Dexie layout: one active checkpoint plus one game row per
- * accepted game, reconstructed on load. It enforces the same runtime
- * validation on every read as the Dexie implementation, so contract tests run
- * identically against both.
+ * accepted game, reconstructed on load, and one active classic draft row. It
+ * enforces the same runtime validation on every read as the Dexie
+ * implementation, so contract tests run identically against both.
  */
 
 export class InMemoryChallengeRepository implements ChallengeRepository {
@@ -26,6 +30,7 @@ export class InMemoryChallengeRepository implements ChallengeRepository {
   private activeGames = new Map<number, GameResult>();
   private completed = new Map<string, StoredRunRecord>();
   private history = new Map<string, CompletedRunIndex>();
+  private classicDraft: StoredClassicDraft | null = null;
 
   async saveActiveRun(record: StoredRunRecord): Promise<void> {
     this.active = checkpointFromRun(record);
@@ -109,5 +114,30 @@ export class InMemoryChallengeRepository implements ChallengeRepository {
   async clearHistory(): Promise<void> {
     this.completed.clear();
     this.history.clear();
+  }
+
+  async saveClassicDraft(record: StoredClassicDraft): Promise<void> {
+    const validated = classicDraftRecordSchema.parse(record);
+    this.classicDraft = { ...validated, updatedAtIso: new Date().toISOString() };
+  }
+
+  async loadClassicDraft(): Promise<StoredClassicDraft | null> {
+    if (this.classicDraft === null) return null;
+    return classicDraftRecordSchema.parse(this.classicDraft);
+  }
+
+  async clearClassicDraft(): Promise<void> {
+    this.classicDraft = null;
+  }
+
+  async promoteClassicDraftToRun(record: StoredRunRecord, draftId: string): Promise<void> {
+    const validatedRun = storedRunRecordSchema.parse(record);
+    const checkpoint = checkpointFromRun(validatedRun);
+    if (this.classicDraft !== null && this.classicDraft.draft.draftId !== draftId) {
+      throw new Error('promoteClassicDraftToRun: draftId mismatch');
+    }
+    this.activeGames.clear();
+    this.active = checkpoint;
+    this.classicDraft = null;
   }
 }

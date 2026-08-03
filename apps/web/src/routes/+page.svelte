@@ -2,10 +2,11 @@
   import { browser } from '$app/environment';
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
-  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
+  import { variantLabel } from '$lib/draft-presentation';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
 
@@ -26,21 +27,16 @@
     {
       code: '02',
       name: 'Classic',
-      line: 'Five draft rounds. Each round rolls a franchise and an era. One franchise reroll and one era reroll, then live with the board.',
-      status: 'coming-soon',
-      cta: 'Coming soon',
-    },
-    {
-      code: '03',
-      name: 'Ball Knowledge',
-      line: 'The same draft with every rating stripped out. Names and headshots only — do you actually know the league?',
-      status: 'coming-soon',
-      cta: 'Coming soon',
+      line: 'Five draft rounds. Each round rolls a franchise and an era. One franchise reroll and one era reroll, then live with the board. Ratings or Ball Knowledge.',
+      status: 'available',
+      cta: 'Start classic',
+      href: '/classic' as RouteId,
     },
   ] as const;
 
   let manifest = $state<HoopRushManifest | null>(null);
   let active = $state.raw<ActiveRunCheckpoint | null>(null);
+  let classicDraft = $state.raw<ClassicDraftState | null>(null);
   let recent = $state.raw<CompletedRunIndex[]>([]);
 
   $effect(() => {
@@ -57,11 +53,13 @@
     Promise.all([
       challengeRepository.loadActiveRunCheckpoint(),
       challengeRepository.listCompletedRuns(),
+      challengeRepository.loadClassicDraft(),
     ]).then(
-      ([activeCheckpoint, rows]) => {
+      ([activeCheckpoint, rows, savedDraft]) => {
         if (cancelled) return;
         active = activeCheckpoint;
         recent = rows.slice(0, 3);
+        classicDraft = savedDraft?.draft ?? null;
       },
       () => {
         // History and continue are best-effort on the start page.
@@ -123,11 +121,20 @@
     </div>
     {#if active && active.status === 'active'}
       <a
-        href={resolve('/sandbox/challenge')}
+        href={active.mode === 'classic'
+          ? resolve('/classic/challenge')
+          : resolve('/sandbox/challenge')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
         Continue: game {(active.gamesPlayed ?? 0) + 1} of 82 · {active.aggregates.team.wins}-
         {active.aggregates.team.losses}
+      </a>
+    {:else if classicDraft && classicDraft.status === 'drafting'}
+      <a
+        href={resolve('/classic')}
+        class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
+      >
+        Continue draft · round {classicDraft.round} of 5
       </a>
     {/if}
   </div>
@@ -209,14 +216,18 @@
         {#each recent as row (row.runId)}
           <li>
             <a
-              href={resolve(`/sandbox/result?runId=${encodeURIComponent(row.runId)}`)}
+              href={row.mode === 'classic'
+                ? resolve(`/classic/result?runId=${encodeURIComponent(row.runId)}`)
+                : resolve(`/sandbox/result?runId=${encodeURIComponent(row.runId)}`)}
               class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-line-strong"
             >
               <span class="min-w-0 flex-1">
                 <span
                   class="font-display block truncate text-base font-extrabold tracking-tight uppercase"
                 >
-                  {#if row.franchiseId !== null}
+                  {#if row.mode === 'classic'}
+                    Classic · {variantLabel(row.variant ?? 'ratings')}
+                  {:else if row.franchiseId !== null}
                     {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
                   {:else}
                     {eraName(row.eraId)} · 5-player lineup

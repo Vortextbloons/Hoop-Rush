@@ -1,24 +1,23 @@
 <script lang="ts">
   import { browser } from '$app/environment';
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { ChallengeRun, HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
-  import type { RouteId } from '$app/types';
+  import { variantLabel } from '$lib/draft-presentation';
   import { getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
-  import { buildSandboxUrl, generateSeed } from '$lib/sandbox-url';
-  import { loadRunPlayersById, lineupPlayersFromRun } from '$lib/sandbox-lineup';
-  import { startSandboxRun } from '$lib/sandbox-run';
+  import { draftStateFromCompletedDraft, saveClassicDraftState } from '$lib/classic-draft';
+  import { startClassicRun } from '$lib/classic-run';
+  import { loadRunPlayersById } from '$lib/sandbox-lineup';
+  import { generateSeed } from '$lib/sandbox-url';
   import SeasonReport from '$lib/components/SeasonReport.svelte';
 
   /**
-   * Challenge result (spec/08): final record and 82-0 outcome, first-loss
-   * explanation when applicable, the full game strip, aggregate shooting,
-   * turnover, rebound, free-throw, and possession facts, the user's
-   * five-player season table, and best single-game performance. The shared
-   * SeasonReport presents the record; this route owns loading and the
-   * sandbox-specific Retry (same five, new seed) and Edit team (draft URL)
-   * actions.
+   * Classic challenge result: the shared SeasonReport record with classic
+   * mode identity. Retry replays the same five draft picks with a brand-new
+   * seed through the classic run path; Edit team restores the completed
+   * draft so the five can be repositioned before the next season.
    */
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -70,7 +69,7 @@
     };
   });
 
-  /** Resolves the run's single franchise-era player pool. */
+  /** Resolves the run's player pools. */
   $effect(() => {
     const currentRun = run;
     const m = manifest;
@@ -89,20 +88,23 @@
     };
   });
 
-  /** Replays the same five players with a brand-new seed. */
-  async function retryRun() {
+  const modeLabel = $derived(
+    run ? `Classic · ${variantLabel(run.variant ?? 'ratings')}` : 'Classic',
+  );
+
+  /** Replays the same five draft picks with a brand-new seed. */
+  async function retryClassic() {
     const currentRun = run;
     const m = manifest;
     if (!currentRun || !m || running) return;
     running = true;
     try {
-      const resolved = await loadRunPlayersById(currentRun, m);
-      const players = lineupPlayersFromRun(currentRun, resolved);
-      if (!players) {
-        error = 'This lineup cannot be replayed because its player pool is unavailable.';
+      if (!currentRun.classicDraft) {
+        error = 'This classic run has no draft snapshot.';
         return;
       }
-      await startSandboxRun(players, generateSeed());
+      const draft = draftStateFromCompletedDraft(currentRun.classicDraft, m.dataVersion);
+      await startClassicRun(draft, generateSeed());
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -110,26 +112,34 @@
     }
   }
 
-  const editHref = $derived.by(() => {
+  /** Restores the completed draft so the five can be repositioned. */
+  async function editClassicTeam() {
     const currentRun = run;
-    if (!currentRun) return null;
-    const slots =
-      currentRun.selections ??
-      currentRun.playerIds.map((playerId) => ({
-        playerId,
-        franchiseId: currentRun.franchiseId ?? 'lakers',
-        eraId: currentRun.eraId,
-      }));
-    return buildSandboxUrl({ slots }) as RouteId;
-  });
+    const m = manifest;
+    if (!currentRun || !m || running) return;
+    running = true;
+    try {
+      if (!currentRun.classicDraft) {
+        error = 'This classic run has no draft snapshot.';
+        return;
+      }
+      const draft = draftStateFromCompletedDraft(currentRun.classicDraft, m.dataVersion);
+      await saveClassicDraftState(draft);
+      void goto(resolve('/classic'));
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    } finally {
+      running = false;
+    }
+  }
 </script>
 
 <svelte:head>
-  <title>Challenge result — Sandbox — Hoop Rush</title>
+  <title>Challenge result — Classic — Hoop Rush</title>
 </svelte:head>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-  <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Sandbox · Result</p>
+  <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Classic · Result</p>
   <h1
     class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
   >
@@ -141,7 +151,7 @@
       <p class="font-semibold">Result unavailable</p>
       <p class="mt-1 text-muted-foreground">{error}</p>
       <a
-        href={resolve('/sandbox/history')}
+        href={resolve('/classic/history')}
         class="mt-3 inline-flex rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground"
       >
         Challenge history
@@ -161,10 +171,11 @@
       {manifest}
       {run}
       {byId}
-      modeLabel="Sandbox · Result"
+      {modeLabel}
       retrying={running}
-      onRetry={retryRun}
-      {editHref}
+      onRetry={retryClassic}
+      editHref={null}
+      onEditTeam={editClassicTeam}
     />
   {/if}
 </section>

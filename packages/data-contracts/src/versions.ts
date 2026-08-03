@@ -50,3 +50,9 @@ export const SCHEDULE_VERSION = 'schedule-v1';
 
 /** Per-game seed derivation version. */
 export const SEED_DERIVATION_VERSION = 'seed-derivation-v1';
+
+/** Accepted classic draft state schema layout (M4). */
+export const CLASSIC_DRAFT_SCHEMA_VERSION = 1;
+
+/** Seeded classic roll derivation version (M4). */
+export const CLASSIC_ROLL_VERSION = 'classic-roll-v1';

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { ArrowRight, Check, ChevronDown, Lock, Plus, Search, X } from '@lucide/svelte';
-  import { Dialog, Select } from 'bits-ui';
+  import { ArrowRight, Check, ChevronDown } from '@lucide/svelte';
+  import { Select } from 'bits-ui';
   import { SvelteMap } from 'svelte/reactivity';
   import type {
     HoopRushManifest,
@@ -13,12 +13,13 @@
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
   import { getManifest, getPlayersIndex, getPool } from '$lib/data';
-  import { lowercaseName } from '$lib/roster-browser';
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
   import { startSandboxRun } from '$lib/sandbox-run';
-  import PlayerFace from '$lib/components/PlayerFace.svelte';
+  import { poolSortLabel, sortDraftRows } from '$lib/draft-presentation';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
+  import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
+  import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
 
   type IndexRow = PlayersIndexEntry;
 
@@ -35,10 +36,6 @@
     'Center',
   ] as const;
   const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
-  const PAGE_SIZE = 120;
-
-  /** Typing delay before the pool list re-filters the full players index. */
-  const SEARCH_DEBOUNCE_MS = 200;
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
@@ -50,22 +47,9 @@
 
   let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
   let pickerPlayer = $state<IndexRow | null>(null);
-  /** Raw input value; `search` below is the debounced query the pool reads. */
-  let searchInput = $state('');
-  let search = $state('');
-  let positionFilter = $state<SlotIndex | null>(null);
   /** Empty string means no filter (show all teams/decades). */
   let franchiseFilter = $state('');
   let eraFilter = $state('');
-  let visibleCount = $state(PAGE_SIZE);
-
-  $effect(() => {
-    const raw = searchInput;
-    const timeout = setTimeout(() => {
-      search = raw;
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timeout);
-  });
 
   $effect(() => {
     let cancelled = false;
@@ -123,8 +107,6 @@
     );
   }
 
-  const eraLabel = $derived(new Map((manifest?.eras ?? []).map((e) => [e.eraId, e.label])));
-
   const franchise = $derived(
     manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseFilter) ?? null,
   );
@@ -146,19 +128,14 @@
     })),
   ]);
 
-  const sortedRows = $derived.by(() => {
-    if (!index) return [] as IndexRow[];
-    return [...index.players].sort(
-      (a, b) => b.overall - a.overall || a.displayName.localeCompare(b.displayName),
-    );
-  });
-
   const poolRows = $derived.by(() => {
-    let list = sortedRows;
+    let list = index?.players ?? [];
     if (franchiseFilter) list = list.filter((p) => p.franchiseId === franchiseFilter);
     if (eraFilter) list = list.filter((p) => p.eraId === eraFilter);
     return list;
   });
+
+  const sortedRows = $derived(sortDraftRows(poolRows, 'sandbox'));
 
   const poolHeading = $derived(
     franchise && era
@@ -170,28 +147,7 @@
           : 'All players',
   );
 
-  const filteredRows = $derived.by(() => {
-    let list = poolRows;
-    if (positionFilter !== null) {
-      const requirement = slotRequirement(positionFilter);
-      list = list.filter((p) => p.positionsCanonical.includes(requirement));
-    }
-    const query = search.trim().toLowerCase();
-    if (query) {
-      list = list.filter((p) => lowercaseName(p).includes(query));
-    }
-    return list;
-  });
-
-  const visibleRows = $derived(filteredRows.slice(0, visibleCount));
-  const hasMore = $derived(filteredRows.length > visibleCount);
-  const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
-
-  // Reset pagination whenever the pool scope or ordering changes.
-  $effect(() => {
-    void [franchiseFilter, eraFilter, positionFilter, search];
-    visibleCount = PAGE_SIZE;
-  });
+  const countLabel = $derived(`${poolRows.length} players · ${poolSortLabel('sandbox')}`);
 
   function selectFranchise(id: string) {
     franchiseFilter = id;
@@ -224,68 +180,6 @@
     return null;
   }
 
-  type PickerOption = {
-    index: number;
-    incumbent: IndexRow | null;
-    state: 'open' | 'self' | 'displace' | 'blocked' | 'cant-play';
-    moveTarget: number | null;
-    ariaLabel: string;
-  };
-
-  const pickerOptions = $derived.by((): PickerOption[] => {
-    const subject = pickerPlayer;
-    if (!subject) return [];
-    const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
-    return SLOT_INDEXES.map((i) => {
-      const incumbent = slots[i] ?? null;
-      const slotName = `${SLOT_NAMES[i]} slot ${i + 1}`;
-      if (!canFillSlot(subject, i)) {
-        return {
-          index: i,
-          incumbent,
-          state: 'cant-play',
-          moveTarget: null,
-          ariaLabel: `${subject.displayName} cannot play ${slotName}`,
-        };
-      }
-      if (!incumbent) {
-        return {
-          index: i,
-          incumbent: null,
-          state: 'open',
-          moveTarget: null,
-          ariaLabel: `Place ${subject.displayName} at ${slotName}`,
-        };
-      }
-      if (incumbent.playerId === subject.playerId) {
-        return {
-          index: i,
-          incumbent,
-          state: 'self',
-          moveTarget: null,
-          ariaLabel: `${subject.displayName} already at ${slotName}`,
-        };
-      }
-      const target = displacementTargetFor(incumbent, i, subjectSlot);
-      if (target !== null) {
-        return {
-          index: i,
-          incumbent,
-          state: 'displace',
-          moveTarget: target,
-          ariaLabel: `Place ${subject.displayName} at ${slotName}, moving ${incumbent.displayName} to ${SLOT_NAMES[target]} slot ${target + 1}`,
-        };
-      }
-      return {
-        index: i,
-        incumbent,
-        state: 'blocked',
-        moveTarget: null,
-        ariaLabel: `${slotName} occupied by ${incumbent.displayName}`,
-      };
-    });
-  });
-
   /** Place the player at a slot, moving any movable incumbent out of the way. */
   function placePlayer(subject: IndexRow, slotIndex: number) {
     const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
@@ -303,49 +197,6 @@
   function openPicker(player: IndexRow) {
     pickerPlayer = player;
   }
-
-  type PoolCardState = 'lineup' | 'place' | 'displace' | 'blocked';
-
-  type PoolCardInfo = {
-    state: PoolCardState;
-    /** Who gets moved and where when this card's take-over is used. */
-    displace: { incumbent: IndexRow; targetSlot: number } | null;
-  };
-
-  /**
-   * Eligibility shown on the pool card itself, before any click. A player is
-   * "place" whenever any eligible slot is open; the displace highlight is
-   * reserved for the case where displacement is the only option.
-   */
-  function poolCardInfoFor(player: IndexRow): PoolCardInfo {
-    if (slots.some((p) => p !== null && p.playerId === player.playerId)) {
-      return { state: 'lineup', displace: null };
-    }
-    let displace: PoolCardInfo['displace'] = null;
-    for (const i of SLOT_INDEXES) {
-      if (!canFillSlot(player, i)) continue;
-      const incumbent = slots[i] ?? null;
-      if (!incumbent) return { state: 'place', displace: null };
-      if (displace === null) {
-        const target = displacementTargetFor(incumbent, i, -1);
-        if (target !== null) displace = { incumbent, targetSlot: target };
-      }
-    }
-    return displace !== null
-      ? { state: 'displace', displace }
-      : { state: 'blocked', displace: null };
-  }
-
-  /**
-   * Card eligibility for every index row, keyed by playerId. The cards only
-   * depend on the lineup slots (plus each player's positions), so the map is
-   * rebuilt once per slot change and looked up in the template instead of
-   * recomputing per rendered row.
-   */
-  const poolCardInfo = $derived.by(
-    (): ReadonlyMap<string, PoolCardInfo> =>
-      new Map(sortedRows.map((player) => [player.playerId, poolCardInfoFor(player)])),
-  );
 
   function removePlayer(slotIndex: number) {
     slots[slotIndex] = null;
@@ -622,149 +473,18 @@
           </div>
         </div>
 
-        <div class="rounded-xl border border-border bg-card">
-          <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-            <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">
-              {poolHeading}
-            </h2>
-            <span
-              class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
-            >
-              {poolRows.length} players · sorted by OVER
-            </span>
-          </div>
-          <div class="flex flex-col gap-2 border-b border-border p-2">
-            <div class="relative">
-              <Search
-                class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                type="search"
-                bind:value={searchInput}
-                placeholder="Search players…"
-                aria-label="Search players by name"
-                class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
-            <div
-              class="flex items-center gap-1 overflow-x-auto pb-0.5"
-              role="group"
-              aria-label="Filter by position"
-            >
-              <button
-                type="button"
-                aria-pressed={positionFilter === null}
-                onclick={() => (positionFilter = null)}
-                class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
-                null
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
-              >
-                All
-              </button>
-              {#each SLOT_INDEXES as i (i)}
-                <button
-                  type="button"
-                  aria-pressed={positionFilter === i}
-                  onclick={() => (positionFilter = positionFilter === i ? null : i)}
-                  class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
-                  i
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
-                >
-                  {SLOT_LABELS[i]}
-                </button>
-              {/each}
-              <span class="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">
-                {filteredRows.length}/{poolRows.length}
-              </span>
-            </div>
-          </div>
-          {#if runError}
-            <p class="border-b border-border/60 p-4 text-sm text-destructive">{runError}</p>
-          {/if}
-          {#if filteredRows.length === 0}
-            <p class="p-6 text-center font-mono text-xs text-muted-foreground">No players match.</p>
-          {:else}
-            <ul
-              class="grid max-h-[55vh] gap-1 overflow-y-auto p-2 sm:max-h-[560px] sm:grid-cols-2 xl:grid-cols-3"
-            >
-              {#each visibleRows as player (player.franchiseId + '/' + player.eraId + '/' + player.playerId)}
-                {@const card = poolCardInfo.get(player.playerId) ?? {
-                  state: 'blocked',
-                  displace: null,
-                }}
-                {@const cardState = card.state}
-                <li>
-                  <button
-                    type="button"
-                    disabled={cardState === 'blocked'}
-                    aria-disabled={cardState === 'blocked' ? 'true' : undefined}
-                    onclick={() => openPicker(player)}
-                    class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left {cardState ===
-                    'lineup'
-                      ? 'border-primary/50 bg-primary/10 opacity-60'
-                      : cardState === 'displace'
-                        ? 'border-accent/50 bg-accent/10 opacity-90 shadow-[0_0_8px_hsl(42_91%_61%/0.15)] hover:bg-accent/20 hover:opacity-100'
-                        : cardState === 'blocked'
-                          ? 'border-transparent opacity-40 disabled:cursor-not-allowed'
-                          : 'border-transparent hover:border-border hover:bg-surface-2'}"
-                  >
-                    <PlayerFace
-                      {player}
-                      {manifest}
-                      size="md"
-                      fallbackInitials={player.firstName[0]! + player.lastName[0]!}
-                    />
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate text-sm font-bold">{player.displayName}</span>
-                      <span class="block font-mono text-[10px] text-muted-foreground">
-                        {player.seasonKey} · {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(
-                          player.eraId,
-                        ) ?? player.eraId} · {player.positionsCanonical.join('/')}
-                      </span>
-                    </span>
-                    <span class="flex shrink-0 gap-1 font-mono text-[10px]">
-                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
-                        O {player.overall}
-                      </span>
-                      {#if cardState === 'displace' && card.displace}
-                        <span
-                          class="rounded bg-accent/25 px-1.5 py-0.5 font-bold text-accent"
-                          title={`Moves ${card.displace.incumbent.displayName} to ${SLOT_NAMES[card.displace.targetSlot]}`}
-                        >
-                          Moves {card.displace.incumbent.displayName.split(' ').pop()}
-                        </span>
-                      {:else if cardState === 'blocked'}
-                        <span
-                          class="rounded bg-surface-3 px-1.5 py-0.5 text-muted-foreground"
-                          title="No open or movable position"
-                        >
-                          No slot
-                        </span>
-                      {/if}
-                    </span>
-                  </button>
-                </li>
-              {/each}
-            </ul>
-            {#if hasMore}
-              <div class="flex items-center justify-between gap-3 px-1 pb-1">
-                <span class="font-mono text-[10px] text-muted-foreground">
-                  Showing {visiblePlayers.toLocaleString()} of
-                  {filteredRows.length.toLocaleString()} players
-                </span>
-                <button
-                  type="button"
-                  onclick={() => (visibleCount += PAGE_SIZE)}
-                  class="rounded-md border border-border px-3 py-1.5 font-mono text-[11px] font-bold text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
-                >
-                  Show {PAGE_SIZE} more
-                </button>
-              </div>
-            {/if}
-          {/if}
-        </div>
+        <DraftPoolBrowser
+          heading={poolHeading}
+          rows={sortedRows}
+          {slots}
+          {countLabel}
+          {manifest}
+          presentation="sandbox"
+          filtersEditable
+          error={runError}
+          emptyMessage="No players match."
+          onpick={openPicker}
+        />
 
         <LineupCourt
           {slots}
@@ -824,110 +544,13 @@
     {/if}
   {/if}
 
-  <Dialog.Root
-    open={pickerPlayer !== null}
-    onOpenChange={(open) => {
-      if (!open) pickerPlayer = null;
-    }}
-  >
-    <Dialog.Portal>
-      <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-      <Dialog.Content
-        class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
-      >
-        {#if pickerPlayer}
-          {@const subject = pickerPlayer}
-          <div class="flex items-start justify-between gap-3">
-            <div class="flex min-w-0 items-center gap-3">
-              <PlayerFace
-                player={subject}
-                manifest={manifest!}
-                size="sm"
-                fallbackInitials={subject.firstName[0]! + subject.lastName[0]!}
-              />
-              <div class="min-w-0">
-                <Dialog.Title
-                  class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
-                >
-                  {subject.displayName}
-                </Dialog.Title>
-                <p class="font-mono text-[10px] text-muted-foreground">
-                  {subject.seasonKey} · {subject.positionsCanonical.join('/')} · O
-                  {subject.overall}
-                </p>
-              </div>
-            </div>
-            <Dialog.Close
-              aria-label="Cancel"
-              class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <X class="h-4 w-4" />
-            </Dialog.Close>
-          </div>
-
-          <div class="mt-4 flex flex-col gap-2">
-            {#each pickerOptions as opt (opt.index)}
-              {@const label = SLOT_LABELS[opt.index]}
-              <button
-                type="button"
-                aria-label={opt.ariaLabel}
-                disabled={opt.state === 'self' ||
-                  opt.state === 'blocked' ||
-                  opt.state === 'cant-play'}
-                onclick={() => placePlayer(subject, opt.index)}
-                class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed {opt.state ===
-                'open'
-                  ? 'border-primary/50 bg-primary/5 hover:bg-primary/10'
-                  : opt.state === 'displace'
-                    ? 'border-accent/60 bg-accent/10 hover:bg-accent/15'
-                    : opt.state === 'self'
-                      ? 'border-primary/40 bg-primary/10 opacity-70'
-                      : 'border-border bg-surface-1 opacity-45'}"
-              >
-                <span
-                  class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-sm font-extrabold {opt.state ===
-                  'displace'
-                    ? 'text-accent'
-                    : 'text-primary'}"
-                >
-                  {label}
-                </span>
-                <span class="min-w-0 flex-1">
-                  {#if opt.incumbent}
-                    <span class="block truncate text-sm font-bold">
-                      {opt.incumbent.displayName}
-                    </span>
-                    <span class="block font-mono text-[10px] text-muted-foreground">
-                      {opt.incumbent.seasonKey} · {opt.incumbent.positionsCanonical.join('/')}
-                    </span>
-                  {:else}
-                    <span class="block truncate text-sm font-semibold">Open {label} slot</span>
-                  {/if}
-                </span>
-                <span class="flex shrink-0 items-center gap-1.5">
-                  {#if opt.state === 'self'}
-                    <Check class="h-4 w-4 text-primary" />
-                    <span class="font-mono text-[10px] tracking-wide uppercase">Current</span>
-                  {:else if opt.state === 'displace' && opt.moveTarget !== null}
-                    <ArrowRight class="h-4 w-4 shrink-0 text-accent" />
-                    <span class="font-mono text-[10px] tracking-wide uppercase text-accent">
-                      Moves {opt.incumbent!.displayName.split(' ').pop()} to
-                      {SLOT_LABELS[opt.moveTarget]}
-                    </span>
-                  {:else if opt.state === 'blocked'}
-                    <Lock class="h-4 w-4 shrink-0" />
-                    <span class="font-mono text-[10px] tracking-wide uppercase">Occupied</span>
-                  {:else if opt.state === 'cant-play'}
-                    <span class="font-mono text-[10px] tracking-wide uppercase">Can't play</span>
-                  {:else}
-                    <Plus class="h-4 w-4 shrink-0 text-primary" />
-                  {/if}
-                </span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </Dialog.Content>
-    </Dialog.Portal>
-  </Dialog.Root>
+  <SlotPickerDialog
+    player={pickerPlayer}
+    {slots}
+    manifest={manifest!}
+    presentation="sandbox"
+    allowDisplacement
+    onplace={placePlayer}
+    onclose={() => (pickerPlayer = null)}
+  />
 </section>

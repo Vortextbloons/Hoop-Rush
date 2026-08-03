@@ -1,5 +1,7 @@
 import type {
   ChallengeRun,
+  ClassicCompletedDraft,
+  ClassicVariant,
   DifficultyProfile,
   EraSimulationProfile,
   GameResult,
@@ -14,8 +16,9 @@ import type {
 import {
   RUN_SCHEMA_VERSION,
   SAVE_SCHEMA_VERSION,
-  type RunPlayerSelection,
+  classicCompletedDraftSchema,
   seedSchema,
+  type RunPlayerSelection,
 } from '@hoop-rush/data-contracts';
 import { validateLineup } from '../domain/lineup.js';
 import type { EngineContext } from '../sim/context.js';
@@ -33,10 +36,8 @@ import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.js';
  * new accepted state. Runs are immutable: every command returns a new state.
  */
 
-export interface ChallengeCreation {
+export interface ChallengeCreationBase {
   runId: string;
-  mode: 'sandbox';
-  /** Null for free-form sandbox lineups; otherwise the selected franchise slot. */
   franchiseId: string | null;
   eraId: string;
   homeDisplayName: string;
@@ -55,6 +56,21 @@ export interface ChallengeCreation {
   profile: EraSimulationProfile;
   bracket: OpponentBracket;
 }
+
+export interface SandboxChallengeCreation extends ChallengeCreationBase {
+  mode: 'sandbox';
+  /** Sandbox runs reject Classic fields. */
+  variant?: undefined;
+  classicDraft?: undefined;
+}
+
+export interface ClassicChallengeCreation extends ChallengeCreationBase {
+  mode: 'classic';
+  variant: ClassicVariant;
+  classicDraft: ClassicCompletedDraft;
+}
+
+export type ChallengeCreation = SandboxChallengeCreation | ClassicChallengeCreation;
 
 /** Validates a complete bracket artifact: content, legality, and schedule. */
 export function validateBracketContent(bracket: OpponentBracket): string[] {
@@ -208,6 +224,73 @@ function validateCreationInput(input: ChallengeCreation): string[] {
     failures.push(`bracket difficulty must be medium (got ${band.name})`);
   }
   failures.push(...validateBracketContent(input.bracket));
+  if (input.mode === 'sandbox') {
+    if (input.variant !== undefined) {
+      failures.push('sandbox runs reject a classic variant');
+    }
+    if (input.classicDraft !== undefined) {
+      failures.push('sandbox runs reject classic draft metadata');
+    }
+  } else {
+    if (input.variant === undefined) {
+      failures.push('classic runs require a variant');
+    }
+    if (input.classicDraft === undefined) {
+      failures.push('classic runs require classic draft metadata');
+    } else {
+      const parsedDraft = classicCompletedDraftSchema.safeParse(input.classicDraft);
+      if (!parsedDraft.success) {
+        failures.push('classic draft metadata is invalid');
+      } else {
+        if (input.variant !== undefined && input.variant !== parsedDraft.data.variant) {
+          failures.push('variant must match the classic draft variant');
+        }
+        const picks = parsedDraft.data.picks;
+        if (picks.length !== 5) {
+          failures.push('classic draft must contain exactly five picks');
+        }
+        const pickIds = picks.map((p) => p.playerId);
+        if (new Set(pickIds).size !== pickIds.length) {
+          failures.push('classic draft picks must reference distinct players');
+        }
+        const pickSlots = picks.map((p) => p.slotIndex);
+        if (new Set(pickSlots).size !== pickSlots.length) {
+          failures.push('classic draft picks must fill distinct slots');
+        }
+        if (!seedSchema.safeParse(input.classicDraft.seed).success) {
+          failures.push('classic draft seed must be hex');
+        }
+        for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
+          const pick = picks.find((p) => p.slotIndex === slotIndex);
+          if (!pick) continue;
+          if (input.lineup.assignments[slotIndex]?.playerId !== pick.playerId) {
+            failures.push(
+              `classic draft pick for slot ${String(slotIndex)} does not match the lineup`,
+            );
+          }
+          if (input.selections[slotIndex]?.playerId !== pick.playerId) {
+            failures.push(
+              `classic draft pick for slot ${String(slotIndex)} does not match the selections`,
+            );
+          }
+          if (input.players[slotIndex]?.playerId !== pick.playerId) {
+            failures.push(
+              `classic draft pick for slot ${String(slotIndex)} does not match the player snapshot`,
+            );
+          }
+          const selection = input.selections[slotIndex];
+          if (
+            selection &&
+            (selection.franchiseId !== pick.franchiseId || selection.eraId !== pick.eraId)
+          ) {
+            failures.push(
+              `classic draft pick for slot ${String(slotIndex)} does not match selection provenance`,
+            );
+          }
+        }
+      }
+    }
+  }
   return failures;
 }
 
@@ -223,6 +306,8 @@ export function createChallenge(input: ChallengeCreation): ChallengeRun {
     schemaVersion: RUN_SCHEMA_VERSION,
     runId: input.runId,
     mode: input.mode,
+    variant: input.variant,
+    classicDraft: input.classicDraft,
     franchiseId: input.franchiseId,
     eraId: input.eraId,
     homeDisplayName: input.homeDisplayName,

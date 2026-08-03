@@ -9,6 +9,7 @@
     PeakPlayerSeason,
   } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
+  import { variantLabel } from '$lib/draft-presentation';
   import { getEraSimulationProfile, getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
@@ -16,11 +17,9 @@
   import { loadRunPlayersById } from '$lib/sandbox-lineup';
 
   /**
-   * Challenge progress (spec/08): a full-screen dialog driven by the paced
-   * runner. The 82-cell strip fills left to right; the currently revealed
-   * opponent, game number, score, and live record sit directly above it.
-   * Assistive technology hears bounded progress announcements, never one per
-   * game. Cancel pauses at the last persisted prefix; reload resumes.
+   * Classic challenge progress: the shared full-screen overlay driven by the
+   * paced runner. Identical lifecycle to the sandbox page; the mode label,
+   * back-to-draft target, and finished redirect point at the Classic routes.
    */
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -57,7 +56,7 @@
           return;
         }
         if (active.status === 'finished') {
-          void goto(resolve(`/sandbox/result?runId=${encodeURIComponent(active.runId)}`));
+          void goto(resolve(`/classic/result?runId=${encodeURIComponent(active.runId)}`));
           return;
         }
         if (active.status !== 'active') {
@@ -122,7 +121,7 @@
         }
       },
       onFinished() {
-        void goto(resolve(`/sandbox/result?runId=${encodeURIComponent(active.run.runId)}`));
+        void goto(resolve(`/classic/result?runId=${encodeURIComponent(active.run.runId)}`));
       },
       onPaused() {
         phase = 'paused';
@@ -184,14 +183,17 @@
     });
   }
 
-  const draftHref = resolve('/sandbox');
+  const draftHref = resolve('/classic');
+  const modeLabel = $derived(
+    run ? `Classic · ${variantLabel(run.variant ?? 'ratings')}` : 'Classic',
+  );
   const resultHref = $derived(
-    run ? (`/sandbox/result?runId=${encodeURIComponent(run.runId)}` as RouteId) : null,
+    run ? (`/classic/result?runId=${encodeURIComponent(run.runId)}` as RouteId) : null,
   );
 </script>
 
 <svelte:head>
-  <title>Challenge in progress — Sandbox — Hoop Rush</title>
+  <title>Challenge in progress — Classic — Hoop Rush</title>
 </svelte:head>
 
 <p id="challenge-announcer" class="sr-only" aria-live="polite"></p>
@@ -223,8 +225,8 @@
       {run}
       {phase}
       error={runnerError}
-      modeLabel="Sandbox"
-      draftHref="/sandbox"
+      {modeLabel}
+      draftHref="/classic"
       {resultHref}
       onCancel={cancel}
       onResume={resume}

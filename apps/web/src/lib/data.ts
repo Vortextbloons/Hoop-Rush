@@ -13,14 +13,14 @@ import {
   type OpponentBracket,
   type PlayersIndex,
 } from '@hoop-rush/data-contracts';
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 
 let manifestPromise: Promise<HoopRushManifest> | null = null;
 
 /** Absolute site root for packaged JSON assets (respects GitHub Pages base path). */
 function siteRoot(): string {
-  return base ? `${base}/` : '/';
+  return resolve('/');
 }
 
 function manifestUrl(): string {

@@ -328,6 +328,7 @@ export class ChallengeRunner {
       recordId: run.runId,
       runId: run.runId,
       mode: run.mode,
+      variant: run.variant,
       franchiseId: run.franchiseId,
       eraId: run.eraId,
       playerIds: run.playerIds,

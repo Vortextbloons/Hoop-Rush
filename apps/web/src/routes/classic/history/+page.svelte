@@ -8,9 +8,9 @@
   import HistoryList from '$lib/components/HistoryList.svelte';
 
   /**
-   * Compact completed-run history (spec/08). Rows list lineup, franchise/era,
-   * record, outcome, and completion time; each row reopens the stored
-   * summary. The active challenge, when one exists, is offered for continue.
+   * Classic challenge history: the shared completed-run list. Rows identify
+   * the information variant; the active card only offers continue when the
+   * active run is itself a classic run.
    */
 
   let manifest = $state<HoopRushManifest | null>(null);
@@ -46,16 +46,20 @@
       cancelled = true;
     };
   });
+
+  const continueHref = $derived(active?.mode === 'classic' ? '/classic/challenge' : null);
 </script>
 
 <svelte:head>
-  <title>Challenge history — Sandbox — Hoop Rush</title>
+  <title>Challenge history — Classic — Hoop Rush</title>
 </svelte:head>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
   <div class="flex items-end justify-between gap-4">
     <div>
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Sandbox</p>
+      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
+        Classic · Challenge history
+      </p>
       <h1
         class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
       >
@@ -79,12 +83,12 @@
       {manifest}
       {rows}
       {active}
-      modeLabel="Sandbox"
+      modeLabel="Classic"
       emptyTitle="No completed challenges yet."
-      emptyHref="/sandbox"
-      emptyCta="Start a sandbox challenge"
-      continueHref="/sandbox/challenge"
-      resultHrefFor={(runId) => `/sandbox/result?runId=${encodeURIComponent(runId)}`}
+      emptyHref="/classic"
+      emptyCta="Start a classic challenge"
+      {continueHref}
+      resultHrefFor={(runId) => `/classic/result?runId=${encodeURIComponent(runId)}`}
     />
   {/if}
 </section>

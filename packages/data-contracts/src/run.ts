@@ -6,6 +6,9 @@ import { simulationPlayerSchema } from './simulation.js';
 import { madeAttemptedSchema, gameResultSchema } from './result.js';
 import { opponentBracketCoreSchema } from './bracket.js';
 import { RUN_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from './versions.js';
+import { classicCompletedDraftSchema, classicVariantSchema } from './classic.js';
+
+export { classicVariantSchema, type ClassicVariant } from './classic.js';
 
 /**
  * Accepted challenge-run state (spec/04 minimal run state). The domain shape
@@ -36,9 +39,6 @@ export type RunVersionBoundaries = z.infer<typeof runVersionBoundariesSchema>;
 
 export const runModeSchema = z.enum(['sandbox', 'classic']);
 export type RunMode = z.infer<typeof runModeSchema>;
-
-export const classicVariantSchema = z.enum(['ratings', 'ball-knowledge']);
-export type ClassicVariant = z.infer<typeof classicVariantSchema>;
 
 export const runStatusSchema = z.enum(['active', 'finished', 'abandoned']);
 export type RunStatus = z.infer<typeof runStatusSchema>;
@@ -116,6 +116,8 @@ export const challengeRunSchema = z.object({
   mode: runModeSchema,
   /** Immutable after creation; present only for classic mode. */
   variant: classicVariantSchema.optional(),
+  /** Frozen classic draft snapshot; present only for classic mode. */
+  classicDraft: classicCompletedDraftSchema.optional(),
   /**
    * Sandbox selection. Null for free-form lineups drawn from any franchise/era
    * pool; otherwise the selected franchise.

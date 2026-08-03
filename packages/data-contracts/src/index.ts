@@ -14,6 +14,7 @@ export * from './era-sim-profile.js';
 export * from './simulation.js';
 export * from './opponent.js';
 export * from './bracket.js';
+export * from './classic.js';
 export * from './worker.js';
 export * from './loaders/manifest.js';
 export * from './loaders/pool.js';

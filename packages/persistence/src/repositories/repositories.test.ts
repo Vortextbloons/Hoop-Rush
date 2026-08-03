@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import Dexie, { type EntityTable, type Table } from 'dexie';
-import { buildChallengeRun } from '@hoop-rush/test-fixtures';
+import { IDBFactory } from 'fake-indexeddb';
+import {
+  buildChallengeRun,
+  buildClassicCompletedDraft,
+  buildClassicDraftState,
+  buildClassicPick,
+  buildCompletedDraftState,
+} from '@hoop-rush/test-fixtures';
 import type { GameResult, RunAggregates } from '@hoop-rush/data-contracts';
 import { DexieChallengeRepository } from './dexie.js';
 import { InMemoryChallengeRepository } from './memory.js';
+import type { StoredClassicDraft } from '../schemas/classic-draft-record.js';
 import type {
   ActiveGameAppend,
   ActiveGameRow,
@@ -18,8 +26,26 @@ import type {
  * active runs atomically, and surface corrupt records instead of silently
  * accepting them. Dexie tests run against fake-indexeddb with one fresh
  * database per test. The active run is append-only: a checkpoint plus one
- * game row per accepted game, reconstructed in order on load.
+ * game row per accepted game, reconstructed in order on load. Classic mode
+ * adds a single active draft row that promotion clears atomically.
  */
+
+/** Replaces the shared fake-indexeddb factory, isolating Dexie versioning. */
+function resetIndexedDb(): void {
+  const factory = new IDBFactory();
+  globalThis.indexedDB = factory;
+  Dexie.dependencies.indexedDB = factory;
+}
+
+function draftRecord(
+  draft: StoredClassicDraft['draft'] = buildClassicDraftState(),
+): StoredClassicDraft {
+  return {
+    recordId: 'classic-draft',
+    saveSchemaVersion: 1,
+    draft,
+  };
+}
 
 function finishedRecord(runId = 'run-1'): StoredRunRecord {
   return {
@@ -151,6 +177,7 @@ class TestDatabase extends Dexie {
   activeGames!: Table<ActiveGameRow, [string, number]>;
   completed!: EntityTable<StoredRunRecord, 'recordId'>;
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
+  classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
 
   constructor(name: string) {
     super(name);
@@ -163,6 +190,9 @@ class TestDatabase extends Dexie {
     });
     this.version(3).stores({
       history: 'recordId, completedAtIso',
+    });
+    this.version(4).stores({
+      classicDrafts: 'recordId',
     });
   }
 }
@@ -406,10 +436,139 @@ describe.each([
       await expect(repo.loadCompletedRun('run-c')).rejects.toThrow();
     }
   });
+
+  it('saves and reloads a partial drafting classic draft state', async () => {
+    const { repo } = makeAdapter();
+    const draft = buildClassicDraftState({
+      draftId: 'draft-partial',
+      round: 2,
+      picks: [buildClassicPick({ round: 1, playerId: 'p-lal-g' })],
+      rerolls: { franchiseSpent: true, franchiseRound: 1, eraSpent: false },
+    });
+    await repo.saveClassicDraft(draftRecord(draft));
+    const loaded = await repo.loadClassicDraft();
+    expect(loaded?.recordId).toBe('classic-draft');
+    expect(loaded?.draft).toEqual(draft);
+  });
+
+  it('saves and reloads a completed classic draft state', async () => {
+    const { repo } = makeAdapter();
+    const draft = buildCompletedDraftState();
+    await repo.saveClassicDraft(draftRecord(draft));
+    expect((await repo.loadClassicDraft())?.draft).toEqual(draft);
+  });
+
+  it('returns null when no classic draft exists', async () => {
+    const { repo } = makeAdapter();
+    expect(await repo.loadClassicDraft()).toBeNull();
+  });
+
+  it('saving a second classic draft replaces the first', async () => {
+    const { repo } = makeAdapter();
+    await repo.saveClassicDraft(draftRecord(buildClassicDraftState({ draftId: 'draft-a' })));
+    await repo.saveClassicDraft(draftRecord(buildClassicDraftState({ draftId: 'draft-b' })));
+    expect((await repo.loadClassicDraft())?.draft.draftId).toBe('draft-b');
+  });
+
+  it('clears the classic draft without touching the active run', async () => {
+    const { repo } = makeAdapter();
+    await repo.saveClassicDraft(draftRecord());
+    await repo.saveActiveRun(finishedRecord());
+    await repo.clearClassicDraft();
+    expect(await repo.loadClassicDraft()).toBeNull();
+    expect((await repo.loadActiveRun())?.run.runId).toBe('run-1');
+  });
+
+  it('surfaces a corrupt classic draft record instead of returning it', async () => {
+    const { repo, db } = makeAdapter();
+    await repo.saveClassicDraft(draftRecord());
+    if (db) {
+      await db.classicDrafts.put({
+        recordId: 'classic-draft',
+        saveSchemaVersion: 1,
+        draft: { corrupted: true },
+      } as never);
+      await expect(repo.loadClassicDraft()).rejects.toThrow();
+    } else {
+      const memory = repo as unknown as { classicDraft: unknown };
+      memory.classicDraft = {
+        recordId: 'classic-draft',
+        saveSchemaVersion: 1,
+        draft: { corrupted: true },
+      };
+      await expect(repo.loadClassicDraft()).rejects.toThrow();
+    }
+  });
+
+  it('promotes a classic draft into the active run and clears the draft', async () => {
+    const { repo } = makeAdapter();
+    await repo.saveClassicDraft(draftRecord(buildClassicDraftState({ draftId: 'draft-go' })));
+    const record: StoredRunRecord = {
+      recordId: 'active',
+      saveSchemaVersion: 2,
+      run: buildChallengeRun({
+        runId: 'run-classic',
+        mode: 'classic',
+        variant: 'ball-knowledge',
+        classicDraft: buildClassicCompletedDraft({ draftId: 'draft-go' }),
+      }),
+    };
+    await repo.promoteClassicDraftToRun(record, 'draft-go');
+    expect(await repo.loadClassicDraft()).toBeNull();
+    const loaded = await repo.loadActiveRun();
+    expect(loaded?.run.runId).toBe('run-classic');
+    expect(loaded?.run.variant).toBe('ball-knowledge');
+    expect(loaded?.run.classicDraft?.draftId).toBe('draft-go');
+  });
+
+  it('rejects promotion on draftId mismatch and leaves state unchanged', async () => {
+    const { repo } = makeAdapter();
+    await repo.saveClassicDraft(draftRecord(buildClassicDraftState({ draftId: 'draft-current' })));
+    await repo.saveActiveRun(finishedRecord('run-kept'));
+    const record: StoredRunRecord = {
+      recordId: 'active',
+      saveSchemaVersion: 2,
+      run: buildChallengeRun({ runId: 'run-old', mode: 'classic' }),
+    };
+    await expect(repo.promoteClassicDraftToRun(record, 'draft-stale')).rejects.toThrow(
+      'draftId mismatch',
+    );
+    expect((await repo.loadClassicDraft())?.draft.draftId).toBe('draft-current');
+    expect((await repo.loadActiveRun())?.run.runId).toBe('run-kept');
+  });
+
+  it('promotes a finished classic run with variant metadata in history', async () => {
+    const { repo } = makeAdapter();
+    const record: StoredRunRecord = {
+      recordId: 'active',
+      saveSchemaVersion: 2,
+      run: buildChallengeRun({
+        runId: 'run-classic-fin',
+        mode: 'classic',
+        variant: 'ratings',
+        classicDraft: buildClassicCompletedDraft({ draftId: 'draft-fin' }),
+        status: 'finished',
+        outcome: 'perfect',
+        firstLossGameNumber: null,
+      }),
+    };
+    await repo.saveActiveRun(record);
+    await repo.promoteActiveToCompleted(record, {
+      ...indexFor('run-classic-fin'),
+      mode: 'classic',
+      variant: 'ratings',
+    });
+    const history = await repo.listCompletedRuns();
+    expect(history[0]?.variant).toBe('ratings');
+    const loaded = await repo.loadCompletedRun('run-classic-fin');
+    expect(loaded?.run.mode).toBe('classic');
+    expect(loaded?.run.classicDraft?.draftId).toBe('draft-fin');
+  });
 });
 
 describe('dexie active-run migration', () => {
   it('splits a legacy v1 full-run row into a checkpoint plus game rows', async () => {
+    resetIndexedDb();
     const legacyRecord: StoredRunRecord = {
       recordId: 'active',
       saveSchemaVersion: 2,
@@ -433,5 +592,66 @@ describe('dexie active-run migration', () => {
     expect(loaded?.run.aggregates.team.gamesPlayed).toBe(2);
     expect(loaded?.run.status).toBe('active');
     expect(loaded?.run.firstLossGameNumber).toBe(2);
+  });
+
+  it('opens a v3-era save at schema version 4 and keeps the active run intact', async () => {
+    resetIndexedDb();
+    const run = buildChallengeRun({
+      status: 'active',
+      games: [buildGameResult(1), buildGameResult(2)],
+      aggregates: aggregatesFor(2, 1, 1),
+      firstLossGameNumber: 2,
+    });
+    const legacyDb = new Dexie('hoop-rush-saves');
+    legacyDb.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
+    legacyDb.version(2).stores({
+      active: 'recordId',
+      activeGames: '[runId+gameNumber], runId',
+      completed: 'recordId',
+      history: 'recordId',
+    });
+    legacyDb.version(3).stores({
+      history: 'recordId, completedAtIso',
+    });
+    await legacyDb.open();
+    await legacyDb.table('active').put({
+      recordId: 'active',
+      saveSchemaVersion: 3,
+      runId: run.runId,
+      mode: run.mode,
+      franchiseId: run.franchiseId,
+      eraId: run.eraId,
+      homeDisplayName: run.homeDisplayName,
+      playerIds: run.playerIds,
+      lineup: run.lineup,
+      players: run.players,
+      runSeed: run.runSeed,
+      versions: run.versions,
+      eraProfileVersion: run.eraProfileVersion,
+      difficulty: run.difficulty,
+      bracket: run.bracket,
+      status: run.status,
+      firstLossGameNumber: run.firstLossGameNumber,
+      gamesPlayed: 2,
+      aggregates: run.aggregates,
+    });
+    await legacyDb.table('activeGames').bulkPut(
+      run.games.map((result) => ({
+        runId: run.runId,
+        gameNumber: result.gameNumber,
+        result,
+        updatedAtIso: '2026-07-31T12:00:00.000Z',
+      })),
+    );
+    await legacyDb.close();
+
+    const repo = new DexieChallengeRepository();
+    const loaded = await repo.loadActiveRun();
+    expect(loaded?.run.runId).toBe('run-1');
+    expect(loaded?.run.games.map((game) => game.gameNumber)).toEqual([1, 2]);
+    expect(loaded?.run.aggregates.team.gamesPlayed).toBe(2);
+    expect(loaded?.run.status).toBe('active');
+    await repo.saveClassicDraft(draftRecord(buildClassicDraftState({ draftId: 'draft-v4' })));
+    expect((await repo.loadClassicDraft())?.draft.draftId).toBe('draft-v4');
   });
 });

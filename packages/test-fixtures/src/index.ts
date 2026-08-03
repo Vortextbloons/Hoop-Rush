@@ -981,3 +981,5 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
     ...overrides,
   };
 }
+
+export * from './classic.js';

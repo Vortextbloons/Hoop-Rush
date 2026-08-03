@@ -26,3 +26,6 @@ export * from './bracket/schedule.js';
 export * from './bracket/generator.js';
 export * from './modes/sandbox/adapters.js';
 export * from './modes/sandbox/selection.js';
+// Classic draft exports live under the `classic` namespace: the module's
+// `slotRequirement` would otherwise collide with domain/lineup.js.
+export * as classic from './modes/classic/draft.js';

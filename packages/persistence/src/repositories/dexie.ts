@@ -1,5 +1,9 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
 import {
+  classicDraftRecordSchema,
+  type StoredClassicDraft,
+} from '../schemas/classic-draft-record.js';
+import {
   activeGameRowSchema,
   activeRunCheckpointSchema,
   checkpointFromRun,
@@ -18,18 +22,20 @@ import {
  * Concrete IndexedDB challenge repository (spec/04, spec/07 reduced reuse).
  * The active run is append-only: one checkpoint row plus one row per accepted
  * game, so per-game persistence never rewrites the growing run. Completed
- * runs keep the full record plus a compact history index. Reads validate
- * every record through the stored schemas; the active-to-completed promotion
- * is one atomic transaction.
+ * runs keep the full record plus a compact history index. Classic mode keeps
+ * exactly one active draft row. Reads validate every record through the
+ * stored schemas; the active-to-completed promotion is one atomic transaction.
  */
 
 const ACTIVE_RECORD_ID = 'active';
+const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 
 class HoopRushDatabase extends Dexie {
   active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
   activeGames!: Table<ActiveGameRow, [string, number]>;
   completed!: EntityTable<StoredRunRecord, 'recordId'>;
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
+  classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
 
   constructor() {
     super('hoop-rush-saves');
@@ -70,6 +76,12 @@ class HoopRushDatabase extends Dexie {
     this.version(3).stores({
       history: 'recordId, completedAtIso',
     });
+    this.version(4).stores({
+      classicDrafts: 'recordId',
+    });
+    // v4 is additive (one new table). The checkpoint fields variant and
+    // classicDraft are optional, so existing saves (v1 split rows, v2 full
+    // records, v3 checkpoints) all remain valid under v4.
   }
 }
 
@@ -190,5 +202,43 @@ export class DexieChallengeRepository implements ChallengeRepository {
       await this.db.completed.clear();
       await this.db.history.clear();
     });
+  }
+
+  async saveClassicDraft(record: StoredClassicDraft): Promise<void> {
+    const validated = classicDraftRecordSchema.parse(record);
+    await this.db.classicDrafts.put({
+      ...validated,
+      updatedAtIso: new Date().toISOString(),
+    });
+  }
+
+  async loadClassicDraft(): Promise<StoredClassicDraft | null> {
+    const record = await this.db.classicDrafts.get(CLASSIC_DRAFT_RECORD_ID);
+    if (record === undefined) return null;
+    return classicDraftRecordSchema.parse(record);
+  }
+
+  async clearClassicDraft(): Promise<void> {
+    await this.db.classicDrafts.delete(CLASSIC_DRAFT_RECORD_ID);
+  }
+
+  async promoteClassicDraftToRun(record: StoredRunRecord, draftId: string): Promise<void> {
+    const validatedRun = storedRunRecordSchema.parse(record);
+    const checkpoint = checkpointFromRun(validatedRun);
+    await this.db.transaction(
+      'rw',
+      this.db.active,
+      this.db.activeGames,
+      this.db.classicDrafts,
+      async () => {
+        const storedDraft = await this.db.classicDrafts.get(CLASSIC_DRAFT_RECORD_ID);
+        if (storedDraft !== undefined && storedDraft.draft.draftId !== draftId) {
+          throw new Error('promoteClassicDraftToRun: draftId mismatch');
+        }
+        await this.db.activeGames.clear();
+        await this.db.active.put(checkpoint);
+        await this.db.classicDrafts.delete(CLASSIC_DRAFT_RECORD_ID);
+      },
+    );
   }
 }

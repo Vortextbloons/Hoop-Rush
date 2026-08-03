@@ -24,6 +24,7 @@ import {
   simulateChallenge,
   validateBracketContent,
   type ChallengeCreation,
+  type ChallengeCreationBase,
 } from './commands.js';
 import { deriveGameSeed } from './seeds.js';
 import { addGameToAggregates, zeroRunAggregates } from './aggregates.js';
@@ -42,7 +43,7 @@ function defaultSelections(
   }));
 }
 
-function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeCreation {
+function fixtureCreation(overrides: Partial<ChallengeCreationBase> = {}): ChallengeCreation {
   const bracket = buildFixtureBracket();
   const team = buildUserTeam();
   return {

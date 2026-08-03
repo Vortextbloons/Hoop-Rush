@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   challengeRunSchema,
+  classicCompletedDraftSchema,
+  classicVariantSchema,
   difficultyProfileSchema,
   franchiseIdSchema,
   gameResultSchema,
@@ -17,6 +19,7 @@ import {
   type GameResult,
   type RunAggregates,
 } from '@hoop-rush/data-contracts';
+import type { StoredClassicDraft } from './classic-draft-record.js';
 
 /**
  * Stored-record schemas for IndexedDB (and any future adapter). Persistence
@@ -50,6 +53,10 @@ export const activeRunCheckpointSchema = z.object({
   saveSchemaVersion: z.literal(3),
   runId: z.string().min(1).max(64),
   mode: runModeSchema,
+  /** Immutable; present only for classic runs. */
+  variant: classicVariantSchema.optional(),
+  /** Frozen completed draft snapshot; present only for classic runs. */
+  classicDraft: classicCompletedDraftSchema.optional(),
   /** Null for free-form sandbox lineups drawn from any franchise/era pool. */
   franchiseId: franchiseIdSchema.nullable(),
   /** Simulation environment era (fixed '2010s' for sandbox). */
@@ -116,6 +123,8 @@ export function checkpointFromRun(record: StoredRunRecord): ActiveRunCheckpoint 
     saveSchemaVersion: 3,
     runId: run.runId,
     mode: run.mode,
+    variant: run.variant,
+    classicDraft: run.classicDraft,
     franchiseId: run.franchiseId,
     eraId: run.eraId,
     homeDisplayName: run.homeDisplayName,
@@ -149,6 +158,8 @@ export function runFromCheckpoint(
     schemaVersion: 1,
     runId: checkpoint.runId,
     mode: checkpoint.mode,
+    variant: checkpoint.variant,
+    classicDraft: checkpoint.classicDraft,
     franchiseId: checkpoint.franchiseId,
     eraId: checkpoint.eraId,
     homeDisplayName: checkpoint.homeDisplayName,
@@ -173,6 +184,8 @@ export const completedRunIndexSchema = z.object({
   recordId: z.string().min(1).max(64),
   runId: z.string().min(1).max(64),
   mode: z.enum(['sandbox', 'classic']),
+  /** Immutable; present only for classic runs. */
+  variant: classicVariantSchema.optional(),
   /** Null for free-form sandbox lineups drawn from any franchise/era pool. */
   franchiseId: z.string().min(1).max(64).nullable(),
   eraId: z.string().min(1).max(24),
@@ -219,4 +232,17 @@ export interface ChallengeRepository {
   listCompletedRuns(): Promise<CompletedRunIndex[]>;
   loadCompletedRun(runId: string): Promise<StoredRunRecord | null>;
   clearHistory(): Promise<void>;
+  /** Creates or replaces the single active classic draft record. */
+  saveClassicDraft(record: StoredClassicDraft): Promise<void>;
+  /** Loads the active classic draft record, or null when none exists. */
+  loadClassicDraft(): Promise<StoredClassicDraft | null>;
+  /** Deletes the active classic draft record (no-op when absent). */
+  clearClassicDraft(): Promise<void>;
+  /**
+   * Atomically promotes a ready classic draft into the active run: replaces
+   * the active checkpoint and clears game rows, then deletes the draft row —
+   * but only when the stored draft's draftId matches. A newer draft must never
+   * be deleted by an older run start.
+   */
+  promoteClassicDraftToRun(record: StoredRunRecord, draftId: string): Promise<void>;
 }

@@ -17,6 +17,7 @@
 
   function isActive(item: BottomNavItem): boolean {
     if (item.href === null) return false;
+    if (routeId === null) return false;
     if (item.href === '/') return routeId === '/';
     return routeId === item.href || routeId.startsWith(`${item.href}/`);
   }

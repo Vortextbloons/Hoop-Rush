@@ -33,13 +33,13 @@ async function reachPlaying(page: Page) {
   const cta = page.getByRole('button', { name: 'Play 82 games' });
   await expect(cta).toBeVisible();
   await cta.click();
-  await expect(page).toHaveURL(/\/sandbox\/challenge$/);
+  await expect(page).toHaveURL(/\/sandbox\/challenge\/?$/);
   await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible();
 }
 
 /** Waits for the completed season report after the animated overlay. */
 async function expectSeasonReport(page: Page) {
-  await expect(page).toHaveURL(/\/sandbox\/result\?runId=/, { timeout: 30000 });
+  await expect(page).toHaveURL(/\/sandbox\/result\/?\?runId=/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
   await expect(
     page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
@@ -121,7 +121,7 @@ test.describe('m3: draft to 82-game season journey', () => {
 
     // Edit team returns to the draft with the five restored.
     await page.getByRole('link', { name: 'Edit team' }).click();
-    await expect(page).toHaveURL(/\/sandbox\?.*slots=/);
+    await expect(page).toHaveURL(/\/sandbox\/?\?.*slots=/);
     await expect(page.getByText('5/5', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Remove Nick Van Exel' })).toBeVisible();
   });
@@ -172,7 +172,7 @@ test.describe('m3: accessibility and mobile', () => {
     const play = page.getByRole('button', { name: 'Play 82 games' });
     await play.focus();
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(/\/sandbox\/challenge$/);
+    await expect(page).toHaveURL(/\/sandbox\/challenge\/?$/);
   });
 
   test('mobile: the draft and season report fit without horizontal overflow', async ({ page }) => {

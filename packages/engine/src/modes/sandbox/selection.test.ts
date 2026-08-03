@@ -11,13 +11,14 @@ import {
   createChallenge,
   simulateChallenge,
   type ChallengeCreation,
+  type ChallengeCreationBase,
 } from '../../challenge/commands.js';
 import { deriveAttemptSeed } from '../../challenge/seeds.js';
 import { BEST_OF_ATTEMPTS, chooseBestRun, scoreRun, simulateChallengeBestOf } from './selection.js';
 
 const context = createEngineContext();
 
-function fixtureCreation(overrides: Partial<ChallengeCreation> = {}): ChallengeCreation {
+function fixtureCreation(overrides: Partial<ChallengeCreationBase> = {}): ChallengeCreation {
   const bracket = buildFixtureBracket();
   const team = buildUserTeam();
   return {

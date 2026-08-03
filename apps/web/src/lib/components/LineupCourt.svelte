@@ -26,12 +26,14 @@
     slots,
     manifest,
     ready,
+    allowRemove = true,
     onmove,
     onremove,
   }: {
     slots: (T | null)[];
     manifest: HoopRushManifest;
     ready: boolean;
+    allowRemove?: boolean;
     onmove: (player: T) => void;
     onremove: (index: number) => void;
   } = $props();
@@ -75,14 +77,16 @@
               >
                 {label}
               </span>
-              <button
-                type="button"
-                aria-label={`Remove ${player.displayName}`}
-                onclick={() => onremove(i)}
-                class="absolute top-[-8px] right-[-8px] z-10 grid h-6 w-6 place-items-center rounded-full border border-border bg-background text-xs font-bold text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                ×
-              </button>
+              {#if allowRemove}
+                <button
+                  type="button"
+                  aria-label={`Remove ${player.displayName}`}
+                  onclick={() => onremove(i)}
+                  class="absolute top-[-8px] right-[-8px] z-10 grid h-6 w-6 place-items-center rounded-full border border-border bg-background text-xs font-bold text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  ×
+                </button>
+              {/if}
             </span>
             <span class="slot-name">{player.displayName}</span>
           {:else}
