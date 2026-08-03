@@ -90,8 +90,6 @@ export interface StrengthOptions {
   samplesPerBenchmark: number;
   /** Seed prefix so different candidates/measurements never share draws. */
   seedBase: string;
-  /** When set, each game is also checked against the exact invariants. */
-  checkInvariants?: boolean;
 }
 
 export interface StrengthMeasurement {
@@ -135,10 +133,6 @@ export function evaluateLineupStrength(
       };
       const result: GameResult = simulateGame(input, context);
       if (result.winner === (homeFirst ? 'home' : 'away')) wins += 1;
-      if (options.checkInvariants) {
-        // Invariant checking is intentionally lazy; the engine command path
-        // validates results with simulateGameWithCheck.
-      }
       totalGames += 1;
     }
     byBenchmark[benchmark.teamId] = { games: samplesPerBenchmark, wins };

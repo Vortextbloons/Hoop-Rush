@@ -218,11 +218,6 @@ export function checkGameResult(result: GameResult): string[] {
   return failures;
 }
 
-/** Whether a game result satisfies every exact invariant. */
-export function isGameResultValid(result: GameResult): boolean {
-  return checkGameResult(result).length === 0;
-}
-
 /** Compact box-score digest for replay comparison and golden fixtures. */
 export function gameResultDigest(result: GameResult): string {
   const { home, away, periodScores, winner, overtimePeriods, seed } = result;

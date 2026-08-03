@@ -120,6 +120,7 @@ export function computeRealOverall(
   const usage = safeFloat(stats.usageRate);
   const bpm = safeFloat(stats.boxPlusMinus);
   const tsPct = safeFloat(stats.tsPct);
+  const hasImpactMetrics = stats.per != null && stats.boxPlusMinus != null;
 
   const blended = Math.max(skillOverall, skillOverall * 0.65 + productionImpact * 0.35);
 
@@ -256,12 +257,13 @@ export function computeRealOverall(
   // upper-80s solely because the derived skill profile is broad. Apply a
   // smooth, position-neutral penalty so low-impact role players separate
   // naturally instead of collapsing onto one hard cap.
-  const lowImpactRotation = gp >= 40 && mpg >= 20 && ppg < 16 && per < 14 && bpm < 1;
+  const lowImpactRotation =
+    hasImpactMetrics && gp >= 40 && mpg >= 20 && ppg < 16 && per < 14 && bpm < 1;
   // A low-minute reserve with very little production and negative impact should
   // not inherit a starter-level overall from broad derived skills. Apply a
   // smooth penalty from the size of the statistical shortfall; there is no
   // hard ceiling, and useful bench specialists are left alone.
-  const lowImpactBench = gp >= 40 && mpg < 20 && ppg < 8 && per < 10 && bpm < 0;
+  const lowImpactBench = hasImpactMetrics && gp >= 40 && mpg < 20 && ppg < 8 && per < 10 && bpm < 0;
   const lowImpactBenchPenalty = lowImpactBench
     ? Math.round(
         Math.max(0, 8 - ppg) * 0.8 +

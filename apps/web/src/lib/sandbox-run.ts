@@ -1,6 +1,11 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import type { PeakPlayerSeason, RunPlayerSelection, Seed } from '@hoop-rush/data-contracts';
+import {
+  LINEUP_STRUCTURE,
+  type PeakPlayerSeason,
+  type RunPlayerSelection,
+  type Seed,
+} from '@hoop-rush/data-contracts';
 import {
   createChallenge,
   createEngineContext,
@@ -20,8 +25,6 @@ import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
 
 /** Fixed simulation environment era for every sandbox run. */
 export const FIXED_SANDBOX_ERA = '2010s';
-
-const LINEUP_STRUCTURE = ['G', 'G', 'F', 'F', 'C'] as const;
 
 /**
  * Creates the 82-game run for the given five players, saves it as the active

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DERIVATION_METHOD_VERSION } from '@hoop-rush/data-contracts';
 import { derivePlayerRecord, fieldPublished, type DerivationInput } from './v2.js';
-import { computeSummaryRatings } from './summary.js';
+import { computeRealOverall, computeSummaryRatings } from './summary.js';
 
 const MODERN = { leaguePpg: 110, league3PARate: 0.36, pace: 99 };
 
@@ -216,6 +216,34 @@ describe('derivePlayerRecord (field-method registry)', () => {
       ),
     );
     expect(derived.summaryRatings.overallRating).toBeLessThan(65);
+  });
+
+  it('does not treat unavailable impact metrics as negative impact', () => {
+    const unavailable = computeRealOverall(
+      {},
+      'SG',
+      starterStats({
+        gamesPlayed: 71,
+        minutes: 937,
+        points: 205,
+        per: null,
+        boxPlusMinus: null,
+      }),
+      79,
+    );
+    const measured = computeRealOverall(
+      {},
+      'SG',
+      starterStats({
+        gamesPlayed: 71,
+        minutes: 937,
+        points: 205,
+        per: 3.01,
+        boxPlusMinus: -2.682,
+      }),
+      79,
+    );
+    expect(unavailable).toBeGreaterThan(measured);
   });
 
   it('fieldPublished follows the source availability table (inclusive first season)', () => {

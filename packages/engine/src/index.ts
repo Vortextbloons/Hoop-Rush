@@ -25,5 +25,4 @@ export * from './challenge/commands.js';
 export * from './bracket/schedule.js';
 export * from './bracket/generator.js';
 export * from './modes/sandbox/adapters.js';
-export * from './modes/sandbox/commands.js';
 export * from './modes/sandbox/selection.js';
