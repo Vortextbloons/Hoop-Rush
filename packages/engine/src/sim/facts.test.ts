@@ -114,35 +114,35 @@ describe('buildFacts usage fact', () => {
       diagnostics: usageDiag(25),
     });
     const rest = Array.from({ length: 3 }, (_, i) =>
-      player({ playerId: `p-rest-${i}`, points: 4, diagnostics: usageDiag(0) }),
+      player({ playerId: `p-rest-${String(i)}`, points: 4, diagnostics: usageDiag(0) }),
     );
     const home = team('user', [scorer, workhorse, ...rest], 50);
     const away = team(
       'away',
       Array.from({ length: 5 }, (_, i) =>
-        player({ playerId: `p-away-${i}`, diagnostics: usageDiag(1) }),
+        player({ playerId: `p-away-${String(i)}`, diagnostics: usageDiag(1) }),
       ),
       40,
     );
     const result = buildFacts(game(home, away, 'home'));
     const usageFact = result.find((fact) => fact.kind === 'usage');
     expect(usageFact).toBeDefined();
-    expect(usageFact!.playerIds).toEqual(['p-workhorse']);
-    expect(usageFact!.evidence.usageShare).toBeCloseTo(25 / 35, 6);
-    expect(usageFact!.evidence.playerUsage).toBe(25);
-    expect(usageFact!.evidence.teamUsage).toBe(35);
-    expect(usageFact!.magnitude).toBeCloseTo(25 / 35, 6);
+    expect(usageFact?.playerIds).toEqual(['p-workhorse']);
+    expect(usageFact?.evidence.usageShare).toBeCloseTo(25 / 35, 6);
+    expect(usageFact?.evidence.playerUsage).toBe(25);
+    expect(usageFact?.evidence.teamUsage).toBe(35);
+    expect(usageFact?.magnitude).toBeCloseTo(25 / 35, 6);
   });
 
   it('emits no usage fact below the share threshold', () => {
     const players = Array.from({ length: 5 }, (_, i) =>
-      player({ playerId: `p-${i}`, points: 10, diagnostics: usageDiag(7) }),
+      player({ playerId: `p-${String(i)}`, points: 10, diagnostics: usageDiag(7) }),
     );
     const home = team('user', players, 50);
     const away = team(
       'away',
       Array.from({ length: 5 }, (_, i) =>
-        player({ playerId: `p-away-${i}`, diagnostics: usageDiag(7) }),
+        player({ playerId: `p-away-${String(i)}`, diagnostics: usageDiag(7) }),
       ),
       40,
     );
@@ -160,13 +160,13 @@ describe('buildFacts usage fact', () => {
       diagnostics: undefined,
     });
     const rest = Array.from({ length: 4 }, (_, i) =>
-      player({ playerId: `p-rest-${i}`, points: 6, diagnostics: undefined }),
+      player({ playerId: `p-rest-${String(i)}`, points: 6, diagnostics: undefined }),
     );
     const home = team('user', [workhorse, ...rest], 32);
     const away = team(
       'away',
       Array.from({ length: 5 }, (_, i) =>
-        player({ playerId: `p-away-${i}`, diagnostics: undefined }),
+        player({ playerId: `p-away-${String(i)}`, diagnostics: undefined }),
       ),
       30,
     );
@@ -174,7 +174,7 @@ describe('buildFacts usage fact', () => {
     const usageFact = result.find((fact) => fact.kind === 'usage');
     // Legacy formula usage = 16 + 0.44*5 + 4 = 22.2 of 22.2 team usage.
     expect(usageFact).toBeDefined();
-    expect(usageFact!.playerIds).toEqual(['p-legacy']);
-    expect(usageFact!.evidence.usageShare).toBeCloseTo(1, 6);
+    expect(usageFact?.playerIds).toEqual(['p-legacy']);
+    expect(usageFact?.evidence.usageShare).toBeCloseTo(1, 6);
   });
 });

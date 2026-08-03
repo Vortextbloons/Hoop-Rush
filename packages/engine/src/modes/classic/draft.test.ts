@@ -11,7 +11,6 @@ import type {
   ClassicDraftCatalogEntry,
   ClassicDraftState,
   ClassicVariant,
-  SlotIndex,
 } from '@hoop-rush/data-contracts';
 import { challengeRunSchema } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../../sim/context.js';
@@ -439,8 +438,8 @@ describe('classic rerolls', () => {
     const narrowed = { ...state, roll: { franchiseId: 'lakers', eraId: '1990s' } };
     const before = narrowed.roll;
     const rolled = rerollClassicFranchise(narrowed, catalog, context);
-    expect(rolled.roll!.franchiseId).not.toBe(before.franchiseId);
-    expect(rolled.roll!.eraId).toBe(before.eraId);
+    expect(rolled.roll?.franchiseId).not.toBe(before.franchiseId);
+    expect(rolled.roll?.eraId).toBe(before.eraId);
     expect(rolled.rerolls.franchiseSpent).toBe(true);
     expect(rolled.rerolls.franchiseRound).toBe(1);
     expect(rolled.round).toBe(1);
@@ -486,8 +485,8 @@ describe('classic rerolls', () => {
     const narrowed = { ...state, roll: { franchiseId: 'lakers', eraId: '1990s' } };
     const before = narrowed.roll;
     const rolled = rerollClassicEra(narrowed, catalog, context);
-    expect(rolled.roll!.eraId).not.toBe(before.eraId);
-    expect(rolled.roll!.franchiseId).toBe(before.franchiseId);
+    expect(rolled.roll?.eraId).not.toBe(before.eraId);
+    expect(rolled.roll?.franchiseId).toBe(before.franchiseId);
     expect(rolled.rerolls.eraSpent).toBe(true);
     expect(rolled.rerolls.eraRound).toBe(1);
     expect(() => rerollClassicEra(rolled, catalog, context)).toThrow(/already spent/);
@@ -616,7 +615,7 @@ describe('classic reroll single-axis candidates', () => {
   it('franchise reroll preserves the era and changes the franchise across seeds', () => {
     const catalog = decoyFixture();
     for (let i = 0; i < 20; i += 1) {
-      const state = decoyState({ seed: seedFromString(`decoy-franchise-${i}`) });
+      const state = decoyState({ seed: seedFromString(`decoy-franchise-${String(i)}`) });
       const rolled = rerollClassicFranchise(state, catalog, context);
       expect(rolled.roll?.eraId).toBe('1990s');
       expect(rolled.roll?.franchiseId).not.toBe('lakers');
@@ -626,7 +625,7 @@ describe('classic reroll single-axis candidates', () => {
   it('era reroll preserves the franchise and changes the era across seeds', () => {
     const catalog = decoyFixture();
     for (let i = 0; i < 20; i += 1) {
-      const state = decoyState({ seed: seedFromString(`decoy-era-${i}`) });
+      const state = decoyState({ seed: seedFromString(`decoy-era-${String(i)}`) });
       const rolled = rerollClassicEra(state, catalog, context);
       expect(rolled.roll?.franchiseId).toBe('lakers');
       expect(rolled.roll?.eraId).not.toBe('1990s');
@@ -1063,8 +1062,8 @@ describe('classic draft command sequences (property)', () => {
               state = rerollClassicFranchise(state, catalog, context);
               expect(state.rerolls.franchiseSpent).toBe(true);
               expect(state.rerolls.franchiseRound).toBe(state.round);
-              expect(state.roll?.franchiseId).not.toBe(before?.franchiseId);
-              expect(state.roll?.eraId).toBe(before?.eraId);
+              expect(state.roll?.franchiseId).not.toBe(before.franchiseId);
+              expect(state.roll?.eraId).toBe(before.eraId);
               break;
             }
             case 'era-reroll': {
@@ -1073,8 +1072,8 @@ describe('classic draft command sequences (property)', () => {
               state = rerollClassicEra(state, catalog, context);
               expect(state.rerolls.eraSpent).toBe(true);
               expect(state.rerolls.eraRound).toBe(state.round);
-              expect(state.roll?.eraId).not.toBe(before?.eraId);
-              expect(state.roll?.franchiseId).toBe(before?.franchiseId);
+              expect(state.roll?.eraId).not.toBe(before.eraId);
+              expect(state.roll?.franchiseId).toBe(before.franchiseId);
               break;
             }
             case 'pick': {

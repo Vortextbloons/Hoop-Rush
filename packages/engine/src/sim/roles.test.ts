@@ -39,7 +39,7 @@ function measureRoles(team: SimulationTeam): Map<string, RoleAccumulator> {
   const players = new Map<string, RoleAccumulator>();
   for (let i = 0; i < SEEDS; i += 1) {
     const input = buildGameSimulationInput({
-      seed: seedFromString(`roles-gate-${i}`),
+      seed: seedFromString(`roles-gate-${String(i)}`),
       profile: DEFAULT_ERA_SIM_PROFILE,
       home: team,
       away: { ...team, teamId: 'roles-away' },
@@ -82,14 +82,14 @@ function measureRoles(team: SimulationTeam): Map<string, RoleAccumulator> {
   return players;
 }
 
-function byId<T>(map: Map<string, T>, team: SimulationTeam): Map<string, T> {
+function byId<T>(map: Map<string, T>): Map<string, T> {
   return map;
 }
 
 describe('player-role behavior (roles lineup)', () => {
   const team = buildRolesTeam();
   const measured = measureRoles(team);
-  const byPlayerId = byId(measured, team);
+  const byPlayerId = byId(measured);
   const teamUsage = [...measured.values()].reduce((sum, a) => sum + a.usage, 0);
   const creator = 'p-roles-creator';
   const spacer = 'p-roles-spacer';
@@ -176,18 +176,23 @@ describe('player-role behavior (roles lineup)', () => {
     for (const [key, observed] of checks) {
       const gate = target(key);
       expect(gate, `missing role gate ${key}`).toBeDefined();
+      if (gate === undefined) {
+        throw new Error(`missing role gate ${key}`);
+      }
+      const value = gate.target.value;
+      const tolerance = gate.target.tolerance;
       expect(
         observed,
-        `${key}: observed ${observed.toFixed(4)} outside ${(gate!.target.value - gate!.target.tolerance).toFixed(4)}..${(gate!.target.value + gate!.target.tolerance).toFixed(4)}`,
-      ).toBeGreaterThanOrEqual(gate!.target.value - gate!.target.tolerance);
-      expect(observed).toBeLessThanOrEqual(gate!.target.value + gate!.target.tolerance);
+        `${key}: observed ${observed.toFixed(4)} outside ${(value - tolerance).toFixed(4)}..${(value + tolerance).toFixed(4)}`,
+      ).toBeGreaterThanOrEqual(value - tolerance);
+      expect(observed).toBeLessThanOrEqual(value + tolerance);
     }
   });
 
   it('keeps exact invariants on every role-fixture game', () => {
     for (let i = 0; i < 20; i += 1) {
       const input = buildGameSimulationInput({
-        seed: seedFromString(`roles-inv-${i}`),
+        seed: seedFromString(`roles-inv-${String(i)}`),
         profile: DEFAULT_ERA_SIM_PROFILE,
         home: team,
         away: { ...team, teamId: 'roles-away' },

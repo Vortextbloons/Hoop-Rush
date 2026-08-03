@@ -9,7 +9,6 @@ import {
   buildEraSimulationProfile,
   buildGameSimulationInput,
   buildLegalSimulationTeam,
-  buildSimulationPlayer,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import { simulateGame } from './game.js';
@@ -27,8 +26,6 @@ const ctx = createEngineContext();
 // v5 contest and lower zone bases make single-dimension bumps move totals by
 // ~2-4%, which is real but small enough that 200 seeds flirted with the floors.
 const SEEDS = 300;
-
-type TeamMutator = (team: SimulationTeam) => SimulationTeam;
 
 function mutatePlayers(
   team: SimulationTeam,
@@ -76,7 +73,7 @@ function compare(
   let baseTotal = 0;
   let changedTotal = 0;
   for (let i = 0; i < SEEDS; i += 1) {
-    const seed = seedFromString(`sens-${name}-${i}`);
+    const seed = seedFromString(`sens-${name}-${String(i)}`);
     const baseInput = buildGameSimulationInput({ seed, home: baseTeam, away: baseTeam });
     const changedInput = buildGameSimulationInput({ seed, home: changedTeam, away: changedTeam });
     baseTotal += select(simulateGame(baseInput, ctx), 'home');
@@ -164,7 +161,10 @@ describe('sensitivity: creation and usage', () => {
         : p,
     );
     const share = (r: GameResult) => {
-      const player = r.home.players.find((p) => p.playerId === 'p-fixture-1')!;
+      const player = r.home.players.find((p) => p.playerId === 'p-fixture-1');
+      if (player === undefined) {
+        throw new Error('sensitivity: fixture player missing from the home box');
+      }
       return player.fieldGoals.attempted / Math.max(1, r.home.box.fieldGoals.attempted);
     };
     const result = compare('usage', baseTeam, star, share);
@@ -183,7 +183,9 @@ describe('sensitivity: ball security', () => {
     const changed = mutateAllRatings(baseTeam, 'ballHandling', 15);
     const tov = compare('handling', baseTeam, changed, (r) => r.home.box.turnovers);
     // Fewer turnovers with better handling.
-    expect(tov.changed, `base=${tov.base} changed=${tov.changed}`).toBeLessThan(tov.base * 0.97);
+    expect(tov.changed, `base=${String(tov.base)} changed=${String(tov.changed)}`).toBeLessThan(
+      tov.base * 0.97,
+    );
     expect(tov.base - tov.changed).toBeGreaterThan(0);
   });
 
@@ -204,9 +206,10 @@ describe('sensitivity: defense', () => {
     // The calibrated contest slope (m3-engine-v5, zero-centered) trades magnitude for
     // compressed blowouts; a +15 perimeter bump still cuts ~2% off opponent
     // scoring (the CLI sensitivity gate bumps interior too and shows -4%).
-    expect(oppPts.changed, `base=${oppPts.base} changed=${oppPts.changed}`).toBeLessThan(
-      oppPts.base * 0.985,
-    );
+    expect(
+      oppPts.changed,
+      `base=${String(oppPts.base)} changed=${String(oppPts.changed)}`,
+    ).toBeLessThan(oppPts.base * 0.985);
   });
 
   it.concurrent('higher interiorDefense lowers opponent field-goal percentage', () => {
@@ -265,7 +268,7 @@ describe('sensitivity: era pace and shot mix', () => {
     let fastTotal = 0;
     let slowTotal = 0;
     for (let i = 0; i < SEEDS; i += 1) {
-      const seed = seedFromString(`sens-pace-${i}`);
+      const seed = seedFromString(`sens-pace-${String(i)}`);
       fastTotal += simulateGame(
         buildGameSimulationInput({ seed, profile: fast, home: baseTeam, away: baseTeam }),
         ctx,
@@ -286,7 +289,7 @@ describe('sensitivity: era pace and shot mix', () => {
     let heavyShare = 0;
     let lightShare = 0;
     for (let i = 0; i < SEEDS; i += 1) {
-      const seed = seedFromString(`sens-mix-${i}`);
+      const seed = seedFromString(`sens-mix-${String(i)}`);
       const pickShare = (input: ReturnType<typeof buildGameSimulationInput>) => {
         const r = simulateGame(input, ctx);
         const b = r.home.box;

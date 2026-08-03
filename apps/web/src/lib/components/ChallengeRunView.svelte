@@ -215,12 +215,9 @@
       : (`/classic/result?runId=${runId}` as RouteId);
   }
 
-  const draftPath = mode === 'sandbox' ? '/sandbox' : '/classic';
-  const draftHref = $derived(resolve(draftPath));
+  const draftPath = $derived((mode === 'sandbox' ? '/sandbox' : '/classic') as RouteId);
   const modeLabel = $derived(modeLabelFor(run));
-  const resultHref = $derived(
-    run ? resultHrefFor(run) : null,
-  );
+  const resultHref = $derived(run ? resultHrefFor(run) : null);
 </script>
 
 <p id="challenge-announcer" class="sr-only" aria-live="polite"></p>
@@ -235,7 +232,7 @@
         retry={retryChallenge}
       />
       <a
-        href={draftHref}
+        href={resolve(draftPath)}
         class="mt-3 inline-flex rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground"
       >
         Back to the draft

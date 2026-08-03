@@ -1,6 +1,6 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
-import type { ClassicDraftState, PeakPlayerSeason, Seed } from '@hoop-rush/data-contracts';
+import type { ClassicDraftState, Seed } from '@hoop-rush/data-contracts';
 import {
   classic,
   createChallenge,

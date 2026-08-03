@@ -45,7 +45,7 @@ function team(
 ): TeamResult {
   const players = Array.from({ length: 5 }, (_, i) =>
     player({
-      playerId: `${teamId}-${i}`,
+      playerId: `${teamId}-${String(i)}`,
       fieldGoals: overrides.fieldGoals ?? { made: 0, attempted: 0 },
       turnovers: overrides.turnovers ?? 0,
     }),
@@ -197,8 +197,8 @@ describe('opponentSeasonTotals', () => {
     expect(totals.reboundOpportunities).toBe(120);
     const rim = totals.shotZones.find((zone) => zone.zone === 'rim');
     expect(rim).toBeDefined();
-    expect(rim!.attempts).toBe(240);
-    expect(rim!.makes).toBe(90);
+    expect(rim?.attempts).toBe(240);
+    expect(rim?.makes).toBe(90);
   });
 
   it('keeps zone attempts reconciled with field-goal attempts', () => {
@@ -223,8 +223,8 @@ describe('explainSeason', () => {
   it('picks the largest meaningful zone make-rate edge', () => {
     const explanation = explainSeason(threeGameRun());
     expect(explanation.zoneAdvantage).not.toBeNull();
-    expect(explanation.zoneAdvantage!.zone).toBe('rim');
-    expect(explanation.zoneAdvantage!.edge).toBeCloseTo(50 / 80 - 30 / 80, 6);
+    expect(explanation.zoneAdvantage?.zone).toBe('rim');
+    expect(explanation.zoneAdvantage?.edge).toBeCloseTo(50 / 80 - 30 / 80, 6);
   });
 
   it('reports no zone advantage below the attempt minimum', () => {
@@ -255,10 +255,10 @@ describe('explainSeason', () => {
   it('names the usage leader from the accepted aggregates', () => {
     const explanation = explainSeason(threeGameRun());
     expect(explanation.usageLeader).not.toBeNull();
-    expect(explanation.usageLeader!.playerId).toBe('p-1');
+    expect(explanation.usageLeader?.playerId).toBe('p-1');
     // p-1: 130 FGA + 0.44*10 FTA + 10 TOV = 144.4 of a 265.28 team usage.
-    expect(explanation.usageLeader!.usageShare).toBeCloseTo(144.4 / 265.28, 6);
-    expect(explanation.usageLeader!.usageShare).toBeGreaterThanOrEqual(
+    expect(explanation.usageLeader?.usageShare).toBeCloseTo(144.4 / 265.28, 6);
+    expect(explanation.usageLeader?.usageShare).toBeGreaterThanOrEqual(
       EXPLAIN_THRESHOLDS.usageShare,
     );
   });

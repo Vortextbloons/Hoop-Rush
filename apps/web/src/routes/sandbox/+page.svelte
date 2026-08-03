@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import { ArrowRight, Check, ChevronDown } from '@lucide/svelte';
   import { Select } from 'bits-ui';
-    import type {
+  import type {
     HoopRushManifest,
     PeakPlayerSeason,
     PlayersIndex,
@@ -11,10 +11,10 @@
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
-import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
-import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
-import { startSandboxRun } from '$lib/sandbox-run';
-import { resolvePlayerRefs } from '$lib/player-refs';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
+  import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
+  import { startSandboxRun } from '$lib/sandbox-run';
+  import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, sortDraftRows } from '$lib/draft-presentation';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';

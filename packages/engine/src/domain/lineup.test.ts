@@ -125,7 +125,10 @@ describe('assignLineup', () => {
     ];
     const result = assignLineup(players);
     expect(result).not.toBeNull();
-    expect(validateLineup({ ...structure, assignments: result! }).ok).toBe(true);
+    if (result === null) {
+      throw new Error('expected a legal assignment');
+    }
+    expect(validateLineup({ ...structure, assignments: result }).ok).toBe(true);
   });
 
   it('returns null when no legal assignment exists (four bigs)', () => {

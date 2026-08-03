@@ -13,12 +13,16 @@
     "format:check": "prettier --check .",
     "test": "pnpm --parallel -r test",
     "test:run": "pnpm --parallel -r test:run",
-    "test:quick": "pnpm --parallel -r exec vitest run --exclude **/generator*.test.ts"
+    "test:quick": "pnpm --parallel -r exec vitest run --exclude **/generator*.test.ts",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=22"
   },
   "packageManager": "pnpm@11.11.0",
+  "lint-staged": {
+    "*.{ts,js,svelte,json,css,html,yml,yaml}": "prettier --write"
+  },
   "devDependencies": {
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",

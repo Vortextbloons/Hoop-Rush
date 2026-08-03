@@ -287,10 +287,7 @@ describe('challenge commands', () => {
     }
     const withDuplicate = {
       ...bracket,
-      opponents: [
-        ...bracket.opponents.slice(0, 29),
-        { ...last, opponentId: first.opponentId },
-      ],
+      opponents: [...bracket.opponents.slice(0, 29), { ...last, opponentId: first.opponentId }],
     };
     expect(validateBracketContent(withDuplicate).join('; ')).toContain('duplicate opponentId');
   });

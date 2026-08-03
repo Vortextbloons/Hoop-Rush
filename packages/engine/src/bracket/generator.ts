@@ -362,10 +362,7 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
             };
           }
         }
-        if (
-          best === null ||
-          best.gap >= bestDirectionGap(currentMedian, medianBand)
-        ) {
+        if (best === null || best.gap >= bestDirectionGap(currentMedian, medianBand)) {
           return false;
         }
         selected.set(best.franchiseId, { proposal: best.proposal, target: best.target });

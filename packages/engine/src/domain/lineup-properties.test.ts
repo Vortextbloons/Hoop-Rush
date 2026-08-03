@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import type { Position, PositionUnion } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
 import {
   assignLineup,
@@ -14,7 +13,7 @@ const positionArb = fc.constantFrom('G', 'F', 'C');
 const unionArb = fc.array(positionArb, { minLength: 1, maxLength: 3 });
 
 const lineupArb = fc.tuple(unionArb, unionArb, unionArb, unionArb, unionArb).map((unions) => ({
-  players: unions.map((positions, i) => ({ playerId: `player-${i}`, positions })),
+  players: unions.map((positions, i) => ({ playerId: `player-${String(i)}`, positions })),
 }));
 
 describe('position union property', () => {
@@ -71,7 +70,10 @@ describe('lineup property', () => {
   it('canFillSlot agrees with position membership', () => {
     fc.assert(
       fc.property(unionArb, fc.integer({ min: 0, max: 4 }), (positions, slotIndex) => {
-        const requirement = LINEUP_STRUCTURE[slotIndex]!;
+        const requirement = LINEUP_STRUCTURE[slotIndex];
+        if (requirement === undefined) {
+          throw new Error(`no slot requirement for index ${String(slotIndex)}`);
+        }
         expect(canFillSlot(positions, slotIndex as never)).toBe(positions.includes(requirement));
       }),
     );

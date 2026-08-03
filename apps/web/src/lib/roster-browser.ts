@@ -16,6 +16,18 @@ import type {
  */
 export type RosterDetailRow = PlayersIndexEntry & RosterDetailsEntry;
 
+/** One flat row of the roster browser: a group header or a player. */
+export type RosterListItem =
+  | { type: 'group'; franchiseId: string; eraId: string; count: number }
+  | { type: 'player'; player: RosterDetailRow };
+
+export interface RosterColumn {
+  key: string;
+  label: string;
+  sort?: RosterSortId;
+  numeric?: boolean;
+}
+
 export type RosterSortId =
   | 'none'
   | 'name'

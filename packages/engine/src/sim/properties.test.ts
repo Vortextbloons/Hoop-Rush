@@ -88,11 +88,13 @@ const teamArb: fc.Arbitrary<SimulationTeam> = fc
   .map((players) => ({
     teamId: 'prop',
     displayName: 'Prop Team',
-    players: players.map((p, i) => ({
-      ...p,
-      positions: SLOT_ORDER[i]!,
-      playerId: `${p.playerId}-${i}`,
-    })),
+    players: players.map((p, i) => {
+      const positions = SLOT_ORDER[i];
+      if (positions === undefined) {
+        throw new Error('property: slot order requires five positions');
+      }
+      return { ...p, positions, playerId: `${p.playerId}-${String(i)}` };
+    }),
   }));
 
 const inputArb = fc.record({
@@ -200,13 +202,17 @@ describe('property: zone skill correlation', () => {
   it('high-zone-skill teams make more shots in that zone', () => {
     const makeSharpshooter = (threePoint: number): SimulationTeam => {
       const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
-      const players = Array.from({ length: 5 }, (_, i) =>
-        buildSimulationPlayer({
-          playerId: `p-3pt-${i}`,
-          positions: slots[i]!,
+      const players = Array.from({ length: 5 }, (_, i) => {
+        const positions = slots[i];
+        if (positions === undefined) {
+          throw new Error('property: slot order requires five positions');
+        }
+        return buildSimulationPlayer({
+          playerId: `p-3pt-${String(i)}`,
+          positions,
           ratings: { ...buildSimulationPlayer().ratings, threePoint },
-        }),
-      );
+        });
+      });
       return { teamId: 'shooters', displayName: 'Shooters', players };
     };
     const bad = makeSharpshooter(45);
@@ -214,7 +220,7 @@ describe('property: zone skill correlation', () => {
     let badThreePct = 0;
     let goodThreePct = 0;
     for (let i = 0; i < 120; i += 1) {
-      const seed = seedFromString(`zone-${i}`);
+      const seed = seedFromString(`zone-${String(i)}`);
       const badR = simulateGame(
         buildGameSimulationInput({ seed, profile, home: bad, away: bad }),
         ctx,

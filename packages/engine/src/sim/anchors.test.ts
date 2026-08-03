@@ -80,8 +80,11 @@ function anchoredCenterTeam(): SimulationTeam {
 
 describe('observed player anchors', () => {
   it('keep low free-throw shooters in a realistic probability band', () => {
-    const player = anchoredCenterTeam().players[4]!;
-    const probability = freeThrowProbability(player, buildEraSimulationProfile());
+    const center = anchoredCenterTeam().players[4];
+    if (center === undefined) {
+      throw new Error('anchored fixture team requires five players');
+    }
+    const probability = freeThrowProbability(center, buildEraSimulationProfile());
     expect(probability).toBeGreaterThan(0.45);
     expect(probability).toBeLessThan(0.65);
   });
@@ -99,7 +102,7 @@ describe('observed player anchors', () => {
     for (let index = 0; index < samples; index += 1) {
       const result = simulateGame(
         buildGameSimulationInput({
-          seed: seedFromString(`anchor-${index}`),
+          seed: seedFromString(`anchor-${String(index)}`),
           home,
           away,
         }),
@@ -107,7 +110,10 @@ describe('observed player anchors', () => {
       );
       const player = result.home.players.find(
         (candidate) => candidate.playerId === 'shaquille-anchor',
-      )!;
+      );
+      if (player === undefined) {
+        throw new Error('anchored center missing from the home box');
+      }
       freeThrowsMade += player.freeThrows.made;
       freeThrowsAttempted += player.freeThrows.attempted;
       rebounds += player.rebounds.total;
@@ -180,23 +186,31 @@ describe('observed player anchors', () => {
 /** Average field-goal percentage of one anchored player across many games. */
 function averageDefenseTeam(): SimulationTeam {
   const base = buildLegalSimulationTeam();
+  const first = base.players[0];
+  if (first === undefined) {
+    throw new Error('fixture team requires five players');
+  }
   const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
   const ratings = {} as SimulationPlayer['ratings'];
-  for (const key of Object.keys(base.players[0]!.ratings) as Array<
-    keyof SimulationPlayer['ratings']
-  >) {
+  for (const key of Object.keys(first.ratings) as Array<keyof SimulationPlayer['ratings']>) {
     ratings[key] = 66;
   }
   return {
     teamId: 'average-defense',
     displayName: 'Average Defense',
-    players: slots.map((positions, index) => ({
-      ...base.players[index]!,
-      playerId: `avg-def-${index}`,
-      displayName: `Avg Def ${index}`,
-      positions,
-      ratings,
-    })),
+    players: slots.map((positions, index) => {
+      const basePlayer = base.players[index];
+      if (basePlayer === undefined) {
+        throw new Error('fixture team requires five players');
+      }
+      return {
+        ...basePlayer,
+        playerId: `avg-def-${String(index)}`,
+        displayName: `Avg Def ${String(index)}`,
+        positions,
+        ratings,
+      };
+    }),
   };
 }
 
@@ -217,13 +231,16 @@ function sampleFieldGoalPct(
   for (let index = 0; index < games; index += 1) {
     const result = simulateGame(
       buildGameSimulationInput({
-        seed: seedFromString(`anchor-pin-${playerId}-${index}`),
+        seed: seedFromString(`anchor-pin-${playerId}-${String(index)}`),
         home,
         away,
       }),
       context,
     );
-    const box = result.home.players.find((p) => p.playerId === playerId)!;
+    const box = result.home.players.find((p) => p.playerId === playerId);
+    if (box === undefined) {
+      throw new Error(`anchored player ${playerId} missing from the home box`);
+    }
     fgm += box.fieldGoals.made;
     fga += box.fieldGoals.attempted;
     tpm += box.threes.made;
@@ -280,13 +297,17 @@ describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
       freeThrowAttemptRate: 0.379,
     };
     const base = buildLegalSimulationTeam();
+    const first = base.players[0];
+    if (first === undefined) {
+      throw new Error('fixture team requires five players');
+    }
     const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
     const star = buildSimulationPlayer({
       playerId: 'mj-anchor',
       displayName: 'Anchor Star',
       positions: ['G'],
       ratings: {
-        ...base.players[0]!.ratings,
+        ...first.ratings,
         insideScoring: 90,
         closeShot: 80,
         midrange: 85,
@@ -295,7 +316,7 @@ describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
         passing: 80,
       },
       tendencies: {
-        ...base.players[0]!.tendencies,
+        ...first.tendencies,
         usageRate: 33,
         shotRate: 35,
         rimFrequency: 40,
@@ -309,18 +330,18 @@ describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
       },
       anchors: mjAnchors,
     });
-    const home = {
+    const buildSide = (): SimulationTeam => ({
       ...base,
-      players: slots.map((positions, index) =>
-        index === 0 ? { ...star, positions } : { ...base.players[index]!, positions },
-      ),
-    };
-    const away = {
-      ...base,
-      players: slots.map((positions, index) =>
-        index === 0 ? { ...star, positions } : { ...base.players[index]!, positions },
-      ),
-    };
+      players: slots.map((positions, index) => {
+        const basePlayer = base.players[index];
+        if (basePlayer === undefined) {
+          throw new Error('fixture team requires five players');
+        }
+        return index === 0 ? { ...star, positions } : { ...basePlayer, positions };
+      }),
+    });
+    const home = buildSide();
+    const away = buildSide();
     const { fieldGoalPct, threePointPct, freeThrowPct, turnoverRate } = sampleFieldGoalPct(
       'mj-anchor',
       home,

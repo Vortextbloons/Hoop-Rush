@@ -51,7 +51,7 @@ function scoringBox(points: number, playerId = 'p-1'): PlayerBoxScore {
 function paddedPlayers(players: PlayerBoxScore[], teamId: string): PlayerBoxScore[] {
   const padded = [...players];
   while (padded.length < 5) {
-    padded.push(scoringBox(0, `${teamId}-filler-${padded.length}`));
+    padded.push(scoringBox(0, `${teamId}-filler-${String(padded.length)}`));
   }
   return padded.slice(0, 5);
 }
@@ -105,7 +105,7 @@ function gameResultFixture(args: {
   return {
     schemaVersion: 1,
     gameNumber,
-    seed: seedFromString(`fixture-game-${gameNumber}`),
+    seed: seedFromString(`fixture-game-${String(gameNumber)}`),
     engineVersion: 'engine-v1',
     dataVersion: 'data-v1',
     profileVersion: 'profile-v1',
@@ -170,9 +170,9 @@ describe('league mvp', () => {
     );
     const mvp = leagueMvp(runFixture(games));
     expect(mvp).not.toBeNull();
-    expect(mvp!.appearances).toBe(3);
-    expect(mvp!.averageGameScore).toBe(20);
-    expect(mvp!.averagePoints).toBe(20);
+    expect(mvp?.appearances).toBe(3);
+    expect(mvp?.averageGameScore).toBe(20);
+    expect(mvp?.averagePoints).toBe(20);
   });
 
   it('returns the user candidate when the user five dominate', () => {
@@ -191,11 +191,11 @@ describe('league mvp', () => {
       }),
     );
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.isUserTeam).toBe(true);
-    expect(mvp!.playerId).toBe('p-1');
-    expect(mvp!.playerName).toBe('Fixture 1');
-    expect(mvp!.teamId).toBe('user');
-    expect(mvp!.teamName).toBe('Los Angeles Lakers');
+    expect(mvp?.isUserTeam).toBe(true);
+    expect(mvp?.playerId).toBe('p-1');
+    expect(mvp?.playerName).toBe('Fixture 1');
+    expect(mvp?.teamId).toBe('user');
+    expect(mvp?.teamName).toBe('Los Angeles Lakers');
   });
 
   it('ranks by per-appearance average, not totals', () => {
@@ -206,19 +206,19 @@ describe('league mvp', () => {
         awayPlayers: [
           scoringBox(
             gameNumber === 1 ? 30 : 0,
-            gameNumber === 1 ? 'p-opp-1-0' : `p-opp-1-${gameNumber}`,
+            gameNumber === 1 ? 'p-opp-1-0' : `p-opp-1-${String(gameNumber)}`,
           ),
         ],
         gameNumber,
       }),
     );
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.isUserTeam).toBe(false);
-    expect(mvp!.teamId).toBe('celtics');
-    expect(mvp!.teamName).toBe('Fixture celtics');
-    expect(mvp!.playerName).toBe('Opponent 1 0');
-    expect(mvp!.appearances).toBe(1);
-    expect(mvp!.averageGameScore).toBe(30);
+    expect(mvp?.isUserTeam).toBe(false);
+    expect(mvp?.teamId).toBe('celtics');
+    expect(mvp?.teamName).toBe('Fixture celtics');
+    expect(mvp?.playerName).toBe('Opponent 1 0');
+    expect(mvp?.appearances).toBe(1);
+    expect(mvp?.averageGameScore).toBe(30);
   });
 
   it('keeps mirror matchup identities separate', () => {
@@ -231,11 +231,11 @@ describe('league mvp', () => {
       }),
     );
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.playerId).toBe('p-1');
-    expect(mvp!.teamId).toBe('user');
-    expect(mvp!.isUserTeam).toBe(true);
-    expect(mvp!.appearances).toBe(2);
-    expect(mvp!.averageGameScore).toBe(40);
+    expect(mvp?.playerId).toBe('p-1');
+    expect(mvp?.teamId).toBe('user');
+    expect(mvp?.isUserTeam).toBe(true);
+    expect(mvp?.appearances).toBe(2);
+    expect(mvp?.averageGameScore).toBe(40);
   });
 
   it('breaks mvp-score and game-score ties by average points', () => {
@@ -264,9 +264,9 @@ describe('league mvp', () => {
       }),
     ];
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.playerId).toBe('p-2');
-    expect(mvp!.averageGameScore).toBe(20);
-    expect(mvp!.averagePoints).toBe(24);
+    expect(mvp?.playerId).toBe('p-2');
+    expect(mvp?.averageGameScore).toBe(20);
+    expect(mvp?.averagePoints).toBe(24);
   });
 
   it('separates equal game scores with the defense bonus', () => {
@@ -297,10 +297,10 @@ describe('league mvp', () => {
       }),
     ];
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.playerId).toBe('p-2');
-    expect(mvp!.averageGameScore).toBe(20);
-    expect(mvp!.averagePoints).toBe(20);
-    expect(mvp!.averageSteals).toBe(2);
+    expect(mvp?.playerId).toBe('p-2');
+    expect(mvp?.averageGameScore).toBe(20);
+    expect(mvp?.averagePoints).toBe(20);
+    expect(mvp?.averageSteals).toBe(2);
   });
 
   it('breaks full ties by team then player identity', () => {
@@ -324,7 +324,7 @@ describe('league mvp', () => {
         }),
       ]),
     );
-    expect(acrossTeams!.teamId).toBe('celtics');
+    expect(acrossTeams?.teamId).toBe('celtics');
 
     const sameTeam = leagueMvp(
       runFixture([
@@ -344,8 +344,8 @@ describe('league mvp', () => {
         }),
       ]),
     );
-    expect(sameTeam!.teamId).toBe('user');
-    expect(sameTeam!.playerId).toBe('p-1');
+    expect(sameTeam?.teamId).toBe('user');
+    expect(sameTeam?.playerId).toBe('p-1');
   });
 
   it('returns unrounded averages', () => {
@@ -358,9 +358,9 @@ describe('league mvp', () => {
       }),
     );
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.averageGameScore).toBe(68 / 3);
-    expect(mvp!.averagePoints).toBe(68 / 3);
-    expect(mvp!.averageGameScore).not.toBe(22.7);
+    expect(mvp?.averageGameScore).toBe(68 / 3);
+    expect(mvp?.averagePoints).toBe(68 / 3);
+    expect(mvp?.averageGameScore).not.toBe(22.7);
   });
 
   it('returns null for a run with no games', () => {
@@ -378,10 +378,10 @@ describe('league mvp', () => {
       }),
     );
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.playerId).toBe('p-1');
-    expect(mvp!.isUserTeam).toBe(true);
-    expect(mvp!.appearances).toBe(82);
-    expect(mvp!.averageGameScore).toBe(20);
+    expect(mvp?.playerId).toBe('p-1');
+    expect(mvp?.isUserTeam).toBe(true);
+    expect(mvp?.appearances).toBe(82);
+    expect(mvp?.averageGameScore).toBe(20);
   });
 
   it('is deterministic across identical runs', () => {
@@ -468,8 +468,8 @@ describe('mvp composite', () => {
       }),
     ];
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.playerId).toBe('p-1');
-    expect(mvp!.averageEfficiency).toBeCloseTo(24 / (2 * (15 + 0.44 * 4)), 5);
+    expect(mvp?.playerId).toBe('p-1');
+    expect(mvp?.averageEfficiency).toBeCloseTo(24 / (2 * (15 + 0.44 * 4)), 5);
   });
 
   it('lets defense and playmaking beat higher raw scoring', () => {
@@ -516,8 +516,8 @@ describe('mvp composite', () => {
       }),
     ];
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.playerId).toBe('p-2');
-    expect(mvp!.averageGameScore).toBe(16.8);
+    expect(mvp?.playerId).toBe('p-2');
+    expect(mvp?.averageGameScore).toBe(16.8);
   });
 
   it('penalizes boom-and-bust consistency', () => {
@@ -530,8 +530,8 @@ describe('mvp composite', () => {
       }),
     );
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.playerId).toBe('p-1');
-    expect(mvp!.consistency).toBe(0);
+    expect(mvp?.playerId).toBe('p-1');
+    expect(mvp?.consistency).toBe(0);
   });
 
   it('applies the small team-context tilt for wins', () => {
@@ -544,8 +544,8 @@ describe('mvp composite', () => {
       }),
     ];
     const mvp = leagueMvp(runFixture(games));
-    expect(mvp!.isUserTeam).toBe(true);
-    expect(mvp!.mvpScore).toBeCloseTo(20.75, 5);
+    expect(mvp?.isUserTeam).toBe(true);
+    expect(mvp?.mvpScore).toBeCloseTo(20.75, 5);
   });
 
   it('adapts the efficiency baseline to the run', () => {
@@ -590,8 +590,13 @@ describe('mvp composite', () => {
         fouls: 0,
       }),
     );
-    const inEfficient = leagueMvp(efficientLeague)!;
-    const inInefficient = leagueMvp(inefficientLeague)!;
+    const inEfficient = leagueMvp(efficientLeague);
+    const inInefficient = leagueMvp(inefficientLeague);
+    expect(inEfficient).not.toBeNull();
+    expect(inInefficient).not.toBeNull();
+    if (inEfficient === null || inInefficient === null) {
+      throw new Error('expected league mvp candidates');
+    }
     // The 62.5% shooter earns a larger bonus when the rest of the run drags
     // the league baseline down, while keeping the same raw box score.
     expect(inEfficient.playerId).toBe('p-1');
