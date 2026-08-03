@@ -3,8 +3,9 @@
   import { resolve } from '$app/paths';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { getManifest } from '$lib/data';
-  import { challengeRepository } from '$lib/challenge-repo';
+import { clearDataLoaderCaches, getManifest } from '$lib/data';
+import { challengeRepository } from '$lib/challenge-repo';
+import AsyncState from '$lib/components/AsyncState.svelte';
   import HistoryList from '$lib/components/HistoryList.svelte';
 
   /**
@@ -17,35 +18,42 @@
   let rows = $state.raw<CompletedRunIndex[]>([]);
   let active = $state.raw<ActiveRunCheckpoint | null>(null);
   let error = $state<string | null>(null);
+  let loading = $state(true);
+  let retryCount = $state(0);
 
-  $effect(() => {
-    if (!browser) return;
+  function loadHistory() {
+    loading = true;
+    error = null;
     let cancelled = false;
-    getManifest().then(
-      (m) => {
-        if (!cancelled) manifest = m;
-      },
-      () => {
-        // History renders without the manifest (names fall back to ids).
-      },
-    );
-    Promise.all([
-      challengeRepository.listCompletedRuns(),
-      challengeRepository.loadActiveRunCheckpoint(),
-    ]).then(
-      ([history, activeCheckpoint]) => {
+    Promise.all([getManifest(), challengeRepository.listCompletedRuns(), challengeRepository.loadActiveRunCheckpoint()]).then(
+      ([m, history, activeCheckpoint]) => {
         if (cancelled) return;
+        manifest = m;
         rows = history;
         active = activeCheckpoint;
+        loading = false;
       },
       (e: unknown) => {
-        if (!cancelled) error = e instanceof Error ? e.message : String(e);
+        if (cancelled) return;
+        error = e instanceof Error ? e.message : String(e);
+        loading = false;
       },
     );
     return () => {
       cancelled = true;
     };
+  }
+
+  $effect(() => {
+    if (!browser) return;
+    void retryCount;
+    return loadHistory();
   });
+
+  function retryHistory() {
+    clearDataLoaderCaches();
+    retryCount += 1;
+  }
 </script>
 
 <svelte:head>
@@ -71,9 +79,18 @@
   </div>
 
   {#if error}
-    <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      {error}
-    </p>
+    <div class="mt-8">
+      <AsyncState
+        kind="error"
+        title="History unavailable"
+        message={`Failed to load challenge history: ${error}`}
+        retry={retryHistory}
+      />
+    </div>
+  {:else if loading}
+    <div class="mt-8">
+      <AsyncState kind="loading" title="Loading history" message="Reading completed runs…" />
+    </div>
   {:else}
     <HistoryList
       {manifest}

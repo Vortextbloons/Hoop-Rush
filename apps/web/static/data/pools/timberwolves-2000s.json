@@ -19852,6 +19852,541 @@
     },
     {
       "schemaVersion": 2,
+      "playerId": "p-2229",
+      "franchiseId": "timberwolves",
+      "eraId": "2000s",
+      "seasonKey": "2006-07",
+      "firstName": "Mike",
+      "lastName": "James",
+      "displayName": "Mike James",
+      "playerExternalId": "2229",
+      "altIds": {
+        "bbref": "jamesmi01",
+        "nbaHeadshotAvailable": false
+      },
+      "positions": {
+        "sourceLabels": [
+          "SG"
+        ],
+        "canonical": [
+          "G"
+        ],
+        "normalizationVersion": "position-v2"
+      },
+      "heightInches": 74,
+      "weightLbs": 190,
+      "eligibility": {
+        "minimumTeamGames": 40,
+        "teamGames": 82,
+        "teamMinutes": 2069
+      },
+      "selectionScore": 79.215,
+      "selectionScoreVersion": "selection-v2",
+      "stats": {
+        "gamesPlayed": 82,
+        "minutes": 2066,
+        "points": 828,
+        "rebounds": 164,
+        "offensiveRebounds": 24,
+        "defensiveRebounds": 139,
+        "assists": 295,
+        "steals": 57,
+        "blocks": 8,
+        "turnovers": 131,
+        "fieldGoalsMade": 295,
+        "fieldGoalsAttempted": 705,
+        "threesMade": 82,
+        "threesAttempted": 213,
+        "freeThrowsMade": 155,
+        "freeThrowsAttempted": 180,
+        "per": 8.549999999999997,
+        "boxPlusMinus": -1.448,
+        "usageRate": 20.200000000000003,
+        "tsPct": 0.529,
+        "efgPct": 0.48
+      },
+      "historicalTeamIdentity": {
+        "teamId": "1610612750",
+        "displayName": "Minnesota Timberwolves",
+        "city": "Minneapolis",
+        "abbreviation": "MIN",
+        "seasonKey": "2006-07",
+        "lineageRuleVersion": "lineage-v1"
+      },
+      "summaryRatings": {
+        "overallRating": 83,
+        "offenseRating": 75,
+        "defenseRating": 61
+      },
+      "detailedRatings": {
+        "threePoint": 84,
+        "freeThrow": 90,
+        "insideScoring": 73,
+        "closeShot": 75,
+        "midrange": 65,
+        "passing": 83,
+        "ballHandling": 75,
+        "offensiveRebound": 42,
+        "defensiveRebound": 48,
+        "perimeterDefense": 66,
+        "interiorDefense": 63,
+        "steal": 69,
+        "block": 60,
+        "defensiveIq": 59,
+        "speed": 78,
+        "strength": 59,
+        "vertical": 60,
+        "offensiveIq": 75
+      },
+      "tendencies": {
+        "usageRate": 24.5,
+        "passRate": 13.69,
+        "shotRate": 32.29,
+        "driveRate": 18,
+        "postUpRate": 5,
+        "rimFrequency": 29.2,
+        "shortMidFrequency": 15,
+        "longMidFrequency": 10,
+        "cornerThreeFrequency": 10.08,
+        "aboveBreakThreeFrequency": 16.8,
+        "threePointRate": 30.97,
+        "freeThrowRate": 27.74,
+        "turnoverRate": 13.01,
+        "isolationRate": 7.35,
+        "pickAndRollBallHandlerRate": 35,
+        "pickAndRollRollManRate": 10,
+        "spotUpRate": 20,
+        "transitionRate": 15,
+        "cutRate": 10,
+        "foulRate": 5.5,
+        "stealAttemptRate": 10.52,
+        "blockAttemptRate": 9.8,
+        "crashOffensiveGlassRate": 15.04
+      },
+      "anchors": {
+        "gamesPlayed": 79,
+        "minutesPerGame": 37,
+        "pointsPerGame": 20.3,
+        "reboundsPerGame": 3.3,
+        "offensiveReboundsPerGame": 0.6,
+        "defensiveReboundsPerGame": 2.7,
+        "assistsPerGame": 5.8,
+        "stealsPerGame": 0.9000000000000001,
+        "blocksPerGame": 0,
+        "turnoversPerGame": 2.6,
+        "fieldGoalPct": 0.4709677419354838,
+        "threePointPct": 0.43750000000000006,
+        "freeThrowPct": 0.8372093023255816,
+        "threePointAttemptRate": 0.3096774193548387,
+        "freeThrowAttemptRate": 0.27741935483870966
+      },
+      "provenance": {
+        "threePoint": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "tpm",
+            "tpa",
+            "tsPct",
+            "ftm",
+            "fta"
+          ]
+        },
+        "freeThrow": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "ftm",
+            "fta"
+          ]
+        },
+        "insideScoring": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "points",
+            "tsPct"
+          ]
+        },
+        "closeShot": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "points"
+          ]
+        },
+        "midrange": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "fgm",
+            "fga",
+            "tpm",
+            "tpa"
+          ]
+        },
+        "passing": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "assists",
+            "per"
+          ]
+        },
+        "ballHandling": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "assists",
+            "usageRate",
+            "per"
+          ]
+        },
+        "offensiveRebound": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "offensiveRebounds"
+          ]
+        },
+        "defensiveRebound": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "defensiveRebounds"
+          ]
+        },
+        "perimeterDefense": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "steals",
+            "blocks",
+            "boxPlusMinus"
+          ]
+        },
+        "interiorDefense": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "steals",
+            "blocks",
+            "boxPlusMinus"
+          ]
+        },
+        "steal": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "steals"
+          ]
+        },
+        "block": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "blocks"
+          ]
+        },
+        "defensiveIq": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "boxPlusMinus",
+            "rebounds"
+          ]
+        },
+        "speed": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "usageRate",
+            "minutes"
+          ]
+        },
+        "strength": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "usageRate",
+            "minutes"
+          ]
+        },
+        "vertical": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "offensiveIq": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "per",
+            "boxPlusMinus"
+          ]
+        },
+        "usageRate": {
+          "kind": "observed",
+          "confidence": "high",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "usageRate"
+          ]
+        },
+        "passRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "assists",
+            "points"
+          ]
+        },
+        "shotRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "fga"
+          ]
+        },
+        "driveRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "postUpRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "rimFrequency": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "insideScoring"
+          ]
+        },
+        "shortMidFrequency": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "longMidFrequency": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "cornerThreeFrequency": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "threePoint"
+          ]
+        },
+        "aboveBreakThreeFrequency": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "threePoint"
+          ]
+        },
+        "threePointRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "tpa",
+            "fga"
+          ]
+        },
+        "freeThrowRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "fta",
+            "fga"
+          ]
+        },
+        "turnoverRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "turnovers",
+            "fga",
+            "fta"
+          ]
+        },
+        "isolationRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "usageRate"
+          ]
+        },
+        "pickAndRollBallHandlerRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "pickAndRollRollManRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "spotUpRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "transitionRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "cutRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "foulRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "fouls"
+          ]
+        },
+        "stealAttemptRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "steal"
+          ]
+        },
+        "blockAttemptRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "block"
+          ]
+        },
+        "crashOffensiveGlassRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "offensiveRebound"
+          ]
+        }
+      },
+      "source": {
+        "dataVersion": "m5",
+        "ratingsVersion": "ratings-v9-smooth-elite-band",
+        "selectionScoreVersion": "selection-v2",
+        "sourceVersion": "source-v1",
+        "derivationMethodVersion": "derive-v3",
+        "lineageRuleVersion": "lineage-v1"
+      }
+    },
+    {
+      "schemaVersion": 2,
       "playerId": "p-2239",
       "franchiseId": "timberwolves",
       "eraId": "2000s",
@@ -24806,6 +25341,541 @@
         "freeThrowPct": 0.75,
         "threePointAttemptRate": 0.08433734939759036,
         "freeThrowAttemptRate": 0.24096385542168675
+      },
+      "provenance": {
+        "threePoint": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "tpm",
+            "tpa",
+            "tsPct",
+            "ftm",
+            "fta"
+          ]
+        },
+        "freeThrow": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "ftm",
+            "fta"
+          ]
+        },
+        "insideScoring": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "points",
+            "tsPct"
+          ]
+        },
+        "closeShot": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "points"
+          ]
+        },
+        "midrange": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "fgm",
+            "fga",
+            "tpm",
+            "tpa"
+          ]
+        },
+        "passing": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "assists",
+            "per"
+          ]
+        },
+        "ballHandling": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "assists",
+            "usageRate",
+            "per"
+          ]
+        },
+        "offensiveRebound": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "offensiveRebounds"
+          ]
+        },
+        "defensiveRebound": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "defensiveRebounds"
+          ]
+        },
+        "perimeterDefense": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "steals",
+            "blocks",
+            "boxPlusMinus"
+          ]
+        },
+        "interiorDefense": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "steals",
+            "blocks",
+            "boxPlusMinus"
+          ]
+        },
+        "steal": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "steals"
+          ]
+        },
+        "block": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "blocks"
+          ]
+        },
+        "defensiveIq": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "boxPlusMinus",
+            "rebounds"
+          ]
+        },
+        "speed": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "usageRate",
+            "minutes"
+          ]
+        },
+        "strength": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "usageRate",
+            "minutes"
+          ]
+        },
+        "vertical": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "offensiveIq": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "per",
+            "boxPlusMinus"
+          ]
+        },
+        "usageRate": {
+          "kind": "observed",
+          "confidence": "high",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "usageRate"
+          ]
+        },
+        "passRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "assists",
+            "points"
+          ]
+        },
+        "shotRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "fga"
+          ]
+        },
+        "driveRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "postUpRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "rimFrequency": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "insideScoring"
+          ]
+        },
+        "shortMidFrequency": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "longMidFrequency": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "cornerThreeFrequency": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "threePoint"
+          ]
+        },
+        "aboveBreakThreeFrequency": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "threePoint"
+          ]
+        },
+        "threePointRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "tpa",
+            "fga"
+          ]
+        },
+        "freeThrowRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "fta",
+            "fga"
+          ]
+        },
+        "turnoverRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "turnovers",
+            "fga",
+            "fta"
+          ]
+        },
+        "isolationRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "usageRate"
+          ]
+        },
+        "pickAndRollBallHandlerRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "pickAndRollRollManRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "spotUpRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "transitionRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "cutRate": {
+          "kind": "estimated",
+          "confidence": "low",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "prior"
+          ]
+        },
+        "foulRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "fouls"
+          ]
+        },
+        "stealAttemptRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "steal"
+          ]
+        },
+        "blockAttemptRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "block"
+          ]
+        },
+        "crashOffensiveGlassRate": {
+          "kind": "derived",
+          "confidence": "medium",
+          "methodVersion": "derive-v3",
+          "sourceVersion": "source-v1",
+          "sourceFields": [
+            "offensiveRebound"
+          ]
+        }
+      },
+      "source": {
+        "dataVersion": "m5",
+        "ratingsVersion": "ratings-v9-smooth-elite-band",
+        "selectionScoreVersion": "selection-v2",
+        "sourceVersion": "source-v1",
+        "derivationMethodVersion": "derive-v3",
+        "lineageRuleVersion": "lineage-v1"
+      }
+    },
+    {
+      "schemaVersion": 2,
+      "playerId": "p-393",
+      "franchiseId": "timberwolves",
+      "eraId": "2000s",
+      "seasonKey": "2002-03",
+      "firstName": "Rod",
+      "lastName": "Strickland",
+      "displayName": "Rod Strickland",
+      "playerExternalId": "393",
+      "altIds": {
+        "bbref": "stricro02",
+        "nbaHeadshotAvailable": true
+      },
+      "positions": {
+        "sourceLabels": [
+          "SG"
+        ],
+        "canonical": [
+          "G"
+        ],
+        "normalizationVersion": "position-v2"
+      },
+      "heightInches": 75,
+      "weightLbs": 185,
+      "eligibility": {
+        "minimumTeamGames": 40,
+        "teamGames": 47,
+        "teamMinutes": 955
+      },
+      "selectionScore": 78.483,
+      "selectionScoreVersion": "selection-v2",
+      "stats": {
+        "gamesPlayed": 47,
+        "minutes": 954,
+        "points": 319,
+        "rebounds": 94,
+        "offensiveRebounds": 18,
+        "defensiveRebounds": 75,
+        "assists": 216,
+        "steals": 47,
+        "blocks": 4,
+        "turnovers": 75,
+        "fieldGoalsMade": 122,
+        "fieldGoalsAttempted": 277,
+        "threesMade": 0,
+        "threesAttempted": 9,
+        "freeThrowsMade": 79,
+        "freeThrowsAttempted": 108,
+        "per": 7.949999999999998,
+        "boxPlusMinus": -1.104000000000001,
+        "usageRate": 18.8,
+        "tsPct": 0.492,
+        "efgPct": 0.433
+      },
+      "historicalTeamIdentity": {
+        "teamId": "1610612750",
+        "displayName": "Minnesota Timberwolves",
+        "city": "Minneapolis",
+        "abbreviation": "MIN",
+        "seasonKey": "2002-03",
+        "lineageRuleVersion": "lineage-v1"
+      },
+      "summaryRatings": {
+        "overallRating": 83,
+        "offenseRating": 74,
+        "defenseRating": 68
+      },
+      "detailedRatings": {
+        "threePoint": 63,
+        "freeThrow": 76,
+        "insideScoring": 67,
+        "closeShot": 71,
+        "midrange": 55,
+        "passing": 100,
+        "ballHandling": 89,
+        "offensiveRebound": 51,
+        "defensiveRebound": 55,
+        "perimeterDefense": 77,
+        "interiorDefense": 74,
+        "steal": 77,
+        "block": 63,
+        "defensiveIq": 64,
+        "speed": 79,
+        "strength": 61,
+        "vertical": 60,
+        "offensiveIq": 83
+      },
+      "tendencies": {
+        "usageRate": 23.5,
+        "passRate": 20.59,
+        "shotRate": 31.04,
+        "driveRate": 18,
+        "postUpRate": 5,
+        "rimFrequency": 26.8,
+        "shortMidFrequency": 15,
+        "longMidFrequency": 10,
+        "cornerThreeFrequency": 7.56,
+        "aboveBreakThreeFrequency": 12.6,
+        "threePointRate": 4.03,
+        "freeThrowRate": 43.62,
+        "turnoverRate": 16.46,
+        "isolationRate": 7.05,
+        "pickAndRollBallHandlerRate": 35,
+        "pickAndRollRollManRate": 10,
+        "spotUpRate": 20,
+        "transitionRate": 15,
+        "cutRate": 10,
+        "foulRate": 4.9,
+        "stealAttemptRate": 11.16,
+        "blockAttemptRate": 10.04,
+        "crashOffensiveGlassRate": 16.12
+      },
+      "anchors": {
+        "gamesPlayed": 76,
+        "minutesPerGame": 39.7,
+        "pointsPerGame": 17.8,
+        "reboundsPerGame": 5.3,
+        "offensiveReboundsPerGame": 1.5,
+        "defensiveReboundsPerGame": 3.9,
+        "assistsPerGame": 10.5,
+        "stealsPerGame": 1.7,
+        "blocksPerGame": 0.3,
+        "turnoversPerGame": 3.5,
+        "fieldGoalPct": 0.42953020134228187,
+        "threePointPct": 0.33333333333333337,
+        "freeThrowPct": 0.7230769230769231,
+        "threePointAttemptRate": 0.040268456375838924,
+        "freeThrowAttemptRate": 0.436241610738255
       },
       "provenance": {
         "threePoint": {

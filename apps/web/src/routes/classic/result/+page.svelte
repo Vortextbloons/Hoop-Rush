@@ -10,11 +10,12 @@
     PlayersIndexEntry,
   } from '@hoop-rush/data-contracts';
   import { variantLabel } from '$lib/draft-presentation';
-  import { getManifest, getPlayersIndex } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { clearClassicDraftState } from '$lib/classic-draft';
   import { loadRunPlayersById } from '$lib/sandbox-lineup';
   import SeasonReport from '$lib/components/SeasonReport.svelte';
+  import AsyncState from '$lib/components/AsyncState.svelte';
 
   /**
    * Classic challenge result: the shared SeasonReport record with classic
@@ -31,17 +32,35 @@
   let run = $state.raw<ChallengeRun | null>(null);
   let error = $state<string | null>(null);
   let running = $state(false);
+  let loading = $state(true);
+  let retryCount = $state(0);
+  let manifestLoaded = false;
+  let runLoaded = false;
+
+  function markLoaded() {
+    if (manifestLoaded && runLoaded) loading = false;
+  }
 
   const { url } = $derived(page);
 
   $effect(() => {
     if (!browser) return;
+    void retryCount;
     let cancelled = false;
+    manifestLoaded = false;
+    runLoaded = false;
+    loading = true;
+    error = null;
+    manifest = null;
+    run = null;
+    byId = null;
     const runId = new URL(url.toString()).searchParams.get('runId');
     getManifest().then(
       (m) => {
         if (cancelled) return;
         manifest = m;
+        manifestLoaded = true;
+        markLoaded();
         getPlayersIndex().then(
           (ix) => {
             if (!cancelled) {
@@ -54,7 +73,10 @@
         );
       },
       () => {
-        if (!cancelled) error = 'The manifest is unavailable.';
+        if (!cancelled) {
+          error = 'The manifest is unavailable.';
+          loading = false;
+        }
       },
     );
     const loadRun = (id: string | null) => {
@@ -69,12 +91,18 @@
           if (cancelled) return;
           if (!record) {
             error = 'No completed challenge found. Run one first.';
+            loading = false;
             return;
           }
           run = record.run;
+          runLoaded = true;
+          markLoaded();
         },
         (e: unknown) => {
-          if (!cancelled) error = e instanceof Error ? e.message : String(e);
+          if (!cancelled) {
+            error = e instanceof Error ? e.message : String(e);
+            loading = false;
+          }
         },
       );
     };
@@ -83,6 +111,11 @@
       cancelled = true;
     };
   });
+
+  function retryResult() {
+    clearDataLoaderCaches();
+    retryCount += 1;
+  }
 
   /** Resolves the run's player pools. */
   $effect(() => {
@@ -136,8 +169,7 @@
 
   {#if error}
     <div class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      <p class="font-semibold">Result unavailable</p>
-      <p class="mt-1 text-muted-foreground">{error}</p>
+      <AsyncState kind="error" title="Result unavailable" message={error} retry={retryResult} />
       <a
         href={resolve('/classic/history')}
         class="mt-3 inline-flex rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground"
@@ -145,7 +177,7 @@
         Challenge history
       </a>
     </div>
-  {:else if !run}
+  {:else if loading || !run}
     <div class="mt-8 grid place-items-center rounded-xl border border-border bg-card p-16">
       <div
         class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"

@@ -241,16 +241,24 @@
   }
 
   function toggleCompare(player: IndexRow) {
-    const existing = compareSelection.findIndex((entry) => entry.playerId === player.playerId);
+    const existing = compareSelection.findIndex((entry) => comparisonKey(entry) === comparisonKey(player));
     if (existing >= 0) {
-      compareSelection = compareSelection.filter((entry) => entry.playerId !== player.playerId);
+      compareSelection = compareSelection.filter((entry) => comparisonKey(entry) !== comparisonKey(player));
       return;
     }
     if (compareSelection.length < 2) compareSelection = [...compareSelection, player];
   }
 
-  function removeCompare(playerId: string) {
-    compareSelection = compareSelection.filter((entry) => entry.playerId !== playerId);
+  function comparisonKey(player: IndexRow): string {
+    return `${player.franchiseId}/${player.eraId}/${player.playerId}`;
+  }
+
+  function isCompared(player: IndexRow): boolean {
+    return compareSelection.some((entry) => comparisonKey(entry) === comparisonKey(player));
+  }
+
+  function removeCompare(key: string) {
+    compareSelection = compareSelection.filter((entry) => comparisonKey(entry) !== key);
   }
 
   function clearCompare() {
@@ -764,22 +772,15 @@
                       <td class="px-3 py-2 text-right">
                         <button
                           type="button"
-                          aria-pressed={compareSelection.some(
-                            (entry) => entry.playerId === player.playerId,
-                          )}
-                          aria-label={`${compareSelection.some((entry) => entry.playerId === player.playerId) ? 'Remove' : 'Add'} ${player.displayName} ${compareSelection.length >= 2 && !compareSelection.some((entry) => entry.playerId === player.playerId) ? '(comparison full)' : ''}`}
-                          disabled={compareSelection.length >= 2 &&
-                            !compareSelection.some((entry) => entry.playerId === player.playerId)}
+                          aria-pressed={isCompared(player)}
+                          aria-label={`${isCompared(player) ? 'Remove' : 'Add'} ${player.displayName} ${compareSelection.length >= 2 && !isCompared(player) ? '(comparison full)' : ''}`}
+                          disabled={compareSelection.length >= 2 && !isCompared(player)}
                           onclick={() => toggleCompare(player)}
-                          class="rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {compareSelection.some(
-                            (entry) => entry.playerId === player.playerId,
-                          )
+                          class="rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(player)
                             ? 'border-primary bg-primary/10 text-primary'
                             : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
                         >
-                          {compareSelection.some((entry) => entry.playerId === player.playerId)
-                            ? 'Added'
-                            : 'Compare'}
+                          {isCompared(player) ? 'Added' : 'Compare'}
                         </button>
                       </td>
                     </tr>
@@ -843,22 +844,15 @@
                     </button>
                     <button
                       type="button"
-                      aria-pressed={compareSelection.some(
-                        (entry) => entry.playerId === player.playerId,
-                      )}
-                      aria-label={`${compareSelection.some((entry) => entry.playerId === player.playerId) ? 'Remove' : 'Add'} ${player.displayName} ${compareSelection.length >= 2 && !compareSelection.some((entry) => entry.playerId === player.playerId) ? '(comparison full)' : ''}`}
-                      disabled={compareSelection.length >= 2 &&
-                        !compareSelection.some((entry) => entry.playerId === player.playerId)}
+                      aria-pressed={isCompared(player)}
+                      aria-label={`${isCompared(player) ? 'Remove' : 'Add'} ${player.displayName} ${compareSelection.length >= 2 && !isCompared(player) ? '(comparison full)' : ''}`}
+                      disabled={compareSelection.length >= 2 && !isCompared(player)}
                       onclick={() => toggleCompare(player)}
-                      class="shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {compareSelection.some(
-                        (entry) => entry.playerId === player.playerId,
-                      )
+                      class="shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(player)
                         ? 'border-primary bg-primary/10 text-primary'
                         : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
                     >
-                      {compareSelection.some((entry) => entry.playerId === player.playerId)
-                        ? 'Added'
-                        : 'Compare'}
+                      {isCompared(player) ? 'Added' : 'Compare'}
                     </button>
                   </div>
                 </li>

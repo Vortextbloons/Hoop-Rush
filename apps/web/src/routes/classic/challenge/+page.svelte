@@ -10,11 +10,12 @@
   } from '@hoop-rush/data-contracts';
   import type { RouteId } from '$app/types';
   import { variantLabel } from '$lib/draft-presentation';
-  import { getEraSimulationProfile, getManifest } from '$lib/data';
+import { clearDataLoaderCaches, getEraSimulationProfile, getManifest } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { ChallengeRunner, type RunnerPhase } from '$lib/challenge-runner';
   import ChallengeOverlay from '$lib/components/ChallengeOverlay.svelte';
-  import { loadRunPlayersById } from '$lib/sandbox-lineup';
+import { loadRunPlayersById } from '$lib/sandbox-lineup';
+import AsyncState from '$lib/components/AsyncState.svelte';
 
   /**
    * Classic challenge progress: the shared full-screen overlay driven by the
@@ -31,12 +32,14 @@
 
   let phase = $state<RunnerPhase>('idle');
   let runnerError = $state<string | null>(null);
+  let retryCount = $state(0);
   let announcedCount = 0;
 
   const ANNOUNCEMENT_EVERY = 10;
 
   $effect(() => {
     if (!browser) return;
+    void retryCount;
     let cancelled = false;
     getManifest().then(
       (m) => {
@@ -97,6 +100,18 @@
       cancelled = true;
     };
   });
+
+  function retryChallenge() {
+    clearDataLoaderCaches();
+    manifest = null;
+    profile = null;
+    run = null;
+    byId = null;
+    loadError = null;
+    runnerError = null;
+    phase = 'idle';
+    retryCount += 1;
+  }
 
   // Worker + persistence boundary: one runner per loaded session. The runner
   // is intentionally NON-reactive (a plain variable): the effect must not
@@ -201,6 +216,12 @@
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
   {#if loadError}
     <div class="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+      <AsyncState
+        kind="error"
+        title="Challenge unavailable"
+        message={loadError}
+        retry={retryChallenge}
+      />
       <p class="font-semibold">Challenge unavailable</p>
       <p class="mt-1 text-muted-foreground">{loadError}</p>
       <a
@@ -211,6 +232,7 @@
       </a>
     </div>
   {:else if !run}
+    <AsyncState kind="loading" title="Loading challenge" message="Restoring the active run…" />
     <div class="mt-8 grid place-items-center rounded-xl border border-border bg-card p-16">
       <div
         class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"

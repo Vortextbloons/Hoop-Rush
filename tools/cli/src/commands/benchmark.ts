@@ -101,8 +101,8 @@ function compareBaseline(
   ];
   const failures: string[] = [];
   for (const comparison of comparisons) {
-    const currentMetric = current[comparison.id] as TimedMetric;
-    const baselineMetric = baseline[comparison.id] as TimedMetric;
+    const currentMetric: TimedMetric = current[comparison.id];
+    const baselineMetric: TimedMetric = baseline[comparison.id];
     for (const metric of ['medianMs', 'p95Ms'] as const) {
       const increase = currentMetric[metric] - baselineMetric[metric];
       if (currentMetric[metric] > baselineMetric[metric] * 1.25 && increase > comparison.noiseMs) {

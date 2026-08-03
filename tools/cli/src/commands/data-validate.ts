@@ -334,8 +334,10 @@ function auditPoolContent(
       }
     }
 
-    // Cross-slot duplication: (playerExternalId, seasonKey) at most once.
-    const psKey = `${player.playerExternalId}/${player.seasonKey}`;
+    // A player may legitimately appear in multiple franchise pools during
+    // one season after a trade. The uniqueness boundary is the packaged
+    // franchise player-season, not the league-wide player-season.
+    const psKey = `${player.franchiseId}/${player.playerExternalId}/${player.seasonKey}`;
     const owner = playerSeasons.get(psKey);
     if (owner !== undefined && owner !== key) {
       failures.push(`pools: ${key} player-season ${psKey} also packaged in ${owner}`);

@@ -24,7 +24,24 @@
   } = $props();
 
   let open = $state(false);
+  let compareButton = $state<HTMLButtonElement | undefined>(undefined);
+  let lastTrigger = $state<HTMLElement | null>(null);
   const ready = $derived(selected.length === 2);
+
+  function selectionKey(player: PlayersIndexEntry): string {
+    return `${player.franchiseId}/${player.eraId}/${player.playerId}`;
+  }
+
+  function openComparison() {
+    lastTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : compareButton ?? null;
+    open = true;
+  }
+
+  function restoreFocus() {
+    const target = lastTrigger ?? compareButton;
+    lastTrigger = null;
+    queueMicrotask(() => target?.focus());
+  }
 
   function displayName(player: PlayersIndexEntry): string {
     return player.displayName || `${player.firstName} ${player.lastName}`;
@@ -121,7 +138,7 @@
         Compare tray · {selected.length}/2
       </p>
       <div class="mt-2 flex min-w-0 flex-wrap gap-2">
-        {#each selected as player (player.playerId)}
+        {#each selected as player (selectionKey(player))}
           <span
             class="inline-flex max-w-full items-center gap-1.5 rounded-md bg-surface-2 px-2 py-1 text-xs font-semibold"
           >
@@ -129,7 +146,7 @@
             <button
               type="button"
               aria-label={`Remove ${displayName(player)} from comparison`}
-              onclick={() => onremove(player.playerId)}
+              onclick={() => onremove(selectionKey(player))}
               class="grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               <X class="h-3 w-3" />
@@ -141,8 +158,9 @@
     <div class="mt-3 flex shrink-0 gap-2 sm:mt-0">
       <button
         type="button"
+        bind:this={compareButton}
         disabled={!ready}
-        onclick={() => (open = true)}
+        onclick={openComparison}
         class="flex-1 rounded-md bg-primary px-3 py-2 font-mono text-xs font-bold text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none"
       >
         Compare players
@@ -165,6 +183,7 @@
   open={open && ready}
   onOpenChange={(value) => {
     open = value;
+    if (!value) restoreFocus();
   }}
 >
   <Dialog.Portal>
@@ -190,7 +209,7 @@
       </div>
 
       <div class="mt-5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 sm:gap-4">
-        {#each selected as player (player.playerId)}
+        {#each selected as player (selectionKey(player))}
           <section class="min-w-0 rounded-lg border border-border bg-surface-1 p-3 sm:p-4">
             <div class="flex items-center gap-2.5">
               <PlayerFace
@@ -245,7 +264,7 @@
           class="grid grid-cols-[minmax(6rem,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] bg-surface-2 font-mono text-[10px] font-bold uppercase"
         >
           <div class="px-2.5 py-2 text-muted-foreground">Stat</div>
-          {#each selected as player (player.playerId)}
+          {#each selected as player (selectionKey(player))}
             <div class="truncate px-2.5 py-2 text-right">{displayName(player)}</div>
           {/each}
         </div>
@@ -254,7 +273,7 @@
             class="grid grid-cols-[minmax(6rem,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] border-t border-border/70 text-xs"
           >
             <div class="px-2.5 py-2 text-muted-foreground">{metric}</div>
-            {#each selected as player (player.playerId)}
+            {#each selected as player (selectionKey(player))}
               <div class="px-2.5 py-2 text-right font-mono font-semibold tabular-nums">
                 {metricValue(player, metric)}
               </div>
