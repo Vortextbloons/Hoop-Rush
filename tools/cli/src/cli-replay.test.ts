@@ -21,8 +21,6 @@ describe('cli: replay', () => {
     expect(code).toBe(0);
     const payload = simGameReportSchema.parse(jsonPayload(stdout));
     const { result } = payload;
-    const report = JSON.parse(stdout.slice(stdout.indexOf('{'))) as { input: { seed?: string } };
-    const input = report.input;
 
     // Build the serialized GameSimulationInput from the fixture + seed.
     const fixture = JSON.parse(
@@ -58,7 +56,6 @@ describe('cli: replay', () => {
     expect(replayPayload.identical).toBe(true);
     expect(replayPayload.firstDifference).toBeNull();
     expect(replayPayload.seed).toBe('12341234123412341234123412341234');
-    void input;
   });
 
   it('reports the first structured difference and exits 1 on mismatch', async () => {

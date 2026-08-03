@@ -32,6 +32,7 @@
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
+  import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
@@ -170,6 +171,8 @@
     }
     return rows;
   });
+
+  const pickedCount = $derived(slots.filter((player) => player !== null).length);
 
   const franchiseRerollAvailable = $derived(
     draft && catalog.length > 0
@@ -664,6 +667,8 @@
           onmove={openPicker}
           onremove={() => undefined}
         />
+
+        <LineupSummaryNav {slots} {pickedCount} />
       </div>
     {/if}
   {/if}

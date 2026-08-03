@@ -135,7 +135,7 @@
 
 {#if selected.length > 0}
   <div
-    class="sticky bottom-3 z-30 mt-4 rounded-xl border border-primary/35 bg-card/95 p-3 shadow-2xl shadow-black/25 backdrop-blur sm:bottom-5 sm:flex sm:items-center sm:gap-4"
+    class="fixed inset-x-3 bottom-3 z-30 rounded-xl border border-primary/35 bg-card/95 p-3 shadow-2xl shadow-black/25 backdrop-blur sm:sticky sm:inset-x-auto sm:bottom-5 sm:mt-4 sm:flex sm:items-center sm:gap-4"
   >
     <div class="min-w-0 flex-1">
       <p class="font-mono text-[10px] font-bold tracking-[0.14em] text-primary uppercase">

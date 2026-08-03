@@ -129,7 +129,7 @@ describe('completedRunIndexSchema', () => {
     expect(completedRunIndexSchema.safeParse(row).success).toBe(true);
   });
 
-  it('rejects an outcome missing from a completed row', () => {
+  it('rejects a completed row with an invalid completedAtIso', () => {
     const row = {
       recordId: 'run-2',
       runId: 'run-2',
@@ -143,6 +143,23 @@ describe('completedRunIndexSchema', () => {
       gamesPlayed: 82,
       outcome: 'perfect',
       completedAtIso: 'not-a-date',
+    };
+    expect(completedRunIndexSchema.safeParse(row).success).toBe(false);
+  });
+
+  it('rejects a completed row missing the outcome', () => {
+    const row = {
+      recordId: 'run-2',
+      runId: 'run-2',
+      mode: 'sandbox',
+      franchiseId: 'lakers',
+      eraId: '1990s',
+      playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
+      runSeed: 'abcd1234abcd1234abcd1234abcd1234',
+      wins: 82,
+      losses: 0,
+      gamesPlayed: 82,
+      completedAtIso: '2026-07-31T12:00:00.000Z',
     };
     expect(completedRunIndexSchema.safeParse(row).success).toBe(false);
   });

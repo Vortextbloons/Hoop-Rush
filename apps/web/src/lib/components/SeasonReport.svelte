@@ -661,73 +661,101 @@
         {@const row = seasonTable[index]}
         {@const raw = aggregates!.players.find((p) => p.playerId === aggregate.playerId)!}
         <article class="rounded-lg border border-border bg-surface-1 p-3">
-          <div class="flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <p class="truncate text-sm font-bold">
-                {row?.player.displayName ?? aggregate.playerId}
-              </p>
-              <p class="font-mono text-[10px] text-muted-foreground">
-                {SLOT_LABELS[index]} · {aggregate.gamesPlayed} games
-              </p>
+          <div class="flex items-start gap-3">
+            {#if row}
+              <PlayerFace
+                player={row.player}
+                manifest={manifest!}
+                size="sm"
+                fallbackInitials={row.player.firstName[0]! + row.player.lastName[0]!}
+              />
+            {/if}
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="truncate text-sm font-bold">
+                    {row?.player.displayName ?? aggregate.playerId}
+                  </p>
+                  <p class="font-mono text-[10px] text-muted-foreground">
+                    {SLOT_LABELS[index]} · {aggregate.gamesPlayed} games
+                  </p>
+                </div>
+                <p class="shrink-0 font-mono text-sm font-bold tabular-nums">
+                  {formatAggregateStat(aggregate.points)} PTS
+                </p>
+              </div>
             </div>
-            <p class="font-mono text-sm font-bold">{formatAggregateStat(aggregate.points)} PTS</p>
           </div>
-          <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">FGA</dt>
-              <dd class="font-mono">{formatAggregateStat(aggregate.fieldGoals.attempted)}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">FG%</dt>
-              <dd class="font-mono">{pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">3PA / 3P%</dt>
-              <dd class="font-mono">
-                {formatAggregateStat(aggregate.threes.attempted)} / {pct(
-                  raw.threes.made,
-                  raw.threes.attempted,
-                )}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">FTA / FT%</dt>
-              <dd class="font-mono">
-                {formatAggregateStat(aggregate.freeThrows.attempted)} / {pct(
-                  raw.freeThrows.made,
-                  raw.freeThrows.attempted,
-                )}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">TS%</dt>
-              <dd class="font-mono">
-                {trueShootingPct(raw.points, raw.fieldGoals.attempted, raw.freeThrows.attempted)}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">USG%</dt>
-              <dd class="font-mono">{usagePct(raw, aggregates!.team)}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">REB</dt>
-              <dd class="font-mono">{formatAggregateStat(aggregate.rebounds.total)}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">AST</dt>
-              <dd class="font-mono">{formatAggregateStat(aggregate.assists)}</dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">STL / BLK</dt>
-              <dd class="font-mono">
-                {formatAggregateStat(aggregate.steals)} / {formatAggregateStat(aggregate.blocks)}
-              </dd>
-            </div>
-            <div class="flex justify-between gap-2">
-              <dt class="text-muted-foreground">TOV</dt>
-              <dd class="font-mono">{formatAggregateStat(aggregate.turnovers)}</dd>
-            </div>
-          </dl>
+          <table class="mt-3 w-full text-xs">
+            <tbody class="font-mono tabular-nums">
+              <tr class="border-b border-border/40">
+                <td class="py-1.5 pr-2 text-muted-foreground">FGA</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {formatAggregateStat(aggregate.fieldGoals.attempted)}
+                </td>
+                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">FG%</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {pct(raw.fieldGoals.made, raw.fieldGoals.attempted)}
+                </td>
+              </tr>
+              <tr class="border-b border-border/40">
+                <td class="py-1.5 pr-2 text-muted-foreground">3PA</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {formatAggregateStat(aggregate.threes.attempted)}
+                </td>
+                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">3P%</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {pct(raw.threes.made, raw.threes.attempted)}
+                </td>
+              </tr>
+              <tr class="border-b border-border/40">
+                <td class="py-1.5 pr-2 text-muted-foreground">FTA</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {formatAggregateStat(aggregate.freeThrows.attempted)}
+                </td>
+                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">FT%</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {pct(raw.freeThrows.made, raw.freeThrows.attempted)}
+                </td>
+              </tr>
+              <tr class="border-b border-border/40">
+                <td class="py-1.5 pr-2 text-muted-foreground">TS%</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {trueShootingPct(raw.points, raw.fieldGoals.attempted, raw.freeThrows.attempted)}
+                </td>
+                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">USG%</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {usagePct(raw, aggregates!.team)}
+                </td>
+              </tr>
+              <tr class="border-b border-border/40">
+                <td class="py-1.5 pr-2 text-muted-foreground">REB</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {formatAggregateStat(aggregate.rebounds.total)}
+                </td>
+                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">AST</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {formatAggregateStat(aggregate.assists)}
+                </td>
+              </tr>
+              <tr class="border-b border-border/40">
+                <td class="py-1.5 pr-2 text-muted-foreground">STL</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {formatAggregateStat(aggregate.steals)}
+                </td>
+                <td class="py-1.5 pr-2 pl-3 text-muted-foreground">BLK</td>
+                <td class="py-1.5 text-right font-semibold text-foreground">
+                  {formatAggregateStat(aggregate.blocks)}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-1.5 pr-2 text-muted-foreground">TOV</td>
+                <td class="py-1.5 text-right font-semibold text-foreground" colspan="3">
+                  {formatAggregateStat(aggregate.turnovers)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </article>
       {/each}
     </div>

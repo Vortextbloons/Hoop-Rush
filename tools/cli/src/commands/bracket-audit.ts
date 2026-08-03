@@ -172,8 +172,18 @@ export function bracketAudit(
   }
 
   // The opening opponent must be unchanged from the authored preview and be
-  // the game-one matchup.
-  const openingFailures = openingOpponentUnchanged(bracket, previewPath);
+  // the game-one matchup. A missing preview is a data-load error, not a
+  // checked bracket failure.
+  let openingFailures: string[];
+  try {
+    openingFailures = openingOpponentUnchanged(bracket, previewPath);
+  } catch (error) {
+    return makeReport(
+      'bracket audit',
+      { input: inputPath },
+      { failures: [(error as Error).message], exitCode: EXIT_USAGE_OR_DATA_ERROR },
+    );
+  }
   failures.push(...openingFailures);
   if (bracket.schedule[0]?.opponentId !== 'lakers-1990s-opening') {
     failures.push('schedule game one must be the lakers-1990s-opening opponent');

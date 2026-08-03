@@ -9,6 +9,7 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { parsePool } from '@hoop-rush/data-contracts';
 import { PUBLIC_DATA } from './config.js';
 import { readJson } from './json.js';
 import { computePool, loadBbrefIds, loadManifest } from './pools/compute.js';
@@ -55,45 +56,60 @@ function topFive(players: CommittedPoolPlayer[]): string[] {
 
 describe('parity: pools vs committed artifacts', () => {
   for (const [franchiseId, eraId] of TARGETS) {
-    it(`${franchiseId}/${eraId} eligibility and top-5 selection match`, () => {
-      const manifest = loadManifest();
-      const bbrefIds = loadBbrefIds();
-      const result = computePool(franchiseId, eraId, manifest, bbrefIds, false);
-      if ('reason' in result) {
-        throw new Error(`pool ${franchiseId}/${eraId} failed: ${result.reason} ${result.detail}`);
-      }
-      const pool = result;
+    it(
+      `${franchiseId}/${eraId} eligibility and top-5 selection match`,
+      // The real-data recompute scans raw-data season files; under a fully
+      // parallel gate a cold cache can exceed the 5s default vitest budget.
+      { timeout: 30_000 },
+      () => {
+        const manifest = loadManifest();
+        const bbrefIds = loadBbrefIds();
+        const result = computePool(franchiseId, eraId, manifest, bbrefIds, false);
+        if ('reason' in result) {
+          throw new Error(`pool ${franchiseId}/${eraId} failed: ${result.reason} ${result.detail}`);
+        }
+        const pool = result;
 
-      const committed = readJson(
-        `${PUBLIC_DATA}/pools/${franchiseId}-${eraId}.json`,
-      ) as CommittedPool;
-      expect(pool.players.length).toBe(committed.players.length);
-      expect(topFive(pool.players)).toEqual(topFive(committed.players));
-    });
+        // The TS port must produce a schema-valid pool (folded in from the
+        // former real-data dry run).
+        expect(() => parsePool(pool)).not.toThrow();
+
+        const committed = readJson(
+          `${PUBLIC_DATA}/pools/${franchiseId}-${eraId}.json`,
+        ) as CommittedPool;
+        expect(pool.players.length).toBe(committed.players.length);
+        expect(topFive(pool.players)).toEqual(topFive(committed.players));
+      },
+    );
   }
 });
 
 describe('parity: era profiles vs committed artifacts', () => {
-  it('all era parameters match the committed profiles within rounding tolerance', () => {
-    const eras = erasWithData();
-    expect(eras.length).toBeGreaterThan(0);
+  it(
+    'all era parameters match the committed profiles within rounding tolerance',
+    // The real-data recompute reads every packaged era's stint files.
+    { timeout: 30_000 },
+    () => {
+      const eras = erasWithData();
+      expect(eras.length).toBeGreaterThan(0);
 
-    for (const era of eras) {
-      const packagedPath = `${PUBLIC_DATA}/era-sim/${era.eraId}.json`;
-      if (!existsSync(packagedPath)) continue;
+      for (const era of eras) {
+        const packagedPath = `${PUBLIC_DATA}/era-sim/${era.eraId}.json`;
+        if (!existsSync(packagedPath)) continue;
 
-      const profile = computeEraProfile(era);
-      const committedProfile = readJson(packagedPath) as {
-        parameters: Record<string, number>;
-      };
-      for (const key of PARAM_KEYS) {
-        const expected = committedProfile.parameters[key] ?? 0;
-        const actual = profile.parameters[key];
-        // Both sides round from the same stint aggregates; allow float noise.
-        expect(Math.abs(actual - expected)).toBeLessThanOrEqual(0.0015);
+        const profile = computeEraProfile(era);
+        const committedProfile = readJson(packagedPath) as {
+          parameters: Record<string, number>;
+        };
+        for (const key of PARAM_KEYS) {
+          const expected = committedProfile.parameters[key] ?? 0;
+          const actual = profile.parameters[key];
+          // Both sides round from the same stint aggregates; allow float noise.
+          expect(Math.abs(actual - expected)).toBeLessThanOrEqual(0.0015);
+        }
       }
-    }
-  });
+    },
+  );
 
   it('era-sim directory contains a profile per packaged era', () => {
     const files = readdirSync(`${PUBLIC_DATA}/era-sim`).filter((f) => f.endsWith('.json'));

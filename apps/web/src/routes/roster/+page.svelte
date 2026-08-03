@@ -296,7 +296,11 @@
   <title>Roster — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+<section
+  class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 {compareSelection.length > 0
+    ? 'pb-40 sm:pb-10'
+    : ''}"
+>
   <div class="flex items-end justify-between gap-4">
     <div>
       <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Roster</p>

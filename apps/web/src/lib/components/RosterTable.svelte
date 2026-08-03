@@ -194,26 +194,24 @@
   </table>
 </div>
 
-<ul class="flex flex-col gap-1 sm:hidden" aria-label={heading}>
+<ul class="flex flex-col gap-2 sm:hidden" aria-label={heading}>
   {#each items as item (groupKey(item))}
     {#if item.type === 'group'}
       <li
-        class="px-2 pt-3 pb-1 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+        class="px-1 pt-3 pb-1 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
       >
         {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ?? item.eraId} · {item.count}
         players
       </li>
     {:else}
       {@const player = item.player}
-      <li
-        class="rounded-lg border border-transparent px-2 py-2.5 transition-colors active:bg-surface-2"
-      >
-        <div class="flex items-center gap-3">
+      <li class="rounded-lg border border-border bg-card px-3 py-3">
+        <div class="flex items-start gap-3">
           <button
             type="button"
             aria-label={`View ${player.displayName} stats`}
             onclick={() => onOpen(player)}
-            class="flex min-w-0 flex-1 items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="flex min-w-0 flex-1 items-start gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <PlayerFace
               {player}
@@ -223,23 +221,9 @@
             />
             <span class="min-w-0 flex-1">
               <span class="block truncate text-sm font-bold">{player.displayName}</span>
-              <span class="block font-mono text-[10px] text-muted-foreground">
+              <span class="mt-0.5 block font-mono text-[10px] leading-snug text-muted-foreground">
                 {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(player.eraId) ??
                   player.eraId} · {player.seasonKey} · {player.positionsCanonical.join('/')}
-              </span>
-            </span>
-            <span class="flex shrink-0 items-center gap-1 font-mono text-[10px]">
-              <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
-                O {player.overall}
-              </span>
-              <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Points per game">
-                {formatPerGame(perGame(player.stats, 'points'))}
-              </span>
-              <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Rebounds per game">
-                {formatPerGame(perGame(player.stats, 'rebounds'))}
-              </span>
-              <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Assists per game">
-                {formatPerGame(perGame(player.stats, 'assists'))}
               </span>
             </span>
           </button>
@@ -248,8 +232,11 @@
             aria-pressed={isCompared(player)}
             aria-label={compareLabel(player)}
             disabled={compareFull && !isCompared(player)}
-            onclick={() => onToggleCompare(player)}
-            class="shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(
+            onclick={(event) => {
+              event.stopPropagation();
+              onToggleCompare(player);
+            }}
+            class="shrink-0 rounded-md border px-2.5 py-2 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(
               player,
             )
               ? 'border-primary bg-primary/10 text-primary'
@@ -258,6 +245,35 @@
             {isCompared(player) ? 'Added' : 'Compare'}
           </button>
         </div>
+        <button
+          type="button"
+          aria-label={`View ${player.displayName} stats`}
+          onclick={() => onOpen(player)}
+          class="mt-2.5 grid w-full grid-cols-4 gap-1 rounded-md bg-surface-1 p-2 text-center font-mono text-[10px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span class="rounded px-1 py-0.5">
+            <span class="block text-[9px] text-muted-foreground uppercase">O</span>
+            <span class="block font-bold tabular-nums">{player.overall}</span>
+          </span>
+          <span class="rounded px-1 py-0.5">
+            <span class="block text-[9px] text-muted-foreground uppercase">PTS</span>
+            <span class="block font-bold tabular-nums"
+              >{formatPerGame(perGame(player.stats, 'points'))}</span
+            >
+          </span>
+          <span class="rounded px-1 py-0.5">
+            <span class="block text-[9px] text-muted-foreground uppercase">REB</span>
+            <span class="block font-bold tabular-nums"
+              >{formatPerGame(perGame(player.stats, 'rebounds'))}</span
+            >
+          </span>
+          <span class="rounded px-1 py-0.5">
+            <span class="block text-[9px] text-muted-foreground uppercase">AST</span>
+            <span class="block font-bold tabular-nums"
+              >{formatPerGame(perGame(player.stats, 'assists'))}</span
+            >
+          </span>
+        </button>
       </li>
     {/if}
   {/each}
