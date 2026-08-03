@@ -217,6 +217,7 @@ const COMMANDS: Record<string, CommandDef> = {
       importRatings({
         seasons: getOptionString(args, 'seasons'),
         forceRatings: hasOption(args, 'force-ratings'),
+        workers: getOptionString(args, 'workers'),
       }),
   },
   'import pools': {
@@ -226,6 +227,7 @@ const COMMANDS: Record<string, CommandDef> = {
         pools: getOptionString(args, 'pools'),
         all: hasOption(args, 'all'),
         noAssets: hasOption(args, 'no-assets'),
+        workers: getOptionString(args, 'workers'),
       }),
   },
   'import era-profile': {

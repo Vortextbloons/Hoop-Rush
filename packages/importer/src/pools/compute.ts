@@ -251,7 +251,8 @@ export interface PoolWorkerData {
   targets: Array<[string, string]>;
   manifest: Manifest;
   bbrefIds: Record<string, string>;
-  careerLabels: Map<string, string[]> | null;
+  /** Structured-clone-safe form of Map<string, Set<string>>. */
+  careerLabels: Array<[string, string[]]> | null;
   withAssets: boolean;
 }
 
@@ -314,7 +315,9 @@ function runPoolChunk(
         targets: chunk,
         manifest,
         bbrefIds,
-        careerLabels: [...careerLabels.entries()].map(([pid, labels]) => [pid, [...labels]]),
+        careerLabels: [...careerLabels.entries()].map(
+          ([pid, labels]) => [pid, [...labels]] as [string, string[]],
+        ),
         withAssets,
       } satisfies PoolWorkerData,
     });
@@ -328,7 +331,7 @@ function runPoolChunk(
       if (settled) return;
       settled = true;
       void worker.terminate();
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
     });
     worker.once('exit', (code) => {
       if (settled || code === 0) return;
@@ -568,7 +571,9 @@ export function loadExistingAssetAltIds(
     }
     return byExternalId;
   } catch (error) {
-    console.log(`  [WARN] cannot read previous pool ${basename(path)}: ${(error as Error).message}`);
+    console.log(
+      `  [WARN] cannot read previous pool ${basename(path)}: ${(error as Error).message}`,
+    );
     return new Map();
   }
 }
@@ -583,7 +588,11 @@ export interface PoolPlayer {
   lastName: string;
   displayName: string;
   playerExternalId: string;
-  altIds: { bbref: string | null } | null;
+  altIds: {
+    bbref?: string | null;
+    nbaHeadshotAvailable?: boolean;
+    photoUrl?: string | null;
+  } | null;
   positions: {
     sourceLabels: string[];
     canonical: string[];
@@ -978,7 +987,7 @@ export function computePool(
       str(player.firstName),
       str(player.lastName),
     );
-    const altIds: Record<string, unknown> = {};
+    const altIds: NonNullable<PoolPlayer['altIds']> = {};
     if (Object.hasOwn(bbrefIds, pid)) {
       altIds.bbref = bbrefIds[pid];
     }
@@ -987,11 +996,11 @@ export function computePool(
     // (the UI then regresses to CDN silhouettes). bbref stays cache-authoritative.
     const previous = existingAssetAltIds.get(pid);
     if (previous !== undefined) {
-      if (Object.hasOwn(previous, 'nbaHeadshotAvailable')) {
+      if (typeof previous.nbaHeadshotAvailable === 'boolean') {
         altIds.nbaHeadshotAvailable = previous.nbaHeadshotAvailable;
       }
       if (Object.hasOwn(previous, 'photoUrl')) {
-        altIds.photoUrl = previous.photoUrl;
+        altIds.photoUrl = previous.photoUrl as string | null;
       }
     }
     playersOut.push({
@@ -1256,16 +1265,17 @@ export async function run(
   } else {
     const chunks = partitionPoolTargets(targets, workerCount);
     const workerResults = await Promise.all(
-      chunks.map((chunk) =>
-        runPoolChunk(chunk, manifest, bbrefIds, careerLabels, withAssets),
-      ),
+      chunks.map((chunk) => runPoolChunk(chunk, manifest, bbrefIds, careerLabels, withAssets)),
     );
     results = workerResults.flatMap((chunkResult) => chunkResult.results);
   }
 
   const entries = results
     .map((result) => result.entry)
-    .filter((entry): entry is { franchiseId: string; eraId: string; url: string; contentHash: string } => entry !== null);
+    .filter(
+      (entry): entry is { franchiseId: string; eraId: string; url: string; contentHash: string } =>
+        entry !== null,
+    );
   updateManifest(entries);
   recordCoverageReport(results.map((result) => result.coverage));
   refreshPlayersIndexInManifest();

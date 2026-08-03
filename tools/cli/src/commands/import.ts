@@ -41,17 +41,29 @@ function usageFailure(command: string, input: Record<string, unknown>, message: 
 export const IMPORT_RATINGS_OPTIONS: Record<string, boolean> = {
   seasons: true,
   'force-ratings': false,
+  workers: true,
   format: true,
   verbose: false,
 };
 
-export function importRatings(args: {
+/** Parses --workers; undefined when absent, usage error when malformed. */
+function parseWorkerCount(raw: string | null | undefined): number | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) {
+    throw new Error(`--workers must be a positive integer (got "${raw}")`);
+  }
+  return Math.trunc(n);
+}
+
+export async function importRatings(args: {
   seasons?: string | null;
   forceRatings?: boolean;
-}): CliReport {
+  workers?: string | null;
+}): Promise<CliReport> {
   const seasons = splitList(args.seasons ?? null) ?? DEFAULT_SEASONS;
   try {
-    ratings.run(seasons, args.forceRatings ?? false);
+    await ratings.run(seasons, args.forceRatings ?? false, parseWorkerCount(args.workers));
   } catch (error) {
     return usageFailure(
       'import ratings',
@@ -72,15 +84,17 @@ export const IMPORT_POOLS_OPTIONS: Record<string, boolean> = {
   pools: true,
   all: false,
   'no-assets': false,
+  workers: true,
   format: true,
   verbose: false,
 };
 
-export function importPools(args: {
+export async function importPools(args: {
   pools?: string | null;
   all?: boolean;
   noAssets?: boolean;
-}): CliReport {
+  workers?: string | null;
+}): Promise<CliReport> {
   let targets: Array<[string, string]> | null = null;
   if (args.all) {
     try {
@@ -103,7 +117,7 @@ export function importPools(args: {
     }
   }
   try {
-    pools.run(targets, !(args.noAssets ?? false));
+    await pools.run(targets, !(args.noAssets ?? false), parseWorkerCount(args.workers));
   } catch (error) {
     return usageFailure('import pools', { targets }, `pools failed: ${(error as Error).message}`);
   }
@@ -289,7 +303,7 @@ export async function importRunAll(args: {
 
   if (failures.length === 0) {
     try {
-      ratings.run(seasons, args.forceRatings ?? false);
+      await ratings.run(seasons, args.forceRatings ?? false, workers);
       details.push(`ratings: ${String(seasons.length)} season(s)`);
     } catch (error) {
       failures.push(`ratings failed: ${(error as Error).message}`);
@@ -307,7 +321,7 @@ export async function importRunAll(args: {
 
   if (failures.length === 0) {
     try {
-      pools.run(targets, true);
+      await pools.run(targets, true, workers);
       details.push('pools: built');
     } catch (error) {
       failures.push(`pools failed: ${(error as Error).message}`);

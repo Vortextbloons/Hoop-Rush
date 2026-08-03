@@ -27,8 +27,13 @@ export interface LineupBalance {
   ok: boolean;
 }
 
-/** Minimum lineup-average dimension value for an authored opponent (spec/01 #3). */
-export const BALANCE_FLOOR = 55;
+/**
+ * Minimum lineup-average dimension value for an authored opponent (spec/01 #3).
+ * Recalibrated to the m3.5 rating scale (m1.9-era ratings reached 100 on some
+ * dimensions; the m3.5 scale compresses rebounding to roughly 40-85), so the
+ * proposal sampler can find balanced lineups for every franchise.
+ */
+export const BALANCE_FLOOR = 52;
 
 function mean(values: readonly number[]): number {
   if (values.length === 0) return 0;

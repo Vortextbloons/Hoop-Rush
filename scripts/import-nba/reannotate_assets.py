@@ -229,6 +229,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("targets", nargs="*", help="franchiseId eraId pairs; default: all pools")
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="photo worker count")
+    parser.add_argument(
+        "--retry-wikipedia",
+        action="store_true",
+        help="retry empty Wikipedia cache entries and add cached Wikipedia photos even when other fallbacks exist",
+    )
     args = parser.parse_args()
 
     if args.targets:
@@ -290,7 +295,7 @@ def main() -> int:
         if not pool:
             continue
         for player in pool.get("players", []):
-            if (player.get("altIds") or {}).get("photoUrl") is None:
+            if args.retry_wikipedia or (player.get("altIds") or {}).get("photoUrl") is None:
                 pending.append((path.name, player))
     print(f"  [OK] {len(pending)} players need photoUrl ({args.workers} workers)")
 
@@ -310,6 +315,7 @@ def main() -> int:
                 status_cache,
                 photo_cache,
                 cache_lock,
+                args.retry_wikipedia,
             )
             ensure_alt_ids(player)["photoUrl"] = photo
 

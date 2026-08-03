@@ -233,7 +233,7 @@ function runRatingsChunk(seasons: readonly string[], force: boolean): Promise<vo
       if (settled) return;
       settled = true;
       void worker.terminate();
-      reject(error);
+      reject(error instanceof Error ? error : new Error(String(error)));
     });
     worker.once('exit', (code) => {
       if (settled || code === 0) return;
@@ -254,9 +254,7 @@ export async function run(seasons?: string[], force = false, workers?: number): 
     }
     return;
   }
-  await Promise.all(
-    chunkList(target, workerCount).map((chunk) => runRatingsChunk(chunk, force)),
-  );
+  await Promise.all(chunkList(target, workerCount).map((chunk) => runRatingsChunk(chunk, force)));
 }
 
 export { fieldPublished };

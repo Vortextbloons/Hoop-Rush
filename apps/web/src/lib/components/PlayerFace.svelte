@@ -1,6 +1,5 @@
 <script lang="ts">
   import {
-    isNbaCdnHeadshotUrl,
     resolveHeadshotUrls,
     shouldStallTimeoutHeadshot,
     type HoopRushManifest,
@@ -38,7 +37,6 @@
 
   const src = $derived(urls[attempt] ?? '');
   const showInitials = $derived(!src || attempt >= urls.length);
-  const useAnonymousCors = $derived(src !== '' && !isNbaCdnHeadshotUrl(src));
   const applyStallTimeout = $derived(shouldStallTimeoutHeadshot(src, urls, attempt, player));
 
   /**
@@ -87,7 +85,6 @@
         class="h-full w-full origin-top scale-[1.2] object-cover object-top"
         loading="lazy"
         decoding="async"
-        crossorigin={useAnonymousCors ? 'anonymous' : undefined}
         referrerpolicy="no-referrer"
         onerror={onError}
       />

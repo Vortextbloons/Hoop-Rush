@@ -27,9 +27,11 @@ import {
   sanitizeAnchors,
   candidateKey,
   computePool,
+  defaultPoolWorkers,
   loadBbrefIds,
   loadCareerPositionLabels,
   parsePoolTargets,
+  partitionPoolTargets,
   run,
   seasonToEra,
   selectionScore,
@@ -930,6 +932,115 @@ describe('allPoolTargets', () => {
   });
 });
 
+describe('partitionPoolTargets', () => {
+  const TARGETS: Array<[string, string]> = [
+    ['lakers', '1990s'],
+    ['celtics', '1990s'],
+    ['nets', '1990s'],
+    ['lakers', '2000s'],
+    ['celtics', '2000s'],
+    ['lakers', '2010s'],
+  ];
+
+  it('keeps every chunk single-era and preserves all targets', () => {
+    const chunks = partitionPoolTargets(TARGETS, 3);
+    expect(chunks).toHaveLength(3);
+    expect(chunks.flat()).toEqual(TARGETS);
+    for (const chunk of chunks) {
+      expect(new Set(chunk.map(([, era]) => era)).size).toBe(1);
+    }
+    expect(chunks.map((chunk) => chunk[0]?.[1])).toEqual(['1990s', '2000s', '2010s']);
+  });
+
+  it('splits the largest era groups to reach the worker count', () => {
+    const chunks = partitionPoolTargets(TARGETS, 4);
+    expect(chunks).toHaveLength(4);
+    expect(chunks.flat()).toEqual(TARGETS);
+    const sizes = chunks.map((chunk) => chunk.length).sort((a, b) => b - a);
+    expect(sizes).toEqual([2, 2, 1, 1]);
+  });
+
+  it('returns a single chunk for workers 1 and for single targets', () => {
+    expect(partitionPoolTargets(TARGETS, 1)).toEqual([TARGETS]);
+    expect(partitionPoolTargets([['lakers', '1990s']], 4)).toEqual([[['lakers', '1990s']]]);
+  });
+
+  it('is deterministic across calls', () => {
+    expect(partitionPoolTargets(TARGETS, 2)).toEqual(partitionPoolTargets(TARGETS, 2));
+  });
+});
+
+describe('defaultPoolWorkers', () => {
+  it('stays sequential under test (mocked config paths)', () => {
+    expect(defaultPoolWorkers()).toBe(1);
+  });
+});
+
+describe('asset altIds preservation', () => {
+  it('backfills nbaHeadshotAvailable and photoUrl from the previous pool build', () => {
+    const root = buildStandardFixture('altids');
+    // Simulate a previous build annotated by reannotate_assets.py: bbref id on
+    // record, stale bbref in the file, markers present, and one player whose
+    // photoUrl is legitimately null.
+    const previous = {
+      schemaVersion: SCHEMA_VERSION,
+      dataVersion: DATA_VERSION,
+      franchiseId: 'lakers',
+      eraId: '1990s',
+      eligibility: { minimumTeamGames: MIN_TEAM_GAMES },
+      coverageSummary: {
+        coverageBand: 'complete-box-derived',
+        observedFamilies: [],
+        derivedFamilies: [],
+        estimatedFamilies: [],
+        missingCategories: [],
+        lowConfidenceShare: 0,
+        policyVersion: CONFIDENCE_POLICY_VERSION,
+      },
+      players: [
+        {
+          playerExternalId: '1',
+          altIds: {
+            bbref: 'stale-alpha',
+            nbaHeadshotAvailable: false,
+            photoUrl: 'https://example.com/alpha.png',
+          },
+        },
+        {
+          playerExternalId: '2',
+          altIds: { bbref: 'stale-bravo', nbaHeadshotAvailable: true, photoUrl: null },
+        },
+        { playerExternalId: '10', altIds: null },
+      ],
+    };
+    writeJson(join(root.data, 'pools', 'lakers-1990s.json'), previous);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false) as Pool;
+
+    const byId = new Map(pool.players.map((player) => [player.playerExternalId, player.altIds]));
+    expect(byId.get('1')).toEqual({
+      bbref: 'alpha01',
+      nbaHeadshotAvailable: false,
+      photoUrl: 'https://example.com/alpha.png',
+    });
+    expect(byId.get('2')).toEqual({ bbref: 'bravo01', nbaHeadshotAvailable: true, photoUrl: null });
+    for (const [pid, altIds] of byId) {
+      if (pid === '1' || pid === '2') continue;
+      expect(altIds).toBeNull();
+    }
+  });
+
+  it('does not fabricate markers when no previous pool exists', () => {
+    buildStandardFixture('altids-none');
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false) as Pool;
+    const byId = new Map(pool.players.map((player) => [player.playerExternalId, player.altIds]));
+    expect(byId.get('1')).toEqual({ bbref: 'alpha01' });
+    expect(byId.get('2')).toEqual({ bbref: 'bravo01' });
+  });
+});
+
 describe('candidateKey', () => {
   it('orders by score, minutes, games, then earlier season', () => {
     const mk = (
@@ -981,10 +1092,10 @@ function compareKeys(a: readonly number[], b: readonly number[]): number {
 }
 
 describe('run / writePool / updateManifest', () => {
-  it('writes a valid pool, digests it, and merges the manifest sorted by key', () => {
+  it('writes a valid pool, digests it, and merges the manifest sorted by key', async () => {
     const root = buildStandardFixture('run');
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    run([['lakers', '1990s']], false);
+    await run([['lakers', '1990s']], false, 1);
 
     const poolPath = join(root.data, 'pools', 'lakers-1990s.json');
     const written = JSON.parse(readFileSync(poolPath, 'utf8')) as Pool;
@@ -1016,10 +1127,10 @@ describe('run / writePool / updateManifest', () => {
     expect(messages(log).some((m) => m.includes('[OK] manifest updated: 2 pools'))).toBe(true);
   });
 
-  it('skips failed pools and still updates the manifest', () => {
+  it('skips failed pools and still updates the manifest', async () => {
     const root = buildStandardFixture('run-skip');
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    run([['nets', '1990s']], false);
+    await run([['nets', '1990s']], false, 1);
     const manifest = readJson(join(root.data, 'manifest.json')) as Manifest;
     expect(manifest.pools).toEqual(fixtureManifest().pools);
     expect(manifest.dataVersion).toBe(DATA_VERSION);

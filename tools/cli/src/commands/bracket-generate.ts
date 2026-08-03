@@ -40,9 +40,9 @@ export const BRACKET_GENERATE_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-/** Fixed default generation seed; --seed overrides for regeneration checks. */
-const DEFAULT_GENERATION_SEED: Seed = '2b7e151628aed2a6abf7158809cf4f3c';
-const GENERATION_VERSION = 'bracket-m3-v2';
+/** Committed seed of the frozen bracket artifact; regeneration uses it. */
+const COMMITTED_GENERATION_SEED: Seed = '8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d';
+const GENERATION_VERSION = 'bracket-m3-v3';
 
 const NBA_ROOT = resolve(REPO_ROOT, 'raw-data/nba');
 const OPPONENTS_DIR = resolve(REPO_ROOT, 'apps/web/static/data/opponents');
@@ -427,7 +427,7 @@ export function bracketGenerate(args: {
   'data-version'?: string;
   verbose?: boolean;
 }): CliReport {
-  const seed = args.seed ?? DEFAULT_GENERATION_SEED;
+  const seed = args.seed ?? COMMITTED_GENERATION_SEED;
   if (!/^[0-9a-f]{16,64}$/.test(seed)) {
     throw new UsageError(`--seed must be hex (got "${seed}")`);
   }
@@ -458,10 +458,10 @@ export function bracketGenerate(args: {
   const openingOpponent: OpponentTeam = openingParsed.data;
 
   const difficulty: DifficultyProfile = {
-    profileVersion: 'm3-medium-v3',
+    profileVersion: 'm3-medium-v4',
     name: 'medium',
-    leagueMedianPercentileBand: [0.4, 0.55],
-    teamPercentileBand: [0.25, 0.65],
+    leagueMedianPercentileBand: [0.4, 0.52],
+    teamPercentileBand: [0.23, 0.6],
   };
 
   let bracket: OpponentBracket;
@@ -530,7 +530,7 @@ export function bracketGenerate(args: {
     `wrote ${outPath} (${contentHash.slice(0, 12)}…)`,
     `bracket ${bracket.bracketVersion} · schedule ${bracket.scheduleVersion} · seed ${seed}`,
     ...details,
-    `median percentile ${medianPct.toFixed(3)} (band 0.45..0.60)`,
+    `median percentile ${medianPct.toFixed(3)} (band ${difficulty.leagueMedianPercentileBand[0].toFixed(2)}..${difficulty.leagueMedianPercentileBand[1].toFixed(2)})`,
     ...sorted.map(
       (o) =>
         `  ${o.opponentId}: pct ${o.strength.percentile.toFixed(3)} · winRate ${o.strength.winRate.toFixed(3)} · ${o.players.map((p) => p.displayName).join(', ')}`,

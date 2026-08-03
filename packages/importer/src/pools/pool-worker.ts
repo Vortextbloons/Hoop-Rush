@@ -8,11 +8,7 @@
  * which alone updates the manifest, coverage report, and players index.
  */
 import { parentPort, workerData } from 'node:worker_threads';
-import {
-  buildPoolForTarget,
-  type PoolWorkerData,
-  type PoolWorkerResult,
-} from './compute.js';
+import { buildPoolForTarget, type PoolWorkerData, type PoolWorkerResult } from './compute.js';
 
 const data = workerData as PoolWorkerData;
 if (parentPort === null) {
@@ -23,7 +19,7 @@ const careerLabels =
   data.careerLabels === null
     ? null
     : new Map(
-        [...data.careerLabels.entries()].map(([pid, labels]) => [pid, new Set(labels)]),
+        data.careerLabels.map(([pid, labels]) => [pid, new Set(labels)] as [string, Set<string>]),
       );
 
 const results: PoolWorkerResult['results'] = [];

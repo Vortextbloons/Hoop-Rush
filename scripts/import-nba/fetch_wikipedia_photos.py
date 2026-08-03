@@ -203,14 +203,17 @@ def resolve_photo(
     status_cache: dict[str, str],
     photo_cache: dict[str, str],
     cache_lock: threading.Lock,
+    retry_wikipedia: bool = False,
 ) -> str | None:
     """Resolve (and cache in memory) a Wikipedia photo URL for a player."""
     cached = photo_cache.get(external_id)
-    if cached is not None:
+    if cached and not retry_wikipedia:
         return cached or None
+    if cached == "" and not retry_wikipedia:
+        return None
 
     photo: str | None = None
-    if bbref_image_status(external_id, bbref_id, status_cache, cache_lock) != "ok":
+    if retry_wikipedia or bbref_image_status(external_id, bbref_id, status_cache, cache_lock) != "ok":
         photo = wikipedia_thumbnail(display_name)
         if photo:
             print(f"    [photo] {display_name} ({external_id}) <- wikipedia")
