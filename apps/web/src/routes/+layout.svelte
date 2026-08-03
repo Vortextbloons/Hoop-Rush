@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
+  import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
   import { Home, Users } from '@lucide/svelte';
   import '../app.css';
@@ -36,7 +36,7 @@
       class="flex items-center gap-2.5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <img
-        src="/app-icon-512.png"
+        src={asset('/app-icon-512.png')}
         alt=""
         class="h-9 w-9 rounded-lg object-contain"
         width="36"
