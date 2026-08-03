@@ -178,8 +178,8 @@ export function perGame(stats: PlayerSeasonStats, key: keyof PlayerSeasonStats):
 }
 
 /** Made/attempted percentage 0-1, guarding against zero attempts. */
-export function shotPct(made: number, attempted: number): number {
-  if (attempted <= 0) return 0;
+export function shotPct(made: number | null, attempted: number | null): number {
+  if (made === null || attempted === null || attempted <= 0) return 0;
   return made / attempted;
 }
 

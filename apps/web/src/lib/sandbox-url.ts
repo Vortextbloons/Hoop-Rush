@@ -89,7 +89,7 @@ export function parseSandboxUrl(
 
   if (manifest !== null) {
     for (const slot of slots) {
-      if (!manifest.franchiseLineage.some((e) => e.franchiseId === slot.franchiseId)) {
+      if (!manifest.modernFranchiseSlots.some((s) => s.franchiseId === slot.franchiseId)) {
         return { ok: false, state: null, error: `Unknown franchise "${slot.franchiseId}".` };
       }
       if (!manifest.eras.some((e) => e.eraId === slot.eraId)) {
