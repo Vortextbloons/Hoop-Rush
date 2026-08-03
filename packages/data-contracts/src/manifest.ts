@@ -56,6 +56,14 @@ export const opponentIndexEntrySchema = z.object({
 });
 export type OpponentIndexEntry = z.infer<typeof opponentIndexEntrySchema>;
 
+export const playersIndexAssetSchema = z.object({
+  /** Relative or absolute URL of the global players index artifact. */
+  url: z.string().min(1).max(512),
+  /** SHA-256 content hash of the referenced artifact. */
+  contentHash: contentHashSchema,
+});
+export type PlayersIndexAsset = z.infer<typeof playersIndexAssetSchema>;
+
 export const hoopRushManifestSchema = z.object({
   schemaVersion: z.literal(2),
   dataVersion: z.string().min(1).max(64),
@@ -72,6 +80,8 @@ export const hoopRushManifestSchema = z.object({
   eraSimulationProfiles: z.array(simProfileIndexEntrySchema),
   /** The single frozen opponent bracket (M3+), loaded and cached as a unit. */
   bracket: opponentIndexEntrySchema.optional(),
+  /** Global players index for the free-form draft and roster browser. */
+  playersIndex: playersIndexAssetSchema.optional(),
   assets: assetConfigSchema,
 });
 export type HoopRushManifest = z.infer<typeof hoopRushManifestSchema>;

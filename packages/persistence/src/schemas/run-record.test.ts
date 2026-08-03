@@ -53,14 +53,14 @@ describe('storedRunRecordSchema', () => {
     expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
   });
 
-  it('rejects a free-form run with a null franchiseId', () => {
-    const run = buildChallengeRun();
+  it('accepts a free-form run with a null franchiseId and selections', () => {
+    const run = buildChallengeRun({ franchiseId: null });
     const record = {
       recordId: 'record-6',
       saveSchemaVersion: 2,
-      run: { ...run, franchiseId: null },
-    } as unknown;
-    expect(storedRunRecordSchema.safeParse(record).success).toBe(false);
+      run,
+    };
+    expect(storedRunRecordSchema.safeParse(record).success).toBe(true);
   });
 
   it('still parses a legacy single-pool record without selections', () => {
@@ -73,7 +73,7 @@ describe('storedRunRecordSchema', () => {
     expect(storedRunRecordSchema.safeParse(record).success).toBe(true);
   });
 
-  it('rejects a run with a missing franchiseId field', () => {
+  it('rejects a run without the required franchiseId', () => {
     const run = buildChallengeRun();
     const { franchiseId: _franchiseId, ...withoutFranchise } = run;
     const record = {
@@ -104,7 +104,7 @@ describe('completedRunIndexSchema', () => {
     expect(completedRunIndexSchema.safeParse(row).success).toBe(true);
   });
 
-  it('rejects an index row with a null franchiseId', () => {
+  it('accepts an index row with a null franchiseId', () => {
     const row = {
       recordId: 'run-free',
       runId: 'run-free',
@@ -119,7 +119,7 @@ describe('completedRunIndexSchema', () => {
       outcome: 'perfect',
       completedAtIso: '2026-07-31T12:00:00.000Z',
     };
-    expect(completedRunIndexSchema.safeParse(row).success).toBe(false);
+    expect(completedRunIndexSchema.safeParse(row).success).toBe(true);
   });
 
   it('rejects an outcome missing from a completed row', () => {

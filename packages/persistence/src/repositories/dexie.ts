@@ -67,30 +67,6 @@ class HoopRushDatabase extends Dexie {
           updatedAtIso: validated.updatedAtIso,
         });
       });
-    this.version(3).upgrade(async (tx) => {
-      // Free-form sandbox saves were never released and are incompatible
-      // with the authoritative franchise+decade contract: records whose
-      // franchiseId is null are removed. Established franchise-era saves
-      // (non-null franchiseId) pass through untouched.
-      const active = await tx.table('active').toArray();
-      for (const row of active) {
-        if (row.franchiseId === null || row.franchiseId === undefined) {
-          await tx.table('active').delete(row.recordId);
-        }
-      }
-      const history = await tx.table('history').toArray();
-      for (const row of history) {
-        if (row.franchiseId === null || row.franchiseId === undefined) {
-          await tx.table('history').delete(row.recordId);
-        }
-      }
-      const completed = await tx.table('completed').toArray();
-      for (const row of completed) {
-        if (row.run?.franchiseId === null || row.run?.franchiseId === undefined) {
-          await tx.table('completed').delete(row.recordId);
-        }
-      }
-    });
   }
 }
 

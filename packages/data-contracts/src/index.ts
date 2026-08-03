@@ -17,6 +17,7 @@ export * from './bracket.js';
 export * from './worker.js';
 export * from './loaders/manifest.js';
 export * from './loaders/pool.js';
+export * from './loaders/players-index.js';
 export * from './loaders/assets.js';
 export * from './loaders/simulation.js';
 export * from './loaders/bracket.js';

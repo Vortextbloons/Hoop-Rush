@@ -31,6 +31,7 @@ import {
   type UnavailabilityReason,
 } from '@hoop-rush/data-contracts';
 import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.js';
+import { refreshPlayersIndexInManifest } from '../manifest/index.js';
 import {
   fileExists,
   safeFloat,
@@ -1070,6 +1071,7 @@ export function run(targets: Array<[string, string]> | null = null, withAssets =
   }
   updateManifest(entries);
   recordCoverageReport(coverage);
+  refreshPlayersIndexInManifest();
 }
 
 /** One persisted coverage-audit row (spec/12 first full audit + CLI data coverage). */
