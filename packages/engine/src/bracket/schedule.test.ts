@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SimulationPlayer } from '@hoop-rush/data-contracts';
-import {
-  buildFixtureBracket,
-  buildSimulationPlayer,
-  seedFromString,
-} from '@hoop-rush/test-fixtures';
+import { buildFixtureBracket, seedFromString } from '@hoop-rush/test-fixtures';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.js';
 
 const ALL_FRANCHISES = [

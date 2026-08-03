@@ -72,9 +72,7 @@ describe('lineup property', () => {
     fc.assert(
       fc.property(unionArb, fc.integer({ min: 0, max: 4 }), (positions, slotIndex) => {
         const requirement = LINEUP_STRUCTURE[slotIndex]!;
-        expect(canFillSlot(positions as PositionUnion, slotIndex as never)).toBe(
-          positions.includes(requirement as Position),
-        );
+        expect(canFillSlot(positions, slotIndex as never)).toBe(positions.includes(requirement));
       }),
     );
   });

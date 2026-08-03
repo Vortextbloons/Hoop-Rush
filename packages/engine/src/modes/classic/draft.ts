@@ -41,7 +41,7 @@ export function classicRollSeed(
   kind: ClassicRollKind,
   round: number,
 ): string {
-  return `${seed}:classic-roll:${version}:${kind}:${round}`;
+  return `${seed}:classic-roll:${version}:${kind}:${String(round)}`;
 }
 
 /** Canonically sorted copy of the catalog: franchiseId asc, then eraId asc. */
@@ -64,7 +64,11 @@ export function slotRequirement(slotIndex: number): 'G' | 'F' | 'C' {
   if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 4) {
     throw new Error(`slot index must be an integer in 0..4 (got ${String(slotIndex)})`);
   }
-  return LINEUP_STRUCTURE[slotIndex]!;
+  const requirement = LINEUP_STRUCTURE[slotIndex];
+  if (requirement === undefined) {
+    throw new Error(`no slot requirement for index ${String(slotIndex)}`);
+  }
+  return requirement;
 }
 
 /**
@@ -89,19 +93,21 @@ export function classicRollCandidates(
   const occupiedSlots = new Set(state.picks.map((p) => p.slotIndex));
   const requirements = new Set<Position>();
   for (let slotIndex = 0; slotIndex < LINEUP_STRUCTURE.length; slotIndex += 1) {
-    if (!occupiedSlots.has(slotIndex as SlotIndex)) {
+    if (!occupiedSlots.has(slotIndex)) {
       requirements.add(slotRequirement(slotIndex));
     }
   }
   return sortClassicCatalog(
     catalog.filter((entry) => {
       if (kind === 'franchise-reroll') {
-        if (entry.eraId !== state.roll!.eraId) return false;
-        if (entry.franchiseId === state.roll!.franchiseId) return false;
+        if (state.roll === null) return false;
+        if (entry.eraId !== state.roll.eraId) return false;
+        if (entry.franchiseId === state.roll.franchiseId) return false;
       }
       if (kind === 'era-reroll') {
-        if (entry.franchiseId !== state.roll!.franchiseId) return false;
-        if (entry.eraId === state.roll!.eraId) return false;
+        if (state.roll === null) return false;
+        if (entry.franchiseId !== state.roll.franchiseId) return false;
+        if (entry.eraId === state.roll.eraId) return false;
       }
       return entry.players.some(
         (player) =>
@@ -401,7 +407,7 @@ export function createClassicChallenge(
   }
   const pickBySlot = new Map(draft.picks.map((p) => [p.slotIndex, p]));
   for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
-    const pick = pickBySlot.get(slotIndex as SlotIndex);
+    const pick = pickBySlot.get(slotIndex);
     const player = env.players[slotIndex];
     if (!pick) {
       throw new Error(`classic draft has no pick for slot ${String(slotIndex)}`);
@@ -413,7 +419,7 @@ export function createClassicChallenge(
     }
   }
   const assignments = env.players.map((player, slotIndex) => ({
-    slotIndex: slotIndex as SlotIndex,
+    slotIndex: slotIndex,
     playerId: player.playerId,
     positions: player.positions,
   }));

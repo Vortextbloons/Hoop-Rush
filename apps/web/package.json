@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "e2e": "playwright test",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "lint": "prettier --check . && eslint .",
+    "lint": "prettier --check src e2e vitest.config.ts playwright.config.ts svelte.config.js eslint.config.js && eslint --cache .",
     "test": "vitest",
     "test:run": "vitest run"
   },

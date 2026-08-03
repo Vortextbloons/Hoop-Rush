@@ -142,6 +142,15 @@ export class GameRecorder {
     this.sides = [createRecorderSide(), createRecorderSide()];
   }
 
+  /** Slot access with an explicit invariant: five players per side at all times. */
+  private playerAt(side: SideIndex, slot: number): RecorderPlayer {
+    const player = this.players[side][slot];
+    if (player === undefined) {
+      throw new Error(`recorder: no player at side ${String(side)} slot ${String(slot)}`);
+    }
+    return player;
+  }
+
   fieldGoalAttempt(
     side: SideIndex,
     slot: number,
@@ -150,23 +159,24 @@ export class GameRecorder {
     three: boolean,
     assisted: boolean,
   ): void {
-    const player = this.players[side][slot]!;
+    const player = this.playerAt(side, slot);
     const team = this.sides[side];
     player.fieldGoalAttempts += 1;
     team.fieldGoalAttempts += 1;
-    player.zoneAttempts[zone]! += 1;
-    team.zoneAttempts[zone]! += 1;
+    player.zoneAttempts[zone] += 1;
+    team.zoneAttempts[zone] += 1;
     if (made) {
       player.fieldGoalMakes += 1;
       team.fieldGoalMakes += 1;
-      player.zoneMakes[zone]! += 1;
-      team.zoneMakes[zone]! += 1;
+      player.zoneMakes[zone] += 1;
+      team.zoneMakes[zone] += 1;
       if (assisted) team.assistedFieldGoals += 1;
       else team.unassistedFieldGoals += 1;
       const points = three ? 3 : 2;
       player.points += points;
       team.points += points;
-      team.periodPoints[team.periodPoints.length - 1]! += points;
+      const lastPeriod = team.periodPoints.length - 1;
+      team.periodPoints[lastPeriod] = (team.periodPoints[lastPeriod] ?? 0) + points;
     }
     if (three) {
       player.threeAttempts += 1;
@@ -179,7 +189,7 @@ export class GameRecorder {
   }
 
   freeThrow(side: SideIndex, slot: number, made: boolean): void {
-    const player = this.players[side][slot]!;
+    const player = this.playerAt(side, slot);
     const team = this.sides[side];
     player.freeThrowAttempts += 1;
     team.freeThrowAttempts += 1;
@@ -188,19 +198,20 @@ export class GameRecorder {
       team.freeThrowMakes += 1;
       player.points += 1;
       team.points += 1;
-      team.periodPoints[team.periodPoints.length - 1]! += 1;
+      const lastPeriod = team.periodPoints.length - 1;
+      team.periodPoints[lastPeriod] = (team.periodPoints[lastPeriod] ?? 0) + 1;
     }
   }
 
   offensiveRebound(side: SideIndex, slot: number): void {
-    const player = this.players[side][slot]!;
+    const player = this.playerAt(side, slot);
     const team = this.sides[side];
     player.offensiveRebounds += 1;
     team.offensiveRebounds += 1;
   }
 
   defensiveRebound(side: SideIndex, slot: number): void {
-    const player = this.players[side][slot]!;
+    const player = this.playerAt(side, slot);
     const team = this.sides[side];
     player.defensiveRebounds += 1;
     team.defensiveRebounds += 1;
@@ -212,7 +223,7 @@ export class GameRecorder {
 
   /** One made field goal on a passed possession by this player (diagnostics). */
   assistOpportunity(side: SideIndex, slot: number): void {
-    this.players[side][slot]!.assistOpportunities += 1;
+    this.playerAt(side, slot).assistOpportunities += 1;
   }
 
   /** Every missed shot gives each player on the offensive side an OReb chance. */
@@ -227,31 +238,31 @@ export class GameRecorder {
 
   /** One field-goal attempt defended by this player (diagnostics). */
   contest(side: SideIndex, slot: number): void {
-    this.players[side][slot]!.contestedShots += 1;
+    this.playerAt(side, slot).contestedShots += 1;
   }
 
   assist(side: SideIndex, slot: number): void {
-    this.players[side][slot]!.assists += 1;
+    this.playerAt(side, slot).assists += 1;
     this.sides[side].assists += 1;
   }
 
   steal(side: SideIndex, slot: number): void {
-    this.players[side][slot]!.steals += 1;
+    this.playerAt(side, slot).steals += 1;
     this.sides[side].steals += 1;
   }
 
   block(side: SideIndex, slot: number): void {
-    this.players[side][slot]!.blocks += 1;
+    this.playerAt(side, slot).blocks += 1;
     this.sides[side].blocks += 1;
   }
 
   turnover(side: SideIndex, slot: number): void {
-    this.players[side][slot]!.turnovers += 1;
+    this.playerAt(side, slot).turnovers += 1;
     this.sides[side].turnovers += 1;
   }
 
   foul(side: SideIndex, slot: number): void {
-    this.players[side][slot]!.fouls += 1;
+    this.playerAt(side, slot).fouls += 1;
     this.sides[side].fouls += 1;
   }
 
@@ -276,9 +287,9 @@ export class GameRecorder {
   }
 
   playerBox(side: SideIndex, slot: number): PlayerBoxScore {
-    const p = this.players[side][slot]!;
+    const p = this.playerAt(side, slot);
     return {
-      playerId: `slot-${slot}`,
+      playerId: `slot-${String(slot)}`,
       minutes: p.minutes,
       points: p.points,
       fieldGoals: { made: p.fieldGoalMakes, attempted: p.fieldGoalAttempts },
@@ -347,7 +358,7 @@ function zoneSummaryArray(
 ): ShotZoneSummary[] {
   return SHOT_ZONES.map((zone) => ({
     zone,
-    attempts: attempts[zone] ?? 0,
-    makes: makes[zone] ?? 0,
+    attempts: attempts[zone],
+    makes: makes[zone],
   }));
 }

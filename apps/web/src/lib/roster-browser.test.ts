@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
 import {
   defaultDirection,
   filterRoster,
@@ -11,9 +10,10 @@ import {
   perGame,
   shotPct,
   sortRoster,
+  type RosterDetailRow,
 } from './roster-browser';
 
-function row(partial: Partial<PlayersIndexEntry> & { playerId: string }): PlayersIndexEntry {
+function row(partial: Partial<RosterDetailRow> & { playerId: string }): RosterDetailRow {
   return {
     franchiseId: 'lakers',
     eraId: '1990s',
@@ -234,7 +234,7 @@ describe('paginateItems', () => {
     const c = row({ playerId: 'c' });
     const items: (
       | { type: 'group'; franchiseId: string; eraId: string; count: number }
-      | { type: 'player'; player: PlayersIndexEntry }
+      | { type: 'player'; player: RosterDetailRow }
     )[] = [
       { type: 'group', franchiseId: 'x', eraId: '1990s', count: 1 },
       { type: 'player', player: a },

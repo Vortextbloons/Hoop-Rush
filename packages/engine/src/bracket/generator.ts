@@ -164,7 +164,10 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       'uniform',
     ];
     for (let k = 0; k < proposalsPerFranchise; k += 1) {
-      const bias = BIASES[k % BIASES.length]!;
+      const bias = BIASES[k % BIASES.length];
+      if (bias === undefined) {
+        throw new Error(`bracket: no bias for proposal ${String(k)}`);
+      }
       const chosen = pickFive(rng, guards, forwards, centers, bias, (player) => {
         const count = participation.get(player.playerId) ?? 0;
         return count >= maxParticipation;
@@ -278,10 +281,17 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
             : 1,
       );
     for (let i = 0; i < shuffled.length; i += 1) {
-      const franchiseId = shuffled[i]!;
+      const franchiseId = shuffled[i];
+      if (franchiseId === undefined) {
+        throw new Error(`bracket: missing franchise at index ${String(i)}`);
+      }
       const target = band[0] + ((band[1] - band[0]) * i) / (shuffled.length - 1);
       const proposals = proposalsByFranchise.get(franchiseId) ?? [];
-      selected.set(franchiseId, { proposal: rankProposals(proposals, target)[0]!, target });
+      const top = rankProposals(proposals, target)[0];
+      if (top === undefined) {
+        throw new Error(`bracket: no proposals for ${franchiseId}`);
+      }
+      selected.set(franchiseId, { proposal: top, target });
     }
 
     for (let round = 0; round < 100; round += 1) {
@@ -330,12 +340,13 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
           const bestForFranchise = ranked[0];
           if (!bestForFranchise) continue;
           const previous = selected.get(franchiseId);
+          if (previous === undefined) continue;
           selected.set(franchiseId, {
             proposal: bestForFranchise,
             target: current.target,
           });
           const movedMedian = bracketMedian();
-          selected.set(franchiseId, previous!);
+          selected.set(franchiseId, previous);
           const gap =
             movedMedian < medianBand[0]
               ? medianBand[0] - movedMedian
@@ -353,7 +364,7 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
         }
         if (
           best === null ||
-          best.gap >= (bestDirectionGap(currentMedian, medianBand) ?? Infinity)
+          best.gap >= bestDirectionGap(currentMedian, medianBand)
         ) {
           return false;
         }
@@ -425,9 +436,16 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   for (const franchiseId of selectableFranchises) {
     const current = selected.get(franchiseId);
     if (!current) continue;
-    const candidates = byFranchise.get(franchiseId)!;
+    const candidates = byFranchise.get(franchiseId);
+    if (candidates === undefined) {
+      throw new Error(`bracket: missing candidates for ${franchiseId}`);
+    }
     const proposal = current.proposal;
-    const seasonKey = [...proposal.players].sort((a, b) => b.score - a.score)[0]!.seasonKey;
+    const top = [...proposal.players].sort((a, b) => b.score - a.score)[0];
+    if (top === undefined) {
+      throw new Error(`bracket: proposal has no players for ${franchiseId}`);
+    }
+    const seasonKey = top.seasonKey;
     const opponentId = `bracket-${franchiseId}`;
     const lineup: BracketOpponent['lineup'] = {
       structure: ['G', 'G', 'F', 'F', 'C'],
@@ -558,13 +576,21 @@ function pickFive(
   return chosen;
 }
 
+/** Swap two indexed positions; throws when either index is out of bounds. */
+function swapAt(values: unknown[], a: number, b: number): void {
+  const va = values[a];
+  const vb = values[b];
+  if (va === undefined || vb === undefined) {
+    throw new Error(`shuffle: index out of range (${String(a)}, ${String(b)})`);
+  }
+  values[a] = vb;
+  values[b] = va;
+}
+
 function shuffle<T>(items: readonly T[], rng: ReturnType<typeof createRng>): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i -= 1) {
-    const j = rng.nextInt(0, i);
-    const tmp = result[i]!;
-    result[i] = result[j]!;
-    result[j] = tmp;
+    swapAt(result, i, rng.nextInt(0, i));
   }
   return result;
 }
@@ -572,8 +598,19 @@ function shuffle<T>(items: readonly T[], rng: ReturnType<typeof createRng>): T[]
 function medianOf(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[mid]!;
-  return (sorted[mid - 1]! + sorted[mid]!) / 2;
+  if (sorted.length % 2 === 1) {
+    const value = sorted[mid];
+    if (value === undefined) {
+      throw new Error('medianOf: empty values');
+    }
+    return value;
+  }
+  const lo = sorted[mid - 1];
+  const hi = sorted[mid];
+  if (lo === undefined || hi === undefined) {
+    throw new Error('medianOf: empty values');
+  }
+  return (lo + hi) / 2;
 }
 
 function inBand(strength: number, population: readonly number[], band: [number, number]): boolean {

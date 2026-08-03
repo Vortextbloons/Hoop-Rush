@@ -102,23 +102,30 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
     });
   }
 
-  // Usage: the winner's most-usage player among meaningful scorers.
-  const topScorer = [...winner.players].sort((a, b) => b.points - a.points)[0];
-  if (topScorer && winner.box.points > 0) {
-    const share = topScorer.points / winner.box.points;
+  // Usage: the winner's most-usage player. Usage is the recorded diagnostic
+  // FGA + 0.44*FTA + TOV (invariant-checked in invariants.ts), never scoring
+  // share; the fallback re-derives it for legacy records without diagnostics.
+  function playerUsage(player: TeamResult['players'][number]): number {
+    if (player.diagnostics) return player.diagnostics.usage;
+    return player.fieldGoals.attempted + 0.44 * player.freeThrows.attempted + player.turnovers;
+  }
+  const topUsage = [...winner.players].sort((a, b) => playerUsage(b) - playerUsage(a))[0];
+  const teamUsage = winner.players.reduce((sum, player) => sum + playerUsage(player), 0);
+  if (topUsage && teamUsage > 0) {
+    const share = playerUsage(topUsage) / teamUsage;
     if (share >= t.usageShare) {
       facts.push({
         kind: 'usage',
         teamId: winner.teamId,
         magnitude: share,
         evidence: {
-          playerPoints: topScorer.points,
-          teamPoints: winner.box.points,
+          playerUsage: playerUsage(topUsage),
+          teamUsage,
           usageShare: share,
-          playerFieldGoalAttempts: topScorer.fieldGoals.attempted,
-          playerMinutes: topScorer.minutes,
+          playerFieldGoalAttempts: topUsage.fieldGoals.attempted,
+          playerMinutes: topUsage.minutes,
         },
-        playerIds: [topScorer.playerId],
+        playerIds: [topUsage.playerId],
       });
     }
   }

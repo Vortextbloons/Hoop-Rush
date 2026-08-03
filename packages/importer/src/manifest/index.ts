@@ -18,6 +18,7 @@ import {
   ARTIFACT_SCHEMA_VERSION,
   parsePool,
   parsePlayersIndex,
+  parseRosterDetails,
 } from '@hoop-rush/data-contracts';
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.js';
 import {
@@ -33,7 +34,7 @@ export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
 
 export const DATA_VERSION = 'm5';
 
-function peakPlayerToIndexEntry(player: ReturnType<typeof parsePool>['players'][number]) {
+function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
     playerId: player.playerId,
     franchiseId: player.franchiseId,
@@ -49,6 +50,15 @@ function peakPlayerToIndexEntry(player: ReturnType<typeof parsePool>['players'][
     offense: player.summaryRatings.offenseRating,
     defense: player.summaryRatings.defenseRating,
     selectionScore: player.selectionScore,
+  };
+}
+
+function peakPlayerToRosterDetails(player: ReturnType<typeof parsePool>['players'][number]) {
+  return {
+    playerId: player.playerId,
+    franchiseId: player.franchiseId,
+    eraId: player.eraId,
+    seasonKey: player.seasonKey,
     heightInches: player.heightInches,
     weightLbs: player.weightLbs,
     stats: player.stats,
@@ -66,21 +76,21 @@ function sortedJsonFiles(dir: string): string[] {
 }
 
 /**
- * Rebuilds players-index.json from schema-valid packaged pools and returns the
- * manifest index entry (url + content hash). Skips invalid pool files with a
- * warning instead of failing the whole build.
+ * Rebuilds players-index.json (compact draft rows) from schema-valid packaged
+ * pools and returns the manifest index entry (url + content hash). Skips
+ * invalid pool files with a warning instead of failing the whole build.
  */
 export function rebuildPlayersIndex(
   dataDir = PUBLIC_DATA,
 ): { url: string; contentHash: string } | null {
   const poolsDir = join(dataDir, 'pools');
   const poolFiles = sortedJsonFiles(poolsDir);
-  const indexPlayers: ReturnType<typeof peakPlayerToIndexEntry>[] = [];
+  const indexPlayers: ReturnType<typeof peakPlayerToDraftEntry>[] = [];
   for (const name of poolFiles) {
     try {
       const validated = parsePool(readJson(join(poolsDir, name)));
       for (const player of validated.players) {
-        indexPlayers.push(peakPlayerToIndexEntry(player));
+        indexPlayers.push(peakPlayerToDraftEntry(player));
       }
     } catch (error) {
       console.warn(`skipped pool ${name} for players index: ${(error as Error).message}`);
@@ -89,7 +99,7 @@ export function rebuildPlayersIndex(
   if (indexPlayers.length === 0) return null;
   const indexPath = join(dataDir, 'players-index.json');
   const index = parsePlayersIndex({
-    schemaVersion: ARTIFACT_SCHEMA_VERSION,
+    schemaVersion: 3,
     dataVersion: DATA_VERSION,
     players: indexPlayers,
   });
@@ -100,16 +110,55 @@ export function rebuildPlayersIndex(
   };
 }
 
-/** Refreshes the players index artifact and updates manifest.json in place. */
+/**
+ * Rebuilds roster-details.json (season statistics and height/weight behind
+ * every draft row) and returns the manifest index entry. Only the Roster
+ * screen loads this asset, so sandbox and classic never parse it.
+ */
+export function rebuildRosterDetails(
+  dataDir = PUBLIC_DATA,
+): { url: string; contentHash: string } | null {
+  const poolsDir = join(dataDir, 'pools');
+  const poolFiles = sortedJsonFiles(poolsDir);
+  const detailPlayers: ReturnType<typeof peakPlayerToRosterDetails>[] = [];
+  for (const name of poolFiles) {
+    try {
+      const validated = parsePool(readJson(join(poolsDir, name)));
+      for (const player of validated.players) {
+        detailPlayers.push(peakPlayerToRosterDetails(player));
+      }
+    } catch (error) {
+      console.warn(`skipped pool ${name} for roster details: ${(error as Error).message}`);
+    }
+  }
+  if (detailPlayers.length === 0) return null;
+  const detailsPath = join(dataDir, 'roster-details.json');
+  const details = parseRosterDetails({
+    schemaVersion: 1,
+    dataVersion: DATA_VERSION,
+    players: detailPlayers,
+  });
+  writeJsonRetry(detailsPath, details, true);
+  return {
+    url: 'roster-details.json',
+    contentHash: sha256File(detailsPath),
+  };
+}
+
+/** Refreshes the draft index and roster-details artifacts and updates manifest.json in place. */
 export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
   const entry = rebuildPlayersIndex(dataDir);
-  if (entry === null) return;
+  const detailsEntry = rebuildRosterDetails(dataDir);
+  if (entry === null && detailsEntry === null) return;
   const manifestPath = join(dataDir, 'manifest.json');
   if (!fileExists(manifestPath)) return;
   const manifest = readJson(manifestPath) as Manifest;
-  manifest['playersIndex'] = entry;
+  if (entry !== null) manifest['playersIndex'] = entry;
+  if (detailsEntry !== null) manifest['rosterDetails'] = detailsEntry;
   writeJsonRetry(manifestPath, manifest, true);
-  console.log(`updated players index (${entry.contentHash.slice(0, 8)}…)`);
+  console.log(
+    `updated players index (${entry?.contentHash.slice(0, 8) ?? 'n/a'}…) and roster details (${detailsEntry?.contentHash.slice(0, 8) ?? 'n/a'}…)`,
+  );
 }
 
 /** Rebuilds the complete v2 manifest from packaged artifacts. */
@@ -170,6 +219,10 @@ export function run(dataDir = PUBLIC_DATA): void {
   const playersIndexEntry = rebuildPlayersIndex(dataDir);
   if (playersIndexEntry !== null) {
     manifest['playersIndex'] = playersIndexEntry;
+  }
+  const rosterDetailsEntry = rebuildRosterDetails(dataDir);
+  if (rosterDetailsEntry !== null) {
+    manifest['rosterDetails'] = rosterDetailsEntry;
   }
 
   // Complete availability matrix: every slot x era combination, from the

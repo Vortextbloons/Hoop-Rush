@@ -36,7 +36,7 @@ export function deriveGameSeed(runSeed: Seed, gameNumber: number): Seed {
   const material = `hoop-rush:${SEED_DERIVATION_VERSION}:${runSeed}:game-${String(gameNumber)}`;
   const high = fnv1a32(material, FNV_OFFSET_32);
   const low = fnv1a32(`${material}:tail`, FNV_OFFSET_32 ^ high);
-  return `${hex32(high)}${hex32(low)}` as Seed;
+  return `${hex32(high)}${hex32(low)}`;
 }
 
 /**
@@ -51,5 +51,5 @@ export function deriveAttemptSeed(runSeed: Seed, attemptIndex: number): Seed {
   const material = `hoop-rush:${SEED_DERIVATION_VERSION}:${runSeed}:attempt-${String(attemptIndex)}`;
   const high = fnv1a32(material, FNV_OFFSET_32);
   const low = fnv1a32(`${material}:tail`, FNV_OFFSET_32 ^ high);
-  return `${hex32(high)}${hex32(low)}` as Seed;
+  return `${hex32(high)}${hex32(low)}`;
 }

@@ -7,7 +7,6 @@ import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   lineupSchema,
-  opponentBracketSchema,
   opponentTeamSchema,
   peakPlayerSeasonSchema,
   simulationPlayerSchema,
@@ -230,13 +229,14 @@ describe('player-season contracts', () => {
       players: duplicate,
     });
     expect(parsed.success).toBe(true);
-    expect(new Set(parsed.data!.players.map((p) => p.playerId)).size).toBe(1);
+    if (!parsed.success) return;
+    expect(new Set(parsed.data.players.map((p) => p.playerId)).size).toBe(1);
   });
 });
 
 describe('lineup contracts', () => {
   const assignment = (slotIndex: number, playerId: string): LineupAssignment => ({
-    slotIndex: slotIndex as LineupAssignment['slotIndex'],
+    slotIndex: slotIndex,
     playerId,
     positions: ['G'],
   });
@@ -347,11 +347,11 @@ describe('run contracts', () => {
 
   const opponents = Array.from({ length: 30 }, (_, index) => ({
     schemaVersion: 1,
-    opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${index}`,
+    opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String(index)}`,
     bracketVersion: 'bracket-v1',
     difficultyBand: 'medium',
-    teamId: `team-${index}`,
-    displayName: `Opponent ${index}`,
+    teamId: `team-${String(index)}`,
+    displayName: `Opponent ${String(index)}`,
     seasonKey: '1995-96',
     lineup: {
       structure: ['G', 'G', 'F', 'F', 'C'],
@@ -363,7 +363,7 @@ describe('run contracts', () => {
     },
     players: fivePlayers.map((player) => ({
       ...player,
-      playerId: `p-opp-${index}-${player.playerId}`,
+      playerId: `p-opp-${String(index)}-${player.playerId}`,
     })),
     strength: {
       evaluationVersion: 'gen-v1',
@@ -375,10 +375,13 @@ describe('run contracts', () => {
   }));
 
   const schedule = (opponentIds: string[]) =>
-    Array.from({ length: 82 }, (_, index) => ({
-      gameNumber: index + 1,
-      opponentId: opponentIds[index % 30]!,
-    }));
+    Array.from({ length: 82 }, (_, index) => {
+      const opponentId = opponentIds[index % 30];
+      if (opponentId === undefined) {
+        throw new Error('schedule requires at least 30 opponent ids');
+      }
+      return { gameNumber: index + 1, opponentId };
+    });
 
   const zeroAggregates = {
     team: {
@@ -481,8 +484,8 @@ describe('run contracts', () => {
 
 describe('manifest contracts', () => {
   const thirtySlots = Array.from({ length: 30 }, (_, index) => ({
-    franchiseId: `franchise-${index}`,
-    displayName: `Franchise ${index}`,
+    franchiseId: `franchise-${String(index)}`,
+    displayName: `Franchise ${String(index)}`,
     teamExternalId: String(1610612700 + index),
   }));
 
@@ -866,7 +869,7 @@ function gameResultFixture(gameNumber: number) {
       possessions: 96,
     },
     players: Array.from({ length: 5 }, (_, i) => ({
-      playerId: `p-${i}`,
+      playerId: `p-${String(i)}`,
       minutes: 48,
       points: 20,
       fieldGoals: { made: 8, attempted: 17 },
@@ -919,7 +922,7 @@ function buildMinimalRun() {
         slotIndex,
         playerId,
         positions:
-          ['G', 'G', 'F', 'F', 'C'][slotIndex]! === 'G'
+          (['G', 'G', 'F', 'F', 'C'][slotIndex] ?? 'G') === 'G'
             ? ['G']
             : ['F', 'F', 'C'][slotIndex - 2] === 'F'
               ? ['F']
@@ -1006,17 +1009,17 @@ function buildMinimalRun() {
       scheduleVersion: 'schedule-v1',
       opponents: Array.from({ length: 30 }, (_, index) => ({
         schemaVersion: 1,
-        opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${index}`,
+        opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String(index)}`,
         bracketVersion: 'bracket-v1',
         difficultyBand: 'medium' as const,
-        teamId: `team-${index}`,
-        displayName: `Opponent ${index}`,
+        teamId: `team-${String(index)}`,
+        displayName: `Opponent ${String(index)}`,
         seasonKey: '1995-96',
         lineup: {
           structure: ['G', 'G', 'F', 'F', 'C'],
           assignments: five.map((playerId, slotIndex) => ({
             slotIndex,
-            playerId: `p-opp-${index}-${playerId}`,
+            playerId: `p-opp-${String(index)}-${playerId}`,
             positions:
               ['G', 'G', 'F', 'F', 'C'][slotIndex] === 'G'
                 ? ['G']
@@ -1026,8 +1029,8 @@ function buildMinimalRun() {
           })),
         },
         players: five.map((playerId, slotIndex) => ({
-          playerId: `p-opp-${index}-${playerId}`,
-          displayName: `Opp ${index} ${slotIndex}`,
+          playerId: `p-opp-${String(index)}-${playerId}`,
+          displayName: `Opp ${String(index)} ${String(slotIndex)}`,
           positions:
             ['G', 'G', 'F', 'F', 'C'][slotIndex] === 'G'
               ? ['G']
@@ -1092,7 +1095,8 @@ function buildMinimalRun() {
       })),
       schedule: Array.from({ length: 82 }, (_, index) => ({
         gameNumber: index + 1,
-        opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${(index % 29) + 1}`,
+        opponentId:
+          index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String((index % 29) + 1)}`,
       })),
     },
     status: 'active',
@@ -1161,7 +1165,9 @@ describe('classic draft contracts (M4)', () => {
   });
 
   it('rejects more than five picks', () => {
-    const picks = Array.from({ length: 6 }, (_, i) => pick((i % 5) + 1, `p-${i + 1}`, i % 5));
+    const picks = Array.from({ length: 6 }, (_, i) =>
+      pick((i % 5) + 1, `p-${String(i + 1)}`, i % 5),
+    );
     expect(classicDraftStateSchema.safeParse({ ...baseDraft, picks }).success).toBe(false);
   });
 
@@ -1191,7 +1197,7 @@ describe('classic draft contracts (M4)', () => {
 
   it('accepts a completed draft snapshot and rejects short pick lists', () => {
     const picks = [0, 1, 2, 3, 4].map((slotIndex) =>
-      pick(slotIndex + 1, `p-${slotIndex + 1}`, slotIndex),
+      pick(slotIndex + 1, `p-${String(slotIndex + 1)}`, slotIndex),
     );
     const snapshot = {
       draftId: 'draft-1',

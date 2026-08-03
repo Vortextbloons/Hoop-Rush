@@ -82,7 +82,7 @@ function benchmarkTeam(teamId: string, displayName: string, targetCenter: number
     displayName,
     players: SLOT_POSITIONS.map((positions, i) => ({
       playerId: `bm-${teamId}-${String(i + 1)}`,
-      displayName: `${displayName} ${i + 1}`,
+      displayName: `${displayName} ${String(i + 1)}`,
       positions,
       heightInches: 78,
       weightLbs: 215,

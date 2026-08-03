@@ -26,31 +26,6 @@ function row(partial: Partial<PlayersIndexEntry> & { playerId: string }): Player
     offense: 70,
     defense: 70,
     selectionScore: 50,
-    heightInches: 78,
-    weightLbs: 200,
-    stats: {
-      gamesPlayed: 80,
-      minutes: 2400,
-      points: 1600,
-      rebounds: 800,
-      offensiveRebounds: null,
-      defensiveRebounds: null,
-      assists: 400,
-      steals: 80,
-      blocks: 40,
-      turnovers: 200,
-      fieldGoalsMade: 600,
-      fieldGoalsAttempted: 1200,
-      threesMade: 100,
-      threesAttempted: 250,
-      freeThrowsMade: 300,
-      freeThrowsAttempted: 360,
-      per: 20,
-      boxPlusMinus: 2,
-      usageRate: 25,
-      tsPct: 0.6,
-      efgPct: 0.54,
-    },
     ...partial,
   };
 }
@@ -323,5 +298,32 @@ describe('LineupCourt allowRemove', () => {
     const { container } = renderCourt({});
 
     expect(container.querySelectorAll('button[aria-label^="Remove"]')).toHaveLength(1);
+  });
+
+  it('announces a placement once and does not re-announce for a fresh array with identical ids', async () => {
+    // Regression: previousSlots is a non-reactive snapshot. A reactive
+    // snapshot re-triggers the effect after every slot reallocation, which
+    // produced effect_update_depth_exceeded under parallel test runs.
+    const manifest = buildManifest();
+    const a = row({ playerId: 'a', displayName: 'Aaron A' });
+    const b = row({ playerId: 'b', displayName: 'Barry B' });
+    const props = {
+      slots: [a, null, null, null, null],
+      manifest,
+      ready: false,
+      allowRemove: false,
+      onmove: vi.fn(),
+      onremove: vi.fn(),
+    };
+    const { container, rerender } = render(LineupCourt, { props });
+
+    await rerender({ ...props, slots: [null, b, null, null, null] });
+    const status = container.querySelector('[role="status"]');
+    expect(status?.textContent).toBe('Placed Barry B at SG.');
+
+    // Same ids, freshly allocated array: the snapshot must prevent a repeat
+    // announcement (and any effect loop).
+    await rerender({ ...props, slots: [null, b, null, null, null] });
+    expect(status?.textContent).toBe('Placed Barry B at SG.');
   });
 });

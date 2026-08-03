@@ -10,7 +10,8 @@ import {
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
 import { setClassicGuardBypass } from '$lib/classic-nav-guard';
-import { getBracket, getEraSimulationProfile, getManifest, getPool } from '$lib/data';
+import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
+import { resolvePlayerRefs } from '$lib/player-refs';
 import { FIXED_SANDBOX_ERA } from '$lib/sandbox-run';
 
 /**
@@ -44,31 +45,14 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
   // unique pairs, so each franchise-era pool loads at most once (pools are
   // cached by the data layer anyway).
   const pickBySlot = new Map(draft.picks.map((pick) => [pick.slotIndex, pick]));
-  const pools = new Map<string, PeakPlayerSeason[]>();
-  const players: PeakPlayerSeason[] = [];
-  for (const slotIndex of [0, 1, 2, 3, 4]) {
+  const refs = [0, 1, 2, 3, 4].map((slotIndex) => {
     const pick = pickBySlot.get(slotIndex);
     if (!pick) {
       throw new Error(`The classic draft has no pick for slot ${String(slotIndex)}.`);
     }
-    const key = `${pick.franchiseId}/${pick.eraId}`;
-    let pool = pools.get(key);
-    if (!pool) {
-      const entry = manifest.pools.find(
-        (p) => p.franchiseId === pick.franchiseId && p.eraId === pick.eraId,
-      );
-      if (!entry) {
-        throw new Error(`Pool unavailable for ${key}.`);
-      }
-      pool = (await getPool(entry)).players;
-      pools.set(key, pool);
-    }
-    const player = pool.find((p) => p.playerId === pick.playerId);
-    if (!player) {
-      throw new Error(`Drafted player ${pick.playerId} is unavailable.`);
-    }
-    players.push(player);
-  }
+    return { playerId: pick.playerId, franchiseId: pick.franchiseId, eraId: pick.eraId };
+  });
+  const players = await resolvePlayerRefs(refs, manifest);
   const sample = players[0];
   const context = createEngineContext();
   const creation = classic.createClassicChallenge(draft, {

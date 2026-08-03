@@ -32,7 +32,7 @@ export function seedFromString(value: string): Seed {
     hash ^= value.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
-  return (hash >>> 0).toString(16).padStart(8, '0').repeat(4) as Seed;
+  return (hash >>> 0).toString(16).padStart(8, '0').repeat(4);
 }
 
 export const DEFAULT_SUMMARY_RATINGS: SummaryRatings = {
@@ -64,14 +64,6 @@ export const DEFAULT_PLAYER_STATS: PlayerSeasonStats = {
   tsPct: 0.598,
   efgPct: 0.548,
 };
-
-const FIXTURE_PROVENANCE = {
-  kind: 'observed',
-  confidence: 'high',
-  methodVersion: 'fixture-v1',
-  sourceVersion: 'source-v1',
-  sourceFields: ['fixture'],
-} as const;
 
 const FIXTURE_HISTORICAL_IDENTITY = {
   teamId: '1610612747',
@@ -408,7 +400,7 @@ export function buildUserTeam(): SimulationTeam {
     players: positions.map((position, i) =>
       buildSimulationPlayer({
         playerId: `p-${String(i + 1)}`,
-        displayName: `Fixture ${i + 1}`,
+        displayName: `Fixture ${String(i + 1)}`,
         positions: position,
       }),
     ),
@@ -464,7 +456,7 @@ export function buildBracketOpponent(
   const players = positions.map((position, slot) =>
     buildSimulationPlayer({
       playerId: `p-opp-${String(index)}-${String(slot)}`,
-      displayName: `Opponent ${index} ${slot}`,
+      displayName: `Opponent ${String(index)} ${String(slot)}`,
       positions: position,
     }),
   );
@@ -507,7 +499,11 @@ export function buildFixtureSchedule(opponentIds: readonly string[]): BracketSch
   }
   const twice = opponentIds.slice(0, 8);
   const thrice = opponentIds.slice(8);
-  const round1 = [opponentIds[0]!, ...thrice, ...twice.slice(1)];
+  const first = opponentIds[0];
+  if (first === undefined) {
+    throw new Error('fixture schedule needs at least one opponent');
+  }
+  const round1 = [first, ...thrice, ...twice.slice(1)];
   const round2 = [...twice, ...thrice];
   const round3 = [...thrice];
   const order = [...round1, ...round2, ...round3];
@@ -615,8 +611,8 @@ export function buildLegalSimulationTeam(overrides: Partial<SimulationTeam> = {}
   const positions: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
   const players = positions.map((position, i) =>
     buildSimulationPlayer({
-      playerId: `p-fixture-${i + 1}`,
-      displayName: `Fixture ${i + 1}`,
+      playerId: `p-fixture-${String(i + 1)}`,
+      displayName: `Fixture ${String(i + 1)}`,
       positions: position,
       ratings: { ...DEFAULT_SIM_RATINGS, interiorDefense: position[0] === 'C' ? 75 : 62 },
     }),
@@ -750,8 +746,8 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
 function fixtureScale(targetCenter: number) {
   return (_element: unknown, index: number): SimulationPlayer => {
     const base = buildSimulationPlayer({
-      playerId: `p-fx-${index + 1}`,
-      displayName: `Fixture ${index + 1}`,
+      playerId: `p-fx-${String(index + 1)}`,
+      displayName: `Fixture ${String(index + 1)}`,
     });
     const shifted: SimulationRatings = Object.fromEntries(
       Object.entries(base.ratings).map(([key, value]) => {
@@ -760,7 +756,11 @@ function fixtureScale(targetCenter: number) {
       }),
     ) as SimulationRatings;
     const positions: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
-    return { ...base, positions: positions[index]!, ratings: shifted };
+    const position = positions[index];
+    if (position === undefined) {
+      throw new Error(`fixture positions missing at index ${String(index)}`);
+    }
+    return { ...base, positions: position, ratings: shifted };
   };
 }
 

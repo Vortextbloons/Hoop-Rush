@@ -9,8 +9,13 @@ export default defineConfig({
     baseURL: 'http://localhost:4173',
     headless: true,
   },
+  // The packaged player index is hash-verified before rendering. Keep the
+  // assertion budget above the cold parse/hash cost on slower CI machines.
+  expect: {
+    timeout: 15_000,
+  },
   webServer: {
-    command: 'pnpm preview --port 4173 --strictPort',
+    command: '.\\node_modules\\.bin\\vite.cmd preview --port 4173 --strictPort',
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

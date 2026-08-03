@@ -9,6 +9,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
+    "lint": "prettier --check src vitest.config.ts eslint.config.js && eslint --cache .",
     "test": "vitest",
     "test:run": "vitest run"
   },
@@ -16,7 +17,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "eslint": "^10.8.0",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.10"
   }
 }

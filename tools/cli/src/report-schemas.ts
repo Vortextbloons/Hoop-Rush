@@ -136,18 +136,29 @@ export const replayReportSchema = z.object({
 });
 export type ReplayReport = z.infer<typeof replayReportSchema>;
 
+export const calibrationMetricStatusSchema = z.enum(['pass', 'fail', 'skippedInsufficientSample']);
+export type CalibrationMetricStatus = z.infer<typeof calibrationMetricStatusSchema>;
+
 export const calibrationMetricSchema = z.object({
   key: z.string().min(1).max(64),
   target: z.number(),
   tolerance: z.number(),
   observed: z.number(),
+  /**
+   * Three-state gate result: 'pass' (in range), 'fail' (out of range), or
+   * 'skippedInsufficientSample' (sample below the gate's minimum). A skipped
+   * gate is never reported as passing.
+   */
+  status: calibrationMetricStatusSchema,
+  /** Derived from status: true only for 'pass'. */
   pass: z.boolean(),
   sample: z.number().int().nonnegative(),
+  minimumSample: z.number().int().nonnegative(),
 });
 export type CalibrationMetric = z.infer<typeof calibrationMetricSchema>;
 
 export const calibrateRunReportSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   command: z.literal('calibrate run'),
   profileVersion: z.string().min(1).max(64),
   eraId: z.string().min(1).max(24),

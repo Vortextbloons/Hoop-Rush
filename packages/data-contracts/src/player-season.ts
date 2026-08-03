@@ -146,7 +146,7 @@ export const peakPlayerSeasonSchema = z.object({
       /** When false, the NBA CDN only serves the generic silhouette for this player. */
       nbaHeadshotAvailable: z.boolean().optional(),
       /** Direct fallback image URL (e.g. a Wikipedia thumbnail), used as a final candidate. */
-      photoUrl: z.string().url().nullable().optional(),
+      photoUrl: z.url().nullable().optional(),
     })
     .nullable()
     .optional(),
@@ -198,14 +198,17 @@ export const franchiseEraPoolSchema = z.object({
 export type FranchiseEraPool = z.infer<typeof franchiseEraPoolSchema>;
 
 /**
- * Lightweight roster-browser row: one peak player-season with summary ratings
- * flattened for fast filtering and sorting without loading full pool artifacts.
+ * Lightweight draft row: one peak player-season with summary ratings
+ * flattened for fast filtering and sorting without loading full pool
+ * artifacts or the heavier roster details (spec/02). Identity, context,
+ * positions, and image identifiers only; season statistics and
+ * height/weight live in the separate roster-details asset.
  */
 export const playersIndexAltIdsSchema = z
   .object({
     bbref: bbrefIdSchema.nullable().optional(),
     nbaHeadshotAvailable: z.boolean().optional(),
-    photoUrl: z.string().url().nullable().optional(),
+    photoUrl: z.url().nullable().optional(),
   })
   .nullable();
 export type PlayersIndexAltIds = z.infer<typeof playersIndexAltIdsSchema>;
@@ -225,16 +228,44 @@ export const playersIndexEntrySchema = z.object({
   offense: z.number().int().min(0).max(100),
   defense: z.number().int().min(0).max(100),
   selectionScore: z.number().min(0).max(999),
-  heightInches: z.number().int().min(60).max(96).nullable(),
-  weightLbs: z.number().int().min(120).max(400).nullable(),
-  stats: playerSeasonStatsSchema,
 });
 export type PlayersIndexEntry = z.infer<typeof playersIndexEntrySchema>;
 
-/** Global players index: every packaged peak player-season in one asset. */
+/**
+ * Draft index (global players index): every packaged peak player-season as a
+ * compact identity/ratings row. Loaded by the draft, classic, and result
+ * screens; the Roster screen additionally loads the roster-details asset.
+ */
 export const playersIndexSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   dataVersion: z.string().min(1).max(64),
   players: z.array(playersIndexEntrySchema).min(1),
 });
 export type PlayersIndex = z.infer<typeof playersIndexSchema>;
+
+/**
+ * Heavy roster-browser details: the season statistics and physical profile
+ * behind a draft row, kept out of the draft index so sandbox and classic
+ * never parse them. Loaded lazily by the Roster screen only. The identity
+ * fields mirror the draft row: the same playerId can peak in several
+ * franchise/era contexts, so the composite key (playerId + franchiseId +
+ * eraId + seasonKey) is the join key.
+ */
+export const rosterDetailsEntrySchema = z.object({
+  playerId: playerIdSchema,
+  franchiseId: franchiseIdSchema,
+  eraId: z.string().min(1).max(24),
+  seasonKey: seasonKeySchema,
+  heightInches: z.number().int().min(60).max(96).nullable(),
+  weightLbs: z.number().int().min(120).max(400).nullable(),
+  stats: playerSeasonStatsSchema,
+});
+export type RosterDetailsEntry = z.infer<typeof rosterDetailsEntrySchema>;
+
+/** Roster-details asset: one entry per draft row, addressable by playerId. */
+export const rosterDetailsSchema = z.object({
+  schemaVersion: z.literal(1),
+  dataVersion: z.string().min(1).max(64),
+  players: z.array(rosterDetailsEntrySchema).min(1),
+});
+export type RosterDetails = z.infer<typeof rosterDetailsSchema>;

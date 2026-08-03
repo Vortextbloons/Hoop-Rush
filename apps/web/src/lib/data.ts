@@ -4,6 +4,7 @@ import {
   loadEraSimulationProfile,
   loadOpponentBracket,
   loadPlayersIndex,
+  loadRosterDetails,
   type HoopRushManifest,
   type FranchiseEraPool,
   type PoolIndexEntry,
@@ -12,6 +13,7 @@ import {
   type EraSimulationProfile,
   type OpponentBracket,
   type PlayersIndex,
+  type RosterDetails,
 } from '@hoop-rush/data-contracts';
 import { resolve } from '$app/paths';
 import { readCachedPool, writeCachedPool } from './pool-cache';
@@ -216,7 +218,7 @@ export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> 
 
 let playersIndexPromise: Promise<PlayersIndex> | null = null;
 
-/** Load, hash-verify, and validate the global players index asset. */
+/** Load, hash-verify, and validate the draft index (compact identity rows). */
 export function getPlayersIndex(): Promise<PlayersIndex> {
   if (!playersIndexPromise) {
     playersIndexPromise = loadPlayersIndexFor();
@@ -250,6 +252,42 @@ async function loadPlayersIndexFor(): Promise<PlayersIndex> {
   }
 }
 
+let rosterDetailsPromise: Promise<RosterDetails> | null = null;
+
+/** Load, hash-verify, and validate the roster-details asset (stats, height/weight). */
+export function getRosterDetails(): Promise<RosterDetails> {
+  if (!rosterDetailsPromise) {
+    rosterDetailsPromise = loadRosterDetailsFor();
+    rosterDetailsPromise.catch(() => {
+      rosterDetailsPromise = null;
+    });
+  }
+  return rosterDetailsPromise;
+}
+
+async function loadRosterDetailsFor(): Promise<RosterDetails> {
+  const manifest = await getManifest();
+  const entry = manifest.rosterDetails;
+  if (!entry) {
+    throw new Error('Roster details are unavailable.');
+  }
+  const load = (url: string, contentHash: string, bustCache = false) =>
+    loadRosterDetails(
+      bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url),
+      contentHash,
+    );
+  try {
+    return await load(entry.url, entry.contentHash);
+  } catch (error) {
+    return retryWithFreshManifest(
+      error,
+      entry.contentHash,
+      (fresh) => fresh.rosterDetails ?? null,
+      (url, contentHash) => load(url, contentHash, true),
+    );
+  }
+}
+
 /** @internal Resets memoized loaders between unit tests. */
 export function clearDataLoaderCaches(): void {
   manifestPromise = null;
@@ -257,4 +295,5 @@ export function clearDataLoaderCaches(): void {
   profileCache.clear();
   bracketCache.clear();
   playersIndexPromise = null;
+  rosterDetailsPromise = null;
 }

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import type { HoopRushManifest, PlayersIndexEntry } from '@hoop-rush/data-contracts';
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import type { RosterDetailRow } from '$lib/roster-browser';
   import { X } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import PlayerFace from './PlayerFace.svelte';
@@ -14,11 +15,11 @@
     onremove,
     onclear,
   }: {
-    selected: PlayersIndexEntry[];
+    selected: RosterDetailRow[];
     manifest: HoopRushManifest;
     franchiseName: Map<string, string>;
     eraLabel: Map<string, string>;
-    oncompare: (player: PlayersIndexEntry) => void;
+    oncompare: (player: RosterDetailRow) => void;
     onremove: (playerId: string) => void;
     onclear: () => void;
   } = $props();
@@ -28,7 +29,7 @@
   let lastTrigger = $state<HTMLElement | null>(null);
   const ready = $derived(selected.length === 2);
 
-  function selectionKey(player: PlayersIndexEntry): string {
+  function selectionKey(player: RosterDetailRow): string {
     return `${player.franchiseId}/${player.eraId}/${player.playerId}`;
   }
 
@@ -46,11 +47,11 @@
     queueMicrotask(() => target?.focus());
   }
 
-  function displayName(player: PlayersIndexEntry): string {
+  function displayName(player: RosterDetailRow): string {
     return player.displayName || `${player.firstName} ${player.lastName}`;
   }
 
-  function isSelected(player: PlayersIndexEntry): boolean {
+  function isSelected(player: RosterDetailRow): boolean {
     return selected.some((entry) => entry.playerId === player.playerId);
   }
 
@@ -64,7 +65,7 @@
   }
 
   function perGame(
-    player: PlayersIndexEntry,
+    player: RosterDetailRow,
     key: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks',
   ): string {
     const value = player.stats[key];
@@ -73,7 +74,7 @@
   }
 
   function countValue(
-    player: PlayersIndexEntry,
+    player: RosterDetailRow,
     key: 'minutes' | 'points' | 'rebounds' | 'assists' | 'steals' | 'blocks',
   ): string {
     const value = player.stats[key];
@@ -81,7 +82,7 @@
     return `${value.toLocaleString()} (${perGame(player, key)}/g)`;
   }
 
-  function metricValue(player: PlayersIndexEntry, metric: string): string {
+  function metricValue(player: RosterDetailRow, metric: string): string {
     const stats = player.stats;
     switch (metric) {
       case 'Games':

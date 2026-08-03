@@ -17,7 +17,7 @@ export function checkGameResult(result: GameResult): string[] {
     const other = side === 'home' ? 'away' : 'home';
 
     if (players.length !== 5) {
-      failures.push(`${side}: expected exactly five players, got ${players.length}`);
+      failures.push(`${side}: expected exactly five players, got ${String(players.length)}`);
       return;
     }
     const ids = new Set(players.map((p) => p.playerId));
@@ -26,7 +26,7 @@ export function checkGameResult(result: GameResult): string[] {
     }
     if (players.some((p) => p.minutes !== 48 + result.overtimePeriods * 5)) {
       failures.push(
-        `${side}: player minutes must equal 48 + 5*OT (${48 + result.overtimePeriods * 5}) with no bench`,
+        `${side}: player minutes must equal 48 + 5*OT (${String(48 + result.overtimePeriods * 5)}) with no bench`,
       );
     }
 
@@ -35,7 +35,9 @@ export function checkGameResult(result: GameResult): string[] {
       players.reduce((acc, p) => acc + select(p), 0);
     const teamPoints = sumOf((p) => p.points);
     if (teamPoints !== box.points) {
-      failures.push(`${side}: player points (${teamPoints}) != team points (${box.points})`);
+      failures.push(
+        `${side}: player points (${String(teamPoints)}) != team points (${String(box.points)})`,
+      );
     }
     const fgm = box.fieldGoals.made;
     const fga = box.fieldGoals.attempted;
@@ -45,7 +47,7 @@ export function checkGameResult(result: GameResult): string[] {
     const fta = box.freeThrows.attempted;
     if (box.points !== (fgm - tpm) * 2 + tpm * 3 + ftm) {
       failures.push(
-        `${side}: points ${box.points} != 2*2fg + 3*3fg + ft (${(fgm - tpm) * 2 + tpm * 3 + ftm})`,
+        `${side}: points ${String(box.points)} != 2*2fg + 3*3fg + ft (${String((fgm - tpm) * 2 + tpm * 3 + ftm)})`,
       );
     }
     if (fgm > fga) failures.push(`${side}: field-goal makes exceed attempts`);
@@ -67,7 +69,9 @@ export function checkGameResult(result: GameResult): string[] {
     ): void => {
       const p = sumOf(select);
       if (p !== teamValue) {
-        failures.push(`${side}: player ${label} (${p}) != team ${label} (${teamValue})`);
+        failures.push(
+          `${side}: player ${label} (${String(p)}) != team ${label} (${String(teamValue)})`,
+        );
       }
     };
     reconcile('fieldGoalMakes', (p) => p.fieldGoals.made, fgm);
@@ -98,12 +102,12 @@ export function checkGameResult(result: GameResult): string[] {
           box.freeThrows.made;
         if (d.reboundOpportunities !== misses) {
           failures.push(
-            `${side}: rebound opportunities (${d.reboundOpportunities}) != misses (${misses})`,
+            `${side}: rebound opportunities (${String(d.reboundOpportunities)}) != misses (${String(misses)})`,
           );
         }
         if (d.assistedFieldGoals + d.unassistedFieldGoals !== box.fieldGoals.made) {
           failures.push(
-            `${side}: assisted (${d.assistedFieldGoals}) + unassisted (${d.unassistedFieldGoals}) != made field goals (${box.fieldGoals.made})`,
+            `${side}: assisted (${String(d.assistedFieldGoals)}) + unassisted (${String(d.unassistedFieldGoals)}) != made field goals (${String(box.fieldGoals.made)})`,
           );
         }
         if (playerDiag((p) => p.contestedShots) !== d.contestedShots) {
@@ -133,11 +137,13 @@ export function checkGameResult(result: GameResult): string[] {
         const makes = playerDiag((p) => p.shotZones.find((z) => z.zone === zone.zone)?.makes ?? 0);
         if (attempts !== zone.attempts) {
           failures.push(
-            `${side}: player zone attempts (${zone.zone}) ${attempts} != team ${zone.attempts}`,
+            `${side}: player zone attempts (${zone.zone}) ${String(attempts)} != team ${String(zone.attempts)}`,
           );
         }
         if (makes !== zone.makes) {
-          failures.push(`${side}: player zone makes (${zone.zone}) ${makes} != team ${zone.makes}`);
+          failures.push(
+            `${side}: player zone makes (${zone.zone}) ${String(makes)} != team ${String(zone.makes)}`,
+          );
         }
       }
       for (const p of players) {
@@ -151,7 +157,7 @@ export function checkGameResult(result: GameResult): string[] {
         }
         if (d.assistOpportunities < p.assists) {
           failures.push(
-            `${side}: assist opportunities (${d.assistOpportunities}) < assists (${p.assists})`,
+            `${side}: assist opportunities (${String(d.assistOpportunities)}) < assists (${String(p.assists)})`,
           );
         }
       }
@@ -167,7 +173,9 @@ export function checkGameResult(result: GameResult): string[] {
       (box.freeThrows.attempted - box.freeThrows.made);
     const claimed = rebounds.offensive + otherBox.rebounds.defensive + otherBox.rebounds.team;
     if (misses !== claimed) {
-      failures.push(`${side}: misses (${misses}) != own OReb + opponent DREB/team (${claimed})`);
+      failures.push(
+        `${side}: misses (${String(misses)}) != own OReb + opponent DREB/team (${String(claimed)})`,
+      );
     }
 
     // Possession reconciliation: every ended trip counted once.
@@ -178,7 +186,7 @@ export function checkGameResult(result: GameResult): string[] {
     const opponentRecoveries = otherBox.rebounds.offensive + rebounds.defensive + rebounds.team;
     if (opponentRecoveries !== opponentMisses) {
       failures.push(
-        `${side}: opponent miss recoveries (${opponentRecoveries}) != opponent misses (${opponentMisses})`,
+        `${side}: opponent miss recoveries (${String(opponentRecoveries)}) != opponent misses (${String(opponentMisses)})`,
       );
     }
     if (box.possessions < box.fieldGoals.attempted - rebounds.offensive + box.turnovers) {
@@ -193,17 +201,21 @@ export function checkGameResult(result: GameResult): string[] {
   const homeTotal = result.periodScores.home.reduce((a, b) => a + b, 0);
   const awayTotal = result.periodScores.away.reduce((a, b) => a + b, 0);
   if (homeTotal !== result.home.box.points) {
-    failures.push(`home period scores (${homeTotal}) != home points (${result.home.box.points})`);
+    failures.push(
+      `home period scores (${String(homeTotal)}) != home points (${String(result.home.box.points)})`,
+    );
   }
   if (awayTotal !== result.away.box.points) {
-    failures.push(`away period scores (${awayTotal}) != away points (${result.away.box.points})`);
+    failures.push(
+      `away period scores (${String(awayTotal)}) != away points (${String(result.away.box.points)})`,
+    );
   }
   if (result.periodScores.home.length !== result.periodScores.away.length) {
     failures.push(`period score lengths differ`);
   }
   if (result.periodScores.home.length !== 4 + result.overtimePeriods) {
     failures.push(
-      `period count (${result.periodScores.home.length}) != 4 + OT (${result.overtimePeriods})`,
+      `period count (${String(result.periodScores.home.length)}) != 4 + OT (${String(result.overtimePeriods)})`,
     );
   }
   if (result.home.box.points === result.away.box.points) {
@@ -238,10 +250,10 @@ export function gameResultDigest(result: GameResult): string {
 
 function boxDigest(box: TeamBoxScore): string[] {
   return [
-    `${box.fieldGoals.made}/${box.fieldGoals.attempted}`,
-    `${box.threes.made}/${box.threes.attempted}`,
-    `${box.freeThrows.made}/${box.freeThrows.attempted}`,
-    `${box.rebounds.offensive}+${box.rebounds.defensive}+${box.rebounds.team}`,
+    `${String(box.fieldGoals.made)}/${String(box.fieldGoals.attempted)}`,
+    `${String(box.threes.made)}/${String(box.threes.attempted)}`,
+    `${String(box.freeThrows.made)}/${String(box.freeThrows.attempted)}`,
+    `${String(box.rebounds.offensive)}+${String(box.rebounds.defensive)}+${String(box.rebounds.team)}`,
     String(box.assists),
     String(box.steals),
     String(box.blocks),
@@ -256,10 +268,10 @@ function playerDigest(p: PlayerBoxScore): string[] {
     p.playerId,
     String(p.minutes),
     String(p.points),
-    `${p.fieldGoals.made}/${p.fieldGoals.attempted}`,
-    `${p.threes.made}/${p.threes.attempted}`,
-    `${p.freeThrows.made}/${p.freeThrows.attempted}`,
-    `${p.rebounds.offensive}+${p.rebounds.defensive}`,
+    `${String(p.fieldGoals.made)}/${String(p.fieldGoals.attempted)}`,
+    `${String(p.threes.made)}/${String(p.threes.attempted)}`,
+    `${String(p.freeThrows.made)}/${String(p.freeThrows.attempted)}`,
+    `${String(p.rebounds.offensive)}+${String(p.rebounds.defensive)}`,
     String(p.assists),
     String(p.steals),
     String(p.blocks),

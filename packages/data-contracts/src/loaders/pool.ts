@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { franchiseEraPoolSchema, type FranchiseEraPool } from '../player-season.js';
 import { sha256Hex } from './verify-hash.js';
 
@@ -19,7 +18,7 @@ export async function loadPool(
 ): Promise<FranchiseEraPool> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`pool request failed: ${response.status} ${response.statusText}`);
+    throw new Error(`pool request failed: ${String(response.status)} ${response.statusText}`);
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (expectedHash !== undefined) {

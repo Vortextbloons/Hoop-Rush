@@ -1,13 +1,14 @@
 import { playersIndexSchema, type PlayersIndex } from '../player-season.js';
 import { sha256Hex } from './verify-hash.js';
 
-/** Validate an unknown players index value at a runtime boundary. */
+/** Validate an unknown draft-index value at a runtime boundary. */
 export function parsePlayersIndex(value: unknown): PlayersIndex {
   return playersIndexSchema.parse(value);
 }
 
 /**
- * Fetch, hash-verify, and validate the global players index asset. When
+ * Fetch, hash-verify, and validate the draft index asset (compact identity
+ * and summary-rating rows for the free-form draft and roster browser). When
  * `expectedHash` is provided (manifest content hash), the response bytes must
  * match before the index is parsed.
  */
@@ -18,7 +19,9 @@ export async function loadPlayersIndex(
 ): Promise<PlayersIndex> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`players index request failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `players index request failed: ${String(response.status)} ${response.statusText}`,
+    );
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (expectedHash !== undefined) {

@@ -11,15 +11,23 @@ import { createRng } from '../sim/rng.js';
 
 export const SCHEDULE_GENERATION_VERSION = 'schedule-v1';
 
+/** Swap two indexed positions; throws if either index is out of bounds. */
+function swapAt(values: string[], a: number, b: number): void {
+  const va = values[a];
+  const vb = values[b];
+  if (va === undefined || vb === undefined) {
+    throw new Error(`schedule swap out of range (${String(a)}, ${String(b)})`);
+  }
+  values[a] = vb;
+  values[b] = va;
+}
+
 /** Counts assignment: which opponents appear twice instead of three times. */
 export function pickTwoGameOpponents(opponentIds: readonly string[], seed: Seed): Set<string> {
   const rng = createRng(`${seed}:counts`);
   const shuffled = [...opponentIds];
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
-    const j = rng.nextInt(0, i);
-    const tmp = shuffled[i]!;
-    shuffled[i] = shuffled[j]!;
-    shuffled[j] = tmp;
+    swapAt(shuffled, i, rng.nextInt(0, i));
   }
   return new Set(shuffled.slice(0, 8));
 }
@@ -53,10 +61,7 @@ export function generateSchedule(
     for (let i = 0; i < (counts.get(id) ?? 0); i += 1) remaining.push(id);
   }
   for (let i = remaining.length - 1; i > 0; i -= 1) {
-    const j = rng.nextInt(0, i);
-    const tmp = remaining[i]!;
-    remaining[i] = remaining[j]!;
-    remaining[j] = tmp;
+    swapAt(remaining, i, rng.nextInt(0, i));
   }
   slots.push(...remaining);
 
@@ -65,12 +70,12 @@ export function generateSchedule(
   for (let i = 1; i < slots.length - 1; i += 1) {
     if (slots[i] !== slots[i - 1]) continue;
     for (let j = i + 1; j < slots.length; j += 1) {
-      const candidate = slots[j]!;
+      const candidate = slots[j];
+      if (candidate === undefined) continue;
       const okBefore = candidate !== slots[i - 1];
       const okAfter = j + 1 < slots.length ? candidate !== slots[j + 1] : true;
       if (okBefore && okAfter) {
-        slots[j] = slots[i]!;
-        slots[i] = candidate;
+        swapAt(slots, i, j);
         break;
       }
     }
@@ -79,10 +84,9 @@ export function generateSchedule(
   // lone remaining repeat would be caught by the repair pass. As a guard,
   // if slot 1 repeats slot 0 (game one), swap with the last slot.
   if (slots.length > 1 && slots[1] === slots[0]) {
-    const last = slots[slots.length - 1]!;
-    if (last !== slots[0]) {
-      slots[slots.length - 1] = slots[1]!;
-      slots[1] = last;
+    const last = slots[slots.length - 1];
+    if (last !== undefined && last !== slots[0]) {
+      swapAt(slots, 1, slots.length - 1);
     }
   }
 

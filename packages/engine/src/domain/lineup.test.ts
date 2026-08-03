@@ -10,7 +10,7 @@ function assignment(
   playerId: string,
   positions: PositionUnion,
 ): LineupAssignment {
-  return { slotIndex: slotIndex as LineupAssignment['slotIndex'], playerId, positions };
+  return { slotIndex: slotIndex, playerId, positions };
 }
 
 function lineup(assignments: LineupAssignment[]): Lineup {
@@ -21,9 +21,7 @@ const five = (assignments: LineupAssignment[]): Lineup => lineup(assignments);
 
 describe('slotRequirement', () => {
   it('follows the fixed G,G,F,F,C structure', () => {
-    expect([0, 1, 2, 3, 4].map((s) => slotRequirement(s as LineupAssignment['slotIndex']))).toEqual(
-      ['G', 'G', 'F', 'F', 'C'],
-    );
+    expect([0, 1, 2, 3, 4].map((s) => slotRequirement(s))).toEqual(['G', 'G', 'F', 'F', 'C']);
   });
 });
 

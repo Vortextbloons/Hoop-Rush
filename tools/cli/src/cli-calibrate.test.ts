@@ -15,6 +15,7 @@ describe('cli: calibrate commands', () => {
       '1',
       '--opponent-games',
       '3',
+      '--allow-skipped',
       '--format',
       'json',
     ]);
@@ -27,6 +28,8 @@ describe('cli: calibrate commands', () => {
     expect(payload.bracketMedianObservedWinRate).not.toBeNull();
     expect(payload.perfectRunRate).not.toBeNull();
     expect(payload.challengeRuns).toBe(1);
+    // Gates below their minimum sample report as skipped, never as a
+    // vacuous pass; --allow-skipped keeps this quick run from failing.
     const lowSampleMetrics = new Set([
       'closeGameRate',
       'blowoutRate',
@@ -35,10 +38,38 @@ describe('cli: calibrate commands', () => {
       'equalLineupHomeWinRate',
     ]);
     for (const metric of payload.metrics) {
-      if (lowSampleMetrics.has(metric.key)) continue;
+      if (lowSampleMetrics.has(metric.key)) {
+        expect(metric.status).toBe('skippedInsufficientSample');
+        expect(metric.sample).toBe(500);
+        expect(metric.minimumSample).toBe(2000);
+        expect(metric.pass).toBe(false);
+        continue;
+      }
+      expect(metric.status).toBe('pass');
       expect(metric.observed).toBeGreaterThanOrEqual(metric.target - metric.tolerance - 0.02);
       expect(metric.observed).toBeLessThanOrEqual(metric.target + metric.tolerance + 0.02);
     }
+  }, 60_000);
+
+  it('calibrate run fails when a required gate is skipped (no --allow-skipped)', async () => {
+    const { code, stdout, stderr } = await runCli([
+      'calibrate',
+      'run',
+      '--samples',
+      '300',
+      '--challenge-samples',
+      '0',
+      '--opponent-games',
+      '3',
+      '--format',
+      'json',
+    ]);
+    expect(code).toBe(1);
+    const payload = calibrateRunReportSchema.parse(jsonPayload(stdout, stderr));
+    expect(payload.pass).toBe(false);
+    const skipped = payload.metrics.filter((m) => m.status === 'skippedInsufficientSample');
+    expect(skipped.length).toBeGreaterThan(0);
+    expect(skipped.some((m) => m.key === 'strongVsWeakWinRate')).toBe(true);
   }, 60_000);
 
   it('calibrate run exits 1 when a gate fails', async () => {
@@ -62,6 +93,7 @@ describe('cli: calibrate commands', () => {
       '3',
       '--profile',
       badPath,
+      '--allow-skipped',
     ]);
     expect(code).toBe(1);
   }, 60_000);

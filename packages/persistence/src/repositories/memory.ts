@@ -18,6 +18,14 @@ import {
 } from '../schemas/run-record.js';
 
 /**
+ * The repository interface is async (Promise-returning) because the Dexie
+ * implementation is genuinely async; this in-memory implementation is
+ * synchronous by nature but must keep the same contract for the contract
+ * tests. Every method is marked `async` with no awaited work on purpose.
+ */
+/* eslint-disable @typescript-eslint/require-await */
+
+/**
  * In-memory challenge repository for tests and non-browser environments. It
  * mirrors the Dexie layout: one active checkpoint plus one game row per
  * accepted game, reconstructed on load, and one active classic draft row. It

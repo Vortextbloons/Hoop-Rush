@@ -2,7 +2,6 @@ import type {
   ChallengeRun,
   ClassicCompletedDraft,
   ClassicVariant,
-  DifficultyProfile,
   EraSimulationProfile,
   GameResult,
   GameSimulationInput,
@@ -219,74 +218,56 @@ function validateCreationInput(input: ChallengeCreation): string[] {
   if (input.profile.dataVersion !== input.dataVersion) {
     failures.push('dataVersion must match the era profile dataVersion');
   }
-  const band = input.bracket.difficulty;
-  if (band.name !== 'medium') {
-    failures.push(`bracket difficulty must be medium (got ${band.name})`);
-  }
   failures.push(...validateBracketContent(input.bracket));
-  if (input.mode === 'sandbox') {
-    if (input.variant !== undefined) {
-      failures.push('sandbox runs reject a classic variant');
-    }
-    if (input.classicDraft !== undefined) {
-      failures.push('sandbox runs reject classic draft metadata');
-    }
-  } else {
-    if (input.variant === undefined) {
-      failures.push('classic runs require a variant');
-    }
-    if (input.classicDraft === undefined) {
-      failures.push('classic runs require classic draft metadata');
+  if (input.mode === 'classic') {
+    const parsedDraft = classicCompletedDraftSchema.safeParse(input.classicDraft);
+    if (!parsedDraft.success) {
+      failures.push('classic draft metadata is invalid');
     } else {
-      const parsedDraft = classicCompletedDraftSchema.safeParse(input.classicDraft);
-      if (!parsedDraft.success) {
-        failures.push('classic draft metadata is invalid');
-      } else {
-        if (input.variant !== undefined && input.variant !== parsedDraft.data.variant) {
-          failures.push('variant must match the classic draft variant');
+      if (input.variant !== parsedDraft.data.variant) {
+        failures.push('variant must match the classic draft variant');
+      }
+      const picks = parsedDraft.data.picks;
+      if (picks.length !== 5) {
+        failures.push('classic draft must contain exactly five picks');
+      }
+      const pickIds = picks.map((p) => p.playerId);
+      if (new Set(pickIds).size !== pickIds.length) {
+        failures.push('classic draft picks must reference distinct players');
+      }
+      const pickSlots = picks.map((p) => p.slotIndex);
+      if (new Set(pickSlots).size !== pickSlots.length) {
+        failures.push('classic draft picks must fill distinct slots');
+      }
+      if (!seedSchema.safeParse(input.classicDraft.seed).success) {
+        failures.push('classic draft seed must be hex');
+      }
+      for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
+        const pick = picks.find((p) => p.slotIndex === slotIndex);
+        if (!pick) continue;
+        if (input.lineup.assignments[slotIndex]?.playerId !== pick.playerId) {
+          failures.push(
+            `classic draft pick for slot ${String(slotIndex)} does not match the lineup`,
+          );
         }
-        const picks = parsedDraft.data.picks;
-        if (picks.length !== 5) {
-          failures.push('classic draft must contain exactly five picks');
+        if (input.selections[slotIndex]?.playerId !== pick.playerId) {
+          failures.push(
+            `classic draft pick for slot ${String(slotIndex)} does not match the selections`,
+          );
         }
-        const pickIds = picks.map((p) => p.playerId);
-        if (new Set(pickIds).size !== pickIds.length) {
-          failures.push('classic draft picks must reference distinct players');
+        if (input.players[slotIndex]?.playerId !== pick.playerId) {
+          failures.push(
+            `classic draft pick for slot ${String(slotIndex)} does not match the player snapshot`,
+          );
         }
-        const pickSlots = picks.map((p) => p.slotIndex);
-        if (new Set(pickSlots).size !== pickSlots.length) {
-          failures.push('classic draft picks must fill distinct slots');
-        }
-        if (!seedSchema.safeParse(input.classicDraft.seed).success) {
-          failures.push('classic draft seed must be hex');
-        }
-        for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
-          const pick = picks.find((p) => p.slotIndex === slotIndex);
-          if (!pick) continue;
-          if (input.lineup.assignments[slotIndex]?.playerId !== pick.playerId) {
-            failures.push(
-              `classic draft pick for slot ${String(slotIndex)} does not match the lineup`,
-            );
-          }
-          if (input.selections[slotIndex]?.playerId !== pick.playerId) {
-            failures.push(
-              `classic draft pick for slot ${String(slotIndex)} does not match the selections`,
-            );
-          }
-          if (input.players[slotIndex]?.playerId !== pick.playerId) {
-            failures.push(
-              `classic draft pick for slot ${String(slotIndex)} does not match the player snapshot`,
-            );
-          }
-          const selection = input.selections[slotIndex];
-          if (
-            selection &&
-            (selection.franchiseId !== pick.franchiseId || selection.eraId !== pick.eraId)
-          ) {
-            failures.push(
-              `classic draft pick for slot ${String(slotIndex)} does not match selection provenance`,
-            );
-          }
+        const selection = input.selections[slotIndex];
+        if (
+          selection &&
+          (selection.franchiseId !== pick.franchiseId || selection.eraId !== pick.eraId)
+        ) {
+          failures.push(
+            `classic draft pick for slot ${String(slotIndex)} does not match selection provenance`,
+          );
         }
       }
     }
@@ -417,9 +398,6 @@ export function acceptGameResult(run: ChallengeRun, result: GameResult): Challen
   const derivedSeed = deriveGameSeed(run.runSeed, result.gameNumber);
   if (result.seed !== derivedSeed) {
     failures.push(`seed for game ${String(result.gameNumber)} does not derive from the run seed`);
-  }
-  if (result.schemaVersion !== 1) {
-    failures.push(`unsupported result schemaVersion ${String(result.schemaVersion)}`);
   }
   if (result.home.teamId !== 'user') {
     failures.push(`home team must be the user lineup (got ${result.home.teamId})`);

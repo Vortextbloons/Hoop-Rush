@@ -28,37 +28,12 @@ function row(partial: Partial<PlayersIndexEntry> & { playerId: string }): Player
     offense: 70,
     defense: 70,
     selectionScore: 50,
-    heightInches: 78,
-    weightLbs: 200,
-    stats: {
-      gamesPlayed: 80,
-      minutes: 2400,
-      points: 1600,
-      rebounds: 800,
-      offensiveRebounds: null,
-      defensiveRebounds: null,
-      assists: 400,
-      steals: 80,
-      blocks: 40,
-      turnovers: 200,
-      fieldGoalsMade: 600,
-      fieldGoalsAttempted: 1200,
-      threesMade: 100,
-      threesAttempted: 250,
-      freeThrowsMade: 300,
-      freeThrowsAttempted: 360,
-      per: 20,
-      boxPlusMinus: 2,
-      usageRate: 25,
-      tsPct: 0.6,
-      efgPct: 0.54,
-    },
     ...partial,
   };
 }
 
 function indexOf(rows: PlayersIndexEntry[]): PlayersIndex {
-  return { schemaVersion: 2, dataVersion: 'data-v1', players: rows };
+  return { schemaVersion: 3, dataVersion: 'data-v1', players: rows };
 }
 
 describe('buildClassicCatalog', () => {

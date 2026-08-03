@@ -15,7 +15,7 @@ export async function loadOpponentBracket(
 ): Promise<OpponentBracket> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`failed to load opponent bracket from ${url}: HTTP ${response.status}`);
+    throw new Error(`failed to load opponent bracket from ${url}: HTTP ${String(response.status)}`);
   }
   const bytes = await response.arrayBuffer();
   if (expectedHash !== undefined) {

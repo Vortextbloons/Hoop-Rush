@@ -20,7 +20,7 @@ test.describe('roster browser', () => {
   test('loads the whole dataset grouped by team then decade', async ({ page }) => {
     await page.goto('/roster');
     await expect(page.getByRole('heading', { name: 'Player database' })).toBeVisible();
-    await expect(page.getByText('7,792 players', { exact: true })).toBeVisible();
+    await expect(page.getByText('7,933 players', { exact: true })).toBeVisible();
 
     // Default organization ("None") groups by franchise then decade in pool order.
     await expect(page.locator('tbody').getByText('POR · 1990s · 42 players')).toBeVisible();
@@ -104,15 +104,15 @@ test.describe('roster browser', () => {
 
   test('reveals more players in pages', async ({ page }) => {
     await page.goto('/roster');
-    await expect(page.getByText('Showing 120 of 7,792 players')).toBeVisible();
+    await expect(page.getByText('Showing 120 of 7,933 players')).toBeVisible();
     await page.getByRole('button', { name: 'Show 120 more' }).click();
-    await expect(page.getByText('Showing 240 of 7,792 players')).toBeVisible();
+    await expect(page.getByText('Showing 240 of 7,933 players')).toBeVisible();
   });
 
   test('mobile layout uses compact cards', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/roster');
-    await expect(page.getByText('7,792 players', { exact: true })).toBeVisible();
+    await expect(page.getByText('7,933 players', { exact: true })).toBeVisible();
 
     const card = page.locator('ul').getByRole('button', { name: /View Walt Williams stats/ });
     await expect(card).toContainText('POR');

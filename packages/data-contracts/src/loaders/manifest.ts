@@ -9,7 +9,7 @@ export function parseManifest(value: unknown): HoopRushManifest {
 export async function loadManifest(url: string, init?: RequestInit): Promise<HoopRushManifest> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`manifest request failed: ${response.status} ${response.statusText}`);
+    throw new Error(`manifest request failed: ${String(response.status)} ${response.statusText}`);
   }
   return parseManifest(await response.json());
 }

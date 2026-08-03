@@ -66,7 +66,7 @@ export const classicDraftStateSchema = z
     // legal once the draft is complete.
     if (state.status === 'drafting' && state.roll === null) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'a drafting classic draft must carry an active roll',
       });
     }

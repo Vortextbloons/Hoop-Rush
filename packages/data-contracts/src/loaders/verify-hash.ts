@@ -1,9 +1,6 @@
 /** Shared SHA-256 content-hash verification for packaged artifacts. */
 
 export async function sha256Hex(bytes: Uint8Array<ArrayBuffer> | ArrayBuffer): Promise<string> {
-  if (typeof globalThis.crypto?.subtle === 'undefined') {
-    throw new Error('crypto.subtle is unavailable');
-  }
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }

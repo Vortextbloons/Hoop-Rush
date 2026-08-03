@@ -39,7 +39,7 @@ export const storedRunRecordSchema = z.object({
   saveSchemaVersion: z.literal(2),
   run: challengeRunSchema,
   /** Written by the adapter, never by domain logic. */
-  updatedAtIso: z.string().datetime().optional(),
+  updatedAtIso: z.iso.datetime().optional(),
 });
 export type StoredRunRecord = z.infer<typeof storedRunRecordSchema>;
 
@@ -82,7 +82,7 @@ export const activeRunCheckpointSchema = z.object({
    */
   gamesPlayed: z.number().int().min(0).max(82).optional(),
   aggregates: runAggregatesSchema,
-  updatedAtIso: z.string().datetime().optional(),
+  updatedAtIso: z.iso.datetime().optional(),
 });
 export type ActiveRunCheckpoint = z.infer<typeof activeRunCheckpointSchema>;
 
@@ -91,7 +91,7 @@ export const activeGameRowSchema = z.object({
   runId: z.string().min(1).max(64),
   gameNumber: z.number().int().min(1).max(82),
   result: gameResultSchema,
-  updatedAtIso: z.string().datetime().optional(),
+  updatedAtIso: z.iso.datetime().optional(),
 });
 export type ActiveGameRow = z.infer<typeof activeGameRowSchema>;
 
@@ -198,7 +198,7 @@ export const completedRunIndexSchema = z.object({
   losses: z.number().int().nonnegative(),
   gamesPlayed: z.number().int().positive(),
   outcome: z.enum(['perfect', 'eliminated']),
-  completedAtIso: z.string().datetime(),
+  completedAtIso: z.iso.datetime(),
 });
 export type CompletedRunIndex = z.infer<typeof completedRunIndexSchema>;
 

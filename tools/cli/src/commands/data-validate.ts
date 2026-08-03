@@ -9,6 +9,8 @@ import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   opponentBracketSchema,
+  playersIndexSchema,
+  rosterDetailsSchema,
   REQUIRED_RATING_KEYS,
   unavailabilityReasonSchema,
   type HoopRushManifest,
@@ -529,6 +531,120 @@ function auditAssets(manifest: HoopRushManifest): AuditResult {
   return { ok: failures.length === 0, details, failures };
 }
 
+/**
+ * Global draft-index and roster-details assets: file presence, content-hash
+ * match, schema validity, unique composite keys, and a one-to-one
+ * correspondence between the two assets. Composite keys are the draft row
+ * identity (playerId + franchiseId + eraId + seasonKey): the same playerId
+ * can legitimately peak in several franchise/era contexts.
+ */
+async function auditGlobalAssets(
+  manifest: HoopRushManifest,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+
+  // Small manifest fixtures used by focused validator tests intentionally omit
+  // packaged global assets. Production manifests advertise both together.
+  if (manifest.playersIndex === undefined && manifest.rosterDetails === undefined) {
+    return { ok: true, details, failures };
+  }
+
+  const loadAsset = async (
+    entry: { url: string; contentHash: string } | undefined,
+    label: string,
+  ): Promise<{ keys: Set<string>; parsed: unknown } | null> => {
+    if (entry === undefined) {
+      failures.push(`${label}: manifest has no entry`);
+      return null;
+    }
+    const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
+    let content: Buffer;
+    try {
+      content = await readFile(assetPath);
+    } catch {
+      failures.push(`${label}: asset missing (${assetPath})`);
+      return null;
+    }
+    const actualHash = createHash('sha256').update(content).digest('hex');
+    if (actualHash !== entry.contentHash) {
+      failures.push(`${label}: content hash mismatch (${assetPath})`);
+      return null;
+    }
+    if (verbose) details.push(`${label}: hash verified (${assetPath})`);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(content.toString('utf8')) as unknown;
+    } catch {
+      failures.push(`${label}: asset is not valid JSON (${assetPath})`);
+      return null;
+    }
+    return { keys: new Set<string>(), parsed: raw };
+  };
+
+  const keyOf = (player: {
+    playerId: string;
+    franchiseId: string;
+    eraId: string;
+    seasonKey: string;
+  }) => `${player.playerId}/${player.franchiseId}/${player.eraId}/${player.seasonKey}`;
+
+  const indexAsset = await loadAsset(manifest.playersIndex, 'playersIndex');
+  if (indexAsset !== null) {
+    const parsed = playersIndexSchema.safeParse(indexAsset.parsed);
+    if (!parsed.success) {
+      failures.push(
+        `playersIndex: asset fails the schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? ''}`,
+      );
+    } else {
+      for (const player of parsed.data.players) {
+        const key = keyOf(player);
+        if (indexAsset.keys.has(key)) {
+          failures.push(`playersIndex: duplicate row ${key}`);
+        }
+        indexAsset.keys.add(key);
+      }
+      details.push(`playersIndex: ${String(parsed.data.players.length)} draft rows`);
+    }
+  }
+
+  const detailsAsset = await loadAsset(manifest.rosterDetails, 'rosterDetails');
+  if (detailsAsset !== null) {
+    const parsed = rosterDetailsSchema.safeParse(detailsAsset.parsed);
+    if (!parsed.success) {
+      failures.push(
+        `rosterDetails: asset fails the schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? ''}`,
+      );
+    } else {
+      for (const player of parsed.data.players) {
+        const key = keyOf(player);
+        if (detailsAsset.keys.has(key)) {
+          failures.push(`rosterDetails: duplicate entry ${key}`);
+        }
+        detailsAsset.keys.add(key);
+      }
+      details.push(`rosterDetails: ${String(parsed.data.players.length)} detail entries`);
+    }
+  }
+
+  if (indexAsset !== null && detailsAsset !== null) {
+    for (const key of indexAsset.keys) {
+      if (!detailsAsset.keys.has(key)) {
+        failures.push(`rosterDetails: missing detail for draft row ${key}`);
+      }
+    }
+    for (const key of detailsAsset.keys) {
+      if (!indexAsset.keys.has(key)) {
+        failures.push(`rosterDetails: orphan detail ${key} with no draft row`);
+      }
+    }
+  }
+
+  return { ok: failures.length === 0, details, failures };
+}
+
 export async function dataValidate(inputPath: string, verbose: boolean): Promise<CliReport> {
   let raw: string;
   try {
@@ -575,6 +691,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditPools(manifest, manifestDir, verbose),
     await auditEraSimulationProfiles(manifest, manifestDir, verbose),
     await auditBracket(manifest, manifestDir, verbose),
+    await auditGlobalAssets(manifest, manifestDir, verbose),
     auditAssets(manifest),
   ];
 

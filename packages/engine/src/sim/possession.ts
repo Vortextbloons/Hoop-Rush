@@ -56,11 +56,11 @@ export interface GameState {
   secondsRemaining: number;
 }
 
-export function createGameState(
-  profile: EraSimulationProfile,
-  home: SimulationTeam,
-  away: SimulationTeam,
-): GameState {
+/**
+ * Fresh game state. The clock is initialized by the game loop immediately
+ * after creation (game.ts), so this factory takes no inputs.
+ */
+export function createGameState(): GameState {
   return {
     periodFouls: [0, 0],
     periodIndex: 0,
@@ -258,7 +258,10 @@ function resolveFreeThrows(
   deadBall: boolean,
 ): void {
   const { rng, recorder } = ctx;
-  const shooter = ctx.teams[offenseSide].players[shooterSlot]!;
+  const shooter = ctx.teams[offenseSide].players[shooterSlot];
+  if (shooter === undefined) {
+    throw new Error(`possession: no player at slot ${String(shooterSlot)}`);
+  }
   for (let i = 0; i < attempts; i += 1) {
     const last = i === attempts - 1;
     const p = freeThrowProbabilityFor(ctx, shooter);
@@ -295,10 +298,22 @@ function resolveShot(
   const defensePrep = ctx.preps[defenseSide];
 
   const initiator = pickInitiator(team, teamPrep.initiatorWeights, rng);
-  const action = pickAction(initiator, teamPrep.actionWeights.get(initiator.playerId)!, rng);
-  const shot = pickShot(teamPrep.teammateShots.get(initiator.playerId)!, initiator, action, rng);
+  const actionWeights = teamPrep.actionWeights.get(initiator.playerId);
+  if (actionWeights === undefined) {
+    throw new Error(`possession: no action weights for ${initiator.playerId}`);
+  }
+  const action = pickAction(initiator, actionWeights, rng);
+  const teammateShots = teamPrep.teammateShots.get(initiator.playerId);
+  if (teammateShots === undefined) {
+    throw new Error(`possession: no teammate shot table for ${initiator.playerId}`);
+  }
+  const shot = pickShot(teammateShots, initiator, action, rng);
   const shooter = shot.shooter;
-  const zone = pickZone(action, teamPrep.zonePrep.get(shooter.playerId)!, rng);
+  const zonePrep = teamPrep.zonePrep.get(shooter.playerId);
+  if (zonePrep === undefined) {
+    throw new Error(`possession: no zone preparation for ${shooter.playerId}`);
+  }
+  const zone = pickZone(action, zonePrep, rng);
   const defender = pickDefender(defense, shooter, zone, rng);
 
   const shooterSlot = teamPrep.slotByPlayerId.get(shooter.playerId) ?? -1;

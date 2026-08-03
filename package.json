@@ -13,9 +13,15 @@
     "format:check": "prettier --check .",
     "test": "pnpm --parallel -r test",
     "test:run": "pnpm --parallel -r test:run",
-    "test:quick": "pnpm --parallel -r exec vitest run --exclude **/generator.test.ts"
+    "test:quick": "pnpm --parallel -r exec vitest run --exclude **/generator*.test.ts"
   },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.11.0",
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",
     "prettier-plugin-svelte": "^4.1.1"
   }

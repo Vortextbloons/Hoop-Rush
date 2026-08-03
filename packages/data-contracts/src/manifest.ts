@@ -15,13 +15,13 @@ import { poolAvailabilitySchema } from './provenance.js';
 
 export const assetConfigSchema = z.object({
   /** NBA CDN headshot template; {playerExternalId} is substituted at runtime. */
-  headshotUrlTemplate: z.string().url().nullable(),
+  headshotUrlTemplate: z.url().nullable(),
   /** Optional fallback headshot template; {altIds.bbref} is substituted when set. */
-  headshotUrlTemplateSecondary: z.string().url().nullable(),
+  headshotUrlTemplateSecondary: z.url().nullable(),
   /** NBA CDN logo template; {teamExternalId} is substituted at runtime. */
-  logoUrlTemplate: z.string().url().nullable(),
+  logoUrlTemplate: z.url().nullable(),
   /** Optional fallback logo template; {teamAbbreviation} is substituted when set. */
-  logoUrlTemplateSecondary: z.string().url().nullable(),
+  logoUrlTemplateSecondary: z.url().nullable(),
   /** Source attribution for image assets. */
   source: z.string().min(1).max(256),
   /** Cache-busting version for asset URLs. */
@@ -80,8 +80,10 @@ export const hoopRushManifestSchema = z.object({
   eraSimulationProfiles: z.array(simProfileIndexEntrySchema),
   /** The single frozen opponent bracket (M3+), loaded and cached as a unit. */
   bracket: opponentIndexEntrySchema.optional(),
-  /** Global players index for the free-form draft and roster browser. */
+  /** Global players index (draft rows) for the free-form draft and roster browser. */
   playersIndex: playersIndexAssetSchema.optional(),
+  /** Heavy roster-browser details (stats, height/weight); loaded by the Roster screen only. */
+  rosterDetails: playersIndexAssetSchema.optional(),
   assets: assetConfigSchema,
 });
 export type HoopRushManifest = z.infer<typeof hoopRushManifestSchema>;

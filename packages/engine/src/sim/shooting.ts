@@ -151,7 +151,7 @@ export function blockProbability(
   const c = ENGINE_CONSTANTS;
   const anchors = defender.anchors;
   const per48 =
-    anchors && anchors.blocksPerGame !== undefined && anchors.minutesPerGame > 0
+    anchors && anchors.minutesPerGame > 0
       ? (anchors.blocksPerGame / anchors.minutesPerGame) * 48
       : 0;
   const anchorBonus =

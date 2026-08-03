@@ -109,7 +109,7 @@ function advanceOne(state: ClassicDraftState): ClassicDraftState {
       return draftClassicPlayer(
         state,
         catalogFixture(),
-        { playerId: player.playerId, slotIndex: slotIndex as SlotIndex },
+        { playerId: player.playerId, slotIndex: slotIndex },
         context,
       );
     }
@@ -437,7 +437,7 @@ describe('classic rerolls', () => {
       context,
     );
     const narrowed = { ...state, roll: { franchiseId: 'lakers', eraId: '1990s' } };
-    const before = narrowed.roll!;
+    const before = narrowed.roll;
     const rolled = rerollClassicFranchise(narrowed, catalog, context);
     expect(rolled.roll!.franchiseId).not.toBe(before.franchiseId);
     expect(rolled.roll!.eraId).toBe(before.eraId);
@@ -484,7 +484,7 @@ describe('classic rerolls', () => {
       context,
     );
     const narrowed = { ...state, roll: { franchiseId: 'lakers', eraId: '1990s' } };
-    const before = narrowed.roll!;
+    const before = narrowed.roll;
     const rolled = rerollClassicEra(narrowed, catalog, context);
     expect(rolled.roll!.eraId).not.toBe(before.eraId);
     expect(rolled.roll!.franchiseId).toBe(before.franchiseId);
@@ -1095,7 +1095,7 @@ describe('classic draft command sequences (property)', () => {
               state = draftClassicPlayer(
                 state,
                 catalog,
-                { playerId: player.playerId, slotIndex: slotIndex as SlotIndex },
+                { playerId: player.playerId, slotIndex: slotIndex },
                 context,
               );
               break;
@@ -1125,7 +1125,7 @@ describe('classic draft command sequences (property)', () => {
               }
               state = repositionClassicPlayer(state, catalog, {
                 playerId: pick.playerId,
-                slotIndex: target as SlotIndex,
+                slotIndex: target,
               });
               break;
             }

@@ -16,7 +16,11 @@ import { canPlay } from './positions.js';
 
 /** Position requirement for a slot index in the fixed G,G,F,F,C structure. */
 export function slotRequirement(slotIndex: SlotIndex): Position {
-  return LINEUP_STRUCTURE[slotIndex]!;
+  const requirement = LINEUP_STRUCTURE[slotIndex];
+  if (requirement === undefined) {
+    throw new Error(`lineup: no position requirement for slot ${String(slotIndex)}`);
+  }
+  return requirement;
 }
 
 /** Whether a player's career union satisfies a slot requirement. */
@@ -53,9 +57,9 @@ export function validateLineup(lineup: Lineup): LineupValidation {
     if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 4) {
       issues.push({
         code: 'bad-slot',
-        slotIndex: slotIndex as SlotIndex,
+        slotIndex: slotIndex,
         playerId,
-        message: `slot index ${slotIndex} is outside 0..4`,
+        message: `slot index ${String(slotIndex)} is outside 0..4`,
       });
       continue;
     }
@@ -75,7 +79,7 @@ export function validateLineup(lineup: Lineup): LineupValidation {
         code: 'slot-missing',
         slotIndex,
         playerId,
-        message: `slot ${slotIndex} is assigned more than once`,
+        message: `slot ${String(slotIndex)} is assigned more than once`,
       });
     }
     covered.add(slotIndex);
@@ -86,18 +90,18 @@ export function validateLineup(lineup: Lineup): LineupValidation {
         code: 'slot-mismatch',
         slotIndex,
         playerId,
-        message: `player ${playerId} (${positions.join('/')}) cannot fill ${requirement} slot ${slotIndex}`,
+        message: `player ${playerId} (${positions.join('/')}) cannot fill ${requirement} slot ${String(slotIndex)}`,
       });
     }
   }
 
   for (let slotIndex = 0; slotIndex < LINEUP_STRUCTURE.length; slotIndex += 1) {
-    if (!covered.has(slotIndex as SlotIndex)) {
+    if (!covered.has(slotIndex)) {
       issues.push({
         code: 'slot-missing',
-        slotIndex: slotIndex as SlotIndex,
+        slotIndex: slotIndex,
         playerId: '',
-        message: `slot ${slotIndex} is not assigned`,
+        message: `slot ${String(slotIndex)} is not assigned`,
       });
     }
   }
@@ -120,13 +124,18 @@ export function assignLineup(
 
   function search(index: number, used: Map<SlotIndex, string>): LineupAssignment[] | null {
     if (index === players.length) {
-      return [...used.entries()].map(([slotIndex, playerId]) => ({
-        slotIndex,
-        playerId,
-        positions: byId.get(playerId)!.positions,
-      }));
+      return [...used.entries()].map(([slotIndex, playerId]) => {
+        const assigned = byId.get(playerId);
+        if (assigned === undefined) {
+          throw new Error(`lineup: missing player ${playerId}`);
+        }
+        return { slotIndex, playerId, positions: assigned.positions };
+      });
     }
-    const player = players[index]!;
+    const player = players[index];
+    if (player === undefined) {
+      throw new Error(`lineup: missing player at index ${String(index)}`);
+    }
     for (const slotIndex of slots) {
       if (used.has(slotIndex)) continue;
       if (!canFillSlot(player.positions, slotIndex)) continue;

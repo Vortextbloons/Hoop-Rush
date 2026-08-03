@@ -97,7 +97,7 @@ function buildGameResult(gameNumber: number): GameResult {
       possessions: 96,
     },
     players: Array.from({ length: 5 }, (_, i) => ({
-      playerId: `p-${i + 1}`,
+      playerId: `p-${String(i + 1)}`,
       minutes: 48,
       points: 20,
       fieldGoals: { made: 8, attempted: 17 },
@@ -155,7 +155,7 @@ function aggregatesFor(gamesPlayed: number, wins: number, losses: number): RunAg
       possessions: 0,
     },
     players: Array.from({ length: 5 }, (_, i) => ({
-      playerId: `p-${i + 1}`,
+      playerId: `p-${String(i + 1)}`,
       gamesPlayed,
       minutes: 0,
       points: 0,
@@ -197,17 +197,20 @@ class TestDatabase extends Dexie {
   }
 }
 
-const adapters: Array<() => { repo: ChallengeRepository; db?: TestDatabase }> = [
+const adapters: [
+  () => { repo: ChallengeRepository; db?: TestDatabase },
+  () => { repo: ChallengeRepository; db?: TestDatabase },
+] = [
   () => ({ repo: new InMemoryChallengeRepository() }),
   () => {
-    const db = new TestDatabase(`test-${Math.random()}`);
+    const db = new TestDatabase(`test-${String(Math.random())}`);
     return { repo: new DexieChallengeRepository(db), db };
   },
 ];
 
 describe.each([
-  ['in-memory', adapters[0]!],
-  ['dexie', adapters[1]!],
+  ['in-memory', adapters[0]],
+  ['dexie', adapters[1]],
 ] as const)('challenge repository (%s)', (_name, makeAdapter) => {
   it('saves and reloads the active run', async () => {
     const { repo } = makeAdapter();
@@ -583,7 +586,7 @@ describe('dexie active-run migration', () => {
     legacyDb.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
     await legacyDb.open();
     await legacyDb.table('active').put(legacyRecord);
-    await legacyDb.close();
+    legacyDb.close();
 
     const repo = new DexieChallengeRepository();
     const loaded = await repo.loadActiveRun();
@@ -643,7 +646,7 @@ describe('dexie active-run migration', () => {
         updatedAtIso: '2026-07-31T12:00:00.000Z',
       })),
     );
-    await legacyDb.close();
+    legacyDb.close();
 
     const repo = new DexieChallengeRepository();
     const loaded = await repo.loadActiveRun();

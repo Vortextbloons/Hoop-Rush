@@ -2,8 +2,7 @@
   import { resolve } from '$app/paths';
   import { ArrowRight, Check, ChevronDown } from '@lucide/svelte';
   import { Select } from 'bits-ui';
-  import { SvelteMap } from 'svelte/reactivity';
-  import type {
+    import type {
     HoopRushManifest,
     PeakPlayerSeason,
     PlayersIndex,
@@ -12,9 +11,10 @@
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
-  import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
-  import { startSandboxRun } from '$lib/sandbox-run';
+import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
+import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
+import { startSandboxRun } from '$lib/sandbox-run';
+import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, sortDraftRows } from '$lib/draft-presentation';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
@@ -255,21 +255,8 @@
    * franchise-era pools, in slot order.
    */
   async function resolveRefsToPlayers(refs: SlotRef[]): Promise<PeakPlayerSeason[]> {
-    const byKey = new SvelteMap<string, SvelteMap<string, PeakPlayerSeason>>();
-    for (const key of new Set(refs.map((r) => `${r.franchiseId}/${r.eraId}`))) {
-      const slash = key.indexOf('/');
-      const poolEntry = manifest?.pools.find(
-        (p) => p.franchiseId === key.slice(0, slash) && p.eraId === key.slice(slash + 1),
-      );
-      if (!poolEntry) throw new Error(`Pool unavailable for ${key}.`);
-      const pool = await getPool(poolEntry);
-      byKey.set(key, new SvelteMap(pool.players.map((p) => [p.playerId, p])));
-    }
-    return refs.map((ref) => {
-      const player = byKey.get(`${ref.franchiseId}/${ref.eraId}`)?.get(ref.playerId);
-      if (!player) throw new Error(`Drafted player ${ref.playerId} is unavailable.`);
-      return player;
-    });
+    if (!manifest) throw new Error('The manifest is unavailable.');
+    return resolvePlayerRefs(refs, manifest);
   }
 
   /** Resolves the picked players, then starts and persists the 82-game run. */

@@ -16,6 +16,6 @@ export const classicDraftRecordSchema = z.object({
   saveSchemaVersion: z.literal(1),
   draft: classicDraftStateSchema,
   /** Written by the adapter, never by domain logic. */
-  updatedAtIso: z.string().datetime().optional(),
+  updatedAtIso: z.iso.datetime().optional(),
 });
 export type StoredClassicDraft = z.infer<typeof classicDraftRecordSchema>;

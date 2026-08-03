@@ -13,7 +13,7 @@
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import type { SandboxHref } from '$lib/sandbox-url';
-  import { BEST_OF_ATTEMPTS, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
+  import { BEST_OF_ATTEMPTS, explainSeason, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
   import { resolve } from '$app/paths';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
@@ -115,6 +115,7 @@
   );
   const opponentPointsPerGame = $derived(opponentPoints / gamesPlayed);
   const pointDifferential = $derived((record?.points ?? 0) - opponentPoints);
+  const explanation = $derived(explainSeason(run));
   const firstLoss = $derived.by((): { game: GameResult; opponentName: string } | null => {
     const gameNumber = run.firstLossGameNumber;
     if (gameNumber === null) return null;
@@ -149,9 +150,10 @@
         );
         const playerName = seasonTable.find((row) => row.aggregate.playerId === player?.playerId)
           ?.player.displayName;
+        // Usage is the recorded diagnostic FGA + 0.44*FTA + TOV, not points.
         return player
-          ? `${playerName ?? player.playerId} scored ${String(evidence.playerPoints)} of ${String(evidence.teamPoints)} team points.`
-          : `${team} concentrated ${Math.round(Number(evidence.usageShare) * 100)}% of scoring in one player.`;
+          ? `${playerName ?? player.playerId} consumed ${Math.round(Number(evidence.usageShare) * 100)}% of ${team}'s estimated usage (${String(evidence.playerUsage)} of ${String(evidence.teamUsage)}).`
+          : `${team} concentrated ${Math.round(Number(evidence.usageShare) * 100)}% of estimated usage in one player.`;
       }
       case 'overtime':
         return `${team} won the overtime period ${String(evidence.homeOvertimePoints)}–${String(evidence.awayOvertimePoints)}.`;
@@ -160,6 +162,39 @@
 
   function pct(made: number, attempted: number): string {
     return attempted === 0 ? '—' : `${((made / attempted) * 100).toFixed(1)}%`;
+  }
+
+  const netRatingLabel = $derived(
+    explanation.netRatingPer100 >= 0
+      ? `+${explanation.netRatingPer100.toFixed(1)}`
+      : explanation.netRatingPer100.toFixed(1),
+  );
+
+  const usageLeaderName = $derived.by(() => {
+    const leader = explanation.usageLeader;
+    if (!leader) return '';
+    const row = seasonTable.find((candidate) => candidate.aggregate.playerId === leader.playerId);
+    return row?.player.displayName ?? leader.playerId;
+  });
+
+  const ZONE_NAMES: Readonly<Record<string, { label: string; noun: string }>> = {
+    rim: { label: 'at the rim', noun: 'rim' },
+    shortMid: { label: 'from short mid-range', noun: 'short mid-range' },
+    longMid: { label: 'from long mid-range', noun: 'long mid-range' },
+    cornerThree: { label: 'from the corner three', noun: 'corner-three' },
+    aboveBreakThree: { label: 'from above the break', noun: 'above-the-break three' },
+  };
+
+  function zoneName(zone: string): string {
+    return ZONE_NAMES[zone]?.label ?? 'by shot zone';
+  }
+
+  function zoneNoun(zone: string): string {
+    return ZONE_NAMES[zone]?.noun ?? 'shot';
+  }
+
+  function zonePctLabel(rate: number): string {
+    return `${(rate * 100).toFixed(1)}%`;
   }
 
   /** True shooting percentage from exact season totals: PTS / (2*(FGA + 0.44*FTA)). */
@@ -427,6 +462,62 @@
     </span>
   </div>
 </div>
+
+<!-- How the five won: thresholded comparisons of recorded season data -->
+<section aria-labelledby="how-won-heading" class="mt-6 rounded-xl border border-border bg-card p-5">
+  <h2 id="how-won-heading" class="font-display text-xl font-extrabold tracking-tight uppercase">
+    How your five won
+  </h2>
+  <ul class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+    <li class="rounded-lg border border-border bg-surface-1 p-3">
+      <span class="font-semibold">{explanation.turnoverBattleWins} of {run.games.length} games</span
+      >
+      <span class="text-muted-foreground">
+        &nbsp;you won the turnover battle{explanation.turnoverBattleLosses > 0
+          ? ` (${explanation.turnoverBattleLosses} went the other way)`
+          : ''}.
+      </span>
+    </li>
+    <li class="rounded-lg border border-border bg-surface-1 p-3">
+      <span class="font-semibold">{netRatingLabel}</span>
+      <span class="text-muted-foreground"> net points per 100 possessions.</span>
+    </li>
+    {#if explanation.zoneAdvantage}
+      <li class="rounded-lg border border-border bg-surface-1 p-3">
+        <span class="font-semibold"
+          >Your advantage came primarily {zoneName(explanation.zoneAdvantage.zone)}.</span
+        >
+        <span class="text-muted-foreground">
+          &nbsp;You shot {zonePctLabel(explanation.zoneAdvantage.pct)} to your opponents'
+          {zonePctLabel(explanation.zoneAdvantage.opponentPct)} on {explanation.zoneAdvantage.attempts.toLocaleString()}
+          {zoneNoun(explanation.zoneAdvantage.zone)} attempts.
+        </span>
+      </li>
+    {/if}
+    {#if explanation.opponentOffensiveReboundRate >= 0.3}
+      <li class="rounded-lg border border-border bg-surface-1 p-3">
+        <span class="font-semibold">This lineup was weak on the defensive glass.</span>
+        <span class="text-muted-foreground">
+          &nbsp;Opponents grabbed {(explanation.opponentOffensiveReboundRate * 100).toFixed(1)}% of
+          their own misses.
+        </span>
+      </li>
+    {/if}
+    {#if explanation.usageLeader}
+      <li class="rounded-lg border border-border bg-surface-1 p-3">
+        <span class="font-semibold">{usageLeaderName}</span>
+        <span class="text-muted-foreground">
+          &nbsp;consumed {(explanation.usageLeader.usageShare * 100).toFixed(0)}% of estimated
+          usage.
+        </span>
+      </li>
+    {/if}
+  </ul>
+  <p class="mt-3 font-mono text-[10px] text-muted-foreground">
+    Turnovers, possessions, zone splits, rebounds, and usage come from recorded game diagnostics;
+    usage is FGA + 0.44 × FTA + turnovers.
+  </p>
+</section>
 
 <!-- Five-player season table directly below the record -->
 <section

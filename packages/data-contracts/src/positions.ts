@@ -16,7 +16,7 @@ export const positionUnionSchema = z
   .array(positionSchema)
   .min(1)
   .max(3)
-  .transform((values) => [...new Set(values)].sort() as Position[]);
+  .transform((values) => [...new Set(values)].sort());
 export type PositionUnion = z.infer<typeof positionUnionSchema>;
 
 /** Source labels exactly as published (e.g. "PG", "G-F", "C-F"). */

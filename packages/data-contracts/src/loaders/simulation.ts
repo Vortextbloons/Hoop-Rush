@@ -17,7 +17,9 @@ export async function loadEraSimulationProfile(
 ): Promise<EraSimulationProfile> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`failed to load era simulation profile from ${url}: HTTP ${response.status}`);
+    throw new Error(
+      `failed to load era simulation profile from ${url}: HTTP ${String(response.status)}`,
+    );
   }
   const bytes = await response.arrayBuffer();
   if (expectedHash !== undefined) {
@@ -39,7 +41,7 @@ export async function loadOpponentTeam(
 ): Promise<OpponentTeam> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new Error(`failed to load opponent from ${url}: HTTP ${response.status}`);
+    throw new Error(`failed to load opponent from ${url}: HTTP ${String(response.status)}`);
   }
   const bytes = await response.arrayBuffer();
   if (expectedHash !== undefined) {

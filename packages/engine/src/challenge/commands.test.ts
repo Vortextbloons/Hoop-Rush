@@ -1,17 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildChallengeRun,
   buildFixtureBracket,
   buildGameSimulationInput,
   buildUserTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import type {
-  ChallengeRun,
-  GameResult,
-  RunPlayerSelection,
-  SimulationPlayer,
-} from '@hoop-rush/data-contracts';
+import type { GameResult, RunPlayerSelection, SimulationPlayer } from '@hoop-rush/data-contracts';
 import { challengeRunSchema } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.js';
 import { simulateGame } from '../sim/game.js';
@@ -152,7 +146,11 @@ describe('challenge commands', () => {
 
   it('accepts one verified game result and accumulates aggregates', () => {
     const run = createChallenge(fixtureCreation());
-    const input = createNextGameInput(run, buildGameSimulationInput().profile)!;
+    const input = createNextGameInput(run, buildGameSimulationInput().profile);
+    expect(input).not.toBeNull();
+    if (input === null) {
+      throw new Error('expected a next game input for an active run');
+    }
     const result = simulateGame(input, context);
     const next = acceptGameResult(run, result);
     expect(next.games).toHaveLength(1);
@@ -214,7 +212,10 @@ describe('challenge commands', () => {
     let interrupted = run;
     for (let i = 0; i < 37; i += 1) {
       const input = createNextGameInput(interrupted, profileInput);
-      interrupted = acceptGameResult(interrupted, simulateGame(input!, context));
+      if (input === null) {
+        throw new Error(`expected a next game input at game ${String(i + 1)}`);
+      }
+      interrupted = acceptGameResult(interrupted, simulateGame(input, context));
     }
     const resumed = simulateChallenge(interrupted, profileInput, context);
     expect(resumed).toEqual(uninterrupted);
@@ -279,11 +280,16 @@ describe('challenge commands', () => {
     const failures = validateBracketContent(bracket);
     expect(failures).toEqual([]);
 
+    const last = bracket.opponents[28];
+    const first = bracket.opponents[0];
+    if (last === undefined || first === undefined) {
+      throw new Error('fixture bracket requires 30 opponents');
+    }
     const withDuplicate = {
       ...bracket,
       opponents: [
         ...bracket.opponents.slice(0, 29),
-        { ...bracket.opponents[28]!, opponentId: bracket.opponents[0]!.opponentId },
+        { ...last, opponentId: first.opponentId },
       ],
     };
     expect(validateBracketContent(withDuplicate).join('; ')).toContain('duplicate opponentId');

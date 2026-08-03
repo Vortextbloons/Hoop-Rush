@@ -46,11 +46,9 @@ function mulberry32(seed: number): () => number {
 /** Creates an RNG whose next draw is the `position`-th draw of the seed. */
 export function createRng(seed: string, position = 0): Rng {
   const next = mulberry32(hashStringFnv1a(seed));
-  let current = position;
   for (let i = 0; i < position; i += 1) next();
 
   function draw(): number {
-    current += 1;
     return next();
   }
 
@@ -62,19 +60,23 @@ export function createRng(seed: string, position = 0): Rng {
       return draw() < probability;
     },
     nextInt(min, max) {
-      if (max < min) throw new Error(`nextInt: max (${max}) < min (${min})`);
+      if (max < min) throw new Error(`nextInt: max (${String(max)}) < min (${String(min)})`);
       if (max === min) return min;
       return Math.floor(draw() * (max - min + 1)) + min;
     },
     pick(items) {
       if (items.length === 0) throw new Error('pick: cannot pick from an empty list');
-      return items[this.nextInt(0, items.length - 1)]!;
+      const item = items[this.nextInt(0, items.length - 1)];
+      if (item === undefined) {
+        throw new Error('pick: index out of range');
+      }
+      return item;
     },
     weightedPick(items, weights) {
       if (items.length === 0) throw new Error('weightedPick: cannot pick from an empty list');
       if (items.length !== weights.length) {
         throw new Error(
-          `weightedPick: items (${items.length}) and weights (${weights.length}) length mismatch`,
+          `weightedPick: items (${String(items.length)}) and weights (${String(weights.length)}) length mismatch`,
         );
       }
       let total = 0;
@@ -83,10 +85,20 @@ export function createRng(seed: string, position = 0): Rng {
       let roll = draw() * total;
       for (let i = 0; i < items.length; i += 1) {
         const w = Math.max(0, weights[i] ?? 0);
-        if (roll < w) return items[i]!;
+        if (roll < w) {
+          const item = items[i];
+          if (item === undefined) {
+            throw new Error(`weightedPick: no item at index ${String(i)}`);
+          }
+          return item;
+        }
         roll -= w;
       }
-      return items[items.length - 1]!;
+      const last = items[items.length - 1];
+      if (last === undefined) {
+        throw new Error('weightedPick: index out of range');
+      }
+      return last;
     },
   };
 }

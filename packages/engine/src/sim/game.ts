@@ -1,9 +1,4 @@
-import type {
-  GameResult,
-  GameSimulationInput,
-  SimulationPlayer,
-  SimulationTeam,
-} from '@hoop-rush/data-contracts';
+import type { GameResult, GameSimulationInput, SimulationTeam } from '@hoop-rush/data-contracts';
 import type { EngineContext } from './context.js';
 import { GameRecorder, type SideIndex } from './recorder.js';
 import { createGameState, createTripContext, resolveTrip } from './possession.js';
@@ -24,7 +19,7 @@ export function simulateGame(input: GameSimulationInput, context: EngineContext)
   const profile = input.profile;
   const teams: [SimulationTeam, SimulationTeam] = [input.home, input.away];
   const recorder = new GameRecorder([input.home.displayName, input.away.displayName]);
-  const state = createGameState(profile, input.home, input.away);
+  const state = createGameState();
   const tripContext = createTripContext(rng, recorder, state, profile, teams);
 
   // Neutral-site tip: the opening possession is a fair coin.

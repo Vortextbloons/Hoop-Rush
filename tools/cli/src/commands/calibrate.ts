@@ -50,6 +50,10 @@ export const CALIBRATE_OPTIONS: Record<string, boolean> = {
   era: true,
   'challenge-samples': true,
   'opponent-games': true,
+  // Dev convenience: report undersampled gates as skipped without failing.
+  // Release calibration (the default, without this flag) fails on any
+  // skipped required gate.
+  'allow-skipped': false,
   format: true,
   verbose: false,
 };
@@ -231,11 +235,13 @@ export function calibrateRun(args: {
   era?: string;
   'challenge-samples'?: string;
   'opponent-games'?: string;
+  'allow-skipped'?: boolean;
 }): CliReport {
   const samples = parseCount(args.samples, '--samples', 2000);
   const seedFrom = parseCount(args['seed-from'], '--seed-from', 0);
   const challengeSamples = parseCount(args['challenge-samples'], '--challenge-samples', 25);
   const opponentGames = parseCount(args['opponent-games'], '--opponent-games', 60);
+  const allowSkipped = args['allow-skipped'] === true;
   const packaged = loadPackagedData();
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile
@@ -370,14 +376,17 @@ export function calibrateRun(args: {
   const metrics = buildMetrics(equalAcc, strongWeakAcc, samples, profile);
   const roleMetrics = buildRoleMetrics(samples, profile);
   const allMetrics = [...metrics, ...roleMetrics];
+  const skipped = allMetrics.filter((m) => m.status === 'skippedInsufficientSample');
+  const anyFailed = allMetrics.some((m) => m.status === 'fail');
+  const pass = !anyFailed && (allowSkipped || skipped.length === 0);
   const payload = calibrateRunReportSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     command: 'calibrate run',
     profileVersion: profile.profileVersion,
     eraId: profile.eraId,
     samples,
     engineVersion: context.engineVersion,
-    pass: allMetrics.every((m) => m.pass),
+    pass,
     metrics: allMetrics,
     openingOpponentWinRateVsStrongUser: openingWinRateVsStrongUser,
     bracketDistribution,
@@ -388,11 +397,15 @@ export function calibrateRun(args: {
   });
 
   const failures: string[] = [];
-  if (!payload.pass) {
-    for (const m of metrics) {
-      if (!m.pass) {
+  if (!pass) {
+    for (const m of allMetrics) {
+      if (m.status === 'fail') {
         failures.push(
           `${m.key}: observed ${m.observed.toFixed(4)} outside ${(m.target - m.tolerance).toFixed(4)}..${(m.target + m.tolerance).toFixed(4)}`,
+        );
+      } else if (m.status === 'skippedInsufficientSample' && !allowSkipped) {
+        failures.push(
+          `${m.key}: skipped (sample ${String(m.sample)} below minimum ${String(m.minimumSample)})`,
         );
       }
     }
@@ -403,7 +416,7 @@ export function calibrateRun(args: {
     `profile ${profile.profileVersion} · era ${profile.eraId} · ${String(samples)} samples · engine ${payload.engineVersion}`,
     ...metrics.map(
       (m) =>
-        `${m.pass ? 'pass' : 'FAIL'} ${m.key}: ${m.observed.toFixed(4)} (target ${m.target.toFixed(4)} ± ${m.tolerance.toFixed(4)})`,
+        `${m.status === 'pass' ? 'pass' : m.status === 'fail' ? 'FAIL' : 'SKIPPED'} ${m.key}: ${m.observed.toFixed(4)} (target ${m.target.toFixed(4)} ± ${m.tolerance.toFixed(4)}, sample ${String(m.sample)}/${String(m.minimumSample)})`,
     ),
     payload.openingOpponentWinRateVsStrongUser === null
       ? 'opening opponent vs strong user: not measured'
@@ -480,12 +493,33 @@ function metric(
   target: { value: number; tolerance: number; minimumSample: number },
   sample: number,
 ): z.infer<typeof calibrationMetricSchema> {
-  // Gates below their minimum sample are not evaluated (vacuous pass); the
-  // sample count is still reported.
-  const pass =
-    sample < target.minimumSample ||
-    (observed >= target.value - target.tolerance && observed <= target.value + target.tolerance);
-  return { key, target: target.value, tolerance: target.tolerance, observed, pass, sample };
+  // Gates below their minimum sample are not evaluated and are reported as
+  // skipped, never as a vacuous pass. `calibrate run` fails unless every
+  // required gate was sampled (or --allow-skipped is given).
+  if (sample < target.minimumSample) {
+    return {
+      key,
+      target: target.value,
+      tolerance: target.tolerance,
+      observed,
+      status: 'skippedInsufficientSample',
+      pass: false,
+      sample,
+      minimumSample: target.minimumSample,
+    };
+  }
+  const inRange =
+    observed >= target.value - target.tolerance && observed <= target.value + target.tolerance;
+  return {
+    key,
+    target: target.value,
+    tolerance: target.tolerance,
+    observed,
+    status: inRange ? 'pass' : 'fail',
+    pass: inRange,
+    sample,
+    minimumSample: target.minimumSample,
+  };
 }
 
 interface RoleAccumulator {

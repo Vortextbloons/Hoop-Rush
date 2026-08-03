@@ -30,10 +30,10 @@ describe('generateBracket (propose-review-freeze)', () => {
     const bracket = fixtureBracket();
     const entry = bracket.opponents.find((o) => o.opponentId === 'lakers-1990s-opening');
     expect(entry).toBeDefined();
-    expect(entry!.teamId).toBe(opening.teamId);
-    expect(entry!.displayName).toBe(opening.displayName);
-    expect(JSON.stringify(entry!.lineup)).toBe(JSON.stringify(opening.lineup));
-    expect(JSON.stringify(entry!.players)).toBe(JSON.stringify(opening.players));
+    expect(entry?.teamId).toBe(opening.teamId);
+    expect(entry?.displayName).toBe(opening.displayName);
+    expect(JSON.stringify(entry?.lineup)).toBe(JSON.stringify(opening.lineup));
+    expect(JSON.stringify(entry?.players)).toBe(JSON.stringify(opening.players));
   }, 40_000);
 
   it('only selects balanced legal lineups with no internal duplicates', () => {
@@ -68,7 +68,12 @@ describe('generateBracket (propose-review-freeze)', () => {
     expect(Math.min(...percentiles)).toBeGreaterThanOrEqual(band[0] - 0.001);
     expect(Math.max(...percentiles)).toBeLessThanOrEqual(band[1] + 0.001);
     const all = bracket.opponents.map((o) => o.strength.percentile).sort((a, b) => a - b);
-    const median = (all[14]! + all[15]!) / 2;
+    const lower = all[14];
+    const upper = all[15];
+    if (lower === undefined || upper === undefined) {
+      throw new Error('bracket requires 30 opponents');
+    }
+    const median = (lower + upper) / 2;
     const medianBand = bracket.difficulty.leagueMedianPercentileBand;
     expect(median).toBeGreaterThanOrEqual(medianBand[0]);
     expect(median).toBeLessThanOrEqual(medianBand[1]);

@@ -1,8 +1,4 @@
-import type {
-  EraSimulationProfile,
-  OpponentBracket,
-  SimulationPlayer,
-} from '@hoop-rush/data-contracts';
+import type { OpponentBracket, SimulationPlayer } from '@hoop-rush/data-contracts';
 import {
   buildEraSimulationProfile,
   buildFixtureBracket,
@@ -35,7 +31,7 @@ function candidatePlayer(
 ): BracketCandidatePlayer {
   const sim = buildSimulationPlayer({
     playerId: `p-${franchiseId}-${String(index)}`,
-    displayName: `${franchiseId} ${index}`,
+    displayName: `${franchiseId} ${String(index)}`,
     positions,
   });
   // Scale the possession ratings with the score so proposals span the
@@ -120,10 +116,11 @@ function candidatesFor(franchiseId: string): FranchiseCandidates {
     ];
   for (const { position, count, offset } of groups) {
     for (let i = 0; i < count; i += 1) {
-      const score = ladder[(offset + i) % ladder.length]!;
-      players.push(
-        candidatePlayer(franchiseId, index, position as SimulationPlayer['positions'], score),
-      );
+      const score = ladder[(offset + i) % ladder.length];
+      if (score === undefined) {
+        throw new Error(`candidate ladder missing score at index ${String(offset + i)}`);
+      }
+      players.push(candidatePlayer(franchiseId, index, position, score));
       index += 1;
     }
   }

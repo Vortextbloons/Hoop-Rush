@@ -1,9 +1,20 @@
-import type { PlayersIndexEntry, PlayerSeasonStats } from '@hoop-rush/data-contracts';
+import type {
+  PlayersIndexEntry,
+  PlayerSeasonStats,
+  RosterDetailsEntry,
+} from '@hoop-rush/data-contracts';
 
 /**
  * Pure presentation helpers for the Roster browser: filtering, sorting, and
  * grouping of the global players index. No DOM, no Svelte — unit-testable.
  */
+
+/**
+ * Roster-browser row: a draft-index entry joined with its roster-details
+ * (season stats and physical profile). The Roster screen builds these by
+ * joining the two assets; draft screens use `PlayersIndexEntry` only.
+ */
+export type RosterDetailRow = PlayersIndexEntry & RosterDetailsEntry;
 
 export type RosterSortId =
   | 'none'
@@ -67,11 +78,11 @@ function compareName(a: PlayersIndexEntry, b: PlayersIndexEntry): number {
 }
 
 function compareBy<T>(
-  rows: PlayersIndexEntry[],
-  value: (row: PlayersIndexEntry) => T,
+  rows: RosterDetailRow[],
+  value: (row: RosterDetailRow) => T,
   direction: RosterSortDirection,
   compare: (a: T, b: T) => number,
-): PlayersIndexEntry[] {
+): RosterDetailRow[] {
   const sign = direction === 'asc' ? 1 : -1;
   return [...rows].sort((a, b) => {
     const primary = sign * compare(value(a), value(b));
@@ -89,10 +100,10 @@ function compareText(a: string, b: string): number {
 
 /** Applies the sort mode to a copy of the rows. 'none' preserves dataset order. */
 export function sortRoster(
-  rows: PlayersIndexEntry[],
+  rows: RosterDetailRow[],
   sortId: RosterSortId,
   direction: RosterSortDirection,
-): PlayersIndexEntry[] {
+): RosterDetailRow[] {
   switch (sortId) {
     case 'none':
       return [...rows];
@@ -125,10 +136,7 @@ export function sortRoster(
 }
 
 /** Applies franchise, decade, position, and name-query filters. */
-export function filterRoster(
-  rows: PlayersIndexEntry[],
-  filters: RosterFilters,
-): PlayersIndexEntry[] {
+export function filterRoster(rows: RosterDetailRow[], filters: RosterFilters): RosterDetailRow[] {
   let list = rows;
   if (filters.franchiseId) list = list.filter((r) => r.franchiseId === filters.franchiseId);
   if (filters.eraId) list = list.filter((r) => r.eraId === filters.eraId);
@@ -145,11 +153,11 @@ export function filterRoster(
 export interface RosterGroup {
   franchiseId: string;
   eraId: string;
-  players: PlayersIndexEntry[];
+  players: RosterDetailRow[];
 }
 
 /** Groups rows by franchise then era, preserving dataset order. */
-export function groupRoster(rows: PlayersIndexEntry[]): RosterGroup[] {
+export function groupRoster(rows: RosterDetailRow[]): RosterGroup[] {
   const groups: RosterGroup[] = [];
   const byKey = new Map<string, RosterGroup>();
   for (const row of rows) {

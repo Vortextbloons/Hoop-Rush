@@ -1,15 +1,17 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { onDestroy } from 'svelte';
+  import { SvelteMap } from 'svelte/reactivity';
   import { ArrowRight, Check, ChevronDown, Search, X } from '@lucide/svelte';
   import { Dialog, Select } from 'bits-ui';
   import type {
     HoopRushManifest,
     PlayersIndex,
-    PlayersIndexEntry,
+    RosterDetails,
+    RosterDetailsEntry,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getRosterDetails } from '$lib/data';
   import {
     defaultDirection,
     filterRoster,
@@ -21,6 +23,7 @@
     perGame,
     shotPct,
     sortRoster,
+    type RosterDetailRow,
     type RosterSortDirection,
     type RosterSortId,
   } from '$lib/roster-browser';
@@ -29,7 +32,7 @@
   import AsyncState from '$lib/components/AsyncState.svelte';
   import RosterComparison from '$lib/components/RosterComparison.svelte';
 
-  type IndexRow = PlayersIndexEntry;
+  type IndexRow = RosterDetailRow;
 
   const SORT_OPTIONS: { id: RosterSortId; label: string }[] = [
     { id: 'none', label: 'None' },
@@ -55,6 +58,8 @@
   let manifestError: string | null = $state(null);
   let index = $state.raw<PlayersIndex | null>(null);
   let indexError: string | null = $state(null);
+  let details = $state.raw<RosterDetails | null>(null);
+  let detailsError: string | null = $state(null);
 
   let franchiseId = $state('');
   let eraId = $state('');
@@ -79,8 +84,10 @@
   function loadRosterData() {
     manifestError = null;
     indexError = null;
+    detailsError = null;
     manifest = null;
     index = null;
+    details = null;
     let cancelled = false;
     getManifest().then(
       (m) => {
@@ -93,6 +100,15 @@
           },
           (error: unknown) => {
             if (!cancelled) indexError = error instanceof Error ? error.message : String(error);
+          },
+        );
+        getRosterDetails().then(
+          (det) => {
+            if (cancelled) return;
+            details = det;
+          },
+          (error: unknown) => {
+            if (!cancelled) detailsError = error instanceof Error ? error.message : String(error);
           },
         );
       },
@@ -133,15 +149,34 @@
     })),
   ]);
 
-  const eraLabel = $derived(new Map((manifest?.eras ?? []).map((e) => [e.eraId, e.label])));
+  const eraLabel = $derived(new SvelteMap((manifest?.eras ?? []).map((e) => [e.eraId, e.label])));
 
   const franchiseName = $derived(
-    new Map((manifest?.modernFranchiseSlots ?? []).map((e) => [e.franchiseId, e.displayName])),
+    new SvelteMap(
+      (manifest?.modernFranchiseSlots ?? []).map((e) => [e.franchiseId, e.displayName]),
+    ),
   );
 
+  /** Draft rows joined with their roster details for the table and dialog. */
+  const rosterRows = $derived.by((): IndexRow[] => {
+    if (!index || !details) return [];
+    const byKey = new SvelteMap<string, RosterDetailsEntry>();
+    for (const entry of details.players) {
+      byKey.set(`${entry.playerId}/${entry.franchiseId}/${entry.eraId}/${entry.seasonKey}`, entry);
+    }
+    const rows: IndexRow[] = [];
+    for (const player of index.players) {
+      const detail = byKey.get(
+        `${player.playerId}/${player.franchiseId}/${player.eraId}/${player.seasonKey}`,
+      );
+      if (!detail) continue;
+      rows.push({ ...player, ...detail });
+    }
+    return rows;
+  });
+
   const filteredRows = $derived.by(() => {
-    if (!index) return [] as IndexRow[];
-    return filterRoster(index.players, {
+    return filterRoster(rosterRows, {
       franchiseId: franchiseId || null,
       eraId: eraId || null,
       position: positionFilter,
@@ -567,16 +602,16 @@
       </div>
     </div>
 
-    {#if indexError}
+    {#if indexError || detailsError}
       <div class="mt-8">
         <AsyncState
           kind="error"
           title="Players unavailable"
-          message={`Failed to load players: ${indexError}`}
+          message={`Failed to load players: ${indexError ?? detailsError}`}
           retry={retryRosterData}
         />
       </div>
-    {:else if !index}
+    {:else if !index || !details}
       <div class="mt-8">
         <AsyncState kind="loading" title="Loading player index" message="One moment…" />
       </div>

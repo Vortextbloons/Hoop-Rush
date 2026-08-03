@@ -1,175 +1,41 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { page } from '$app/state';
-  import type {
-    ChallengeRun,
-    HoopRushManifest,
-    PeakPlayerSeason,
-    PlayersIndexEntry,
-  } from '@hoop-rush/data-contracts';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
-  import { challengeRepository } from '$lib/challenge-repo';
-  import { lineupPlayersFromRun, loadRunPlayersById } from '$lib/sandbox-lineup';
+  import type { ChallengeRun, PeakPlayerSeason } from '@hoop-rush/data-contracts';
+  import type { SandboxHref } from '$lib/sandbox-url';
+  import { lineupPlayersFromRun } from '$lib/sandbox-lineup';
   import { startSandboxRun } from '$lib/sandbox-run';
   import { buildSandboxHref, generateSeed } from '$lib/sandbox-url';
-  import SeasonReport from '$lib/components/SeasonReport.svelte';
-  import AsyncState from '$lib/components/AsyncState.svelte';
+  import ResultPage from '$lib/components/ResultPage.svelte';
 
   /**
-   * Challenge result (spec/08): final record and 82-0 outcome with the League
-   * MVP spotlight, the full game strip, aggregate facts, and the user's
-   * five-player season table. The shared SeasonReport presents the report;
-   * this route owns loading, Run again (fresh draft), Edit team (restore the
-   * completed lineup on the sandbox draft page), and Retry with same team.
+   * Sandbox challenge result: the shared SeasonReport record. This route owns
+   * the mode-specific actions — Run again (cleared draft), Edit team
+   * (restore the completed lineup on the draft page), and Retry with same
+   * team (new seed, same five).
    */
-
-  let manifest = $state.raw<HoopRushManifest | null>(null);
-  /** playerId → peak season across the run's loaded pools (slot provenance). */
-  let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
-  /** playerId → global players-index entry, used for MVP headshots. */
-  let indexById = $state.raw<Map<string, PlayersIndexEntry> | null>(null);
-  let run = $state.raw<ChallengeRun | null>(null);
-  let error = $state<string | null>(null);
-  let running = $state(false);
-  let loading = $state(true);
-  let retryCount = $state(0);
-  let manifestLoaded = false;
-  let runLoaded = false;
-
-  function markLoaded() {
-    if (manifestLoaded && runLoaded) loading = false;
-  }
-
-  const { url } = $derived(page);
-
-  const editTeamHref = $derived(
-    run?.mode === 'sandbox' && run.selections ? buildSandboxHref(run.selections) : null,
-  );
-
-  $effect(() => {
-    if (!browser) return;
-    void retryCount;
-    let cancelled = false;
-    manifestLoaded = false;
-    runLoaded = false;
-    loading = true;
-    error = null;
-    manifest = null;
-    run = null;
-    byId = null;
-    const runId = new URL(url.toString()).searchParams.get('runId');
-    getManifest().then(
-      (m) => {
-        if (cancelled) return;
-        manifest = m;
-        manifestLoaded = true;
-        markLoaded();
-        getPlayersIndex().then(
-          (ix) => {
-            if (!cancelled) {
-              indexById = new Map(ix.players.map((p) => [p.playerId, p]));
-            }
-          },
-          () => {
-            // Headshots are best-effort; the report renders without them.
-          },
-        );
-      },
-      () => {
-        if (!cancelled) {
-          error = 'The manifest is unavailable.';
-          loading = false;
-        }
-      },
-    );
-    const loadRun = (id: string | null) => {
-      const promise = id
-        ? challengeRepository.loadCompletedRun(id)
-        : challengeRepository.listCompletedRuns().then((rows) => {
-            const latest = rows[0];
-            return latest ? challengeRepository.loadCompletedRun(latest.runId) : null;
-          });
-      promise.then(
-        (record) => {
-          if (cancelled) return;
-          if (!record) {
-            error = 'No completed challenge found. Run one first.';
-            loading = false;
-            return;
-          }
-          run = record.run;
-          runLoaded = true;
-          markLoaded();
-        },
-        (e: unknown) => {
-          if (!cancelled) {
-            error = e instanceof Error ? e.message : String(e);
-            loading = false;
-          }
-        },
-      );
-    };
-    loadRun(runId);
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  function retryResult() {
-    clearDataLoaderCaches();
-    retryCount += 1;
-  }
-
-  /** Resolves the run's single franchise-era player pool. */
-  $effect(() => {
-    const currentRun = run;
-    const m = manifest;
-    if (!browser || !currentRun || !m) return;
-    let cancelled = false;
-    loadRunPlayersById(currentRun, m).then(
-      (map) => {
-        if (!cancelled) byId = map;
-      },
-      () => {
-        if (!cancelled) byId = new Map();
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  });
 
   /** Fresh start: back to a completely cleared sandbox draft. */
   async function runAgain() {
-    if (running) return;
-    running = true;
-    try {
-      void goto(resolve('/sandbox'));
-    } finally {
-      running = false;
-    }
+    void goto(resolve('/sandbox'));
   }
 
   /** Same five, new seed: start another sandbox run immediately. */
-  async function retrySameTeam() {
-    const currentRun = run;
-    const playersById = byId;
-    if (running || !currentRun || !playersById) return;
+  async function retrySameTeam(
+    currentRun: ChallengeRun,
+    playersById: Map<string, PeakPlayerSeason>,
+  ) {
     const players = lineupPlayersFromRun(currentRun, playersById);
     if (!players) {
-      error = 'Could not restore the lineup for another run.';
-      return;
+      throw new Error('Could not restore the lineup for another run.');
     }
-    running = true;
-    error = null;
-    try {
-      await startSandboxRun(players, generateSeed());
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-      running = false;
-    }
+    await startSandboxRun(players, generateSeed());
+  }
+
+  function editTeamHrefFor(current: ChallengeRun): SandboxHref | null {
+    return current.mode === 'sandbox' && current.selections
+      ? buildSandboxHref(current.selections)
+      : null;
   }
 </script>
 
@@ -177,39 +43,11 @@
   <title>Challenge result — Sandbox — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-  <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Sandbox · Result</p>
-  <h1
-    class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
-  >
-    Season report
-  </h1>
-
-  {#if error}
-    <div class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      <AsyncState kind="error" title="Result unavailable" message={error} retry={retryResult} />
-      <a
-        href={resolve('/sandbox/history')}
-        class="mt-3 inline-flex rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground"
-      >
-        Challenge history
-      </a>
-    </div>
-  {:else if loading || !run}
-    <div class="mt-8">
-      <AsyncState kind="loading" title="Loading result" message="Reading the completed run…" />
-    </div>
-  {:else}
-    <SeasonReport
-      {manifest}
-      {run}
-      {byId}
-      {indexById}
-      modeLabel="Sandbox · Result"
-      {running}
-      onRunAgain={runAgain}
-      onRetrySameTeam={retrySameTeam}
-      {editTeamHref}
-    />
-  {/if}
-</section>
+<ResultPage
+  mode="sandbox"
+  eyebrow="Sandbox · Result"
+  modeLabelFor={() => 'Sandbox · Result'}
+  onRunAgain={runAgain}
+  onRetrySameTeam={retrySameTeam}
+  {editTeamHrefFor}
+/>

@@ -193,6 +193,7 @@ const COMMANDS: Record<string, CommandDef> = {
         era: getOptionString(args, 'era') ?? undefined,
         'challenge-samples': getOptionString(args, 'challenge-samples') ?? undefined,
         'opponent-games': getOptionString(args, 'opponent-games') ?? undefined,
+        'allow-skipped': hasOption(args, 'allow-skipped'),
       }),
   },
   'calibrate sensitivity': {

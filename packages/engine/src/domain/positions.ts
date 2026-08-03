@@ -2,7 +2,7 @@ import type { Position, PositionUnion } from '@hoop-rush/data-contracts';
 
 /** Sorted, deduplicated canonical position union (G < F < C). */
 export function normalizePositionUnion(positions: readonly Position[]): PositionUnion {
-  return [...new Set(positions)].sort() as PositionUnion;
+  return [...new Set(positions)].sort();
 }
 
 /** Whether a player's career union contains the given position. */
