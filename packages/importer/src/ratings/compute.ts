@@ -18,6 +18,7 @@ import { derivePlayerRecord, fieldPublished, type SeasonContext } from './v2.js'
 import { getEra } from './era.js';
 import { mapPosition } from './derive.js';
 import { canonicalPlayerName } from '../identity.js';
+import { positionOverrideFor } from '../positions/overrides.js';
 import type { StatsRow } from './stats.js';
 
 export interface RosterPlayer extends Record<string, unknown> {
@@ -120,8 +121,18 @@ export function computeForSeason(season: string, force = false): void {
     );
     player.firstName = canonicalFirstName;
     player.lastName = canonicalLastName;
-    const pos = mapPosition(player.position ?? 'SF');
+    // Apply the reviewed override before derivation so ratings use the
+    // corrected primary; the corrected position and secondary positions are
+    // persisted back into roster.json, so the v5 career-labels cache and
+    // pool builds inherit the corrections.
+    const override = positionOverrideFor(extId);
+    const pos = override !== null ? override.primary : mapPosition(player.position ?? 'SF');
     player.position = pos;
+    if (override !== null) {
+      player.secondaryPositions = [...override.secondary];
+    } else if (player.secondaryPositions === undefined || player.secondaryPositions === null) {
+      player.secondaryPositions = [];
+    }
 
     // Set internal ID if missing
     if (player.id === undefined || player.id === null || player.id === '') {
@@ -155,7 +166,7 @@ export function computeForSeason(season: string, force = false): void {
       }
     }
 
-    // Set secondaryPositions
+    // Set secondaryPositions (overrides set it above; clear missing values).
     if (player.secondaryPositions === undefined || player.secondaryPositions === null) {
       player.secondaryPositions = [];
     }

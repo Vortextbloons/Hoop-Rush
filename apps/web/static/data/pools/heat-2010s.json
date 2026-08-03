@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "dataVersion": "m5",
+  "schemaVersion": 3,
+  "dataVersion": "m6",
   "franchiseId": "heat",
   "eraId": "2010s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-101123",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -50,13 +50,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 205,
@@ -562,7 +564,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -571,7 +573,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1626159",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -586,13 +588,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 225,
@@ -1098,7 +1102,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1107,7 +1111,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1626196",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -1122,15 +1126,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 200,
@@ -1636,7 +1642,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1645,7 +1651,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1627884",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -1660,13 +1666,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 210,
@@ -2172,7 +2180,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2181,7 +2189,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1628389",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -2196,13 +2204,20 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [
+          "PF"
+        ],
+        "playable": [
+          "C",
+          "PF"
+        ],
         "sourceLabels": [
+          "C",
+          "PF",
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 255,
@@ -2265,8 +2280,8 @@
         "block": 75,
         "defensiveIq": 67,
         "speed": 73,
-        "strength": 71,
-        "vertical": 60,
+        "strength": 75,
+        "vertical": 65,
         "offensiveIq": 83
       },
       "tendencies": {
@@ -2285,7 +2300,7 @@
         "turnoverRate": 17.36,
         "isolationRate": 6.36,
         "pickAndRollBallHandlerRate": 20,
-        "pickAndRollRollManRate": 10,
+        "pickAndRollRollManRate": 25,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
@@ -2708,7 +2723,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2717,7 +2732,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629130",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -2732,13 +2747,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 215,
@@ -3244,7 +3261,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3253,7 +3270,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629134",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -3268,13 +3285,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 190,
@@ -3780,7 +3799,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3789,7 +3808,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629639",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -3804,13 +3823,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 195,
@@ -4316,7 +4337,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4325,7 +4346,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629735",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -4340,13 +4361,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 234,
@@ -4852,7 +4875,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4861,7 +4884,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1740",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -4876,13 +4899,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 235,
@@ -5388,7 +5413,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5397,7 +5422,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-200761",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -5412,13 +5437,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 230,
@@ -5924,7 +5951,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5933,7 +5960,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201177",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -5948,13 +5975,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 240,
@@ -6460,7 +6489,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -6469,7 +6498,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201202",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -6484,13 +6513,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 245,
@@ -6993,7 +7024,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -7002,7 +7033,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201563",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -7017,13 +7048,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 235,
@@ -7529,7 +7562,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -7538,7 +7571,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201596",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -7553,13 +7586,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 190,
@@ -8065,7 +8100,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8074,7 +8109,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201609",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -8089,13 +8124,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 190,
@@ -8601,7 +8638,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8610,7 +8647,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201949",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -8625,13 +8662,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 250,
@@ -9137,7 +9176,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9146,7 +9185,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201961",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -9161,13 +9200,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 200,
@@ -9673,7 +9714,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9682,7 +9723,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-202337",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -9697,13 +9738,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 225,
@@ -10209,7 +10252,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10218,7 +10261,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-202355",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -10233,13 +10276,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 265,
@@ -10742,7 +10787,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10751,7 +10796,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-202708",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -10766,13 +10811,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 175,
@@ -11278,7 +11325,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11287,7 +11334,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-202710",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -11302,15 +11349,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 230,
@@ -11816,7 +11865,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11825,7 +11874,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-203079",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -11840,13 +11889,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 220,
@@ -12352,7 +12403,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12361,7 +12412,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-203086",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -12376,15 +12427,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 260,
@@ -12890,7 +12943,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12899,7 +12952,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-203186",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -12914,13 +12967,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 245,
@@ -13426,7 +13481,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13435,7 +13490,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2034",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -13450,15 +13505,17 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f0/MikeMiller1.jpg/330px-MikeMiller1.jpg"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 218,
@@ -13964,7 +14021,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13973,7 +14030,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-203482",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -13988,13 +14045,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 245,
@@ -14500,7 +14559,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -14509,7 +14568,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-203516",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -14524,13 +14583,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 208,
@@ -15036,7 +15097,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -15045,7 +15106,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-203585",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -15060,15 +15121,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 200,
@@ -15574,7 +15637,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -15583,7 +15646,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-203894",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -15598,13 +15661,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 175,
@@ -16110,7 +16175,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -16119,7 +16184,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-204020",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -16134,13 +16199,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 186,
@@ -16646,7 +16713,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -16655,7 +16722,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2067",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -16670,13 +16737,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 190,
@@ -17182,7 +17251,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -17191,7 +17260,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2203",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -17206,13 +17275,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 225,
@@ -17718,7 +17789,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -17727,7 +17798,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2306",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -17742,13 +17813,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 200,
@@ -18254,7 +18327,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -18263,7 +18336,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2365",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -18278,15 +18351,17 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/6/67/Chris_%22Birdman%22_Andersen_2009.jpg"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 245,
@@ -18792,7 +18867,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -18801,7 +18876,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2405",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -18816,15 +18891,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 245,
@@ -19327,7 +19404,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -19336,7 +19413,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2544",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -19351,15 +19428,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 250,
@@ -19368,7 +19447,7 @@
         "teamGames": 76,
         "teamMinutes": 2877
       },
-      "selectionScore": 90.811,
+      "selectionScore": 92.007,
       "selectionScoreVersion": "selection-v2",
       "stats": {
         "gamesPlayed": 76,
@@ -19402,7 +19481,7 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 94,
+        "overallRating": 96,
         "offenseRating": 83,
         "defenseRating": 78
       },
@@ -19865,7 +19944,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -19874,7 +19953,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2547",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -19889,15 +19968,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 235,
@@ -20403,7 +20484,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -20412,7 +20493,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2548",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -20427,13 +20508,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 220,
@@ -20939,7 +21022,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -20948,7 +21031,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2592",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -20963,13 +21046,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 215,
@@ -21475,7 +21560,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -21484,7 +21569,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2617",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -21499,13 +21584,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 235,
@@ -22008,7 +22095,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -22017,7 +22104,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2736",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -22032,13 +22119,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 220,
@@ -22544,7 +22633,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -22553,7 +22642,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-436",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -22568,13 +22657,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 250,
@@ -23077,7 +23168,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -23086,7 +23177,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-951",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -23101,13 +23192,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 205,
@@ -23613,7 +23706,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -23622,7 +23715,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-956",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -23637,13 +23730,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 265,
@@ -24146,7 +24241,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -24155,7 +24250,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-980",
       "franchiseId": "heat",
       "eraId": "2010s",
@@ -24170,13 +24265,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 87,
       "weightLbs": 260,
@@ -24679,7 +24776,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",

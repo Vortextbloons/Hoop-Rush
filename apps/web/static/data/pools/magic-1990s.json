@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "dataVersion": "m5",
+  "schemaVersion": 3,
+  "dataVersion": "m6",
   "franchiseId": "magic",
   "eraId": "1990s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-101",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -50,13 +50,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 180,
@@ -562,7 +564,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -571,7 +573,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1036",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -586,13 +588,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 185,
@@ -1098,7 +1102,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1107,7 +1111,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1088",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -1122,13 +1126,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 71,
       "weightLbs": 160,
@@ -1634,7 +1640,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1643,7 +1649,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1112",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -1657,15 +1663,18 @@
         "nbaHeadshotAvailable": true
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
           "C",
           "SF"
         ],
-        "canonical": [
+        "sourceLabels": [
           "C",
-          "F"
+          "F",
+          "SF"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 240,
@@ -2168,7 +2177,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2177,7 +2186,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1123",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -2192,13 +2201,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 250,
@@ -2701,7 +2712,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2710,7 +2721,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1134",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -2725,13 +2736,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 270,
@@ -3237,7 +3250,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3246,7 +3259,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-138",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -3261,15 +3274,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 235,
@@ -3772,7 +3787,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3781,7 +3796,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-140",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -3796,13 +3811,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 210,
@@ -4308,7 +4325,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4317,7 +4334,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1505",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -4331,13 +4348,16 @@
         "nbaHeadshotAvailable": false
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
           "SF"
         ],
-        "canonical": [
-          "F"
+        "sourceLabels": [
+          "F",
+          "SF"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 223,
@@ -4843,7 +4863,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4852,7 +4872,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-157",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -4867,13 +4887,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 206,
@@ -5379,7 +5401,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5388,7 +5410,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1720",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -5403,13 +5425,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 262,
@@ -5912,7 +5936,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5921,7 +5945,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1723",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -5936,13 +5960,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 231,
@@ -6448,7 +6474,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -6457,7 +6483,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1727",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -6472,13 +6498,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 238,
@@ -6984,7 +7012,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -6993,7 +7021,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-183",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -7008,15 +7036,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 235,
@@ -7519,7 +7549,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -7528,7 +7558,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1894",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -7543,15 +7573,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 218,
@@ -8057,7 +8089,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8066,7 +8098,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-192",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -8081,13 +8113,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 229,
@@ -8593,7 +8627,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8602,7 +8636,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-194",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -8617,13 +8651,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 190,
@@ -9129,7 +9165,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9138,7 +9174,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-216",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -9153,13 +9189,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 200,
@@ -9665,7 +9703,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9674,7 +9712,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-270",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -9689,15 +9727,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 235,
@@ -10203,7 +10243,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10212,7 +10252,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-341",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -10227,15 +10267,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 257,
@@ -10741,7 +10783,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10750,7 +10792,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-353",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -10765,13 +10807,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 180,
@@ -11277,7 +11321,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11286,7 +11330,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-358",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -11301,15 +11345,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 207,
@@ -11815,7 +11861,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11824,7 +11870,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-400",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -11839,13 +11885,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 240,
@@ -12351,7 +12399,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12360,7 +12408,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-402",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -12375,13 +12423,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 250,
@@ -12887,7 +12937,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12896,7 +12946,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-406",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -12911,13 +12961,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 85,
       "weightLbs": 340,
@@ -13423,7 +13475,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13432,7 +13484,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-42",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -13447,13 +13499,15 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Monty_Williams_%28cropped%29.jpg/330px-Monty_Williams_%28cropped%29.jpg"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 225,
@@ -13959,7 +14013,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13968,7 +14022,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-423",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -13982,15 +14036,18 @@
         "nbaHeadshotAvailable": false
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
           "C",
           "SF"
         ],
-        "canonical": [
+        "sourceLabels": [
           "C",
-          "F"
+          "F",
+          "SF"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 230,
@@ -14496,7 +14553,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -14505,7 +14562,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-448",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -14520,13 +14577,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 210,
@@ -15029,7 +15088,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -15038,7 +15097,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-680",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -15053,13 +15112,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 270,
@@ -15565,7 +15626,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -15574,7 +15635,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-7",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -15589,15 +15650,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 260,
@@ -16100,7 +16163,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -16109,7 +16172,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-70",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -16124,13 +16187,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 181,
@@ -16636,7 +16701,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -16645,7 +16710,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-76009",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -16660,13 +16725,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 220,
@@ -17172,7 +17239,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -17181,7 +17248,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-76050",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -17196,13 +17263,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 225,
@@ -17705,7 +17774,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -17714,7 +17783,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-76450",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -17729,13 +17798,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 72,
       "weightLbs": 185,
@@ -18241,7 +18312,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -18250,7 +18321,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-767",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -18265,13 +18336,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 220,
@@ -18777,7 +18850,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -18786,7 +18859,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-77946",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -18801,13 +18874,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 200,
@@ -19313,7 +19388,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -19322,7 +19397,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-78014",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -19337,13 +19412,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 85,
       "weightLbs": 235,
@@ -19846,7 +19923,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -19855,7 +19932,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-78198",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -19870,13 +19947,15 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/e/ee/Otis_Smith_at_the_Air_Canada_Centre_2008.jpg"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 210,
@@ -20382,7 +20461,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -20391,7 +20470,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-78347",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -20406,13 +20485,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 235,
@@ -20918,7 +20999,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -20927,7 +21008,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-78381",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -20942,13 +21023,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 230,
@@ -21454,7 +21537,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -21463,7 +21546,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-78417",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -21478,13 +21561,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 185,
@@ -21990,7 +22075,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -21999,7 +22084,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-786",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -22014,15 +22099,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 225,
@@ -22528,7 +22615,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -22537,7 +22624,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-899",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -22552,13 +22639,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 72,
       "weightLbs": 180,
@@ -23064,7 +23153,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -23073,7 +23162,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-914",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -23088,13 +23177,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 290,
@@ -23600,7 +23691,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -23609,7 +23700,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-938",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -23624,13 +23715,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 253,
@@ -24133,7 +24226,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -24142,7 +24235,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-967",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -24157,13 +24250,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 220,
@@ -24669,7 +24764,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -24678,7 +24773,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-98",
       "franchiseId": "magic",
       "eraId": "1990s",
@@ -24693,15 +24788,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 205,
@@ -25207,7 +25304,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",

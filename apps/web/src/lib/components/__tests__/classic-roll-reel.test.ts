@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { fireEvent, render } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import type { HoopRushManifest } from '@hoop-rush/data-contracts';
 import { buildManifest } from '@hoop-rush/test-fixtures';
 import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
@@ -30,6 +31,7 @@ interface ReelProps {
   announceText: string;
   roundLabel?: string;
   reducedMotion?: boolean;
+  spinDurationMs?: number;
   onSettled: () => void;
 }
 
@@ -211,6 +213,49 @@ describe('ClassicRollReel', () => {
     await vi.advanceTimersByTimeAsync(2000);
 
     expect(onSettled).not.toHaveBeenCalled();
+  });
+
+  it('settles early when spinDurationMs shortens the spin', async () => {
+    vi.useRealTimers();
+    const { container, onSettled } = renderReel({ spinKey: 1, spinDurationMs: 100 });
+
+    // With a 100 ms spin the reels settle well before the default 900 ms.
+    await vi.waitFor(
+      () => {
+        expect(container.querySelector(RESULT)).not.toBeNull();
+      },
+      { timeout: 700 },
+    );
+    expect(onSettled).not.toHaveBeenCalled();
+
+    await vi.waitFor(
+      () => {
+        expect(onSettled).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it('closes immediately when the settled overlay is clicked', async () => {
+    const { container, rerender, onSettled } = renderReel();
+
+    await rerender({ spinKey: 1 });
+    await vi.advanceTimersByTimeAsync(950);
+    const overlay = container.querySelector(OVERLAY);
+    expect(overlay).not.toBeNull();
+    expect(onSettled).not.toHaveBeenCalled();
+
+    if (overlay) {
+      await fireEvent.click(overlay);
+    }
+
+    expect(onSettled).toHaveBeenCalledTimes(1);
+    await tick();
+    expect(container.querySelector(OVERLAY)).toBeNull();
+
+    // The pending result timer must not double-fire onSettled.
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(onSettled).toHaveBeenCalledTimes(1);
   });
 
   it('settles with the final value when franchise options are empty', async () => {

@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "dataVersion": "m5",
+  "schemaVersion": 3,
+  "dataVersion": "m6",
   "franchiseId": "mavericks",
   "eraId": "2000s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1005",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -49,13 +49,16 @@
         "nbaHeadshotAvailable": true
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
           "SF"
         ],
-        "canonical": [
-          "F"
+        "sourceLabels": [
+          "F",
+          "SF"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 230,
@@ -561,7 +564,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -570,7 +573,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-101120",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -585,13 +588,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 215,
@@ -1097,7 +1102,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1106,7 +1111,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-101138",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -1121,13 +1126,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 250,
@@ -1633,7 +1640,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1642,7 +1649,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-101189",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -1657,13 +1664,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 230,
@@ -2169,7 +2178,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2178,7 +2187,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1496",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -2193,13 +2202,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 245,
@@ -2705,7 +2716,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2714,7 +2725,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1504",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -2729,15 +2740,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 260,
@@ -3240,7 +3253,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3249,7 +3262,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1506",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -3264,13 +3277,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 235,
@@ -3776,7 +3791,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3785,7 +3800,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1533",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -3800,13 +3815,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 195,
@@ -4312,7 +4329,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4321,7 +4338,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1559",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -4336,13 +4353,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 215,
@@ -4848,7 +4867,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4857,7 +4876,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1711",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -4872,13 +4891,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 245,
@@ -5384,7 +5405,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5393,7 +5414,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1712",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -5408,13 +5429,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 225,
@@ -5920,7 +5943,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5929,7 +5952,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1717",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -5944,13 +5967,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 245,
@@ -6456,7 +6481,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -6465,7 +6490,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1761",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -6480,15 +6505,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 210,
@@ -6994,7 +7021,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -7003,7 +7030,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1890",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -7018,13 +7045,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 228,
@@ -7530,7 +7559,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -7539,7 +7568,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1891",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -7554,13 +7583,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 180,
@@ -8066,7 +8097,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8075,7 +8106,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1904",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -8090,15 +8121,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 235,
@@ -8604,7 +8637,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8613,7 +8646,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1917",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -8627,13 +8660,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 85,
       "weightLbs": 220,
@@ -9139,7 +9174,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9148,7 +9183,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1952",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -9163,15 +9198,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 205,
@@ -9677,7 +9714,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9686,7 +9723,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-200826",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -9701,13 +9738,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 72,
       "weightLbs": 175,
@@ -10213,7 +10252,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10222,7 +10261,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201958",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -10237,13 +10276,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 72,
       "weightLbs": 170,
@@ -10749,7 +10790,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10758,7 +10799,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2059",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -10773,15 +10814,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 234,
@@ -11284,7 +11327,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11293,7 +11336,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2205",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -11308,15 +11351,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 280,
@@ -11819,7 +11864,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11828,7 +11873,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-224",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -11843,15 +11888,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 200,
@@ -12357,7 +12404,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12366,7 +12413,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2400",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -12381,13 +12428,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 250,
@@ -12893,7 +12942,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12902,7 +12951,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2572",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -12917,13 +12966,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 210,
@@ -13429,7 +13480,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13438,7 +13489,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2605",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -13453,15 +13504,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 200,
@@ -13967,7 +14020,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13976,7 +14029,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-271",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -13991,13 +14044,15 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/Johnny-Newman-circa-1993-1994.jpg/330px-Johnny-Newman-circa-1993-1994.jpg"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 210,
@@ -14503,7 +14558,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -14512,7 +14567,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2734",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -14527,13 +14582,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 185,
@@ -15039,7 +15096,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -15048,7 +15105,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2788",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -15063,13 +15120,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 245,
@@ -15572,7 +15631,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -15581,7 +15640,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-330",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -15595,13 +15654,16 @@
         "nbaHeadshotAvailable": true
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
           "SF"
         ],
-        "canonical": [
-          "F"
+        "sourceLabels": [
+          "F",
+          "SF"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 244,
@@ -16107,7 +16169,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -16116,7 +16178,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-353",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -16131,13 +16193,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 180,
@@ -16643,7 +16707,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -16652,7 +16716,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-363",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -16667,13 +16731,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 245,
@@ -17179,7 +17245,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -17188,7 +17254,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-422",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -17203,13 +17269,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 71,
       "weightLbs": 180,
@@ -17712,7 +17780,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -17721,7 +17789,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-436",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -17736,13 +17804,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 250,
@@ -18245,7 +18315,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -18254,7 +18324,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-458",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -18269,13 +18339,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 180,
@@ -18781,7 +18853,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -18790,7 +18862,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-467",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -18805,13 +18877,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 210,
@@ -19317,7 +19391,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -19326,7 +19400,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-673",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -19341,13 +19415,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 240,
@@ -19850,7 +19926,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -19859,7 +19935,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-696",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -19874,13 +19950,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 71,
       "weightLbs": 185,
@@ -20386,7 +20464,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -20395,7 +20473,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-711",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -20410,13 +20488,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 218,
@@ -20922,7 +21002,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -20931,7 +21011,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-714",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -20946,15 +21026,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 215,
@@ -21460,7 +21542,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -21469,7 +21551,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-762",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -21484,13 +21566,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 90,
       "weightLbs": 265,
@@ -21996,7 +22080,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -22005,7 +22089,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-89",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -22020,13 +22104,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 195,
@@ -22532,7 +22618,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -22541,7 +22627,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-896",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -22555,13 +22641,17 @@
         "nbaHeadshotAvailable": false
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
           "SG"
         ],
-        "canonical": [
-          "G"
+        "sourceLabels": [
+          "F",
+          "SG"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 72,
       "weightLbs": 195,
@@ -23067,7 +23157,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -23076,7 +23166,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-93",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -23091,13 +23181,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 183,
@@ -23603,7 +23695,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -23612,7 +23704,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-952",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -23627,13 +23719,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 245,
@@ -24139,7 +24233,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -24148,7 +24242,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-956",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -24163,13 +24257,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 265,
@@ -24675,7 +24771,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -24684,7 +24780,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-959",
       "franchiseId": "mavericks",
       "eraId": "2000s",
@@ -24699,13 +24795,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 195,
@@ -25211,7 +25309,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",

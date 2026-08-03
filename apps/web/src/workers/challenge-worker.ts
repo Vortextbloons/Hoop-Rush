@@ -10,15 +10,19 @@ import {
   type WorkerCompleteMessage,
   type WorkerErrorMessage,
   type WorkerResultsMessage,
+  type WorkerStartResultMessage,
 } from '@hoop-rush/data-contracts';
+import { chooseBestRunFromRun } from '../lib/best-of';
 
 /**
  * Challenge worker entry (spec/04 static deployment and workers). Receives
- * runtime-validated, versioned requests; simulates games from the start game
- * through game 82 through the authoritative challenge command path, and posts
- * results in batches of up to BATCH_SIZE games. It never writes IndexedDB and
- * holds no domain state: results are a pure function of the request. The main
- * thread validates every message once at its boundary.
+ * runtime-validated, versioned requests; a `start` request simulates the
+ * whole-run best-of-N and reports the chosen attempt seed, and a `simulate`
+ * request simulates games from the start game through game 82 through the
+ * authoritative challenge command path, posting results in batches of up to
+ * BATCH_SIZE games. It never writes IndexedDB and holds no domain state:
+ * results are a pure function of the request. The main thread validates every
+ * message once at its boundary.
  */
 
 /** Results posted per message; keeps the post count near 82 / BATCH_SIZE. */
@@ -27,7 +31,10 @@ const BATCH_SIZE = 4;
 let currentRequestId: string | null = null;
 let requestToken = 0;
 
-function post(message: WorkerResultsMessage | WorkerErrorMessage | WorkerCompleteMessage): void {
+function post(
+  message:
+    WorkerResultsMessage | WorkerErrorMessage | WorkerCompleteMessage | WorkerStartResultMessage,
+): void {
   self.postMessage(message);
 }
 
@@ -61,6 +68,25 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   const context: EngineContext = createEngineContext({
     engineVersion: request.engineVersion,
   });
+
+  if (request.type === 'start') {
+    try {
+      const chosen = chooseBestRunFromRun(request.run, request.profile, context);
+      if (token !== requestToken) return;
+      post({
+        schemaVersion: 1,
+        type: 'start-result',
+        requestId: request.requestId,
+        chosenRunSeed: chosen.chosenRunSeed,
+        chosenWins: chosen.chosenWins,
+        chosenLosses: chosen.chosenLosses,
+        chosenDifferential: chosen.chosenDifferential,
+      });
+    } catch (error) {
+      postError(request.requestId, error instanceof Error ? error.message : String(error));
+    }
+    return;
+  }
 
   void (async () => {
     let delivered = 0;

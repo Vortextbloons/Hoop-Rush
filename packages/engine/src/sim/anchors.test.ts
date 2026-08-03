@@ -190,7 +190,7 @@ function averageDefenseTeam(): SimulationTeam {
   if (first === undefined) {
     throw new Error('fixture team requires five players');
   }
-  const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
   const ratings = {} as SimulationPlayer['ratings'];
   for (const key of Object.keys(first.ratings) as Array<keyof SimulationPlayer['ratings']>) {
     ratings[key] = 66;
@@ -301,11 +301,11 @@ describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
     if (first === undefined) {
       throw new Error('fixture team requires five players');
     }
-    const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+    const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
     const star = buildSimulationPlayer({
       playerId: 'mj-anchor',
       displayName: 'Anchor Star',
-      positions: ['G'],
+      positions: ['PG'],
       ratings: {
         ...first.ratings,
         insideScoring: 90,

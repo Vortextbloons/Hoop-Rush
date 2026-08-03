@@ -10,12 +10,13 @@
  * Output: `apps/web/static/data/opponents/lakers-1990s-opening.json`
  */
 import { parseOpponentTeam } from '@hoop-rush/data-contracts';
+import { playableSlotGroups, type Position } from '@hoop-rush/data-contracts';
 import { join } from 'node:path';
 import { PUBLIC_DATA } from '../config.js';
 import { clamp, readJson, writeJson } from '../json.js';
 
 export const OPPONENT_ID = 'lakers-1990s-opening';
-export const BRACKET_VERSION = 'bracket-m3-v2';
+export const BRACKET_VERSION = 'bracket-m3-v3';
 export const SEASON_KEY = '1995-96';
 export const OPPONENTS_DIR = join(PUBLIC_DATA, 'opponents');
 export const POOL_PATH = join(PUBLIC_DATA, 'pools', 'lakers-1990s.json');
@@ -81,7 +82,7 @@ export interface PoolPlayer {
   displayName: string;
   heightInches: number;
   weightLbs: number;
-  positions: { canonical: string[] };
+  positions: { playable: string[] };
   detailedRatings: Record<string, number>;
   tendencies: Record<string, number>;
   /** Stint-derived stat totals; the anchor derivation treats null like Python's None. */
@@ -165,7 +166,7 @@ export interface SimPlayer {
 }
 
 export interface OpponentArtifact {
-  schemaVersion: 1;
+  schemaVersion: 2;
   opponentId: string;
   bracketVersion: string;
   difficultyBand: 'medium';
@@ -199,8 +200,8 @@ function shrunkRatio(
 export function anchorsForPlayer(player: PoolPlayer): PlayerAnchors {
   const stats = player.stats;
   const games = Math.max(1, stats['gamesPlayed'] ?? 0);
-  const positions = player.positions.canonical;
-  const fallbackShare = positions.includes('C') ? 0.28 : positions.includes('F') ? 0.22 : 0.15;
+  const slotGroups = playableSlotGroups(player.positions.playable as Position[]);
+  const fallbackShare = slotGroups.includes('C') ? 0.28 : slotGroups.includes('F') ? 0.22 : 0.15;
   // Mirror `x is not None`: JSON null and missing keys both disable the split.
   const offensiveKnown =
     stats['offensiveRebounds'] !== null && stats['offensiveRebounds'] !== undefined;
@@ -210,8 +211,8 @@ export function anchorsForPlayer(player: PoolPlayer): PlayerAnchors {
     offensiveKnown &&
     defensiveKnown &&
     ((stats['offensiveRebounds'] ?? 0) > 0 ||
-      (!positions.includes('C') &&
-        !(positions.includes('F') && (stats['rebounds'] ?? 0) / games > 2.5)));
+      (!slotGroups.includes('C') &&
+        !(slotGroups.includes('F') && (stats['rebounds'] ?? 0) / games > 2.5)));
   const rebounds = stats['rebounds'] ?? 0;
   const offensive = hasSplit
     ? (stats['offensiveRebounds'] ?? 0)
@@ -269,11 +270,11 @@ export function buildOpponentArtifact(pool: { players: PoolPlayer[] }): Opponent
   const players: SimPlayer[] = [];
   for (const entry of LINEUP) {
     const p = byId.get(entry.playerId) as PoolPlayer;
-    const canonical = p.positions.canonical;
+    const playable = p.positions.playable;
     assignments.push({
       slotIndex: entry.slotIndex,
       playerId: entry.playerId,
-      positions: canonical,
+      positions: playable,
     });
 
     // Python: ratings clamp(round(v), 0, 100); tendencies clamp(v, 0, 100)
@@ -290,7 +291,7 @@ export function buildOpponentArtifact(pool: { players: PoolPlayer[] }): Opponent
     players.push({
       playerId: entry.playerId,
       displayName: p.displayName,
-      positions: canonical,
+      positions: playable,
       heightInches: p.heightInches,
       weightLbs: p.weightLbs,
       ratings,
@@ -300,7 +301,7 @@ export function buildOpponentArtifact(pool: { players: PoolPlayer[] }): Opponent
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     opponentId: OPPONENT_ID,
     bracketVersion: BRACKET_VERSION,
     difficultyBand: 'medium',

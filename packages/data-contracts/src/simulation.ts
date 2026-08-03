@@ -120,7 +120,7 @@ export type SimulationAnchors = z.infer<typeof simulationAnchorsSchema>;
 export const simulationPlayerSchema = z.object({
   playerId: playerIdSchema,
   displayName: z.string().min(1).max(96),
-  /** Career-wide canonical position union; slot legality was validated upstream. */
+  /** Career-wide detailed playable union; slot-group legality was validated upstream. */
   positions: positionUnionSchema,
   heightInches: z.number().int().min(60).max(96).nullable(),
   weightLbs: z.number().int().min(120).max(400).nullable(),

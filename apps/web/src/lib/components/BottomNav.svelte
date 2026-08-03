@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import type { RouteId } from '$app/types';
   import type { Component } from 'svelte';
+  import { warmPlayersIndex } from '$lib/data';
 
   export type BottomNavItem = {
     id: string;
@@ -20,6 +21,10 @@
     if (routeId === null) return false;
     if (item.href === '/') return routeId === '/';
     return routeId === item.href || routeId.startsWith(`${item.href}/`);
+  }
+
+  function warmForRoster(itemId: string): void {
+    if (itemId === 'roster') warmPlayersIndex();
   }
 </script>
 
@@ -45,6 +50,9 @@
         <a
           href={resolve(item.href as RouteId)}
           aria-current={active ? 'page' : undefined}
+          onpointerenter={() => warmForRoster(item.id)}
+          onfocus={() => warmForRoster(item.id)}
+          ontouchstart={() => warmForRoster(item.id)}
           class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
             ? 'bg-primary text-primary-foreground'
             : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"

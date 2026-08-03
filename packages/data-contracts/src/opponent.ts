@@ -13,7 +13,7 @@ export const difficultyBandSchema = z.enum(['medium']);
 export type DifficultyBand = z.infer<typeof difficultyBandSchema>;
 
 export const opponentTeamSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   /** Stable artifact identity, referenced by the manifest. */
   opponentId: z.string().min(1).max(64),
   /** Version of the fixed bracket this entry belongs to. */
@@ -24,7 +24,7 @@ export const opponentTeamSchema = z.object({
   displayName: z.string().min(1).max(96),
   /** Representative season key for the authored lineup. */
   seasonKey: seasonKeySchema,
-  /** Legal G,G,F,F,C assignment, validated at authoring and load time. */
+  /** Legal G,G,F,F,C slot-group assignment, validated at authoring and load time. */
   lineup: lineupSchema,
   /** Five simulation-ready players matching the lineup assignments. */
   players: z.array(simulationPlayerSchema).length(5),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildOpeningOpponent, seedFromString } from '@hoop-rush/test-fixtures';
+import { playableSlotGroups } from '../domain/positions.js';
 import { generateBracket } from './generator.js';
 import { fixtureBracket, generationOptions } from './generator-testing.js';
 import { validateBracketContent } from '../challenge/commands.js';
@@ -95,7 +96,7 @@ describe('generateBracket (propose-review-freeze)', () => {
       candidate.franchiseId === 'hawks'
         ? {
             ...candidate,
-            players: candidate.players.filter((p) => p.positions.includes('G')),
+            players: candidate.players.filter((p) => playableSlotGroups(p.positions).includes('G')),
           }
         : candidate,
     );

@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "dataVersion": "m5",
+  "schemaVersion": 3,
+  "dataVersion": "m6",
   "franchiseId": "cavaliers",
   "eraId": "2020s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1626224",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -50,13 +50,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 230,
@@ -562,7 +564,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -571,7 +573,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1627747",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -586,15 +588,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 205,
@@ -1100,7 +1104,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1109,7 +1113,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1627777",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -1124,13 +1128,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 230,
@@ -1636,7 +1642,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1645,7 +1651,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1628374",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -1660,13 +1666,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 240,
@@ -2172,7 +2180,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2181,11 +2189,11 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1628378",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
-      "seasonKey": "2023-24",
+      "seasonKey": "2025-26",
       "firstName": "Donovan",
       "lastName": "Mitchell",
       "displayName": "Donovan Mitchell",
@@ -2196,120 +2204,122 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
-      "heightInches": 75,
+      "heightInches": 74,
       "weightLbs": 215,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 55,
-        "teamMinutes": 1942
+        "teamGames": 70,
+        "teamMinutes": 2342
       },
-      "selectionScore": 85.964,
+      "selectionScore": 89,
       "selectionScoreVersion": "selection-v2",
       "stats": {
-        "gamesPlayed": 55,
-        "minutes": 1941,
-        "points": 1463,
-        "rebounds": 280,
-        "offensiveRebounds": 44,
-        "defensiveRebounds": 236,
-        "assists": 335,
-        "steals": 99,
-        "blocks": 27,
-        "turnovers": 154,
-        "fieldGoalsMade": 500,
-        "fieldGoalsAttempted": 1089,
-        "threesMade": 181,
-        "threesAttempted": 495,
-        "freeThrowsMade": 275,
-        "freeThrowsAttempted": 319,
-        "per": 21.134999999999998,
-        "boxPlusMinus": 3.357,
-        "usageRate": 30.099999999999998,
-        "tsPct": 0.595,
-        "efgPct": 0.545
+        "gamesPlayed": 70,
+        "minutes": 2345,
+        "points": 1953,
+        "rebounds": 315,
+        "offensiveRebounds": 49,
+        "defensiveRebounds": 266,
+        "assists": 399,
+        "steals": 105,
+        "blocks": 21,
+        "turnovers": 196,
+        "fieldGoalsMade": 679,
+        "fieldGoalsAttempted": 1400,
+        "threesMade": 224,
+        "threesAttempted": 616,
+        "freeThrowsMade": 371,
+        "freeThrowsAttempted": 427,
+        "per": 20.625,
+        "boxPlusMinus": 2.4430000000000005,
+        "usageRate": 31.1,
+        "tsPct": 0.613,
+        "efgPct": 0.563
       },
       "historicalTeamIdentity": {
         "teamId": "1610612739",
         "displayName": "Cleveland Cavaliers",
         "city": "Cleveland",
         "abbreviation": "CLE",
-        "seasonKey": "2023-24",
+        "seasonKey": "2025-26",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 91,
+        "overallRating": 96,
         "offenseRating": 78,
-        "defenseRating": 72
+        "defenseRating": 68
       },
       "detailedRatings": {
-        "threePoint": 75,
-        "freeThrow": 93,
-        "insideScoring": 77,
-        "closeShot": 84,
-        "midrange": 66,
-        "passing": 88,
+        "threePoint": 76,
+        "freeThrow": 94,
+        "insideScoring": 79,
+        "closeShot": 86,
+        "midrange": 68,
+        "passing": 85,
         "ballHandling": 80,
-        "offensiveRebound": 45,
-        "defensiveRebound": 56,
-        "perimeterDefense": 82,
-        "interiorDefense": 79,
-        "steal": 78,
-        "block": 66,
-        "defensiveIq": 66,
-        "speed": 80,
-        "strength": 62,
+        "offensiveRebound": 44,
+        "defensiveRebound": 54,
+        "perimeterDefense": 76,
+        "interiorDefense": 73,
+        "steal": 75,
+        "block": 63,
+        "defensiveIq": 64,
+        "speed": 79,
+        "strength": 60,
         "vertical": 60,
-        "offensiveIq": 87
+        "offensiveIq": 85
       },
       "tendencies": {
-        "usageRate": 30.1,
-        "passRate": 11.96,
-        "shotRate": 41.25,
+        "usageRate": 31.1,
+        "passRate": 11.04,
+        "shotRate": 41.67,
         "driveRate": 18,
         "postUpRate": 5,
-        "rimFrequency": 30.8,
+        "rimFrequency": 31.6,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 9,
-        "aboveBreakThreeFrequency": 15,
-        "threePointRate": 45.45,
-        "freeThrowRate": 29.29,
-        "turnoverRate": 11.13,
-        "isolationRate": 9.03,
+        "cornerThreeFrequency": 9.12,
+        "aboveBreakThreeFrequency": 15.2,
+        "threePointRate": 44,
+        "freeThrowRate": 30.5,
+        "turnoverRate": 10.99,
+        "isolationRate": 9.33,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 4.86,
-        "stealAttemptRate": 11.24,
-        "blockAttemptRate": 10.28,
-        "crashOffensiveGlassRate": 15.4
+        "foulRate": 5.3,
+        "stealAttemptRate": 11,
+        "blockAttemptRate": 10.04,
+        "crashOffensiveGlassRate": 15.28
       },
       "anchors": {
-        "gamesPlayed": 55,
-        "minutesPerGame": 35.3,
-        "pointsPerGame": 26.6,
-        "reboundsPerGame": 5.1,
-        "offensiveReboundsPerGame": 0.8,
-        "defensiveReboundsPerGame": 4.3,
-        "assistsPerGame": 6.1,
-        "stealsPerGame": 1.8,
-        "blocksPerGame": 0.5,
+        "gamesPlayed": 70,
+        "minutesPerGame": 33.5,
+        "pointsPerGame": 27.9,
+        "reboundsPerGame": 4.5,
+        "offensiveReboundsPerGame": 0.7,
+        "defensiveReboundsPerGame": 3.8,
+        "assistsPerGame": 5.7,
+        "stealsPerGame": 1.5,
+        "blocksPerGame": 0.3,
         "turnoversPerGame": 2.8,
-        "fieldGoalPct": 0.4595959595959596,
-        "threePointPct": 0.36666666666666664,
-        "freeThrowPct": 0.8620689655172413,
-        "threePointAttemptRate": 0.45454545454545453,
-        "freeThrowAttemptRate": 0.29292929292929293
+        "fieldGoalPct": 0.485,
+        "threePointPct": 0.36363636363636365,
+        "freeThrowPct": 0.8688524590163934,
+        "threePointAttemptRate": 0.44,
+        "freeThrowAttemptRate": 0.305
       },
       "provenance": {
         "threePoint": {
@@ -2708,7 +2718,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2717,7 +2727,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1628386",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -2732,13 +2742,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 243,
@@ -3244,7 +3256,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3253,7 +3265,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1628418",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -3268,15 +3280,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 248,
@@ -3782,7 +3796,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3791,7 +3805,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1628422",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -3806,13 +3820,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 210,
@@ -4318,7 +4334,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4327,7 +4343,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629012",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -4342,13 +4358,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 190,
@@ -4854,7 +4872,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4863,7 +4881,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629622",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -4878,13 +4896,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 215,
@@ -5390,7 +5410,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5399,7 +5419,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629631",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -5414,13 +5434,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 221,
@@ -5926,7 +5948,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5935,7 +5957,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629636",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -5950,13 +5972,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 192,
@@ -6462,7 +6486,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -6471,7 +6495,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629660",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -6486,13 +6510,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 195,
@@ -6998,7 +7024,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -7007,7 +7033,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629685",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -7022,13 +7048,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 196,
@@ -7534,7 +7562,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -7543,7 +7571,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1629731",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -7558,13 +7586,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 228,
@@ -8070,7 +8100,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8079,7 +8109,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1630171",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -8094,13 +8124,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 225,
@@ -8606,7 +8638,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8615,7 +8647,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1630205",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -8630,13 +8662,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 230,
@@ -9142,7 +9176,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9151,7 +9185,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1630241",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -9166,13 +9200,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 205,
@@ -9678,7 +9714,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9687,7 +9723,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1630596",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -9702,13 +9738,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 215,
@@ -10214,7 +10252,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10223,7 +10261,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1641772",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -10238,13 +10276,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 210,
@@ -10750,7 +10790,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10759,7 +10799,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1641854",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -10774,13 +10814,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 180,
@@ -11286,7 +11328,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11295,7 +11337,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1642281",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -11310,13 +11352,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 215,
@@ -11822,7 +11866,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11831,7 +11875,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1642878",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -11846,13 +11890,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 185,
@@ -12358,7 +12404,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12367,7 +12413,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201567",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -12382,13 +12428,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 251,
@@ -12894,7 +12942,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12903,7 +12951,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-202684",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -12918,15 +12966,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 254,
@@ -13429,7 +13479,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13438,7 +13488,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-203526",
       "franchiseId": "cavaliers",
       "eraId": "2020s",
@@ -13453,13 +13503,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 180,
@@ -13965,7 +14017,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",

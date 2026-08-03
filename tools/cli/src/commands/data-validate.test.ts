@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
+import { POSITION_NORMALIZATION_VERSION } from '@hoop-rush/data-contracts';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
 import { dataValidate } from './data-validate.js';
 import { EXIT_CHECKS_FAILED, EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.js';
@@ -26,24 +27,26 @@ async function writeManifest(manifest: unknown): Promise<string> {
 
 /** Five fixture players in a legal G,G,F,F,C spread. */
 function legalPool(altIds: PeakPlayerSeason['altIds'] = null): ReturnType<typeof buildPool> {
-  const positions: PeakPlayerSeason['positions']['canonical'][] = [
-    ['G'],
-    ['G'],
-    ['F'],
-    ['F'],
+  const playable: PeakPlayerSeason['positions']['playable'][] = [
+    ['PG'],
+    ['SG'],
+    ['SF'],
+    ['PF'],
     ['C'],
   ];
   return buildPool(
-    positions.map((position, index) => {
-      const label = position[0];
-      if (label === undefined) throw new Error('fixture position label missing');
+    playable.map((positions, index) => {
+      const primary = positions[0];
+      if (primary === undefined) throw new Error('fixture position label missing');
       return buildPlayerSeason({
         playerId: `p-fixture-${String(index + 1)}`,
         displayName: `Fixture ${String(index + 1)}`,
         positions: {
-          sourceLabels: [label],
-          canonical: position,
-          normalizationVersion: 'position-v2',
+          primary,
+          secondary: [],
+          playable: positions,
+          sourceLabels: [primary],
+          normalizationVersion: POSITION_NORMALIZATION_VERSION,
         },
         altIds,
       });

@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "dataVersion": "m5",
+  "schemaVersion": 3,
+  "dataVersion": "m6",
   "franchiseId": "cavaliers",
   "eraId": "2000s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-101204",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -50,13 +50,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 251,
@@ -559,7 +561,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -568,7 +570,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-101214",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -583,13 +585,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 218,
@@ -1095,7 +1099,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1104,7 +1108,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1112",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -1119,15 +1123,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 240,
@@ -1630,7 +1636,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -1639,7 +1645,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1499",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -1654,15 +1660,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 240,
@@ -2168,7 +2176,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2177,7 +2185,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1515",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -2192,15 +2200,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 215,
@@ -2706,7 +2716,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -2715,7 +2725,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1538",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -2729,13 +2739,16 @@
         "nbaHeadshotAvailable": false
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
           "SF"
         ],
-        "canonical": [
-          "F"
+        "sourceLabels": [
+          "F",
+          "SF"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 215,
@@ -3238,7 +3251,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3247,7 +3260,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1563",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -3262,13 +3275,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 195,
@@ -3774,7 +3789,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -3783,7 +3798,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1565",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -3798,15 +3813,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 230,
@@ -4309,7 +4326,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4318,7 +4335,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1714",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -4333,13 +4350,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 289,
@@ -4842,7 +4861,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -4851,7 +4870,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1716",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -4866,15 +4885,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 184,
@@ -5380,7 +5401,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5389,7 +5410,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1720",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -5404,13 +5425,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 262,
@@ -5913,7 +5936,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -5922,7 +5945,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1723",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -5937,13 +5960,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 231,
@@ -6449,7 +6474,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -6458,7 +6483,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1729",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -6473,15 +6498,17 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3c/Ricky_Davis_2007-12-30.jpg/330px-Ricky_Davis_2007-12-30.jpg"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 197,
@@ -6987,7 +7014,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -6996,7 +7023,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1730",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -7011,15 +7038,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 265,
@@ -7522,7 +7551,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -7531,7 +7560,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-179",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -7546,15 +7575,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 210,
@@ -8060,7 +8091,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8069,7 +8100,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1800",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -8084,13 +8115,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 190,
@@ -8596,7 +8629,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -8605,7 +8638,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1887",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -8620,13 +8653,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 240,
@@ -9132,7 +9167,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9141,7 +9176,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1889",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -9156,13 +9191,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 200,
@@ -9668,7 +9705,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -9677,7 +9714,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1892",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -9692,13 +9729,15 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Trajan_Langdon_at_all-star_PBL_game_2011_%281%29.JPG/330px-Trajan_Langdon_at_all-star_PBL_game_2011_%281%29.JPG"
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 197,
@@ -10204,7 +10243,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10213,7 +10252,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1908",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -10228,17 +10267,19 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/JumaineJonesMVP.JPG/330px-JumaineJonesMVP.JPG"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "C",
           "SF",
           "SG"
         ],
-        "canonical": [
-          "C",
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 218,
@@ -10744,7 +10785,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -10753,7 +10794,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1956",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -10768,13 +10809,15 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/0/03/Ira_Newble_2005.jpg"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 220,
@@ -11280,7 +11323,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11289,7 +11332,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-1960",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -11304,13 +11347,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 195,
@@ -11816,7 +11861,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -11825,7 +11870,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-200081",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -11840,13 +11885,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 200,
@@ -12352,7 +12399,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12361,7 +12408,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-200789",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -12376,13 +12423,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 194,
@@ -12888,7 +12937,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -12897,7 +12946,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-200814",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -12912,13 +12961,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 189,
@@ -13424,7 +13475,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13433,7 +13484,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201581",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -13448,13 +13499,15 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/JJHickson.jpg/330px-JJHickson.jpg"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 242,
@@ -13957,7 +14010,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -13966,7 +14019,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-201616",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -13981,13 +14034,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 253,
@@ -14490,7 +14545,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -14499,7 +14554,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2032",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -14514,13 +14569,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 210,
@@ -15026,7 +15083,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -15035,7 +15092,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2036",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -15050,15 +15107,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 85,
       "weightLbs": 265,
@@ -15561,7 +15620,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -15570,7 +15629,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2205",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -15585,15 +15644,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 84,
       "weightLbs": 300,
@@ -16096,7 +16157,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -16105,7 +16166,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-221",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -16120,13 +16181,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 265,
@@ -16629,7 +16692,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -16638,7 +16701,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2400",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -16653,13 +16716,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 242,
@@ -17165,7 +17230,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -17174,7 +17239,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2402",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -17189,13 +17254,15 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Dajuan_Wagner_in_2010_%28cropped%29.jpg/330px-Dajuan_Wagner_in_2010_%28cropped%29.jpg"
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 200,
@@ -17701,7 +17768,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -17710,7 +17777,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2430",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -17725,13 +17792,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 258,
@@ -18237,7 +18306,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -18246,7 +18315,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2470",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -18261,13 +18330,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 180,
@@ -18773,7 +18844,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -18782,7 +18853,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2484",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -18797,15 +18868,17 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Devin_Brown.jpg/330px-Devin_Brown.jpg"
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 210,
@@ -19311,7 +19384,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -19320,7 +19393,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2544",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -19335,15 +19408,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 250,
@@ -19849,7 +19924,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -19858,7 +19933,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2562",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -19873,13 +19948,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 210,
@@ -20385,7 +20462,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -20394,7 +20471,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2574",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -20409,13 +20486,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 213,
@@ -20921,7 +21000,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -20930,7 +21009,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2590",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -20945,13 +21024,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 73,
       "weightLbs": 190,
@@ -21457,7 +21538,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -21466,7 +21547,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2753",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -21481,13 +21562,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 180,
@@ -21993,7 +22076,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -22002,7 +22085,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-2760",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -22017,15 +22100,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
       "weightLbs": 260,
@@ -22531,7 +22616,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -22540,7 +22625,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-406",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -22555,13 +22640,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 85,
       "weightLbs": 325,
@@ -23064,7 +23151,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -23073,7 +23160,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-423",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -23088,15 +23175,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "C",
+          "SF"
+        ],
         "sourceLabels": [
           "C",
           "SF"
         ],
-        "canonical": [
-          "C",
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 82,
       "weightLbs": 230,
@@ -23602,7 +23691,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -23611,7 +23700,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-441",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -23626,13 +23715,15 @@
         "photoUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Lamond_Murray.png/330px-Lamond_Murray.png"
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 79,
       "weightLbs": 236,
@@ -24138,7 +24229,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -24147,7 +24238,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-445",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -24162,15 +24253,17 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
+          "SG"
+        ],
         "sourceLabels": [
           "SF",
           "SG"
         ],
-        "canonical": [
-          "F",
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 78,
       "weightLbs": 200,
@@ -24676,7 +24769,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -24685,7 +24778,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-446",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -24699,13 +24792,17 @@
         "nbaHeadshotAvailable": false
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
           "SG"
         ],
-        "canonical": [
-          "G"
+        "sourceLabels": [
+          "F",
+          "SG"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 77,
       "weightLbs": 205,
@@ -25211,7 +25308,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -25220,7 +25317,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-673",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -25235,13 +25332,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 240,
@@ -25744,7 +25843,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -25753,7 +25852,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-677",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -25768,13 +25867,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 80,
       "weightLbs": 220,
@@ -26280,7 +26381,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -26289,7 +26390,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-727",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -26304,13 +26405,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 75,
       "weightLbs": 205,
@@ -26816,7 +26919,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -26825,7 +26928,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-902",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -26839,13 +26942,17 @@
         "nbaHeadshotAvailable": false
       },
       "positions": {
-        "sourceLabels": [
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF",
           "SG"
         ],
-        "canonical": [
-          "G"
+        "sourceLabels": [
+          "F",
+          "SG"
         ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
       "weightLbs": 182,
@@ -27351,7 +27458,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -27360,7 +27467,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-923",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -27375,13 +27482,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SF",
+        "secondary": [],
+        "playable": [
+          "SF"
+        ],
         "sourceLabels": [
           "SF"
         ],
-        "canonical": [
-          "F"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 81,
       "weightLbs": 230,
@@ -27887,7 +27996,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -27896,7 +28005,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-976",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -27911,13 +28020,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "SG",
+        "secondary": [],
+        "playable": [
+          "SG"
+        ],
         "sourceLabels": [
           "SG"
         ],
-        "canonical": [
-          "G"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 76,
       "weightLbs": 179,
@@ -28423,7 +28534,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",
@@ -28432,7 +28543,7 @@
       }
     },
     {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "playerId": "p-980",
       "franchiseId": "cavaliers",
       "eraId": "2000s",
@@ -28447,13 +28558,15 @@
         "photoUrl": null
       },
       "positions": {
+        "primary": "C",
+        "secondary": [],
+        "playable": [
+          "C"
+        ],
         "sourceLabels": [
           "C"
         ],
-        "canonical": [
-          "C"
-        ],
-        "normalizationVersion": "position-v2"
+        "normalizationVersion": "position-v3"
       },
       "heightInches": 87,
       "weightLbs": 260,
@@ -28959,7 +29072,7 @@
         }
       },
       "source": {
-        "dataVersion": "m5",
+        "dataVersion": "m6",
         "ratingsVersion": "ratings-v9-smooth-elite-band",
         "selectionScoreVersion": "selection-v2",
         "sourceVersion": "source-v1",

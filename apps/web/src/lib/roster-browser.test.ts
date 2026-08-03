@@ -6,11 +6,13 @@ import {
   formatPerGame,
   groupRoster,
   lowercaseName,
+  paginateGroupedRows,
   paginateItems,
   perGame,
   shotPct,
   sortRoster,
   type RosterDetailRow,
+  type RosterListItem,
 } from './roster-browser';
 
 function row(partial: Partial<RosterDetailRow> & { playerId: string }): RosterDetailRow {
@@ -23,7 +25,7 @@ function row(partial: Partial<RosterDetailRow> & { playerId: string }): RosterDe
     displayName: 'Test Player',
     playerExternalId: '1',
     altIds: null,
-    positionsCanonical: ['F'],
+    positionsPlayable: ['SF'],
     overall: 70,
     offense: 70,
     defense: 70,
@@ -65,7 +67,7 @@ describe('sortRoster', () => {
     eraId: '1990s',
     franchiseId: 'bulls',
     seasonKey: '1995-96',
-    positionsCanonical: ['G'],
+    positionsPlayable: ['PG'],
     stats: { ...row({ playerId: 'x' }).stats, points: 1600, per: 20 },
   });
   const b = row({
@@ -75,7 +77,7 @@ describe('sortRoster', () => {
     eraId: '2000s',
     franchiseId: 'lakers',
     seasonKey: '2000-01',
-    positionsCanonical: ['F'],
+    positionsPlayable: ['SF'],
     stats: { ...row({ playerId: 'x' }).stats, points: 2000, per: 28 },
   });
   const c = row({
@@ -85,7 +87,7 @@ describe('sortRoster', () => {
     eraId: '1980s',
     franchiseId: 'celtics',
     seasonKey: '1985-86',
-    positionsCanonical: ['C'],
+    positionsPlayable: ['C'],
     stats: { ...row({ playerId: 'x' }).stats, points: 1200, per: 15 },
   });
 
@@ -126,7 +128,7 @@ describe('sortRoster', () => {
     expect(byDecade.map((r) => r.eraId)).toEqual(['1980s', '1990s', '2000s']);
   });
 
-  it('sorts by position G, F, C', () => {
+  it('sorts by position PG, SF, C', () => {
     const sorted = sortRoster([c, b, a], 'position', 'asc');
     expect(sorted.map((r) => r.playerId)).toEqual(['a', 'b', 'c']);
   });
@@ -144,21 +146,21 @@ describe('filterRoster', () => {
     playerId: 'a',
     franchiseId: 'lakers',
     eraId: '1990s',
-    positionsCanonical: ['G'],
+    positionsPlayable: ['PG'],
     displayName: 'Magic Johnson',
   });
   const bulls90 = row({
     playerId: 'b',
     franchiseId: 'bulls',
     eraId: '1990s',
-    positionsCanonical: ['F'],
+    positionsPlayable: ['SF'],
     displayName: 'Scottie Pippen',
   });
   const lakers00 = row({
     playerId: 'c',
     franchiseId: 'lakers',
     eraId: '2000s',
-    positionsCanonical: ['C'],
+    positionsPlayable: ['C'],
     displayName: "Shaquille O'Neal",
   });
 
@@ -175,7 +177,7 @@ describe('filterRoster', () => {
       filterRoster([lakers90, bulls90, lakers00], {
         franchiseId: null,
         eraId: '1990s',
-        position: 'F',
+        position: 'SF',
         query: '',
       }).map((r) => r.playerId),
     ).toEqual(['b']);
@@ -246,6 +248,63 @@ describe('paginateItems', () => {
     expect(page.map((item) => (item.type === 'player' ? item.player.playerId : item.type))).toEqual(
       ['group', 'a', 'group', 'b'],
     );
+  });
+});
+
+describe('paginateGroupedRows', () => {
+  // Contiguous by franchise/era, like the packaged players index.
+  const rows = [
+    row({ playerId: 'a', franchiseId: 'lakers', eraId: '1990s' }),
+    row({ playerId: 'b', franchiseId: 'lakers', eraId: '1990s' }),
+    row({ playerId: 'c', franchiseId: 'bulls', eraId: '1990s' }),
+    row({ playerId: 'd', franchiseId: 'bulls', eraId: '1990s' }),
+    row({ playerId: 'e', franchiseId: 'bulls', eraId: '1990s' }),
+    row({ playerId: 'f', franchiseId: 'lakers', eraId: '2000s' }),
+    row({ playerId: 'g', franchiseId: 'celtics', eraId: '2000s' }),
+    row({ playerId: 'h', franchiseId: 'celtics', eraId: '2000s' }),
+  ];
+
+  function reference(rows: RosterDetailRow[], count: number): RosterListItem[] {
+    return paginateItems(
+      groupRoster(rows).flatMap((group): RosterListItem[] => [
+        {
+          type: 'group',
+          franchiseId: group.franchiseId,
+          eraId: group.eraId,
+          count: group.players.length,
+        },
+        ...group.players.map((player): RosterListItem => ({ type: 'player', player })),
+      ]),
+      count,
+    );
+  }
+
+  it('is output-identical to groupRoster + flatMap + paginateItems at every cut point', () => {
+    for (const n of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100]) {
+      expect(paginateGroupedRows(rows, n)).toEqual(reference(rows, n));
+    }
+  });
+
+  it('stops at exactly count player items', () => {
+    const page = paginateGroupedRows(rows, 5);
+    const players = page.filter((item) => item.type === 'player');
+    expect(players).toHaveLength(5);
+    expect(page.map((item) => (item.type === 'player' ? item.player.playerId : item.type))).toEqual(
+      ['group', 'a', 'b', 'group', 'c', 'd', 'e'],
+    );
+    const exhausted = paginateGroupedRows(rows, 100);
+    expect(exhausted.filter((item) => item.type === 'player')).toHaveLength(rows.length);
+  });
+
+  it('keeps the group header of the boundary group with its full count', () => {
+    const page = paginateGroupedRows(rows, 3);
+    expect(page).toEqual([
+      { type: 'group', franchiseId: 'lakers', eraId: '1990s', count: 2 },
+      { type: 'player', player: rows[0] },
+      { type: 'player', player: rows[1] },
+      { type: 'group', franchiseId: 'bulls', eraId: '1990s', count: 3 },
+      { type: 'player', player: rows[2] },
+    ]);
   });
 });
 

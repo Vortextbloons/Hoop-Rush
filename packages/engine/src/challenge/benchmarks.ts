@@ -15,7 +15,7 @@ import type {
 
 export const BENCHMARK_VERSION = 'benchmark-v1';
 
-const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
 
 /** League-average possession-relevant tendencies shared by every benchmark player. */
 const BENCHMARK_TENDENCIES: SimulationTendencies = {

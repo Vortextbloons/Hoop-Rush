@@ -4,10 +4,12 @@ import { positionSchema } from './positions.js';
 
 /**
  * A legal lineup contains two Guard slots, two Forward slots, and one Center
- * slot. Players may fill only their career-wide NBA-listed positions.
+ * slot. The slot structure is expressed in coarse slot groups (G/F/C); each
+ * slot is filled by a player whose detailed position union maps to that slot
+ * group via the authoritative mapping in positions.ts.
  */
 
-/** Position requirement per slot index, in fixed order. */
+/** Slot-group requirement per slot index, in fixed order. */
 export const lineupStructureSchema = z.tuple([
   z.literal('G'),
   z.literal('G'),
@@ -25,8 +27,8 @@ export type SlotIndex = z.infer<typeof slotIndexSchema>;
 export const lineupAssignmentSchema = z.object({
   slotIndex: slotIndexSchema,
   playerId: playerIdSchema,
-  /** The assigned player's career-wide position union, recorded for audit. */
-  positions: z.array(positionSchema).min(1).max(3),
+  /** The assigned player's career-wide detailed playable union, recorded for audit. */
+  positions: z.array(positionSchema).min(1).max(5),
 });
 export type LineupAssignment = z.infer<typeof lineupAssignmentSchema>;
 

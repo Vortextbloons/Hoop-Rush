@@ -13,6 +13,9 @@ import {
   rosterDetailsSchema,
   REQUIRED_RATING_KEYS,
   unavailabilityReasonSchema,
+  POSITIONS,
+  POSITION_NORMALIZATION_VERSION,
+  playableSlotGroups,
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
@@ -347,14 +350,58 @@ function auditPoolContent(
     playerSeasons.set(psKey, key);
   }
 
-  // Legal G,G,F,F,C lineup coverage from packaged canonical positions.
-  const guards = pool.players.filter((p) => p.positions.canonical.includes('G'));
-  const forwards = pool.players.filter((p) => p.positions.canonical.includes('F'));
-  const centers = pool.players.filter((p) => p.positions.canonical.includes('C'));
+  // Legal G,G,F,F,C lineup coverage from packaged playable positions.
+  const guards = pool.players.filter((p) => playableSlotGroups(p.positions.playable).includes('G'));
+  const forwards = pool.players.filter((p) =>
+    playableSlotGroups(p.positions.playable).includes('F'),
+  );
+  const centers = pool.players.filter((p) =>
+    playableSlotGroups(p.positions.playable).includes('C'),
+  );
   if (guards.length < 2 || forwards.length < 2 || centers.length < 1) {
     failures.push(
       `pools: ${key} cannot form G,G,F,F,C (G ${String(guards.length)}, F ${String(forwards.length)}, C ${String(centers.length)})`,
     );
+  }
+
+  // Detailed position record (position-v3): reviewed primary, secondary
+  // positions, the career-wide playable union, source labels, and the
+  // normalization version. The schema enforces the enum and bounds; these
+  // audits assert the record is internally consistent.
+  for (const player of pool.players) {
+    const { primary, secondary, playable, sourceLabels, normalizationVersion } = player.positions;
+    if (!POSITIONS.includes(primary)) {
+      failures.push(`pools: ${key} ${player.displayName} invalid primary position ${primary}`);
+    }
+    if (!playable.includes(primary)) {
+      failures.push(`pools: ${key} ${player.displayName} primary ${primary} missing from playable`);
+    }
+    for (const position of secondary) {
+      if (!playable.includes(position)) {
+        failures.push(
+          `pools: ${key} ${player.displayName} secondary ${position} missing from playable`,
+        );
+      }
+      if (position === primary) {
+        failures.push(
+          `pools: ${key} ${player.displayName} secondary ${position} equals primary ${primary}`,
+        );
+      }
+    }
+    if (playable.length === 0) {
+      failures.push(`pools: ${key} ${player.displayName} empty playable positions`);
+    }
+    if (sourceLabels.length === 0) {
+      failures.push(`pools: ${key} ${player.displayName} empty sourceLabels`);
+    }
+    if (normalizationVersion !== POSITION_NORMALIZATION_VERSION) {
+      failures.push(
+        `pools: ${key} ${player.displayName} position normalization ${normalizationVersion} != ${POSITION_NORMALIZATION_VERSION}`,
+      );
+    }
+    if (playableSlotGroups(playable).length < 1) {
+      failures.push(`pools: ${key} ${player.displayName} playable positions map to no slot groups`);
+    }
   }
 
   // Peak reproducibility: selectionScore recomputed from packaged fields.

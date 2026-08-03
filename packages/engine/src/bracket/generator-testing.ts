@@ -106,13 +106,13 @@ function candidatesFor(franchiseId: string): FranchiseCandidates {
   const ladder = [92, 89, 86, 83, 80, 77, 74, 71, 68, 65, 62, 59, 56, 53, 50, 47];
   const groups: Array<{ position: SimulationPlayer['positions']; count: number; offset: number }> =
     [
-      { position: ['G'], count: 8, offset: 0 },
-      { position: ['G'], count: 8, offset: 8 },
-      { position: ['F'], count: 8, offset: 16 },
-      { position: ['F'], count: 8, offset: 24 },
+      { position: ['PG'], count: 8, offset: 0 },
+      { position: ['SG'], count: 8, offset: 8 },
+      { position: ['SF'], count: 8, offset: 16 },
+      { position: ['PF'], count: 8, offset: 24 },
       { position: ['C'], count: 5, offset: 32 },
-      { position: ['G', 'F'], count: 2, offset: 37 },
-      { position: ['F', 'C'], count: 1, offset: 39 },
+      { position: ['PG', 'SF'], count: 2, offset: 37 },
+      { position: ['PF', 'C'], count: 1, offset: 39 },
     ];
   for (const { position, count, offset } of groups) {
     for (let i = 0; i < count; i += 1) {

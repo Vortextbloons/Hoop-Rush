@@ -242,6 +242,14 @@
     <div class="mt-8">
       <AsyncState kind="loading" title="Loading challenge" message="Restoring the active run…" />
     </div>
+  {:else if phase === 'starting'}
+    <div class="mt-8">
+      <AsyncState
+        kind="loading"
+        title="Running simulations…"
+        message="Playing two full seasons to pick the best one to reveal."
+      />
+    </div>
   {:else}
     <ChallengeOverlay
       {manifest}

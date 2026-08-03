@@ -18,17 +18,58 @@ import { generateSeed } from '$lib/sandbox-url';
  * index and the manifest pools are the whole surface.
  */
 
+/** The franchise/era grouping key used for every bucket lookup. */
+function franchiseEraKey(franchiseId: string, eraId: string): string {
+  return `${franchiseId}/${eraId}`;
+}
+
+/**
+ * Memoized bucket maps keyed on the immutable index instance, so catalog and
+ * pool-row builds never rescan the global index more than once per load.
+ */
+const franchiseEraBucketCache = new WeakMap<
+  PlayersIndex,
+  ReadonlyMap<string, PlayersIndexEntry[]>
+>();
+
+/**
+ * Single pass over the global players index grouping rows by their
+ * franchise/era pair. Buckets preserve index order, which keeps the catalog
+ * and pool rows identical to a per-pool filter. Memoized per index instance.
+ */
+export function buildFranchiseEraBuckets(
+  index: PlayersIndex,
+): ReadonlyMap<string, PlayersIndexEntry[]> {
+  const cached = franchiseEraBucketCache.get(index);
+  if (cached) return cached;
+  const mutable = new Map<string, PlayersIndexEntry[]>();
+  for (const p of index.players) {
+    const key = franchiseEraKey(p.franchiseId, p.eraId);
+    const bucket = mutable.get(key);
+    if (bucket) {
+      bucket.push(p);
+    } else {
+      mutable.set(key, [p]);
+    }
+  }
+  const buckets: ReadonlyMap<string, PlayersIndexEntry[]> = mutable;
+  franchiseEraBucketCache.set(index, buckets);
+  return buckets;
+}
+
 /** One catalog entry per packaged manifest pool, in manifest.pools order. */
 export function buildClassicCatalog(
   manifest: HoopRushManifest,
   index: PlayersIndex,
 ): ClassicDraftCatalog {
+  const buckets = buildFranchiseEraBuckets(index);
   return manifest.pools.map((pair) => ({
     franchiseId: pair.franchiseId,
     eraId: pair.eraId,
-    players: index.players
-      .filter((p) => p.franchiseId === pair.franchiseId && p.eraId === pair.eraId)
-      .map((p) => ({ playerId: p.playerId, positions: [...p.positionsCanonical] })),
+    players: (buckets.get(franchiseEraKey(pair.franchiseId, pair.eraId)) ?? []).map((p) => ({
+      playerId: p.playerId,
+      positions: [...p.positionsPlayable],
+    })),
   }));
 }
 
@@ -38,8 +79,9 @@ export function classicPoolRows(
   pair: { franchiseId: string; eraId: string },
   presentation: DraftPresentation,
 ): PlayersIndexEntry[] {
+  const buckets = buildFranchiseEraBuckets(index);
   return sortDraftRows(
-    index.players.filter((p) => p.franchiseId === pair.franchiseId && p.eraId === pair.eraId),
+    buckets.get(franchiseEraKey(pair.franchiseId, pair.eraId)) ?? [],
     presentation,
   );
 }

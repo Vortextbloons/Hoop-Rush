@@ -18,7 +18,7 @@ function row(partial: Partial<PlayersIndexEntry> & { playerId: string }): Player
     displayName: 'Test Player',
     playerExternalId: '1',
     altIds: null,
-    positionsCanonical: ['F'],
+    positionsPlayable: ['SF'],
     overall: 70,
     offense: 70,
     defense: 70,

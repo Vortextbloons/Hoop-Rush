@@ -1,21 +1,23 @@
 import type {
   Lineup,
   LineupAssignment,
-  Position,
   PositionUnion,
+  SlotGroup,
   SlotIndex,
 } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
 import { canPlay } from './positions.js';
 
 /**
- * Lineup legality: exactly two Guards, two Forwards, and one Center, with each
- * player assigned only to a career-wide NBA-listed position (spec/01, spec/03).
- * This module is the single authoritative implementation of the rule.
+ * Lineup legality: exactly two Guards, two Forwards, and one Center. Slots are
+ * G/G/F/F/C requirements resolved through the detailed position map: a player
+ * fills a slot when any detailed position in their union maps to the slot's
+ * group (spec/01, spec/03). This module is the single authoritative
+ * implementation of the rule.
  */
 
-/** Position requirement for a slot index in the fixed G,G,F,F,C structure. */
-export function slotRequirement(slotIndex: SlotIndex): Position {
+/** Slot-group requirement for a slot index in the fixed G,G,F,F,C structure. */
+export function slotRequirement(slotIndex: SlotIndex): SlotGroup {
   const requirement = LINEUP_STRUCTURE[slotIndex];
   if (requirement === undefined) {
     throw new Error(`lineup: no position requirement for slot ${String(slotIndex)}`);

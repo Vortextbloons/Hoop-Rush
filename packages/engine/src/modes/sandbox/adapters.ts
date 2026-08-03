@@ -15,7 +15,7 @@ export function toSimulationPlayer(player: PeakPlayerSeason): SimulationPlayer {
   return {
     playerId: player.playerId,
     displayName: player.displayName,
-    positions: player.positions.canonical,
+    positions: player.positions.playable,
     heightInches: player.heightInches,
     weightLbs: player.weightLbs,
     ratings: player.detailedRatings,

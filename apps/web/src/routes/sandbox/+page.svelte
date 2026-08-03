@@ -11,10 +11,10 @@
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { canPlay, slotRequirement, validateLineup } from '@hoop-rush/engine';
-  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
+  import { resolvePlayerRefs } from '$lib/player-refs';
   import { generateSeed, parseSandboxUrl } from '$lib/sandbox-url';
   import { startSandboxRun } from '$lib/sandbox-run';
-  import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, sortDraftRows } from '$lib/draft-presentation';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
@@ -46,6 +46,18 @@
   let runError: string | null = $state(null);
 
   let starting = $state(false);
+
+  /** False once this component starts being destroyed (see below). */
+  let mounted = true;
+  $effect(() => {
+    mounted = true;
+    return () => {
+      // Post-destroy async callbacks (pool loads, bits-ui dismissal timers)
+      // must never write reactive state on a torn-down tree; that can
+      // cascade into an update-depth error during navigation away.
+      mounted = false;
+    };
+  });
 
   let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
   let pickerPlayer = $state<IndexRow | null>(null);
@@ -113,6 +125,7 @@
     const filled = rows.filter((row): row is IndexRow => row !== undefined);
     resolveRefsToPlayers(result.state.slots).then(
       () => {
+        if (!mounted) return;
         slots = filled;
         pickerPlayer = null;
       },
@@ -173,7 +186,7 @@
   }
 
   function canFillSlot(player: IndexRow, slotIndex: number): boolean {
-    return canPlay(player.positionsCanonical, slotRequirement(slotIndex as SlotIndex));
+    return canPlay(player.positionsPlayable, slotRequirement(slotIndex as SlotIndex));
   }
 
   /**
@@ -195,7 +208,11 @@
     return null;
   }
 
-  /** Place the player at a slot, moving any movable incumbent out of the way. */
+  /**
+   * Place the player at a slot, moving any movable incumbent out of the way.
+   * The placed player's pool is prefetched (fire-and-forget; getPool is
+   * memoized) so Play's resolve completes without a network wait.
+   */
   function placePlayer(subject: IndexRow, slotIndex: number) {
     const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
     const incumbent = slots[slotIndex];
@@ -206,6 +223,12 @@
     }
     slots[slotIndex] = subject;
     if (subjectSlot !== -1 && subjectSlot !== slotIndex) slots[subjectSlot] = null;
+    if (manifest) {
+      const entry = manifest.pools.find(
+        (p) => p.franchiseId === subject.franchiseId && p.eraId === subject.eraId,
+      );
+      if (entry) void getPool(entry).catch(() => {});
+    }
     closePicker();
   }
 
@@ -216,12 +239,14 @@
   }
 
   function closePicker() {
+    if (!mounted) return;
     pickerPlayer = null;
     const trigger = pickerTrigger;
     const fallback = pickerFallbackId;
     pickerTrigger = null;
     pickerFallbackId = null;
     queueMicrotask(() => {
+      if (!mounted) return;
       if (trigger?.isConnected) {
         trigger.focus();
       } else if (fallback) {
@@ -244,7 +269,7 @@
       assignments: slots.map((player, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: player!.playerId,
-        positions: player!.positionsCanonical,
+        positions: player!.positionsPlayable,
       })),
     }).ok;
   });
@@ -253,11 +278,14 @@
 
   /**
    * Loads the full peak records behind the picked index rows via their
-   * franchise-era pools, in slot order.
+   * franchise-era pools. Distinct pools load in parallel; results stay in
+   * slot order. Pool loads are memoized, so prefetches from placing players
+   * make Play resolve without a network wait.
    */
   async function resolveRefsToPlayers(refs: SlotRef[]): Promise<PeakPlayerSeason[]> {
-    if (!manifest) throw new Error('The manifest is unavailable.');
-    return resolvePlayerRefs(refs, manifest);
+    const m = manifest;
+    if (!m) throw new Error('The manifest is unavailable.');
+    return resolvePlayerRefs(refs, m);
   }
 
   /** Resolves the picked players, then starts and persists the 82-game run. */

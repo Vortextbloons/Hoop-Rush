@@ -12,6 +12,7 @@ import type {
   Position,
   Seed,
   SimulationPlayer,
+  SlotGroup,
   SlotIndex,
 } from '@hoop-rush/data-contracts';
 import {
@@ -20,6 +21,7 @@ import {
   LINEUP_STRUCTURE,
   classicDraftCatalogSchema,
 } from '@hoop-rush/data-contracts';
+import { canPlay, slotGroupOf } from '../../domain/positions.js';
 import { validateLineup } from '../../domain/lineup.js';
 import type { EngineContext } from '../../sim/context.js';
 import type { ClassicChallengeCreation } from '../../challenge/commands.js';
@@ -59,8 +61,8 @@ export function sortClassicCatalog(catalog: ClassicDraftCatalog): ClassicDraftCa
   );
 }
 
-/** Slot requirement (position union) for a slot index. */
-export function slotRequirement(slotIndex: number): 'G' | 'F' | 'C' {
+/** Slot requirement (slot group) for a slot index. */
+export function slotRequirement(slotIndex: number): SlotGroup {
   if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 4) {
     throw new Error(`slot index must be an integer in 0..4 (got ${String(slotIndex)})`);
   }
@@ -69,6 +71,49 @@ export function slotRequirement(slotIndex: number): 'G' | 'F' | 'C' {
     throw new Error(`no slot requirement for index ${String(slotIndex)}`);
   }
   return requirement;
+}
+
+const SLOT_INDEXES: SlotIndex[] = [0, 1, 2, 3, 4];
+
+function catalogPlayer(
+  catalog: ClassicDraftCatalog,
+  franchiseId: string,
+  eraId: string,
+  playerId: PlayerId,
+): { playerId: PlayerId; positions: Position[] } | null {
+  const entry = catalog.find((e) => e.franchiseId === franchiseId && e.eraId === eraId);
+  return entry?.players.find((p) => p.playerId === playerId) ?? null;
+}
+
+/**
+ * First open slot the incumbent can fill when vacating `targetSlot`, counting
+ * `vacatingSlot` as open when the incoming player leaves it. Matches sandbox
+ * displacement: move the occupant out of the way before placing the subject.
+ */
+function displacementTargetFor(
+  catalog: ClassicDraftCatalog,
+  incumbent: ClassicPick,
+  targetSlot: SlotIndex,
+  vacatingSlot: SlotIndex | null,
+  picks: ClassicPick[],
+): SlotIndex | null {
+  const incumbentPlayer = catalogPlayer(
+    catalog,
+    incumbent.franchiseId,
+    incumbent.eraId,
+    incumbent.playerId,
+  );
+  if (!incumbentPlayer) return null;
+  for (const slotIndex of SLOT_INDEXES) {
+    if (slotIndex === targetSlot) continue;
+    const occupied = picks.some((pick) => pick.slotIndex === slotIndex);
+    const willBeOpen = slotIndex === vacatingSlot || !occupied;
+    if (!willBeOpen) continue;
+    if (canPlay(incumbentPlayer.positions, slotRequirement(slotIndex))) {
+      return slotIndex;
+    }
+  }
+  return null;
 }
 
 /**
@@ -91,7 +136,7 @@ export function classicRollCandidates(
   }
   const draftedIds = new Set(state.picks.map((p) => p.playerId));
   const occupiedSlots = new Set(state.picks.map((p) => p.slotIndex));
-  const requirements = new Set<Position>();
+  const requirements = new Set<SlotGroup>();
   for (let slotIndex = 0; slotIndex < LINEUP_STRUCTURE.length; slotIndex += 1) {
     if (!occupiedSlots.has(slotIndex)) {
       requirements.add(slotRequirement(slotIndex));
@@ -112,7 +157,7 @@ export function classicRollCandidates(
       return entry.players.some(
         (player) =>
           !draftedIds.has(player.playerId) &&
-          player.positions.some((position) => requirements.has(position)),
+          player.positions.some((position) => requirements.has(slotGroupOf(position))),
       );
     }),
   );
@@ -268,9 +313,6 @@ export function draftClassicPlayer(
   if (state.picks.some((p) => p.playerId === input.playerId)) {
     throw new Error(`player ${input.playerId} is already drafted`);
   }
-  if (state.picks.some((p) => p.slotIndex === input.slotIndex)) {
-    throw new Error(`slot ${String(input.slotIndex)} is already filled`);
-  }
   const entry = catalog.find((e) => e.franchiseId === roll.franchiseId && e.eraId === roll.eraId);
   if (!entry) {
     throw new Error('catalog does not contain the current roll pair');
@@ -279,8 +321,42 @@ export function draftClassicPlayer(
   if (!player) {
     throw new Error(`${input.playerId} is not in the rolled pool`);
   }
-  if (!player.positions.includes(slotRequirement(input.slotIndex))) {
+  if (!canPlay(player.positions, slotRequirement(input.slotIndex))) {
     throw new Error(`${input.playerId} cannot play slot ${String(input.slotIndex)}`);
+  }
+  const incumbentAtSlot = state.picks.find((p) => p.slotIndex === input.slotIndex);
+  if (incumbentAtSlot) {
+    const target = displacementTargetFor(
+      catalog,
+      incumbentAtSlot,
+      input.slotIndex,
+      null,
+      state.picks,
+    );
+    if (target === null) {
+      throw new Error(`slot ${String(input.slotIndex)} is already filled`);
+    }
+    const picksWithDisplacement = state.picks.map((pick) =>
+      pick.playerId === incumbentAtSlot.playerId ? { ...pick, slotIndex: target } : pick,
+    );
+    const pick: ClassicPick = {
+      round: state.round,
+      playerId: input.playerId,
+      franchiseId: roll.franchiseId,
+      eraId: roll.eraId,
+      slotIndex: input.slotIndex,
+    };
+    const picks = [...picksWithDisplacement, pick];
+    if (picks.length === 5) {
+      return { ...state, picks, status: 'complete', roll: null };
+    }
+    const nextState: ClassicDraftState = { ...state, picks, round: state.round + 1 };
+    const candidates = classicRollCandidates(catalog, nextState, 'initial');
+    if (candidates.length === 0) {
+      throw new Error(`no eligible pool for round ${String(nextState.round)}`);
+    }
+    const nextRoll = rollClassicPair(state.seed, nextState.round, 'initial', candidates, context);
+    return { ...nextState, roll: nextRoll };
   }
   const pick: ClassicPick = {
     round: state.round,
@@ -309,9 +385,10 @@ export interface ClassicRepositionInput {
 
 /**
  * Moves a drafted player to another legal slot. When the target is occupied,
- * both picks swap only if the incumbent can fill the vacated slot. Never
- * removes or replaces a player, and never changes round, status, roll, or
- * rerolls. The catalog resolves the playable position unions.
+ * swaps when the incumbent can fill the vacated slot; otherwise displaces the
+ * incumbent to the first open slot they can play (including the slot the
+ * subject vacates). Never removes or replaces a player, and never changes
+ * round, status, roll, or rerolls.
  */
 export function repositionClassicPlayer(
   state: ClassicDraftState,
@@ -330,7 +407,7 @@ export function repositionClassicPlayer(
   if (!player) {
     throw new Error(`${input.playerId} has no catalog record`);
   }
-  if (!player.positions.includes(slotRequirement(input.slotIndex))) {
+  if (!canPlay(player.positions, slotRequirement(input.slotIndex))) {
     throw new Error(`${input.playerId} cannot play slot ${String(input.slotIndex)}`);
   }
   const incumbent = state.picks.find((p) => p.slotIndex === input.slotIndex);
@@ -342,21 +419,40 @@ export function repositionClassicPlayer(
       ),
     };
   }
-  const incumbentEntry = catalog.find(
-    (e) => e.franchiseId === incumbent.franchiseId && e.eraId === incumbent.eraId,
+  const incumbentPlayer = catalogPlayer(
+    catalog,
+    incumbent.franchiseId,
+    incumbent.eraId,
+    incumbent.playerId,
   );
-  const incumbentPlayer = incumbentEntry?.players.find((p) => p.playerId === incumbent.playerId);
   if (!incumbentPlayer) {
     throw new Error(`${incumbent.playerId} has no catalog record`);
   }
-  if (!incumbentPlayer.positions.includes(slotRequirement(pick.slotIndex))) {
-    throw new Error(`${incumbent.playerId} cannot play slot ${String(pick.slotIndex)}`);
+  if (canPlay(incumbentPlayer.positions, slotRequirement(pick.slotIndex))) {
+    return {
+      ...state,
+      picks: state.picks.map((p) => {
+        if (p.playerId === input.playerId) return { ...p, slotIndex: input.slotIndex };
+        if (p.playerId === incumbent.playerId) return { ...p, slotIndex: pick.slotIndex };
+        return p;
+      }),
+    };
+  }
+  const target = displacementTargetFor(
+    catalog,
+    incumbent,
+    input.slotIndex,
+    pick.slotIndex,
+    state.picks,
+  );
+  if (target === null) {
+    throw new Error(`${incumbent.playerId} cannot be moved out of slot ${String(input.slotIndex)}`);
   }
   return {
     ...state,
     picks: state.picks.map((p) => {
       if (p.playerId === input.playerId) return { ...p, slotIndex: input.slotIndex };
-      if (p.playerId === incumbent.playerId) return { ...p, slotIndex: pick.slotIndex };
+      if (p.playerId === incumbent.playerId) return { ...p, slotIndex: target };
       return p;
     }),
   };

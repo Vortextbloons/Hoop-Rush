@@ -24,21 +24,21 @@ const DEFAULT_CLASSIC_CATALOG: readonly ClassicCatalogEntry[] = [
     franchiseId: 'lakers',
     eraId: '1990s',
     players: [
-      { playerId: 'p-lal-g', positions: ['G'] },
-      { playerId: 'p-lal-gf', positions: ['F', 'G'] },
+      { playerId: 'p-lal-g', positions: ['PG', 'SG'] },
+      { playerId: 'p-lal-gf', positions: ['PG', 'SF'] },
       { playerId: 'p-lal-c', positions: ['C'] },
     ],
   },
   {
     franchiseId: 'lakers',
     eraId: '1980s',
-    players: [{ playerId: 'p-lal-f', positions: ['F'] }],
+    players: [{ playerId: 'p-lal-f', positions: ['SF', 'PF'] }],
   },
   {
     franchiseId: 'celtics',
     eraId: '1990s',
     players: [
-      { playerId: 'p-bos-g', positions: ['G'] },
+      { playerId: 'p-bos-g', positions: ['PG', 'SG'] },
       { playerId: 'p-bos-c', positions: ['C'] },
     ],
   },
@@ -51,28 +51,28 @@ const DEFAULT_CLASSIC_CATALOG: readonly ClassicCatalogEntry[] = [
     franchiseId: 'bulls',
     eraId: '1990s',
     players: [
-      { playerId: 'p-chi-f', positions: ['F'] },
+      { playerId: 'p-chi-f', positions: ['SF', 'PF'] },
       { playerId: 'p-chi-c', positions: ['C'] },
     ],
   },
   {
     franchiseId: 'bulls',
     eraId: '1980s',
-    players: [{ playerId: 'p-chi-g', positions: ['G'] }],
+    players: [{ playerId: 'p-chi-g', positions: ['PG', 'SG'] }],
   },
   {
     franchiseId: 'heat',
     eraId: '2000s',
     players: [
-      { playerId: 'p-mia-fc', positions: ['C', 'F'] },
-      { playerId: 'p-mia-g', positions: ['G'] },
+      { playerId: 'p-mia-fc', positions: ['PF', 'C'] },
+      { playerId: 'p-mia-g', positions: ['PG', 'SG'] },
     ],
   },
   {
     franchiseId: 'knicks',
     eraId: '2010s',
     players: [
-      { playerId: 'p-nyk-f', positions: ['F'] },
+      { playerId: 'p-nyk-f', positions: ['SF', 'PF'] },
       { playerId: 'p-nyk-c', positions: ['C'] },
     ],
   },
@@ -80,7 +80,7 @@ const DEFAULT_CLASSIC_CATALOG: readonly ClassicCatalogEntry[] = [
 
 /**
  * A deterministic mini-catalog: 8 entries across 5 franchises and 5 eras,
- * every player with the sorted canonical position union. Pass `entries` to
+ * every player with the sorted detailed playable union. Pass `entries` to
  * replace the whole catalog (the array type has no meaningful partial).
  */
 export function buildClassicCatalog(

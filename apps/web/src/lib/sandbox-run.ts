@@ -9,7 +9,6 @@ import {
 import {
   createChallenge,
   createEngineContext,
-  simulateChallengeBestOf,
   toSimulationPlayer,
   type ChallengeCreation,
 } from '@hoop-rush/engine';
@@ -68,7 +67,7 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
       assignments: players.map((player, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: player.playerId,
-        positions: player.positions.canonical,
+        positions: player.positions.playable,
       })),
     },
     players: players.map((player) => toSimulationPlayer(player)),
@@ -81,11 +80,10 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
     profile,
     bracket,
   };
-  // Sandbox simulates the complete season twice from derived attempt seeds
-  // and keeps the best record; the chosen attempt's seed becomes the
-  // persisted run seed so the paced reveal reproduces exactly those games.
-  const chosen = simulateChallengeBestOf(creation, profile, context);
-  const run = createChallenge({ ...creation, runSeed: chosen.runSeed });
+  // The run is saved with the base run seed and no games; the challenge page
+  // asks the worker to simulate the whole-run best-of and re-saves the chosen
+  // attempt seed before the paced reveal starts (spec/01 sandbox loop).
+  const run = createChallenge({ ...creation, runSeed: seed });
   await challengeRepository.saveActiveRun({
     recordId: 'active',
     saveSchemaVersion: 2,

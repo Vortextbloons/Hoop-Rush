@@ -70,12 +70,18 @@ const tendenciesArb = fc.record({
   crashOffensiveGlassRate: tendencyArb,
 });
 
-const SLOT_ORDER: readonly SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+const SLOT_ORDER: readonly SimulationPlayer['positions'][] = [
+  ['PG'],
+  ['SG'],
+  ['SF'],
+  ['PF'],
+  ['C'],
+];
 
 const playerArb: fc.Arbitrary<SimulationPlayer> = fc.record({
   playerId: fc.string({ minLength: 3, maxLength: 12 }),
   displayName: fc.string({ minLength: 3, maxLength: 12 }),
-  positions: fc.constantFrom<SimulationPlayer['positions']>(['G'], ['F'], ['C']),
+  positions: fc.constantFrom<SimulationPlayer['positions']>(['PG'], ['SG'], ['SF'], ['PF'], ['C']),
   heightInches: fc.constant<number | null>(78),
   weightLbs: fc.constant<number | null>(210),
   ratings: ratingsArb,
@@ -201,7 +207,7 @@ describe('property: accounting and determinism', () => {
 describe('property: zone skill correlation', () => {
   it('high-zone-skill teams make more shots in that zone', () => {
     const makeSharpshooter = (threePoint: number): SimulationTeam => {
-      const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+      const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
       const players = Array.from({ length: 5 }, (_, i) => {
         const positions = slots[i];
         if (positions === undefined) {

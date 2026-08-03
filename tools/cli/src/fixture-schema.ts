@@ -9,7 +9,7 @@ import { simulationTeamSchema } from '@hoop-rush/data-contracts';
  */
 
 export const simFixtureSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   fixtureId: z.string().min(1).max(64),
   description: z.string().min(1).max(256),
   home: simulationTeamSchema,

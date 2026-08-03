@@ -14,6 +14,8 @@ import {
   type GameResult,
   type GameSimulationInput,
   type SimulationTeam,
+  playableSlotGroups,
+  slotGroupOf,
 } from '@hoop-rush/data-contracts';
 import { makeReport, type CliReport } from '../report.js';
 import {
@@ -97,7 +99,7 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
   for (const key of Object.keys(tendencies) as Array<keyof typeof tendencies>) {
     tendencies[key] = meanTendencies[key] ?? tendencies[key];
   }
-  const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
   return {
     teamId: 'league-average',
     displayName: 'League Average',
@@ -120,7 +122,7 @@ export function poolStrengthLineups(pool: FranchiseEraPool): {
   strong: SimulationTeam;
   weak: SimulationTeam;
 } {
-  const SLOTS: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const SLOTS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
   const pick = (players: typeof pool.players): SimulationTeam => {
     const remaining = [...players];
     const chosen: Array<{
@@ -130,7 +132,9 @@ export function poolStrengthLineups(pool: FranchiseEraPool): {
     for (const slot of SLOTS) {
       const requirement = slot[0];
       if (!requirement) throw new UsageError('pool cannot form a legal lineup');
-      const index = remaining.findIndex((p) => p.positions.canonical.includes(requirement));
+      const index = remaining.findIndex((p) =>
+        playableSlotGroups(p.positions.playable).includes(slotGroupOf(requirement)),
+      );
       if (index < 0) throw new UsageError('pool cannot form a legal lineup');
       const player = remaining[index];
       if (!player) throw new UsageError('pool cannot form a legal lineup');

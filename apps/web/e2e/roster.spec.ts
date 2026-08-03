@@ -67,9 +67,9 @@ test.describe('roster browser', () => {
         .filter({ hasText: /1990s/ }),
     ).toBeVisible();
 
-    // Guard positions keep Shaq in the Lakers 1990s pool, G excludes him.
+    // Point-guard positions keep Shaq out of the Lakers 1990s pool, PG keeps him excluded.
     await filterLakers1990s(page);
-    await page.getByRole('button', { name: 'G', exact: true }).click();
+    await page.getByRole('button', { name: 'PG', exact: true }).click();
     await expect(
       page.locator('tbody').getByRole('button', { name: /View Magic Johnson stats/ }),
     ).toBeVisible();

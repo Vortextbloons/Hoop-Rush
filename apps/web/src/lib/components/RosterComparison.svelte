@@ -256,7 +256,7 @@
               </div>
               <div class="flex justify-between gap-2">
                 <dt class="text-muted-foreground">Positions</dt>
-                <dd class="font-mono font-semibold">{player.positionsCanonical.join('/')}</dd>
+                <dd class="font-mono font-semibold">{player.positionsPlayable.join('/')}</dd>
               </div>
             </dl>
           </section>

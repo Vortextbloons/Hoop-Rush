@@ -7,6 +7,7 @@ import type {
 import type { Rng } from './rng.js';
 import { ENGINE_CONSTANTS } from './constants.js';
 import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.js';
+import { slotGroupOf } from '../domain/positions.js';
 
 /**
  * Usage, creation, passing, and action tendencies select the initiator,
@@ -228,7 +229,11 @@ function defenderWeight(
   shooter: SimulationPlayer,
   zone: ShotZone,
 ): number {
-  const positionMatch = defender.positions.some((p) => shooter.positions.includes(p)) ? 1.35 : 1;
+  const positionMatch = defender.positions.some((p) =>
+    shooter.positions.some((q) => slotGroupOf(p) === slotGroupOf(q)),
+  )
+    ? 1.35
+    : 1;
   const zoneRating =
     zone === 'rim' || zone === 'shortMid'
       ? defender.ratings.interiorDefense

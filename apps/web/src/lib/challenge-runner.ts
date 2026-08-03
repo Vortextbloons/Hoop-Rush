@@ -4,6 +4,7 @@ import {
   type ChallengeRun,
   type EraSimulationProfile,
   type GameResult,
+  type Seed,
 } from '@hoop-rush/data-contracts';
 import {
   type ChallengeRepository,
@@ -20,6 +21,10 @@ import {
  * UI state, and discards buffered results after cancellation. A worker crash,
  * invalid result, or persistence failure stops presentation without advancing
  * beyond the last successfully saved game.
+ *
+ * Fresh runs start with a `start` request: the worker simulates the whole-run
+ * best-of and reports the chosen attempt seed, which is persisted (a full
+ * saveActiveRun) before the first game is ever revealed.
  */
 
 /** Minimum presentation duration: one committed reveal roughly every 36 ms. */
@@ -28,7 +33,7 @@ export const REVEAL_INTERVAL_MS = 36;
 /** Target minimum presentation duration for a full 82-game reveal. */
 export const MIN_PRESENTATION_MS = 82 * REVEAL_INTERVAL_MS;
 
-export type RunnerPhase = 'idle' | 'running' | 'paused' | 'finished' | 'error';
+export type RunnerPhase = 'idle' | 'starting' | 'running' | 'paused' | 'finished' | 'error';
 
 export interface RunnerCallbacks {
   /** A game was accepted, persisted, and is now revealed as UI state. */
@@ -51,7 +56,15 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 type WorkerMessageEnvelope =
   | { requestId: string; type: 'results'; results: GameResult[] }
   | { requestId: string; type: 'error'; message: string }
-  | { requestId: string; type: 'complete' };
+  | { requestId: string; type: 'complete' }
+  | {
+      requestId: string;
+      type: 'start-result';
+      chosenRunSeed: Seed;
+      chosenWins: number;
+      chosenLosses: number;
+      chosenDifferential: number;
+    };
 
 /**
  * Cheap boundary shape check for worker messages. The engine's
@@ -73,6 +86,32 @@ function parseWorkerMessageEnvelope(raw: unknown): WorkerMessageEnvelope | null 
   }
   if (message.type === 'complete') {
     return { requestId: message.requestId, type: 'complete' };
+  }
+  if (message.type === 'start-result') {
+    const chosenRunSeed = message.chosenRunSeed;
+    if (typeof chosenRunSeed !== 'string' || !/^[0-9a-f]{16,64}$/.test(chosenRunSeed)) {
+      return null;
+    }
+    if (
+      typeof message.chosenWins !== 'number' ||
+      !Number.isInteger(message.chosenWins) ||
+      message.chosenWins < 0 ||
+      typeof message.chosenLosses !== 'number' ||
+      !Number.isInteger(message.chosenLosses) ||
+      message.chosenLosses < 0 ||
+      typeof message.chosenDifferential !== 'number' ||
+      !Number.isInteger(message.chosenDifferential)
+    ) {
+      return null;
+    }
+    return {
+      requestId: message.requestId,
+      type: 'start-result',
+      chosenRunSeed,
+      chosenWins: message.chosenWins,
+      chosenLosses: message.chosenLosses,
+      chosenDifferential: message.chosenDifferential,
+    };
   }
   if (message.type !== 'results') return null;
   const rawResults: unknown = message.results;
@@ -126,9 +165,14 @@ export class ChallengeRunner {
     return this.lastError;
   }
 
-  /** Starts (or resumes) a run from its next unplayed game. */
+  /**
+   * Starts (or resumes) a run from its next unplayed game. A fresh run enters
+   * 'starting' first: the worker simulates the whole-run best-of and reports
+   * the chosen attempt seed, which is re-saved as the run seed before the
+   * reveal begins. A run with accepted games skips straight to the reveal.
+   */
   start(run: ChallengeRun, profile: EraSimulationProfile, options: RunnerOptions): void {
-    if (this.phase === 'running') return;
+    if (this.phase === 'running' || this.phase === 'starting') return;
     if (run.status !== 'active') {
       this.fail(`cannot run a challenge in status ${run.status}`);
       return;
@@ -137,12 +181,10 @@ export class ChallengeRunner {
     this.run = run;
     this.profile = profile;
     this.reducedMotion = options.reducedMotion;
-    this.expectedNext = run.games.length + 1;
     this.queue = [];
     this.queueHead = 0;
     this.lastError = null;
     this.requestId = crypto.randomUUID();
-    this.phase = 'running';
 
     this.worker = new Worker(new URL('../workers/challenge-worker.ts', import.meta.url), {
       type: 'module',
@@ -154,25 +196,26 @@ export class ChallengeRunner {
       this.fail('the simulation worker crashed');
     };
 
-    this.nextRevealAt = performance.now() + (this.reducedMotion ? 0 : REVEAL_INTERVAL_MS);
-    const request = workerRequestSchema.parse({
-      schemaVersion: 1,
-      type: 'simulate',
-      requestId: this.requestId,
-      // Games are stripped from the worker copy: inputs derive from the
-      // schedule, seed, and versions, never from recorded results.
-      run: { ...run, games: [] },
-      startGameNumber: this.expectedNext,
-      profile,
-      engineVersion: run.versions.engineVersion,
-    });
-    this.worker.postMessage(request);
-    void this.pump();
+    if (run.games.length === 0) {
+      this.phase = 'starting';
+      this.worker.postMessage(
+        workerRequestSchema.parse({
+          schemaVersion: 1,
+          type: 'start',
+          requestId: this.requestId,
+          run: { ...run, games: [] },
+          profile,
+          engineVersion: run.versions.engineVersion,
+        }),
+      );
+      return;
+    }
+    this.beginReveal(run);
   }
 
   /** Cancels the worker, discards buffered results, keeps the persisted prefix. */
   cancel(): void {
-    if (this.phase !== 'running') return;
+    if (this.phase !== 'running' && this.phase !== 'starting') return;
     this.phase = 'paused';
     this.pumpToken += 1;
     this.queue = [];
@@ -219,12 +262,76 @@ export class ChallengeRunner {
           this.queue.push({ gameNumber: result.gameNumber, result });
         }
         break;
+      case 'start-result':
+        if (this.disposed || this.phase !== 'starting') return; // stale
+        void this.handleStartResult(envelope);
+        break;
       case 'error':
         this.fail(envelope.message);
         break;
       case 'complete':
         break;
     }
+  }
+
+  /**
+   * Persists the chosen attempt seed (spec/01: no game may be revealed before
+   * the chosen seed is saved), then starts the paced reveal with that seed.
+   */
+  private async handleStartResult(
+    envelope: Extract<WorkerMessageEnvelope, { type: 'start-result' }>,
+  ): Promise<void> {
+    if (this.disposed || this.phase !== 'starting') return;
+    const run = this.run;
+    if (!run) return;
+    // cancel()/dispose()/fail() bump the pump token; the token snapshot makes
+    // the post-await revalidation explicit (TS keeps the early-return
+    // narrowing across the await, but the worker may have been torn down).
+    const token = this.pumpToken;
+    const updatedRun =
+      envelope.chosenRunSeed === run.runSeed ? run : { ...run, runSeed: envelope.chosenRunSeed };
+    if (updatedRun !== run) {
+      try {
+        await this.repo.saveActiveRun({
+          recordId: 'active',
+          saveSchemaVersion: 2,
+          run: updatedRun,
+        });
+      } catch (error) {
+        this.fail(
+          `could not save the chosen attempt seed: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return;
+      }
+      if (this.pumpToken !== token) return;
+      this.run = updatedRun;
+    }
+    this.beginReveal(updatedRun);
+  }
+
+  /** Posts the simulate request for the reveal and starts the paced pump. */
+  private beginReveal(run: ChallengeRun): void {
+    const profile = this.profile;
+    if (!this.worker || !this.requestId || !profile) return;
+    this.phase = 'running';
+    this.expectedNext = run.games.length + 1;
+    this.nextRevealAt = performance.now() + (this.reducedMotion ? 0 : REVEAL_INTERVAL_MS);
+    this.worker.postMessage(
+      workerRequestSchema.parse({
+        schemaVersion: 1,
+        type: 'simulate',
+        requestId: this.requestId,
+        // Games are stripped from the worker copy: inputs derive from the
+        // schedule, seed, and versions, never from recorded results.
+        run: { ...run, games: [] },
+        startGameNumber: this.expectedNext,
+        profile,
+        engineVersion: run.versions.engineVersion,
+      }),
+    );
+    void this.pump();
   }
 
   /** True when this pump generation was superseded (cancel/dispose/fail). */

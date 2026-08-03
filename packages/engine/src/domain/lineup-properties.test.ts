@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
+import { LINEUP_STRUCTURE, playableSlotGroups } from '@hoop-rush/data-contracts';
 import {
   assignLineup,
   canFillSlot,
@@ -9,7 +9,7 @@ import {
   validateLineup,
 } from '../index.js';
 
-const positionArb = fc.constantFrom('G', 'F', 'C');
+const positionArb = fc.constantFrom('PG', 'SG', 'SF', 'PF', 'C');
 const unionArb = fc.array(positionArb, { minLength: 1, maxLength: 3 });
 
 const lineupArb = fc.tuple(unionArb, unionArb, unionArb, unionArb, unionArb).map((unions) => ({
@@ -17,14 +17,14 @@ const lineupArb = fc.tuple(unionArb, unionArb, unionArb, unionArb, unionArb).map
 }));
 
 describe('position union property', () => {
-  it('normalizes to a sorted, deduplicated subset of G/F/C', () => {
+  it('normalizes to a sorted, deduplicated subset of PG/SG/SF/PF/C', () => {
     fc.assert(
       fc.property(unionArb, (input) => {
         const union = normalizePositionUnion(input);
         expect(new Set(union).size).toBe(union.length);
         expect([...union]).toEqual([...union].sort());
         for (const position of union) {
-          expect(['G', 'F', 'C']).toContain(position);
+          expect(['PG', 'SG', 'SF', 'PF', 'C']).toContain(position);
         }
         for (const position of input) {
           expect(union).toContain(position);
@@ -74,7 +74,9 @@ describe('lineup property', () => {
         if (requirement === undefined) {
           throw new Error(`no slot requirement for index ${String(slotIndex)}`);
         }
-        expect(canFillSlot(positions, slotIndex as never)).toBe(positions.includes(requirement));
+        expect(canFillSlot(positions, slotIndex as never)).toBe(
+          playableSlotGroups(positions).includes(requirement),
+        );
       }),
     );
   });

@@ -1,8 +1,19 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
-import type { FranchiseEraPool, HoopRushManifest, PoolIndexEntry } from '@hoop-rush/data-contracts';
-import { getPool, clearDataLoaderCaches, getManifest } from './data';
+import type {
+  FranchiseEraPool,
+  HoopRushManifest,
+  PlayersIndex,
+  PoolIndexEntry,
+} from '@hoop-rush/data-contracts';
+import {
+  getPool,
+  getPlayersIndex,
+  clearDataLoaderCaches,
+  getManifest,
+  warmPlayersIndex,
+} from './data';
 import { readCachedPool, writeCachedPool } from './pool-cache';
 
 vi.mock('./pool-cache', () => ({
@@ -185,5 +196,96 @@ describe('data asset loading with a stale manifest', () => {
 
     expect(result).toBe(pool);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('warmPlayersIndex', () => {
+  let routes: Map<string, string>;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    clearDataLoaderCaches();
+    routes = new Map();
+    fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = requestUrl(input);
+      const normalized = url.replace(/[?&]v=\d+/, '').replace(/\?$/, '');
+      const body = routes.get(url) ?? routes.get(normalized);
+      if (body === undefined) throw new Error(`unexpected fetch: ${url}`);
+      return response(body);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    vi.mocked(readCachedPool).mockResolvedValue(null);
+    vi.mocked(writeCachedPool).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('is a no-op when there is no window', () => {
+    expect(() => {
+      warmPlayersIndex();
+    }).not.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('starts loading the players index without awaiting the caller', async () => {
+    const index: PlayersIndex = {
+      schemaVersion: 4,
+      dataVersion: 'data-v1',
+      players: [
+        {
+          playerId: 'lakers-1990s-a',
+          franchiseId: 'lakers',
+          eraId: '1990s',
+          seasonKey: '1996-97',
+          firstName: 'Test',
+          lastName: 'Player',
+          displayName: 'Test Player',
+          playerExternalId: '101',
+          positionsPlayable: ['PG', 'SG'],
+          overall: 92,
+          offense: 95,
+          defense: 80,
+          selectionScore: 91.517,
+        },
+      ],
+    };
+    const indexHash = sha256(JSON.stringify(index));
+    const manifest: HoopRushManifest = buildManifest({
+      playersIndex: { url: 'players-index.json', contentHash: indexHash },
+    });
+    routes.set('/data/players-index.json', JSON.stringify(index));
+    routes.set('/data/manifest.json', JSON.stringify(manifest));
+    vi.stubGlobal('window', {});
+
+    warmPlayersIndex();
+
+    await vi.waitFor(() => {
+      const urls = fetchMock.mock.calls.map(([url]) => String(url));
+      expect(urls.some((url) => /players-index\.json/.test(url))).toBe(true);
+    });
+    await expect(getPlayersIndex()).resolves.toEqual(index);
+  });
+
+  it('never throws when the underlying load fails', async () => {
+    const manifest: HoopRushManifest = buildManifest({
+      playersIndex: { url: 'players-index.json', contentHash: sha256(JSON.stringify('junk')) },
+    });
+    routes.set('/data/manifest.json', JSON.stringify(manifest));
+    routes.set('/data/players-index.json', 'not json');
+    vi.stubGlobal('window', {});
+
+    expect(() => {
+      warmPlayersIndex();
+    }).not.toThrow();
+
+    await vi.waitFor(() => {
+      const urls = fetchMock.mock.calls.map(([url]) => String(url));
+      expect(urls.some((url) => /players-index\.json/.test(url))).toBe(true);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await expect(getPlayersIndex()).rejects.toThrow();
   });
 });

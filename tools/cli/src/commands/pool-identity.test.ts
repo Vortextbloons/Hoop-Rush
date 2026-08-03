@@ -58,13 +58,13 @@ describe('shipped Lakers 1990s pool', () => {
     }
   });
 
-  it('contains only canonical positions inside the G/F/C union', () => {
+  it('contains only detailed positions from the five-position vocabulary', () => {
     const pool = loadShippedPool();
     for (const player of pool.players) {
-      for (const position of player.positions.canonical) {
-        expect(['G', 'F', 'C']).toContain(position);
+      for (const position of player.positions.playable) {
+        expect(['PG', 'SG', 'SF', 'PF', 'C']).toContain(position);
       }
-      expect(player.positions.canonical.length).toBeGreaterThan(0);
+      expect(player.positions.playable.length).toBeGreaterThan(0);
     }
   });
 });

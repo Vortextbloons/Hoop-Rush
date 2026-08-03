@@ -21,7 +21,7 @@ function row(partial: Partial<PlayersIndexEntry> & { playerId: string }): Player
     displayName: 'Test Player',
     playerExternalId: '1',
     altIds: null,
-    positionsCanonical: ['G'],
+    positionsPlayable: ['PG'],
     overall: 70,
     offense: 70,
     defense: 70,
@@ -134,16 +134,16 @@ describe('DraftPoolBrowser parity', () => {
   });
 
   it('with allowDisplacement=false a displace-only pool card shows the blocked state instead', () => {
-    const subject = row({ playerId: 'sub', displayName: 'Subject One', positionsCanonical: ['G'] });
+    const subject = row({ playerId: 'sub', displayName: 'Subject One', positionsPlayable: ['PG'] });
     // The only slot Subject One can fill (PG) is occupied, and the swing player
     // there is the only one who could move (to the open SF slot). That makes
     // this displace-only: blocked without displacement, "Moves …" with it.
     const filledSlots = [
-      row({ playerId: 'g1', displayName: 'Guard One', positionsCanonical: ['G'] }),
-      row({ playerId: 'g2', displayName: 'Swing Two', positionsCanonical: ['G', 'F'] }),
+      row({ playerId: 'g1', displayName: 'Guard One', positionsPlayable: ['PG'] }),
+      row({ playerId: 'g2', displayName: 'Swing Two', positionsPlayable: ['PG', 'SF'] }),
       null,
-      row({ playerId: 'c4', displayName: 'Center Four', positionsCanonical: ['C'] }),
-      row({ playerId: 'c5', displayName: 'Center Five', positionsCanonical: ['C'] }),
+      row({ playerId: 'c4', displayName: 'Center Four', positionsPlayable: ['C'] }),
+      row({ playerId: 'c5', displayName: 'Center Five', positionsPlayable: ['C'] }),
     ];
     const manifest = buildManifest();
     const { container } = render(DraftPoolBrowser, {
@@ -169,13 +169,13 @@ describe('DraftPoolBrowser parity', () => {
   });
 
   it('with allowDisplacement=true the same displace-only card shows the Moves hint', () => {
-    const subject = row({ playerId: 'sub', displayName: 'Subject One', positionsCanonical: ['G'] });
+    const subject = row({ playerId: 'sub', displayName: 'Subject One', positionsPlayable: ['PG'] });
     const filledSlots = [
-      row({ playerId: 'g1', displayName: 'Guard One', positionsCanonical: ['G'] }),
-      row({ playerId: 'g2', displayName: 'Swing Two', positionsCanonical: ['G', 'F'] }),
+      row({ playerId: 'g1', displayName: 'Guard One', positionsPlayable: ['PG'] }),
+      row({ playerId: 'g2', displayName: 'Swing Two', positionsPlayable: ['PG', 'SF'] }),
       null,
-      row({ playerId: 'c4', displayName: 'Center Four', positionsCanonical: ['C'] }),
-      row({ playerId: 'c5', displayName: 'Center Five', positionsCanonical: ['C'] }),
+      row({ playerId: 'c4', displayName: 'Center Four', positionsPlayable: ['C'] }),
+      row({ playerId: 'c5', displayName: 'Center Five', positionsPlayable: ['C'] }),
     ];
     const manifest = buildManifest();
     const { container } = render(DraftPoolBrowser, {
@@ -206,7 +206,7 @@ describe('SlotPickerDialog swap state', () => {
     const subject = row({
       playerId: 'sub',
       displayName: 'Subject One',
-      positionsCanonical: ['G'],
+      positionsPlayable: ['PG'],
     });
     return render(SlotPickerDialog, {
       props: {
@@ -225,7 +225,7 @@ describe('SlotPickerDialog swap state', () => {
     const incumbent = row({
       playerId: 'inc',
       displayName: 'Incumbent Two',
-      positionsCanonical: ['G'],
+      positionsPlayable: ['PG'],
     });
     const { getByRole } = renderPicker({ allowDisplacement: false, incumbent });
 
@@ -240,7 +240,7 @@ describe('SlotPickerDialog swap state', () => {
     const incumbent = row({
       playerId: 'inc',
       displayName: 'Incumbent Two',
-      positionsCanonical: ['C'],
+      positionsPlayable: ['C'],
     });
     const { getByRole } = renderPicker({ allowDisplacement: false, incumbent });
 
@@ -255,7 +255,7 @@ describe('SlotPickerDialog swap state', () => {
     const incumbent = row({
       playerId: 'inc',
       displayName: 'Incumbent Two',
-      positionsCanonical: ['G'],
+      positionsPlayable: ['PG'],
     });
     const { getByRole, queryByRole } = renderPicker({ allowDisplacement: true, incumbent });
 

@@ -2,6 +2,7 @@
   import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { canPlay, slotRequirement } from '@hoop-rush/engine';
+  import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
   import { lowercaseName } from '$lib/roster-browser';
   import {
@@ -22,10 +23,10 @@
     'Center',
   ] as const;
   const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
-  const PAGE_SIZE = 120;
+  const PAGE_SIZE = 48;
 
   /** Typing delay before the pool list re-filters the players index. */
-  const SEARCH_DEBOUNCE_MS = 200;
+  const SEARCH_DEBOUNCE_MS = 80;
 
   const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
     O: 'Overall',
@@ -78,7 +79,7 @@
     let list = rows;
     if (positionFilter !== null) {
       const requirement = slotRequirement(positionFilter);
-      list = list.filter((p) => p.positionsCanonical.includes(requirement));
+      list = list.filter((p) => canPlay(p.positionsPlayable, requirement));
     }
     const query = search.trim().toLowerCase();
     if (query) {
@@ -93,17 +94,24 @@
 
   // Reset the draft's local filters whenever the pool scope or editability
   // changes so a new rolled pool (Classic) or a new franchise/era scope
-  // (Sandbox) always starts with an unfiltered, fresh list.
+  // (Sandbox) always starts with an unfiltered, fresh list. The effect's
+  // dependency set stays [rows, filtersEditable]: the value comparisons are
+  // untracked reads, and every write is value-guarded so an unchanged scope
+  // never invalidates state or schedules a second effect cycle.
   $effect(() => {
     void [rows, filtersEditable];
-    searchInput = '';
-    search = '';
-    positionFilter = null;
-    visibleCount = PAGE_SIZE;
+    const input = untrack(() => searchInput);
+    const query = untrack(() => search);
+    const position = untrack(() => positionFilter);
+    const visible = untrack(() => visibleCount);
+    if (input !== '') searchInput = '';
+    if (query !== '') search = '';
+    if (position !== null) positionFilter = null;
+    if (visible !== PAGE_SIZE) visibleCount = PAGE_SIZE;
   });
 
   function canFillSlot(player: IndexRow, slotIndex: number): boolean {
-    return canPlay(player.positionsCanonical, slotRequirement(slotIndex as SlotIndex));
+    return canPlay(player.positionsPlayable, slotRequirement(slotIndex as SlotIndex));
   }
 
   /**
@@ -136,9 +144,7 @@
   /**
    * Eligibility shown on the pool card itself, before any click. A player is
    * "place" whenever any eligible slot is open; the displace highlight is
-   * reserved for the case where displacement is the only option. Classic
-   * drafts pass allowDisplacement={false}, so a displace-only case reads as
-   * blocked with no "Moves X" affordance.
+   * reserved for the case where displacement is the only option.
    */
   function poolCardInfoFor(player: IndexRow): PoolCardInfo {
     if (slots.some((p) => p !== null && p.playerId === player.playerId)) {
@@ -160,14 +166,14 @@
   }
 
   /**
-   * Card eligibility for every pool row, keyed by playerId. The cards only
-   * depend on the lineup slots (plus each player's positions), so the map is
-   * rebuilt once per slot change and looked up in the template instead of
+   * Card eligibility for every visible pool row, keyed by playerId. The cards
+   * only depend on the lineup slots (plus each player's positions), so the map
+   * is rebuilt once per slot change and looked up in the template instead of
    * recomputing per rendered row.
    */
   const poolCardInfo = $derived.by(
     (): ReadonlyMap<string, PoolCardInfo> =>
-      new Map(rows.map((player) => [player.playerId, poolCardInfoFor(player)])),
+      new Map(visibleRows.map((player) => [player.playerId, poolCardInfoFor(player)])),
   );
 </script>
 
@@ -274,7 +280,7 @@
               <span class="block font-mono text-[10px] text-muted-foreground">
                 {player.seasonKey} · {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(
                   player.eraId,
-                ) ?? player.eraId} · {player.positionsCanonical.join('/')}
+                ) ?? player.eraId} · {player.positionsPlayable.join('/')}
               </span>
             </span>
             <span class="flex shrink-0 gap-1 font-mono text-[10px]">

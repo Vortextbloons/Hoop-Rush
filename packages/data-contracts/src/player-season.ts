@@ -8,6 +8,7 @@ import {
 } from './ids.js';
 import {
   positionNormalizationVersionSchema,
+  positionSchema,
   positionUnionSchema,
   sourcePositionSchema,
 } from './positions.js';
@@ -127,7 +128,7 @@ export type SourceMetadata = z.infer<typeof sourceMetadataSchema>;
  * packaged simulation anchors preserve the season's observable production.
  */
 export const peakPlayerSeasonSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
   eraId: z.string().min(1).max(24),
@@ -152,8 +153,14 @@ export const peakPlayerSeasonSchema = z.object({
     .optional(),
   /** Career-wide playable positions (spec/02). */
   positions: z.object({
+    /** Reviewed authoritative primary position (PG/SG/SF/PF/C). */
+    primary: positionSchema,
+    /** Reviewed secondary positions (usually empty; e.g. Wembanyama: primary C, secondary ['SF']). */
+    secondary: z.array(positionSchema).max(4),
+    /** Career-wide playable union: primary + secondary + every career source label (detailed). */
+    playable: positionUnionSchema,
+    /** Original source labels exactly as ingested, including unknown labels, for auditing. */
     sourceLabels: z.array(sourcePositionSchema).min(1),
-    canonical: positionUnionSchema,
     normalizationVersion: positionNormalizationVersionSchema,
   }),
   heightInches: z.number().int().min(60).max(96).nullable(),
@@ -186,7 +193,7 @@ export type PeakPlayerSeason = z.infer<typeof peakPlayerSeasonSchema>;
 
 /** Compact, directly indexed franchise/decade pool (spec/02 fast-load artifact). */
 export const franchiseEraPoolSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   dataVersion: z.string().min(1).max(64),
   franchiseId: franchiseIdSchema,
   eraId: z.string().min(1).max(24),
@@ -223,7 +230,8 @@ export const playersIndexEntrySchema = z.object({
   displayName: z.string().min(1).max(96),
   playerExternalId: playerExternalIdSchema,
   altIds: playersIndexAltIdsSchema.optional(),
-  positionsCanonical: positionUnionSchema,
+  /** Career-wide detailed playable union, for filtering by slot group. */
+  positionsPlayable: positionUnionSchema,
   overall: z.number().int().min(0).max(100),
   offense: z.number().int().min(0).max(100),
   defense: z.number().int().min(0).max(100),
@@ -237,7 +245,7 @@ export type PlayersIndexEntry = z.infer<typeof playersIndexEntrySchema>;
  * screens; the Roster screen additionally loads the roster-details asset.
  */
 export const playersIndexSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(4),
   dataVersion: z.string().min(1).max(64),
   players: z.array(playersIndexEntrySchema).min(1),
 });

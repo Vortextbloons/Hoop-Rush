@@ -178,7 +178,7 @@ describe('game performance goal', () => {
 });
 
 function ratingFixture(ratings: Partial<SimulationPlayer['ratings']>): SimulationTeam {
-  const slots: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
   return buildLegalSimulationTeam({
     players: Array.from({ length: 5 }, (_, i) => {
       const positions = slots[i];

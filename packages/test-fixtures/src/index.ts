@@ -110,7 +110,7 @@ function fullProvenance(): PeakPlayerSeason['provenance'] {
 
 export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     playerId: 'p-1',
     franchiseId: 'lakers',
     eraId: '1990s',
@@ -120,9 +120,11 @@ export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): Pe
     displayName: 'Test Player',
     playerExternalId: '101',
     positions: {
-      sourceLabels: ['G'],
-      canonical: ['G'],
-      normalizationVersion: 'position-v2',
+      primary: 'SG',
+      secondary: [],
+      playable: ['SG'],
+      sourceLabels: ['SG'],
+      normalizationVersion: 'position-v3',
     },
     heightInches: 79,
     weightLbs: 215,
@@ -174,7 +176,7 @@ export function buildPool(
   overrides: Partial<FranchiseEraPool> = {},
 ): FranchiseEraPool {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     dataVersion: 'data-v1',
     franchiseId: players[0]?.franchiseId ?? 'lakers',
     eraId: players[0]?.eraId ?? '1990s',
@@ -271,7 +273,7 @@ function unavailableMatrix(): HoopRushManifest['availability'] {
 
 export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRushManifest {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     dataVersion: 'data-v1',
     modernFranchiseSlots: buildModernFranchiseSlots(),
     franchiseLineage: [
@@ -348,7 +350,7 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
   const bracket = buildFixtureBracket();
   const players = buildUserTeam().players;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: 'run-1',
     mode: 'sandbox',
     franchiseId: 'lakers',
@@ -369,7 +371,7 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
       saveSchemaVersion: 2,
       dataVersion: 'data-v1',
       ratingVersion: 'ratings-v1',
-      positionNormalizationVersion: 'position-v2',
+      positionNormalizationVersion: 'position-v3',
       engineVersion: 'engine-v1',
       bracketVersion: bracket.bracketVersion,
       scheduleVersion: bracket.scheduleVersion,
@@ -393,7 +395,7 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
 
 /** Five fixture players in legal G,G,F,F,C slot order (fixture team content). */
 export function buildUserTeam(): SimulationTeam {
-  const positions: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
   return {
     teamId: 'user',
     displayName: 'Los Angeles Lakers',
@@ -452,7 +454,7 @@ export function buildBracketOpponent(
   index: number,
   overrides: Partial<BracketOpponent> = {},
 ): BracketOpponent {
-  const positions: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
   const players = positions.map((position, slot) =>
     buildSimulationPlayer({
       playerId: `p-opp-${String(index)}-${String(slot)}`,
@@ -461,7 +463,7 @@ export function buildBracketOpponent(
     }),
   );
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     opponentId,
     bracketVersion: 'bracket-v1',
     difficultyBand: 'medium',
@@ -597,7 +599,7 @@ export function buildSimulationPlayer(overrides: Partial<SimulationPlayer> = {})
   return {
     playerId: 'p-1',
     displayName: 'Test Player',
-    positions: ['G'],
+    positions: ['SG'],
     heightInches: 76,
     weightLbs: 200,
     ratings: { ...DEFAULT_SIM_RATINGS },
@@ -608,7 +610,7 @@ export function buildSimulationPlayer(overrides: Partial<SimulationPlayer> = {})
 
 /** A five-player lineup with a legal G,G,F,F,C position spread. */
 export function buildLegalSimulationTeam(overrides: Partial<SimulationTeam> = {}): SimulationTeam {
-  const positions: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+  const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
   const players = positions.map((position, i) =>
     buildSimulationPlayer({
       playerId: `p-fixture-${String(i + 1)}`,
@@ -637,7 +639,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
     buildSimulationPlayer({
       playerId: 'p-roles-creator',
       displayName: 'Primary Creator',
-      positions: ['G'],
+      positions: ['PG'],
       ratings: {
         ...DEFAULT_SIM_RATINGS,
         ballHandling: 88,
@@ -659,7 +661,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
     buildSimulationPlayer({
       playerId: 'p-roles-spacer',
       displayName: 'Floor Spacer',
-      positions: ['G'],
+      positions: ['SG'],
       ratings: { ...DEFAULT_SIM_RATINGS, threePoint: 84 },
       tendencies: {
         ...DEFAULT_SIM_TENDENCIES,
@@ -675,7 +677,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
     buildSimulationPlayer({
       playerId: 'p-roles-secondary',
       displayName: 'Secondary Creator',
-      positions: ['F'],
+      positions: ['SF'],
       ratings: {
         ...DEFAULT_SIM_RATINGS,
         ballHandling: 74,
@@ -695,7 +697,7 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
     buildSimulationPlayer({
       playerId: 'p-roles-post',
       displayName: 'Post Presence',
-      positions: ['F'],
+      positions: ['PF'],
       ratings: { ...DEFAULT_SIM_RATINGS, insideScoring: 82, closeShot: 74, offensiveRebound: 78 },
       tendencies: {
         ...DEFAULT_SIM_TENDENCIES,
@@ -755,7 +757,7 @@ function fixtureScale(targetCenter: number) {
         return [key, scaled];
       }),
     ) as SimulationRatings;
-    const positions: SimulationPlayer['positions'][] = [['G'], ['G'], ['F'], ['F'], ['C']];
+    const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
     const position = positions[index];
     if (position === undefined) {
       throw new Error(`fixture positions missing at index ${String(index)}`);
@@ -934,7 +936,7 @@ export function buildGameSimulationInput(
 /** The authored M2 opening opponent: 1990s Lakers at medium strength. */
 export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): OpponentTeam {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     opponentId: 'lakers-1990s-opening',
     bracketVersion: 'bracket-m3-preview-v1',
     difficultyBand: 'medium',
@@ -944,10 +946,10 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
     lineup: {
       structure: ['G', 'G', 'F', 'F', 'C'],
       assignments: [
-        { slotIndex: 0, playerId: 'p-89', positions: ['G'] },
-        { slotIndex: 1, playerId: 'p-9', positions: ['G'] },
-        { slotIndex: 2, playerId: 'p-920', positions: ['F'] },
-        { slotIndex: 3, playerId: 'p-109', positions: ['F'] },
+        { slotIndex: 0, playerId: 'p-89', positions: ['PG'] },
+        { slotIndex: 1, playerId: 'p-9', positions: ['SG'] },
+        { slotIndex: 2, playerId: 'p-920', positions: ['SF'] },
+        { slotIndex: 3, playerId: 'p-109', positions: ['PF'] },
         { slotIndex: 4, playerId: 'p-124', positions: ['C'] },
       ],
     },
@@ -955,22 +957,22 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
       buildSimulationPlayer({
         playerId: 'p-89',
         displayName: 'Nick Van Exel',
-        positions: ['G'],
+        positions: ['PG'],
       }),
       buildSimulationPlayer({
         playerId: 'p-9',
         displayName: 'Sedale Threatt',
-        positions: ['G'],
+        positions: ['SG'],
       }),
       buildSimulationPlayer({
         playerId: 'p-920',
         displayName: 'A.C. Green',
-        positions: ['F'],
+        positions: ['SF'],
       }),
       buildSimulationPlayer({
         playerId: 'p-109',
         displayName: 'Robert Horry',
-        positions: ['F'],
+        positions: ['PF'],
       }),
       buildSimulationPlayer({
         playerId: 'p-124',

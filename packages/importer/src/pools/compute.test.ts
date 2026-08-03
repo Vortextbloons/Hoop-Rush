@@ -69,6 +69,7 @@ interface RosterSpec {
   summary?: { overallRating: number; offenseRating: number; defenseRating: number };
   height?: number;
   weight?: number;
+  secondaryPositions?: string[];
 }
 
 const SUMMARY_60 = { overallRating: 60, offenseRating: 60, defenseRating: 60 };
@@ -282,6 +283,9 @@ function rosterRow(spec: RosterSpec): Record<string, unknown> {
     teamExternalId: TEAM,
     heightInches: spec.height,
     weightLbs: spec.weight,
+    ...(spec.secondaryPositions !== undefined
+      ? { secondaryPositions: spec.secondaryPositions }
+      : {}),
     ...(spec.summary ? { summaryRatings: spec.summary } : {}),
     ratings,
     tendencies: FULL_TENDENCIES,
@@ -490,7 +494,7 @@ function buildStandardFixture(label: string): FixtureRoot {
   const root = makeRoot(label);
   writeSeason(root, '1991-92', ROSTER_S1, STINTS_S1, STATS_S1);
   writeSeason(root, '1992-93', ROSTER_S2, STINTS_S2, STATS_S2);
-  writeJson(join(root.cache, 'career-position-labels-v4.json'), CAREER_LABELS);
+  writeJson(join(root.cache, 'career-position-labels-v5.json'), CAREER_LABELS);
   writeJson(join(root.cache, 'bbref_ids.json'), BBREF_IDS);
   writeJson(join(root.data, 'manifest.json'), fixtureManifest());
   return root;
@@ -708,8 +712,10 @@ describe('computePool (fixture)', () => {
       lineageRuleVersion: 'lineage-v1',
     });
     expect(alpha?.positions).toEqual({
+      primary: 'PG',
+      secondary: [],
+      playable: ['PF', 'PG', 'SF', 'SG'],
       sourceLabels: ['G-F', 'SG'],
-      canonical: ['F', 'G'],
       normalizationVersion: POSITION_NORMALIZATION_VERSION,
     });
 
@@ -730,8 +736,10 @@ describe('computePool (fixture)', () => {
     expect(echo?.seasonKey).toBe('1991-92');
     expect(echo?.selectionScore).toBe(59.752);
     expect(echo?.positions).toEqual({
+      primary: 'C',
+      secondary: [],
+      playable: ['C'],
       sourceLabels: ['C'],
-      canonical: ['C'],
       normalizationVersion: POSITION_NORMALIZATION_VERSION,
     });
     expect(echo?.stats.gamesPlayed).toBe(60);
@@ -749,8 +757,10 @@ describe('computePool (fixture)', () => {
     expect(foxtrot?.eligibility.teamMinutes).toBe(1200);
     expect(foxtrot?.altIds).toBeNull();
     expect(foxtrot?.positions).toEqual({
-      sourceLabels: ['PF'],
-      canonical: ['F'],
+      primary: 'PF',
+      secondary: [],
+      playable: ['PF'],
+      sourceLabels: ['PF', 'XYZ'],
       normalizationVersion: POSITION_NORMALIZATION_VERSION,
     });
 
@@ -779,7 +789,8 @@ describe('computePool (fixture)', () => {
     expect(poolResult.coverageSummary.coverageBand).toBe('complete-box-derived');
     expect(poolResult.coverageSummary.policyVersion).toBe(CONFIDENCE_POLICY_VERSION);
 
-    // Unknown position label is warned and excluded from the canonical union.
+    // Unknown position label is warned and preserved in sourceLabels, and it
+    // never feeds the playable union.
     const warning = messages(log).find((message) => message.includes('unknown position labels'));
     expect(warning).toContain("unknown position labels: ['XYZ']");
     expect(warning).toContain('(6)');
@@ -896,12 +907,12 @@ describe('loadBbrefIds', () => {
 describe('loadCareerPositionLabels', () => {
   it('reads the versioned cache when present', () => {
     const root = makeRoot('labels-cached');
-    writeJson(join(root.cache, 'career-position-labels-v4.json'), { '1': ['SG', 'G-F'] });
+    writeJson(join(root.cache, 'career-position-labels-v5.json'), { '1': ['SG', 'G-F'] });
     const labels = loadCareerPositionLabels();
     expect(labels.get('1')).toEqual(new Set(['G-F', 'SG']));
   });
 
-  it('scans packaged rosters and writes the versioned cache when missing', () => {
+  it('scans packaged rosters (primary + secondary labels) and writes the versioned cache when missing', () => {
     const root = makeRoot('labels-scan');
     writeSeason(root, '1991-92', ROSTER_S1, STINTS_S1, STATS_S1);
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -909,8 +920,38 @@ describe('loadCareerPositionLabels', () => {
     expect(labels.get('1')).toEqual(new Set(['SG']));
     expect(labels.get('999')).toBeUndefined();
     expect(
-      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v4.json'), 'utf8')),
+      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v5.json'), 'utf8')),
     ).toEqual(expect.objectContaining({ '1': ['SG'], '5': ['C'] }));
+    expect(messages(log).some((m) => m.includes('[OK] career position labels for'))).toBe(true);
+  });
+
+  it('collects non-empty secondaryPositions labels alongside the primary label', () => {
+    const root = makeRoot('labels-secondary');
+    writeSeason(root, '1991-92', ROSTER_S1, STINTS_S1, STATS_S1);
+    const withSecondary: RosterSpec[] = [
+      {
+        id: '1',
+        firstName: 'Alpha',
+        lastName: 'Ace',
+        position: 'SG',
+        secondaryPositions: ['PG', ''],
+      },
+      {
+        id: '2',
+        firstName: 'Bravo',
+        lastName: 'Bold',
+        position: 'PG',
+        secondaryPositions: [],
+      },
+    ];
+    writeJson(join(root.nba, '1991-92', 'roster.json'), withSecondary.map(rosterRow));
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const labels = loadCareerPositionLabels();
+    expect(labels.get('1')).toEqual(new Set(['PG', 'SG']));
+    expect(labels.get('2')).toEqual(new Set(['PG']));
+    expect(
+      JSON.parse(readFileSync(join(root.cache, 'career-position-labels-v5.json'), 'utf8')),
+    ).toEqual(expect.objectContaining({ '1': ['PG', 'SG'], '2': ['PG'] }));
     expect(messages(log).some((m) => m.includes('[OK] career position labels for'))).toBe(true);
   });
 });
@@ -1138,14 +1179,15 @@ describe('run / writePool / updateManifest', () => {
 });
 
 describe('schema fit (documented discrepancy)', () => {
-  it('parsePool rejects a player whose canonical union is empty (Python emits [])', () => {
-    // Python normalize_position_labels returns canonical=[] for a player whose
-    // only label is "" (or whose labels are all unknown). The TS schema forbids
-    // that with .min(1); computePool keeps Python's emission and the writer
-    // logs the validation failure rather than dropping the player.
+  it('parsePool rejects a player whose playable union is empty (schema forbids empty unions)', () => {
+    // normalizePositionLabels returns detailed=[] for a player whose only
+    // label is "" (or whose labels are all unknown). The TS schema forbids
+    // an empty union with .min(1); computePool's record builder falls back
+    // to 'SF', and the writer logs the validation failure rather than
+    // dropping a player when a record somehow ships an empty union.
     const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false) as Pool;
-    const { canonical, sourceLabels } = normalizePositionLabels(new Set(['']));
-    expect(canonical).toEqual([]);
+    const { detailed, sourceLabels } = normalizePositionLabels(new Set(['']));
+    expect(detailed).toEqual([]);
     expect(sourceLabels).toEqual(['']);
     const edited = {
       ...pool,
@@ -1153,7 +1195,13 @@ describe('schema fit (documented discrepancy)', () => {
     };
     edited.players[0] = {
       ...(edited.players[0] as (typeof pool.players)[number]),
-      positions: { sourceLabels, canonical, normalizationVersion: POSITION_NORMALIZATION_VERSION },
+      positions: {
+        primary: 'SF',
+        secondary: [],
+        playable: detailed,
+        sourceLabels,
+        normalizationVersion: POSITION_NORMALIZATION_VERSION,
+      },
     };
     expect(() => parsePool(edited)).toThrow();
   });

@@ -86,6 +86,7 @@ export type ClassicCompletedDraft = z.infer<typeof classicCompletedDraftSchema>;
 /** Minimal per-player catalog record used to derive rolls without pool loads. */
 export const classicCatalogPlayerSchema = z.object({
   playerId: playerIdSchema,
+  /** Career-wide detailed playable union (PG/SG/SF/PF/C). */
   positions: positionUnionSchema,
 });
 export type ClassicCatalogPlayer = z.infer<typeof classicCatalogPlayerSchema>;

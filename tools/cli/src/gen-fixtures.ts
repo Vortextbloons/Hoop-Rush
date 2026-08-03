@@ -61,7 +61,7 @@ function main(): void {
   mkdirSync(FIXTURES_DIR, { recursive: true });
 
   write('equal.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'equal',
     description: 'Two identical legal lineups; determinism, home-rate, and distribution baseline.',
     ...buildEqualFixture(),
@@ -69,7 +69,7 @@ function main(): void {
 
   const { strong: sStrong, medium } = buildStrongMediumFixture();
   write('strong-medium.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'strong-medium',
     description: 'Strong lineup versus medium lineup.',
     home: sStrong,
@@ -78,7 +78,7 @@ function main(): void {
 
   const { strong, weak } = buildStrongWeakFixture();
   write('strong-weak.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'strong-weak',
     description: 'Strong lineup versus weak lineup; calibration win-rate gate.',
     home: strong,
@@ -86,7 +86,7 @@ function main(): void {
   });
 
   write('sens-shooting.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-shooting',
     description: 'Single dimension: three-point and inside-scoring skill +15 on every player.',
     home: base,
@@ -95,7 +95,7 @@ function main(): void {
   });
 
   write('sens-creation.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-creation',
     description: 'Single dimension: usage rate +35 for the initiator.',
     home: base,
@@ -108,7 +108,7 @@ function main(): void {
   });
 
   write('sens-passing.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-passing',
     description: 'Single dimension: passing +15 on every player.',
     home: base,
@@ -117,7 +117,7 @@ function main(): void {
   });
 
   write('sens-turnovers.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-turnovers',
     description: 'Single dimension: ball handling +15 (fewer turnovers).',
     home: base,
@@ -126,7 +126,7 @@ function main(): void {
   });
 
   write('sens-defense.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-defense',
     description: 'Single dimension: perimeter and interior defense +15 on every player.',
     home: base,
@@ -135,7 +135,7 @@ function main(): void {
   });
 
   write('sens-rebounding.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-rebounding',
     description: 'Single dimension: offensive rebounding +15 on every player.',
     home: base,
@@ -144,7 +144,7 @@ function main(): void {
   });
 
   write('sens-fouls.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-fouls',
     description: 'Single dimension: foul-drawing freeThrowRate tendency +15 on every player.',
     home: base,
@@ -153,7 +153,7 @@ function main(): void {
   });
 
   write('sens-pace.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-pace',
     description: 'Single dimension: era pace 115 versus 80 (variant profile).',
     home: base,
@@ -162,7 +162,7 @@ function main(): void {
   });
 
   write('sens-shot-mix.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'sens-shot-mix',
     description: 'Single dimension: league three-point rate 0.35 versus the packaged rate.',
     home: base,
@@ -176,7 +176,7 @@ function main(): void {
   const roleTeam = buildRolesTeam();
 
   write('roles.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
     fixtureId: 'roles',
     description:
       'Role-differentiated lineup (creator, spacer, secondary, post, rim runner) against itself; player-role calibration gates.',

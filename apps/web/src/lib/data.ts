@@ -229,6 +229,12 @@ export function getPlayersIndex(): Promise<PlayersIndex> {
   return playersIndexPromise;
 }
 
+/** Warm the players index during idle or on hover/focus intent. Never throws. */
+export function warmPlayersIndex(): void {
+  if (typeof window === 'undefined') return;
+  void getPlayersIndex().catch(() => {});
+}
+
 async function loadPlayersIndexFor(): Promise<PlayersIndex> {
   const manifest = await getManifest();
   const entry = manifest.playersIndex;

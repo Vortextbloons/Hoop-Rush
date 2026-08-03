@@ -15,8 +15,7 @@
   import {
     defaultDirection,
     filterRoster,
-    groupRoster,
-    paginateItems,
+    paginateGroupedRows,
     sortRoster,
     type RosterColumn,
     type RosterDetailRow,
@@ -46,11 +45,11 @@
     { id: 'position', label: 'Position' },
   ];
 
-  const POSITION_OPTIONS = ['G', 'F', 'C'] as const;
+  const POSITION_OPTIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
   const PAGE_SIZE = 120;
 
   /** Typing delay before the filter/sort pipeline re-runs on the full index. */
-  const SEARCH_DEBOUNCE_MS = 200;
+  const SEARCH_DEBOUNCE_MS = 80;
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
   let manifestError: string | null = $state(null);
@@ -61,7 +60,7 @@
 
   let franchiseId = $state('');
   let eraId = $state('');
-  let positionFilter = $state<'G' | 'F' | 'C' | null>(null);
+  let positionFilter = $state<'PG' | 'SG' | 'SF' | 'PF' | 'C' | null>(null);
   /** Raw input value; `search` below is the debounced query the pipeline reads. */
   let searchInput = $state('');
   let search = $state('');
@@ -184,23 +183,12 @@
 
   const sortedRows = $derived.by(() => sortRoster(filteredRows, sortId, sortDir));
 
-  /** Flat list of group headers and players; groups only in 'none' order. */
-  const listItems = $derived.by((): RosterListItem[] => {
+  const visibleItems = $derived.by((): RosterListItem<IndexRow>[] => {
     if (sortId !== 'none') {
-      return sortedRows.map((player) => ({ type: 'player', player }));
+      return sortedRows.slice(0, visibleCount).map((player) => ({ type: 'player', player }));
     }
-    return groupRoster(sortedRows).flatMap((group): RosterListItem[] => [
-      {
-        type: 'group',
-        franchiseId: group.franchiseId,
-        eraId: group.eraId,
-        count: group.players.length,
-      },
-      ...group.players.map((player): RosterListItem => ({ type: 'player', player })),
-    ]);
+    return paginateGroupedRows(sortedRows, visibleCount);
   });
-
-  const visibleItems = $derived(paginateItems(listItems, visibleCount));
   const hasMore = $derived(filteredRows.length > visibleCount);
   const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
 

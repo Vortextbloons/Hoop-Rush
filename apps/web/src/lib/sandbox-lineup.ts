@@ -23,20 +23,27 @@ export async function loadRunPlayersById(
     pairs.push({ franchiseId: currentRun.franchiseId, eraId: currentRun.eraId });
   }
   const entries: Array<[string, PeakPlayerSeason]> = [];
-  for (const pair of pairs) {
-    const entry = manifest.pools.find(
-      (p) => p.franchiseId === pair.franchiseId && p.eraId === pair.eraId,
-    );
-    if (!entry) continue;
-    try {
-      const pool = await getPool(entry);
-      for (const player of pool.players) {
-        if (currentRun.playerIds.includes(player.playerId)) {
-          entries.push([player.playerId, player]);
-        }
+  // Load every distinct pool in parallel; a missing entry or a failed load
+  // only skips that pair, never the whole call (callers render from run
+  // snapshots regardless of partial player details).
+  const loaded = await Promise.all(
+    pairs.map(async (pair) => {
+      const entry = manifest.pools.find(
+        (p) => p.franchiseId === pair.franchiseId && p.eraId === pair.eraId,
+      );
+      if (!entry) return [];
+      try {
+        const pool = await getPool(entry);
+        return pool.players.filter((player) => currentRun.playerIds.includes(player.playerId));
+      } catch {
+        // Player details are optional; callers render from run snapshots regardless.
+        return [];
       }
-    } catch {
-      // Player details are optional; callers render from run snapshots regardless.
+    }),
+  );
+  for (const players of loaded) {
+    for (const player of players) {
+      entries.push([player.playerId, player]);
     }
   }
   return new Map(entries);

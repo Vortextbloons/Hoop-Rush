@@ -31,6 +31,7 @@
     announceText,
     roundLabel = '',
     reducedMotion,
+    spinDurationMs,
     onSettled,
   }: {
     manifest: HoopRushManifest;
@@ -44,6 +45,8 @@
     /** e.g. "Round 3 of 5" shown with the settled result indicator. */
     roundLabel?: string;
     reducedMotion?: boolean;
+    /** Spin duration for non-reduced spins; defaults to SPIN_MS (900). */
+    spinDurationMs?: number;
     onSettled: () => void;
   } = $props();
 
@@ -114,6 +117,7 @@
       franchiseOptions,
       eraOptions,
       reduced: reducedMotion ?? selfDetectedReduced,
+      spinDurationMs,
     }));
 
     const franchiseActive = params.axis === 'both' || params.axis === 'franchise';
@@ -135,7 +139,10 @@
     eraFading = eraActive && !eraStrip;
     announced = '';
 
-    const duration = params.reduced || (!franchiseStrip && !eraStrip) ? FADE_MS : SPIN_MS;
+    const duration =
+      params.reduced || (!franchiseStrip && !eraStrip)
+        ? FADE_MS
+        : (params.spinDurationMs ?? SPIN_MS);
     spinTimer = setTimeout(settle, duration);
   }
 
@@ -155,7 +162,10 @@
 
   /** The modal closes; the parent reveals the rolled pool. */
   function finish() {
-    resultTimer = null;
+    if (resultTimer !== null) {
+      clearTimeout(resultTimer);
+      resultTimer = null;
+    }
     phase = 'idle';
     onSettled();
   }
@@ -177,7 +187,19 @@
 </script>
 
 {#if phase !== 'idle'}
-  <div class="roll-overlay" role="presentation">
+  <div
+    class="roll-overlay {phase === 'settled' ? 'roll-overlay--ready' : ''}"
+    role="button"
+    tabindex="0"
+    aria-label={phase === 'settled' ? 'Show the rolled pool' : 'Roll in progress'}
+    onclick={phase === 'settled' ? finish : undefined}
+    onkeydown={(event) => {
+      if (phase === 'settled' && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault();
+        finish();
+      }
+    }}
+  >
     <div class="roll-stage">
       <p class="roll-round">{roundLabel}</p>
       {#if phase === 'spinning'}
@@ -287,6 +309,10 @@
     background: rgba(9, 12, 17, 0.72);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+  }
+
+  .roll-overlay--ready {
+    cursor: pointer;
   }
 
   .roll-stage {

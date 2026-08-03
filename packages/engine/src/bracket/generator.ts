@@ -18,6 +18,7 @@ import { createRng } from '../sim/rng.js';
 import { validateBracketContent } from '../challenge/commands.js';
 import { evaluateLineupBalance, evaluateLineupStrength } from '../challenge/lineup-eval.js';
 import { BENCHMARK_VERSION } from '../challenge/benchmarks.js';
+import { playableSlotGroups } from '../domain/positions.js';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.js';
 
 /** Frozen schedule version label shared by the artifact and audits. */
@@ -138,9 +139,9 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   const proposalsByFranchise = new Map<string, Proposal[]>();
   for (const candidates of options.candidates) {
     const eligible = candidates.players.filter((p) => p.score >= minPlayerScore);
-    const guards = eligible.filter((p) => p.positions.includes('G'));
-    const forwards = eligible.filter((p) => p.positions.includes('F'));
-    const centers = eligible.filter((p) => p.positions.includes('C'));
+    const guards = eligible.filter((p) => playableSlotGroups(p.positions).includes('G'));
+    const forwards = eligible.filter((p) => playableSlotGroups(p.positions).includes('F'));
+    const centers = eligible.filter((p) => playableSlotGroups(p.positions).includes('C'));
     if (guards.length < 2 || forwards.length < 2 || centers.length < 1) {
       throw new Error(
         `${candidates.franchiseId} cannot form a legal lineup (${String(guards.length)} guards, ${String(forwards.length)} forwards, ${String(centers.length)} centers)`,
@@ -461,7 +462,7 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       usedInBracket.add(player.playerId);
     }
     const entry: BracketOpponent = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       opponentId,
       bracketVersion: options.generationVersion,
       difficultyBand: 'medium',

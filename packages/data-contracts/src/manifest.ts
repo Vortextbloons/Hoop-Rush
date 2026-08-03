@@ -65,7 +65,7 @@ export const playersIndexAssetSchema = z.object({
 export type PlayersIndexAsset = z.infer<typeof playersIndexAssetSchema>;
 
 export const hoopRushManifestSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   dataVersion: z.string().min(1).max(64),
   /** Exactly 30 stable modern franchise slots (selectable + bracket identity). */
   modernFranchiseSlots: z.array(modernFranchiseSlotSchema).length(30),

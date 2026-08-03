@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { ARTIFACT_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { run, DATA_VERSION } from './index.js';
 import { sha256File, writeJson } from '../json.js';
 
@@ -104,7 +105,7 @@ describe('manifest run', () => {
       };
 
       // The v2 contract: 30 slots, lineage segments, preserved eras/assets.
-      expect(manifest.schemaVersion).toBe(2);
+      expect(manifest.schemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
       expect(manifest.dataVersion).toBe(DATA_VERSION);
       expect(manifest.modernFranchiseSlots).toHaveLength(30);
       expect(manifest.franchiseLineage.length).toBeGreaterThan(30);

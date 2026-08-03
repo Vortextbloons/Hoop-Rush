@@ -45,7 +45,7 @@
   } = $props();
 
   function canFillSlot(player: IndexRow, slotIndex: number): boolean {
-    return canPlay(player.positionsCanonical, slotRequirement(slotIndex as SlotIndex));
+    return canPlay(player.positionsPlayable, slotRequirement(slotIndex as SlotIndex));
   }
 
   /**
@@ -178,7 +178,7 @@
                 {subject.displayName}
               </Dialog.Title>
               <p class="font-mono text-[10px] text-muted-foreground">
-                {subject.seasonKey} · {subject.positionsCanonical.join('/')}
+                {subject.seasonKey} · {subject.positionsPlayable.join('/')}
                 {#each ratingBadges(subject, presentation) as badge (badge.label)}
                   <span
                     class="rounded bg-surface-3 px-1.5 py-0.5"
@@ -231,7 +231,7 @@
                     {opt.incumbent.displayName}
                   </span>
                   <span class="block font-mono text-[10px] text-muted-foreground">
-                    {opt.incumbent.seasonKey} · {opt.incumbent.positionsCanonical.join('/')}
+                    {opt.incumbent.seasonKey} · {opt.incumbent.positionsPlayable.join('/')}
                   </span>
                 {:else}
                   <span class="block truncate text-sm font-semibold">Open {label} slot</span>

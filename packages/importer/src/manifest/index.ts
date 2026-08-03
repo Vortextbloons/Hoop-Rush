@@ -32,7 +32,7 @@ type Manifest = Record<string, unknown>;
 
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
 
-export const DATA_VERSION = 'm5';
+export const DATA_VERSION = 'm6';
 
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
@@ -45,7 +45,7 @@ function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][
     displayName: player.displayName,
     playerExternalId: player.playerExternalId,
     altIds: player.altIds ?? null,
-    positionsCanonical: player.positions.canonical,
+    positionsPlayable: player.positions.playable,
     overall: player.summaryRatings.overallRating,
     offense: player.summaryRatings.offenseRating,
     defense: player.summaryRatings.defenseRating,
@@ -99,7 +99,7 @@ export function rebuildPlayersIndex(
   if (indexPlayers.length === 0) return null;
   const indexPath = join(dataDir, 'players-index.json');
   const index = parsePlayersIndex({
-    schemaVersion: 3,
+    schemaVersion: 4,
     dataVersion: DATA_VERSION,
     players: indexPlayers,
   });

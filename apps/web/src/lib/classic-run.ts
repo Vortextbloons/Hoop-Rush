@@ -5,7 +5,6 @@ import {
   classic,
   createChallenge,
   createEngineContext,
-  simulateChallengeBestOf,
   toSimulationPlayer,
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
@@ -17,10 +16,11 @@ import { FIXED_SANDBOX_ERA } from '$lib/sandbox-run';
 /**
  * The single authoritative path from a completed classic draft to an active
  * saved run (spec/01 Classic loop). The draft page owns the five picks; this
- * module resolves them to full peak player-seasons in slot order, builds the
- * classic challenge through the engine, simulates best-of-2, promotes the
- * active run, and navigates to the classic challenge page. Like sandbox, every
- * run simulates in the fixed '2010s' environment era.
+ * module resolves them to full peak player-seasons in slot order (loading the
+ * distinct franchise-era pools in parallel), builds the classic challenge
+ * through the engine, promotes the active run, and navigates to the classic
+ * challenge page. Like sandbox, every run simulates in the fixed '2010s'
+ * environment era.
  */
 export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): Promise<void> {
   if (draft.status !== 'complete') {
@@ -42,8 +42,8 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
     getBracket(manifest.bracket),
   ]);
   // Resolve the five picks to full peak records in slot order. Draft picks are
-  // unique pairs, so each franchise-era pool loads at most once (pools are
-  // cached by the data layer anyway).
+  // unique franchise/era pairs, so load each distinct pool exactly once and in
+  // parallel (pools are cached by the data layer anyway).
   const pickBySlot = new Map(draft.picks.map((pick) => [pick.slotIndex, pick]));
   const refs = [0, 1, 2, 3, 4].map((slotIndex) => {
     const pick = pickBySlot.get(slotIndex);
@@ -71,11 +71,10 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
       .join(' · ')
       .slice(0, 96),
   });
-  // Classic simulates the complete season twice from derived attempt seeds and
-  // keeps the best record, exactly like sandbox; the chosen attempt's seed
-  // becomes the persisted run seed.
-  const chosen = simulateChallengeBestOf(creation, profile, context);
-  const run = createChallenge({ ...creation, runSeed: chosen.runSeed });
+  // The run is saved with the base run seed and no games; the challenge page
+  // asks the worker to simulate the whole-run best-of and re-saves the chosen
+  // attempt seed before the paced reveal starts (spec/01 Classic loop).
+  const run = createChallenge(creation);
   await challengeRepository.promoteClassicDraftToRun(
     { recordId: 'active', saveSchemaVersion: 2, run },
     draft.draftId,

@@ -145,7 +145,7 @@
               </button>
             </td>
             <td class="px-2 py-2 font-mono text-[11px] whitespace-nowrap text-muted-foreground">
-              {player.positionsCanonical.join('/')}
+              {player.positionsPlayable.join('/')}
             </td>
             <td class="px-2 py-2 font-mono text-[11px] whitespace-nowrap text-muted-foreground">
               {eraLabel.get(player.eraId) ?? player.eraId}
@@ -223,7 +223,7 @@
               <span class="block truncate text-sm font-bold">{player.displayName}</span>
               <span class="mt-0.5 block font-mono text-[10px] leading-snug text-muted-foreground">
                 {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(player.eraId) ??
-                  player.eraId} · {player.seasonKey} · {player.positionsCanonical.join('/')}
+                  player.eraId} · {player.seasonKey} · {player.positionsPlayable.join('/')}
               </span>
             </span>
           </button>

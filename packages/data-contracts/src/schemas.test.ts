@@ -17,7 +17,7 @@ import {
 import type { Lineup, LineupAssignment, PeakPlayerSeason } from './index.js';
 
 const validPlayer: PeakPlayerSeason = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   playerId: 'p-1',
   franchiseId: 'lakers',
   eraId: '1990s',
@@ -27,9 +27,11 @@ const validPlayer: PeakPlayerSeason = {
   displayName: 'Magic Johnson',
   playerExternalId: '77142',
   positions: {
+    primary: 'PG',
+    secondary: ['SG'],
+    playable: ['PG', 'SG'],
     sourceLabels: ['PG', 'SG'],
-    canonical: ['G'],
-    normalizationVersion: 'position-v2',
+    normalizationVersion: 'position-v3',
   },
   heightInches: 81,
   weightLbs: 220,
@@ -193,10 +195,10 @@ describe('player-season contracts', () => {
     expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('rejects an ineligible position canonical value', () => {
+  it('rejects an ineligible position value', () => {
     const invalid = {
       ...validPlayer,
-      positions: { ...validPlayer.positions, canonical: ['G', 'PG'] },
+      positions: { ...validPlayer.positions, primary: 'G' },
     };
     expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
   });
@@ -212,7 +214,7 @@ describe('player-season contracts', () => {
   it('rejects a duplicate player id inside a pool', () => {
     const duplicate = [validPlayer, { ...validPlayer, seasonKey: '1997-98', selectionScore: 96 }];
     const parsed = franchiseEraPoolSchema.safeParse({
-      schemaVersion: 2,
+      schemaVersion: 3,
       dataVersion: 'data-v1',
       franchiseId: 'lakers',
       eraId: '1990s',
@@ -238,7 +240,7 @@ describe('lineup contracts', () => {
   const assignment = (slotIndex: number, playerId: string): LineupAssignment => ({
     slotIndex: slotIndex,
     playerId,
-    positions: ['G'],
+    positions: ['PG', 'SG'],
   });
 
   it('accepts a five-assignment legal lineup', () => {
@@ -284,10 +286,10 @@ describe('lineup contracts', () => {
 });
 
 describe('run contracts', () => {
-  const simPlayer = (id: string, position: string) => ({
+  const simPlayer = (id: string, positions: string[]) => ({
     playerId: id,
     displayName: `Player ${id}`,
-    positions: [position],
+    positions,
     heightInches: 76,
     weightLbs: 200,
     ratings: {
@@ -338,15 +340,15 @@ describe('run contracts', () => {
   });
 
   const fivePlayers = [
-    simPlayer('p-1', 'G'),
-    simPlayer('p-2', 'G'),
-    simPlayer('p-3', 'F'),
-    simPlayer('p-4', 'F'),
-    simPlayer('p-5', 'C'),
+    simPlayer('p-1', ['PG', 'SG']),
+    simPlayer('p-2', ['PG', 'SG']),
+    simPlayer('p-3', ['SF', 'PF']),
+    simPlayer('p-4', ['SF', 'PF']),
+    simPlayer('p-5', ['C']),
   ];
 
   const opponents = Array.from({ length: 30 }, (_, index) => ({
-    schemaVersion: 1,
+    schemaVersion: 2,
     opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String(index)}`,
     bracketVersion: 'bracket-v1',
     difficultyBand: 'medium',
@@ -418,7 +420,7 @@ describe('run contracts', () => {
   };
 
   const baseRun = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: 'run-1',
     mode: 'sandbox',
     franchiseId: 'lakers',
@@ -439,7 +441,7 @@ describe('run contracts', () => {
       saveSchemaVersion: 2,
       dataVersion: 'data-v1',
       ratingVersion: 'ratings-v1',
-      positionNormalizationVersion: 'position-v2',
+      positionNormalizationVersion: 'position-v3',
       engineVersion: 'engine-v1',
       bracketVersion: 'bracket-v1',
       scheduleVersion: 'schedule-v1',
@@ -491,7 +493,7 @@ describe('manifest contracts', () => {
 
   it('accepts the shipped manifest shape', () => {
     const manifest = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       dataVersion: 'm0.1',
       modernFranchiseSlots: thirtySlots,
       franchiseLineage: [
@@ -555,7 +557,7 @@ describe('manifest contracts', () => {
 
   it('rejects a bad content hash', () => {
     const manifest = {
-      schemaVersion: 2,
+      schemaVersion: 3,
       dataVersion: 'm0.1',
       modernFranchiseSlots: thirtySlots,
       franchiseLineage: [],
@@ -580,7 +582,7 @@ describe('simulation contracts', () => {
   const player = {
     playerId: 'p-1',
     displayName: 'Test Player',
-    positions: ['G'],
+    positions: ['PG', 'SG'],
     heightInches: 76,
     weightLbs: 200,
     ratings: {
@@ -653,7 +655,7 @@ describe('simulation contracts', () => {
 describe('opponent contracts', () => {
   it('rejects an opponent whose lineup and players disagree', () => {
     const opponent = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       opponentId: 'lakers-1990s-opening',
       bracketVersion: 'bracket-v1',
       difficultyBand: 'medium',
@@ -663,10 +665,10 @@ describe('opponent contracts', () => {
       lineup: {
         structure: ['G', 'G', 'F', 'F', 'C'],
         assignments: [
-          { slotIndex: 0, playerId: 'p-89', positions: ['G'] },
-          { slotIndex: 1, playerId: 'p-9', positions: ['G'] },
-          { slotIndex: 2, playerId: 'p-920', positions: ['F'] },
-          { slotIndex: 3, playerId: 'p-109', positions: ['F'] },
+          { slotIndex: 0, playerId: 'p-89', positions: ['PG', 'SG'] },
+          { slotIndex: 1, playerId: 'p-9', positions: ['PG', 'SG'] },
+          { slotIndex: 2, playerId: 'p-920', positions: ['SF', 'PF'] },
+          { slotIndex: 3, playerId: 'p-109', positions: ['SF', 'PF'] },
           { slotIndex: 4, playerId: 'p-124', positions: ['C'] },
         ],
       },
@@ -907,9 +909,10 @@ function gameResultFixture(gameNumber: number) {
 /** Minimal valid challenge run for worker request fixtures. */
 function buildMinimalRun() {
   const five = ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'];
+  const slotPositions = [['PG', 'SG'], ['PG', 'SG'], ['SF', 'PF'], ['SF', 'PF'], ['C']];
   const zero = () => ({ made: 0, attempted: 0 });
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: 'run-1',
     mode: 'sandbox',
     franchiseId: 'lakers',
@@ -921,23 +924,13 @@ function buildMinimalRun() {
       assignments: five.map((playerId, slotIndex) => ({
         slotIndex,
         playerId,
-        positions:
-          (['G', 'G', 'F', 'F', 'C'][slotIndex] ?? 'G') === 'G'
-            ? ['G']
-            : ['F', 'F', 'C'][slotIndex - 2] === 'F'
-              ? ['F']
-              : ['C'],
+        positions: slotPositions[slotIndex],
       })),
     },
     players: five.map((playerId, slotIndex) => ({
       playerId,
       displayName: `Player ${playerId}`,
-      positions:
-        ['G', 'G', 'F', 'F', 'C'][slotIndex] === 'G'
-          ? ['G']
-          : ['F', 'F', 'C'][slotIndex - 2] === 'F'
-            ? ['F']
-            : ['C'],
+      positions: slotPositions[slotIndex],
       heightInches: 76,
       weightLbs: 200,
       ratings: {
@@ -991,7 +984,7 @@ function buildMinimalRun() {
       saveSchemaVersion: 2,
       dataVersion: 'data-v1',
       ratingVersion: 'ratings-v1',
-      positionNormalizationVersion: 'position-v2',
+      positionNormalizationVersion: 'position-v3',
       engineVersion: 'engine-v1',
       bracketVersion: 'bracket-v1',
       scheduleVersion: 'schedule-v1',
@@ -1008,7 +1001,7 @@ function buildMinimalRun() {
       bracketVersion: 'bracket-v1',
       scheduleVersion: 'schedule-v1',
       opponents: Array.from({ length: 30 }, (_, index) => ({
-        schemaVersion: 1,
+        schemaVersion: 2,
         opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String(index)}`,
         bracketVersion: 'bracket-v1',
         difficultyBand: 'medium' as const,
@@ -1020,23 +1013,13 @@ function buildMinimalRun() {
           assignments: five.map((playerId, slotIndex) => ({
             slotIndex,
             playerId: `p-opp-${String(index)}-${playerId}`,
-            positions:
-              ['G', 'G', 'F', 'F', 'C'][slotIndex] === 'G'
-                ? ['G']
-                : ['F', 'F', 'C'][slotIndex - 2] === 'F'
-                  ? ['F']
-                  : ['C'],
+            positions: slotPositions[slotIndex],
           })),
         },
         players: five.map((playerId, slotIndex) => ({
           playerId: `p-opp-${String(index)}-${playerId}`,
           displayName: `Opp ${String(index)} ${String(slotIndex)}`,
-          positions:
-            ['G', 'G', 'F', 'F', 'C'][slotIndex] === 'G'
-              ? ['G']
-              : ['F', 'F', 'C'][slotIndex - 2] === 'F'
-                ? ['F']
-                : ['C'],
+          positions: slotPositions[slotIndex],
           heightInches: 76,
           weightLbs: 200,
           ratings: {
@@ -1251,5 +1234,79 @@ describe('franchise abbreviations', () => {
       expect(franchiseAbbreviation(franchiseId)).toBe(abbreviation);
       expect(abbreviation).toHaveLength(3);
     }
+  });
+});
+
+describe('worker start best-of contracts (M5)', () => {
+  it('accepts a start request with the simulate fields minus the start game', () => {
+    const request = {
+      schemaVersion: 1,
+      type: 'start',
+      requestId: 'req-start-1',
+      run: buildMinimalRun(),
+      profile: eraProfileFixture(),
+      engineVersion: 'engine-v1',
+    };
+    expect(workerRequestSchema.safeParse(request).success).toBe(true);
+  });
+
+  it('rejects a start request missing the run snapshot', () => {
+    const request = {
+      schemaVersion: 1,
+      type: 'start',
+      requestId: 'req-start-1',
+      profile: eraProfileFixture(),
+      engineVersion: 'engine-v1',
+    };
+    expect(workerRequestSchema.safeParse(request).success).toBe(false);
+  });
+
+  it('accepts a start-result message and rejects malformed scores', () => {
+    expect(
+      workerMessageSchema.safeParse({
+        schemaVersion: 1,
+        type: 'start-result',
+        requestId: 'req-start-1',
+        chosenRunSeed: 'abcd1234abcd1234abcd1234abcd1234',
+        chosenWins: 41,
+        chosenLosses: 41,
+        chosenDifferential: 120,
+      }).success,
+    ).toBe(true);
+    expect(
+      workerMessageSchema.safeParse({
+        schemaVersion: 1,
+        type: 'start-result',
+        requestId: 'req-start-1',
+        chosenRunSeed: 'abcd1234abcd1234abcd1234abcd1234',
+        chosenWins: -1,
+        chosenLosses: 41,
+        chosenDifferential: 120,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a start-result in the request union and a start in the message union', () => {
+    expect(
+      workerRequestSchema.safeParse({
+        schemaVersion: 1,
+        type: 'start-result',
+        requestId: 'req-start-1',
+        chosenRunSeed: 'abcd1234abcd1234abcd1234abcd1234',
+        chosenWins: 41,
+        chosenLosses: 41,
+        chosenDifferential: 120,
+      }).success,
+    ).toBe(false);
+    expect(
+      workerMessageSchema.safeParse({
+        schemaVersion: 1,
+        type: 'start',
+        requestId: 'req-start-1',
+        run: buildMinimalRun(),
+        profile: eraProfileFixture(),
+        engineVersion: 'engine-v1',
+      }).success,
+    ).toBe(false);
   });
 });

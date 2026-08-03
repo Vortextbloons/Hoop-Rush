@@ -155,7 +155,7 @@ export function runFromCheckpoint(
   results: GameResult[],
 ): ChallengeRun {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: checkpoint.runId,
     mode: checkpoint.mode,
     variant: checkpoint.variant,

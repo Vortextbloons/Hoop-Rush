@@ -17,9 +17,9 @@ import type {
 export type RosterDetailRow = PlayersIndexEntry & RosterDetailsEntry;
 
 /** One flat row of the roster browser: a group header or a player. */
-export type RosterListItem =
+export type RosterListItem<T = RosterDetailRow> =
   | { type: 'group'; franchiseId: string; eraId: string; count: number }
-  | { type: 'player'; player: RosterDetailRow };
+  | { type: 'player'; player: T };
 
 export interface RosterColumn {
   key: string;
@@ -61,12 +61,18 @@ export function defaultDirection(sortId: RosterSortId): RosterSortDirection {
 export interface RosterFilters {
   franchiseId: string | null;
   eraId: string | null;
-  /** Canonical position union member ('G' | 'F' | 'C'). */
-  position: 'G' | 'F' | 'C' | null;
+  /** Detailed position union member ('PG' | 'SG' | 'SF' | 'PF' | 'C'). */
+  position: 'PG' | 'SG' | 'SF' | 'PF' | 'C' | null;
   query: string;
 }
 
-const POSITION_ORDER: Readonly<Record<string, number>> = { G: 0, F: 1, C: 2 };
+const POSITION_ORDER: Readonly<Record<string, number>> = {
+  PG: 0,
+  SG: 1,
+  SF: 2,
+  PF: 3,
+  C: 4,
+};
 
 const lowercaseNameCache = new WeakMap<PlayersIndexEntry, string>();
 
@@ -140,7 +146,7 @@ export function sortRoster(
     case 'position':
       return compareBy(
         rows,
-        (r) => POSITION_ORDER[r.positionsCanonical[0] ?? ''] ?? 99,
+        (r) => POSITION_ORDER[r.positionsPlayable[0] ?? ''] ?? 99,
         direction,
         compareNumber,
       );
@@ -153,7 +159,7 @@ export function filterRoster(rows: RosterDetailRow[], filters: RosterFilters): R
   if (filters.franchiseId) list = list.filter((r) => r.franchiseId === filters.franchiseId);
   if (filters.eraId) list = list.filter((r) => r.eraId === filters.eraId);
   const position = filters.position;
-  if (position) list = list.filter((r) => r.positionsCanonical.includes(position));
+  if (position) list = list.filter((r) => r.positionsPlayable.includes(position));
   const query = filters.query.trim().toLowerCase();
   if (query) {
     list = list.filter((r) => lowercaseName(r).includes(query));
@@ -196,6 +202,44 @@ export function paginateItems<T extends { type: string }>(items: T[], count: num
   for (const item of items) {
     if (item.type === 'player') players += 1;
     page.push(item);
+    if (players >= count) break;
+  }
+  return page;
+}
+
+/**
+ * Paginates grouped roster rows in a single pass, emitting a group header the
+ * first time each franchise/era key appears and stopping once `count` player
+ * rows are included. Output-identical to
+ * `paginateItems(groupRoster(rows).flatMap(...), count)` for contiguously
+ * grouped input (the players index order).
+ */
+export function paginateGroupedRows<T extends PlayersIndexEntry>(
+  rows: T[],
+  count: number,
+): RosterListItem<T>[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const key = `${row.franchiseId}/${row.eraId}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const seen = new Set<string>();
+  const page: RosterListItem<T>[] = [];
+  let players = 0;
+  for (const row of rows) {
+    const key = `${row.franchiseId}/${row.eraId}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      page.push({
+        type: 'group',
+        franchiseId: row.franchiseId,
+        eraId: row.eraId,
+        count: counts.get(key) ?? 0,
+      });
+      if (players >= count) break;
+    }
+    page.push({ type: 'player', player: row });
+    players += 1;
     if (players >= count) break;
   }
   return page;

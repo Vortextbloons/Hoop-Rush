@@ -7,7 +7,7 @@ describe('cli: benchmark', () => {
     // `--workers` is a pass-through re-chunking a sequential loop; the flag
     // is still exercised end-to-end here (worker plumbing itself is covered
     // by the sim batch worker-count test).
-    const { code, stdout } = await runCli([
+    const { code, stdout, stderr } = await runCli([
       'benchmark',
       '--samples',
       '5',
@@ -16,7 +16,7 @@ describe('cli: benchmark', () => {
       '--format',
       'json',
     ]);
-    expect(code).toBe(0);
+    expect(code, stderr || stdout).toBe(0);
     const payload = benchmarkReportSchema.parse(jsonPayload(stdout));
     expect(payload.environment.platform).toBe(process.platform);
     expect(payload.engineVersion).toMatch(/^m3-engine/);

@@ -31,8 +31,10 @@ import {
   type Confidence,
   type CoverageSummary,
   type HistoricalValueProvenance,
+  type Position,
   type UnavailabilityReason,
 } from '@hoop-rush/data-contracts';
+import { playableSlotGroups } from '@hoop-rush/data-contracts';
 import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.js';
 import { refreshPlayersIndexInManifest } from '../manifest/index.js';
 import {
@@ -45,8 +47,12 @@ import {
   clamp,
   clampUnitInterval,
 } from '../json.js';
-import { normalizePositionLabels } from './positions.js';
+import { buildPlayerPositions } from './positions.js';
+import { positionOverrideFor } from '../positions/overrides.js';
 import { canonicalPlayerName } from '../identity.js';
+
+/** Re-exported so CLI consumers (e.g. bracket generation) share the one normalization. */
+export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.js';
 import {
   LINEAGE_SEGMENTS,
   MODERN_SLOTS,
@@ -85,7 +91,7 @@ export function manifestPath(): string {
 
 export const SCHEMA_VERSION = ARTIFACT_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm5';
+export const DATA_VERSION = 'm6';
 /** Confidence policy v1: maximum allowed low-confidence share of required fields. */
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
@@ -101,8 +107,9 @@ export {
 export function loadCareerPositionLabels(): Map<string, Set<string>> {
   // The cache is derived from the packaged roster snapshot. Version the
   // filename so older imports cannot silently erase positions for players
-  // added in a later snapshot.
-  const cachePath = join(RAW_CACHE, 'career-position-labels-v4.json');
+  // added in a later snapshot. v5 also collects each season's
+  // secondaryPositions entries alongside the primary label.
+  const cachePath = join(RAW_CACHE, 'career-position-labels-v5.json');
   if (fileExists(cachePath)) {
     const data = readJsonLoose(cachePath) as Record<string, unknown>;
     return new Map(Object.entries(data).map(([pid, labels]) => [pid, new Set(labels as string[])]));
@@ -126,6 +133,13 @@ export function loadCareerPositionLabels(): Map<string, Set<string>> {
         labelsByPlayer.set(pid, labels);
       }
       labels.add(str(player.position));
+      if (Array.isArray(player.secondaryPositions)) {
+        for (const secondary of player.secondaryPositions) {
+          if (typeof secondary === 'string' && secondary !== '') {
+            labels.add(secondary);
+          }
+        }
+      }
     }
   }
 
@@ -251,17 +265,20 @@ function loadFallbackRosterPlayers(): Map<string, Record<string, unknown>> {
         const playerExternalId = str(player.playerExternalId);
         if (!playerExternalId) continue;
         const positions = player.positions as
-          { sourceLabels?: unknown; canonical?: unknown } | undefined;
-        const sourceLabels = Array.isArray(positions?.sourceLabels)
-          ? positions.sourceLabels.filter((label): label is string => typeof label === 'string')
+          { primary?: unknown; secondary?: unknown } | undefined;
+        const primary = typeof positions?.primary === 'string' ? positions.primary : 'F';
+        const secondaryPositions = Array.isArray(positions?.secondary)
+          ? positions.secondary.filter(
+              (secondary): secondary is string => typeof secondary === 'string' && secondary !== '',
+            )
           : [];
         const candidate: Record<string, unknown> = {
           ...player,
           externalId: playerExternalId,
           firstName: player.firstName,
           lastName: player.lastName,
-          position: sourceLabels[0] ?? 'F',
-          secondaryPositions: sourceLabels.slice(1),
+          position: primary,
+          secondaryPositions,
           heightInches: player.heightInches,
           weightLbs: player.weightLbs,
           ratings: player.detailedRatings,
@@ -665,8 +682,10 @@ export interface PoolPlayer {
     photoUrl?: string | null;
   } | null;
   positions: {
+    primary: string;
+    secondary: string[];
+    playable: string[];
     sourceLabels: string[];
-    canonical: string[];
     normalizationVersion: string;
   };
   heightInches: number | null;
@@ -743,9 +762,11 @@ export function coverageBandForSeasons(
 
 /** True when at least one legal G,G,F,F,C assignment exists over the pool. */
 export function legalLineupCovered(players: readonly PoolPlayer[]): boolean {
-  const guards = players.filter((p) => p.positions.canonical.includes('G'));
-  const forwards = players.filter((p) => p.positions.canonical.includes('F'));
-  const centers = players.filter((p) => p.positions.canonical.includes('C'));
+  const slotGroupsOf = (player: PoolPlayer): readonly string[] =>
+    playableSlotGroups(player.positions.playable as Position[]);
+  const guards = players.filter((p) => slotGroupsOf(p).includes('G'));
+  const forwards = players.filter((p) => slotGroupsOf(p).includes('F'));
+  const centers = players.filter((p) => slotGroupsOf(p).includes('C'));
   if (guards.length < 2 || forwards.length < 2 || centers.length < 1) return false;
   // Any guard can take a G slot, any forward an F slot; C must be a center.
   return true;
@@ -981,10 +1002,22 @@ export function computePool(
     const stint = best.stint;
     const stats = best.stats;
     const summary = player.summaryRatings as SummaryRatingsRaw | undefined;
-    const ownLabels = new Set([str(player.position)]);
+    const peakPrimary = str(player.position);
+    const peakSecondary = Array.isArray(player.secondaryPositions)
+      ? player.secondaryPositions.filter(
+          (secondary): secondary is string => typeof secondary === 'string' && secondary !== '',
+        )
+      : [];
+    const override = positionOverrideFor(pid);
     const career = careerLabelsMap.get(pid);
-    const labels = career !== undefined && career.size > 0 ? career : ownLabels;
-    const { canonical, sourceLabels, unknownLabels } = normalizePositionLabels(labels);
+    const labels =
+      career !== undefined && career.size > 0 ? career : new Set([peakPrimary, ...peakSecondary]);
+    const { record, unknownLabels } = buildPlayerPositions({
+      careerLabels: labels,
+      peakPrimary,
+      peakSecondary,
+      override,
+    });
     if (unknownLabels.length > 0) {
       console.log(
         `  [WARN] ${str(player.firstName)} ${str(player.lastName)} (${pid}) unknown position labels: ${formatList(unknownLabels)}`,
@@ -1087,8 +1120,10 @@ export function computePool(
       playerExternalId: pid,
       altIds: Object.keys(altIds).length > 0 ? altIds : null,
       positions: {
-        sourceLabels,
-        canonical,
+        primary: record.primary,
+        secondary: record.secondary,
+        playable: record.playable,
+        sourceLabels: record.sourceLabels,
         normalizationVersion: POSITION_NORMALIZATION_VERSION,
       },
       heightInches: asNumberOrNull(player.heightInches),

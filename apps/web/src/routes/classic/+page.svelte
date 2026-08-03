@@ -60,6 +60,18 @@
   let starting = $state(false);
   let launchError: string | null = $state(null);
 
+  /** False once this component starts being destroyed (see below). */
+  let mounted = true;
+  $effect(() => {
+    mounted = true;
+    return () => {
+      // Post-destroy async callbacks (persistence, bits-ui dismissal timers)
+      // must never write reactive state on a torn-down tree; that can
+      // cascade into an update-depth error during navigation away.
+      mounted = false;
+    };
+  });
+
   let unregister: (() => void) | null = null;
   $effect(() => {
     unregister = registerClassicDraftNavigationGuard(
@@ -199,6 +211,7 @@
    */
   async function applyRoll(next: ClassicDraftState, axis: 'both' | 'franchise' | 'era') {
     draft = await persist(next);
+    if (!mounted) return;
     if (next.roll) {
       reelAxis = axis;
       spinKey += 1;
@@ -218,24 +231,28 @@
     actionError = null;
     launchError = null;
     try {
+      // Lock interactions immediately so the feedback shows before the async
+      // persist resolves (the engine result itself is synchronous).
+      spinning = true;
       const next = classic.createClassicDraft(
         {
           draftId: crypto.randomUUID(),
           variant,
           seed: classicDraftSeed(),
           dataVersion: manifest.dataVersion,
-          catalog: buildClassicCatalog(manifest, index),
+          catalog,
         },
         createEngineContext(),
       );
       draft = await persist(next);
+      if (!mounted) return;
       // The very first roll animates too: the reel mounts with spinKey > 0
       // and spins on mount. A resumed draft always mounts with spinKey 0 and
       // never replays.
       reelAxis = 'both';
       spinKey += 1;
-      spinning = true;
     } catch (error) {
+      spinning = false;
       setupError = error instanceof Error ? error.message : String(error);
     }
   }
@@ -271,9 +288,8 @@
   }
 
   /**
-   * Slot choice from the picker. A drafted player repositions (swapping when
-   * the target is occupied and both sides can fill each other's slots); a new
-   * player is drafted into the open slot. The engine throws precise reasons
+   * Slot choice from the picker. A drafted player repositions (swapping or
+   * displacing incumbents when needed); a new player is drafted into the
    * for invalid placements, surfaced inline. The fifth pick auto-launches the
    * season (no reel spin — the draft is done); every other successful
    * placement rolls the next round through the reels. Interactions lock
@@ -299,6 +315,7 @@
         starting = true;
         pickerPlayer = null;
         draft = await persist(next);
+        if (!mounted) return;
         void launchRun(next);
       } else {
         spinning = true;
@@ -324,6 +341,7 @@
     try {
       await startClassicRun(draftToRun, classicDraftSeed());
     } catch (error) {
+      if (!mounted) return;
       launchError = error instanceof Error ? error.message : String(error);
       starting = false;
     }
@@ -570,6 +588,7 @@
             {spinKey}
             announceText={reelAnnouncement}
             roundLabel={`Round ${draft.round} of 5`}
+            spinDurationMs={draft.round === 1 ? undefined : 500}
             onSettled={onReelSettled}
           />
         {/if}
@@ -583,7 +602,7 @@
             {manifest}
             {presentation}
             filtersEditable={true}
-            allowDisplacement={false}
+            allowDisplacement
             error={actionError}
             emptyMessage="No players in this pool."
             onpick={openPicker}
@@ -632,7 +651,7 @@
                       {row.displayName}
                     </span>
                     <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                      {row.seasonKey} · {row.positionsCanonical.join('/')} ·
+                      {row.seasonKey} · {row.positionsPlayable.join('/')} ·
                       {franchiseAbbreviation(row.franchiseId)}
                     </span>
                   {:else}
@@ -678,9 +697,11 @@
     {slots}
     manifest={manifest!}
     {presentation}
-    allowDisplacement={false}
+    allowDisplacement
     onplace={placePlayer}
-    onclose={() => (pickerPlayer = null)}
+    onclose={() => {
+      if (mounted) pickerPlayer = null;
+    }}
   />
 
   <Dialog.Root

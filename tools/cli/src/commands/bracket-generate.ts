@@ -16,10 +16,12 @@ import {
   type PositionUnion,
   type Seed,
   type SimulationAnchors,
+  playableSlotGroups,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
 import { bracketGenerateReportSchema } from '../report-schemas.js';
 import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.js';
+import { pools } from '@hoop-rush/importer';
 import { UsageError } from './sim.js';
 
 /**
@@ -97,29 +99,12 @@ const TENDENCY_KEYS = [
 
 const MIN_TEAM_GAMES = 40;
 
-const POSITION_LABEL_MAP: Record<string, string[]> = {
-  G: ['G'],
-  F: ['F'],
-  C: ['C'],
-  'G-F': ['G', 'F'],
-  'F-G': ['G', 'F'],
-  'F-C': ['F', 'C'],
-  'C-F': ['F', 'C'],
-  'G-C': ['G', 'C'],
-  'C-G': ['G', 'C'],
-  'G-F-C': ['G', 'F', 'C'],
-  'F-G-C': ['F', 'G', 'C'],
-  PG: ['G'],
-  SG: ['G'],
-  SF: ['F'],
-  PF: ['F'],
-};
-
 interface RosterPlayer {
   externalId: string;
   firstName: string;
   lastName: string;
   position: string;
+  secondaryPositions?: string[];
   heightInches: number | null;
   weightLbs: number | null;
   teamExternalId: string;
@@ -192,13 +177,14 @@ function anchorsFromStats(
 ): SimulationAnchors | undefined {
   if (!stats || stats.gamesPlayed <= 0) return undefined;
   const games = Math.max(1, stats.gamesPlayed);
+  const groups = playableSlotGroups(positions);
   const offensive = stats.offensiveRebounds;
   const defensive = stats.defensiveRebounds;
   const hasReliableSplit =
     offensive !== undefined &&
     defensive !== undefined &&
     (offensive > 0 ||
-      (!positions.includes('C') && !(positions.includes('F') && stats.rebounds / games > 2.5)));
+      (!groups.includes('C') && !(groups.includes('F') && stats.rebounds / games > 2.5)));
   const offensiveRebounds = hasReliableSplit ? offensive : stats.rebounds * 0.2;
   const defensiveRebounds = hasReliableSplit
     ? defensive
@@ -222,15 +208,9 @@ function anchorsFromStats(
   };
 }
 
-/** Canonical position union for a set of source labels (same map as the pool importer). */
-function canonicalPositions(labels: ReadonlySet<string>): PositionUnion {
-  const union = new Set<string>();
-  for (const label of labels) {
-    const mapped = POSITION_LABEL_MAP[label];
-    if (mapped) for (const position of mapped) union.add(position);
-  }
-  const sorted = ['G', 'F', 'C'].filter((p) => union.has(p));
-  return sorted as PositionUnion;
+/** Detailed career-wide playable union for a set of source labels (shared importer normalization). */
+function playablePositions(labels: ReadonlySet<string>): PositionUnion {
+  return pools.normalizePositionLabels(labels).detailed as PositionUnion;
 }
 
 /** Builds the private candidate catalog from the packaged NBA season data. */
@@ -302,6 +282,11 @@ export function buildCandidateCatalog(
       byId.set(player.externalId, player);
       const labels = careerLabels.get(player.externalId) ?? new Set<string>();
       labels.add(player.position);
+      if (Array.isArray(player.secondaryPositions)) {
+        for (const secondary of player.secondaryPositions) {
+          if (typeof secondary === 'string' && secondary !== '') labels.add(secondary);
+        }
+      }
       careerLabels.set(player.externalId, labels);
     }
     rosterBySeason.set(season, byId);
@@ -379,7 +364,7 @@ export function buildCandidateCatalog(
             const value = player.tendencies[keyName];
             tendencies[keyName] = typeof value === 'number' ? clampTendency(value) : 0;
           }
-          const positions = canonicalPositions(
+          const positions = playablePositions(
             careerLabels.get(stint.playerExternalId) ?? new Set(),
           );
           const anchors = anchorsFromStats(

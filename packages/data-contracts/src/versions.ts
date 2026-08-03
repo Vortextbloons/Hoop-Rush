@@ -9,10 +9,14 @@
  */
 
 /** Packaged artifact schema layout (manifest, pools, era profiles, bracket). */
-export const ARTIFACT_SCHEMA_VERSION = 2;
+export const ARTIFACT_SCHEMA_VERSION = 3;
 
-/** Accepted challenge-run domain schema layout (unchanged since M3). */
-export const RUN_SCHEMA_VERSION = 1;
+/**
+ * Accepted challenge-run domain schema layout. Bumped to 2 because stored
+ * runs freeze lineup assignments with the detailed position vocabulary; old
+ * G/F/C union saves are intentionally not migrated.
+ */
+export const RUN_SCHEMA_VERSION = 2;
 
 /**
  * Run-level save layout version frozen into accepted runs. Stays at 2 so
@@ -36,14 +40,17 @@ export const RATINGS_VERSION = 'ratings-v9-smooth-elite-band';
 /** Deterministic peak-season selection score version (spec/02). */
 export const SELECTION_SCORE_VERSION = 'selection-v2';
 
-/** Position normalization version (career-wide playable union). */
-export const POSITION_NORMALIZATION_VERSION = 'position-v2';
+/** Position normalization version (career-wide detailed playable union). */
+export const POSITION_NORMALIZATION_VERSION = 'position-v3';
+
+/** Reviewed per-player position override table version (importer input). */
+export const POSITION_OVERRIDES_VERSION = 'position-overrides-v1';
 
 /** Possession engine version (injected through EngineContext). */
 export const ENGINE_VERSION = 'm3-engine-v6';
 
 /** Fixed opponent bracket content version. */
-export const BRACKET_VERSION = 'bracket-m3-v2';
+export const BRACKET_VERSION = 'bracket-m3-v3';
 
 /** Shared 82-game schedule version. */
 export const SCHEDULE_VERSION = 'schedule-v1';

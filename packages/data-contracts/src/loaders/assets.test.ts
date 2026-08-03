@@ -22,7 +22,7 @@ const assets: HoopRushManifest['assets'] = {
 };
 
 const manifest = (assetOverrides: Partial<typeof assets> = {}): HoopRushManifest => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   dataVersion: 'data-v1',
   modernFranchiseSlots: [
     { franchiseId: 'lakers', displayName: 'Los Angeles Lakers', teamExternalId: '1610612747' },
@@ -36,7 +36,7 @@ const manifest = (assetOverrides: Partial<typeof assets> = {}): HoopRushManifest
 });
 
 const player = (overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   playerId: 'p-1',
   franchiseId: 'lakers',
   eraId: '1990s',
@@ -45,7 +45,13 @@ const player = (overrides: Partial<PeakPlayerSeason> = {}): PeakPlayerSeason => 
   lastName: 'Player',
   displayName: 'Test Player',
   playerExternalId: '101',
-  positions: { sourceLabels: ['G'], canonical: ['G'], normalizationVersion: 'position-v2' },
+  positions: {
+    primary: 'SF',
+    secondary: ['SG'],
+    playable: ['SF', 'SG'],
+    sourceLabels: ['SF', 'SG'],
+    normalizationVersion: 'position-v3',
+  },
   heightInches: 79,
   weightLbs: 215,
   eligibility: { minimumTeamGames: 40, teamGames: 78, teamMinutes: 2700 },

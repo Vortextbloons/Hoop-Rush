@@ -4,7 +4,7 @@
   import type { RouteId } from '$app/types';
   import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { getManifest } from '$lib/data';
+  import { getManifest, warmPlayersIndex } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { variantLabel } from '$lib/draft-presentation';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
@@ -39,6 +39,15 @@
   let classicDraft = $state.raw<ClassicDraftState | null>(null);
   let recent = $state.raw<CompletedRunIndex[]>([]);
 
+  function warmPlayersIndexDuringIdle(): void {
+    const idle = window.requestIdleCallback;
+    if (typeof idle === 'function') {
+      idle(() => warmPlayersIndex());
+    } else {
+      setTimeout(() => warmPlayersIndex(), 0);
+    }
+  }
+
   $effect(() => {
     if (!browser) return;
     let cancelled = false;
@@ -65,6 +74,7 @@
         // History and continue are best-effort on the start page.
       },
     );
+    warmPlayersIndexDuringIdle();
     return () => {
       cancelled = true;
     };
@@ -144,6 +154,9 @@
       {#if mode.status === 'available'}
         <a
           href={resolve(mode.href)}
+          onpointerenter={() => warmPlayersIndex()}
+          onfocus={() => warmPlayersIndex()}
+          ontouchstart={() => warmPlayersIndex()}
           class="group flex h-full flex-col rounded-xl border border-border bg-card p-6 outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
         >
           <div class="flex items-center justify-between gap-3">

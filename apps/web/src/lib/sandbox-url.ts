@@ -110,7 +110,7 @@ export function parseSandboxUrl(
       assignments: rows.map((row, slotIndex) => ({
         slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
         playerId: row.playerId,
-        positions: row.positionsCanonical,
+        positions: row.positionsPlayable,
       })),
     });
     if (!validation.ok) {

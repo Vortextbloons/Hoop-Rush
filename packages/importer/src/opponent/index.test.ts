@@ -8,7 +8,7 @@ function poolPlayer(partial: Partial<PoolPlayer>): PoolPlayer {
     displayName: 'Test Player',
     heightInches: 78,
     weightLbs: 220,
-    positions: { canonical: ['F'] },
+    positions: { playable: ['SF', 'PF'] },
     detailedRatings: {
       insideScoring: 70,
       closeShot: 60,
@@ -77,11 +77,27 @@ function poolPlayer(partial: Partial<PoolPlayer>): PoolPlayer {
 }
 
 const FIVE: PoolPlayer[] = [
-  poolPlayer({ playerId: 'p-89', displayName: 'Nick Van Exel', positions: { canonical: ['G'] } }),
-  poolPlayer({ playerId: 'p-9', displayName: 'Sedale Threatt', positions: { canonical: ['G'] } }),
-  poolPlayer({ playerId: 'p-920', displayName: 'A.C. Green', positions: { canonical: ['F'] } }),
-  poolPlayer({ playerId: 'p-109', displayName: 'Robert Horry', positions: { canonical: ['F'] } }),
-  poolPlayer({ playerId: 'p-124', displayName: 'Vlade Divac', positions: { canonical: ['C'] } }),
+  poolPlayer({
+    playerId: 'p-89',
+    displayName: 'Nick Van Exel',
+    positions: { playable: ['PG', 'SG'] },
+  }),
+  poolPlayer({
+    playerId: 'p-9',
+    displayName: 'Sedale Threatt',
+    positions: { playable: ['PG', 'SG'] },
+  }),
+  poolPlayer({
+    playerId: 'p-920',
+    displayName: 'A.C. Green',
+    positions: { playable: ['PF', 'SF'] },
+  }),
+  poolPlayer({
+    playerId: 'p-109',
+    displayName: 'Robert Horry',
+    positions: { playable: ['PF', 'SF'] },
+  }),
+  poolPlayer({ playerId: 'p-124', displayName: 'Vlade Divac', positions: { playable: ['C'] } }),
 ];
 
 describe('anchorsForPlayer', () => {
@@ -106,7 +122,7 @@ describe('anchorsForPlayer', () => {
 
   it('falls back to the share split for a center with no offensive rebounds', () => {
     const p = poolPlayer({
-      positions: { canonical: ['C'] },
+      positions: { playable: ['C'] },
       stats: { ...poolPlayer({}).stats, offensiveRebounds: 0, defensiveRebounds: null },
     });
     const anchors = anchorsForPlayer(p);
@@ -117,7 +133,7 @@ describe('anchorsForPlayer', () => {
 
   it('uses the fallback split for forwards with many rebounds and no split data', () => {
     const p = poolPlayer({
-      positions: { canonical: ['F'] },
+      positions: { playable: ['SF', 'PF'] },
       stats: {
         ...poolPlayer({}).stats,
         offensiveRebounds: null,
@@ -161,9 +177,9 @@ describe('buildOpponentArtifact', () => {
   it('builds the exact committed artifact shape and validates against the schema', () => {
     const artifact = buildOpponentArtifact({ players: FIVE });
 
-    expect(artifact.schemaVersion).toBe(1);
+    expect(artifact.schemaVersion).toBe(2);
     expect(artifact.opponentId).toBe('lakers-1990s-opening');
-    expect(artifact.bracketVersion).toBe('bracket-m3-v2');
+    expect(artifact.bracketVersion).toBe('bracket-m3-v3');
     expect(artifact.difficultyBand).toBe('medium');
     expect(artifact.teamId).toBe('lakers');
     expect(artifact.displayName).toBe('Los Angeles Lakers');

@@ -33,8 +33,29 @@ export const workerCancelRequestSchema = z.object({
 });
 export type WorkerCancelRequest = z.infer<typeof workerCancelRequestSchema>;
 
+/**
+ * Whole-run best-of request: the worker simulates every derived attempt of the
+ * complete season and reports the chosen attempt's seed, which the main thread
+ * persists before any game is revealed. Same fields as the simulate request
+ * minus `startGameNumber`; the sender strips recorded games to keep the post
+ * light.
+ */
+export const workerStartRequestSchema = z.object({
+  schemaVersion: z.literal(1),
+  type: z.literal('start'),
+  requestId: z.string().min(1).max(64),
+  /** Challenge snapshot; only the fresh (games: []) form is accepted. */
+  run: challengeRunSchema,
+  /** Era profile every simulated attempt game uses (static, versioned content). */
+  profile: eraSimulationProfileSchema,
+  /** Engine version the worker must report; the main thread verifies results. */
+  engineVersion: z.string().min(1).max(64),
+});
+export type WorkerStartRequest = z.infer<typeof workerStartRequestSchema>;
+
 export const workerRequestSchema = z.discriminatedUnion('type', [
   workerSimulateRequestSchema,
+  workerStartRequestSchema,
   workerCancelRequestSchema,
 ]);
 export type WorkerRequest = z.infer<typeof workerRequestSchema>;
@@ -66,9 +87,26 @@ export const workerErrorMessageSchema = z.object({
 });
 export type WorkerErrorMessage = z.infer<typeof workerErrorMessageSchema>;
 
+/**
+ * Reply to a `start` request: the chosen attempt seed plus its exact record.
+ * The main thread re-saves the active run with the chosen seed before any game
+ * is revealed, so per-game seeds and resume reproduce exactly those games.
+ */
+export const workerStartResultMessageSchema = z.object({
+  schemaVersion: z.literal(1),
+  type: z.literal('start-result'),
+  requestId: z.string().min(1).max(64),
+  chosenRunSeed: z.string().min(1).max(64),
+  chosenWins: z.number().int().nonnegative(),
+  chosenLosses: z.number().int().nonnegative(),
+  chosenDifferential: z.number().int(),
+});
+export type WorkerStartResultMessage = z.infer<typeof workerStartResultMessageSchema>;
+
 export const workerMessageSchema = z.discriminatedUnion('type', [
   workerResultsMessageSchema,
   workerCompleteMessageSchema,
   workerErrorMessageSchema,
+  workerStartResultMessageSchema,
 ]);
 export type WorkerMessage = z.infer<typeof workerMessageSchema>;
