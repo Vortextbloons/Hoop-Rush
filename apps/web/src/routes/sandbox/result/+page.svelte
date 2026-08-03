@@ -36,7 +36,7 @@
   const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 
   let manifest = $state<HoopRushManifest | null>(null);
-  /** playerId ΓåÆ peak season across the run's loaded pools (slot provenance). */
+  /** playerId → peak season across the run's loaded pools (slot provenance). */
   let byId = $state<Map<string, PeakPlayer> | null>(null);
   let run = $state<ChallengeRun | null>(null);
   let error = $state<string | null>(null);
@@ -173,13 +173,13 @@
   });
 
   function pct(made: number, attempted: number): string {
-    return attempted === 0 ? 'ΓÇö' : `${((made / attempted) * 100).toFixed(1)}%`;
+    return attempted === 0 ? '—' : `${((made / attempted) * 100).toFixed(1)}%`;
   }
 
   /** True shooting percentage from exact season totals: PTS / (2*(FGA + 0.44*FTA)). */
   function trueShootingPct(points: number, fga: number, fta: number): string {
     const denominator = 2 * (fga + 0.44 * fta);
-    return denominator <= 0 ? 'ΓÇö' : `${((points / denominator) * 100).toFixed(1)}%`;
+    return denominator <= 0 ? '—' : `${((points / denominator) * 100).toFixed(1)}%`;
   }
 
   /** Usage percentage: the player's possession estimate share of the team's. */
@@ -191,7 +191,7 @@
     }) => p.fieldGoals.attempted + 0.44 * p.freeThrows.attempted + p.turnovers;
     const player = possessionEstimate(raw);
     const teamTotal = possessionEstimate(team);
-    if (teamTotal <= 0) return 'ΓÇö';
+    if (teamTotal <= 0) return '—';
     return `${((player / teamTotal) * 100).toFixed(1)}%`;
   }
 
@@ -250,11 +250,11 @@
 </script>
 
 <svelte:head>
-  <title>Challenge result ΓÇö Sandbox ΓÇö Hoop Rush</title>
+  <title>Challenge result — Sandbox — Hoop Rush</title>
 </svelte:head>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-  <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Sandbox ┬╖ Result</p>
+  <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Sandbox · Result</p>
   <h1
     class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
   >
@@ -278,7 +278,7 @@
         class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
       ></div>
       <p class="mt-4 font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase">
-        Loading resultΓÇª
+        Loading result…
       </p>
     </div>
   {:else}
@@ -286,9 +286,7 @@
     <div
       class="mt-8 rounded-2xl border border-line-strong bg-card p-6 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:p-8"
     >
-      <div
-        class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
-      >
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div class="flex items-center gap-3">
           {#if franchise && manifest}
             <TeamLogo
@@ -304,14 +302,13 @@
               {run.homeDisplayName}
             </p>
             <p class="font-mono text-[10px] text-muted-foreground">
-              {franchiseLabel(run.franchiseId)} ┬╖ {era?.label ?? run.eraId} ┬╖ five players, no
-              bench
+              {franchiseLabel(run.franchiseId)} · {era?.label ?? run.eraId} · five players, no bench
             </p>
           </div>
         </div>
         <div class="shrink-0 text-center sm:text-right">
           <p class="font-display text-5xl font-extrabold tracking-tight sm:text-6xl">
-            {record.wins}<span class="text-muted-foreground">ΓÇô</span>{record.losses}
+            {record.wins}<span class="text-muted-foreground">–</span>{record.losses}
           </p>
           <SeasonTierBadge wins={record.wins} size="large" />
         </div>
@@ -342,8 +339,8 @@
           </a>
         {/if}
         <span class="ml-auto font-mono text-[10px] text-muted-foreground">
-          seed {run.runSeed} ┬╖ best of {BEST_OF_ATTEMPTS} ┬╖ engine {run.versions.engineVersion} ┬╖ bracket
-          {run.versions.bracketVersion} ┬╖ schedule {run.versions.scheduleVersion}
+          seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion} · bracket
+          {run.versions.bracketVersion} · schedule {run.versions.scheduleVersion}
         </span>
       </div>
     </div>
@@ -358,7 +355,7 @@
           id="season-table-heading"
           class="font-display text-xl font-extrabold tracking-tight uppercase"
         >
-          Your five ┬╖ season
+          Your five · season
         </h2>
         <div
           class="flex rounded-lg border border-border p-0.5"
@@ -494,10 +491,10 @@
           </table>
         </div>
         {#if byId === null}
-          <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player detailsΓÇª</p>
+          <p class="mt-3 animate-pulse text-sm text-muted-foreground">Loading player details…</p>
         {/if}
       {:else}
-        <p class="mt-4 animate-pulse text-sm text-muted-foreground">Loading season tableΓÇª</p>
+        <p class="mt-4 animate-pulse text-sm text-muted-foreground">Loading season table…</p>
       {/if}
     </section>
 
@@ -517,7 +514,7 @@
               Field goal
             </dt>
             <dd class="min-w-0 font-mono sm:text-right">
-              {pct(record.fieldGoals.made, record.fieldGoals.attempted)} ┬╖ {record.fieldGoals.made}/
+              {pct(record.fieldGoals.made, record.fieldGoals.attempted)} · {record.fieldGoals.made}/
               {record.fieldGoals.attempted}
             </dd>
           </div>
@@ -530,7 +527,7 @@
               Three-point
             </dt>
             <dd class="min-w-0 font-mono sm:text-right">
-              {pct(record.threes.made, record.threes.attempted)} ┬╖ {record.threes.made}/
+              {pct(record.threes.made, record.threes.attempted)} · {record.threes.made}/
               {record.threes.attempted}
             </dd>
           </div>
@@ -543,7 +540,7 @@
               Free throws
             </dt>
             <dd class="min-w-0 font-mono sm:text-right">
-              {pct(record.freeThrows.made, record.freeThrows.attempted)} ┬╖ {record.freeThrows.made}/
+              {pct(record.freeThrows.made, record.freeThrows.attempted)} · {record.freeThrows.made}/
               {record.freeThrows.attempted}
             </dd>
           </div>
@@ -556,7 +553,7 @@
               Turnovers
             </dt>
             <dd class="min-w-0 font-mono sm:text-right">
-              {perGameValue(record.turnovers, record.gamesPlayed)} per game ┬╖ {record.turnovers} total
+              {perGameValue(record.turnovers, record.gamesPlayed)} per game · {record.turnovers} total
             </dd>
           </div>
           <div
@@ -572,8 +569,8 @@
                 >{perGameValue(record.rebounds.total, record.gamesPlayed)} per game</span
               >
               <span class="block text-muted-foreground sm:inline">
-                <span class="hidden sm:inline"> ┬╖ </span>
-                {record.rebounds.offensive} offensive ┬╖ {record.rebounds.defensive} defensive
+                <span class="hidden sm:inline"> · </span>
+                {record.rebounds.offensive} offensive · {record.rebounds.defensive} defensive
               </span>
             </dd>
           </div>
@@ -586,7 +583,7 @@
               Assists
             </dt>
             <dd class="min-w-0 font-mono sm:text-right">
-              {perGameValue(record.assists, record.gamesPlayed)} per game ┬╖ {record.assists} total
+              {perGameValue(record.assists, record.gamesPlayed)} per game · {record.assists} total
             </dd>
           </div>
           <div
@@ -598,7 +595,7 @@
               Possessions
             </dt>
             <dd class="min-w-0 font-mono sm:text-right">
-              {perGameValue(record.possessions, record.gamesPlayed)} per game ┬╖ {record.possessions} total
+              {perGameValue(record.possessions, record.gamesPlayed)} per game · {record.possessions} total
             </dd>
           </div>
         </dl>
@@ -614,7 +611,7 @@
               {bestPlayerName}
             </p>
             <p class="mt-1 font-mono text-xs text-muted-foreground">
-              {bestPerformance.points} points ┬╖ game {bestPerformance.gameNumber} vs {bestPerformance.opponent}
+              {bestPerformance.points} points · game {bestPerformance.gameNumber} vs {bestPerformance.opponent}
             </p>
           </div>
           <p class="mt-3 text-xs text-muted-foreground">

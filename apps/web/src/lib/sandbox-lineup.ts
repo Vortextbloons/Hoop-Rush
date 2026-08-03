@@ -2,7 +2,7 @@ import type { ChallengeRun, HoopRushManifest, PeakPlayerSeason } from '@hoop-rus
 import { getPool } from '$lib/data';
 
 /**
- * Loads the pools behind a run and maps playerId ΓåÆ peak season. Free-form
+ * Loads the pools behind a run and maps playerId → peak season. Free-form
  * runs resolve the pools of their selections (unique franchise/era pairs);
  * legacy runs resolve the single franchise/era pool. Missing or failed
  * pools are skipped so callers render from run snapshots regardless.

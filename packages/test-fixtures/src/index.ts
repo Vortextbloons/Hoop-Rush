@@ -208,9 +208,11 @@ export const DEFAULT_DIFFICULTY: DifficultyProfile = {
   teamPercentileBand: [0.25, 0.65],
 };
 
-const ALL_FRANCHISE_SLOTS: ReadonlyArray<
-  { franchiseId: string; displayName: string; teamExternalId: string }
-> = [
+const ALL_FRANCHISE_SLOTS: ReadonlyArray<{
+  franchiseId: string;
+  displayName: string;
+  teamExternalId: string;
+}> = [
   { franchiseId: 'hawks', displayName: 'Atlanta Hawks', teamExternalId: '1610612737' },
   { franchiseId: 'celtics', displayName: 'Boston Celtics', teamExternalId: '1610612738' },
   { franchiseId: 'nets', displayName: 'Brooklyn Nets', teamExternalId: '1610612751' },
@@ -228,7 +230,11 @@ const ALL_FRANCHISE_SLOTS: ReadonlyArray<
   { franchiseId: 'grizzlies', displayName: 'Memphis Grizzlies', teamExternalId: '1610612763' },
   { franchiseId: 'heat', displayName: 'Miami Heat', teamExternalId: '1610612748' },
   { franchiseId: 'bucks', displayName: 'Milwaukee Bucks', teamExternalId: '1610612749' },
-  { franchiseId: 'timberwolves', displayName: 'Minnesota Timberwolves', teamExternalId: '1610612750' },
+  {
+    franchiseId: 'timberwolves',
+    displayName: 'Minnesota Timberwolves',
+    teamExternalId: '1610612750',
+  },
   { franchiseId: 'pelicans', displayName: 'New Orleans Pelicans', teamExternalId: '1610612740' },
   { franchiseId: 'knicks', displayName: 'New York Knicks', teamExternalId: '1610612752' },
   { franchiseId: 'thunder', displayName: 'Oklahoma City Thunder', teamExternalId: '1610612760' },

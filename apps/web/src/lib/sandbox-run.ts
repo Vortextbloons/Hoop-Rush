@@ -58,7 +58,7 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
     eraId: FIXED_SANDBOX_ERA,
     homeDisplayName: players
       .map((p) => p.displayName)
-      .join(' ┬╖ ')
+      .join(' · ')
       .slice(0, 96),
     lineup: {
       structure: [...LINEUP_STRUCTURE],

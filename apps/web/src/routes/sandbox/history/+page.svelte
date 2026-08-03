@@ -73,7 +73,7 @@
 </script>
 
 <svelte:head>
-  <title>Challenge history ΓÇö Sandbox ΓÇö Hoop Rush</title>
+  <title>Challenge history — Sandbox — Hoop Rush</title>
 </svelte:head>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
@@ -113,8 +113,8 @@
       <div class="mt-8 rounded-xl border border-line-strong bg-surface-2 p-5">
         <p class="font-display text-lg font-extrabold tracking-tight uppercase">Active challenge</p>
         <p class="mt-1 text-sm text-muted-foreground">
-          {franchiseName(active.run.franchiseId)} ┬╖ {eraName(active.run.eraId)} ┬╖ game
-          {active.run.games.length + 1} of 82 ┬╖ {active.run.aggregates.team.wins}-
+          {franchiseName(active.run.franchiseId)} · {eraName(active.run.eraId)} · game
+          {active.run.games.length + 1} of 82 · {active.run.aggregates.team.wins}-
           {active.run.aggregates.team.losses}
         </p>
         <a
@@ -141,15 +141,15 @@
               <span
                 class="font-display block truncate text-base font-extrabold tracking-tight uppercase"
               >
-                {franchiseName(row.franchiseId)} ┬╖ {eraName(row.eraId)}
+                {franchiseName(row.franchiseId)} · {eraName(row.eraId)}
               </span>
               <span class="block font-mono text-[10px] text-muted-foreground">
-                {row.playerIds.length} players ┬╖ {franchiseLabel(row.franchiseId)} ┬╖ seed
+                {row.playerIds.length} players · {franchiseLabel(row.franchiseId)} · seed
                 {row.runSeed.slice(0, 8)}
               </span>
             </span>
             <span class="font-display text-xl font-extrabold tracking-tight">
-              {row.wins}<span class="text-muted-foreground">ΓÇô</span>{row.losses}
+              {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
             </span>
             <SeasonTierBadge wins={row.wins} />
             <span class="w-full font-mono text-[10px] text-muted-foreground sm:w-auto">

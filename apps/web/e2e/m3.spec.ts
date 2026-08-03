@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
 /**
- * M3 journeys (spec/08, spec/06): draft five ΓåÆ Play ΓåÆ animated 82-game
- * overlay ΓåÆ completed summary ΓåÆ reload ΓåÆ history ΓåÆ reopen result, plus
+ * M3 journeys (spec/08, spec/06): draft five → Play → animated 82-game
+ * overlay → completed summary → reload → history → reopen result, plus
  * cancellation/resume, mobile layout, keyboard control, screen-reader
  * landmarks, image fallbacks, and reduced motion. The draft browses a global
  * players index with optional Franchise/Decade filters; every run simulates
@@ -11,11 +11,6 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function draftFive(page: Page) {
   await page.goto('/sandbox');
-  await page.getByRole('button', { name: 'Franchise' }).click();
-  await page.getByRole('option', { name: /Los Angeles Lakers/ }).click();
-  await page.getByRole('button', { name: 'Decade' }).click();
-  await page.getByRole('option', { name: '1990s', exact: true }).click();
-  await expect(page.getByRole('heading', { name: /LAL ┬╖ 1990s/ })).toBeVisible();
   for (const [name, slotLabel] of [
     ['Nick Van Exel', 'Point Guard slot 1'],
     ['Sedale Threatt', 'Shooting Guard slot 2'],
@@ -23,7 +18,11 @@ async function draftFive(page: Page) {
     ['Robert Horry', 'Power Forward slot 4'],
     ['Vlade Divac', 'Center slot 5'],
   ] as const) {
-    await page.getByRole('button', { name: new RegExp(name) }).click();
+    const search = page.getByRole('searchbox', { name: 'Search players by name' });
+    await search.fill(name);
+    const card = page.getByRole('button', { name: new RegExp(name) }).first();
+    await expect(card).toBeVisible();
+    await card.click();
     await page.getByRole('button', { name: `Place ${name} at ${slotLabel}`, exact: true }).click();
   }
 }
@@ -43,7 +42,7 @@ async function expectSeasonReport(page: Page) {
   await expect(page).toHaveURL(/\/sandbox\/result\?runId=/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
   await expect(
-    page.getByText(/82(-0 ┬╖ perfect| games ┬╖ (contender|playoff|lottery|tanking))/),
+    page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
   ).toBeVisible({
     timeout: 15000,
   });
@@ -67,9 +66,9 @@ test.describe('m3: draft to 82-game season journey', () => {
 
     // Season facts: final record, strip, facts, and the five-player table.
     await expect(
-      page.getByText(/82(-0 ┬╖ perfect| games ┬╖ (contender|playoff|lottery|tanking))/),
+      page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
     ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Your five ┬╖ season' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Best performance' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
@@ -77,11 +76,11 @@ test.describe('m3: draft to 82-game season journey', () => {
     await expect(strip.locator('li')).toHaveCount(82);
 
     // The record survives a reload.
-    const recordText = await page.getByText(/^\d+ΓÇô\d+$/).innerText();
+    const recordText = await page.getByText(/^\d+–\d+$/).innerText();
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
-    await expect(page.getByText(/^\d+ΓÇô\d+$/)).toBeVisible();
-    expect(await page.getByText(/^\d+ΓÇô\d+$/).innerText()).toBe(recordText);
+    await expect(page.getByText(/^\d+–\d+$/)).toBeVisible();
+    expect(await page.getByText(/^\d+–\d+$/).innerText()).toBe(recordText);
 
     // Totals toggle switches the season table to totals.
     await page.getByRole('button', { name: 'Totals' }).click();
@@ -99,8 +98,8 @@ test.describe('m3: draft to 82-game season journey', () => {
     await expect(row).toBeVisible();
     await row.click();
     await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
-    await expect(page.getByText(/^\d+ΓÇô\d+$/)).toBeVisible();
-    expect(await page.getByText(/^\d+ΓÇô\d+$/).innerText()).toBe(recordText);
+    await expect(page.getByText(/^\d+–\d+$/)).toBeVisible();
+    expect(await page.getByText(/^\d+–\d+$/).innerText()).toBe(recordText);
 
     // The start page lists the completed challenge.
     await page.goto('/');
@@ -154,8 +153,8 @@ test.describe('m3: draft to 82-game season journey', () => {
       timeout: 15000,
     });
     await expectSeasonReport(page);
-    const recordText = await page.getByText(/^\d+ΓÇô\d+$/).innerText();
-    expect(recordText).toMatch(/^\d+ΓÇô\d+$/);
+    const recordText = await page.getByText(/^\d+–\d+$/).innerText();
+    expect(recordText).toMatch(/^\d+–\d+$/);
   });
 });
 
@@ -198,7 +197,7 @@ test.describe('m3: accessibility and mobile', () => {
   test('screen reader: key regions carry labelled landmarks', async ({ page }) => {
     await reachPlaying(page);
     await expectSeasonReport(page);
-    await expect(page.getByRole('heading', { name: 'Your five ┬╖ season' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Best performance' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Per game' })).toBeVisible();
@@ -211,6 +210,6 @@ test.describe('m3: accessibility and mobile', () => {
     await page.route('https://cdn.nba.com/**', (route) => route.abort());
     await reachPlaying(page);
     await expectSeasonReport(page);
-    await expect(page.getByRole('heading', { name: 'Your five ┬╖ season' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
   });
 });

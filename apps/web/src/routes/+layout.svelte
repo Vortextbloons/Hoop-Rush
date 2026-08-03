@@ -24,7 +24,7 @@
 
 <svelte:head>
   <meta name="color-scheme" content="dark light" />
-  <title>Hoop Rush ΓÇö make yours never</title>
+  <title>Hoop Rush — make yours never</title>
 </svelte:head>
 
 <ModeWatcher />

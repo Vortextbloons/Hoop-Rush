@@ -324,7 +324,7 @@
 </script>
 
 <svelte:head>
-  <title>Sandbox ΓÇö Hoop Rush</title>
+  <title>Sandbox — Hoop Rush</title>
 </svelte:head>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
@@ -354,14 +354,14 @@
       Failed to load data: {manifestError}
     </p>
   {:else if !manifest}
-    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading dataΓÇª</p>
+    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading data…</p>
   {:else}
     {#if indexError}
       <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
         Failed to load players: {indexError}
       </p>
     {:else if !index}
-      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading playersΓÇª</p>
+      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading players…</p>
     {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">
         <div class="rounded-xl border border-border bg-card">
@@ -372,7 +372,7 @@
             <span
               class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
             >
-              {sortedRows.length} players ┬╖ sorted by OVER
+              {sortedRows.length} players · sorted by OVER
             </span>
           </div>
           <div class="flex flex-col gap-2 border-b border-border p-2">
@@ -383,7 +383,7 @@
               <input
                 type="search"
                 bind:value={search}
-                placeholder="Search playersΓÇª"
+                placeholder="Search players…"
                 aria-label="Search players by name"
                 class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
               />
@@ -458,9 +458,9 @@
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-bold">{player.displayName}</span>
                       <span class="block font-mono text-[10px] text-muted-foreground">
-                        {player.seasonKey} ┬╖ {franchiseAbbreviation(player.franchiseId)} ┬╖ {eraLabel.get(
+                        {player.seasonKey} · {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(
                           player.eraId,
-                        ) ?? player.eraId} ┬╖ {player.positionsCanonical.join('/')}
+                        ) ?? player.eraId} · {player.positionsCanonical.join('/')}
                       </span>
                     </span>
                     <span class="flex shrink-0 gap-1 font-mono text-[10px]">
@@ -505,7 +505,7 @@
               disabled={starting}
               class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {starting ? 'StartingΓÇª' : 'Play 82 games'}
+              {starting ? 'Starting…' : 'Play 82 games'}
               <ArrowRight class="h-4 w-4" />
             </button>
           </div>
@@ -576,7 +576,7 @@
                   {subject.displayName}
                 </Dialog.Title>
                 <p class="font-mono text-[10px] text-muted-foreground">
-                  {subject.seasonKey} ┬╖ {subject.positionsCanonical.join('/')} ┬╖ O
+                  {subject.seasonKey} · {subject.positionsCanonical.join('/')} · O
                   {subject.overall}
                 </p>
               </div>
@@ -622,7 +622,7 @@
                       {opt.incumbent.displayName}
                     </span>
                     <span class="block font-mono text-[10px] text-muted-foreground">
-                      {opt.incumbent.seasonKey} ┬╖ {opt.incumbent.positionsCanonical.join('/')}
+                      {opt.incumbent.seasonKey} · {opt.incumbent.positionsCanonical.join('/')}
                     </span>
                   {:else}
                     <span class="block truncate text-sm font-semibold">Open {label} slot</span>

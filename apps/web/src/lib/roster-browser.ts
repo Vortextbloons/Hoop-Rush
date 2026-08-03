@@ -2,7 +2,7 @@ import type { PlayersIndexEntry, PlayerSeasonStats } from '@hoop-rush/data-contr
 
 /**
  * Pure presentation helpers for the Roster browser: filtering, sorting, and
- * grouping of the global players index. No DOM, no Svelte ΓÇö unit-testable.
+ * grouping of the global players index. No DOM, no Svelte — unit-testable.
  */
 
 export type RosterSortId =

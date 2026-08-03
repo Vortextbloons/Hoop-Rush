@@ -232,7 +232,16 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       : detailPos === 'PF' || detailPos === 'SF'
         ? 'F'
         : 'C';
-  const priors = POSITION_PRIORS[position] ?? POSITION_PRIORS['F'] ?? POSITION_PRIORS['G']!;
+  const priors = POSITION_PRIORS[position] ??
+    POSITION_PRIORS['F'] ??
+    POSITION_PRIORS['G'] ?? {
+      stealsPer36: 1,
+      blocksPer36: 0.8,
+      turnoversPer36: 2.4,
+      offensiveReboundsPer36: 1.5,
+      defensiveReboundsPer36: 5,
+      threePointRatePrior: 0.12,
+    };
 
   const unclamped: Record<string, number> = {};
   const methods: Record<string, ProvenanceKind> = {};

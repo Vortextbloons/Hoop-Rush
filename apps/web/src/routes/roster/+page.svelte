@@ -193,14 +193,14 @@
   }
 
   function heightLabel(player: IndexRow): string {
-    if (player.heightInches === null || player.heightInches === undefined) return 'ΓÇö';
+    if (player.heightInches === null || player.heightInches === undefined) return '—';
     const feet = Math.floor(player.heightInches / 12);
     const inches = player.heightInches % 12;
     return `${feet}'${inches}"`;
   }
 
   function weightLabel(player: IndexRow): string {
-    if (player.weightLbs === null || player.weightLbs === undefined) return 'ΓÇö';
+    if (player.weightLbs === null || player.weightLbs === undefined) return '—';
     return `${player.weightLbs} lbs`;
   }
 
@@ -261,7 +261,7 @@
 
   const poolHeading = $derived(
     franchise && era
-      ? `${franchiseAbbreviation(franchise.franchiseId)} ┬╖ ${era.label}`
+      ? `${franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
       : franchise
         ? franchiseAbbreviation(franchise.franchiseId)
         : era
@@ -288,11 +288,11 @@
     { key: 'per', label: 'PER', sort: 'per', numeric: true },
   ];
 
-  const sortArrow = $derived(sortId === 'none' ? '' : sortDir === 'asc' ? 'Γåæ' : 'Γåô');
+  const sortArrow = $derived(sortId === 'none' ? '' : sortDir === 'asc' ? '↑' : '↓');
 </script>
 
 <svelte:head>
-  <title>Roster ΓÇö Hoop Rush</title>
+  <title>Roster — Hoop Rush</title>
 </svelte:head>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
@@ -306,7 +306,7 @@
       </h1>
       <p class="mt-3 max-w-xl text-sm text-muted-foreground">
         Every eligible peak player-season in the league. Browse by franchise, decade, rating, and
-        stats ΓÇö then take your favorites to the sandbox.
+        stats — then take your favorites to the sandbox.
       </p>
     </div>
     <a
@@ -322,7 +322,7 @@
       Failed to load data: {manifestError}
     </p>
   {:else if !manifest}
-    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading dataΓÇª</p>
+    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading data…</p>
   {:else}
     <div class="mt-8 grid gap-6 sm:grid-cols-2">
       <div>
@@ -342,7 +342,7 @@
             aria-labelledby="roster-franchise-label"
             class="mt-3 flex h-12 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Select.Value placeholder="Any franchiseΓÇª">
+            <Select.Value placeholder="Any franchise…">
               {#snippet children(props)}
                 {#if franchise}
                   <span class="flex min-w-0 items-center gap-2.5">
@@ -394,7 +394,7 @@
                   <Select.Item
                     value={entry.franchiseId}
                     label={entry.displayName}
-                    aria-label={`${franchiseAbbreviation(entry.franchiseId)} ΓÇö ${entry.displayName}`}
+                    aria-label={`${franchiseAbbreviation(entry.franchiseId)} — ${entry.displayName}`}
                     class="cursor-pointer select-none rounded-md outline-none transition-colors data-[disabled]:cursor-not-allowed data-[disabled]:opacity-40 data-[highlighted]:bg-surface-3 data-[selected]:bg-primary/10"
                   >
                     {#snippet children({ selected })}
@@ -432,7 +432,7 @@
             aria-labelledby="roster-decade-label"
             class="mt-3 flex h-12 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-3.5 text-sm font-semibold text-foreground outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Select.Value placeholder="Any decadeΓÇª">
+            <Select.Value placeholder="Any decade…">
               {#snippet children(props)}
                 {#if era}
                   <span class="truncate font-mono">{era.label}</span>
@@ -501,7 +501,7 @@
         Failed to load players: {indexError}
       </p>
     {:else if !index}
-      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading playersΓÇª</p>
+      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading players…</p>
     {:else}
       <div class="mt-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-2 sm:p-3">
         <div class="flex flex-col gap-2">
@@ -512,7 +512,7 @@
             <input
               type="search"
               bind:value={search}
-              placeholder="Search playersΓÇª"
+              placeholder="Search players…"
               aria-label="Search players by name"
               class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
             />
@@ -612,7 +612,7 @@
                         >
                           {col.label}
                           {#if sortId === col.sort}
-                            <span aria-hidden="true">{sortDir === 'asc' ? 'Γåæ' : 'Γåô'}</span>
+                            <span aria-hidden="true">{sortDir === 'asc' ? '↑' : '↓'}</span>
                           {/if}
                         </button>
                       {:else}
@@ -630,8 +630,8 @@
                         colspan={columns.length}
                         class="border-b border-border/60 bg-surface-1 px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
                       >
-                        {franchiseAbbreviation(item.franchiseId)} ┬╖ {eraLabel.get(item.eraId) ??
-                          item.eraId} ┬╖ {item.count} players
+                        {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ??
+                          item.eraId} · {item.count} players
                       </td>
                     </tr>
                   {:else}
@@ -713,8 +713,8 @@
                 <li
                   class="px-2 pt-3 pb-1 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
                 >
-                  {franchiseAbbreviation(item.franchiseId)} ┬╖ {eraLabel.get(item.eraId) ??
-                    item.eraId} ┬╖ {item.count} players
+                  {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ??
+                    item.eraId} · {item.count} players
                 </li>
               {:else}
                 {@const player = item.player}
@@ -734,8 +734,8 @@
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-bold">{player.displayName}</span>
                       <span class="block font-mono text-[10px] text-muted-foreground">
-                        {franchiseAbbreviation(player.franchiseId)} ┬╖ {eraLabel.get(player.eraId) ??
-                          player.eraId} ┬╖ {player.seasonKey} ┬╖ {player.positionsCanonical.join('/')}
+                        {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(player.eraId) ??
+                          player.eraId} · {player.seasonKey} · {player.positionsCanonical.join('/')}
                       </span>
                     </span>
                     <span class="flex shrink-0 items-center gap-1 font-mono text-[10px]">
@@ -807,9 +807,9 @@
                   {subject.displayName}
                 </Dialog.Title>
                 <p class="font-mono text-[10px] text-muted-foreground">
-                  {franchiseName.get(subject.franchiseId) ?? subject.franchiseId} ┬╖ {eraLabel.get(
+                  {franchiseName.get(subject.franchiseId) ?? subject.franchiseId} · {eraLabel.get(
                     subject.eraId,
-                  ) ?? subject.eraId} ┬╖ {subject.seasonKey}
+                  ) ?? subject.eraId} · {subject.seasonKey}
                 </p>
               </div>
             </div>
@@ -862,7 +862,7 @@
           </div>
 
           <p class="mt-4 font-mono text-[10px] text-muted-foreground">
-            Peak season by selection score ┬╖ {line.usage.toFixed(1)}% usage ┬╖ {formatPerGame(
+            Peak season by selection score · {line.usage.toFixed(1)}% usage · {formatPerGame(
               line.mpg,
             )} minutes per game
           </p>

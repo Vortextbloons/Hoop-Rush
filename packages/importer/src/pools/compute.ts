@@ -1172,7 +1172,7 @@ export function availabilityEntryFor(
       eraId,
       status: 'unavailable',
       reason: computed.reason,
-      ...(computed.detail !== undefined ? { detail: computed.detail } : {}),
+      detail: computed.detail,
       ...(computed.firstSupportedSeason !== undefined
         ? { firstSupportedSeason: computed.firstSupportedSeason }
         : {}),

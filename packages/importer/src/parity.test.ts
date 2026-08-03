@@ -11,7 +11,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PUBLIC_DATA } from './config.js';
 import { readJson } from './json.js';
-import { computePool, loadBbrefIds, loadManifest, type Pool } from './pools/compute.js';
+import { computePool, loadBbrefIds, loadManifest } from './pools/compute.js';
 import { computeEraProfile, erasWithData } from './era-profile/profile.js';
 
 interface CommittedPoolPlayer {

@@ -31,7 +31,7 @@
   let profile = $state.raw<EraSimulationProfile | null>(null);
   let run = $state.raw<ChallengeRun | null>(null);
   let loadError = $state<string | null>(null);
-  /** playerId ΓåÆ peak season for lineup headshots. */
+  /** playerId → peak season for lineup headshots. */
   let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
 
   let phase = $state<RunnerPhase>('idle');
@@ -215,7 +215,7 @@
 </script>
 
 <svelte:head>
-  <title>Challenge in progress ΓÇö Sandbox ΓÇö Hoop Rush</title>
+  <title>Challenge in progress — Sandbox — Hoop Rush</title>
 </svelte:head>
 
 <p id="challenge-announcer" class="sr-only" aria-live="polite"></p>
@@ -238,7 +238,7 @@
         class="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"
       ></div>
       <p class="mt-4 font-mono text-xs tracking-[0.16em] text-muted-foreground uppercase">
-        Loading challengeΓÇª
+        Loading challenge…
       </p>
     </div>
   {:else}
@@ -250,7 +250,7 @@
         class="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-center px-4 py-8 sm:px-6"
       >
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
-          Sandbox ┬╖ {franchiseLabel(run.franchiseId)} ┬╖ {run.eraId}
+          Sandbox · {franchiseLabel(run.franchiseId)} · {run.eraId}
         </p>
         <h1 class="font-display mt-2 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl">
           {#if phase === 'paused'}
@@ -283,24 +283,24 @@
                 {run.homeDisplayName}
               </p>
               <p class="font-mono text-[10px] text-muted-foreground">
-                {franchiseLabel(run.franchiseId)} ┬╖ {run.eraId}
+                {franchiseLabel(run.franchiseId)} · {run.eraId}
               </p>
             </div>
           </div>
           <div class="flex flex-col items-center gap-1">
             <p class="font-display text-4xl font-extrabold tracking-tight sm:text-6xl">
               <span class={latest?.winner === 'home' ? 'text-primary' : 'text-muted-foreground'}>
-                {latest?.home.box.points ?? 'ΓÇô'}
+                {latest?.home.box.points ?? '–'}
               </span>
-              <span class="mx-2 text-muted-foreground">ΓÇô</span>
+              <span class="mx-2 text-muted-foreground">–</span>
               <span class={latest?.winner === 'away' ? 'text-primary' : 'text-muted-foreground'}>
-                {latest?.away.box.points ?? 'ΓÇô'}
+                {latest?.away.box.points ?? '–'}
               </span>
             </p>
             <p
               class="rounded-full border border-border px-3 py-0.5 font-mono text-[10px] uppercase"
             >
-              Game {run.games.length}{run.games.length === 82 ? ' ┬╖ final' : ''} ┬╖ {record?.wins ??
+              Game {run.games.length}{run.games.length === 82 ? ' · final' : ''} · {record?.wins ??
                 0}-
               {record?.losses ?? 0}
             </p>
@@ -319,7 +319,7 @@
               <p
                 class="font-display truncate text-sm font-extrabold tracking-tight uppercase sm:text-base"
               >
-                {latestOpponent?.displayName ?? 'Waiting for the first tipΓÇª'}
+                {latestOpponent?.displayName ?? 'Waiting for the first tip…'}
               </p>
               <p class="font-mono text-[10px] text-muted-foreground">
                 {latestOpponent?.seasonKey ?? 'Medium difficulty'}
@@ -401,9 +401,9 @@
         </div>
 
         <p class="mt-4 font-mono text-[10px] text-muted-foreground">
-          seed {run.runSeed} ┬╖ best of {BEST_OF_ATTEMPTS} ┬╖ engine {run.versions.engineVersion}
-          ┬╖ bracket {run.versions.bracketVersion}
-          ┬╖ schedule {run.versions.scheduleVersion}
+          seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion}
+          · bracket {run.versions.bracketVersion}
+          · schedule {run.versions.scheduleVersion}
         </p>
       </div>
     </div>
