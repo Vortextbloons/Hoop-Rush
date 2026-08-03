@@ -3,9 +3,14 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import type { ChallengeRun, HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
+  import type {
+    ChallengeRun,
+    HoopRushManifest,
+    PeakPlayerSeason,
+    PlayersIndexEntry,
+  } from '@hoop-rush/data-contracts';
   import { variantLabel } from '$lib/draft-presentation';
-  import { getManifest } from '$lib/data';
+  import { getManifest, getPlayersIndex } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { clearClassicDraftState } from '$lib/classic-draft';
   import { loadRunPlayersById } from '$lib/sandbox-lineup';
@@ -21,6 +26,8 @@
   let manifest = $state.raw<HoopRushManifest | null>(null);
   /** playerId → peak season across the run's loaded pools (slot provenance). */
   let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
+  /** playerId → global players-index entry, used for MVP headshots. */
+  let indexById = $state.raw<Map<string, PlayersIndexEntry> | null>(null);
   let run = $state.raw<ChallengeRun | null>(null);
   let error = $state<string | null>(null);
   let running = $state(false);
@@ -35,6 +42,16 @@
       (m) => {
         if (cancelled) return;
         manifest = m;
+        getPlayersIndex().then(
+          (ix) => {
+            if (!cancelled) {
+              indexById = new Map(ix.players.map((p) => [p.playerId, p]));
+            }
+          },
+          () => {
+            // Headshots are best-effort; the report renders without them.
+          },
+        );
       },
       () => {
         if (!cancelled) error = 'The manifest is unavailable.';
@@ -138,6 +155,6 @@
       </p>
     </div>
   {:else}
-    <SeasonReport {manifest} {run} {byId} {modeLabel} {running} onRunAgain={runAgain} />
+    <SeasonReport {manifest} {run} {byId} {indexById} {modeLabel} {running} onRunAgain={runAgain} />
   {/if}
 </section>

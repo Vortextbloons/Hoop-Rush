@@ -3,8 +3,13 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import type { ChallengeRun, HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
-  import { getManifest } from '$lib/data';
+  import type {
+    ChallengeRun,
+    HoopRushManifest,
+    PeakPlayerSeason,
+    PlayersIndexEntry,
+  } from '@hoop-rush/data-contracts';
+  import { getManifest, getPlayersIndex } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { loadRunPlayersById } from '$lib/sandbox-lineup';
   import SeasonReport from '$lib/components/SeasonReport.svelte';
@@ -20,6 +25,8 @@
   let manifest = $state.raw<HoopRushManifest | null>(null);
   /** playerId → peak season across the run's loaded pools (slot provenance). */
   let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
+  /** playerId → global players-index entry, used for MVP headshots. */
+  let indexById = $state.raw<Map<string, PlayersIndexEntry> | null>(null);
   let run = $state.raw<ChallengeRun | null>(null);
   let error = $state<string | null>(null);
   let running = $state(false);
@@ -34,6 +41,16 @@
       (m) => {
         if (cancelled) return;
         manifest = m;
+        getPlayersIndex().then(
+          (ix) => {
+            if (!cancelled) {
+              indexById = new Map(ix.players.map((p) => [p.playerId, p]));
+            }
+          },
+          () => {
+            // Headshots are best-effort; the report renders without them.
+          },
+        );
       },
       () => {
         if (!cancelled) error = 'The manifest is unavailable.';
@@ -134,6 +151,7 @@
       {manifest}
       {run}
       {byId}
+      {indexById}
       modeLabel="Sandbox · Result"
       {running}
       onRunAgain={runAgain}

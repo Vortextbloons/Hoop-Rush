@@ -18,19 +18,19 @@
   const modes = [
     {
       code: '01',
-      name: 'Sandbox',
-      line: 'Draft any five peak seasons from any franchise and any era, then face all 30 teams on a fixed schedule.',
-      status: 'available',
-      cta: 'Start sandbox',
-      href: '/sandbox' as RouteId,
-    },
-    {
-      code: '02',
       name: 'Classic',
       line: 'Five draft rounds. Each round rolls a franchise and an era. One franchise reroll and one era reroll, then live with the board. Ratings or Ball Knowledge.',
       status: 'available',
       cta: 'Start classic',
       href: '/classic' as RouteId,
+    },
+    {
+      code: '02',
+      name: 'Sandbox',
+      line: 'Draft any five peak seasons from any franchise and any era, then face all 30 teams on a fixed schedule.',
+      status: 'available',
+      cta: 'Start sandbox',
+      href: '/sandbox' as RouteId,
     },
   ] as const;
 

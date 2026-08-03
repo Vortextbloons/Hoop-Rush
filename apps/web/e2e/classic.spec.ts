@@ -51,7 +51,7 @@ async function pickOne(page: Page) {
 
 async function draftRounds(page: Page, fromRound = 1) {
   for (let round = fromRound; round <= 5; round += 1) {
-    await expect(page.getByText(`Round ${String(round)} of 5`)).toBeVisible();
+    await expect(roundHeading(page, round)).toBeVisible();
     await pickOne(page);
   }
 }
@@ -85,6 +85,15 @@ async function recordText(page: Page): Promise<string> {
   return page.getByText(/^\d+–\d+$/).innerText();
 }
 
+/**
+ * The round-card header. The roll modal also renders the round, so plain
+ * getByText would match two elements while a spin is open; the header is
+ * the only element carrying data-round-heading.
+ */
+function roundHeading(page: Page, round: number) {
+  return page.locator('[data-round-heading]', { hasText: `Round ${String(round)} of 5` });
+}
+
 test.describe('classic: reel draft, auto-launch, guard, and result journeys', () => {
   test.describe.configure({ timeout: 60_000 });
 
@@ -95,17 +104,22 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await page.goto('/classic');
     await expect(page.getByRole('heading', { name: 'Five draft rounds' })).toBeVisible();
     await page.getByRole('button', { name: 'Start Ratings draft' }).click();
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
 
-    // The initial roll renders both reels settled.
-    await expect(page.locator('[data-axis="franchise"]')).toBeVisible();
-    await expect(page.locator('[data-axis="era"]')).toBeVisible();
+    // The initial roll shows the franchise + era indicators.
+    await expect(page.locator('[data-indicator="franchise"]')).toBeVisible();
+    await expect(page.locator('[data-indicator="era"]')).toBeVisible();
 
-    // After the first pick the round advances and the new roll shows again.
+    // After the first pick the roll modal opens with the spinning reels, then
+    // closes on the new pair; the round advances and the indicators update.
     await pickOne(page);
-    await expect(page.getByText('Round 2 of 5')).toBeVisible();
+    await expect(page.locator('.roll-overlay')).toBeVisible();
     await expect(page.locator('[data-axis="franchise"]')).toBeVisible();
     await expect(page.locator('[data-axis="era"]')).toBeVisible();
+    await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+    await expect(roundHeading(page, 2)).toBeVisible();
+    await expect(page.locator('[data-indicator="franchise"]')).toBeVisible();
+    await expect(page.locator('[data-indicator="era"]')).toBeVisible();
 
     // The remaining rounds: pick, spin, settle.
     await draftRounds(page, 2);
@@ -173,45 +187,46 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/classic');
     await page.getByRole('button', { name: 'Start Ratings draft' }).click();
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
 
+    const franchiseIndicator = page.locator('[data-indicator="franchise"]');
+    const eraIndicator = page.locator('[data-indicator="era"]');
+    const overlay = page.locator('.roll-overlay');
     const franchiseReel = page.locator('[data-axis="franchise"]');
     const eraReel = page.locator('[data-axis="era"]');
-    const franchiseFinal = franchiseReel.locator('.reel-row--final');
-    const eraFinal = eraReel.locator('.reel-row--final');
 
-    const eraBefore = (await eraFinal.innerText()).trim();
-    const franchiseBefore = (await franchiseFinal.innerText()).trim();
+    const eraBefore = (await eraIndicator.innerText()).trim();
+    const franchiseBefore = (await franchiseIndicator.innerText()).trim();
 
     const reroll = page.getByRole('button', { name: /Reroll franchise/ });
     await expect(reroll).toBeVisible();
     if (await reroll.isEnabled()) {
       await reroll.click();
-      // Only the franchise reel animates; the era value is untouched.
+      // The modal opens; only the franchise reel animates; the era stays fixed.
+      await expect(overlay).toBeVisible();
       await expect(franchiseReel.locator('.reel-strip')).toHaveClass(/reel-spinning/, {
         timeout: 2000,
       });
       await expect(eraReel.locator('.reel-strip')).not.toHaveClass(/reel-spinning/);
-      await expect.poll(async () => (await eraFinal.innerText()).trim()).toBe(eraBefore);
-      // Once settled, the franchise value differs (the roll changed).
-      await expect
-        .poll(async () => (await franchiseFinal.innerText()).trim())
-        .not.toBe(franchiseBefore);
+      // After the result beat the modal closes; the era indicator is unchanged
+      // and the franchise changed.
+      await expect(overlay).not.toBeVisible({ timeout: 5000 });
+      await expect(eraIndicator).toContainText(eraBefore);
+      await expect(franchiseIndicator).not.toContainText(franchiseBefore);
     } else {
       // A roll with no alternative franchise explains itself on the button.
       await expect(reroll).toHaveAttribute('title', /\S/);
     }
 
     // Pick round 1, then reload: the draft resumes in round 2 with the spent
-    // reroll state still recorded, and the reels are settled — no replay.
+    // reroll state still recorded, and the roll modal never replays.
     // Wait for the round header to advance first: it only renders after the
     // pick's persist commits, so the reload can never race the save.
     await pickOne(page);
-    await expect(page.getByText('Round 2 of 5')).toBeVisible({ timeout: 5000 });
+    await expect(roundHeading(page, 2)).toBeVisible({ timeout: 5000 });
     await page.reload();
-    await expect(page.getByText('Round 2 of 5')).toBeVisible();
-    await expect(franchiseReel.locator('.reel-strip')).not.toHaveClass(/reel-spinning/);
-    await expect(eraReel.locator('.reel-strip')).not.toHaveClass(/reel-spinning/);
+    await expect(roundHeading(page, 2)).toBeVisible();
+    await expect(overlay).toHaveCount(0);
     const spent = await reroll.isDisabled();
     const showsUsed = /used/i.test(await reroll.innerText());
     expect(spent || showsUsed).toBe(true);
@@ -219,17 +234,17 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     // The era reroll is independent: it can be spent in a later round.
     const eraReroll = page.getByRole('button', { name: /Reroll era/ });
     if (await eraReroll.isEnabled()) {
-      const eraBefore2 = (await eraFinal.innerText()).trim();
-      const franchiseBefore2 = (await franchiseFinal.innerText()).trim();
+      const eraBefore2 = (await eraIndicator.innerText()).trim();
+      const franchiseBefore2 = (await franchiseIndicator.innerText()).trim();
       await eraReroll.click();
+      await expect(overlay).toBeVisible();
       await expect(eraReel.locator('.reel-strip')).toHaveClass(/reel-spinning/, {
         timeout: 2000,
       });
       await expect(franchiseReel.locator('.reel-strip')).not.toHaveClass(/reel-spinning/);
-      await expect
-        .poll(async () => (await franchiseFinal.innerText()).trim())
-        .toBe(franchiseBefore2);
-      await expect.poll(async () => (await eraFinal.innerText()).trim()).not.toBe(eraBefore2);
+      await expect(overlay).not.toBeVisible({ timeout: 5000 });
+      await expect(franchiseIndicator).toContainText(franchiseBefore2);
+      await expect(eraIndicator).not.toContainText(eraBefore2);
     } else {
       await expect(eraReroll).toHaveAttribute('title', /\S/);
     }
@@ -243,7 +258,7 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
   test('the classic variant is immutable once a draft starts', async ({ page }) => {
     await page.goto('/classic');
     await page.getByRole('button', { name: 'Start Ratings draft' }).click();
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
 
     // No variant picker exists inside an in-progress draft.
     await expect(page.getByRole('button', { name: 'Start Ratings draft' })).toHaveCount(0);
@@ -251,7 +266,7 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
 
     // The variant label survives a reload unchanged.
     await page.reload();
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
     await expect(page.getByText('Classic · Ratings')).toBeVisible();
   });
 
@@ -276,7 +291,7 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await expect(page).toHaveURL(/\/classic\/?$/);
     await expect(page.getByRole('heading', { name: 'Five draft rounds' })).toBeVisible();
     await page.getByRole('button', { name: 'Start Ratings draft' }).click();
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
 
     // The page Back link is intercepted with the leave/discard dialog.
     await page.getByRole('link', { name: 'Back' }).click();
@@ -287,11 +302,11 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await dialog.getByRole('button', { name: 'Stay' }).click();
     await expect(dialog).not.toBeVisible();
     await expect(page).toHaveURL(/\/classic\/?$/);
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
 
     // Reload keeps the draft (the guard never intercepts full-page unloads).
     await page.reload();
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
 
     // Browser-back ('popstate') is guarded the same way.
     await page.goBack();
@@ -299,7 +314,7 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await page.getByRole('dialog').getByRole('button', { name: 'Stay' }).click();
     await expect(page.getByRole('dialog')).not.toBeVisible();
     await expect(page).toHaveURL(/\/classic\/?$/);
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
   });
 
   test('navigation guard: Leave and discard clears the draft', async ({ page }) => {
@@ -307,12 +322,12 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await page.getByRole('link', { name: /Start classic/ }).click();
     await expect(page).toHaveURL(/\/classic\/?$/);
     await page.getByRole('button', { name: 'Start Ratings draft' }).click();
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
 
     // The home page offers to resume the in-progress draft.
     await page.goto('/');
     await page.getByRole('link', { name: /Continue draft/ }).click();
-    await expect(page.getByText('Round 1 of 5')).toBeVisible();
+    await expect(roundHeading(page, 1)).toBeVisible();
 
     await page.getByRole('link', { name: 'Back' }).click();
     const dialog = page.getByRole('dialog');

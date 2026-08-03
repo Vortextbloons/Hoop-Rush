@@ -29,6 +29,7 @@
   } from '$lib/classic-nav-guard';
   import { startClassicRun } from '$lib/classic-run';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
+  import TeamLogo from '$lib/components/TeamLogo.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
@@ -454,7 +455,10 @@
             <div
               class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3"
             >
-              <span class="font-display text-lg font-extrabold tracking-tight uppercase">
+              <span
+                data-round-heading
+                class="font-display text-lg font-extrabold tracking-tight uppercase"
+              >
                 Round {draft.round} of 5
               </span>
               <span class="flex gap-1.5" aria-hidden="true">
@@ -470,18 +474,42 @@
               </span>
             </div>
             <div class="flex flex-col gap-3 p-4">
-              <ClassicRollReel
-                {manifest}
-                franchiseId={roll.franchiseId}
-                eraId={roll.eraId}
-                franchiseOptions={manifest.modernFranchiseSlots.map((f) => f.franchiseId)}
-                eraOptions={manifest.eras.map((e) => e.eraId)}
-                axis={reelAxis}
-                {spinKey}
-                announceText={reelAnnouncement}
-                onSettled={onReelSettled}
-              />
-              <div class="flex flex-wrap items-center gap-2">
+              <div
+                class="grid w-full grid-cols-[minmax(0,1fr)_8.5rem] gap-2"
+                aria-label={`Round ${draft.round} of 5 · ${rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`}
+              >
+                <span
+                  class="flex min-w-0 items-center gap-2 rounded-lg border border-line-strong bg-surface-1 px-3 py-2 shadow-[0_0_14px_hsl(13_100%_62%/0.12)]"
+                  data-indicator="franchise"
+                >
+                  {#if rollFranchise}
+                    <TeamLogo
+                      {manifest}
+                      franchiseId={rollFranchise.franchiseId}
+                      teamExternalId={rollFranchise.teamExternalId}
+                    />
+                  {/if}
+                  <span class="min-w-0">
+                    <span class="block font-mono text-[10px] font-bold tracking-[0.12em] uppercase">
+                      {franchiseAbbreviation(roll.franchiseId)}
+                    </span>
+                    {#if rollFranchise}
+                      <span class="block truncate text-sm font-bold">
+                        {rollFranchise.displayName}
+                      </span>
+                    {/if}
+                  </span>
+                </span>
+                <span
+                  class="flex items-center justify-center rounded-lg border border-line-strong bg-surface-1 px-3 py-2 shadow-[0_0_14px_hsl(13_100%_62%/0.12)]"
+                  data-indicator="era"
+                >
+                  <span class="font-display text-sm font-extrabold tracking-tight">
+                    {rollEra?.label ?? roll.eraId}
+                  </span>
+                </span>
+              </div>
+              <div class="grid w-full grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
                 <button
                   type="button"
                   disabled={spinning || starting || !franchiseRerollAvailable}
@@ -491,7 +519,7 @@
                       ? 'Already used'
                       : 'No alternative'}
                   onclick={rerollFranchise}
-                  class="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+                  class="flex min-w-0 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Reroll franchise
                   {#if draft.rerolls.franchiseSpent}
@@ -511,7 +539,7 @@
                       ? 'Already used'
                       : 'No alternative'}
                   onclick={rerollEra}
-                  class="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+                  class="flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Reroll era
                   {#if draft.rerolls.eraSpent}
@@ -525,9 +553,18 @@
               </div>
             </div>
           </div>
-          {#if spinning}
-            <p class="font-mono text-xs text-muted-foreground">Picking the next pool…</p>
-          {/if}
+          <ClassicRollReel
+            {manifest}
+            franchiseId={roll.franchiseId}
+            eraId={roll.eraId}
+            franchiseOptions={manifest.modernFranchiseSlots.map((f) => f.franchiseId)}
+            eraOptions={manifest.eras.map((e) => e.eraId)}
+            axis={reelAxis}
+            {spinKey}
+            announceText={reelAnnouncement}
+            roundLabel={`Round ${draft.round} of 5`}
+            onSettled={onReelSettled}
+          />
         {/if}
 
         {#if draft.status === 'drafting' && roll && !spinning && !starting}

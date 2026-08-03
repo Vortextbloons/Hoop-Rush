@@ -6,6 +6,7 @@
     MadeAttempted,
     PeakPlayerSeason,
     PlayerSeasonAggregate,
+    PlayersIndexEntry,
     RunAggregates,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
@@ -30,6 +31,7 @@
     manifest,
     run,
     byId,
+    indexById,
     modeLabel,
     running,
     onRunAgain,
@@ -37,6 +39,8 @@
     manifest: HoopRushManifest | null;
     run: ChallengeRun;
     byId: Map<string, PeakPlayerSeason> | null;
+    /** Global players-index entries by playerId, used for MVP headshots. */
+    indexById: Map<string, PlayersIndexEntry> | null;
     modeLabel: string;
     running: boolean;
     onRunAgain: () => void;
@@ -56,11 +60,11 @@
   /** League MVP across every home and away appearance of the run's games. */
   const mvp = $derived(run.games.length > 0 ? leagueMvp(run) : null);
 
-  /** Headshot record for the MVP: full pool record for the user's five, else initials. */
+  /** Headshot record for the MVP: pool record, then global index, then initials. */
   const mvpFace = $derived.by(() => {
     const current = mvp;
     if (!current) return null;
-    const record = current.isUserTeam ? byId?.get(current.playerId) : undefined;
+    const record = byId?.get(current.playerId) ?? indexById?.get(current.playerId);
     if (record) return record;
     return {
       playerId: current.playerId,
