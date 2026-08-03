@@ -186,6 +186,7 @@ export interface SeasonData {
 
 /** Memoized per run so availability scans read each season's JSON once. */
 const seasonDataCache = new Map<string, SeasonData>();
+let fallbackRosterCache: Map<string, Record<string, unknown>> | null = null;
 
 /** Return { rosterByExtId, stintsByTeam, statsByPlayer } for a season. */
 export function loadSeasonData(season: string): SeasonData {
@@ -227,9 +228,79 @@ export function loadSeasonData(season: string): SeasonData {
   return data;
 }
 
+/**
+ * Recover historical roster metadata when a source roster snapshot is empty
+ * for a team but its player-team stints are present. Some NBA API historical
+ * roster endpoints omit the original Charlotte franchise while still
+ * returning the game-log stints. Packaged pools already contain validated
+ * names, positions, ratings, tendencies, anchors, and provenance for most of
+ * those players, so use the best existing record as metadata only and keep
+ * the candidate season's stint and stats as the source of truth.
+ */
+function loadFallbackRosterPlayers(): Map<string, Record<string, unknown>> {
+  if (fallbackRosterCache !== null) return fallbackRosterCache;
+
+  const byPlayer = new Map<string, Record<string, unknown>>();
+  for (const file of sortedJsonFiles(poolDir())) {
+    try {
+      const raw = readJsonLoose(join(poolDir(), file)) as { players?: unknown };
+      if (!Array.isArray(raw.players)) continue;
+      for (const value of raw.players) {
+        if (value === null || typeof value !== 'object') continue;
+        const player = value as Record<string, unknown>;
+        const playerExternalId = str(player.playerExternalId);
+        if (!playerExternalId) continue;
+        const positions = player.positions as
+          { sourceLabels?: unknown; canonical?: unknown } | undefined;
+        const sourceLabels = Array.isArray(positions?.sourceLabels)
+          ? positions.sourceLabels.filter((label): label is string => typeof label === 'string')
+          : [];
+        const candidate: Record<string, unknown> = {
+          ...player,
+          externalId: playerExternalId,
+          firstName: player.firstName,
+          lastName: player.lastName,
+          position: sourceLabels[0] ?? 'F',
+          secondaryPositions: sourceLabels.slice(1),
+          heightInches: player.heightInches,
+          weightLbs: player.weightLbs,
+          ratings: player.detailedRatings,
+          tendencies: player.tendencies,
+          summaryRatings: player.summaryRatings,
+          anchors: player.anchors,
+          provenance: player.provenance,
+        };
+        const previous = byPlayer.get(playerExternalId);
+        if (
+          previous === undefined ||
+          Number(player.selectionScore ?? 0) > Number(previous.selectionScore ?? 0)
+        ) {
+          byPlayer.set(playerExternalId, candidate);
+        }
+      }
+    } catch {
+      // One malformed or partial pool must not prevent other fallback records
+      // from being used; the referenced pool will still fail its own audit.
+    }
+  }
+  fallbackRosterCache = byPlayer;
+  return byPlayer;
+}
+
+function sortedJsonFiles(dir: string): string[] {
+  try {
+    return readdirSync(dir)
+      .filter((name) => name.endsWith('.json'))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 /** @internal Clears the per-run season cache (determinism tests). */
 export function clearSeasonDataCache(): void {
   seasonDataCache.clear();
+  fallbackRosterCache = null;
 }
 
 /** Default pool worker count: one per era, capped by the machine's cores. */
@@ -834,6 +905,7 @@ export function computePool(
   console.log(`[${franchiseId} ${eraId}] scanning ${String(seasons.length)} seasons`);
   const careerLabelsMap = careerLabels ?? loadCareerPositionLabels();
   const existingAssetAltIds = loadExistingAssetAltIds(franchiseId, eraId);
+  const fallbackRosterPlayers = loadFallbackRosterPlayers();
 
   const eligible = new Map<string, Candidate[]>();
   const missingStints: string[] = [];
@@ -856,7 +928,7 @@ export function computePool(
         continue;
       }
       const pid = str(stint.playerExternalId);
-      const player = rosterByExtId[pid];
+      const player = rosterByExtId[pid] ?? fallbackRosterPlayers.get(pid);
       if (player === undefined) {
         continue;
       }

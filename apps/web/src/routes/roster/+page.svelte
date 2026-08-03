@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { onDestroy } from 'svelte';
   import { ArrowRight, Check, ChevronDown, Search, X } from '@lucide/svelte';
   import { Dialog, Select } from 'bits-ui';
   import type {
@@ -8,7 +9,7 @@
     PlayersIndexEntry,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { getManifest, getPlayersIndex } from '$lib/data';
+  import { clearDataLoaderCaches, getManifest, getPlayersIndex } from '$lib/data';
   import {
     defaultDirection,
     filterRoster,
@@ -25,6 +26,8 @@
   } from '$lib/roster-browser';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
+  import AsyncState from '$lib/components/AsyncState.svelte';
+  import RosterComparison from '$lib/components/RosterComparison.svelte';
 
   type IndexRow = PlayersIndexEntry;
 
@@ -63,6 +66,7 @@
   let sortDir = $state<RosterSortDirection>('asc');
   let visibleCount = $state(PAGE_SIZE);
   let dialogPlayer = $state<IndexRow | null>(null);
+  let compareSelection = $state<IndexRow[]>([]);
 
   $effect(() => {
     const raw = searchInput;
@@ -72,7 +76,11 @@
     return () => clearTimeout(timeout);
   });
 
-  $effect(() => {
+  function loadRosterData() {
+    manifestError = null;
+    indexError = null;
+    manifest = null;
+    index = null;
     let cancelled = false;
     getManifest().then(
       (m) => {
@@ -95,7 +103,14 @@
     return () => {
       cancelled = true;
     };
-  });
+  }
+
+  $effect(() => loadRosterData());
+
+  function retryRosterData() {
+    clearDataLoaderCaches();
+    loadRosterData();
+  }
 
   const franchise = $derived(
     manifest?.modernFranchiseSlots.find((e) => e.franchiseId === franchiseId) ?? null,
@@ -225,6 +240,25 @@
     dialogPlayer = null;
   }
 
+  function toggleCompare(player: IndexRow) {
+    const existing = compareSelection.findIndex((entry) => entry.playerId === player.playerId);
+    if (existing >= 0) {
+      compareSelection = compareSelection.filter((entry) => entry.playerId !== player.playerId);
+      return;
+    }
+    if (compareSelection.length < 2) compareSelection = [...compareSelection, player];
+  }
+
+  function removeCompare(playerId: string) {
+    compareSelection = compareSelection.filter((entry) => entry.playerId !== playerId);
+  }
+
+  function clearCompare() {
+    compareSelection = [];
+  }
+
+  onDestroy(clearCompare);
+
   const dialogSections = $derived.by(() => {
     const p = dialogPlayer;
     if (!p) return [] as { title: string; items: [string, string][] }[];
@@ -299,6 +333,7 @@
     { key: 'assists', label: 'AST', numeric: true },
     { key: 'ts', label: 'TS%', numeric: true },
     { key: 'per', label: 'PER', sort: 'per', numeric: true },
+    { key: 'compare', label: 'Compare' },
   ];
 
   const sortArrow = $derived(sortId === 'none' ? '' : sortDir === 'asc' ? '↑' : '↓');
@@ -331,11 +366,22 @@
   </div>
 
   {#if manifestError}
-    <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-      Failed to load data: {manifestError}
-    </p>
+    <div class="mt-8">
+      <AsyncState
+        kind="error"
+        title="Data unavailable"
+        message={`Failed to load data: ${manifestError}`}
+        retry={retryRosterData}
+      />
+    </div>
   {:else if !manifest}
-    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading data…</p>
+    <div class="mt-8">
+      <AsyncState
+        kind="loading"
+        title="Loading roster data"
+        message="Preparing the player index…"
+      />
+    </div>
   {:else}
     <div class="mt-8 grid gap-6 sm:grid-cols-2">
       <div>
@@ -510,11 +556,18 @@
     </div>
 
     {#if indexError}
-      <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
-        Failed to load players: {indexError}
-      </p>
+      <div class="mt-8">
+        <AsyncState
+          kind="error"
+          title="Players unavailable"
+          message={`Failed to load players: ${indexError}`}
+          retry={retryRosterData}
+        />
+      </div>
     {:else if !index}
-      <p class="mt-8 font-mono text-sm text-muted-foreground">Loading players…</p>
+      <div class="mt-8">
+        <AsyncState kind="loading" title="Loading player index" message="One moment…" />
+      </div>
     {:else}
       <div class="mt-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-2 sm:p-3">
         <div class="flex flex-col gap-2">
@@ -650,20 +703,15 @@
                   {:else}
                     {@const player = item.player}
                     <tr
-                      tabindex="0"
-                      role="button"
-                      aria-label={`View ${player.displayName} stats`}
-                      onclick={() => openPlayer(player)}
-                      onkeydown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          openPlayer(player);
-                        }
-                      }}
-                      class="cursor-pointer border-b border-border/40 outline-none transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                      class="border-b border-border/40 transition-colors last:border-b-0 hover:bg-surface-2"
                     >
                       <td class="px-3 py-2">
-                        <span class="flex min-w-0 items-center gap-2.5">
+                        <button
+                          type="button"
+                          aria-label={`View ${player.displayName} stats`}
+                          onclick={() => openPlayer(player)}
+                          class="flex min-w-0 items-center gap-2.5 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
                           <PlayerFace
                             {player}
                             {manifest}
@@ -678,7 +726,7 @@
                               {franchiseAbbreviation(player.franchiseId)}
                             </span>
                           </span>
-                        </span>
+                        </button>
                       </td>
                       <td
                         class="px-2 py-2 font-mono text-[11px] whitespace-nowrap text-muted-foreground"
@@ -713,6 +761,27 @@
                       <td class="px-3 py-2 text-right font-mono text-[11px] tabular-nums">
                         {formatDecimal(player.stats.per ?? 0)}
                       </td>
+                      <td class="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          aria-pressed={compareSelection.some(
+                            (entry) => entry.playerId === player.playerId,
+                          )}
+                          aria-label={`${compareSelection.some((entry) => entry.playerId === player.playerId) ? 'Remove' : 'Add'} ${player.displayName} ${compareSelection.length >= 2 && !compareSelection.some((entry) => entry.playerId === player.playerId) ? '(comparison full)' : ''}`}
+                          disabled={compareSelection.length >= 2 &&
+                            !compareSelection.some((entry) => entry.playerId === player.playerId)}
+                          onclick={() => toggleCompare(player)}
+                          class="rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {compareSelection.some(
+                            (entry) => entry.playerId === player.playerId,
+                          )
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+                        >
+                          {compareSelection.some((entry) => entry.playerId === player.playerId)
+                            ? 'Added'
+                            : 'Compare'}
+                        </button>
+                      </td>
                     </tr>
                   {/if}
                 {/each}
@@ -731,41 +800,67 @@
                 </li>
               {:else}
                 {@const player = item.player}
-                <li>
-                  <button
-                    type="button"
-                    aria-label={`View ${player.displayName} stats`}
-                    onclick={() => openPlayer(player)}
-                    class="flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring active:bg-surface-2 sm:hover:border-border"
-                  >
-                    <PlayerFace
-                      {player}
-                      {manifest}
-                      size="sm"
-                      fallbackInitials={player.firstName[0]! + player.lastName[0]!}
-                    />
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate text-sm font-bold">{player.displayName}</span>
-                      <span class="block font-mono text-[10px] text-muted-foreground">
-                        {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(player.eraId) ??
-                          player.eraId} · {player.seasonKey} · {player.positionsCanonical.join('/')}
+                <li
+                  class="rounded-lg border border-transparent px-2 py-2.5 transition-colors active:bg-surface-2"
+                >
+                  <div class="flex items-center gap-3">
+                    <button
+                      type="button"
+                      aria-label={`View ${player.displayName} stats`}
+                      onclick={() => openPlayer(player)}
+                      class="flex min-w-0 flex-1 items-center gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <PlayerFace
+                        {player}
+                        {manifest}
+                        size="sm"
+                        fallbackInitials={player.firstName[0]! + player.lastName[0]!}
+                      />
+                      <span class="min-w-0 flex-1">
+                        <span class="block truncate text-sm font-bold">{player.displayName}</span>
+                        <span class="block font-mono text-[10px] text-muted-foreground">
+                          {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(
+                            player.eraId,
+                          ) ?? player.eraId} · {player.seasonKey} · {player.positionsCanonical.join(
+                            '/',
+                          )}
+                        </span>
                       </span>
-                    </span>
-                    <span class="flex shrink-0 items-center gap-1 font-mono text-[10px]">
-                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
-                        O {player.overall}
+                      <span class="flex shrink-0 items-center gap-1 font-mono text-[10px]">
+                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Overall">
+                          O {player.overall}
+                        </span>
+                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Points per game">
+                          {formatPerGame(perGame(player.stats, 'points'))}
+                        </span>
+                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Rebounds per game">
+                          {formatPerGame(perGame(player.stats, 'rebounds'))}
+                        </span>
+                        <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Assists per game">
+                          {formatPerGame(perGame(player.stats, 'assists'))}
+                        </span>
                       </span>
-                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Points per game">
-                        {formatPerGame(perGame(player.stats, 'points'))}
-                      </span>
-                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Rebounds per game">
-                        {formatPerGame(perGame(player.stats, 'rebounds'))}
-                      </span>
-                      <span class="rounded bg-surface-3 px-1.5 py-0.5" title="Assists per game">
-                        {formatPerGame(perGame(player.stats, 'assists'))}
-                      </span>
-                    </span>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={compareSelection.some(
+                        (entry) => entry.playerId === player.playerId,
+                      )}
+                      aria-label={`${compareSelection.some((entry) => entry.playerId === player.playerId) ? 'Remove' : 'Add'} ${player.displayName} ${compareSelection.length >= 2 && !compareSelection.some((entry) => entry.playerId === player.playerId) ? '(comparison full)' : ''}`}
+                      disabled={compareSelection.length >= 2 &&
+                        !compareSelection.some((entry) => entry.playerId === player.playerId)}
+                      onclick={() => toggleCompare(player)}
+                      class="shrink-0 rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {compareSelection.some(
+                        (entry) => entry.playerId === player.playerId,
+                      )
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+                    >
+                      {compareSelection.some((entry) => entry.playerId === player.playerId)
+                        ? 'Added'
+                        : 'Compare'}
+                    </button>
+                  </div>
                 </li>
               {/if}
             {/each}
@@ -789,6 +884,18 @@
         {/if}
       </div>
     {/if}
+  {/if}
+
+  {#if manifest && compareSelection.length > 0}
+    <RosterComparison
+      selected={compareSelection}
+      {manifest}
+      {franchiseName}
+      {eraLabel}
+      oncompare={toggleCompare}
+      onremove={removeCompare}
+      onclear={clearCompare}
+    />
   {/if}
 
   <Dialog.Root

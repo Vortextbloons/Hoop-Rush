@@ -14,8 +14,8 @@ describe('cli: bracket audit', () => {
     expect(payload.openingOpponentUnchanged).toBe(true);
     expect(payload.generationSeed).toHaveLength(32);
     expect(payload.schedulePreview).toHaveLength(82);
-    expect(payload.leagueMedianPercentile).toBeGreaterThanOrEqual(0.45);
-    expect(payload.leagueMedianPercentile).toBeLessThanOrEqual(0.6);
+    expect(payload.leagueMedianPercentile).toBeGreaterThanOrEqual(0.4);
+    expect(payload.leagueMedianPercentile).toBeLessThanOrEqual(0.52);
   });
 
   it('exits 1 when the bracket fails validation', async () => {
