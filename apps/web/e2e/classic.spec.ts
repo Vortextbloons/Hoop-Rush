@@ -65,14 +65,18 @@ async function reachClassicPlaying(page: Page) {
   await expect(page.getByRole('heading', { name: 'Five draft rounds' })).toBeVisible();
   await page.getByRole('button', { name: 'Start Ratings draft' }).click();
   await draftRounds(page);
-  await expect(page).toHaveURL(/\/classic\/challenge\/?$/, { timeout: 15000 });
+  // The fifth pick pre-simulates the season before navigating; under a fully
+  // parallel gate that can take well past the default 15s budget.
+  await expect(page).toHaveURL(/\/classic\/challenge\/?$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible();
 }
 
 /** Waits for the completed classic season report after the animated overlay. */
 async function expectClassicSeasonReport(page: Page) {
   await expect(page).toHaveURL(/\/classic\/result\/?\?runId=/, { timeout: 30000 });
-  await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible({
+    timeout: 30000,
+  });
   await expect(
     page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
   ).toBeVisible({

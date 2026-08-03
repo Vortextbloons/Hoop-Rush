@@ -159,22 +159,19 @@
   });
 
   /** Wraps the route's same-team rerun with the shared run/byId/error state. */
-  const retrySameTeam = $derived(() => {
+  function retrySameTeam() {
     const handler = onRetrySameTeam;
-    if (!handler) return null;
-    return () => {
-      if (!run || !byId || running) return;
-      running = true;
-      error = null;
-      Promise.resolve(handler(run, byId))
-        .catch((e: unknown) => {
-          error = e instanceof Error ? e.message : String(e);
-        })
-        .finally(() => {
-          running = false;
-        });
-    };
-  });
+    if (!handler || !run || !byId || running) return;
+    running = true;
+    error = null;
+    Promise.resolve(handler(run, byId))
+      .catch((e: unknown) => {
+        error = e instanceof Error ? e.message : String(e);
+      })
+      .finally(() => {
+        running = false;
+      });
+  }
 </script>
 
 <section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
@@ -208,7 +205,7 @@
       {modeLabel}
       {running}
       {onRunAgain}
-      onRetrySameTeam={retrySameTeam}
+      onRetrySameTeam={onRetrySameTeam ? retrySameTeam : null}
       {editTeamHref}
     />
   {/if}

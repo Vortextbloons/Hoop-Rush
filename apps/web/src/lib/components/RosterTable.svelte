@@ -114,8 +114,8 @@
               colspan={columns.length}
               class="border-b border-border/60 bg-surface-1 px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
             >
-              {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ?? item.eraId} ·
-              {item.count} players
+              {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ?? item.eraId} · {item.count}
+              players
             </td>
           </tr>
         {:else}
@@ -200,8 +200,8 @@
       <li
         class="px-2 pt-3 pb-1 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
       >
-        {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ?? item.eraId} ·
-        {item.count} players
+        {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ?? item.eraId} · {item.count}
+        players
       </li>
     {:else}
       {@const player = item.player}

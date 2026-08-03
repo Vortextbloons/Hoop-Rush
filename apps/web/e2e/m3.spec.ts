@@ -33,14 +33,18 @@ async function reachPlaying(page: Page) {
   const cta = page.getByRole('button', { name: 'Play 82 games' });
   await expect(cta).toBeVisible();
   await cta.click();
-  await expect(page).toHaveURL(/\/sandbox\/challenge\/?$/);
+  // The launch pre-simulates the season before navigating; under a fully
+  // parallel gate that can take well past the default 15s budget.
+  await expect(page).toHaveURL(/\/sandbox\/challenge\/?$/, { timeout: 30000 });
   await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible();
 }
 
 /** Waits for the completed season report after the animated overlay. */
 async function expectSeasonReport(page: Page) {
   await expect(page).toHaveURL(/\/sandbox\/result\/?\?runId=/, { timeout: 30000 });
-  await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible({
+    timeout: 30000,
+  });
   await expect(
     page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
   ).toBeVisible({
@@ -135,12 +139,16 @@ test.describe('m3: draft to 82-game season journey', () => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await reachPlaying(page);
     await expectSeasonReport(page);
+    const previousRunId = page.url();
 
+    // The same five re-run under a fresh seed: the challenge screen appears,
+    // plays out, and lands on a NEW result page (different runId).
     await page.getByRole('button', { name: 'Retry with same team' }).click();
-    await expect(page).toHaveURL(/\/sandbox\/challenge\/?$/);
     await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible({
-      timeout: 15000,
+      timeout: 30000,
     });
+    await expect(page).toHaveURL(/\/sandbox\/result\/\?runId=/, { timeout: 30000 });
+    expect(page.url()).not.toBe(previousRunId);
     await expectSeasonReport(page);
   });
 
@@ -150,7 +158,8 @@ test.describe('m3: draft to 82-game season journey', () => {
     await expectSeasonReport(page);
 
     await page.getByRole('link', { name: 'Edit team' }).click();
-    await expect(page).toHaveURL(/\/sandbox\?slots=/);
+    // The app routes with a trailing slash (trailingSlash = 'always').
+    await expect(page).toHaveURL(/\/sandbox\/?\?slots=/);
     await expect(page.getByText('5/5', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Remove Nick Van Exel' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Remove Vlade Divac' })).toBeVisible();

@@ -609,7 +609,7 @@
           <p class="p-6 text-center font-mono text-xs text-muted-foreground">No players match.</p>
         {:else}
           <RosterTable
-            items={listItems}
+            items={visibleItems}
             {columns}
             {sortId}
             {sortDir}
