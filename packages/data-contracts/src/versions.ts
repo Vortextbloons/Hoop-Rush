@@ -31,7 +31,7 @@ export const SOURCE_VERSION = 'source-v1';
 export const DERIVATION_METHOD_VERSION = 'derive-v3';
 
 /** Detailed ratings derivation version (strict engine contracts). */
-export const RATINGS_VERSION = 'ratings-v4-position-calibrated';
+export const RATINGS_VERSION = 'ratings-v7-elite-band';
 
 /** Deterministic peak-season selection score version (spec/02). */
 export const SELECTION_SCORE_VERSION = 'selection-v2';

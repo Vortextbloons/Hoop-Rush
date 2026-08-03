@@ -270,6 +270,24 @@ export function computeRealOverall(
     else boosted = Math.min(boosted, 90);
   }
 
+  // Restore a real elite band after the position and volume safeguards above.
+  // This is deliberately harder for bigs than for wings so a strong center
+  // cannot reach 98+ from scoring, rebounding, and size alone. The historic
+  // tier is reserved for an exceptional skill profile plus near-max impact;
+  // it is what makes a 100 possible without making 100 common.
+  const eliteNonBigPeak =
+    !isBig && gp >= 55 && mpg >= 30 && ppg >= 28 && per >= 22 && bpm >= 3 && tsPct >= 0.58;
+  const eliteBigPeak =
+    isBig && gp >= 55 && mpg >= 30 && ppg >= 27 && per >= 25 && bpm >= 5 && tsPct >= 0.56;
+  const premiumNonBigPeak =
+    !isBig && gp >= 55 && mpg >= 30 && ppg >= 28 && per >= 23 && bpm >= 3.5 && tsPct >= 0.6;
+  const premiumBigPeak =
+    isBig && gp >= 55 && mpg >= 30 && ppg >= 28 && per >= 27 && bpm >= 6 && tsPct >= 0.56;
+  const historicPeak = gp >= 55 && mpg >= 30 && skillOverall >= 92 && productionImpact >= 98;
+  if (historicPeak) boosted = Math.max(boosted, 97);
+  else if (premiumNonBigPeak || premiumBigPeak) boosted = Math.max(boosted, 96);
+  else if (eliteNonBigPeak || eliteBigPeak) boosted = Math.max(boosted, 95);
+
   // A regular-minute season with weak overall impact should not remain in the
   // upper-80s solely because the derived skill profile is broad. Apply a
   // smooth, position-neutral penalty so low-impact role players separate
@@ -291,9 +309,8 @@ export function computeRealOverall(
     : 0;
 
   // --- Final boost (matches TS) ---
-  // Reduced so the top of the distribution is no longer lifted 2-6 points on
-  // top of the capped blend; the all-time band now sits at 97-99 instead of
-  // saturating at 100, while the 96-cluster role players fall below the stars.
+  // Keep ordinary players close to the capped blend, but give the elite tier
+  // enough headroom for 98-99 and reserve 100 for the historic peak tier.
   let finalBoost: number;
   if (boosted < 65) {
     finalBoost = 5.0;
@@ -303,8 +320,12 @@ export function computeRealOverall(
     finalBoost = 3.0;
   } else if (boosted < 85) {
     finalBoost = 2.0;
-  } else {
+  } else if (boosted < 92) {
     finalBoost = 1.0;
+  } else if (boosted < 95) {
+    finalBoost = 2.0;
+  } else {
+    finalBoost = 3.0;
   }
 
   let finalOverall = clampRating(boosted + finalBoost);
