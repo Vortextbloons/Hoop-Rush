@@ -28,10 +28,12 @@ import {
   type SimulationRatings,
   type SimulationTendencies,
   type SummaryRatings,
+  type RatingProfile,
+  type RatingsModelArtifact,
 } from '@hoop-rush/data-contracts';
 import { clamp, clampRating, clampUnitInterval, safeFloat } from '../json.js';
 import { FIELD_AVAILABILITY } from '../config.js';
-import { computeSummaryRatings, computeRealOverall } from './summary.js';
+import { deriveRatingProfile } from './v3.js';
 import type { StatsRow } from './stats.js';
 
 /** League context used for era-relative translation (spec/12 environment). */
@@ -43,11 +45,14 @@ export interface SeasonContext {
 
 export interface DerivationInput {
   season: string;
+  /** Stable packaged player identifier used for calibrated adjustments. */
+  playerId?: string;
   /** Mapped detailed position (PG/SG/SF/PF/C). */
   position: string;
   heightInches: number | null;
   stats: StatsRow;
   era: SeasonContext;
+  artifact?: RatingsModelArtifact;
 }
 
 export interface DerivedRecord {
@@ -55,6 +60,7 @@ export interface DerivedRecord {
   tendencies: SimulationTendencies;
   anchors: SimulationAnchors;
   summaryRatings: SummaryRatings;
+  ratingProfile: RatingProfile;
   /** Field-level provenance keyed by packaged field name. */
   provenance: ProvenanceMap;
   /** Unclamped diagnostic values per final field (spec/12 clamp rule). */
@@ -610,23 +616,46 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     freeThrowAttemptRate: clampUnitInterval(Math.min(1, freeThrowAttemptRate)) ?? 0,
   };
 
-  const skillSummary = computeSummaryRatings(ratings, tendencies);
-  const summaryRatings: SummaryRatings = {
-    offenseRating: skillSummary.offenseRating,
-    defenseRating: skillSummary.defenseRating,
-    // `position` above is the coarse G/F/C prior used for missing-data
-    // reconstruction. Overall weights and big-man detection need the actual
-    // detailed roster label: Duncan is listed as SF but is a genuine big
-    // profile by height, while guards need guard weights rather than the SF
-    // fallback.
-    overallRating: computeRealOverall(ratings, detailPos, input.stats, input.heightInches),
-  };
+  const v3 = deriveRatingProfile({
+    ratings,
+    tendencies,
+    stats: input.stats,
+    position: detailPos,
+    heightInches: input.heightInches,
+    playerId:
+      input.playerId ??
+      (typeof input.stats.playerExternalId === 'string' ? input.stats.playerExternalId : undefined),
+    artifact: input.artifact ?? {
+      schemaVersion: 1,
+      modelVersion: 'ratings-model-v3',
+      ratingsVersion: 'ratings-v3',
+      benchmarkVersion: 'ratings-benchmarks-v1',
+      seedVersion: 'ratings-seeds-v1',
+      sampleCountPerContext: 256,
+      contexts: ['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'],
+      mapping: {
+        impactPerNetRating: 0.22,
+        impactPerWinProbability: 8,
+        impactPerEfficiency: 0.12,
+        impactPerDefensiveEfficiency: 0.08,
+        impactPerTurnovers: 0.15,
+        impactPerRebound: 0.1,
+        impactPerShotQuality: 4,
+        shrinkageGames: 120,
+      },
+      distributionTargets: { exceptionalMin: 95, mvpMin: 90, rotationMax: 89 },
+      regressionGates: [],
+      generatedAt: '2026-08-03T00:00:00.000Z',
+    },
+  });
+  const summaryRatings: SummaryRatings = v3.summaryRatings;
 
   return {
     ratings,
     tendencies,
     anchors,
     summaryRatings,
+    ratingProfile: v3.profile,
     provenance,
     unclamped,
     methods,

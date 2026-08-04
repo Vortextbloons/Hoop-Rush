@@ -19,6 +19,7 @@ import { getEra } from './era.js';
 import { canonicalPlayerName } from '../identity.js';
 import { positionOverrideFor } from '../positions/overrides.js';
 import type { StatsRow } from './stats.js';
+import { loadRatingsModelArtifact } from './artifact.js';
 
 export interface RosterPlayer extends Record<string, unknown> {
   externalId?: string | null;
@@ -36,6 +37,7 @@ export interface RosterPlayer extends Record<string, unknown> {
   ratings?: Record<string, number>;
   tendencies?: Record<string, number>;
   summaryRatings?: { offenseRating: number; defenseRating: number; overallRating: number };
+  ratingProfile?: import('@hoop-rush/data-contracts').RatingProfile;
   anchors?: Record<string, unknown>;
   provenance?: Record<string, unknown>;
   unclamped?: Record<string, number>;
@@ -124,6 +126,7 @@ export function computeForSeason(season: string, force = false): void {
   }
 
   const context = seasonContext(season);
+  const artifact = loadRatingsModelArtifact();
 
   let computed = 0;
   for (const player of roster) {
@@ -191,10 +194,12 @@ export function computeForSeason(season: string, force = false): void {
     // Derive all fields through the versioned registry (no jitter).
     const derived = derivePlayerRecord({
       season,
+      playerId: extId !== '' ? `p-${extId}` : (player.id ?? undefined),
       position: pos,
       heightInches: safeHeight(player.heightInches),
       stats,
       era: context,
+      artifact,
     });
     player.ratings = derived.ratings;
     player.tendencies = derived.tendencies;
@@ -203,6 +208,7 @@ export function computeForSeason(season: string, force = false): void {
     player.provenance = derived.provenance;
     player.unclamped = derived.unclamped;
     player.methods = derived.methods;
+    player.ratingProfile = derived.ratingProfile;
     player.traits = deriveTraits(player.ratings, stats, pos);
     const age = safeFloat(stats['age'] ?? player.age, 25) || 25;
     player.contract = deriveContract(player.summaryRatings.overallRating, Math.trunc(age));

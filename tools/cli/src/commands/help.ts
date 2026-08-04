@@ -51,6 +51,8 @@ Commands:
                          Exits 1 when any required gate fails.
   calibrate sensitivity  A/B the single-dimension sensitivity fixtures.
                          --samples N (default 200)   --profile <path>  --era <eraId>
+  calibrate ratings      Generate the deterministic paired-simulation Ratings v3 artifact.
+                         --samples N (default 256) --workers N --output <path>
   combine docs           Combine every markdown file under the docs directory
                          into one file in the docs root (outside subfolders).
                          --input <dir>        Docs directory (default Docs/)

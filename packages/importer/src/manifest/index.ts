@@ -19,6 +19,8 @@ import {
   parsePool,
   parsePlayersIndex,
   parseRosterDetails,
+  PLAYERS_INDEX_SCHEMA_VERSION,
+  RATING_MODEL_VERSION,
 } from '@hoop-rush/data-contracts';
 import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.js';
 import {
@@ -32,7 +34,7 @@ type Manifest = Record<string, unknown>;
 
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
 
-export const DATA_VERSION = 'm6';
+export const DATA_VERSION = 'm7-ratings-v3';
 
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
@@ -50,6 +52,7 @@ function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][
     offense: player.summaryRatings.offenseRating,
     defense: player.summaryRatings.defenseRating,
     selectionScore: player.selectionScore,
+    ratingModelVersion: RATING_MODEL_VERSION,
   };
 }
 
@@ -99,7 +102,7 @@ export function rebuildPlayersIndex(
   if (indexPlayers.length === 0) return null;
   const indexPath = join(dataDir, 'players-index.json');
   const index = parsePlayersIndex({
-    schemaVersion: 4,
+    schemaVersion: PLAYERS_INDEX_SCHEMA_VERSION,
     dataVersion: DATA_VERSION,
     players: indexPlayers,
   });

@@ -11,6 +11,7 @@ export * from './json.js';
 export * from './fetch.js';
 export * from './lineage.js';
 export * as ratings from './ratings/index.js';
+export * from './ratings/artifact.js';
 export * as pools from './pools/compute.js';
 export * as eraProfile from './era-profile/index.js';
 export * as manifest from './manifest/index.js';

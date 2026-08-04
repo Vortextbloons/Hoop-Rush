@@ -64,7 +64,8 @@ export const franchiseLineageEntrySchema = z.object({
   /** Lineage rule version that produced this segment. */
   lineageRuleVersion: z.string().min(1).max(64),
   /** Verified historical logo candidates, best first. At least one required. */
-  logoCandidates: z.array(historicalLogoCandidateSchema).min(1),
+  /** Optional for legacy fixtures; new builds always emit candidates. */
+  logoCandidates: z.array(historicalLogoCandidateSchema).min(1).optional(),
 });
 export type FranchiseLineageEntry = z.infer<typeof franchiseLineageEntrySchema>;
 

@@ -20,8 +20,8 @@ export const contextualReasonSchema = z.object({
   code: contextualReasonCodeSchema,
   direction: z.enum(['positive', 'negative', 'neutral']),
   label: z.string().min(1).max(96),
-  measuredValue: z.number().finite(),
-  comparisonValue: z.number().finite(),
+  measuredValue: z.number(),
+  comparisonValue: z.number(),
   priority: z.number().int().min(0).max(99),
 });
 export type ContextualReason = z.infer<typeof contextualReasonSchema>;

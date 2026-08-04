@@ -40,13 +40,13 @@ export const archetypeMembershipsSchema = z
 export type ArchetypeMemberships = z.infer<typeof archetypeMembershipsSchema>;
 
 export const nonlinearComponentsSchema = z.object({
-  creation: z.number().finite(),
-  penetration: z.number().finite(),
-  shootingGravity: z.number().finite(),
-  scalableScoring: z.number().finite(),
-  switchability: z.number().finite(),
-  rimProtection: z.number().finite(),
-  possessionControl: z.number().finite(),
+  creation: z.number(),
+  penetration: z.number(),
+  shootingGravity: z.number(),
+  scalableScoring: z.number(),
+  switchability: z.number(),
+  rimProtection: z.number(),
+  possessionControl: z.number(),
   synergyBonus: z.number().min(0).max(5),
   weaknessPenalty: z.number().min(-6).max(0),
   weaknesses: z.object({
@@ -103,11 +103,37 @@ export const ratingsModelArtifactSchema = z.object({
   sampleCountPerContext: z.number().int().positive(),
   contexts: z.array(z.enum(['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'])),
   mapping: z.object({
-    impactPerNetRating: z.number().finite(),
-    impactPerWinProbability: z.number().finite(),
-    impactPerEfficiency: z.number().finite(),
+    impactPerNetRating: z.number(),
+    impactPerWinProbability: z.number(),
+    impactPerEfficiency: z.number(),
+    impactPerDefensiveEfficiency: z.number(),
+    impactPerTurnovers: z.number(),
+    impactPerRebound: z.number(),
+    impactPerShotQuality: z.number(),
     shrinkageGames: z.number().positive(),
   }),
+  /** Player-level paired-simulation results, keyed by stable player id. */
+  playerAdjustments: z
+    .record(
+      z.string().min(1),
+      z.object({
+        adjustment: z.number().min(-6).max(6),
+        confidence: z.number().min(0).max(1),
+        sampleCount: z.number().int().nonnegative(),
+        metrics: z
+          .object({
+            netRating: z.number(),
+            winProbability: z.number(),
+            offensiveEfficiency: z.number(),
+            defensiveEfficiency: z.number(),
+            turnovers: z.number(),
+            rebounds: z.number(),
+            shotQuality: z.number(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
   distributionTargets: z.object({
     exceptionalMin: z.number().min(95).max(100),
     mvpMin: z.number().min(90).max(100),
@@ -120,6 +146,6 @@ export const ratingsModelArtifactSchema = z.object({
       max: z.number().min(0).max(100),
     }),
   ),
-  generatedAt: z.string().datetime(),
+  generatedAt: z.iso.datetime(),
 });
 export type RatingsModelArtifact = z.infer<typeof ratingsModelArtifactSchema>;

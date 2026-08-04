@@ -18,6 +18,7 @@
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
+  import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
   import AsyncState from '$lib/components/AsyncState.svelte';
@@ -55,6 +56,7 @@
   });
 
   let slots = $state<(IndexRow | null)[]>([null, null, null, null, null]);
+  let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
   let pickerPlayer = $state<IndexRow | null>(null);
   let pickerTrigger = $state<HTMLElement | null>(null);
   let pickerFallbackId = $state<string | null>(null);
@@ -93,6 +95,34 @@
   }
 
   $effect(() => loadSandboxData());
+
+  /** Resolve full profiles for the contextual fit panel; this never feeds the simulator. */
+  $effect(() => {
+    const m = manifest;
+    const refs = slots
+      .filter((player): player is IndexRow => player !== null)
+      .map((player) => ({
+        playerId: player.playerId,
+        franchiseId: player.franchiseId,
+        eraId: player.eraId,
+      }));
+    if (!m || refs.length === 0) {
+      resolvedDraftPlayers = [];
+      return;
+    }
+    let cancelled = false;
+    resolvePlayerRefs(refs, m).then(
+      (players) => {
+        if (!cancelled) resolvedDraftPlayers = players;
+      },
+      () => {
+        if (!cancelled) resolvedDraftPlayers = [];
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  });
 
   function retrySandboxData() {
     clearDataLoaderCaches();
@@ -541,6 +571,7 @@
           onmove={openPicker}
           onremove={removePlayer}
         />
+        <DraftValuePanel players={resolvedDraftPlayers} />
         {#if ready}
           <div class="mt-4">
             <button

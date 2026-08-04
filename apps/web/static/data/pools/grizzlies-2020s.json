@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 3,
-  "dataVersion": "m6",
+  "schemaVersion": 4,
+  "dataVersion": "m7-ratings-v3",
   "franchiseId": "grizzlies",
   "eraId": "2020s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1626145",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -67,8 +67,8 @@
         "teamGames": 80,
         "teamMinutes": 1939
       },
-      "selectionScore": 71.39,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 64.347,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 80,
         "minutes": 1936,
@@ -101,9 +101,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 73,
+        "overallRating": 61,
         "offenseRating": 68,
-        "defenseRating": 62
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.037041,
+          "secondaryCreator": 0.072056,
+          "scoringGuard": 0.050376,
+          "movementSpacer": 0.260379,
+          "twoWayWing": 0.107526,
+          "connector": 0.190489,
+          "interiorFinisher": 0.036489,
+          "stretchBig": 0.140863,
+          "rebounder": 0.035184,
+          "defensiveAnchor": 0.069597
+        },
+        "baseScore": 60.03,
+        "nonlinear": {
+          "creation": 71.91386304081406,
+          "penetration": 62.983366735098855,
+          "shootingGravity": 80.2675,
+          "scalableScoring": 64,
+          "switchability": 65.10090835390949,
+          "rimProtection": 60.71168174693731,
+          "possessionControl": 74.20949999999999,
+          "synergyBonus": 1.0613444705729322,
+          "weaknessPenalty": -0.38226750374999996,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.1243161874999998
+          }
+        },
+        "production": {
+          "score": 41.55615000000001,
+          "weight": 0.14273961971284438,
+          "confidence": "high",
+          "sampleGames": 80,
+          "sampleMinutes": 1936,
+          "shrinkage": 0.37563057819169576
+        },
+        "calibratedImpact": {
+          "adjustment": 0.02871875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 61,
+        "offenseRating": 68,
+        "defenseRating": 63
       },
       "detailedRatings": {
         "threePoint": 71,
@@ -564,16 +617,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628379",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -605,8 +658,8 @@
         "teamGames": 65,
         "teamMinutes": 1471
       },
-      "selectionScore": 68.926,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 65.951,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 65,
         "minutes": 1469,
@@ -639,7 +692,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
+        "overallRating": 66,
+        "offenseRating": 67,
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.01698,
+          "secondaryCreator": 0.039609,
+          "scoringGuard": 0.04787,
+          "movementSpacer": 0.355207,
+          "twoWayWing": 0.095438,
+          "connector": 0.138415,
+          "interiorFinisher": 0.030676,
+          "stretchBig": 0.191398,
+          "rebounder": 0.031162,
+          "defensiveAnchor": 0.053245
+        },
+        "baseScore": 63.02,
+        "nonlinear": {
+          "creation": 63.936134205996645,
+          "penetration": 59.8328682150426,
+          "shootingGravity": 90.9025,
+          "scalableScoring": 67.33333333333333,
+          "switchability": 65.59531991200272,
+          "rimProtection": 60.98359994474735,
+          "possessionControl": 65.5255,
+          "synergyBonus": 2.1281916727736236,
+          "weaknessPenalty": -0.8006262958200001,
+          "weaknesses": {
+            "turnoverLiability": 1.245871848,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.108911375
+          }
+        },
+        "production": {
+          "score": 40.8297,
+          "weight": 0.08729322042053601,
+          "confidence": "medium",
+          "sampleGames": 65,
+          "sampleMinutes": 1469,
+          "shrinkage": 0.30629200147556496
+        },
+        "calibratedImpact": {
+          "adjustment": 0.02015625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 66,
         "offenseRating": 67,
         "defenseRating": 60
       },
@@ -1102,16 +1208,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628415",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -1143,8 +1249,8 @@
         "teamGames": 67,
         "teamMinutes": 1996
       },
-      "selectionScore": 77.008,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 63.061,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 67,
         "minutes": 1996,
@@ -1177,8 +1283,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
-        "offenseRating": 67,
+        "overallRating": 59,
+        "offenseRating": 66,
+        "defenseRating": 65
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.033961,
+          "secondaryCreator": 0.047147,
+          "scoringGuard": 0.05645,
+          "movementSpacer": 0.179424,
+          "twoWayWing": 0.159629,
+          "connector": 0.138237,
+          "interiorFinisher": 0.073515,
+          "stretchBig": 0.143882,
+          "rebounder": 0.047584,
+          "defensiveAnchor": 0.120171
+        },
+        "baseScore": 58.14,
+        "nonlinear": {
+          "creation": 66.86398485126897,
+          "penetration": 67.28297926852633,
+          "shootingGravity": 75.34,
+          "scalableScoring": 68.33333333333333,
+          "switchability": 69.96624222619991,
+          "rimProtection": 66.71510717854896,
+          "possessionControl": 69.893,
+          "synergyBonus": 0.807645964577069,
+          "weaknessPenalty": -1.18695454112,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0.13520000000000001,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.1940807679999996,
+            "deficientRebounding": 1.161762
+          }
+        },
+        "production": {
+          "score": 47.51485,
+          "weight": 0.13586879858190679,
+          "confidence": "high",
+          "sampleGames": 67,
+          "sampleMinutes": 1996.6000000000001,
+          "shrinkage": 0.3575494699523863
+        },
+        "calibratedImpact": {
+          "adjustment": -0.049625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 59,
+        "offenseRating": 66,
         "defenseRating": 65
       },
       "detailedRatings": {
@@ -1640,16 +1799,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628960",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -1681,8 +1840,8 @@
         "teamGames": 50,
         "teamMinutes": 1259
       },
-      "selectionScore": 68.438,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 63.27,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 50,
         "minutes": 1260,
@@ -1715,9 +1874,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 63,
         "offenseRating": 64,
-        "defenseRating": 60
+        "defenseRating": 61
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.018281,
+          "secondaryCreator": 0.035159,
+          "scoringGuard": 0.048475,
+          "movementSpacer": 0.365569,
+          "twoWayWing": 0.095663,
+          "connector": 0.137487,
+          "interiorFinisher": 0.033728,
+          "stretchBig": 0.174319,
+          "rebounder": 0.03344,
+          "defensiveAnchor": 0.057879
+        },
+        "baseScore": 60.59,
+        "nonlinear": {
+          "creation": 61.54857686285338,
+          "penetration": 59.923977791820036,
+          "shootingGravity": 87.5675,
+          "scalableScoring": 65,
+          "switchability": 64.8715411671635,
+          "rimProtection": 60.48966740982,
+          "possessionControl": 65.7995,
+          "synergyBonus": 1.8524061424571523,
+          "weaknessPenalty": -0.33973055,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.9992075
+          }
+        },
+        "production": {
+          "score": 40.272800000000004,
+          "weight": 0.07228260869565217,
+          "confidence": "medium",
+          "sampleGames": 50,
+          "sampleMinutes": 1260,
+          "shrinkage": 0.2536231884057971
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00021875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 63,
+        "offenseRating": 64,
+        "defenseRating": 61
       },
       "detailedRatings": {
         "threePoint": 75,
@@ -2178,20 +2390,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628991",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
-      "seasonKey": "2023-24",
+      "seasonKey": "2022-23",
       "firstName": "Jaren",
       "lastName": "Jackson Jr.",
       "displayName": "Jaren Jackson Jr.",
@@ -2216,108 +2428,161 @@
       "weightLbs": 242,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 66,
-        "teamMinutes": 2124
+        "teamGames": 63,
+        "teamMinutes": 1787
       },
-      "selectionScore": 84.092,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 76.219,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 66,
-        "minutes": 2125,
-        "points": 1485,
-        "rebounds": 363,
-        "offensiveRebounds": 85,
-        "defensiveRebounds": 277,
-        "assists": 151,
-        "steals": 79,
-        "blocks": 105,
-        "turnovers": 158,
-        "fieldGoalsMade": 514,
-        "fieldGoalsAttempted": 1161,
-        "threesMade": 118,
-        "threesAttempted": 363,
-        "freeThrowsMade": 336,
-        "freeThrowsAttempted": 415,
-        "per": 17.275000000000002,
-        "boxPlusMinus": 3.3450000000000006,
-        "usageRate": 30.2,
-        "tsPct": 0.553,
-        "efgPct": 0.495
+        "gamesPlayed": 63,
+        "minutes": 1789,
+        "points": 1171,
+        "rebounds": 428,
+        "offensiveRebounds": 107,
+        "defensiveRebounds": 315,
+        "assists": 63,
+        "steals": 63,
+        "blocks": 189,
+        "turnovers": 107,
+        "fieldGoalsMade": 415,
+        "fieldGoalsAttempted": 819,
+        "threesMade": 100,
+        "threesAttempted": 283,
+        "freeThrowsMade": 239,
+        "freeThrowsAttempted": 308,
+        "per": 16.855000000000004,
+        "boxPlusMinus": 5.4620000000000015,
+        "usageRate": 24.3,
+        "tsPct": 0.613,
+        "efgPct": 0.567
       },
       "historicalTeamIdentity": {
         "teamId": "1610612763",
         "displayName": "Memphis Grizzlies",
         "city": "Memphis",
         "abbreviation": "MEM",
-        "seasonKey": "2023-24",
+        "seasonKey": "2022-23",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 90,
-        "offenseRating": 70,
-        "defenseRating": 74
+        "overallRating": 76,
+        "offenseRating": 69,
+        "defenseRating": 82
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.019212,
+          "secondaryCreator": 0.027206,
+          "scoringGuard": 0.032525,
+          "movementSpacer": 0.12755,
+          "twoWayWing": 0.185954,
+          "connector": 0.127436,
+          "interiorFinisher": 0.051407,
+          "stretchBig": 0.119971,
+          "rebounder": 0.051924,
+          "defensiveAnchor": 0.256815
+        },
+        "baseScore": 67.46,
+        "nonlinear": {
+          "creation": 68.2862786635927,
+          "penetration": 67.17825850897306,
+          "shootingGravity": 77.155,
+          "scalableScoring": 76.66666666666667,
+          "switchability": 79.51535112230258,
+          "rimProtection": 80.52603877834188,
+          "possessionControl": 71.4505,
+          "synergyBonus": 0.9730527734805756,
+          "weaknessPenalty": -0.9299871134400002,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.7352562160000002,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 66.9273,
+          "weight": 0.12643156951435058,
+          "confidence": "high",
+          "sampleGames": 63,
+          "sampleMinutes": 1789.1999999999998,
+          "shrinkage": 0.33271465661671207
+        },
+        "calibratedImpact": {
+          "adjustment": 0.02021875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 76,
+        "offenseRating": 69,
+        "defenseRating": 82
       },
       "detailedRatings": {
-        "threePoint": 66,
-        "freeThrow": 87,
-        "insideScoring": 75,
-        "closeShot": 78,
-        "midrange": 61,
-        "passing": 66,
-        "ballHandling": 69,
-        "offensiveRebound": 49,
-        "defensiveRebound": 56,
-        "perimeterDefense": 85,
-        "interiorDefense": 90,
-        "steal": 72,
-        "block": 79,
-        "defensiveIq": 66,
-        "speed": 74,
+        "threePoint": 73,
+        "freeThrow": 83,
+        "insideScoring": 70,
+        "closeShot": 72,
+        "midrange": 68,
+        "passing": 60,
+        "ballHandling": 61,
+        "offensiveRebound": 53,
+        "defensiveRebound": 61,
+        "perimeterDefense": 97,
+        "interiorDefense": 100,
+        "steal": 70,
+        "block": 96,
+        "defensiveIq": 70,
+        "speed": 71,
         "strength": 73,
         "vertical": 60,
-        "offensiveIq": 83
+        "offensiveIq": 87
       },
       "tendencies": {
-        "usageRate": 30.2,
-        "passRate": 6.32,
-        "shotRate": 36.67,
+        "usageRate": 24.3,
+        "passRate": 3.54,
+        "shotRate": 27.08,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 30,
+        "rimFrequency": 28,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 7.92,
-        "aboveBreakThreeFrequency": 13.2,
-        "threePointRate": 31.25,
-        "freeThrowRate": 35.8,
-        "turnoverRate": 10.54,
-        "isolationRate": 9.06,
+        "cornerThreeFrequency": 8.76,
+        "aboveBreakThreeFrequency": 14.6,
+        "threePointRate": 34.62,
+        "freeThrowRate": 37.69,
+        "turnoverRate": 10.09,
+        "isolationRate": 7.29,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 7.37,
-        "stealAttemptRate": 10.76,
-        "blockAttemptRate": 11.32,
-        "crashOffensiveGlassRate": 15.88
+        "foulRate": 8.08,
+        "stealAttemptRate": 10.6,
+        "blockAttemptRate": 12.68,
+        "crashOffensiveGlassRate": 16.36
       },
       "anchors": {
-        "gamesPlayed": 66,
-        "minutesPerGame": 32.2,
-        "pointsPerGame": 22.5,
-        "reboundsPerGame": 5.5,
-        "offensiveReboundsPerGame": 1.3,
-        "defensiveReboundsPerGame": 4.2,
-        "assistsPerGame": 2.3,
-        "stealsPerGame": 1.2,
-        "blocksPerGame": 1.6,
-        "turnoversPerGame": 2.4,
-        "fieldGoalPct": 0.44318181818181807,
-        "threePointPct": 0.32727272727272727,
-        "freeThrowPct": 0.8095238095238094,
-        "threePointAttemptRate": 0.31249999999999994,
-        "freeThrowAttemptRate": 0.3579545454545454
+        "gamesPlayed": 63,
+        "minutesPerGame": 28.4,
+        "pointsPerGame": 18.6,
+        "reboundsPerGame": 6.8,
+        "offensiveReboundsPerGame": 1.7,
+        "defensiveReboundsPerGame": 5,
+        "assistsPerGame": 1,
+        "stealsPerGame": 1,
+        "blocksPerGame": 3,
+        "turnoversPerGame": 1.7,
+        "fieldGoalPct": 0.5076923076923077,
+        "threePointPct": 0.35555555555555557,
+        "freeThrowPct": 0.7755102040816325,
+        "threePointAttemptRate": 0.34615384615384615,
+        "freeThrowAttemptRate": 0.37692307692307697
       },
       "provenance": {
         "threePoint": {
@@ -2716,16 +2981,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629001",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -2757,8 +3022,8 @@
         "teamGames": 73,
         "teamMinutes": 1656
       },
-      "selectionScore": 71.464,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 62.254,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 73,
         "minutes": 1657,
@@ -2791,8 +3056,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
-        "offenseRating": 64,
+        "overallRating": 59,
+        "offenseRating": 63,
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.029147,
+          "secondaryCreator": 0.045981,
+          "scoringGuard": 0.044651,
+          "movementSpacer": 0.28818,
+          "twoWayWing": 0.111644,
+          "connector": 0.172805,
+          "interiorFinisher": 0.034688,
+          "stretchBig": 0.142873,
+          "rebounder": 0.041233,
+          "defensiveAnchor": 0.088798
+        },
+        "baseScore": 58.89,
+        "nonlinear": {
+          "creation": 66.55726501181805,
+          "penetration": 61.78629161493222,
+          "shootingGravity": 78.67,
+          "scalableScoring": 64.66666666666667,
+          "switchability": 67.60789329302793,
+          "rimProtection": 63.547048191620725,
+          "possessionControl": 67.949,
+          "synergyBonus": 1.0453383884350356,
+          "weaknessPenalty": -0.64387797024,
+          "weaknesses": {
+            "turnoverLiability": 0.6525750240000002,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.6354897119999997,
+            "deficientRebounding": 0.605694
+          }
+        },
+        "production": {
+          "score": 41.518150000000006,
+          "weight": 0.12885117769387894,
+          "confidence": "high",
+          "sampleGames": 73,
+          "sampleMinutes": 1657.1,
+          "shrinkage": 0.3390820465628393
+        },
+        "calibratedImpact": {
+          "adjustment": 0.01353125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 59,
+        "offenseRating": 63,
         "defenseRating": 66
       },
       "detailedRatings": {
@@ -3254,16 +3572,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629111",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -3295,8 +3613,8 @@
         "teamGames": 45,
         "teamMinutes": 1060
       },
-      "selectionScore": 69.184,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 60.936,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 68,
         "minutes": 1502,
@@ -3329,7 +3647,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 73,
+        "overallRating": 59,
+        "offenseRating": 64,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.020474,
+          "secondaryCreator": 0.034324,
+          "scoringGuard": 0.037635,
+          "movementSpacer": 0.176024,
+          "twoWayWing": 0.131461,
+          "connector": 0.112719,
+          "interiorFinisher": 0.06454,
+          "stretchBig": 0.210687,
+          "rebounder": 0.089389,
+          "defensiveAnchor": 0.122747
+        },
+        "baseScore": 57.92,
+        "nonlinear": {
+          "creation": 61.807763920213276,
+          "penetration": 60.8569612767726,
+          "shootingGravity": 73.6425,
+          "scalableScoring": 67.33333333333333,
+          "switchability": 69.82910694279354,
+          "rimProtection": 69.59076193446914,
+          "possessionControl": 66.4675,
+          "synergyBonus": 0.7278296112245503,
+          "weaknessPenalty": -0.5400912525600001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.5885036840000002,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 43.17154999999998,
+          "weight": 0.11974117983709032,
+          "confidence": "high",
+          "sampleGames": 68,
+          "sampleMinutes": 1502.8000000000002,
+          "shrinkage": 0.31510836799234293
+        },
+        "calibratedImpact": {
+          "adjustment": -0.10190625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 59,
         "offenseRating": 64,
         "defenseRating": 62
       },
@@ -3792,16 +4163,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629630",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -3833,8 +4204,8 @@
         "teamGames": 61,
         "teamMinutes": 1948
       },
-      "selectionScore": 83.564,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 76.19,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 61,
         "minutes": 1945,
@@ -3867,8 +4238,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 88,
-        "offenseRating": 77,
+        "overallRating": 76,
+        "offenseRating": 76,
+        "defenseRating": 67
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.098447,
+          "secondaryCreator": 0.112333,
+          "scoringGuard": 0.062632,
+          "movementSpacer": 0.139751,
+          "twoWayWing": 0.109915,
+          "connector": 0.205571,
+          "interiorFinisher": 0.06387,
+          "stretchBig": 0.091054,
+          "rebounder": 0.042116,
+          "defensiveAnchor": 0.074311
+        },
+        "baseScore": 66.6,
+        "nonlinear": {
+          "creation": 90.50620105449573,
+          "penetration": 81.12980254932964,
+          "shootingGravity": 69.905,
+          "scalableScoring": 74.33333333333333,
+          "switchability": 70.49982395207786,
+          "rimProtection": 63.122657198601495,
+          "possessionControl": 86.037,
+          "synergyBonus": 0.8930187024645085,
+          "weaknessPenalty": -0.3549633484899997,
+          "weaknesses": {
+            "turnoverLiability": 0.6063615360000001,
+            "inefficientUsage": 0.293019999999999,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.1446283125
+          }
+        },
+        "production": {
+          "score": 76.22234999999999,
+          "weight": 0.1296014635271821,
+          "confidence": "high",
+          "sampleGames": 61,
+          "sampleMinutes": 1945.8999999999999,
+          "shrinkage": 0.3410564829662687
+        },
+        "calibratedImpact": {
+          "adjustment": 0.09596875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 76,
+        "offenseRating": 76,
         "defenseRating": 67
       },
       "detailedRatings": {
@@ -4330,20 +4754,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629634",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
-      "seasonKey": "2020-21",
+      "seasonKey": "2021-22",
       "firstName": "Brandon",
       "lastName": "Clarke",
       "displayName": "Brandon Clarke",
@@ -4368,108 +4792,161 @@
       "weightLbs": 215,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 59,
-        "teamMinutes": 1414
+        "teamGames": 64,
+        "teamMinutes": 1246
       },
-      "selectionScore": 71.701,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 61.4,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 59,
-        "minutes": 1416,
-        "points": 607,
-        "rebounds": 330,
-        "offensiveRebounds": 94,
-        "defensiveRebounds": 230,
-        "assists": 94,
-        "steals": 59,
-        "blocks": 53,
-        "turnovers": 35,
-        "fieldGoalsMade": 253,
-        "fieldGoalsAttempted": 495,
-        "threesMade": 17,
-        "threesAttempted": 76,
-        "freeThrowsMade": 76,
-        "freeThrowsAttempted": 112,
-        "per": 11.160000000000002,
-        "boxPlusMinus": 1.396,
-        "usageRate": 16.7,
-        "tsPct": 0.56,
-        "efgPct": 0.537
+        "gamesPlayed": 64,
+        "minutes": 1248,
+        "points": 665,
+        "rebounds": 339,
+        "offensiveRebounds": 134,
+        "defensiveRebounds": 204,
+        "assists": 83,
+        "steals": 38,
+        "blocks": 70,
+        "turnovers": 32,
+        "fieldGoalsMade": 288,
+        "fieldGoalsAttempted": 448,
+        "threesMade": 6,
+        "threesAttempted": 19,
+        "freeThrowsMade": 83,
+        "freeThrowsAttempted": 128,
+        "per": 10.679999999999998,
+        "boxPlusMinus": 1.0130000000000008,
+        "usageRate": 17.1,
+        "tsPct": 0.66,
+        "efgPct": 0.65
       },
       "historicalTeamIdentity": {
         "teamId": "1610612763",
         "displayName": "Memphis Grizzlies",
         "city": "Memphis",
         "abbreviation": "MEM",
-        "seasonKey": "2020-21",
+        "seasonKey": "2021-22",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
-        "offenseRating": 61,
-        "defenseRating": 69
+        "overallRating": 58,
+        "offenseRating": 64,
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025656,
+          "secondaryCreator": 0.043169,
+          "scoringGuard": 0.047906,
+          "movementSpacer": 0.108406,
+          "twoWayWing": 0.195425,
+          "connector": 0.115505,
+          "interiorFinisher": 0.070721,
+          "stretchBig": 0.128131,
+          "rebounder": 0.088629,
+          "defensiveAnchor": 0.176452
+        },
+        "baseScore": 56.36,
+        "nonlinear": {
+          "creation": 60.96871996559927,
+          "penetration": 59.88496477441765,
+          "shootingGravity": 66.3225,
+          "scalableScoring": 66.33333333333333,
+          "switchability": 67.95585369890954,
+          "rimProtection": 67.97013604180786,
+          "possessionControl": 67.7165,
+          "synergyBonus": 0.2876781436328154,
+          "weaknessPenalty": -0.58365342276,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.4756444639999997,
+            "deficientRebounding": 0.24098324999999998
+          }
+        },
+        "production": {
+          "score": 49.10994999999999,
+          "weight": 0.07965065502183408,
+          "confidence": "medium",
+          "sampleGames": 64,
+          "sampleMinutes": 1248,
+          "shrinkage": 0.27947598253275113
+        },
+        "calibratedImpact": {
+          "adjustment": -0.03640625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 58,
+        "offenseRating": 64,
+        "defenseRating": 66
       },
       "detailedRatings": {
-        "threePoint": 51,
-        "freeThrow": 72,
-        "insideScoring": 57,
+        "threePoint": 69,
+        "freeThrow": 68,
+        "insideScoring": 59,
         "closeShot": 60,
-        "midrange": 65,
-        "passing": 59,
-        "ballHandling": 57,
-        "offensiveRebound": 51,
-        "defensiveRebound": 55,
-        "perimeterDefense": 75,
-        "interiorDefense": 80,
-        "steal": 69,
+        "midrange": 74,
+        "passing": 57,
+        "ballHandling": 56,
+        "offensiveRebound": 54,
+        "defensiveRebound": 52,
+        "perimeterDefense": 71,
+        "interiorDefense": 76,
+        "steal": 64,
         "block": 70,
-        "defensiveIq": 62,
-        "speed": 67,
+        "defensiveIq": 61,
+        "speed": 65,
         "strength": 68,
         "vertical": 59,
-        "offensiveIq": 73
+        "offensiveIq": 71
       },
       "tendencies": {
-        "usageRate": 16.7,
-        "passRate": 8.26,
-        "shotRate": 17.5,
+        "usageRate": 17.1,
+        "passRate": 6.93,
+        "shotRate": 14.58,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 22.8,
+        "rimFrequency": 23.6,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 6.12,
-        "aboveBreakThreeFrequency": 10.2,
-        "threePointRate": 15.48,
-        "freeThrowRate": 22.62,
-        "turnoverRate": 6.1,
-        "isolationRate": 5.01,
+        "cornerThreeFrequency": 8.28,
+        "aboveBreakThreeFrequency": 13.8,
+        "threePointRate": 4.29,
+        "freeThrowRate": 28.57,
+        "turnoverRate": 5.97,
+        "isolationRate": 5.13,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 4.8,
-        "stealAttemptRate": 10.52,
+        "foulRate": 6.68,
+        "stealAttemptRate": 10.12,
         "blockAttemptRate": 10.6,
-        "crashOffensiveGlassRate": 16.12
+        "crashOffensiveGlassRate": 16.48
       },
       "anchors": {
-        "gamesPlayed": 59,
-        "minutesPerGame": 24,
-        "pointsPerGame": 10.3,
-        "reboundsPerGame": 5.6,
-        "offensiveReboundsPerGame": 1.6,
-        "defensiveReboundsPerGame": 3.9,
-        "assistsPerGame": 1.6,
-        "stealsPerGame": 1,
-        "blocksPerGame": 0.9,
-        "turnoversPerGame": 0.6,
-        "fieldGoalPct": 0.5119047619047619,
-        "threePointPct": 0.23076923076923075,
-        "freeThrowPct": 0.6842105263157895,
-        "threePointAttemptRate": 0.15476190476190477,
-        "freeThrowAttemptRate": 0.22619047619047616
+        "gamesPlayed": 64,
+        "minutesPerGame": 19.5,
+        "pointsPerGame": 10.4,
+        "reboundsPerGame": 5.3,
+        "offensiveReboundsPerGame": 2.1,
+        "defensiveReboundsPerGame": 3.2,
+        "assistsPerGame": 1.3,
+        "stealsPerGame": 0.6,
+        "blocksPerGame": 1.1,
+        "turnoversPerGame": 0.5,
+        "fieldGoalPct": 0.6428571428571429,
+        "threePointPct": 0.33333333333333337,
+        "freeThrowPct": 0.65,
+        "threePointAttemptRate": 0.04285714285714286,
+        "freeThrowAttemptRate": 0.2857142857142857
       },
       "provenance": {
         "threePoint": {
@@ -4868,16 +5345,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629723",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -4909,8 +5386,8 @@
         "teamGames": 72,
         "teamMinutes": 1493
       },
-      "selectionScore": 64.399,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.985,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 72,
         "minutes": 1490,
@@ -4943,8 +5420,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
-        "offenseRating": 59,
+        "overallRating": 54,
+        "offenseRating": 58,
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.016748,
+          "secondaryCreator": 0.034758,
+          "scoringGuard": 0.040638,
+          "movementSpacer": 0.285923,
+          "twoWayWing": 0.122959,
+          "connector": 0.136949,
+          "interiorFinisher": 0.03392,
+          "stretchBig": 0.179731,
+          "rebounder": 0.05377,
+          "defensiveAnchor": 0.094604
+        },
+        "baseScore": 55.5,
+        "nonlinear": {
+          "creation": 57.709206400127755,
+          "penetration": 53.3736500708886,
+          "shootingGravity": 79.955,
+          "scalableScoring": 57.666666666666664,
+          "switchability": 66.25976597458147,
+          "rimProtection": 62.4499430313003,
+          "possessionControl": 63.1265,
+          "synergyBonus": 1.1690255440090214,
+          "weaknessPenalty": -0.43541010725000007,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.58022265,
+            "deficientRebounding": 0.7003953125
+          }
+        },
+        "production": {
+          "score": 29.130050000000004,
+          "weight": 0.09131305893143775,
+          "confidence": "medium",
+          "sampleGames": 72,
+          "sampleMinutes": 1490.3999999999999,
+          "shrinkage": 0.3203966980050447
+        },
+        "calibratedImpact": {
+          "adjustment": -0.1416875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 54,
+        "offenseRating": 58,
         "defenseRating": 63
       },
       "detailedRatings": {
@@ -5406,16 +5936,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630214",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -5447,8 +5977,8 @@
         "teamGames": 61,
         "teamMinutes": 1180
       },
-      "selectionScore": 68.31,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.996,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 61,
         "minutes": 1177,
@@ -5481,7 +6011,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
+        "overallRating": 57,
+        "offenseRating": 63,
+        "defenseRating": 64
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.022438,
+          "secondaryCreator": 0.043037,
+          "scoringGuard": 0.043632,
+          "movementSpacer": 0.15216,
+          "twoWayWing": 0.172235,
+          "connector": 0.128708,
+          "interiorFinisher": 0.056297,
+          "stretchBig": 0.156458,
+          "rebounder": 0.081737,
+          "defensiveAnchor": 0.143298
+        },
+        "baseScore": 56.61,
+        "nonlinear": {
+          "creation": 59.443464882943765,
+          "penetration": 57.139904609351944,
+          "shootingGravity": 66.5,
+          "scalableScoring": 68.66666666666667,
+          "switchability": 65.97979179298054,
+          "rimProtection": 65.05262699383128,
+          "possessionControl": 63.6945,
+          "synergyBonus": 0.2729263736136845,
+          "weaknessPenalty": -0.40701120180000017,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.8454205200000003,
+            "deficientRebounding": 0.35167125
+          }
+        },
+        "production": {
+          "score": 39.49599999999999,
+          "weight": 0.07569085782817253,
+          "confidence": "medium",
+          "sampleGames": 61,
+          "sampleMinutes": 1177.3,
+          "shrinkage": 0.2655819572918334
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0335,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 57,
         "offenseRating": 63,
         "defenseRating": 64
       },
@@ -5944,20 +6527,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630217",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
-      "seasonKey": "2023-24",
+      "seasonKey": "2022-23",
       "firstName": "Desmond",
       "lastName": "Bane",
       "displayName": "Desmond Bane",
@@ -5982,108 +6565,161 @@
       "weightLbs": 215,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 42,
-        "teamMinutes": 1442
+        "teamGames": 58,
+        "teamMinutes": 1841
       },
-      "selectionScore": 81.333,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 73.672,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 42,
-        "minutes": 1444,
-        "points": 995,
-        "rebounds": 184,
-        "offensiveRebounds": 37,
-        "defensiveRebounds": 147,
-        "assists": 231,
-        "steals": 42,
-        "blocks": 21,
-        "turnovers": 113,
-        "fieldGoalsMade": 361,
-        "fieldGoalsAttempted": 777,
-        "threesMade": 138,
-        "threesAttempted": 361,
-        "freeThrowsMade": 138,
-        "freeThrowsAttempted": 159,
-        "per": 18.090000000000003,
-        "boxPlusMinus": 1.4140000000000006,
-        "usageRate": 27.3,
-        "tsPct": 0.589,
-        "efgPct": 0.552
+        "gamesPlayed": 58,
+        "minutes": 1838,
+        "points": 1247,
+        "rebounds": 290,
+        "offensiveRebounds": 40,
+        "defensiveRebounds": 249,
+        "assists": 255,
+        "steals": 58,
+        "blocks": 23,
+        "turnovers": 127,
+        "fieldGoalsMade": 452,
+        "fieldGoalsAttempted": 939,
+        "threesMade": 168,
+        "threesAttempted": 406,
+        "freeThrowsMade": 179,
+        "freeThrowsAttempted": 203,
+        "per": 16.8,
+        "boxPlusMinus": 1.1899999999999995,
+        "usageRate": 25.2,
+        "tsPct": 0.606,
+        "efgPct": 0.568
       },
       "historicalTeamIdentity": {
         "teamId": "1610612763",
         "displayName": "Memphis Grizzlies",
         "city": "Memphis",
         "abbreviation": "MEM",
-        "seasonKey": "2023-24",
+        "seasonKey": "2022-23",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 88,
+        "overallRating": 74,
         "offenseRating": 74,
-        "defenseRating": 64
+        "defenseRating": 65
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.035364,
+          "secondaryCreator": 0.058073,
+          "scoringGuard": 0.059475,
+          "movementSpacer": 0.253026,
+          "twoWayWing": 0.115286,
+          "connector": 0.167439,
+          "interiorFinisher": 0.053608,
+          "stretchBig": 0.151856,
+          "rebounder": 0.037723,
+          "defensiveAnchor": 0.06815
+        },
+        "baseScore": 66.36,
+        "nonlinear": {
+          "creation": 75.94224605808976,
+          "penetration": 72.59233577996467,
+          "shootingGravity": 85.05250000000001,
+          "scalableScoring": 77,
+          "switchability": 70.46546940003282,
+          "rimProtection": 63.93740823808748,
+          "possessionControl": 75.9335,
+          "synergyBonus": 1.4961026232030026,
+          "weaknessPenalty": -0.4238710956200001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.7395940680000002,
+            "deficientRebounding": 0.507085625
+          }
+        },
+        "production": {
+          "score": 65.3795,
+          "weight": 0.12385352775268137,
+          "confidence": "high",
+          "sampleGames": 58,
+          "sampleMinutes": 1838.6,
+          "shrinkage": 0.32593033619126677
+        },
+        "calibratedImpact": {
+          "adjustment": 0.044625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 74,
+        "offenseRating": 74,
+        "defenseRating": 65
       },
       "detailedRatings": {
-        "threePoint": 76,
-        "freeThrow": 92,
-        "insideScoring": 71,
-        "closeShot": 79,
-        "midrange": 66,
-        "passing": 81,
-        "ballHandling": 75,
-        "offensiveRebound": 45,
-        "defensiveRebound": 52,
-        "perimeterDefense": 72,
-        "interiorDefense": 69,
-        "steal": 69,
-        "block": 65,
+        "threePoint": 83,
+        "freeThrow": 96,
+        "insideScoring": 69,
+        "closeShot": 77,
+        "midrange": 68,
+        "passing": 77,
+        "ballHandling": 72,
+        "offensiveRebound": 44,
+        "defensiveRebound": 56,
+        "perimeterDefense": 71,
+        "interiorDefense": 68,
+        "steal": 70,
+        "block": 64,
         "defensiveIq": 62,
         "speed": 77,
         "strength": 64,
-        "vertical": 59,
+        "vertical": 60,
         "offensiveIq": 79
       },
       "tendencies": {
-        "usageRate": 27.3,
-        "passRate": 11.99,
-        "shotRate": 38.54,
+        "usageRate": 25.2,
+        "passRate": 10.9,
+        "shotRate": 33.75,
         "driveRate": 18,
         "postUpRate": 5,
-        "rimFrequency": 28.4,
+        "rimFrequency": 27.6,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 9.12,
-        "aboveBreakThreeFrequency": 15.2,
-        "threePointRate": 46.49,
-        "freeThrowRate": 20.54,
-        "turnoverRate": 11.8,
-        "isolationRate": 8.19,
+        "cornerThreeFrequency": 9.96,
+        "aboveBreakThreeFrequency": 16.6,
+        "threePointRate": 43.21,
+        "freeThrowRate": 21.6,
+        "turnoverRate": 11.03,
+        "isolationRate": 7.56,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 6.05,
-        "stealAttemptRate": 10.52,
-        "blockAttemptRate": 10.2,
-        "crashOffensiveGlassRate": 15.4
+        "foulRate": 5.94,
+        "stealAttemptRate": 10.6,
+        "blockAttemptRate": 10.12,
+        "crashOffensiveGlassRate": 15.28
       },
       "anchors": {
-        "gamesPlayed": 42,
-        "minutesPerGame": 34.4,
-        "pointsPerGame": 23.7,
-        "reboundsPerGame": 4.4,
-        "offensiveReboundsPerGame": 0.9000000000000001,
-        "defensiveReboundsPerGame": 3.5,
-        "assistsPerGame": 5.5,
+        "gamesPlayed": 58,
+        "minutesPerGame": 31.7,
+        "pointsPerGame": 21.5,
+        "reboundsPerGame": 5,
+        "offensiveReboundsPerGame": 0.7,
+        "defensiveReboundsPerGame": 4.3,
+        "assistsPerGame": 4.4,
         "stealsPerGame": 1,
-        "blocksPerGame": 0.5,
-        "turnoversPerGame": 2.7,
-        "fieldGoalPct": 0.46486486486486484,
-        "threePointPct": 0.38372093023255816,
-        "freeThrowPct": 0.868421052631579,
-        "threePointAttemptRate": 0.46486486486486484,
-        "freeThrowAttemptRate": 0.2054054054054054
+        "blocksPerGame": 0.4,
+        "turnoversPerGame": 2.2,
+        "fieldGoalPct": 0.4814814814814815,
+        "threePointPct": 0.41428571428571426,
+        "freeThrowPct": 0.8857142857142858,
+        "threePointAttemptRate": 0.4320987654320988,
+        "freeThrowAttemptRate": 0.2160493827160494
       },
       "provenance": {
         "threePoint": {
@@ -6482,16 +7118,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630533",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -6523,8 +7159,8 @@
         "teamGames": 62,
         "teamMinutes": 1346
       },
-      "selectionScore": 66.103,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.151,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 62,
         "minutes": 1345,
@@ -6557,9 +7193,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 70,
+        "overallRating": 53,
         "offenseRating": 59,
-        "defenseRating": 59
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.016574,
+          "secondaryCreator": 0.029623,
+          "scoringGuard": 0.037353,
+          "movementSpacer": 0.237566,
+          "twoWayWing": 0.136785,
+          "connector": 0.11996,
+          "interiorFinisher": 0.057143,
+          "stretchBig": 0.215886,
+          "rebounder": 0.05189,
+          "defensiveAnchor": 0.09722
+        },
+        "baseScore": 53.94,
+        "nonlinear": {
+          "creation": 55.84459464441369,
+          "penetration": 56.79148189396043,
+          "shootingGravity": 79.3375,
+          "scalableScoring": 59.666666666666664,
+          "switchability": 64.93421351887973,
+          "rimProtection": 63.866987990137694,
+          "possessionControl": 62.1215,
+          "synergyBonus": 1.087247427128943,
+          "weaknessPenalty": -0.7742003726300001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.8362177320000003,
+            "deficientRebounding": 1.4408421875
+          }
+        },
+        "production": {
+          "score": 30.23355,
+          "weight": 0.08191142359804679,
+          "confidence": "medium",
+          "sampleGames": 62,
+          "sampleMinutes": 1345.3999999999999,
+          "shrinkage": 0.28740850385279576
+        },
+        "calibratedImpact": {
+          "adjustment": 0.02296875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 53,
+        "offenseRating": 59,
+        "defenseRating": 60
       },
       "detailedRatings": {
         "threePoint": 63,
@@ -7020,20 +7709,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630583",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
-      "seasonKey": "2025-26",
+      "seasonKey": "2024-25",
       "firstName": "Santi",
       "lastName": "Aldama",
       "displayName": "Santi Aldama",
@@ -7058,108 +7747,161 @@
       "weightLbs": 215,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 43,
-        "teamMinutes": 1198
+        "teamGames": 65,
+        "teamMinutes": 1659
       },
-      "selectionScore": 72.948,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 65.656,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 43,
-        "minutes": 1199,
-        "points": 602,
-        "rebounds": 288,
-        "offensiveRebounds": 68,
-        "defensiveRebounds": 219,
-        "assists": 124,
-        "steals": 38,
-        "blocks": 30,
-        "turnovers": 55,
-        "fieldGoalsMade": 227,
-        "fieldGoalsAttempted": 477,
-        "threesMade": 68,
-        "threesAttempted": 202,
-        "freeThrowsMade": 77,
-        "freeThrowsAttempted": 116,
-        "per": 13.82,
-        "boxPlusMinus": 1.2349999999999994,
-        "usageRate": 19.1,
-        "tsPct": 0.572,
-        "efgPct": 0.553
+        "gamesPlayed": 65,
+        "minutes": 1657,
+        "points": 812,
+        "rebounds": 416,
+        "offensiveRebounds": 91,
+        "defensiveRebounds": 325,
+        "assists": 188,
+        "steals": 52,
+        "blocks": 26,
+        "turnovers": 71,
+        "fieldGoalsMade": 312,
+        "fieldGoalsAttempted": 650,
+        "threesMade": 117,
+        "threesAttempted": 325,
+        "freeThrowsMade": 65,
+        "freeThrowsAttempted": 91,
+        "per": 12.640000000000002,
+        "boxPlusMinus": 0.4299999999999997,
+        "usageRate": 17.9,
+        "tsPct": 0.588,
+        "efgPct": 0.576
       },
       "historicalTeamIdentity": {
         "teamId": "1610612763",
         "displayName": "Memphis Grizzlies",
         "city": "Memphis",
         "abbreviation": "MEM",
-        "seasonKey": "2025-26",
+        "seasonKey": "2024-25",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 78,
-        "offenseRating": 64,
-        "defenseRating": 67
+        "overallRating": 64,
+        "offenseRating": 66,
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.021407,
+          "secondaryCreator": 0.03768,
+          "scoringGuard": 0.033536,
+          "movementSpacer": 0.198818,
+          "twoWayWing": 0.12115,
+          "connector": 0.132849,
+          "interiorFinisher": 0.053607,
+          "stretchBig": 0.221699,
+          "rebounder": 0.070374,
+          "defensiveAnchor": 0.10888
+        },
+        "baseScore": 61.47,
+        "nonlinear": {
+          "creation": 67.1835761544771,
+          "penetration": 63.24370208139879,
+          "shootingGravity": 78.75,
+          "scalableScoring": 68,
+          "switchability": 70.6002798074656,
+          "rimProtection": 67.9447729763013,
+          "possessionControl": 70.3355,
+          "synergyBonus": 1.0872657369593282,
+          "weaknessPenalty": 0,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 48.9125,
+          "weight": 0.12348603099196924,
+          "confidence": "high",
+          "sampleGames": 65,
+          "sampleMinutes": 1657.5,
+          "shrinkage": 0.3249632394525506
+        },
+        "calibratedImpact": {
+          "adjustment": -0.01203125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 64,
+        "offenseRating": 66,
+        "defenseRating": 66
       },
       "detailedRatings": {
-        "threePoint": 65,
-        "freeThrow": 69,
-        "insideScoring": 61,
-        "closeShot": 65,
-        "midrange": 65,
-        "passing": 65,
+        "threePoint": 71,
+        "freeThrow": 75,
+        "insideScoring": 60,
+        "closeShot": 63,
+        "midrange": 69,
+        "passing": 67,
         "ballHandling": 62,
         "offensiveRebound": 51,
-        "defensiveRebound": 61,
-        "perimeterDefense": 70,
-        "interiorDefense": 75,
-        "steal": 66,
-        "block": 65,
-        "defensiveIq": 61,
+        "defensiveRebound": 60,
+        "perimeterDefense": 69,
+        "interiorDefense": 74,
+        "steal": 68,
+        "block": 64,
+        "defensiveIq": 60,
         "speed": 68,
-        "strength": 74,
-        "vertical": 59,
+        "strength": 75,
+        "vertical": 60,
         "offensiveIq": 73
       },
       "tendencies": {
-        "usageRate": 19.1,
-        "passRate": 10.64,
-        "shotRate": 23.13,
+        "usageRate": 17.9,
+        "passRate": 11.43,
+        "shotRate": 20.83,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 24.4,
+        "rimFrequency": 24,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 7.8,
-        "aboveBreakThreeFrequency": 13,
-        "threePointRate": 42.34,
-        "freeThrowRate": 24.32,
-        "turnoverRate": 9.57,
-        "isolationRate": 5.73,
+        "cornerThreeFrequency": 8.52,
+        "aboveBreakThreeFrequency": 14.2,
+        "threePointRate": 50,
+        "freeThrowRate": 14,
+        "turnoverRate": 9.39,
+        "isolationRate": 5.37,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 4.75,
-        "stealAttemptRate": 10.28,
-        "blockAttemptRate": 10.2,
+        "foulRate": 4.26,
+        "stealAttemptRate": 10.44,
+        "blockAttemptRate": 10.12,
         "crashOffensiveGlassRate": 16.12
       },
       "anchors": {
-        "gamesPlayed": 43,
-        "minutesPerGame": 27.900000000000002,
-        "pointsPerGame": 14,
-        "reboundsPerGame": 6.7,
-        "offensiveReboundsPerGame": 1.5999999999999999,
-        "defensiveReboundsPerGame": 5.1,
+        "gamesPlayed": 65,
+        "minutesPerGame": 25.5,
+        "pointsPerGame": 12.5,
+        "reboundsPerGame": 6.4,
+        "offensiveReboundsPerGame": 1.4,
+        "defensiveReboundsPerGame": 5,
         "assistsPerGame": 2.9,
-        "stealsPerGame": 0.9,
-        "blocksPerGame": 0.7,
-        "turnoversPerGame": 1.3,
-        "fieldGoalPct": 0.4774774774774775,
-        "threePointPct": 0.3404255319148936,
-        "freeThrowPct": 0.6666666666666666,
-        "threePointAttemptRate": 0.42342342342342343,
-        "freeThrowAttemptRate": 0.24324324324324326
+        "stealsPerGame": 0.8,
+        "blocksPerGame": 0.4,
+        "turnoversPerGame": 1.1,
+        "fieldGoalPct": 0.48,
+        "threePointPct": 0.36,
+        "freeThrowPct": 0.7142857142857143,
+        "threePointAttemptRate": 0.5,
+        "freeThrowAttemptRate": 0.14
       },
       "provenance": {
         "threePoint": {
@@ -7558,16 +8300,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630590",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -7599,8 +8341,8 @@
         "teamGames": 79,
         "teamMinutes": 1682
       },
-      "selectionScore": 71.361,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 61.526,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 1682,
@@ -7633,8 +8375,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
-        "offenseRating": 65,
+        "overallRating": 58,
+        "offenseRating": 64,
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.03784,
+          "secondaryCreator": 0.066828,
+          "scoringGuard": 0.049481,
+          "movementSpacer": 0.252119,
+          "twoWayWing": 0.114895,
+          "connector": 0.193296,
+          "interiorFinisher": 0.035558,
+          "stretchBig": 0.126746,
+          "rebounder": 0.038,
+          "defensiveAnchor": 0.085237
+        },
+        "baseScore": 57.37,
+        "nonlinear": {
+          "creation": 70.28867185997157,
+          "penetration": 62.368855677806614,
+          "shootingGravity": 75.0825,
+          "scalableScoring": 65.66666666666667,
+          "switchability": 65.90620284970528,
+          "rimProtection": 62.06433201417594,
+          "possessionControl": 68.554,
+          "synergyBonus": 0.7542189016170604,
+          "weaknessPenalty": -2.3884608719499996,
+          "weaknesses": {
+            "turnoverLiability": 3.886066623999999,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.205988356,
+            "deficientRebounding": 0.9328299375000001
+          }
+        },
+        "production": {
+          "score": 43.898950000000006,
+          "weight": 0.1333750874277508,
+          "confidence": "high",
+          "sampleGames": 79,
+          "sampleMinutes": 1682.7,
+          "shrinkage": 0.3509870721782916
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00465625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 58,
+        "offenseRating": 64,
         "defenseRating": 63
       },
       "detailedRatings": {
@@ -8096,16 +8891,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630643",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -8137,8 +8932,8 @@
         "teamGames": 64,
         "teamMinutes": 748
       },
-      "selectionScore": 63.987,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 60.419,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 64,
         "minutes": 748,
@@ -8171,7 +8966,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 65,
+        "overallRating": 59,
+        "offenseRating": 62,
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.014263,
+          "secondaryCreator": 0.022878,
+          "scoringGuard": 0.032546,
+          "movementSpacer": 0.250867,
+          "twoWayWing": 0.098277,
+          "connector": 0.101208,
+          "interiorFinisher": 0.064943,
+          "stretchBig": 0.24277,
+          "rebounder": 0.065175,
+          "defensiveAnchor": 0.107073
+        },
+        "baseScore": 56.76,
+        "nonlinear": {
+          "creation": 56.180539776862595,
+          "penetration": 56.58423231116241,
+          "shootingGravity": 84.645,
+          "scalableScoring": 64,
+          "switchability": 65.70437108499793,
+          "rimProtection": 66.5520547812018,
+          "possessionControl": 62.421,
+          "synergyBonus": 1.5187453081737288,
+          "weaknessPenalty": -1.01697872073,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.704915072,
+            "deficientRebounding": 1.2861988125
+          }
+        },
+        "production": {
+          "score": 37.5737,
+          "weight": 0.03503948772678762,
+          "confidence": "low",
+          "sampleGames": 64,
+          "sampleMinutes": 748.8,
+          "shrinkage": 0.20490928495197436
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00515625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 59,
         "offenseRating": 62,
         "defenseRating": 59
       },
@@ -8634,16 +9482,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1631222",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -8675,8 +9523,8 @@
         "teamGames": 47,
         "teamMinutes": 981
       },
-      "selectionScore": 64.153,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 57.666,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 66,
         "minutes": 1346,
@@ -8709,7 +9557,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
+        "overallRating": 55,
+        "offenseRating": 61,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.019306,
+          "secondaryCreator": 0.039133,
+          "scoringGuard": 0.036823,
+          "movementSpacer": 0.231913,
+          "twoWayWing": 0.132155,
+          "connector": 0.142628,
+          "interiorFinisher": 0.044274,
+          "stretchBig": 0.198021,
+          "rebounder": 0.054933,
+          "defensiveAnchor": 0.100814
+        },
+        "baseScore": 55.3,
+        "nonlinear": {
+          "creation": 60.91244268937699,
+          "penetration": 57.4582936380579,
+          "shootingGravity": 77.785,
+          "scalableScoring": 64.66666666666667,
+          "switchability": 65.32648361711377,
+          "rimProtection": 64.34450976110953,
+          "possessionControl": 60.7455,
+          "synergyBonus": 0.9508052147920616,
+          "weaknessPenalty": -2.3884711904400002,
+          "weaknesses": {
+            "turnoverLiability": 4.804737424000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.4343910919999998,
+            "deficientRebounding": 0.78578675
+          }
+        },
+        "production": {
+          "score": 35.31545,
+          "weight": 0.0839384803843584,
+          "confidence": "medium",
+          "sampleGames": 66,
+          "sampleMinutes": 1346.3999999999999,
+          "shrinkage": 0.2945209838047663
+        },
+        "calibratedImpact": {
+          "adjustment": 0.07653125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
         "offenseRating": 61,
         "defenseRating": 62
       },
@@ -9172,16 +10073,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1631223",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -9213,8 +10114,8 @@
         "teamGames": 70,
         "teamMinutes": 1258
       },
-      "selectionScore": 61.91,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 51.919,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 70,
         "minutes": 1260,
@@ -9247,9 +10148,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
+        "overallRating": 47,
         "offenseRating": 56,
-        "defenseRating": 58
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.024251,
+          "secondaryCreator": 0.036992,
+          "scoringGuard": 0.042955,
+          "movementSpacer": 0.248057,
+          "twoWayWing": 0.127387,
+          "connector": 0.139428,
+          "interiorFinisher": 0.052051,
+          "stretchBig": 0.169153,
+          "rebounder": 0.057567,
+          "defensiveAnchor": 0.102159
+        },
+        "baseScore": 50.78,
+        "nonlinear": {
+          "creation": 55.53613424845915,
+          "penetration": 55.407442513435,
+          "shootingGravity": 72,
+          "scalableScoring": 56.333333333333336,
+          "switchability": 61.32071521563456,
+          "rimProtection": 61.71229864292956,
+          "possessionControl": 60.634,
+          "synergyBonus": 0.5489605263157894,
+          "weaknessPenalty": -0.6748247325,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.8285579999999999,
+            "deficientRebounding": 1.156220625
+          }
+        },
+        "production": {
+          "score": 25.5676,
+          "weight": 0.08279644268774704,
+          "confidence": "medium",
+          "sampleGames": 70,
+          "sampleMinutes": 1260,
+          "shrinkage": 0.29051383399209485
+        },
+        "calibratedImpact": {
+          "adjustment": -0.04521875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
+        "offenseRating": 56,
+        "defenseRating": 59
       },
       "detailedRatings": {
         "threePoint": 58,
@@ -9710,16 +10664,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1631246",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -9751,8 +10705,8 @@
         "teamGames": 52,
         "teamMinutes": 1436
       },
-      "selectionScore": 70.283,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 63.189,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 52,
         "minutes": 1435,
@@ -9785,7 +10739,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
+        "overallRating": 62,
+        "offenseRating": 64,
+        "defenseRating": 64
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.02196,
+          "secondaryCreator": 0.043637,
+          "scoringGuard": 0.044427,
+          "movementSpacer": 0.29852,
+          "twoWayWing": 0.108147,
+          "connector": 0.156005,
+          "interiorFinisher": 0.032134,
+          "stretchBig": 0.169036,
+          "rebounder": 0.04596,
+          "defensiveAnchor": 0.080174
+        },
+        "baseScore": 59.37,
+        "nonlinear": {
+          "creation": 66.89386924960695,
+          "penetration": 61.45763491178601,
+          "shootingGravity": 82.69749999999999,
+          "scalableScoring": 66,
+          "switchability": 67.81205309508898,
+          "rimProtection": 63.6343175003091,
+          "possessionControl": 65.5425,
+          "synergyBonus": 1.3701665506310459,
+          "weaknessPenalty": -2.0132563575199995,
+          "weaknesses": {
+            "turnoverLiability": 4.452308479999998,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.2105012479999995,
+            "deficientRebounding": 0.2585325
+          }
+        },
+        "production": {
+          "score": 45.12499999999999,
+          "weight": 0.07876533115290271,
+          "confidence": "medium",
+          "sampleGames": 52,
+          "sampleMinutes": 1435.2,
+          "shrinkage": 0.2763695829926411
+        },
+        "calibratedImpact": {
+          "adjustment": 0.047375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 62,
         "offenseRating": 64,
         "defenseRating": 64
       },
@@ -10248,16 +11255,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1641713",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -10289,8 +11296,8 @@
         "teamGames": 48,
         "teamMinutes": 1233
       },
-      "selectionScore": 70.564,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 61.27,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 48,
         "minutes": 1233,
@@ -10323,9 +11330,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 75,
+        "overallRating": 59,
         "offenseRating": 63,
-        "defenseRating": 62
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.023435,
+          "secondaryCreator": 0.031848,
+          "scoringGuard": 0.04279,
+          "movementSpacer": 0.221231,
+          "twoWayWing": 0.136389,
+          "connector": 0.12352,
+          "interiorFinisher": 0.065003,
+          "stretchBig": 0.198133,
+          "rebounder": 0.05643,
+          "defensiveAnchor": 0.101221
+        },
+        "baseScore": 57.17,
+        "nonlinear": {
+          "creation": 61.49573636910441,
+          "penetration": 63.24370208139879,
+          "shootingGravity": 77.07,
+          "scalableScoring": 65.66666666666667,
+          "switchability": 67.31168361469985,
+          "rimProtection": 65.34987769156231,
+          "possessionControl": 65.9425,
+          "synergyBonus": 0.9375151398582183,
+          "weaknessPenalty": -0.27393413250000004,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.805688625
+          }
+        },
+        "production": {
+          "score": 44.44605000000001,
+          "weight": 0.07015244632452709,
+          "confidence": "medium",
+          "sampleGames": 48,
+          "sampleMinutes": 1233.6,
+          "shrinkage": 0.24614893447202488
+        },
+        "calibratedImpact": {
+          "adjustment": 0.01684375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 59,
+        "offenseRating": 63,
+        "defenseRating": 63
       },
       "detailedRatings": {
         "threePoint": 67,
@@ -10786,16 +11846,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1641744",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -10827,8 +11887,8 @@
         "teamGames": 66,
         "teamMinutes": 1415
       },
-      "selectionScore": 70.851,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 63.708,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 66,
         "minutes": 1419,
@@ -10861,7 +11921,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
+        "overallRating": 62,
+        "offenseRating": 63,
+        "defenseRating": 67
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.017727,
+          "secondaryCreator": 0.031942,
+          "scoringGuard": 0.037699,
+          "movementSpacer": 0.105111,
+          "twoWayWing": 0.154724,
+          "connector": 0.092802,
+          "interiorFinisher": 0.064499,
+          "stretchBig": 0.156637,
+          "rebounder": 0.142727,
+          "defensiveAnchor": 0.196132
+        },
+        "baseScore": 59.13,
+        "nonlinear": {
+          "creation": 60.52866160111975,
+          "penetration": 58.798315468424036,
+          "shootingGravity": 71.53,
+          "scalableScoring": 67.66666666666667,
+          "switchability": 74.26119048195746,
+          "rimProtection": 74.85680822177501,
+          "possessionControl": 62.566,
+          "synergyBonus": 0.5778366942276824,
+          "weaknessPenalty": -1.7881572814800004,
+          "weaknesses": {
+            "turnoverLiability": 2.2172958720000007,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 3.04199025,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 46.51084999999999,
+          "weight": 0.08626432546685024,
+          "confidence": "medium",
+          "sampleGames": 66,
+          "sampleMinutes": 1419,
+          "shrinkage": 0.3026818437433342
+        },
+        "calibratedImpact": {
+          "adjustment": 0.066375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 62,
         "offenseRating": 63,
         "defenseRating": 67
       },
@@ -11324,16 +12437,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1641765",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -11365,8 +12478,8 @@
         "teamGames": 53,
         "teamMinutes": 983
       },
-      "selectionScore": 68.602,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.975,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 53,
         "minutes": 985,
@@ -11399,8 +12512,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 73,
-        "offenseRating": 62,
+        "overallRating": 58,
+        "offenseRating": 63,
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.020486,
+          "secondaryCreator": 0.034159,
+          "scoringGuard": 0.046205,
+          "movementSpacer": 0.232466,
+          "twoWayWing": 0.137908,
+          "connector": 0.126456,
+          "interiorFinisher": 0.05619,
+          "stretchBig": 0.193056,
+          "rebounder": 0.057202,
+          "defensiveAnchor": 0.095872
+        },
+        "baseScore": 56.27,
+        "nonlinear": {
+          "creation": 57.84341434020553,
+          "penetration": 59.23776504417715,
+          "shootingGravity": 78.105,
+          "scalableScoring": 65.66666666666667,
+          "switchability": 64.32130093158436,
+          "rimProtection": 62.60128001454307,
+          "possessionControl": 62.6535,
+          "synergyBonus": 0.9438365498517023,
+          "weaknessPenalty": -0.6108773064,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.9507729599999998,
+            "deficientRebounding": 0.845925
+          }
+        },
+        "production": {
+          "score": 43.17325,
+          "weight": 0.0644110547912141,
+          "confidence": "medium",
+          "sampleGames": 53,
+          "sampleMinutes": 985.8000000000001,
+          "shrinkage": 0.22600370102180387
+        },
+        "calibratedImpact": {
+          "adjustment": -0.02846875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 58,
+        "offenseRating": 63,
         "defenseRating": 60
       },
       "detailedRatings": {
@@ -11862,16 +13028,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1642285",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -11903,8 +13069,8 @@
         "teamGames": 72,
         "teamMinutes": 1714
       },
-      "selectionScore": 72.003,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 70.56,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 72,
         "minutes": 1713,
@@ -11937,8 +13103,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 73,
-        "offenseRating": 73,
+        "overallRating": 71,
+        "offenseRating": 72,
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.024494,
+          "secondaryCreator": 0.057341,
+          "scoringGuard": 0.046289,
+          "movementSpacer": 0.343116,
+          "twoWayWing": 0.083105,
+          "connector": 0.176366,
+          "interiorFinisher": 0.028333,
+          "stretchBig": 0.170175,
+          "rebounder": 0.024862,
+          "defensiveAnchor": 0.045919
+        },
+        "baseScore": 66.56,
+        "nonlinear": {
+          "creation": 72.53117961303779,
+          "penetration": 64.5887247204569,
+          "shootingGravity": 92.61,
+          "scalableScoring": 71.66666666666667,
+          "switchability": 65.17899382260288,
+          "rimProtection": 60.991802727907626,
+          "possessionControl": 72.229,
+          "synergyBonus": 2.1457006371807714,
+          "weaknessPenalty": -0.7088666669100002,
+          "weaknesses": {
+            "turnoverLiability": 0.9790490240000005,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.1058529375
+          }
+        },
+        "production": {
+          "score": 49.21055,
+          "weight": 0.13026138909634055,
+          "confidence": "high",
+          "sampleGames": 72,
+          "sampleMinutes": 1713.6000000000001,
+          "shrinkage": 0.3427931292008962
+        },
+        "calibratedImpact": {
+          "adjustment": 0.04446875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 71,
+        "offenseRating": 72,
         "defenseRating": 60
       },
       "detailedRatings": {
@@ -12400,16 +13619,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1642377",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -12441,8 +13660,8 @@
         "teamGames": 69,
         "teamMinutes": 1820
       },
-      "selectionScore": 69.38,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 60.586,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 69,
         "minutes": 1821,
@@ -12475,9 +13694,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 57,
         "offenseRating": 64,
-        "defenseRating": 61
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.022001,
+          "secondaryCreator": 0.036108,
+          "scoringGuard": 0.044604,
+          "movementSpacer": 0.251343,
+          "twoWayWing": 0.123538,
+          "connector": 0.131911,
+          "interiorFinisher": 0.058085,
+          "stretchBig": 0.190902,
+          "rebounder": 0.048969,
+          "defensiveAnchor": 0.092539
+        },
+        "baseScore": 57.24,
+        "nonlinear": {
+          "creation": 61.158238272561235,
+          "penetration": 61.853277753980265,
+          "shootingGravity": 79.37,
+          "scalableScoring": 66,
+          "switchability": 66.32166210209493,
+          "rimProtection": 64.1255001209605,
+          "possessionControl": 66.083,
+          "synergyBonus": 1.0810112029958692,
+          "weaknessPenalty": -0.5921393598500001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.6841235400000002,
+            "deficientRebounding": 1.0574628125
+          }
+        },
+        "production": {
+          "score": 40.3445,
+          "weight": 0.13192037439677573,
+          "confidence": "high",
+          "sampleGames": 69,
+          "sampleMinutes": 1821.6,
+          "shrinkage": 0.34715887999151507
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0193125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 57,
+        "offenseRating": 64,
+        "defenseRating": 62
       },
       "detailedRatings": {
         "threePoint": 70,
@@ -12938,16 +14210,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1642907",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -12979,8 +14251,8 @@
         "teamGames": 62,
         "teamMinutes": 1597
       },
-      "selectionScore": 71.05,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 63.92,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 62,
         "minutes": 1599,
@@ -13013,7 +14285,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
+        "overallRating": 62,
+        "offenseRating": 66,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.03031,
+          "secondaryCreator": 0.051048,
+          "scoringGuard": 0.056639,
+          "movementSpacer": 0.231661,
+          "twoWayWing": 0.12086,
+          "connector": 0.141971,
+          "interiorFinisher": 0.050526,
+          "stretchBig": 0.168865,
+          "rebounder": 0.062645,
+          "defensiveAnchor": 0.085475
+        },
+        "baseScore": 59.53,
+        "nonlinear": {
+          "creation": 66.93615362828137,
+          "penetration": 64.33676650105066,
+          "shootingGravity": 80.225,
+          "scalableScoring": 66.33333333333333,
+          "switchability": 67.2051335364008,
+          "rimProtection": 62.48173503494502,
+          "possessionControl": 68.265,
+          "synergyBonus": 1.0784685618308805,
+          "weaknessPenalty": -0.4490384707299997,
+          "weaknesses": {
+            "turnoverLiability": 0.5672783199999993,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.5907647519999998,
+            "deficientRebounding": 0.1626583125
+          }
+        },
+        "production": {
+          "score": 48.50205,
+          "weight": 0.11920126316109099,
+          "confidence": "high",
+          "sampleGames": 62,
+          "sampleMinutes": 1599.6000000000001,
+          "shrinkage": 0.31368753463445
+        },
+        "calibratedImpact": {
+          "adjustment": 0.03284375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 62,
         "offenseRating": 66,
         "defenseRating": 62
       },
@@ -13476,16 +14801,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1642914",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -13517,8 +14842,8 @@
         "teamGames": 41,
         "teamMinutes": 829
       },
-      "selectionScore": 67.59,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.946,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 41,
         "minutes": 828,
@@ -13551,7 +14876,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 59,
+        "offenseRating": 63,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.028326,
+          "secondaryCreator": 0.053081,
+          "scoringGuard": 0.058237,
+          "movementSpacer": 0.320818,
+          "twoWayWing": 0.094986,
+          "connector": 0.156992,
+          "interiorFinisher": 0.035956,
+          "stretchBig": 0.151273,
+          "rebounder": 0.040367,
+          "defensiveAnchor": 0.059964
+        },
+        "baseScore": 57.09,
+        "nonlinear": {
+          "creation": 63.3103024908487,
+          "penetration": 59.37801905239656,
+          "shootingGravity": 81,
+          "scalableScoring": 64,
+          "switchability": 60.827425877009986,
+          "rimProtection": 57.2349974156963,
+          "possessionControl": 64.2005,
+          "synergyBonus": 1.185111135309971,
+          "weaknessPenalty": -1.33068818112,
+          "weaknesses": {
+            "turnoverLiability": 2.508199968,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.6180287999999998,
+            "deficientRebounding": 0.78756
+          }
+        },
+        "production": {
+          "score": 42.32534999999999,
+          "weight": 0.05131669036960679,
+          "confidence": "medium",
+          "sampleGames": 41,
+          "sampleMinutes": 828.1999999999999,
+          "shrinkage": 0.18005856270037468
+        },
+        "calibratedImpact": {
+          "adjustment": 0.05278125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 59,
         "offenseRating": 63,
         "defenseRating": 58
       },
@@ -14014,16 +15392,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-202685",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -14055,8 +15433,8 @@
         "teamGames": 62,
         "teamMinutes": 1755
       },
-      "selectionScore": 77.983,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 71.447,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 62,
         "minutes": 1754,
@@ -14089,7 +15467,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 71,
+        "offenseRating": 69,
+        "defenseRating": 71
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.023793,
+          "secondaryCreator": 0.037374,
+          "scoringGuard": 0.041014,
+          "movementSpacer": 0.083576,
+          "twoWayWing": 0.147206,
+          "connector": 0.092689,
+          "interiorFinisher": 0.07094,
+          "stretchBig": 0.141762,
+          "rebounder": 0.193524,
+          "defensiveAnchor": 0.168122
+        },
+        "baseScore": 64.19,
+        "nonlinear": {
+          "creation": 68.49920968061835,
+          "penetration": 67.22018597094764,
+          "shootingGravity": 70.125,
+          "scalableScoring": 73.66666666666667,
+          "switchability": 74.25677779013638,
+          "rimProtection": 72.76679931224292,
+          "possessionControl": 70.90350000000001,
+          "synergyBonus": 0.5473813381690519,
+          "weaknessPenalty": -0.6166406246399999,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.8136488959999997,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 65.93805,
+          "weight": 0.1245247330174004,
+          "confidence": "high",
+          "sampleGames": 62,
+          "sampleMinutes": 1754.6000000000001,
+          "shrinkage": 0.3276966658352642
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0023125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 71,
         "offenseRating": 69,
         "defenseRating": 71
       },
@@ -14552,16 +15983,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-203484",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -14593,8 +16024,8 @@
         "teamGames": 51,
         "teamMinutes": 1087
       },
-      "selectionScore": 66.717,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.671,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 51,
         "minutes": 1086,
@@ -14627,7 +16058,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
+        "overallRating": 54,
+        "offenseRating": 60,
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.02761,
+          "secondaryCreator": 0.049108,
+          "scoringGuard": 0.056968,
+          "movementSpacer": 0.257094,
+          "twoWayWing": 0.12325,
+          "connector": 0.137944,
+          "interiorFinisher": 0.047242,
+          "stretchBig": 0.168818,
+          "rebounder": 0.050667,
+          "defensiveAnchor": 0.081299
+        },
+        "baseScore": 54.44,
+        "nonlinear": {
+          "creation": 61.29907769964779,
+          "penetration": 58.145887201735235,
+          "shootingGravity": 77.305,
+          "scalableScoring": 58.666666666666664,
+          "switchability": 63.93319852785275,
+          "rimProtection": 59.74427250450025,
+          "possessionControl": 63.751,
+          "synergyBonus": 0.889059194547086,
+          "weaknessPenalty": -0.7202000135599999,
+          "weaknesses": {
+            "turnoverLiability": 0.9521995839999998,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.1660357499999998
+          }
+        },
+        "production": {
+          "score": 32.55445,
+          "weight": 0.06708795032829366,
+          "confidence": "medium",
+          "sampleGames": 51,
+          "sampleMinutes": 1086.3,
+          "shrinkage": 0.2353963169413813
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0455,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 54,
         "offenseRating": 60,
         "defenseRating": 59
       },
@@ -15090,20 +16574,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-203500",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
-      "seasonKey": "2022-23",
+      "seasonKey": "2021-22",
       "firstName": "Steven",
       "lastName": "Adams",
       "displayName": "Steven Adams",
@@ -15128,108 +16612,161 @@
       "weightLbs": 265,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 42,
-        "teamMinutes": 1133
+        "teamGames": 76,
+        "teamMinutes": 1998
       },
-      "selectionScore": 69.305,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.142,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 42,
-        "minutes": 1134,
-        "points": 361,
-        "rebounds": 483,
-        "offensiveRebounds": 214,
-        "defensiveRebounds": 273,
-        "assists": 96,
-        "steals": 37,
-        "blocks": 46,
-        "turnovers": 79,
-        "fieldGoalsMade": 155,
-        "fieldGoalsAttempted": 264,
+        "gamesPlayed": 76,
+        "minutes": 1998,
+        "points": 524,
+        "rebounds": 760,
+        "offensiveRebounds": 349,
+        "defensiveRebounds": 410,
+        "assists": 258,
+        "steals": 68,
+        "blocks": 60,
+        "turnovers": 114,
+        "fieldGoalsMade": 212,
+        "fieldGoalsAttempted": 387,
         "threesMade": 0,
         "threesAttempted": 0,
-        "freeThrowsMade": 46,
-        "freeThrowsAttempted": 130,
-        "per": 13.5,
-        "boxPlusMinus": 1.487,
-        "usageRate": 13.900000000000002,
-        "tsPct": 0.564,
-        "efgPct": 0.597
+        "freeThrowsMade": 106,
+        "freeThrowsAttempted": 197,
+        "per": 12.575000000000001,
+        "boxPlusMinus": 1.0180000000000007,
+        "usageRate": 11.799999999999999,
+        "tsPct": 0.56,
+        "efgPct": 0.547
       },
       "historicalTeamIdentity": {
         "teamId": "1610612763",
         "displayName": "Memphis Grizzlies",
         "city": "Memphis",
         "abbreviation": "MEM",
-        "seasonKey": "2022-23",
+        "seasonKey": "2021-22",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
-        "offenseRating": 54,
+        "overallRating": 56,
+        "offenseRating": 57,
+        "defenseRating": 69
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026152,
+          "secondaryCreator": 0.046271,
+          "scoringGuard": 0.024451,
+          "movementSpacer": 0.047968,
+          "twoWayWing": 0.149824,
+          "connector": 0.089495,
+          "interiorFinisher": 0.062167,
+          "stretchBig": 0.110992,
+          "rebounder": 0.216519,
+          "defensiveAnchor": 0.226161
+        },
+        "baseScore": 56.09,
+        "nonlinear": {
+          "creation": 67.4130567853603,
+          "penetration": 59.34850710963639,
+          "shootingGravity": 52.75,
+          "scalableScoring": 55.666666666666664,
+          "switchability": 72.52661725799986,
+          "rimProtection": 72.2749688542237,
+          "possessionControl": 65.09649999999999,
+          "synergyBonus": 0.22614502172543596,
+          "weaknessPenalty": -2.3583097557600006,
+          "weaknesses": {
+            "turnoverLiability": 5.730169104000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.57585885,
+            "foulRisk": 0.6301772100000004,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 43.11970000000001,
+          "weight": 0.14222941461703126,
+          "confidence": "high",
+          "sampleGames": 76,
+          "sampleMinutes": 1998.8,
+          "shrinkage": 0.3742879332027138
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0010625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 56,
+        "offenseRating": 57,
         "defenseRating": 69
       },
       "detailedRatings": {
-        "threePoint": 40,
-        "freeThrow": 38,
-        "insideScoring": 54,
-        "closeShot": 58,
-        "midrange": 68,
-        "passing": 62,
-        "ballHandling": 57,
-        "offensiveRebound": 77,
-        "defensiveRebound": 68,
-        "perimeterDefense": 72,
-        "interiorDefense": 77,
-        "steal": 66,
+        "threePoint": 41,
+        "freeThrow": 54,
+        "insideScoring": 52,
+        "closeShot": 55,
+        "midrange": 66,
+        "passing": 69,
+        "ballHandling": 60,
+        "offensiveRebound": 79,
+        "defensiveRebound": 64,
+        "perimeterDefense": 73,
+        "interiorDefense": 78,
+        "steal": 69,
         "block": 69,
-        "defensiveIq": 64,
-        "speed": 66,
-        "strength": 75,
-        "vertical": 63,
-        "offensiveIq": 73
+        "defensiveIq": 63,
+        "speed": 67,
+        "strength": 78,
+        "vertical": 65,
+        "offensiveIq": 74
       },
       "tendencies": {
-        "usageRate": 13.9,
-        "passRate": 12.11,
-        "shotRate": 13.12,
+        "usageRate": 11.8,
+        "passRate": 17.32,
+        "shotRate": 10.63,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 21.6,
+        "rimFrequency": 20.8,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 4.8,
-        "aboveBreakThreeFrequency": 8,
+        "cornerThreeFrequency": 4.92,
+        "aboveBreakThreeFrequency": 8.2,
         "threePointRate": 0,
-        "freeThrowRate": 49.21,
-        "turnoverRate": 19.87,
-        "isolationRate": 4.17,
+        "freeThrowRate": 50.98,
+        "turnoverRate": 19.37,
+        "isolationRate": 3.54,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 25,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 6.09,
-        "stealAttemptRate": 10.28,
+        "foulRate": 5.65,
+        "stealAttemptRate": 10.52,
         "blockAttemptRate": 10.52,
-        "crashOffensiveGlassRate": 19.24
+        "crashOffensiveGlassRate": 19.48
       },
       "anchors": {
-        "gamesPlayed": 42,
-        "minutesPerGame": 27,
-        "pointsPerGame": 8.6,
-        "reboundsPerGame": 11.5,
-        "offensiveReboundsPerGame": 5.1,
-        "defensiveReboundsPerGame": 6.5,
-        "assistsPerGame": 2.3,
-        "stealsPerGame": 0.9000000000000001,
-        "blocksPerGame": 1.1,
-        "turnoversPerGame": 1.9,
-        "fieldGoalPct": 0.5873015873015874,
+        "gamesPlayed": 76,
+        "minutesPerGame": 26.3,
+        "pointsPerGame": 6.8999999999999995,
+        "reboundsPerGame": 10,
+        "offensiveReboundsPerGame": 4.6,
+        "defensiveReboundsPerGame": 5.4,
+        "assistsPerGame": 3.4,
+        "stealsPerGame": 0.9,
+        "blocksPerGame": 0.8,
+        "turnoversPerGame": 1.5,
+        "fieldGoalPct": 0.5490196078431373,
         "threePointPct": null,
-        "freeThrowPct": 0.3548387096774193,
+        "freeThrowPct": 0.5384615384615384,
         "threePointAttemptRate": 0,
-        "freeThrowAttemptRate": 0.4920634920634922
+        "freeThrowAttemptRate": 0.5098039215686275
       },
       "provenance": {
         "threePoint": {
@@ -15625,16 +17162,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-203937",
       "franchiseId": "grizzlies",
       "eraId": "2020s",
@@ -15666,8 +17203,8 @@
         "teamGames": 69,
         "teamMinutes": 1887
       },
-      "selectionScore": 74.228,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 68.266,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 69,
         "minutes": 1890,
@@ -15700,7 +17237,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 66,
+        "offenseRating": 68,
+        "defenseRating": 71
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.024778,
+          "secondaryCreator": 0.045336,
+          "scoringGuard": 0.035614,
+          "movementSpacer": 0.174056,
+          "twoWayWing": 0.146531,
+          "connector": 0.151534,
+          "interiorFinisher": 0.050261,
+          "stretchBig": 0.178271,
+          "rebounder": 0.057773,
+          "defensiveAnchor": 0.135846
+        },
+        "baseScore": 62.32,
+        "nonlinear": {
+          "creation": 70.83058197694525,
+          "penetration": 64.56114626931576,
+          "shootingGravity": 78,
+          "scalableScoring": 70,
+          "switchability": 71.91386304081406,
+          "rimProtection": 69.81971285581103,
+          "possessionControl": 72.7005,
+          "synergyBonus": 0.9786118681710991,
+          "weaknessPenalty": -0.09797854375000001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.2881721875
+          }
+        },
+        "production": {
+          "score": 50.862449999999995,
+          "weight": 0.13413103794246045,
+          "confidence": "high",
+          "sampleGames": 69,
+          "sampleMinutes": 1890.6,
+          "shrinkage": 0.3529764156380538
+        },
+        "calibratedImpact": {
+          "adjustment": -0.05,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 66,
         "offenseRating": 68,
         "defenseRating": 71
       },
@@ -16163,9 +17753,9 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"

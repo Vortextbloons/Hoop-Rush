@@ -64,22 +64,45 @@ function profileWith(
   });
 }
 
-function compare(
+type MetricSelect = (result: GameResult, side: 'home' | 'away') => number;
+
+/** One seeded batch, many metrics — avoids double-simulating the same pair. */
+function compareMany(
   name: string,
   baseTeam: SimulationTeam,
   changedTeam: SimulationTeam,
-  select: (result: GameResult, side: 'home' | 'away') => number,
-): { base: number; changed: number } {
-  let baseTotal = 0;
-  let changedTotal = 0;
+  selectors: readonly MetricSelect[],
+): Array<{ base: number; changed: number }> {
+  const baseTotals = Array.from({ length: selectors.length }, () => 0);
+  const changedTotals = Array.from({ length: selectors.length }, () => 0);
   for (let i = 0; i < SEEDS; i += 1) {
     const seed = seedFromString(`sens-${name}-${String(i)}`);
     const baseInput = buildGameSimulationInput({ seed, home: baseTeam, away: baseTeam });
     const changedInput = buildGameSimulationInput({ seed, home: changedTeam, away: changedTeam });
-    baseTotal += select(simulateGame(baseInput, ctx), 'home');
-    changedTotal += select(simulateGame(changedInput, ctx), 'home');
+    const baseResult = simulateGame(baseInput, ctx);
+    const changedResult = simulateGame(changedInput, ctx);
+    for (let s = 0; s < selectors.length; s += 1) {
+      const selector = selectors[s];
+      if (selector === undefined) throw new Error('selector index out of range');
+      baseTotals[s] = (baseTotals[s] ?? 0) + selector(baseResult, 'home');
+      changedTotals[s] = (changedTotals[s] ?? 0) + selector(changedResult, 'home');
+    }
   }
-  return { base: baseTotal / SEEDS, changed: changedTotal / SEEDS };
+  return selectors.map((_, s) => ({
+    base: (baseTotals[s] ?? 0) / SEEDS,
+    changed: (changedTotals[s] ?? 0) / SEEDS,
+  }));
+}
+
+function compare(
+  name: string,
+  baseTeam: SimulationTeam,
+  changedTeam: SimulationTeam,
+  select: MetricSelect,
+): { base: number; changed: number } {
+  const result = compareMany(name, baseTeam, changedTeam, [select]).at(0);
+  if (!result) throw new Error('comparison did not produce a result');
+  return result;
 }
 
 function expectDirection(
@@ -112,16 +135,18 @@ describe('sensitivity: shooting and finishing', () => {
     const changed = mutateAllRatings(baseTeam, 'insideScoring', 15);
     // Both sides are measured: the home side of a paired seeded batch is
     // systematically offset by RNG consumption order, so a one-sided
-    // selector makes the magnitude estimate noisy.
-    const points = compare('inside', baseTeam, changed, (r) => {
-      return (r.home.box.points + r.away.box.points) / 2;
-    });
+    // selector makes the magnitude estimate noisy. Metrics share one batch
+    // so CI concurrent suites stay under the timeout budget.
+    const [points, fg] = compareMany('inside', baseTeam, changed, [
+      (r) => (r.home.box.points + r.away.box.points) / 2,
+      (r) => {
+        const h = r.home.box.fieldGoals;
+        const a = r.away.box.fieldGoals;
+        return (h.made + a.made) / Math.max(1, h.attempted + a.attempted);
+      },
+    ]);
+    if (!points || !fg) throw new Error('comparison did not produce both metrics');
     expectDirection('points', points.base, points.changed, 1, 0.6, 0.015);
-    const fg = compare('inside-fg', baseTeam, changed, (r) => {
-      const h = r.home.box.fieldGoals;
-      const a = r.away.box.fieldGoals;
-      return (h.made + a.made) / Math.max(1, h.attempted + a.attempted);
-    });
     expectDirection('fgpct', fg.base, fg.changed, 1, 0.6, 0.01);
   });
 
@@ -223,9 +248,12 @@ describe('sensitivity: defense', () => {
 
   it.concurrent('higher steal raises steals and opponent turnovers', () => {
     const changed = mutateAllRatings(baseTeam, 'steal', 15);
-    const steals = compare('steal', baseTeam, changed, (r) => r.home.box.steals);
+    const [steals, oppTov] = compareMany('steal', baseTeam, changed, [
+      (r) => r.home.box.steals,
+      (r) => r.away.box.turnovers,
+    ]);
+    if (!steals || !oppTov) throw new Error('comparison did not produce both metrics');
     expectDirection('steals', steals.base, steals.changed, 1);
-    const oppTov = compare('steal-tov', baseTeam, changed, (r) => r.away.box.turnovers);
     // The era-anchored turnover baseline is per-trip; steal feeds defensive
     // pressure, so the swing is a bounded share of the era turnover rate.
     expectDirection('oppTurnovers', oppTov.base, oppTov.changed, 1, 0.6, 0.02);

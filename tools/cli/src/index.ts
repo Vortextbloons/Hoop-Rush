@@ -14,6 +14,7 @@ import { benchmark, BENCHMARK_OPTIONS } from './commands/benchmark.js';
 import { replay, REPLAY_OPTIONS } from './commands/replay.js';
 import { combineDocs, COMBINE_DOCS_OPTIONS } from './commands/docs-combine.js';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.js';
+import { calibrateRatings, CALIBRATE_RATINGS_OPTIONS } from './commands/calibrate-ratings.js';
 import {
   importEraProfile,
   importFreeze,
@@ -199,6 +200,16 @@ const COMMANDS: Record<string, CommandDef> = {
         samples: getOptionString(args, 'samples') ?? undefined,
         profile: getOptionString(args, 'profile') ?? undefined,
         era: getOptionString(args, 'era') ?? undefined,
+      }),
+  },
+  'calibrate ratings': {
+    options: CALIBRATE_RATINGS_OPTIONS,
+    run: (args) =>
+      calibrateRatings({
+        samples: getOptionString(args, 'samples') ?? undefined,
+        workers: getOptionString(args, 'workers') ?? undefined,
+        output: getOptionString(args, 'output') ?? undefined,
+        manifest: getOptionString(args, 'manifest') ?? undefined,
       }),
   },
   'combine docs': {

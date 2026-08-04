@@ -20,11 +20,11 @@ import { basename, join } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { parsePool } from '@hoop-rush/data-contracts';
 import {
-  ARTIFACT_SCHEMA_VERSION,
   DERIVATION_METHOD_VERSION,
   LINEAGE_RULE_VERSION,
   POSITION_NORMALIZATION_VERSION,
   RATINGS_VERSION,
+  POOL_SCHEMA_VERSION,
   REQUIRED_RATING_KEYS,
   SELECTION_SCORE_VERSION,
   SOURCE_VERSION,
@@ -89,9 +89,9 @@ export function manifestPath(): string {
   return join(PUBLIC_DATA, 'manifest.json');
 }
 
-export const SCHEMA_VERSION = ARTIFACT_SCHEMA_VERSION;
+export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm6';
+export const DATA_VERSION = 'm7-ratings-v3';
 /** Confidence policy v1: maximum allowed low-confidence share of required fields. */
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
@@ -1139,6 +1139,7 @@ export function computePool(
         offenseRating: safeInt(summary?.offenseRating),
         defenseRating: safeInt(summary?.defenseRating),
       },
+      ...(player.ratingProfile !== undefined ? { ratingProfile: player.ratingProfile } : {}),
       detailedRatings,
       tendencies: tendenciesOut,
       anchors: anchorsOut,

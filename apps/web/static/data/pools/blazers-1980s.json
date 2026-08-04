@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 3,
-  "dataVersion": "m6",
+  "schemaVersion": 4,
+  "dataVersion": "m7-ratings-v3",
   "franchiseId": "blazers",
   "eraId": "1980s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-17",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -69,8 +69,8 @@
         "teamGames": 78,
         "teamMinutes": 3064
       },
-      "selectionScore": 90.369,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 81.885,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 78,
         "minutes": 3064,
@@ -103,9 +103,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 96,
-        "offenseRating": 76,
-        "defenseRating": 78
+        "overallRating": 82,
+        "offenseRating": 75,
+        "defenseRating": 79
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.057725,
+          "secondaryCreator": 0.072844,
+          "scoringGuard": 0.046788,
+          "movementSpacer": 0.072477,
+          "twoWayWing": 0.190464,
+          "connector": 0.158864,
+          "interiorFinisher": 0.077299,
+          "stretchBig": 0.079281,
+          "rebounder": 0.072227,
+          "defensiveAnchor": 0.172031
+        },
+        "baseScore": 67.57,
+        "nonlinear": {
+          "creation": 86.77857994672513,
+          "penetration": 79.66111860276087,
+          "shootingGravity": 65.055,
+          "scalableScoring": 76.66666666666667,
+          "switchability": 80.40301837632407,
+          "rimProtection": 70.94763789922426,
+          "possessionControl": 83.892,
+          "synergyBonus": 0.8900346732010145,
+          "weaknessPenalty": -0.4034911623833707,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0.1697303248922669,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.0170083879999998,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 82.29746328123932,
+          "weight": 0.16863173843937077,
+          "confidence": "high",
+          "sampleGames": 78,
+          "sampleMinutes": 3064,
+          "shrinkage": 0.4437677327351862
+        },
+        "calibratedImpact": {
+          "adjustment": -0.05246875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 82,
+        "offenseRating": 75,
+        "defenseRating": 79
       },
       "detailedRatings": {
         "threePoint": 57,
@@ -566,16 +619,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-306",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -607,8 +660,8 @@
         "teamGames": 81,
         "teamMinutes": 1868
       },
-      "selectionScore": 68.685,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 55.491,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 81,
         "minutes": 1868,
@@ -641,7 +694,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 50,
+        "offenseRating": 61,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.032503,
+          "secondaryCreator": 0.070961,
+          "scoringGuard": 0.057479,
+          "movementSpacer": 0.164152,
+          "twoWayWing": 0.16862,
+          "connector": 0.159685,
+          "interiorFinisher": 0.055909,
+          "stretchBig": 0.114881,
+          "rebounder": 0.055234,
+          "defensiveAnchor": 0.120576
+        },
+        "baseScore": 53.66,
+        "nonlinear": {
+          "creation": 63.525791907574934,
+          "penetration": 58.09753703208944,
+          "shootingGravity": 68.975,
+          "scalableScoring": 60.666666666666664,
+          "switchability": 65.80613450319093,
+          "rimProtection": 61.673979904405186,
+          "possessionControl": 64.92349999999999,
+          "synergyBonus": 0.3470576828026265,
+          "weaknessPenalty": -1.58083054808,
+          "weaknesses": {
+            "turnoverLiability": 1.8481223120000003,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.4785668,
+            "deficientRebounding": 1.3228125
+          }
+        },
+        "production": {
+          "score": 33.20189699236356,
+          "weight": 0.1410873363302644,
+          "confidence": "high",
+          "sampleGames": 81,
+          "sampleMinutes": 1868,
+          "shrinkage": 0.3712824640270116
+        },
+        "calibratedImpact": {
+          "adjustment": -0.169,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 50,
         "offenseRating": 61,
         "defenseRating": 62
       },
@@ -1104,20 +1210,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-345",
       "franchiseId": "blazers",
       "eraId": "1980s",
-      "seasonKey": "1988-89",
+      "seasonKey": "1989-90",
       "firstName": "Terry",
       "lastName": "Porter",
       "displayName": "Terry Porter",
@@ -1142,108 +1248,161 @@
       "weightLbs": 195,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 81,
-        "teamMinutes": 3102
+        "teamGames": 80,
+        "teamMinutes": 2781
       },
-      "selectionScore": 80.575,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 73.958,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 81,
-        "minutes": 3102,
-        "points": 1431,
-        "rebounds": 367,
-        "offensiveRebounds": 85,
-        "defensiveRebounds": 282,
-        "assists": 770,
-        "steals": 146,
-        "blocks": 8,
-        "turnovers": 248,
-        "fieldGoalsMade": 540,
-        "fieldGoalsAttempted": 1146,
-        "threesMade": 79,
-        "threesAttempted": 219,
-        "freeThrowsMade": 272,
-        "freeThrowsAttempted": 324,
-        "per": 18.28641975308642,
-        "boxPlusMinus": 1.9798765432098762,
-        "usageRate": 19.968291098115657,
-        "tsPct": 0.5552710001862544,
-        "efgPct": 0.5056719022687609
+        "gamesPlayed": 80,
+        "minutes": 2781,
+        "points": 1406,
+        "rebounds": 272,
+        "offensiveRebounds": 59,
+        "defensiveRebounds": 213,
+        "assists": 726,
+        "steals": 151,
+        "blocks": 4,
+        "turnovers": 245,
+        "fieldGoalsMade": 448,
+        "fieldGoalsAttempted": 969,
+        "threesMade": 89,
+        "threesAttempted": 238,
+        "freeThrowsMade": 421,
+        "freeThrowsAttempted": 472,
+        "per": 17.274375,
+        "boxPlusMinus": 1.7777499999999993,
+        "usageRate": 18.706315789473685,
+        "tsPct": 0.5974436550294048,
+        "efgPct": 0.5082559339525283
       },
       "historicalTeamIdentity": {
         "teamId": "1610612757",
         "displayName": "Portland Trail Blazers",
         "city": "Portland",
         "abbreviation": "POR",
-        "seasonKey": "1988-89",
+        "seasonKey": "1989-90",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 83,
+        "overallRating": 72,
         "offenseRating": 76,
-        "defenseRating": 67
+        "defenseRating": 68
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.055594,
+          "secondaryCreator": 0.111952,
+          "scoringGuard": 0.051449,
+          "movementSpacer": 0.166147,
+          "twoWayWing": 0.124423,
+          "connector": 0.231424,
+          "interiorFinisher": 0.045334,
+          "stretchBig": 0.109146,
+          "rebounder": 0.030847,
+          "defensiveAnchor": 0.073684
+        },
+        "baseScore": 65.72,
+        "nonlinear": {
+          "creation": 86.88962971537224,
+          "penetration": 73.99123343921349,
+          "shootingGravity": 77.64,
+          "scalableScoring": 74,
+          "switchability": 70.62942541512659,
+          "rimProtection": 63.27596817883302,
+          "possessionControl": 81.0235,
+          "synergyBonus": 0.9613955486257901,
+          "weaknessPenalty": -1.8627242184500004,
+          "weaknesses": {
+            "turnoverLiability": 4.577275080000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.9013255625
+          }
+        },
+        "production": {
+          "score": 63.5798551941636,
+          "weight": 0.16456902592852138,
+          "confidence": "high",
+          "sampleGames": 80,
+          "sampleMinutes": 2781,
+          "shrinkage": 0.43307638402242465
+        },
+        "calibratedImpact": {
+          "adjustment": -0.10890625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 72,
+        "offenseRating": 76,
+        "defenseRating": 68
       },
       "detailedRatings": {
-        "threePoint": 71,
-        "freeThrow": 90,
-        "insideScoring": 64,
+        "threePoint": 77,
+        "freeThrow": 97,
+        "insideScoring": 65,
         "closeShot": 71,
         "midrange": 62,
         "passing": 100,
-        "ballHandling": 84,
-        "offensiveRebound": 46,
-        "defensiveRebound": 52,
+        "ballHandling": 82,
+        "offensiveRebound": 43,
+        "defensiveRebound": 48,
         "perimeterDefense": 76,
         "interiorDefense": 73,
         "steal": 78,
-        "block": 61,
+        "block": 60,
         "defensiveIq": 63,
-        "speed": 78,
+        "speed": 76,
         "strength": 61,
         "vertical": 60,
-        "offensiveIq": 82
+        "offensiveIq": 80
       },
       "tendencies": {
-        "usageRate": 19.97,
-        "passRate": 19.66,
-        "shotRate": 29.48,
+        "usageRate": 18.71,
+        "passRate": 19.24,
+        "shotRate": 25.23,
         "driveRate": 18,
         "postUpRate": 5,
-        "rimFrequency": 25.6,
+        "rimFrequency": 26,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 8.52,
-        "aboveBreakThreeFrequency": 14.2,
-        "threePointRate": 19.11,
-        "freeThrowRate": 28.27,
-        "turnoverRate": 16.14,
-        "isolationRate": 5.99,
+        "cornerThreeFrequency": 9.24,
+        "aboveBreakThreeFrequency": 15.4,
+        "threePointRate": 24.56,
+        "freeThrowRate": 48.71,
+        "turnoverRate": 17.23,
+        "isolationRate": 5.61,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 4.89,
+        "foulRate": 4.59,
         "stealAttemptRate": 11.24,
-        "blockAttemptRate": 9.88,
-        "crashOffensiveGlassRate": 15.52
+        "blockAttemptRate": 9.8,
+        "crashOffensiveGlassRate": 15.16
       },
       "anchors": {
-        "gamesPlayed": 81,
-        "minutesPerGame": 38.2962962962963,
-        "pointsPerGame": 17.666666666666668,
-        "reboundsPerGame": 4.530864197530864,
-        "offensiveReboundsPerGame": 1.0493827160493827,
-        "defensiveReboundsPerGame": 3.4814814814814814,
-        "assistsPerGame": 9.506172839506172,
-        "stealsPerGame": 1.8024691358024691,
-        "blocksPerGame": 0.09876543209876543,
-        "turnoversPerGame": 3.0617283950617282,
-        "fieldGoalPct": 0.4712041884816754,
-        "threePointPct": 0.3607305936073059,
-        "freeThrowPct": 0.8395061728395061,
-        "threePointAttemptRate": 0.19109947643979058,
-        "freeThrowAttemptRate": 0.28272251308900526
+        "gamesPlayed": 80,
+        "minutesPerGame": 34.7625,
+        "pointsPerGame": 17.575,
+        "reboundsPerGame": 3.4,
+        "offensiveReboundsPerGame": 0.7375,
+        "defensiveReboundsPerGame": 2.6625,
+        "assistsPerGame": 9.075,
+        "stealsPerGame": 1.8875,
+        "blocksPerGame": 0.05,
+        "turnoversPerGame": 3.0625,
+        "fieldGoalPct": 0.46233230134158926,
+        "threePointPct": 0.3739495798319328,
+        "freeThrowPct": 0.8919491525423728,
+        "threePointAttemptRate": 0.24561403508771928,
+        "freeThrowAttemptRate": 0.4871001031991744
       },
       "provenance": {
         "threePoint": {
@@ -1642,16 +1801,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-361",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -1683,8 +1842,8 @@
         "teamGames": 82,
         "teamMinutes": 1565
       },
-      "selectionScore": 66.017,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.317,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 1565,
@@ -1717,9 +1876,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
-        "offenseRating": 53,
-        "defenseRating": 61
+        "overallRating": 45,
+        "offenseRating": 52,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025531,
+          "secondaryCreator": 0.037349,
+          "scoringGuard": 0.034436,
+          "movementSpacer": 0.082518,
+          "twoWayWing": 0.181215,
+          "connector": 0.094498,
+          "interiorFinisher": 0.093661,
+          "stretchBig": 0.13181,
+          "rebounder": 0.108741,
+          "defensiveAnchor": 0.210241
+        },
+        "baseScore": 50.19,
+        "nonlinear": {
+          "creation": 56.372096923119784,
+          "penetration": 55.726558143060934,
+          "shootingGravity": 52.465,
+          "scalableScoring": 54.666666666666664,
+          "switchability": 67.27252185784059,
+          "rimProtection": 67.32931942240175,
+          "possessionControl": 60.339,
+          "synergyBonus": 0.12571842743007658,
+          "weaknessPenalty": -2.0474015019899996,
+          "weaknesses": {
+            "turnoverLiability": 0.7934098559999997,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.6073644059999997,
+            "foulRisk": 3.641820174,
+            "deficientRebounding": 0.9791746875
+          }
+        },
+        "production": {
+          "score": 24.619412940352916,
+          "weight": 0.13041317893723423,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 1565,
+          "shrinkage": 0.3431925761506164
+        },
+        "calibratedImpact": {
+          "adjustment": -0.02296875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 45,
+        "offenseRating": 52,
+        "defenseRating": 62
       },
       "detailedRatings": {
         "threePoint": 47,
@@ -2180,20 +2392,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-404",
       "franchiseId": "blazers",
       "eraId": "1980s",
-      "seasonKey": "1989-90",
+      "seasonKey": "1988-89",
       "firstName": "Kevin",
       "lastName": "Duckworth",
       "displayName": "Kevin Duckworth",
@@ -2218,116 +2430,172 @@
       "weightLbs": 275,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 82,
-        "teamMinutes": 2462
+        "teamGames": 79,
+        "teamMinutes": 2662
       },
-      "selectionScore": 74.634,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.569,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 82,
-        "minutes": 2462,
-        "points": 1327,
-        "rebounds": 509,
-        "offensiveRebounds": 184,
-        "defensiveRebounds": 325,
-        "assists": 91,
-        "steals": 36,
-        "blocks": 34,
-        "turnovers": 171,
-        "fieldGoalsMade": 548,
-        "fieldGoalsAttempted": 1146,
+        "gamesPlayed": 79,
+        "minutes": 2662,
+        "points": 1432,
+        "rebounds": 635,
+        "offensiveRebounds": 246,
+        "defensiveRebounds": 389,
+        "assists": 60,
+        "steals": 56,
+        "blocks": 49,
+        "turnovers": 200,
+        "fieldGoalsMade": 554,
+        "fieldGoalsAttempted": 1161,
         "threesMade": 0,
-        "threesAttempted": 0,
-        "freeThrowsMade": 231,
-        "freeThrowsAttempted": 312,
-        "per": 11.93780487804878,
-        "boxPlusMinus": -0.828170731707317,
-        "usageRate": 18.668549422336326,
-        "tsPct": 0.5170344741599651,
-        "efgPct": 0.4781849912739965
+        "threesAttempted": 2,
+        "freeThrowsMade": 324,
+        "freeThrowsAttempted": 428,
+        "per": 13.88607594936709,
+        "boxPlusMinus": 0.15303797468354396,
+        "usageRate": 20.643837441705525,
+        "tsPct": 0.530637654522278,
+        "efgPct": 0.4771748492678725
       },
       "historicalTeamIdentity": {
         "teamId": "1610612757",
         "displayName": "Portland Trail Blazers",
         "city": "Portland",
         "abbreviation": "POR",
-        "seasonKey": "1989-90",
+        "seasonKey": "1988-89",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
-        "offenseRating": 59,
-        "defenseRating": 61
+        "overallRating": 57,
+        "offenseRating": 56,
+        "defenseRating": 65
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.032526,
+          "secondaryCreator": 0.039245,
+          "scoringGuard": 0.042638,
+          "movementSpacer": 0.037386,
+          "twoWayWing": 0.179797,
+          "connector": 0.064931,
+          "interiorFinisher": 0.13396,
+          "stretchBig": 0.075748,
+          "rebounder": 0.182775,
+          "defensiveAnchor": 0.210994
+        },
+        "baseScore": 55.52,
+        "nonlinear": {
+          "creation": 62.54292517878185,
+          "penetration": 66.04954956816087,
+          "shootingGravity": 51.792500000000004,
+          "scalableScoring": 53.666666666666664,
+          "switchability": 73.523108102741,
+          "rimProtection": 71.25698890914474,
+          "possessionControl": 65.1495,
+          "synergyBonus": 0.34631014632426493,
+          "weaknessPenalty": -1.2684335394550001,
+          "weaknesses": {
+            "turnoverLiability": 0.7202897520000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.6917693867499997,
+            "foulRisk": 2.3186277420000003,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 50.697279720623406,
+          "weight": 0.16135027196847024,
+          "confidence": "high",
+          "sampleGames": 79,
+          "sampleMinutes": 2662,
+          "shrinkage": 0.42460597886439533
+        },
+        "calibratedImpact": {
+          "adjustment": 0.036,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 57,
+        "offenseRating": 56,
+        "defenseRating": 65
       },
       "detailedRatings": {
-        "threePoint": 44,
-        "freeThrow": 78,
-        "insideScoring": 66,
-        "closeShot": 69,
+        "threePoint": 18,
+        "freeThrow": 80,
+        "insideScoring": 69,
+        "closeShot": 72,
         "midrange": 59,
         "passing": 57,
-        "ballHandling": 57,
-        "offensiveRebound": 57,
-        "defensiveRebound": 55,
-        "perimeterDefense": 64,
-        "interiorDefense": 69,
-        "steal": 64,
-        "block": 64,
-        "defensiveIq": 58,
-        "speed": 70,
-        "strength": 79,
+        "ballHandling": 58,
+        "offensiveRebound": 66,
+        "defensiveRebound": 61,
+        "perimeterDefense": 69,
+        "interiorDefense": 74,
+        "steal": 67,
+        "block": 67,
+        "defensiveIq": 60,
+        "speed": 72,
+        "strength": 80,
         "vertical": 65,
-        "offensiveIq": 70
+        "offensiveIq": 74
       },
       "tendencies": {
-        "usageRate": 18.67,
-        "passRate": 4.35,
-        "shotRate": 29.12,
+        "usageRate": 20.64,
+        "passRate": 2.81,
+        "shotRate": 30.62,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 26.4,
+        "rimFrequency": 27.6,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 5.28,
-        "aboveBreakThreeFrequency": 8.8,
-        "threePointRate": 0,
-        "freeThrowRate": 27.23,
-        "turnoverRate": 11.76,
-        "isolationRate": 5.6,
+        "cornerThreeFrequency": 2.16,
+        "aboveBreakThreeFrequency": 3.6,
+        "threePointRate": 0.17,
+        "freeThrowRate": 36.86,
+        "turnoverRate": 12.91,
+        "isolationRate": 6.19,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 25,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 7.28,
-        "stealAttemptRate": 10.12,
-        "blockAttemptRate": 10.12,
-        "crashOffensiveGlassRate": 16.84
+        "foulRate": 7.41,
+        "stealAttemptRate": 10.36,
+        "blockAttemptRate": 10.36,
+        "crashOffensiveGlassRate": 17.92
       },
       "anchors": {
-        "gamesPlayed": 82,
-        "minutesPerGame": 30.024390243902438,
-        "pointsPerGame": 16.182926829268293,
-        "reboundsPerGame": 6.2073170731707314,
-        "offensiveReboundsPerGame": 2.2439024390243905,
-        "defensiveReboundsPerGame": 3.9634146341463414,
-        "assistsPerGame": 1.1097560975609757,
-        "stealsPerGame": 0.43902439024390244,
-        "blocksPerGame": 0.4146341463414634,
-        "turnoversPerGame": 2.0853658536585367,
-        "fieldGoalPct": 0.4781849912739965,
-        "threePointPct": null,
-        "freeThrowPct": 0.7403846153846154,
-        "threePointAttemptRate": 0,
-        "freeThrowAttemptRate": 0.27225130890052357
+        "gamesPlayed": 79,
+        "minutesPerGame": 33.69620253164557,
+        "pointsPerGame": 18.126582278481013,
+        "reboundsPerGame": 8.037974683544304,
+        "offensiveReboundsPerGame": 3.1139240506329116,
+        "defensiveReboundsPerGame": 4.924050632911392,
+        "assistsPerGame": 0.759493670886076,
+        "stealsPerGame": 0.7088607594936709,
+        "blocksPerGame": 0.620253164556962,
+        "turnoversPerGame": 2.5316455696202533,
+        "fieldGoalPct": 0.4771748492678725,
+        "threePointPct": 0,
+        "freeThrowPct": 0.7570093457943925,
+        "threePointAttemptRate": 0.0017226528854435831,
+        "freeThrowAttemptRate": 0.3686477174849268
       },
       "provenance": {
         "threePoint": {
-          "kind": "estimated",
-          "confidence": "low",
+          "kind": "derived",
+          "confidence": "medium",
           "methodVersion": "derive-v3",
           "sourceVersion": "source-v1",
           "sourceFields": [
+            "tpm",
+            "tpa",
+            "tsPct",
             "ftm",
             "fta"
           ]
@@ -2715,16 +2983,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-433",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -2756,8 +3024,8 @@
         "teamGames": 82,
         "teamMinutes": 2801
       },
-      "selectionScore": 72.24,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 58.29,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 2801,
@@ -2790,9 +3058,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 78,
+        "overallRating": 55,
         "offenseRating": 56,
-        "defenseRating": 67
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.029354,
+          "secondaryCreator": 0.044101,
+          "scoringGuard": 0.038174,
+          "movementSpacer": 0.041154,
+          "twoWayWing": 0.175505,
+          "connector": 0.075582,
+          "interiorFinisher": 0.09802,
+          "stretchBig": 0.081025,
+          "rebounder": 0.2008,
+          "defensiveAnchor": 0.216285
+        },
+        "baseScore": 54.1,
+        "nonlinear": {
+          "creation": 62.881611882357305,
+          "penetration": 63.06988130484194,
+          "shootingGravity": 52.7825,
+          "scalableScoring": 53,
+          "switchability": 69.33173586884831,
+          "rimProtection": 66.8015215167321,
+          "possessionControl": 64.1125,
+          "synergyBonus": 0.18651380320494032,
+          "weaknessPenalty": -1.681525240055,
+          "weaknesses": {
+            "turnoverLiability": 2.5652353999999997,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.5799924307500002,
+            "foulRisk": 1.80043464,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 50.904952190563165,
+          "weight": 0.16633409691226975,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 2801,
+          "shrinkage": 0.43772130766386774
+        },
+        "calibratedImpact": {
+          "adjustment": -0.02403125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
+        "offenseRating": 56,
+        "defenseRating": 66
       },
       "detailedRatings": {
         "threePoint": 21,
@@ -3253,16 +3574,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-760",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -3294,8 +3615,8 @@
         "teamGames": 76,
         "teamMinutes": 2716
       },
-      "selectionScore": 78.6,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 69.029,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 76,
         "minutes": 2716,
@@ -3328,7 +3649,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 66,
+        "offenseRating": 66,
+        "defenseRating": 76
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.034439,
+          "secondaryCreator": 0.05044,
+          "scoringGuard": 0.03738,
+          "movementSpacer": 0.070157,
+          "twoWayWing": 0.190182,
+          "connector": 0.125737,
+          "interiorFinisher": 0.068212,
+          "stretchBig": 0.088569,
+          "rebounder": 0.101181,
+          "defensiveAnchor": 0.233703
+        },
+        "baseScore": 61.88,
+        "nonlinear": {
+          "creation": 72.9150196453375,
+          "penetration": 68.25015989264244,
+          "shootingGravity": 59.9625,
+          "scalableScoring": 69,
+          "switchability": 75.29683842420106,
+          "rimProtection": 72.15328423783892,
+          "possessionControl": 73.741,
+          "synergyBonus": 0.4382970517571197,
+          "weaknessPenalty": -0.5781693540000001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.7004981000000003,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 58.4069224071436,
+          "weight": 0.16038670418111625,
+          "confidence": "high",
+          "sampleGames": 76,
+          "sampleMinutes": 2716,
+          "shrinkage": 0.42207027416083226
+        },
+        "calibratedImpact": {
+          "adjustment": -0.11896875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 66,
         "offenseRating": 66,
         "defenseRating": 76
       },
@@ -3791,20 +4165,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76045",
       "franchiseId": "blazers",
       "eraId": "1980s",
-      "seasonKey": "1987-88",
+      "seasonKey": "1988-89",
       "firstName": "Richard",
       "lastName": "Anderson",
       "displayName": "Richard Anderson",
@@ -3829,108 +4203,161 @@
       "weightLbs": 240,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 62,
-        "teamMinutes": 1297
+        "teamGames": 72,
+        "teamMinutes": 1082
       },
-      "selectionScore": 62.433,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 53.892,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 74,
-        "minutes": 1350,
-        "points": 448,
-        "rebounds": 303,
-        "offensiveRebounds": 91,
-        "defensiveRebounds": 212,
-        "assists": 112,
-        "steals": 51,
-        "blocks": 16,
-        "turnovers": 61,
-        "fieldGoalsMade": 171,
-        "fieldGoalsAttempted": 439,
-        "threesMade": 48,
-        "threesAttempted": 150,
-        "freeThrowsMade": 58,
-        "freeThrowsAttempted": 77,
-        "per": 6.906081081081081,
-        "boxPlusMinus": -1.3039189189189186,
-        "usageRate": 7.594310099573258,
-        "tsPct": 0.47369311453222807,
-        "efgPct": 0.44419134396355353
+        "gamesPlayed": 72,
+        "minutes": 1082,
+        "points": 371,
+        "rebounds": 231,
+        "offensiveRebounds": 62,
+        "defensiveRebounds": 169,
+        "assists": 98,
+        "steals": 44,
+        "blocks": 12,
+        "turnovers": 54,
+        "fieldGoalsMade": 145,
+        "fieldGoalsAttempted": 348,
+        "threesMade": 49,
+        "threesAttempted": 141,
+        "freeThrowsMade": 32,
+        "freeThrowsAttempted": 38,
+        "per": 5.7375,
+        "boxPlusMinus": -1.7531944444444445,
+        "usageRate": 6.121637426900586,
+        "tsPct": 0.5086093441544198,
+        "efgPct": 0.4870689655172414
       },
       "historicalTeamIdentity": {
         "teamId": "1610612757",
         "displayName": "Portland Trail Blazers",
         "city": "Portland",
         "abbreviation": "POR",
-        "seasonKey": "1987-88",
+        "seasonKey": "1988-89",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 65,
+        "overallRating": 51,
         "offenseRating": 57,
-        "defenseRating": 60
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.014911,
+          "secondaryCreator": 0.035055,
+          "scoringGuard": 0.033833,
+          "movementSpacer": 0.187712,
+          "twoWayWing": 0.14712,
+          "connector": 0.117415,
+          "interiorFinisher": 0.058296,
+          "stretchBig": 0.222032,
+          "rebounder": 0.072434,
+          "defensiveAnchor": 0.111192
+        },
+        "baseScore": 53.45,
+        "nonlinear": {
+          "creation": 55.15109966033216,
+          "penetration": 53.06790867974562,
+          "shootingGravity": 75.38,
+          "scalableScoring": 58.333333333333336,
+          "switchability": 63.20868064281824,
+          "rimProtection": 62.59081594731347,
+          "possessionControl": 59.405,
+          "synergyBonus": 0.7447626073909761,
+          "weaknessPenalty": -1.0334775272400003,
+          "weaknesses": {
+            "turnoverLiability": 0.6903352800000002,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.2648562560000003,
+            "deficientRebounding": 1.08444825
+          }
+        },
+        "production": {
+          "score": 22.32851410542927,
+          "weight": 0.07677686179041718,
+          "confidence": "medium",
+          "sampleGames": 72,
+          "sampleMinutes": 1082,
+          "shrinkage": 0.2693924975102357
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0143125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
+        "offenseRating": 57,
+        "defenseRating": 58
       },
       "detailedRatings": {
-        "threePoint": 59,
-        "freeThrow": 79,
+        "threePoint": 65,
+        "freeThrow": 87,
         "insideScoring": 49,
-        "closeShot": 54,
-        "midrange": 56,
-        "passing": 56,
-        "ballHandling": 51,
-        "offensiveRebound": 47,
-        "defensiveRebound": 49,
-        "perimeterDefense": 63,
-        "interiorDefense": 68,
-        "steal": 66,
-        "block": 61,
-        "defensiveIq": 57,
-        "speed": 62,
-        "strength": 70,
-        "vertical": 59,
-        "offensiveIq": 63
+        "closeShot": 53,
+        "midrange": 59,
+        "passing": 55,
+        "ballHandling": 50,
+        "offensiveRebound": 44,
+        "defensiveRebound": 48,
+        "perimeterDefense": 60,
+        "interiorDefense": 65,
+        "steal": 64,
+        "block": 59,
+        "defensiveIq": 56,
+        "speed": 61,
+        "strength": 69,
+        "vertical": 58,
+        "offensiveIq": 61
       },
       "tendencies": {
-        "usageRate": 7.59,
-        "passRate": 10.93,
-        "shotRate": 12.36,
+        "usageRate": 6.12,
+        "passRate": 11.03,
+        "shotRate": 10.07,
         "driveRate": 10,
         "postUpRate": 13,
         "rimFrequency": 19.6,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 7.08,
-        "aboveBreakThreeFrequency": 11.8,
-        "threePointRate": 34.17,
-        "freeThrowRate": 17.54,
-        "turnoverRate": 11.43,
-        "isolationRate": 2.28,
+        "cornerThreeFrequency": 7.8,
+        "aboveBreakThreeFrequency": 13,
+        "threePointRate": 40.52,
+        "freeThrowRate": 10.92,
+        "turnoverRate": 12.9,
+        "isolationRate": 1.84,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 6.87,
-        "stealAttemptRate": 10.28,
-        "blockAttemptRate": 9.88,
-        "crashOffensiveGlassRate": 15.64
+        "foulRate": 6.44,
+        "stealAttemptRate": 10.12,
+        "blockAttemptRate": 9.72,
+        "crashOffensiveGlassRate": 15.28
       },
       "anchors": {
-        "gamesPlayed": 74,
-        "minutesPerGame": 18.243243243243242,
-        "pointsPerGame": 6.054054054054054,
-        "reboundsPerGame": 4.094594594594595,
-        "offensiveReboundsPerGame": 1.2297297297297298,
-        "defensiveReboundsPerGame": 2.864864864864865,
-        "assistsPerGame": 1.5135135135135136,
-        "stealsPerGame": 0.6891891891891891,
-        "blocksPerGame": 0.21621621621621623,
-        "turnoversPerGame": 0.8243243243243243,
-        "fieldGoalPct": 0.3895216400911162,
-        "threePointPct": 0.32,
-        "freeThrowPct": 0.7532467532467533,
-        "threePointAttemptRate": 0.3416856492027335,
-        "freeThrowAttemptRate": 0.17539863325740318
+        "gamesPlayed": 72,
+        "minutesPerGame": 15.027777777777779,
+        "pointsPerGame": 5.152777777777778,
+        "reboundsPerGame": 3.2083333333333335,
+        "offensiveReboundsPerGame": 0.8611111111111112,
+        "defensiveReboundsPerGame": 2.3472222222222223,
+        "assistsPerGame": 1.3611111111111112,
+        "stealsPerGame": 0.6111111111111112,
+        "blocksPerGame": 0.16666666666666666,
+        "turnoversPerGame": 0.75,
+        "fieldGoalPct": 0.4166666666666667,
+        "threePointPct": 0.3475177304964539,
+        "freeThrowPct": 0.8421052631578947,
+        "threePointAttemptRate": 0.4051724137931034,
+        "freeThrowAttemptRate": 0.10919540229885058
       },
       "provenance": {
         "threePoint": {
@@ -4329,16 +4756,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76121",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -4370,8 +4797,8 @@
         "teamGames": 77,
         "teamMinutes": 1560
       },
-      "selectionScore": 68.316,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.495,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 77,
         "minutes": 1560,
@@ -4404,9 +4831,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 52,
         "offenseRating": 61,
-        "defenseRating": 59
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.040399,
+          "secondaryCreator": 0.072226,
+          "scoringGuard": 0.073832,
+          "movementSpacer": 0.124683,
+          "twoWayWing": 0.181712,
+          "connector": 0.133463,
+          "interiorFinisher": 0.084799,
+          "stretchBig": 0.102746,
+          "rebounder": 0.064595,
+          "defensiveAnchor": 0.121545
+        },
+        "baseScore": 53.03,
+        "nonlinear": {
+          "creation": 63.22669651400695,
+          "penetration": 61.74592519566367,
+          "shootingGravity": 66.2475,
+          "scalableScoring": 60.333333333333336,
+          "switchability": 65.5627663980151,
+          "rimProtection": 60.98783565235717,
+          "possessionControl": 65.3005,
+          "synergyBonus": 0.21881044706387992,
+          "weaknessPenalty": -0.9722058282100001,
+          "weaknesses": {
+            "turnoverLiability": 0.9255905039999999,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.5687055900000003,
+            "deficientRebounding": 1.3651328125000002
+          }
+        },
+        "production": {
+          "score": 39.45228724804249,
+          "weight": 0.1274945533769063,
+          "confidence": "high",
+          "sampleGames": 77,
+          "sampleMinutes": 1560,
+          "shrinkage": 0.33551198257080606
+        },
+        "calibratedImpact": {
+          "adjustment": 0.056,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 52,
+        "offenseRating": 61,
+        "defenseRating": 60
       },
       "detailedRatings": {
         "threePoint": 56,
@@ -4867,16 +5347,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76217",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -4908,8 +5388,8 @@
         "teamGames": 76,
         "teamMinutes": 2216
       },
-      "selectionScore": 72.993,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 65.964,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 76,
         "minutes": 2216,
@@ -4942,9 +5422,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 64,
         "offenseRating": 59,
-        "defenseRating": 78
+        "defenseRating": 79
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.020352,
+          "secondaryCreator": 0.037925,
+          "scoringGuard": 0.023618,
+          "movementSpacer": 0.042731,
+          "twoWayWing": 0.191163,
+          "connector": 0.093171,
+          "interiorFinisher": 0.054632,
+          "stretchBig": 0.078027,
+          "rebounder": 0.119264,
+          "defensiveAnchor": 0.339117
+        },
+        "baseScore": 61.53,
+        "nonlinear": {
+          "creation": 68.02406875777223,
+          "penetration": 60.80471454669642,
+          "shootingGravity": 58.5,
+          "scalableScoring": 60.666666666666664,
+          "switchability": 79.14293409884723,
+          "rimProtection": 82.13737954112254,
+          "possessionControl": 65.0215,
+          "synergyBonus": 0.44732849453896245,
+          "weaknessPenalty": -3.0202079231999996,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.882964479999999,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 50.74210848929126,
+          "weight": 0.1484681340707472,
+          "confidence": "high",
+          "sampleGames": 76,
+          "sampleMinutes": 2216,
+          "shrinkage": 0.39070561597565046
+        },
+        "calibratedImpact": {
+          "adjustment": -0.01865625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 64,
+        "offenseRating": 59,
+        "defenseRating": 79
       },
       "detailedRatings": {
         "threePoint": 44,
@@ -5402,16 +5935,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76237",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -5443,8 +5976,8 @@
         "teamGames": 67,
         "teamMinutes": 811
       },
-      "selectionScore": 60.778,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 48.767,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 67,
         "minutes": 811,
@@ -5477,9 +6010,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
-        "offenseRating": 55,
-        "defenseRating": 56
+        "overallRating": 44,
+        "offenseRating": 54,
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026249,
+          "secondaryCreator": 0.048538,
+          "scoringGuard": 0.046855,
+          "movementSpacer": 0.105781,
+          "twoWayWing": 0.188133,
+          "connector": 0.111215,
+          "interiorFinisher": 0.09076,
+          "stretchBig": 0.132904,
+          "rebounder": 0.097341,
+          "defensiveAnchor": 0.152224
+        },
+        "baseScore": 48.04,
+        "nonlinear": {
+          "creation": 54.53380054052347,
+          "penetration": 54.18864065717476,
+          "shootingGravity": 59.5275,
+          "scalableScoring": 54,
+          "switchability": 61.27813506812389,
+          "rimProtection": 60.89744123022304,
+          "possessionControl": 59.631,
+          "synergyBonus": 0,
+          "weaknessPenalty": -1.2731630527600002,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.5280609640000002,
+            "deficientRebounding": 1.21653625
+          }
+        },
+        "production": {
+          "score": 23.632712146906094,
+          "weight": 0.06262630572192318,
+          "confidence": "medium",
+          "sampleGames": 67,
+          "sampleMinutes": 811,
+          "shrinkage": 0.21974142358569537
+        },
+        "calibratedImpact": {
+          "adjustment": -0.02846875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 44,
+        "offenseRating": 54,
+        "defenseRating": 57
       },
       "detailedRatings": {
         "threePoint": 50,
@@ -5940,16 +6526,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76317",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -5981,8 +6567,8 @@
         "teamGames": 41,
         "teamMinutes": 643
       },
-      "selectionScore": 60.177,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.916,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 41,
         "minutes": 643,
@@ -6015,9 +6601,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
+        "overallRating": 48,
         "offenseRating": 56,
-        "defenseRating": 56
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.027289,
+          "secondaryCreator": 0.065442,
+          "scoringGuard": 0.068225,
+          "movementSpacer": 0.178529,
+          "twoWayWing": 0.165201,
+          "connector": 0.129936,
+          "interiorFinisher": 0.059464,
+          "stretchBig": 0.126985,
+          "rebounder": 0.070887,
+          "defensiveAnchor": 0.108042
+        },
+        "baseScore": 49.36,
+        "nonlinear": {
+          "creation": 57.92399874969574,
+          "penetration": 53.88865947793049,
+          "shootingGravity": 65.5575,
+          "scalableScoring": 53.333333333333336,
+          "switchability": 60.63166008951434,
+          "rimProtection": 56.995613528768175,
+          "possessionControl": 62.45,
+          "synergyBonus": 0.14300869144736858,
+          "weaknessPenalty": -0.81679914076,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.2124556640000002,
+            "deficientRebounding": 1.18989475
+          }
+        },
+        "production": {
+          "score": 21.07636176288978,
+          "weight": 0.025970705656659928,
+          "confidence": "low",
+          "sampleGames": 41,
+          "sampleMinutes": 643,
+          "shrinkage": 0.15187547167637383
+        },
+        "calibratedImpact": {
+          "adjustment": 0.06678125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 48,
+        "offenseRating": 56,
+        "defenseRating": 57
       },
       "detailedRatings": {
         "threePoint": 53,
@@ -6478,20 +7117,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76350",
       "franchiseId": "blazers",
       "eraId": "1980s",
-      "seasonKey": "1983-84",
+      "seasonKey": "1982-83",
       "firstName": "Kenny",
       "lastName": "Carr",
       "displayName": "Kenny Carr",
@@ -6517,107 +7156,160 @@
       "eligibility": {
         "minimumTeamGames": 40,
         "teamGames": 82,
-        "teamMinutes": 2455
+        "teamMinutes": 2331
       },
-      "selectionScore": 71.825,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.901,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
-        "minutes": 2455,
-        "points": 1283,
-        "rebounds": 642,
-        "offensiveRebounds": 208,
-        "defensiveRebounds": 434,
-        "assists": 157,
-        "steals": 68,
-        "blocks": 33,
-        "turnovers": 202,
-        "fieldGoalsMade": 518,
-        "fieldGoalsAttempted": 923,
-        "threesMade": 0,
-        "threesAttempted": 5,
-        "freeThrowsMade": 247,
-        "freeThrowsAttempted": 367,
-        "per": 13.340853658536584,
-        "boxPlusMinus": -0.07243902439024374,
-        "usageRate": 16.514505776636714,
-        "tsPct": 0.5915277367955148,
-        "efgPct": 0.5612134344528711
+        "minutes": 2331,
+        "points": 981,
+        "rebounds": 589,
+        "offensiveRebounds": 182,
+        "defensiveRebounds": 407,
+        "assists": 116,
+        "steals": 62,
+        "blocks": 42,
+        "turnovers": 185,
+        "fieldGoalsMade": 362,
+        "fieldGoalsAttempted": 717,
+        "threesMade": 2,
+        "threesAttempted": 6,
+        "freeThrowsMade": 255,
+        "freeThrowsAttempted": 366,
+        "per": 10.928658536585365,
+        "boxPlusMinus": -0.5003658536585371,
+        "usageRate": 13.646213093709884,
+        "tsPct": 0.558630586305863,
+        "efgPct": 0.5062761506276151
       },
       "historicalTeamIdentity": {
         "teamId": "1610612757",
         "displayName": "Portland Trail Blazers",
         "city": "Portland",
         "abbreviation": "POR",
-        "seasonKey": "1983-84",
+        "seasonKey": "1982-83",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 78,
-        "offenseRating": 56,
-        "defenseRating": 64
+        "overallRating": 52,
+        "offenseRating": 60,
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025337,
+          "secondaryCreator": 0.045154,
+          "scoringGuard": 0.0489,
+          "movementSpacer": 0.10158,
+          "twoWayWing": 0.168733,
+          "connector": 0.103345,
+          "interiorFinisher": 0.079448,
+          "stretchBig": 0.132768,
+          "rebounder": 0.126302,
+          "defensiveAnchor": 0.168433
+        },
+        "baseScore": 53.76,
+        "nonlinear": {
+          "creation": 60.37816704277863,
+          "penetration": 60.76790780976869,
+          "shootingGravity": 62.96,
+          "scalableScoring": 65,
+          "switchability": 67.3316885742296,
+          "rimProtection": 66.11128845139491,
+          "possessionControl": 60.93,
+          "synergyBonus": 0.14797445897308995,
+          "weaknessPenalty": -2.475040914,
+          "weaknesses": {
+            "turnoverLiability": 4.295769119999999,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.9837629800000003,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 41.94491671535136,
+          "weight": 0.15540598482611653,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 2331,
+          "shrinkage": 0.4089631179634646
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00721875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 52,
+        "offenseRating": 60,
+        "defenseRating": 63
       },
       "detailedRatings": {
-        "threePoint": 21,
-        "freeThrow": 70,
-        "insideScoring": 66,
-        "closeShot": 68,
-        "midrange": 68,
-        "passing": 62,
-        "ballHandling": 59,
-        "offensiveRebound": 61,
-        "defensiveRebound": 62,
-        "perimeterDefense": 68,
-        "interiorDefense": 73,
-        "steal": 68,
-        "block": 64,
-        "defensiveIq": 59,
-        "speed": 70,
+        "threePoint": 66,
+        "freeThrow": 73,
+        "insideScoring": 60,
+        "closeShot": 62,
+        "midrange": 62,
+        "passing": 58,
+        "ballHandling": 55,
+        "offensiveRebound": 58,
+        "defensiveRebound": 61,
+        "perimeterDefense": 67,
+        "interiorDefense": 72,
+        "steal": 67,
+        "block": 66,
+        "defensiveIq": 58,
+        "speed": 68,
         "strength": 67,
         "vertical": 60,
-        "offensiveIq": 73
+        "offensiveIq": 69
       },
       "tendencies": {
-        "usageRate": 16.51,
-        "passRate": 7.13,
-        "shotRate": 23.45,
+        "usageRate": 13.65,
+        "passRate": 6.74,
+        "shotRate": 18.22,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 26.4,
+        "rimFrequency": 24,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 2.52,
-        "aboveBreakThreeFrequency": 4.2,
-        "threePointRate": 0.54,
-        "freeThrowRate": 39.76,
-        "turnoverRate": 15.7,
-        "isolationRate": 4.95,
+        "cornerThreeFrequency": 7.92,
+        "aboveBreakThreeFrequency": 13.2,
+        "threePointRate": 0.84,
+        "freeThrowRate": 51.05,
+        "turnoverRate": 17.4,
+        "isolationRate": 4.09,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 7.36,
-        "stealAttemptRate": 10.44,
-        "blockAttemptRate": 10.12,
-        "crashOffensiveGlassRate": 17.32
+        "foulRate": 8.3,
+        "stealAttemptRate": 10.36,
+        "blockAttemptRate": 10.28,
+        "crashOffensiveGlassRate": 16.96
       },
       "anchors": {
         "gamesPlayed": 82,
-        "minutesPerGame": 29.9390243902439,
-        "pointsPerGame": 15.646341463414634,
-        "reboundsPerGame": 7.829268292682927,
-        "offensiveReboundsPerGame": 2.5365853658536586,
-        "defensiveReboundsPerGame": 5.2926829268292686,
-        "assistsPerGame": 1.9146341463414633,
-        "stealsPerGame": 0.8292682926829268,
-        "blocksPerGame": 0.4024390243902439,
-        "turnoversPerGame": 2.4634146341463414,
-        "fieldGoalPct": 0.5612134344528711,
-        "threePointPct": 0,
-        "freeThrowPct": 0.6730245231607629,
-        "threePointAttemptRate": 0.005417118093174431,
-        "freeThrowAttemptRate": 0.39761646803900325
+        "minutesPerGame": 28.426829268292682,
+        "pointsPerGame": 11.963414634146341,
+        "reboundsPerGame": 7.182926829268292,
+        "offensiveReboundsPerGame": 2.2195121951219514,
+        "defensiveReboundsPerGame": 4.963414634146342,
+        "assistsPerGame": 1.4146341463414633,
+        "stealsPerGame": 0.7560975609756098,
+        "blocksPerGame": 0.5121951219512195,
+        "turnoversPerGame": 2.2560975609756095,
+        "fieldGoalPct": 0.504881450488145,
+        "threePointPct": 0.3333333333333333,
+        "freeThrowPct": 0.6967213114754098,
+        "threePointAttemptRate": 0.008368200836820083,
+        "freeThrowAttemptRate": 0.5104602510460251
       },
       "provenance": {
         "threePoint": {
@@ -7016,16 +7708,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76441",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -7057,8 +7749,8 @@
         "teamGames": 80,
         "teamMinutes": 2099
       },
-      "selectionScore": 68.447,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 54.661,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 80,
         "minutes": 2099,
@@ -7091,7 +7783,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
+        "overallRating": 51,
+        "offenseRating": 51,
+        "defenseRating": 68
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025749,
+          "secondaryCreator": 0.036915,
+          "scoringGuard": 0.026934,
+          "movementSpacer": 0.032641,
+          "twoWayWing": 0.179009,
+          "connector": 0.068722,
+          "interiorFinisher": 0.085652,
+          "stretchBig": 0.072859,
+          "rebounder": 0.173843,
+          "defensiveAnchor": 0.297676
+        },
+        "baseScore": 53.29,
+        "nonlinear": {
+          "creation": 61.240828836475,
+          "penetration": 58.38174665667319,
+          "shootingGravity": 48.1725,
+          "scalableScoring": 46.666666666666664,
+          "switchability": 72.55208306671406,
+          "rimProtection": 74.98540314659772,
+          "possessionControl": 62.0815,
+          "synergyBonus": 0.24854182074860756,
+          "weaknessPenalty": -3.009230323650001,
+          "weaknesses": {
+            "turnoverLiability": 3.603738128000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 1.0708024345000002,
+            "foulRisk": 4.17613686,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 36.09245535861471,
+          "weight": 0.14774844864314163,
+          "confidence": "high",
+          "sampleGames": 80,
+          "sampleMinutes": 2099,
+          "shrinkage": 0.3888117069556358
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0433125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
         "offenseRating": 51,
         "defenseRating": 68
       },
@@ -7554,16 +8299,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76771",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -7595,8 +8340,8 @@
         "teamGames": 42,
         "teamMinutes": 476
       },
-      "selectionScore": 60.398,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 49.368,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 77,
         "minutes": 1112,
@@ -7629,9 +8374,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
+        "overallRating": 45,
         "offenseRating": 56,
-        "defenseRating": 58
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.028435,
+          "secondaryCreator": 0.069227,
+          "scoringGuard": 0.064568,
+          "movementSpacer": 0.135687,
+          "twoWayWing": 0.191333,
+          "connector": 0.131637,
+          "interiorFinisher": 0.064999,
+          "stretchBig": 0.110949,
+          "rebounder": 0.068478,
+          "defensiveAnchor": 0.134687
+        },
+        "baseScore": 48.98,
+        "nonlinear": {
+          "creation": 57.18397516769872,
+          "penetration": 53.104575770470916,
+          "shootingGravity": 64.0675,
+          "scalableScoring": 55.333333333333336,
+          "switchability": 62.610683869586005,
+          "rimProtection": 59.73610904560854,
+          "possessionControl": 59.6125,
+          "synergyBonus": 0.08246893510782868,
+          "weaknessPenalty": -2.04666332493,
+          "weaknesses": {
+            "turnoverLiability": 2.696798,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.7294077019999998,
+            "deficientRebounding": 1.5933923125
+          }
+        },
+        "production": {
+          "score": 25.1329387376927,
+          "weight": 0.07985117995837751,
+          "confidence": "medium",
+          "sampleGames": 77,
+          "sampleMinutes": 1112,
+          "shrinkage": 0.2801795788013246
+        },
+        "calibratedImpact": {
+          "adjustment": -0.02665625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 45,
+        "offenseRating": 56,
+        "defenseRating": 59
       },
       "detailedRatings": {
         "threePoint": 59,
@@ -8092,16 +8890,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76895",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -8133,8 +8931,8 @@
         "teamGames": 59,
         "teamMinutes": 1377
       },
-      "selectionScore": 67.161,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.202,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 59,
         "minutes": 1377,
@@ -8167,8 +8965,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 69,
-        "offenseRating": 63,
+        "overallRating": 56,
+        "offenseRating": 62,
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.01926,
+          "secondaryCreator": 0.047813,
+          "scoringGuard": 0.044779,
+          "movementSpacer": 0.151584,
+          "twoWayWing": 0.187989,
+          "connector": 0.142182,
+          "interiorFinisher": 0.050651,
+          "stretchBig": 0.137227,
+          "rebounder": 0.066351,
+          "defensiveAnchor": 0.152164
+        },
+        "baseScore": 56.19,
+        "nonlinear": {
+          "creation": 60.31500991818817,
+          "penetration": 56.438730669456675,
+          "shootingGravity": 71.215,
+          "scalableScoring": 70.33333333333333,
+          "switchability": 66.86942714209971,
+          "rimProtection": 66.65002977334609,
+          "possessionControl": 59.8795,
+          "synergyBonus": 0.47063054000212934,
+          "weaknessPenalty": -2.9036059700599997,
+          "weaknesses": {
+            "turnoverLiability": 5.771110495999999,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.202411438,
+            "deficientRebounding": 0.566495625
+          }
+        },
+        "production": {
+          "score": 36.362458851106595,
+          "weight": 0.08129348753436345,
+          "confidence": "medium",
+          "sampleGames": 59,
+          "sampleMinutes": 1377,
+          "shrinkage": 0.2852403071381174
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00109375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 56,
+        "offenseRating": 62,
         "defenseRating": 66
       },
       "detailedRatings": {
@@ -8630,16 +9481,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76901",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -8670,8 +9521,8 @@
         "teamGames": 68,
         "teamMinutes": 845
       },
-      "selectionScore": 58.06,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 52.846,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 68,
         "minutes": 845,
@@ -8704,9 +9555,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 59,
+        "overallRating": 50,
         "offenseRating": 58,
-        "defenseRating": 54
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.013427,
+          "secondaryCreator": 0.035548,
+          "scoringGuard": 0.039517,
+          "movementSpacer": 0.159752,
+          "twoWayWing": 0.142897,
+          "connector": 0.09703,
+          "interiorFinisher": 0.073148,
+          "stretchBig": 0.218106,
+          "rebounder": 0.093522,
+          "defensiveAnchor": 0.127053
+        },
+        "baseScore": 52.47,
+        "nonlinear": {
+          "creation": 52.50784463277288,
+          "penetration": 51.41756378168415,
+          "shootingGravity": 70.4,
+          "scalableScoring": 68.66666666666667,
+          "switchability": 63.83093398727776,
+          "rimProtection": 65.23323504243956,
+          "possessionControl": 49.7655,
+          "synergyBonus": 0.45205818078684634,
+          "weaknessPenalty": -4.35769069866,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 5.678429723999999,
+            "deficientRebounding": 1.1383076250000002
+          }
+        },
+        "production": {
+          "score": 19.317643819412616,
+          "weight": 0.06466121772091922,
+          "confidence": "medium",
+          "sampleGames": 68,
+          "sampleMinutes": 845,
+          "shrinkage": 0.22688146568743583
+        },
+        "calibratedImpact": {
+          "adjustment": 0.05365625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 50,
+        "offenseRating": 58,
+        "defenseRating": 55
       },
       "detailedRatings": {
         "threePoint": 100,
@@ -9167,16 +10071,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76954",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -9208,8 +10112,8 @@
         "teamGames": 68,
         "teamMinutes": 1433
       },
-      "selectionScore": 63.097,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.583,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 68,
         "minutes": 1433,
@@ -9242,7 +10146,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 68,
+        "overallRating": 47,
+        "offenseRating": 48,
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.021248,
+          "secondaryCreator": 0.033798,
+          "scoringGuard": 0.0264,
+          "movementSpacer": 0.036155,
+          "twoWayWing": 0.190236,
+          "connector": 0.068748,
+          "interiorFinisher": 0.097833,
+          "stretchBig": 0.07355,
+          "rebounder": 0.146786,
+          "defensiveAnchor": 0.305246
+        },
+        "baseScore": 50.08,
+        "nonlinear": {
+          "creation": 56.48306590423955,
+          "penetration": 54.64788832188937,
+          "shootingGravity": 48.3175,
+          "scalableScoring": 45.333333333333336,
+          "switchability": 70.82028210138239,
+          "rimProtection": 72.78217203926762,
+          "possessionControl": 58.191,
+          "synergyBonus": 0.22078094550507635,
+          "weaknessPenalty": -3.44547266369,
+          "weaknesses": {
+            "turnoverLiability": 4.116543583999999,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 1.0471100894999998,
+            "foulRisk": 4.54880883,
+            "deficientRebounding": 0.421280625
+          }
+        },
+        "production": {
+          "score": 31.250303669387623,
+          "weight": 0.08767265219532522,
+          "confidence": "medium",
+          "sampleGames": 68,
+          "sampleMinutes": 1433,
+          "shrinkage": 0.30762334103622885
+        },
+        "calibratedImpact": {
+          "adjustment": -0.04225,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
         "offenseRating": 48,
         "defenseRating": 66
       },
@@ -9705,16 +10662,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77047",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -9746,8 +10703,8 @@
         "teamGames": 82,
         "teamMinutes": 1279
       },
-      "selectionScore": 60.03,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 46.98,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 1279,
@@ -9780,9 +10737,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 63,
+        "overallRating": 41,
         "offenseRating": 54,
-        "defenseRating": 54
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.032935,
+          "secondaryCreator": 0.075805,
+          "scoringGuard": 0.067795,
+          "movementSpacer": 0.122391,
+          "twoWayWing": 0.177982,
+          "connector": 0.122498,
+          "interiorFinisher": 0.073456,
+          "stretchBig": 0.113618,
+          "rebounder": 0.084555,
+          "defensiveAnchor": 0.128965
+        },
+        "baseScore": 46.12,
+        "nonlinear": {
+          "creation": 57.56954408450279,
+          "penetration": 53.719741397072276,
+          "shootingGravity": 61.8125,
+          "scalableScoring": 51,
+          "switchability": 61.27813506812389,
+          "rimProtection": 58.72670505969136,
+          "possessionControl": 58.707499999999996,
+          "synergyBonus": 0,
+          "weaknessPenalty": -2.821439711280001,
+          "weaknesses": {
+            "turnoverLiability": 4.500569800000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.054413375,
+            "spacingLimitation": 0,
+            "foulRisk": 2.336190792,
+            "deficientRebounding": 1.407178125
+          }
+        },
+        "production": {
+          "score": 23.602092154385495,
+          "weight": 0.08816188745804306,
+          "confidence": "medium",
+          "sampleGames": 82,
+          "sampleMinutes": 1279,
+          "shrinkage": 0.3093399559931335
+        },
+        "calibratedImpact": {
+          "adjustment": -0.01415625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 41,
+        "offenseRating": 54,
+        "defenseRating": 55
       },
       "detailedRatings": {
         "threePoint": 48,
@@ -10243,16 +11253,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77096",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -10284,8 +11294,8 @@
         "teamGames": 50,
         "teamMinutes": 488
       },
-      "selectionScore": 57.185,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 48.326,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 50,
         "minutes": 488,
@@ -10318,7 +11328,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 60,
+        "overallRating": 45,
+        "offenseRating": 54,
+        "defenseRating": 54
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025206,
+          "secondaryCreator": 0.052173,
+          "scoringGuard": 0.071125,
+          "movementSpacer": 0.171417,
+          "twoWayWing": 0.164061,
+          "connector": 0.112686,
+          "interiorFinisher": 0.073115,
+          "stretchBig": 0.134538,
+          "rebounder": 0.086292,
+          "defensiveAnchor": 0.109387
+        },
+        "baseScore": 47.79,
+        "nonlinear": {
+          "creation": 53.53138171098536,
+          "penetration": 52.704418445484755,
+          "shootingGravity": 60.975,
+          "scalableScoring": 56,
+          "switchability": 58.642286414637155,
+          "rimProtection": 55.71669564454439,
+          "possessionControl": 57.6435,
+          "synergyBonus": 0,
+          "weaknessPenalty": -1.26918930208,
+          "weaknesses": {
+            "turnoverLiability": 1.4984098559999999,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.3222756,
+            "spacingLimitation": 0,
+            "foulRisk": 0.7830592559999997,
+            "deficientRebounding": 1.129165
+          }
+        },
+        "production": {
+          "score": 20.357641038079073,
+          "weight": 0.02331991951710262,
+          "confidence": "low",
+          "sampleGames": 50,
+          "sampleMinutes": 488,
+          "shrinkage": 0.13637379834562935
+        },
+        "calibratedImpact": {
+          "adjustment": 0.05540625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 45,
         "offenseRating": 54,
         "defenseRating": 54
       },
@@ -10781,16 +11844,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77134",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -10822,8 +11885,8 @@
         "teamGames": 79,
         "teamMinutes": 2345
       },
-      "selectionScore": 75.103,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.526,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 2345,
@@ -10856,7 +11919,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 56,
+        "offenseRating": 59,
+        "defenseRating": 65
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.030368,
+          "secondaryCreator": 0.045281,
+          "scoringGuard": 0.04433,
+          "movementSpacer": 0.056443,
+          "twoWayWing": 0.181276,
+          "connector": 0.083617,
+          "interiorFinisher": 0.115876,
+          "stretchBig": 0.100343,
+          "rebounder": 0.139026,
+          "defensiveAnchor": 0.20344
+        },
+        "baseScore": 54.36,
+        "nonlinear": {
+          "creation": 64.75728018001448,
+          "penetration": 65.85459264625678,
+          "shootingGravity": 58.25,
+          "scalableScoring": 61.333333333333336,
+          "switchability": 72.28641060965654,
+          "rimProtection": 72.10547786716394,
+          "possessionControl": 62.7555,
+          "synergyBonus": 0.3151404252184775,
+          "weaknessPenalty": -3.31188696,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 3.740844,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 53.512614729175056,
+          "weight": 0.15385450929396466,
+          "confidence": "high",
+          "sampleGames": 79,
+          "sampleMinutes": 2345,
+          "shrinkage": 0.40488028761569644
+        },
+        "calibratedImpact": {
+          "adjustment": 0.004125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 56,
         "offenseRating": 59,
         "defenseRating": 65
       },
@@ -11316,16 +12432,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77154",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -11357,8 +12473,8 @@
         "teamGames": 64,
         "teamMinutes": 815
       },
-      "selectionScore": 56.362,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 43.426,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 64,
         "minutes": 815,
@@ -11391,9 +12507,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 60,
+        "overallRating": 38,
         "offenseRating": 49,
-        "defenseRating": 54
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.02286,
+          "secondaryCreator": 0.040637,
+          "scoringGuard": 0.036576,
+          "movementSpacer": 0.091502,
+          "twoWayWing": 0.17837,
+          "connector": 0.099225,
+          "interiorFinisher": 0.090398,
+          "stretchBig": 0.138123,
+          "rebounder": 0.130872,
+          "defensiveAnchor": 0.171437
+        },
+        "baseScore": 43.94,
+        "nonlinear": {
+          "creation": 52.12200150674698,
+          "penetration": 51.41756378168415,
+          "shootingGravity": 52.25,
+          "scalableScoring": 52,
+          "switchability": 60.54667072494383,
+          "rimProtection": 61.17217292706763,
+          "possessionControl": 53.6515,
+          "synergyBonus": 0,
+          "weaknessPenalty": -4.173631825819999,
+          "weaknesses": {
+            "turnoverLiability": 5.671024567999999,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.632541975,
+            "foulRisk": 5.19869868,
+            "deficientRebounding": 0.7731224999999999
+          }
+        },
+        "production": {
+          "score": 19.405950077264688,
+          "weight": 0.06174447582654927,
+          "confidence": "medium",
+          "sampleGames": 64,
+          "sampleMinutes": 815,
+          "shrinkage": 0.21664728360192725
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0004375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 38,
+        "offenseRating": 49,
+        "defenseRating": 55
       },
       "detailedRatings": {
         "threePoint": 49,
@@ -11851,16 +13020,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77175",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -11892,8 +13061,8 @@
         "teamGames": 79,
         "teamMinutes": 1778
       },
-      "selectionScore": 61.571,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 47.791,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 1778,
@@ -11926,7 +13095,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
+        "overallRating": 43,
+        "offenseRating": 47,
+        "defenseRating": 64
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.021157,
+          "secondaryCreator": 0.04002,
+          "scoringGuard": 0.029844,
+          "movementSpacer": 0.041192,
+          "twoWayWing": 0.199328,
+          "connector": 0.074329,
+          "interiorFinisher": 0.086144,
+          "stretchBig": 0.086033,
+          "rebounder": 0.144793,
+          "defensiveAnchor": 0.27716
+        },
+        "baseScore": 48.85,
+        "nonlinear": {
+          "creation": 55.51278011019291,
+          "penetration": 52.18670555880056,
+          "shootingGravity": 51.88,
+          "scalableScoring": 43.666666666666664,
+          "switchability": 69.76588453888175,
+          "rimProtection": 72.84196487428932,
+          "possessionControl": 55.483,
+          "synergyBonus": 0.20367871491660808,
+          "weaknessPenalty": -3.65903701278,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.6677048519999997,
+            "foulRisk": 3.615486839999999,
+            "deficientRebounding": 0.47868187500000003
+          }
+        },
+        "production": {
+          "score": 26.91969076999092,
+          "weight": 0.13683164052686358,
+          "confidence": "high",
+          "sampleGames": 79,
+          "sampleMinutes": 1778,
+          "shrinkage": 0.36008326454437783
+        },
+        "calibratedImpact": {
+          "adjustment": -0.10140625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 43,
         "offenseRating": 47,
         "defenseRating": 64
       },
@@ -12389,16 +13611,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77323",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -12430,8 +13652,8 @@
         "teamGames": 55,
         "teamMinutes": 842
       },
-      "selectionScore": 60.131,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 48.881,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 55,
         "minutes": 842,
@@ -12464,7 +13686,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
+        "overallRating": 45,
+        "offenseRating": 53,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.020022,
+          "secondaryCreator": 0.042793,
+          "scoringGuard": 0.035895,
+          "movementSpacer": 0.067501,
+          "twoWayWing": 0.169744,
+          "connector": 0.080685,
+          "interiorFinisher": 0.096751,
+          "stretchBig": 0.131115,
+          "rebounder": 0.159402,
+          "defensiveAnchor": 0.196092
+        },
+        "baseScore": 48.37,
+        "nonlinear": {
+          "creation": 55.11271650042684,
+          "penetration": 53.06790867974562,
+          "shootingGravity": 58.25,
+          "scalableScoring": 52.666666666666664,
+          "switchability": 65.05746397625855,
+          "rimProtection": 65.82483187973006,
+          "possessionControl": 57.007,
+          "synergyBonus": 0.0682876533139514,
+          "weaknessPenalty": -3.1716913872,
+          "weaknesses": {
+            "turnoverLiability": 4.097371680000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 4.8925824,
+            "deficientRebounding": 0.33854999999999996
+          }
+        },
+        "production": {
+          "score": 23.398977644470634,
+          "weight": 0.05932109308283519,
+          "confidence": "medium",
+          "sampleGames": 55,
+          "sampleMinutes": 842,
+          "shrinkage": 0.20814418625556205
+        },
+        "calibratedImpact": {
+          "adjustment": -0.03178125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 45,
         "offenseRating": 53,
         "defenseRating": 58
       },
@@ -12924,16 +14199,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77332",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -12965,8 +14240,8 @@
         "teamGames": 64,
         "teamMinutes": 660
       },
-      "selectionScore": 56.587,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 45.634,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 64,
         "minutes": 660,
@@ -12999,8 +14274,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 59,
-        "offenseRating": 53,
+        "overallRating": 41,
+        "offenseRating": 52,
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026736,
+          "secondaryCreator": 0.055879,
+          "scoringGuard": 0.079922,
+          "movementSpacer": 0.128183,
+          "twoWayWing": 0.186855,
+          "connector": 0.100169,
+          "interiorFinisher": 0.0836,
+          "stretchBig": 0.120862,
+          "rebounder": 0.095547,
+          "defensiveAnchor": 0.122247
+        },
+        "baseScore": 45.36,
+        "nonlinear": {
+          "creation": 52.86997914272561,
+          "penetration": 51.98458616126478,
+          "shootingGravity": 61.495000000000005,
+          "scalableScoring": 50.333333333333336,
+          "switchability": 58.9598501137946,
+          "rimProtection": 56.17646010676257,
+          "possessionControl": 56.400999999999996,
+          "synergyBonus": 0,
+          "weaknessPenalty": -2.0377953584,
+          "weaknesses": {
+            "turnoverLiability": 2.6394941279999995,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.43250740000000004,
+            "spacingLimitation": 0,
+            "foulRisk": 1.595771232,
+            "deficientRebounding": 1.325743
+          }
+        },
+        "production": {
+          "score": 19.695616679266802,
+          "weight": 0.03215384615384616,
+          "confidence": "low",
+          "sampleGames": 64,
+          "sampleMinutes": 660,
+          "shrinkage": 0.18803418803418806
+        },
+        "calibratedImpact": {
+          "adjustment": 0.02303125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 41,
+        "offenseRating": 52,
         "defenseRating": 53
       },
       "detailedRatings": {
@@ -13462,20 +14790,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77376",
       "franchiseId": "blazers",
       "eraId": "1980s",
-      "seasonKey": "1983-84",
+      "seasonKey": "1982-83",
       "firstName": "Lafayette",
       "lastName": "Lever",
       "displayName": "Lafayette Lever",
@@ -13501,107 +14829,160 @@
       "eligibility": {
         "minimumTeamGames": 40,
         "teamGames": 81,
-        "teamMinutes": 2010
+        "teamMinutes": 2020
       },
-      "selectionScore": 71.409,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.742,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 81,
-        "minutes": 2010,
-        "points": 788,
-        "rebounds": 218,
-        "offensiveRebounds": 96,
-        "defensiveRebounds": 122,
-        "assists": 372,
-        "steals": 135,
-        "blocks": 31,
-        "turnovers": 125,
-        "fieldGoalsMade": 313,
-        "fieldGoalsAttempted": 701,
-        "threesMade": 3,
+        "minutes": 2020,
+        "points": 633,
+        "rebounds": 225,
+        "offensiveRebounds": 85,
+        "defensiveRebounds": 140,
+        "assists": 426,
+        "steals": 153,
+        "blocks": 15,
+        "turnovers": 137,
+        "fieldGoalsMade": 256,
+        "fieldGoalsAttempted": 594,
+        "threesMade": 5,
         "threesAttempted": 15,
-        "freeThrowsMade": 159,
-        "freeThrowsAttempted": 214,
-        "per": 10.81543209876543,
-        "boxPlusMinus": 1.0982716049382715,
-        "usageRate": 11.957894736842105,
-        "tsPct": 0.49549776145681373,
-        "efgPct": 0.4486447931526391
+        "freeThrowsMade": 116,
+        "freeThrowsAttempted": 159,
+        "per": 10.324074074074074,
+        "boxPlusMinus": 0.9556790123456782,
+        "usageRate": 10.408836907082522,
+        "tsPct": 0.4766853424905115,
+        "efgPct": 0.4351851851851852
       },
       "historicalTeamIdentity": {
         "teamId": "1610612757",
         "displayName": "Portland Trail Blazers",
         "city": "Portland",
         "abbreviation": "POR",
-        "seasonKey": "1983-84",
+        "seasonKey": "1982-83",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
-        "offenseRating": 60,
-        "defenseRating": 65
+        "overallRating": 51,
+        "offenseRating": 61,
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.042837,
+          "secondaryCreator": 0.090602,
+          "scoringGuard": 0.046057,
+          "movementSpacer": 0.117936,
+          "twoWayWing": 0.173949,
+          "connector": 0.180719,
+          "interiorFinisher": 0.049078,
+          "stretchBig": 0.096834,
+          "rebounder": 0.057882,
+          "defensiveAnchor": 0.144106
+        },
+        "baseScore": 54.33,
+        "nonlinear": {
+          "creation": 70.79475207678324,
+          "penetration": 59.06705007731347,
+          "shootingGravity": 61.3825,
+          "scalableScoring": 59.666666666666664,
+          "switchability": 68.34199110343202,
+          "rimProtection": 63.53371676498234,
+          "possessionControl": 68.845,
+          "synergyBonus": 0.19472681646895532,
+          "weaknessPenalty": -2.1848867262000002,
+          "weaknesses": {
+            "turnoverLiability": 4.302343680000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.010925,
+            "deficientRebounding": 1.11286875
+          }
+        },
+        "production": {
+          "score": 33.75355844477115,
+          "weight": 0.14597952667167544,
+          "confidence": "high",
+          "sampleGames": 81,
+          "sampleMinutes": 2020,
+          "shrinkage": 0.38415664913598796
+        },
+        "calibratedImpact": {
+          "adjustment": -0.06053125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
+        "offenseRating": 61,
+        "defenseRating": 66
       },
       "detailedRatings": {
-        "threePoint": 44,
-        "freeThrow": 79,
-        "insideScoring": 50,
-        "closeShot": 59,
-        "midrange": 56,
-        "passing": 74,
-        "ballHandling": 63,
-        "offensiveRebound": 47,
-        "defensiveRebound": 42,
+        "threePoint": 61,
+        "freeThrow": 77,
+        "insideScoring": 46,
+        "closeShot": 56,
+        "midrange": 55,
+        "passing": 77,
+        "ballHandling": 64,
+        "offensiveRebound": 46,
+        "defensiveRebound": 43,
         "perimeterDefense": 76,
         "interiorDefense": 73,
-        "steal": 76,
-        "block": 64,
-        "defensiveIq": 62,
+        "steal": 78,
+        "block": 62,
+        "defensiveIq": 61,
         "speed": 70,
         "strength": 60,
         "vertical": 60,
-        "offensiveIq": 73
+        "offensiveIq": 72
       },
       "tendencies": {
-        "usageRate": 11.96,
-        "passRate": 17.57,
-        "shotRate": 18.03,
+        "usageRate": 10.41,
+        "passRate": 20.69,
+        "shotRate": 15.28,
         "driveRate": 18,
         "postUpRate": 5,
-        "rimFrequency": 20,
+        "rimFrequency": 18.4,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 5.28,
-        "aboveBreakThreeFrequency": 8.8,
-        "threePointRate": 2.14,
-        "freeThrowRate": 30.53,
-        "turnoverRate": 13.58,
-        "isolationRate": 3.59,
+        "cornerThreeFrequency": 7.32,
+        "aboveBreakThreeFrequency": 12.2,
+        "threePointRate": 2.53,
+        "freeThrowRate": 26.77,
+        "turnoverRate": 17.1,
+        "isolationRate": 3.12,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
         "foulRate": 6.25,
-        "stealAttemptRate": 11.08,
-        "blockAttemptRate": 10.12,
-        "crashOffensiveGlassRate": 15.64
+        "stealAttemptRate": 11.24,
+        "blockAttemptRate": 9.96,
+        "crashOffensiveGlassRate": 15.52
       },
       "anchors": {
         "gamesPlayed": 81,
-        "minutesPerGame": 24.814814814814813,
-        "pointsPerGame": 9.728395061728396,
-        "reboundsPerGame": 2.691358024691358,
-        "offensiveReboundsPerGame": 1.1851851851851851,
-        "defensiveReboundsPerGame": 1.5061728395061729,
-        "assistsPerGame": 4.592592592592593,
-        "stealsPerGame": 1.6666666666666667,
-        "blocksPerGame": 0.38271604938271603,
-        "turnoversPerGame": 1.5432098765432098,
-        "fieldGoalPct": 0.44650499286733236,
-        "threePointPct": 0.2,
-        "freeThrowPct": 0.7429906542056075,
-        "threePointAttemptRate": 0.021398002853067047,
-        "freeThrowAttemptRate": 0.30527817403708984
+        "minutesPerGame": 24.938271604938272,
+        "pointsPerGame": 7.814814814814815,
+        "reboundsPerGame": 2.7777777777777777,
+        "offensiveReboundsPerGame": 1.0493827160493827,
+        "defensiveReboundsPerGame": 1.728395061728395,
+        "assistsPerGame": 5.2592592592592595,
+        "stealsPerGame": 1.8888888888888888,
+        "blocksPerGame": 0.18518518518518517,
+        "turnoversPerGame": 1.691358024691358,
+        "fieldGoalPct": 0.43097643097643096,
+        "threePointPct": 0.3333333333333333,
+        "freeThrowPct": 0.7295597484276729,
+        "threePointAttemptRate": 0.025252525252525252,
+        "freeThrowAttemptRate": 0.2676767676767677
       },
       "provenance": {
         "threePoint": {
@@ -14000,16 +15381,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77420",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -14041,8 +15422,8 @@
         "teamGames": 73,
         "teamMinutes": 1191
       },
-      "selectionScore": 60.329,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 45.544,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 73,
         "minutes": 1191,
@@ -14075,9 +15456,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 65,
+        "overallRating": 40,
         "offenseRating": 50,
-        "defenseRating": 56
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.0286,
+          "secondaryCreator": 0.051043,
+          "scoringGuard": 0.038604,
+          "movementSpacer": 0.053614,
+          "twoWayWing": 0.199298,
+          "connector": 0.08667,
+          "interiorFinisher": 0.104043,
+          "stretchBig": 0.101148,
+          "rebounder": 0.142464,
+          "defensiveAnchor": 0.194516
+        },
+        "baseScore": 45.28,
+        "nonlinear": {
+          "creation": 55.818074590730916,
+          "penetration": 53.78031461039991,
+          "shootingGravity": 51.2,
+          "scalableScoring": 44.333333333333336,
+          "switchability": 62.55042330889883,
+          "rimProtection": 62.65028301097669,
+          "possessionControl": 59.146,
+          "synergyBonus": 0.014433982186436678,
+          "weaknessPenalty": -2.58114557964,
+          "weaknesses": {
+            "turnoverLiability": 1.8116825279999993,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.7604079599999997,
+            "foulRisk": 4.237885908,
+            "deficientRebounding": 0.7816282500000001
+          }
+        },
+        "production": {
+          "score": 24.172994936778764,
+          "weight": 0.08148681445526386,
+          "confidence": "medium",
+          "sampleGames": 73,
+          "sampleMinutes": 1191,
+          "shrinkage": 0.28591864721145216
+        },
+        "calibratedImpact": {
+          "adjustment": 0.056875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 40,
+        "offenseRating": 50,
+        "defenseRating": 57
       },
       "detailedRatings": {
         "threePoint": 21,
@@ -14538,16 +15972,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77527",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -14579,8 +16013,8 @@
         "teamGames": 42,
         "teamMinutes": 375
       },
-      "selectionScore": 52.858,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 41.68,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 56,
         "minutes": 505,
@@ -14613,7 +16047,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 56,
+        "overallRating": 37,
+        "offenseRating": 48,
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.022456,
+          "secondaryCreator": 0.044137,
+          "scoringGuard": 0.038723,
+          "movementSpacer": 0.072269,
+          "twoWayWing": 0.223913,
+          "connector": 0.095857,
+          "interiorFinisher": 0.098021,
+          "stretchBig": 0.114846,
+          "rebounder": 0.124432,
+          "defensiveAnchor": 0.165346
+        },
+        "baseScore": 42.26,
+        "nonlinear": {
+          "creation": 51.52626931410397,
+          "penetration": 51.12541222719445,
+          "shootingGravity": 54.1475,
+          "scalableScoring": 45.666666666666664,
+          "switchability": 59.49012382273132,
+          "rimProtection": 59.89095307925829,
+          "possessionControl": 52.343,
+          "synergyBonus": 0,
+          "weaknessPenalty": -4.11275382316,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.0526329,
+            "spacingLimitation": 0.42582298899999993,
+            "foulRisk": 4.48990326,
+            "deficientRebounding": 1.127975625
+          }
+        },
+        "production": {
+          "score": 15.789466163076815,
+          "weight": 0.02512406483790524,
+          "confidence": "low",
+          "sampleGames": 56,
+          "sampleMinutes": 505,
+          "shrinkage": 0.14692435577722363
+        },
+        "calibratedImpact": {
+          "adjustment": -0.031375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 37,
         "offenseRating": 48,
         "defenseRating": 53
       },
@@ -15076,16 +16563,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77691",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -15117,8 +16604,8 @@
         "teamGames": 75,
         "teamMinutes": 2599
       },
-      "selectionScore": 77.026,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 65.665,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 75,
         "minutes": 2599,
@@ -15151,7 +16638,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 63,
+        "offenseRating": 66,
+        "defenseRating": 67
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.031464,
+          "secondaryCreator": 0.054186,
+          "scoringGuard": 0.056683,
+          "movementSpacer": 0.087917,
+          "twoWayWing": 0.175521,
+          "connector": 0.110704,
+          "interiorFinisher": 0.093983,
+          "stretchBig": 0.106461,
+          "rebounder": 0.120418,
+          "defensiveAnchor": 0.162663
+        },
+        "baseScore": 58.69,
+        "nonlinear": {
+          "creation": 65.9601841271029,
+          "penetration": 66.75076331614123,
+          "shootingGravity": 64.7225,
+          "scalableScoring": 68.66666666666667,
+          "switchability": 68.9657464934908,
+          "rimProtection": 66.28533438674835,
+          "possessionControl": 68.37,
+          "synergyBonus": 0.3056477786052717,
+          "weaknessPenalty": -0.06960699300000013,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.20472645000000037,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 58.87027994701705,
+          "weight": 0.15713588680165894,
+          "confidence": "high",
+          "sampleGames": 75,
+          "sampleMinutes": 2599,
+          "shrinkage": 0.41351549158331297
+        },
+        "calibratedImpact": {
+          "adjustment": 0.10603125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 63,
         "offenseRating": 66,
         "defenseRating": 67
       },
@@ -15614,20 +17154,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77731",
       "franchiseId": "blazers",
       "eraId": "1980s",
-      "seasonKey": "1984-85",
+      "seasonKey": "1983-84",
       "firstName": "Audie",
       "lastName": "Norris",
       "displayName": "Audie Norris",
@@ -15652,119 +17192,169 @@
       "weightLbs": 230,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 78,
-        "teamMinutes": 1112
+        "teamGames": 79,
+        "teamMinutes": 1157
       },
-      "selectionScore": 58.414,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 44.811,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 78,
-        "minutes": 1112,
-        "points": 401,
-        "rebounds": 250,
-        "offensiveRebounds": 89,
-        "defensiveRebounds": 161,
-        "assists": 47,
-        "steals": 42,
-        "blocks": 33,
-        "turnovers": 100,
-        "fieldGoalsMade": 133,
-        "fieldGoalsAttempted": 245,
+        "gamesPlayed": 79,
+        "minutes": 1157,
+        "points": 352,
+        "rebounds": 257,
+        "offensiveRebounds": 82,
+        "defensiveRebounds": 175,
+        "assists": 76,
+        "steals": 30,
+        "blocks": 34,
+        "turnovers": 114,
+        "fieldGoalsMade": 124,
+        "fieldGoalsAttempted": 246,
         "threesMade": 0,
-        "threesAttempted": 3,
-        "freeThrowsMade": 135,
-        "freeThrowsAttempted": 203,
-        "per": 4.94551282051282,
-        "boxPlusMinus": -1.9484615384615385,
-        "usageRate": 5.861268556005398,
-        "tsPct": 0.5997248145489351,
-        "efgPct": 0.5428571428571428
+        "threesAttempted": 0,
+        "freeThrowsMade": 104,
+        "freeThrowsAttempted": 149,
+        "per": 4.629113924050634,
+        "boxPlusMinus": -2.336835443037974,
+        "usageRate": 5.6703530979347105,
+        "tsPct": 0.5648992168442676,
+        "efgPct": 0.5040650406504065
       },
       "historicalTeamIdentity": {
         "teamId": "1610612757",
         "displayName": "Portland Trail Blazers",
         "city": "Portland",
         "abbreviation": "POR",
-        "seasonKey": "1984-85",
+        "seasonKey": "1983-84",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 63,
-        "offenseRating": 47,
+        "overallRating": 39,
+        "offenseRating": 50,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.021048,
+          "secondaryCreator": 0.043266,
+          "scoringGuard": 0.039097,
+          "movementSpacer": 0.070125,
+          "twoWayWing": 0.177098,
+          "connector": 0.081357,
+          "interiorFinisher": 0.107646,
+          "stretchBig": 0.126912,
+          "rebounder": 0.137727,
+          "defensiveAnchor": 0.195724
+        },
+        "baseScore": 45.08,
+        "nonlinear": {
+          "creation": 53.17209986742011,
+          "penetration": 52.42210671052955,
+          "shootingGravity": 57.25,
+          "scalableScoring": 51,
+          "switchability": 63.46295398410754,
+          "rimProtection": 65.15923638528272,
+          "possessionControl": 50.2655,
+          "synergyBonus": 0.034090292720720734,
+          "weaknessPenalty": -4.49395523175,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.082755825,
+            "foulRisk": 6,
+            "deficientRebounding": 1.1347595625
+          }
+        },
+        "production": {
+          "score": 23.388653040524446,
+          "weight": 0.08238853765066433,
+          "confidence": "medium",
+          "sampleGames": 79,
+          "sampleMinutes": 1157,
+          "shrinkage": 0.28908258824794497
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0645,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 39,
+        "offenseRating": 50,
         "defenseRating": 56
       },
       "detailedRatings": {
-        "threePoint": 26,
-        "freeThrow": 69,
-        "insideScoring": 50,
-        "closeShot": 53,
-        "midrange": 64,
-        "passing": 51,
-        "ballHandling": 48,
+        "threePoint": 45,
+        "freeThrow": 73,
+        "insideScoring": 49,
+        "closeShot": 52,
+        "midrange": 61,
+        "passing": 52,
+        "ballHandling": 49,
         "offensiveRebound": 46,
         "defensiveRebound": 47,
-        "perimeterDefense": 61,
-        "interiorDefense": 66,
-        "steal": 63,
+        "perimeterDefense": 60,
+        "interiorDefense": 65,
+        "steal": 62,
         "block": 62,
-        "defensiveIq": 56,
+        "defensiveIq": 55,
         "speed": 60,
         "strength": 71,
         "vertical": 63,
-        "offensiveIq": 60
+        "offensiveIq": 59
       },
       "tendencies": {
-        "usageRate": 5.86,
-        "passRate": 5.78,
-        "shotRate": 6.54,
+        "usageRate": 5.67,
+        "passRate": 9.18,
+        "shotRate": 6.49,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 20,
+        "rimFrequency": 19.6,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 3.12,
-        "aboveBreakThreeFrequency": 5.2,
-        "threePointRate": 1.22,
-        "freeThrowRate": 82.86,
-        "turnoverRate": 23.02,
-        "isolationRate": 1.76,
+        "cornerThreeFrequency": 5.4,
+        "aboveBreakThreeFrequency": 9,
+        "threePointRate": 0,
+        "freeThrowRate": 60.57,
+        "turnoverRate": 26.79,
+        "isolationRate": 1.7,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 25,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 11.54,
-        "stealAttemptRate": 10.04,
+        "foulRate": 11.58,
+        "stealAttemptRate": 9.96,
         "blockAttemptRate": 9.96,
         "crashOffensiveGlassRate": 15.52
       },
       "anchors": {
-        "gamesPlayed": 78,
-        "minutesPerGame": 14.256410256410257,
-        "pointsPerGame": 5.141025641025641,
-        "reboundsPerGame": 3.2051282051282053,
-        "offensiveReboundsPerGame": 1.141025641025641,
-        "defensiveReboundsPerGame": 2.0641025641025643,
-        "assistsPerGame": 0.6025641025641025,
-        "stealsPerGame": 0.5384615384615384,
-        "blocksPerGame": 0.4230769230769231,
-        "turnoversPerGame": 1.2820512820512822,
-        "fieldGoalPct": 0.5428571428571428,
-        "threePointPct": 0,
-        "freeThrowPct": 0.6650246305418719,
-        "threePointAttemptRate": 0.012244897959183673,
-        "freeThrowAttemptRate": 0.8285714285714286
+        "gamesPlayed": 79,
+        "minutesPerGame": 14.645569620253164,
+        "pointsPerGame": 4.455696202531645,
+        "reboundsPerGame": 3.2531645569620253,
+        "offensiveReboundsPerGame": 1.0379746835443038,
+        "defensiveReboundsPerGame": 2.2151898734177213,
+        "assistsPerGame": 0.9620253164556962,
+        "stealsPerGame": 0.379746835443038,
+        "blocksPerGame": 0.43037974683544306,
+        "turnoversPerGame": 1.4430379746835442,
+        "fieldGoalPct": 0.5040650406504065,
+        "threePointPct": null,
+        "freeThrowPct": 0.697986577181208,
+        "threePointAttemptRate": 0,
+        "freeThrowAttemptRate": 0.6056910569105691
       },
       "provenance": {
         "threePoint": {
-          "kind": "derived",
-          "confidence": "medium",
+          "kind": "estimated",
+          "confidence": "low",
           "methodVersion": "derive-v3",
           "sourceVersion": "source-v1",
           "sourceFields": [
-            "tpm",
-            "tpa",
-            "tsPct",
             "ftm",
             "fta"
           ]
@@ -16152,16 +17742,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77786",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -16193,8 +17783,8 @@
         "teamGames": 79,
         "teamMinutes": 1843
       },
-      "selectionScore": 66.798,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 52.569,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 1843,
@@ -16227,9 +17817,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 48,
         "offenseRating": 54,
-        "defenseRating": 61
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.028847,
+          "secondaryCreator": 0.048036,
+          "scoringGuard": 0.039084,
+          "movementSpacer": 0.042176,
+          "twoWayWing": 0.189083,
+          "connector": 0.075001,
+          "interiorFinisher": 0.113868,
+          "stretchBig": 0.089009,
+          "rebounder": 0.15771,
+          "defensiveAnchor": 0.217186
+        },
+        "baseScore": 50.58,
+        "nonlinear": {
+          "creation": 60.4284152076502,
+          "penetration": 59.49012382273132,
+          "shootingGravity": 53.6575,
+          "scalableScoring": 48.666666666666664,
+          "switchability": 68.87311273996666,
+          "rimProtection": 69.39480230490865,
+          "possessionControl": 62.283,
+          "synergyBonus": 0.17099852318567307,
+          "weaknessPenalty": -2.280091432395,
+          "weaknesses": {
+            "turnoverLiability": 2.3307543839999996,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.48460866975000016,
+            "foulRisk": 3.890788217999999,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 39.011624322523716,
+          "weight": 0.13907615813301089,
+          "confidence": "high",
+          "sampleGames": 79,
+          "sampleMinutes": 1843,
+          "shrinkage": 0.3659898898237129
+        },
+        "calibratedImpact": {
+          "adjustment": 0.05984375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 48,
+        "offenseRating": 54,
+        "defenseRating": 62
       },
       "detailedRatings": {
         "threePoint": 20,
@@ -16690,16 +18333,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77819",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -16731,8 +18374,8 @@
         "teamGames": 81,
         "teamMinutes": 2686
       },
-      "selectionScore": 77.494,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 66.249,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 81,
         "minutes": 2686,
@@ -16765,9 +18408,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 63,
         "offenseRating": 68,
-        "defenseRating": 64
+        "defenseRating": 65
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.043297,
+          "secondaryCreator": 0.068847,
+          "scoringGuard": 0.074347,
+          "movementSpacer": 0.113256,
+          "twoWayWing": 0.197389,
+          "connector": 0.133137,
+          "interiorFinisher": 0.102605,
+          "stretchBig": 0.095556,
+          "rebounder": 0.051501,
+          "defensiveAnchor": 0.120065
+        },
+        "baseScore": 59.07,
+        "nonlinear": {
+          "creation": 69.85411795747137,
+          "penetration": 70.1899602257794,
+          "shootingGravity": 67.615,
+          "scalableScoring": 69.33333333333333,
+          "switchability": 71.54184389497176,
+          "rimProtection": 64.1255001209605,
+          "possessionControl": 72.74799999999999,
+          "synergyBonus": 0.5574111866783307,
+          "weaknessPenalty": -0.46204246875000005,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.3589484375
+          }
+        },
+        "production": {
+          "score": 57.85753107075463,
+          "weight": 0.16322625990610182,
+          "confidence": "high",
+          "sampleGames": 81,
+          "sampleMinutes": 2686,
+          "shrinkage": 0.42954278922658373
+        },
+        "calibratedImpact": {
+          "adjustment": -0.065125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 63,
+        "offenseRating": 68,
+        "defenseRating": 65
       },
       "detailedRatings": {
         "threePoint": 62,
@@ -17228,16 +18924,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77845",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -17269,8 +18965,8 @@
         "teamGames": 77,
         "teamMinutes": 967
       },
-      "selectionScore": 61.107,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 52.728,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 77,
         "minutes": 967,
@@ -17303,7 +18999,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 63,
+        "overallRating": 49,
+        "offenseRating": 60,
+        "defenseRating": 52
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.021871,
+          "secondaryCreator": 0.051211,
+          "scoringGuard": 0.066943,
+          "movementSpacer": 0.223733,
+          "twoWayWing": 0.138025,
+          "connector": 0.122025,
+          "interiorFinisher": 0.061226,
+          "stretchBig": 0.168816,
+          "rebounder": 0.062552,
+          "defensiveAnchor": 0.083598
+        },
+        "baseScore": 51.72,
+        "nonlinear": {
+          "creation": 55.25938089315483,
+          "penetration": 54.714776868852866,
+          "shootingGravity": 73.8325,
+          "scalableScoring": 63,
+          "switchability": 59.597303302756124,
+          "rimProtection": 56.94197053896305,
+          "possessionControl": 57.601,
+          "synergyBonus": 0.6111626371710525,
+          "weaknessPenalty": -2.7529447947,
+          "weaknesses": {
+            "turnoverLiability": 3.3942436,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.374504375,
+            "spacingLimitation": 0,
+            "foulRisk": 3.0138604800000004,
+            "deficientRebounding": 1.3142880000000001
+          }
+        },
+        "production": {
+          "score": 27.721700286328275,
+          "weight": 0.07352026233461174,
+          "confidence": "medium",
+          "sampleGames": 77,
+          "sampleMinutes": 967,
+          "shrinkage": 0.25796583275302365
+        },
+        "calibratedImpact": {
+          "adjustment": -0.01659375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 49,
         "offenseRating": 60,
         "defenseRating": 52
       },
@@ -17766,16 +19515,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77911",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -17807,8 +19556,8 @@
         "teamGames": 78,
         "teamMinutes": 2418
       },
-      "selectionScore": 75.709,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 58.692,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 78,
         "minutes": 2418,
@@ -17841,8 +19590,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
-        "offenseRating": 63,
+        "overallRating": 54,
+        "offenseRating": 62,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.088771,
+          "secondaryCreator": 0.130085,
+          "scoringGuard": 0.061399,
+          "movementSpacer": 0.071212,
+          "twoWayWing": 0.161218,
+          "connector": 0.161692,
+          "interiorFinisher": 0.083356,
+          "stretchBig": 0.064367,
+          "rebounder": 0.057741,
+          "defensiveAnchor": 0.120159
+        },
+        "baseScore": 54.08,
+        "nonlinear": {
+          "creation": 78.741987930991,
+          "penetration": 69.93190657180868,
+          "shootingGravity": 55.1175,
+          "scalableScoring": 53.666666666666664,
+          "switchability": 67.33705552950917,
+          "rimProtection": 61.1891770073552,
+          "possessionControl": 75.6425,
+          "synergyBonus": 0.3957637412076443,
+          "weaknessPenalty": -1.788125767475,
+          "weaknesses": {
+            "turnoverLiability": 3.3733446,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.3690335037500001,
+            "foulRisk": 0.2783808299999997,
+            "deficientRebounding": 1.2384344999999999
+          }
+        },
+        "production": {
+          "score": 48.67836666519675,
+          "weight": 0.15502011576297142,
+          "confidence": "high",
+          "sampleGames": 78,
+          "sampleMinutes": 2418,
+          "shrinkage": 0.4079476730604511
+        },
+        "calibratedImpact": {
+          "adjustment": -0.004125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 54,
+        "offenseRating": 62,
         "defenseRating": 62
       },
       "detailedRatings": {
@@ -18304,16 +20106,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78323",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -18345,8 +20147,8 @@
         "teamGames": 68,
         "teamMinutes": 565
       },
-      "selectionScore": 57.267,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 44.306,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 68,
         "minutes": 565,
@@ -18379,9 +20181,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 61,
+        "overallRating": 39,
         "offenseRating": 51,
-        "defenseRating": 52
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.032153,
+          "secondaryCreator": 0.057426,
+          "scoringGuard": 0.07207,
+          "movementSpacer": 0.096756,
+          "twoWayWing": 0.194338,
+          "connector": 0.095617,
+          "interiorFinisher": 0.095716,
+          "stretchBig": 0.101647,
+          "rebounder": 0.110257,
+          "defensiveAnchor": 0.14402
+        },
+        "baseScore": 43.57,
+        "nonlinear": {
+          "creation": 53.53138171098536,
+          "penetration": 52.33584402017134,
+          "shootingGravity": 53.5575,
+          "scalableScoring": 45.333333333333336,
+          "switchability": 59.30873308625656,
+          "rimProtection": 56.44461312009744,
+          "possessionControl": 60.9215,
+          "synergyBonus": 0,
+          "weaknessPenalty": -1.9565941506050004,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.32424735000000005,
+            "spacingLimitation": 0.5160625682500003,
+            "foulRisk": 3.6058737600000006,
+            "deficientRebounding": 1.308505
+          }
+        },
+        "production": {
+          "score": 18.278627297794117,
+          "weight": 0.029458434221146093,
+          "confidence": "low",
+          "sampleGames": 68,
+          "sampleMinutes": 565,
+          "shrinkage": 0.1722715451529011
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0514375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 39,
+        "offenseRating": 51,
+        "defenseRating": 53
       },
       "detailedRatings": {
         "threePoint": 30,
@@ -18842,16 +20697,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78331",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -18883,8 +20738,8 @@
         "teamGames": 79,
         "teamMinutes": 3129
       },
-      "selectionScore": 78.789,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 72.798,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 3129,
@@ -18917,7 +20772,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 72,
+        "offenseRating": 66,
+        "defenseRating": 75
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.038374,
+          "secondaryCreator": 0.049738,
+          "scoringGuard": 0.032538,
+          "movementSpacer": 0.044954,
+          "twoWayWing": 0.16151,
+          "connector": 0.096921,
+          "interiorFinisher": 0.090011,
+          "stretchBig": 0.086729,
+          "rebounder": 0.17465,
+          "defensiveAnchor": 0.224575
+        },
+        "baseScore": 63.94,
+        "nonlinear": {
+          "creation": 77.39194097352251,
+          "penetration": 73.29051678736242,
+          "shootingGravity": 55.25,
+          "scalableScoring": 67.33333333333333,
+          "switchability": 77.98290223531372,
+          "rimProtection": 75.65020675975933,
+          "possessionControl": 75.52250000000001,
+          "synergyBonus": 0.5510946828277301,
+          "weaknessPenalty": -0.8432084252000004,
+          "weaknesses": {
+            "turnoverLiability": 1.6328660000000004,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.30817875,
+            "foulRisk": 0.5389800300000003,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 68.43922461643056,
+          "weight": 0.17052266402348368,
+          "confidence": "high",
+          "sampleGames": 79,
+          "sampleMinutes": 3129,
+          "shrinkage": 0.4487438526933781
+        },
+        "calibratedImpact": {
+          "adjustment": -0.01665625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 72,
         "offenseRating": 66,
         "defenseRating": 75
       },
@@ -19377,16 +21285,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78364",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -19418,8 +21326,8 @@
         "teamGames": 55,
         "teamMinutes": 516
       },
-      "selectionScore": 56.357,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 48.66,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 55,
         "minutes": 516,
@@ -19452,7 +21360,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 58,
+        "overallRating": 45,
+        "offenseRating": 55,
+        "defenseRating": 54
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.020242,
+          "secondaryCreator": 0.041985,
+          "scoringGuard": 0.042242,
+          "movementSpacer": 0.141705,
+          "twoWayWing": 0.196253,
+          "connector": 0.124432,
+          "interiorFinisher": 0.07429,
+          "stretchBig": 0.148622,
+          "rebounder": 0.085271,
+          "defensiveAnchor": 0.124958
+        },
+        "baseScore": 47.93,
+        "nonlinear": {
+          "creation": 52.52887300692024,
+          "penetration": 52.12923966841575,
+          "shootingGravity": 62.92,
+          "scalableScoring": 56,
+          "switchability": 59.57627390676087,
+          "rimProtection": 59.41459935315323,
+          "possessionControl": 58.1035,
+          "synergyBonus": 0.03514484736842112,
+          "weaknessPenalty": -1.74080843217,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 3.8952772379999994,
+            "deficientRebounding": 1.2247475625
+          }
+        },
+        "production": {
+          "score": 15.373440572758115,
+          "weight": 0.02533928571428571,
+          "confidence": "low",
+          "sampleGames": 55,
+          "sampleMinutes": 516,
+          "shrinkage": 0.1481829573934837
+        },
+        "calibratedImpact": {
+          "adjustment": 0.018625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 45,
         "offenseRating": 55,
         "defenseRating": 54
       },
@@ -19915,16 +21876,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78395",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -19956,8 +21917,8 @@
         "teamGames": 75,
         "teamMinutes": 2282
       },
-      "selectionScore": 72.512,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.118,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 75,
         "minutes": 2282,
@@ -19990,8 +21951,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 78,
-        "offenseRating": 59,
+        "overallRating": 51,
+        "offenseRating": 58,
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.074801,
+          "secondaryCreator": 0.127404,
+          "scoringGuard": 0.051149,
+          "movementSpacer": 0.056687,
+          "twoWayWing": 0.185142,
+          "connector": 0.160637,
+          "interiorFinisher": 0.068451,
+          "stretchBig": 0.055447,
+          "rebounder": 0.064419,
+          "defensiveAnchor": 0.155863
+        },
+        "baseScore": 51.89,
+        "nonlinear": {
+          "creation": 77.09405496510013,
+          "penetration": 65.30960774872734,
+          "shootingGravity": 53.3225,
+          "scalableScoring": 48.666666666666664,
+          "switchability": 68.22403042611755,
+          "rimProtection": 62.268119139225995,
+          "possessionControl": 72.3355,
+          "synergyBonus": 0.32999023771116387,
+          "weaknessPenalty": -2.8847709439900004,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.5862563335000003,
+            "foulRisk": 0.7903778400000003,
+            "deficientRebounding": 1.10798625
+          }
+        },
+        "production": {
+          "score": 46.011449416785204,
+          "weight": 0.14953440783574368,
+          "confidence": "high",
+          "sampleGames": 75,
+          "sampleMinutes": 2282,
+          "shrinkage": 0.3935115995677465
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00728125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
+        "offenseRating": 58,
         "defenseRating": 66
       },
       "detailedRatings": {
@@ -20453,16 +22467,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78404",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -20494,8 +22508,8 @@
         "teamGames": 79,
         "teamMinutes": 3029
       },
-      "selectionScore": 81.024,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 74.584,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 3029,
@@ -20528,9 +22542,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 84,
+        "overallRating": 73,
         "offenseRating": 77,
-        "defenseRating": 63
+        "defenseRating": 64
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.034463,
+          "secondaryCreator": 0.057944,
+          "scoringGuard": 0.082114,
+          "movementSpacer": 0.151586,
+          "twoWayWing": 0.166564,
+          "connector": 0.124701,
+          "interiorFinisher": 0.11767,
+          "stretchBig": 0.128618,
+          "rebounder": 0.04483,
+          "defensiveAnchor": 0.09151
+        },
+        "baseScore": 65.64,
+        "nonlinear": {
+          "creation": 71.17697041665042,
+          "penetration": 75.01333096366506,
+          "shootingGravity": 77.045,
+          "scalableScoring": 84.66666666666667,
+          "switchability": 70.2524895374543,
+          "rimProtection": 65.5663687319659,
+          "possessionControl": 74.507,
+          "synergyBonus": 0.9786554517473721,
+          "weaknessPenalty": -0.35636105500000004,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.04812075
+          }
+        },
+        "production": {
+          "score": 67.43491136248488,
+          "weight": 0.16871771274197467,
+          "confidence": "high",
+          "sampleGames": 79,
+          "sampleMinutes": 3029,
+          "shrinkage": 0.44399398089993336
+        },
+        "calibratedImpact": {
+          "adjustment": -0.01459375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 73,
+        "offenseRating": 77,
+        "defenseRating": 64
       },
       "detailedRatings": {
         "threePoint": 92,
@@ -20991,16 +23058,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78414",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -21032,8 +23099,8 @@
         "teamGames": 71,
         "teamMinutes": 1207
       },
-      "selectionScore": 60.746,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 48.214,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 71,
         "minutes": 1207,
@@ -21066,7 +23133,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
+        "overallRating": 43,
+        "offenseRating": 54,
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.020665,
+          "secondaryCreator": 0.042444,
+          "scoringGuard": 0.041238,
+          "movementSpacer": 0.086674,
+          "twoWayWing": 0.202207,
+          "connector": 0.097206,
+          "interiorFinisher": 0.084353,
+          "stretchBig": 0.133049,
+          "rebounder": 0.114353,
+          "defensiveAnchor": 0.177811
+        },
+        "baseScore": 47.72,
+        "nonlinear": {
+          "creation": 53.3979771709165,
+          "penetration": 52.35068685818216,
+          "shootingGravity": 59.25,
+          "scalableScoring": 54,
+          "switchability": 63.5931218911012,
+          "rimProtection": 63.6343175003091,
+          "possessionControl": 57.3465,
+          "synergyBonus": 0.04238689450446052,
+          "weaknessPenalty": -2.64080276028,
+          "weaknesses": {
+            "turnoverLiability": 1.8568419119999995,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 5.026854780000001,
+            "deficientRebounding": 0.88337025
+          }
+        },
+        "production": {
+          "score": 23.299190545514037,
+          "weight": 0.0812829101728252,
+          "confidence": "medium",
+          "sampleGames": 71,
+          "sampleMinutes": 1207,
+          "shrinkage": 0.28520319358886037
+        },
+        "calibratedImpact": {
+          "adjustment": 0.09009375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 43,
         "offenseRating": 54,
         "defenseRating": 57
       },
@@ -21526,16 +23646,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78467",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -21567,8 +23687,8 @@
         "teamGames": 73,
         "teamMinutes": 2120
       },
-      "selectionScore": 71.024,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.824,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 73,
         "minutes": 2120,
@@ -21601,9 +23721,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 57,
         "offenseRating": 55,
-        "defenseRating": 72
+        "defenseRating": 73
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026231,
+          "secondaryCreator": 0.041311,
+          "scoringGuard": 0.027611,
+          "movementSpacer": 0.035146,
+          "twoWayWing": 0.184175,
+          "connector": 0.082034,
+          "interiorFinisher": 0.074853,
+          "stretchBig": 0.069895,
+          "rebounder": 0.16959,
+          "defensiveAnchor": 0.289154
+        },
+        "baseScore": 55.58,
+        "nonlinear": {
+          "creation": 64.7649101285584,
+          "penetration": 61.13398837379675,
+          "shootingGravity": 50.795,
+          "scalableScoring": 52.333333333333336,
+          "switchability": 72.13554712811332,
+          "rimProtection": 71.4352792264838,
+          "possessionControl": 64.5895,
+          "synergyBonus": 0.2551632565661165,
+          "weaknessPenalty": -2.5457138132900003,
+          "weaknesses": {
+            "turnoverLiability": 3.9659854639999996,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.7890577364999999,
+            "foulRisk": 2.732350368,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 51.06737638507064,
+          "weight": 0.1437657067422872,
+          "confidence": "high",
+          "sampleGames": 73,
+          "sampleMinutes": 2120,
+          "shrinkage": 0.3783308072165452
+        },
+        "calibratedImpact": {
+          "adjustment": 0.03215625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 57,
+        "offenseRating": 55,
+        "defenseRating": 73
       },
       "detailedRatings": {
         "threePoint": 20,
@@ -22064,16 +24237,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78633",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -22105,8 +24278,8 @@
         "teamGames": 48,
         "teamMinutes": 952
       },
-      "selectionScore": 62.054,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 52.958,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 48,
         "minutes": 952,
@@ -22139,8 +24312,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 65,
-        "offenseRating": 58,
+        "overallRating": 50,
+        "offenseRating": 57,
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026338,
+          "secondaryCreator": 0.061134,
+          "scoringGuard": 0.057155,
+          "movementSpacer": 0.192707,
+          "twoWayWing": 0.15576,
+          "connector": 0.141891,
+          "interiorFinisher": 0.057342,
+          "stretchBig": 0.138443,
+          "rebounder": 0.061719,
+          "defensiveAnchor": 0.107511
+        },
+        "baseScore": 51.5,
+        "nonlinear": {
+          "creation": 58.55025267756584,
+          "penetration": 54.844741197660404,
+          "shootingGravity": 68.25,
+          "scalableScoring": 58,
+          "switchability": 62.282873235649625,
+          "rimProtection": 58.74417544837357,
+          "possessionControl": 61.344,
+          "synergyBonus": 0.2781247151558929,
+          "weaknessPenalty": -0.99202922323,
+          "weaknesses": {
+            "turnoverLiability": 1.5661470719999997,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.3515859375
+          }
+        },
+        "production": {
+          "score": 26.999042996836337,
+          "weight": 0.06035592466261307,
+          "confidence": "medium",
+          "sampleGames": 48,
+          "sampleMinutes": 952,
+          "shrinkage": 0.2117751742547827
+        },
+        "calibratedImpact": {
+          "adjustment": 0.01440625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 50,
+        "offenseRating": 57,
         "defenseRating": 59
       },
       "detailedRatings": {
@@ -22602,16 +24828,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-95",
       "franchiseId": "blazers",
       "eraId": "1980s",
@@ -22643,8 +24869,8 @@
         "teamGames": 56,
         "teamMinutes": 803
       },
-      "selectionScore": 58.139,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 46.439,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 56,
         "minutes": 803,
@@ -22677,9 +24903,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
+        "overallRating": 42,
         "offenseRating": 52,
-        "defenseRating": 54
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.022789,
+          "secondaryCreator": 0.042742,
+          "scoringGuard": 0.039675,
+          "movementSpacer": 0.089732,
+          "twoWayWing": 0.186933,
+          "connector": 0.096429,
+          "interiorFinisher": 0.093661,
+          "stretchBig": 0.140526,
+          "rebounder": 0.122605,
+          "defensiveAnchor": 0.164908
+        },
+        "baseScore": 46.28,
+        "nonlinear": {
+          "creation": 52.82904451138393,
+          "penetration": 52.42210671052955,
+          "shootingGravity": 55,
+          "scalableScoring": 52.666666666666664,
+          "switchability": 61.19279679415255,
+          "rimProtection": 61.140730011038535,
+          "possessionControl": 57.666,
+          "synergyBonus": 0,
+          "weaknessPenalty": -2.41451434316,
+          "weaknesses": {
+            "turnoverLiability": 0.6900650240000006,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.3315618,
+            "foulRisk": 5.122042199999999,
+            "deficientRebounding": 0.9578437500000001
+          }
+        },
+        "production": {
+          "score": 19.544272153152924,
+          "weight": 0.05796732522796353,
+          "confidence": "medium",
+          "sampleGames": 56,
+          "sampleMinutes": 803,
+          "shrinkage": 0.20339412360688958
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0659375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 42,
+        "offenseRating": 52,
+        "defenseRating": 55
       },
       "detailedRatings": {
         "threePoint": 50,
@@ -23137,9 +25416,9 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"

@@ -15,6 +15,12 @@ export { fnv1a32, hex32 } from './sim/rng.js';
 export { simulateGame } from './sim/game.js';
 export { checkGameResult, gameResultDigest } from './sim/invariants.js';
 export { evaluateLineupStrength } from './challenge/lineup-eval.js';
+export {
+  evaluateContextualPlayerValue,
+  evaluateLineupFit,
+  evaluateMatchup,
+  evaluateLineupMatchup,
+} from './challenge/contextual-value.js';
 export { explainSeason } from './challenge/explain.js';
 export { leagueMvp } from './challenge/mvp.js';
 export { perGamePlayer } from './challenge/aggregates.js';

@@ -8,6 +8,7 @@
     HoopRushManifest,
     PlayersIndex,
     PlayersIndexEntry,
+    PeakPlayerSeason,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
@@ -28,11 +29,13 @@
     type ClassicGuardTarget,
   } from '$lib/classic-nav-guard';
   import { startClassicRun } from '$lib/classic-run';
+  import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
+  import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
@@ -59,6 +62,7 @@
   let guardTarget = $state<ClassicGuardTarget | null>(null);
   let starting = $state(false);
   let launchError: string | null = $state(null);
+  let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
 
   /** False once this component starts being destroyed (see below). */
   let mounted = true;
@@ -182,6 +186,34 @@
       rows[pick.slotIndex] = rowForPick(pick);
     }
     return rows;
+  });
+
+  /** Resolve full profiles for Fit/Matchup explanations while drafting. */
+  $effect(() => {
+    const m = manifest;
+    const refs = slots
+      .filter((player): player is IndexRow => player !== null)
+      .map((player) => ({
+        playerId: player.playerId,
+        franchiseId: player.franchiseId,
+        eraId: player.eraId,
+      }));
+    if (!m || refs.length === 0) {
+      resolvedDraftPlayers = [];
+      return;
+    }
+    let cancelled = false;
+    resolvePlayerRefs(refs, m).then(
+      (players) => {
+        if (!cancelled) resolvedDraftPlayers = players;
+      },
+      () => {
+        if (!cancelled) resolvedDraftPlayers = [];
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   });
 
   const pickedCount = $derived(slots.filter((player) => player !== null).length);
@@ -686,6 +718,7 @@
           onmove={openPicker}
           onremove={() => undefined}
         />
+        <DraftValuePanel players={resolvedDraftPlayers} />
 
         <LineupSummaryNav {slots} {pickedCount} />
       </div>

@@ -96,7 +96,7 @@ export function resolveHistoricalIdentitySpans(
       abbreviation: segment.abbreviation ?? null,
       fromSeasonKey,
       throughSeasonKey,
-      logoCandidates: segment.logoCandidates.map((candidate) => candidate.url),
+      logoCandidates: (segment.logoCandidates ?? []).map((candidate) => candidate.url),
     });
   }
   spans.sort((a, b) => a.fromSeasonKey.localeCompare(b.fromSeasonKey));

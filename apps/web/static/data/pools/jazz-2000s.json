@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 3,
-  "dataVersion": "m6",
+  "schemaVersion": 4,
+  "dataVersion": "m7-ratings-v3",
   "franchiseId": "jazz",
   "eraId": "2000s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-101114",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -67,8 +67,8 @@
         "teamGames": 82,
         "teamMinutes": 3058
       },
-      "selectionScore": 80.791,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 74.541,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 3058,
@@ -101,8 +101,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 83,
-        "offenseRating": 78,
+        "overallRating": 73,
+        "offenseRating": 77,
+        "defenseRating": 64
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.071741,
+          "secondaryCreator": 0.128267,
+          "scoringGuard": 0.059388,
+          "movementSpacer": 0.157719,
+          "twoWayWing": 0.116948,
+          "connector": 0.211731,
+          "interiorFinisher": 0.053266,
+          "stretchBig": 0.103184,
+          "rebounder": 0.030426,
+          "defensiveAnchor": 0.06733
+        },
+        "baseScore": 65.41,
+        "nonlinear": {
+          "creation": 88.92127870544829,
+          "penetration": 78.24283296101662,
+          "shootingGravity": 74.53,
+          "scalableScoring": 75,
+          "switchability": 69.64569268064113,
+          "rimProtection": 62.926363817840226,
+          "possessionControl": 82.2595,
+          "synergyBonus": 0.915764901805881,
+          "weaknessPenalty": -2.137471642680001,
+          "weaknesses": {
+            "turnoverLiability": 5.181920928000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.06772712399999989,
+            "deficientRebounding": 1.0370332500000001
+          }
+        },
+        "production": {
+          "score": 65.6849,
+          "weight": 0.17136764019439388,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 3058.6,
+          "shrinkage": 0.4509674741957733
+        },
+        "calibratedImpact": {
+          "adjustment": 0.029875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 73,
+        "offenseRating": 77,
         "defenseRating": 64
       },
       "detailedRatings": {
@@ -564,16 +617,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-101139",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -607,8 +660,8 @@
         "teamGames": 72,
         "teamMinutes": 1622
       },
-      "selectionScore": 67.724,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 57.723,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 72,
         "minutes": 1620,
@@ -641,9 +694,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 70,
+        "overallRating": 53,
         "offenseRating": 64,
-        "defenseRating": 58
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025832,
+          "secondaryCreator": 0.047301,
+          "scoringGuard": 0.064676,
+          "movementSpacer": 0.205262,
+          "twoWayWing": 0.150007,
+          "connector": 0.125378,
+          "interiorFinisher": 0.061844,
+          "stretchBig": 0.163155,
+          "rebounder": 0.053115,
+          "defensiveAnchor": 0.10343
+        },
+        "baseScore": 55.5,
+        "nonlinear": {
+          "creation": 58.89534256763373,
+          "penetration": 59.50255385314378,
+          "shootingGravity": 79.2625,
+          "scalableScoring": 64,
+          "switchability": 63.97915988130094,
+          "rimProtection": 63.197431689610696,
+          "possessionControl": 63.8875,
+          "synergyBonus": 0.8758797761597776,
+          "weaknessPenalty": -1.1869994387999998,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.1137623199999998,
+            "deficientRebounding": 1.3774125
+          }
+        },
+        "production": {
+          "score": 32.319050000000004,
+          "weight": 0.12684065934065936,
+          "confidence": "high",
+          "sampleGames": 72,
+          "sampleMinutes": 1620,
+          "shrinkage": 0.3337912087912088
+        },
+        "calibratedImpact": {
+          "adjustment": 0.05671875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 53,
+        "offenseRating": 64,
+        "defenseRating": 59
       },
       "detailedRatings": {
         "threePoint": 72,
@@ -1104,20 +1210,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-101179",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2009-10",
+      "seasonKey": "2007-08",
       "firstName": "Ronnie",
       "lastName": "Price",
       "displayName": "Ronnie Price",
@@ -1139,111 +1245,164 @@
         "normalizationVersion": "position-v3"
       },
       "heightInches": 74,
-      "weightLbs": 184,
+      "weightLbs": 190,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 60,
-        "teamMinutes": 805
+        "teamGames": 61,
+        "teamMinutes": 588
       },
-      "selectionScore": 59.3,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 49.322,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 60,
-        "minutes": 804,
-        "points": 258,
-        "rebounds": 72,
-        "offensiveRebounds": 30,
-        "defensiveRebounds": 48,
-        "assists": 126,
-        "steals": 42,
-        "blocks": 12,
-        "turnovers": 54,
-        "fieldGoalsMade": 96,
-        "fieldGoalsAttempted": 240,
-        "threesMade": 18,
-        "threesAttempted": 66,
-        "freeThrowsMade": 42,
-        "freeThrowsAttempted": 60,
-        "per": 4.670000000000001,
-        "boxPlusMinus": -1.8939999999999997,
-        "usageRate": 17.5,
-        "tsPct": 0.476,
-        "efgPct": 0.442
+        "gamesPlayed": 61,
+        "minutes": 585,
+        "points": 225,
+        "rebounds": 48,
+        "offensiveRebounds": 6,
+        "defensiveRebounds": 36,
+        "assists": 79,
+        "steals": 30,
+        "blocks": 0,
+        "turnovers": 30,
+        "fieldGoalsMade": 85,
+        "fieldGoalsAttempted": 201,
+        "threesMade": 24,
+        "threesAttempted": 73,
+        "freeThrowsMade": 24,
+        "freeThrowsAttempted": 36,
+        "per": 3.43,
+        "boxPlusMinus": -2.626,
+        "usageRate": 18.8,
+        "tsPct": 0.516,
+        "efgPct": 0.495
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2009-10",
+        "seasonKey": "2007-08",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
-        "offenseRating": 54,
-        "defenseRating": 54
+        "overallRating": 45,
+        "offenseRating": 55,
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.032354,
+          "secondaryCreator": 0.049343,
+          "scoringGuard": 0.077421,
+          "movementSpacer": 0.268987,
+          "twoWayWing": 0.123027,
+          "connector": 0.127183,
+          "interiorFinisher": 0.048368,
+          "stretchBig": 0.138971,
+          "rebounder": 0.055955,
+          "defensiveAnchor": 0.078391
+        },
+        "baseScore": 48.15,
+        "nonlinear": {
+          "creation": 55.295380500010246,
+          "penetration": 54.21927302133419,
+          "shootingGravity": 68.09,
+          "scalableScoring": 54.333333333333336,
+          "switchability": 58.236155661645064,
+          "rimProtection": 54.98180915907992,
+          "possessionControl": 59.735,
+          "synergyBonus": 0.32690318684210545,
+          "weaknessPenalty": -1.6920533568000002,
+          "weaknesses": {
+            "turnoverLiability": 0.24818832000000057,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.32386770000000004,
+            "spacingLimitation": 0,
+            "foulRisk": 3.1720439999999996,
+            "deficientRebounding": 1.2325275
+          }
+        },
+        "production": {
+          "score": 19.31609999999999,
+          "weight": 0.028998439084414778,
+          "confidence": "low",
+          "sampleGames": 61,
+          "sampleMinutes": 585.6,
+          "shrinkage": 0.1695815151135367
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00865625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 45,
+        "offenseRating": 55,
+        "defenseRating": 53
       },
       "detailedRatings": {
-        "threePoint": 53,
-        "freeThrow": 72,
-        "insideScoring": 45,
+        "threePoint": 59,
+        "freeThrow": 69,
+        "insideScoring": 46,
         "closeShot": 53,
-        "midrange": 55,
-        "passing": 57,
-        "ballHandling": 57,
-        "offensiveRebound": 42,
-        "defensiveRebound": 44,
-        "perimeterDefense": 60,
-        "interiorDefense": 56,
-        "steal": 63,
-        "block": 58,
+        "midrange": 58,
+        "passing": 53,
+        "ballHandling": 55,
+        "offensiveRebound": 41,
+        "defensiveRebound": 45,
+        "perimeterDefense": 57,
+        "interiorDefense": 53,
+        "steal": 60,
+        "block": 55,
         "defensiveIq": 56,
-        "speed": 64,
-        "strength": 56,
-        "vertical": 58,
-        "offensiveIq": 60
+        "speed": 63,
+        "strength": 55,
+        "vertical": 57,
+        "offensiveIq": 58
       },
       "tendencies": {
-        "usageRate": 17.5,
-        "passRate": 16,
-        "shotRate": 8.33,
+        "usageRate": 18.8,
+        "passRate": 12.53,
+        "shotRate": 6.87,
         "driveRate": 18,
         "postUpRate": 5,
-        "rimFrequency": 18,
+        "rimFrequency": 18.4,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 6.36,
-        "aboveBreakThreeFrequency": 10.6,
-        "threePointRate": 27.5,
-        "freeThrowRate": 25,
-        "turnoverRate": 16.85,
-        "isolationRate": 5.25,
+        "cornerThreeFrequency": 7.08,
+        "aboveBreakThreeFrequency": 11.8,
+        "threePointRate": 36.36,
+        "freeThrowRate": 18.18,
+        "turnoverRate": 12.3,
+        "isolationRate": 5.64,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 8.45,
-        "stealAttemptRate": 10.04,
-        "blockAttemptRate": 9.64,
-        "crashOffensiveGlassRate": 15.04
+        "foulRate": 9,
+        "stealAttemptRate": 9.8,
+        "blockAttemptRate": 9.4,
+        "crashOffensiveGlassRate": 14.92
       },
       "anchors": {
-        "gamesPlayed": 60,
-        "minutesPerGame": 13.4,
-        "pointsPerGame": 4.3,
-        "reboundsPerGame": 1.2,
-        "offensiveReboundsPerGame": 0.5,
-        "defensiveReboundsPerGame": 0.8,
-        "assistsPerGame": 2.1,
-        "stealsPerGame": 0.7,
-        "blocksPerGame": 0.2,
-        "turnoversPerGame": 0.9,
-        "fieldGoalPct": 0.4,
-        "threePointPct": 0.2727272727272727,
-        "freeThrowPct": 0.7,
-        "threePointAttemptRate": 0.275,
-        "freeThrowAttemptRate": 0.25
+        "gamesPlayed": 61,
+        "minutesPerGame": 9.6,
+        "pointsPerGame": 3.7,
+        "reboundsPerGame": 0.8,
+        "offensiveReboundsPerGame": 0.1,
+        "defensiveReboundsPerGame": 0.6,
+        "assistsPerGame": 1.3,
+        "stealsPerGame": 0.5,
+        "blocksPerGame": 0,
+        "turnoversPerGame": 0.5,
+        "fieldGoalPct": 0.42424242424242425,
+        "threePointPct": 0.33333333333333337,
+        "freeThrowPct": 0.6666666666666667,
+        "threePointAttemptRate": 0.3636363636363637,
+        "freeThrowAttemptRate": 0.18181818181818185
       },
       "provenance": {
         "threePoint": {
@@ -1642,16 +1801,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-128",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -1683,8 +1842,8 @@
         "teamGames": 49,
         "teamMinutes": 443
       },
-      "selectionScore": 56.137,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 48.463,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 49,
         "minutes": 445,
@@ -1717,7 +1876,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 57,
+        "overallRating": 44,
+        "offenseRating": 55,
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.029968,
+          "secondaryCreator": 0.042249,
+          "scoringGuard": 0.055954,
+          "movementSpacer": 0.13218,
+          "twoWayWing": 0.19239,
+          "connector": 0.111145,
+          "interiorFinisher": 0.07758,
+          "stretchBig": 0.150208,
+          "rebounder": 0.089238,
+          "defensiveAnchor": 0.119088
+        },
+        "baseScore": 46.88,
+        "nonlinear": {
+          "creation": 53.5894796312417,
+          "penetration": 54.5136177849642,
+          "shootingGravity": 63.25,
+          "scalableScoring": 55.666666666666664,
+          "switchability": 59.49577448042325,
+          "rimProtection": 59.15031513242344,
+          "possessionControl": 56.900999999999996,
+          "synergyBonus": 0.046445394736842095,
+          "weaknessPenalty": -2.7582888256199998,
+          "weaknesses": {
+            "turnoverLiability": 2.5520670239999994,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.159612825,
+            "spacingLimitation": 0,
+            "foulRisk": 4.230791844,
+            "deficientRebounding": 1.1701425
+          }
+        },
+        "production": {
+          "score": 19.53105000000001,
+          "weight": 0.021573426928760034,
+          "confidence": "low",
+          "sampleGames": 49,
+          "sampleMinutes": 445.9,
+          "shrinkage": 0.1261603913962575
+        },
+        "calibratedImpact": {
+          "adjustment": 0.03790625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 44,
         "offenseRating": 55,
         "defenseRating": 53
       },
@@ -2180,16 +2392,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1510",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -2221,8 +2433,8 @@
         "teamGames": 74,
         "teamMinutes": 937
       },
-      "selectionScore": 55.989,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 40.201,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 74,
         "minutes": 939,
@@ -2255,8 +2467,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 59,
-        "offenseRating": 46,
+        "overallRating": 33,
+        "offenseRating": 45,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.061156,
+          "secondaryCreator": 0.099099,
+          "scoringGuard": 0.067503,
+          "movementSpacer": 0.096592,
+          "twoWayWing": 0.167555,
+          "connector": 0.137186,
+          "interiorFinisher": 0.065945,
+          "stretchBig": 0.068178,
+          "rebounder": 0.08577,
+          "defensiveAnchor": 0.151016
+        },
+        "baseScore": 41.21,
+        "nonlinear": {
+          "creation": 58.30830672474776,
+          "penetration": 52.337060963017436,
+          "shootingGravity": 47.7125,
+          "scalableScoring": 40,
+          "switchability": 59.1464331616723,
+          "rimProtection": 56.70742963621217,
+          "possessionControl": 56.045,
+          "synergyBonus": 0,
+          "weaknessPenalty": -3.4847772597100004,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 1.2630560425000001,
+            "foulRisk": 1.571061714,
+            "deficientRebounding": 1.4152271250000001
+          }
+        },
+        "production": {
+          "score": 12.707699999999996,
+          "weight": 0.07126116894827444,
+          "confidence": "medium",
+          "sampleGames": 74,
+          "sampleMinutes": 939.8,
+          "shrinkage": 0.25003918929219104
+        },
+        "calibratedImpact": {
+          "adjustment": -0.081625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 33,
+        "offenseRating": 45,
         "defenseRating": 56
       },
       "detailedRatings": {
@@ -2718,16 +2983,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1521",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -2759,8 +3024,8 @@
         "teamGames": 82,
         "teamMinutes": 1626
       },
-      "selectionScore": 63.262,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 54.012,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 1623,
@@ -2793,8 +3058,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
-        "offenseRating": 61,
+        "overallRating": 49,
+        "offenseRating": 60,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.040217,
+          "secondaryCreator": 0.080986,
+          "scoringGuard": 0.069691,
+          "movementSpacer": 0.225126,
+          "twoWayWing": 0.123223,
+          "connector": 0.161675,
+          "interiorFinisher": 0.044465,
+          "stretchBig": 0.130113,
+          "rebounder": 0.046214,
+          "defensiveAnchor": 0.07829
+        },
+        "baseScore": 52.84,
+        "nonlinear": {
+          "creation": 63.93319852785275,
+          "penetration": 58.47665077385962,
+          "shootingGravity": 72.7075,
+          "scalableScoring": 60.666666666666664,
+          "switchability": 61.06434131947083,
+          "rimProtection": 57.960885457355296,
+          "possessionControl": 60.911,
+          "synergyBonus": 0.5107196102229806,
+          "weaknessPenalty": -2.8758711000800004,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.0600509120000001,
+            "deficientRebounding": 1.3983935
+          }
+        },
+        "production": {
+          "score": 28.039299999999997,
+          "weight": 0.1327581668062702,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 1623.6000000000001,
+          "shrinkage": 0.3493635968586058
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0205625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 49,
+        "offenseRating": 60,
         "defenseRating": 56
       },
       "detailedRatings": {
@@ -3256,16 +3574,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1723",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -3297,8 +3615,8 @@
         "teamGames": 78,
         "teamMinutes": 2556
       },
-      "selectionScore": 77.718,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 66.341,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 78,
         "minutes": 2558,
@@ -3331,7 +3649,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 63,
+        "offenseRating": 69,
+        "defenseRating": 64
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.029903,
+          "secondaryCreator": 0.047164,
+          "scoringGuard": 0.06698,
+          "movementSpacer": 0.146097,
+          "twoWayWing": 0.156419,
+          "connector": 0.112986,
+          "interiorFinisher": 0.088301,
+          "stretchBig": 0.147013,
+          "rebounder": 0.087298,
+          "defensiveAnchor": 0.117839
+        },
+        "baseScore": 60.31,
+        "nonlinear": {
+          "creation": 65.11506246935964,
+          "penetration": 69.12767790224522,
+          "shootingGravity": 73.7575,
+          "scalableScoring": 74.33333333333333,
+          "switchability": 68.6268450836196,
+          "rimProtection": 65.08599668678731,
+          "possessionControl": 67.224,
+          "synergyBonus": 0.6849126454739618,
+          "weaknessPenalty": -0.41193505528,
+          "weaknesses": {
+            "turnoverLiability": 0.2608760320000002,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.9506976599999997,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 54.17779999999999,
+          "weight": 0.15834698152732812,
+          "confidence": "high",
+          "sampleGames": 78,
+          "sampleMinutes": 2558.3999999999996,
+          "shrinkage": 0.41670258296665297
+        },
+        "calibratedImpact": {
+          "adjustment": -0.07859375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 63,
         "offenseRating": 69,
         "defenseRating": 64
       },
@@ -3794,16 +4165,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-178",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -3837,8 +4208,8 @@
         "teamGames": 81,
         "teamMinutes": 1620
       },
-      "selectionScore": 61.52,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 47.627,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 81,
         "minutes": 1620,
@@ -3871,9 +4242,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 65,
-        "offenseRating": 49,
-        "defenseRating": 61
+        "overallRating": 42,
+        "offenseRating": 48,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.02731,
+          "secondaryCreator": 0.032398,
+          "scoringGuard": 0.028923,
+          "movementSpacer": 0.06983,
+          "twoWayWing": 0.169743,
+          "connector": 0.084819,
+          "interiorFinisher": 0.086333,
+          "stretchBig": 0.122556,
+          "rebounder": 0.132432,
+          "defensiveAnchor": 0.245656
+        },
+        "baseScore": 48.58,
+        "nonlinear": {
+          "creation": 55.00275468296565,
+          "penetration": 54.63359755546322,
+          "shootingGravity": 43.5,
+          "scalableScoring": 52,
+          "switchability": 68.20698179598956,
+          "rimProtection": 69.26470529569741,
+          "possessionControl": 57.975,
+          "synergyBonus": 0.13863048828903374,
+          "weaknessPenalty": -3.02167803985,
+          "weaknesses": {
+            "turnoverLiability": 2.6981667999999996,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 1.57851495,
+            "foulRisk": 3.9991820399999987,
+            "deficientRebounding": 0.6114245625000001
+          }
+        },
+        "production": {
+          "score": 23.91315000000001,
+          "weight": 0.13208200890019073,
+          "confidence": "high",
+          "sampleGames": 81,
+          "sampleMinutes": 1620,
+          "shrinkage": 0.34758423394787036
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0641875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 42,
+        "offenseRating": 48,
+        "defenseRating": 62
       },
       "detailedRatings": {
         "threePoint": 43,
@@ -4331,16 +4755,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-180",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -4354,14 +4778,12 @@
         "nbaHeadshotAvailable": false
       },
       "positions": {
-        "primary": "SF",
+        "primary": "SG",
         "secondary": [],
         "playable": [
-          "SF",
           "SG"
         ],
         "sourceLabels": [
-          "F",
           "SG"
         ],
         "normalizationVersion": "position-v3"
@@ -4374,7 +4796,7 @@
         "teamMinutes": 799
       },
       "selectionScore": 59.515,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 41,
         "minutes": 799,
@@ -4870,20 +5292,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1905",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2003-04",
+      "seasonKey": "2004-05",
       "firstName": "Andrei",
       "lastName": "Kirilenko",
       "displayName": "Andrei Kirilenko",
@@ -4908,40 +5330,40 @@
       "weightLbs": 225,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 78,
-        "teamMinutes": 2905
+        "teamGames": 41,
+        "teamMinutes": 1353
       },
-      "selectionScore": 80.862,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 79.311,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 78,
-        "minutes": 2909,
-        "points": 1287,
-        "rebounds": 631,
-        "offensiveRebounds": 226,
-        "defensiveRebounds": 405,
-        "assists": 241,
-        "steals": 148,
-        "blocks": 218,
-        "turnovers": 218,
-        "fieldGoalsMade": 413,
-        "fieldGoalsAttempted": 928,
-        "threesMade": 70,
-        "threesAttempted": 202,
-        "freeThrowsMade": 390,
-        "freeThrowsAttempted": 499,
-        "per": 18.034999999999997,
-        "boxPlusMinus": 6.3149999999999995,
-        "usageRate": 21.5,
-        "tsPct": 0.559,
-        "efgPct": 0.479
+        "gamesPlayed": 41,
+        "minutes": 1353,
+        "points": 639,
+        "rebounds": 254,
+        "offensiveRebounds": 90,
+        "defensiveRebounds": 164,
+        "assists": 131,
+        "steals": 65,
+        "blocks": 135,
+        "turnovers": 90,
+        "fieldGoalsMade": 205,
+        "fieldGoalsAttempted": 418,
+        "threesMade": 24,
+        "threesAttempted": 77,
+        "freeThrowsMade": 205,
+        "freeThrowsAttempted": 258,
+        "per": 17.17,
+        "boxPlusMinus": 6.722000000000001,
+        "usageRate": 21.4,
+        "tsPct": 0.599,
+        "efgPct": 0.52
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2003-04",
+        "seasonKey": "2004-05",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
@@ -5408,16 +5830,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1909",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -5449,8 +5871,8 @@
         "teamGames": 75,
         "teamMinutes": 1291
       },
-      "selectionScore": 64.787,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 57.961,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 75,
         "minutes": 1290,
@@ -5483,8 +5905,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
-        "offenseRating": 62,
+        "overallRating": 55,
+        "offenseRating": 61,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.019903,
+          "secondaryCreator": 0.034786,
+          "scoringGuard": 0.04503,
+          "movementSpacer": 0.20155,
+          "twoWayWing": 0.144146,
+          "connector": 0.114597,
+          "interiorFinisher": 0.056955,
+          "stretchBig": 0.209394,
+          "rebounder": 0.069267,
+          "defensiveAnchor": 0.104372
+        },
+        "baseScore": 55.43,
+        "nonlinear": {
+          "creation": 57.19600115491071,
+          "penetration": 57.139904609351944,
+          "shootingGravity": 74.825,
+          "scalableScoring": 66,
+          "switchability": 64.58321091432455,
+          "rimProtection": 63.62733277735661,
+          "possessionControl": 60.74,
+          "synergyBonus": 0.7424626737442406,
+          "weaknessPenalty": -1.2734370812,
+          "weaknesses": {
+            "turnoverLiability": 0.9357302399999995,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.98718344,
+            "deficientRebounding": 0.8224895000000001
+          }
+        },
+        "production": {
+          "score": 31.050599999999992,
+          "weight": 0.08593969144460027,
+          "confidence": "medium",
+          "sampleGames": 75,
+          "sampleMinutes": 1290,
+          "shrinkage": 0.30154277699859744
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00871875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
+        "offenseRating": 61,
         "defenseRating": 58
       },
       "detailedRatings": {
@@ -5946,16 +6421,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1913",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -5987,8 +6462,8 @@
         "teamGames": 41,
         "teamMinutes": 729
       },
-      "selectionScore": 57.634,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 45.286,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 41,
         "minutes": 729,
@@ -6021,7 +6496,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
+        "overallRating": 41,
+        "offenseRating": 48,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026578,
+          "secondaryCreator": 0.042958,
+          "scoringGuard": 0.032856,
+          "movementSpacer": 0.091921,
+          "twoWayWing": 0.196692,
+          "connector": 0.111332,
+          "interiorFinisher": 0.070221,
+          "stretchBig": 0.128454,
+          "rebounder": 0.126768,
+          "defensiveAnchor": 0.17222
+        },
+        "baseScore": 45.29,
+        "nonlinear": {
+          "creation": 54.887926051091874,
+          "penetration": 51.871477478913384,
+          "shootingGravity": 49.5,
+          "scalableScoring": 51,
+          "switchability": 62.279006175336974,
+          "rimProtection": 61.89005228119162,
+          "possessionControl": 53.446,
+          "synergyBonus": 0.0072208266630763305,
+          "weaknessPenalty": -3.64965062173,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.9370332000000001,
+            "foulRisk": 3.360755772,
+            "deficientRebounding": 0.4364775625
+          }
+        },
+        "production": {
+          "score": 8.879099999999989,
+          "weight": 0.028329107742597743,
+          "confidence": "low",
+          "sampleGames": 41,
+          "sampleMinutes": 729.8000000000001,
+          "shrinkage": 0.16566729674033767
+        },
+        "calibratedImpact": {
+          "adjustment": -0.04696875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 41,
         "offenseRating": 48,
         "defenseRating": 58
       },
@@ -6481,20 +7009,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1921",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2004-05",
+      "seasonKey": "2006-07",
       "firstName": "Gordan",
       "lastName": "Giricek",
       "displayName": "Gordan Giricek",
@@ -6517,112 +7045,165 @@
         ],
         "normalizationVersion": "position-v3"
       },
-      "heightInches": 77,
-      "weightLbs": 210,
+      "heightInches": 78,
+      "weightLbs": 222,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 81,
-        "teamMinutes": 1652
+        "teamGames": 61,
+        "teamMinutes": 1188
       },
-      "selectionScore": 67.485,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 57.202,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 81,
-        "minutes": 1652,
-        "points": 712,
-        "rebounds": 178,
+        "gamesPlayed": 61,
+        "minutes": 1189,
+        "points": 475,
+        "rebounds": 128,
         "offensiveRebounds": 24,
-        "defensiveRebounds": 153,
-        "assists": 137,
-        "steals": 48,
-        "blocks": 8,
-        "turnovers": 89,
-        "fieldGoalsMade": 283,
-        "fieldGoalsAttempted": 631,
-        "threesMade": 40,
-        "threesAttempted": 105,
-        "freeThrowsMade": 113,
-        "freeThrowsAttempted": 137,
-        "per": 6.87,
-        "boxPlusMinus": -1.7839999999999998,
-        "usageRate": 21.2,
-        "tsPct": 0.516,
-        "efgPct": 0.478
+        "defensiveRebounds": 103,
+        "assists": 61,
+        "steals": 30,
+        "blocks": 6,
+        "turnovers": 61,
+        "fieldGoalsMade": 176,
+        "fieldGoalsAttempted": 378,
+        "threesMade": 54,
+        "threesAttempted": 122,
+        "freeThrowsMade": 73,
+        "freeThrowsAttempted": 85,
+        "per": 5.76,
+        "boxPlusMinus": -2.1689999999999996,
+        "usageRate": 18.099999999999998,
+        "tsPct": 0.566,
+        "efgPct": 0.53
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2004-05",
+        "seasonKey": "2006-07",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 70,
-        "offenseRating": 62,
-        "defenseRating": 57
+        "overallRating": 55,
+        "offenseRating": 61,
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.022621,
+          "secondaryCreator": 0.03946,
+          "scoringGuard": 0.06989,
+          "movementSpacer": 0.264701,
+          "twoWayWing": 0.13018,
+          "connector": 0.113529,
+          "interiorFinisher": 0.051052,
+          "stretchBig": 0.18054,
+          "rebounder": 0.052083,
+          "defensiveAnchor": 0.075944
+        },
+        "baseScore": 55.8,
+        "nonlinear": {
+          "creation": 56.23276838436021,
+          "penetration": 57.18479064871317,
+          "shootingGravity": 78.815,
+          "scalableScoring": 64,
+          "switchability": 63.22669651400695,
+          "rimProtection": 59.19815206204101,
+          "possessionControl": 60.2155,
+          "synergyBonus": 1.0061077325254506,
+          "weaknessPenalty": -1.2054409418999998,
+          "weaknesses": {
+            "turnoverLiability": 0.6364056719999993,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.053299275,
+            "spacingLimitation": 0,
+            "foulRisk": 1.566281088,
+            "deficientRebounding": 1.2894285
+          }
+        },
+        "production": {
+          "score": 29.747649999999997,
+          "weight": 0.07612831528551628,
+          "confidence": "medium",
+          "sampleGames": 61,
+          "sampleMinutes": 1189.5,
+          "shrinkage": 0.2671168957386536
+        },
+        "calibratedImpact": {
+          "adjustment": 0.01975,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
+        "offenseRating": 61,
+        "defenseRating": 55
       },
       "detailedRatings": {
-        "threePoint": 72,
-        "freeThrow": 88,
+        "threePoint": 81,
+        "freeThrow": 89,
         "insideScoring": 50,
-        "closeShot": 58,
-        "midrange": 59,
-        "passing": 57,
-        "ballHandling": 60,
-        "offensiveRebound": 40,
-        "defensiveRebound": 44,
-        "perimeterDefense": 61,
-        "interiorDefense": 58,
-        "steal": 66,
-        "block": 61,
+        "closeShot": 56,
+        "midrange": 63,
+        "passing": 53,
+        "ballHandling": 55,
+        "offensiveRebound": 41,
+        "defensiveRebound": 45,
+        "perimeterDefense": 59,
+        "interiorDefense": 56,
+        "steal": 63,
+        "block": 59,
         "defensiveIq": 56,
-        "speed": 70,
-        "strength": 62,
-        "vertical": 60,
-        "offensiveIq": 63
+        "speed": 68,
+        "strength": 63,
+        "vertical": 59,
+        "offensiveIq": 61
       },
       "tendencies": {
-        "usageRate": 21.2,
-        "passRate": 9.58,
-        "shotRate": 16.25,
+        "usageRate": 18.1,
+        "passRate": 6.78,
+        "shotRate": 12.92,
         "driveRate": 18,
         "postUpRate": 5,
         "rimFrequency": 20,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 8.64,
-        "aboveBreakThreeFrequency": 14.4,
-        "threePointRate": 16.67,
-        "freeThrowRate": 21.79,
-        "turnoverRate": 11.4,
-        "isolationRate": 6.36,
+        "cornerThreeFrequency": 9.72,
+        "aboveBreakThreeFrequency": 16.2,
+        "threePointRate": 32.26,
+        "freeThrowRate": 22.58,
+        "turnoverRate": 12.79,
+        "isolationRate": 5.43,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 6.47,
-        "stealAttemptRate": 10.28,
-        "blockAttemptRate": 9.88,
-        "crashOffensiveGlassRate": 14.8
+        "foulRate": 6.92,
+        "stealAttemptRate": 10.04,
+        "blockAttemptRate": 9.72,
+        "crashOffensiveGlassRate": 14.92
       },
       "anchors": {
-        "gamesPlayed": 81,
-        "minutesPerGame": 20.4,
-        "pointsPerGame": 8.8,
-        "reboundsPerGame": 2.2,
-        "offensiveReboundsPerGame": 0.3,
-        "defensiveReboundsPerGame": 1.9000000000000001,
-        "assistsPerGame": 1.7,
-        "stealsPerGame": 0.6,
-        "blocksPerGame": 0.09999999999999999,
-        "turnoversPerGame": 1.1,
-        "fieldGoalPct": 0.44871794871794873,
-        "threePointPct": 0.38461538461538464,
-        "freeThrowPct": 0.8235294117647058,
-        "threePointAttemptRate": 0.16666666666666669,
-        "freeThrowAttemptRate": 0.21794871794871795
+        "gamesPlayed": 61,
+        "minutesPerGame": 19.5,
+        "pointsPerGame": 7.8,
+        "reboundsPerGame": 2.1,
+        "offensiveReboundsPerGame": 0.4,
+        "defensiveReboundsPerGame": 1.7,
+        "assistsPerGame": 1,
+        "stealsPerGame": 0.5,
+        "blocksPerGame": 0.1,
+        "turnoversPerGame": 1,
+        "fieldGoalPct": 0.467741935483871,
+        "threePointPct": 0.45,
+        "freeThrowPct": 0.8571428571428572,
+        "threePointAttemptRate": 0.3225806451612903,
+        "freeThrowAttemptRate": 0.22580645161290322
       },
       "provenance": {
         "threePoint": {
@@ -7021,16 +7602,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1952",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -7064,8 +7645,8 @@
         "teamGames": 63,
         "teamMinutes": 1796
       },
-      "selectionScore": 70.04,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 58.746,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 63,
         "minutes": 1795,
@@ -7098,7 +7679,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
+        "overallRating": 55,
+        "offenseRating": 64,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.030951,
+          "secondaryCreator": 0.048449,
+          "scoringGuard": 0.070383,
+          "movementSpacer": 0.211384,
+          "twoWayWing": 0.144959,
+          "connector": 0.124336,
+          "interiorFinisher": 0.066736,
+          "stretchBig": 0.15063,
+          "rebounder": 0.059741,
+          "defensiveAnchor": 0.092431
+        },
+        "baseScore": 56.03,
+        "nonlinear": {
+          "creation": 60.54667072494383,
+          "penetration": 62.615700349366264,
+          "shootingGravity": 72.2025,
+          "scalableScoring": 67,
+          "switchability": 66.17104394717049,
+          "rimProtection": 60.98783565235717,
+          "possessionControl": 64.98349999999999,
+          "synergyBonus": 0.5709431017175255,
+          "weaknessPenalty": -1.06630349262,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.1036103679999996,
+            "deficientRebounding": 1.0325763749999999
+          }
+        },
+        "production": {
+          "score": 36.7439,
+          "weight": 0.12663420109505016,
+          "confidence": "high",
+          "sampleGames": 63,
+          "sampleMinutes": 1795.5,
+          "shrinkage": 0.33324789761855306
+        },
+        "calibratedImpact": {
+          "adjustment": -0.01065625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
         "offenseRating": 64,
         "defenseRating": 58
       },
@@ -7561,16 +8195,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1960",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -7602,8 +8236,8 @@
         "teamGames": 71,
         "teamMinutes": 1375
       },
-      "selectionScore": 60.222,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 43.264,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 71,
         "minutes": 1377,
@@ -7636,8 +8270,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
-        "offenseRating": 49,
+        "overallRating": 36,
+        "offenseRating": 48,
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.06367,
+          "secondaryCreator": 0.081705,
+          "scoringGuard": 0.067517,
+          "movementSpacer": 0.073057,
+          "twoWayWing": 0.188728,
+          "connector": 0.108175,
+          "interiorFinisher": 0.086421,
+          "stretchBig": 0.075533,
+          "rebounder": 0.091765,
+          "defensiveAnchor": 0.163429
+        },
+        "baseScore": 43.04,
+        "nonlinear": {
+          "creation": 61.33152824975318,
+          "penetration": 57.428897620907634,
+          "shootingGravity": 47.8775,
+          "scalableScoring": 40.666666666666664,
+          "switchability": 63.552212827453005,
+          "rimProtection": 59.74427250450025,
+          "possessionControl": 60.847,
+          "synergyBonus": 0.03854552927625667,
+          "weaknessPenalty": -3.2938872046200007,
+          "weaknesses": {
+            "turnoverLiability": 5.622225856000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 1.2277499270000005,
+            "foulRisk": 1.23291876,
+            "deficientRebounding": 1.605009
+          }
+        },
+        "production": {
+          "score": 23.426849999999995,
+          "weight": 0.08726499523781793,
+          "confidence": "medium",
+          "sampleGames": 71,
+          "sampleMinutes": 1377.3999999999999,
+          "shrinkage": 0.30619296574672955
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0960625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 36,
+        "offenseRating": 48,
         "defenseRating": 57
       },
       "detailedRatings": {
@@ -8099,16 +8786,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-200758",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -8142,8 +8829,8 @@
         "teamGames": 81,
         "teamMinutes": 2604
       },
-      "selectionScore": 74.876,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 62.283,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 81,
         "minutes": 2608,
@@ -8176,7 +8863,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 79,
+        "overallRating": 58,
+        "offenseRating": 63,
+        "defenseRating": 68
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.033361,
+          "secondaryCreator": 0.052408,
+          "scoringGuard": 0.053924,
+          "movementSpacer": 0.119497,
+          "twoWayWing": 0.198316,
+          "connector": 0.129129,
+          "interiorFinisher": 0.076916,
+          "stretchBig": 0.113767,
+          "rebounder": 0.067347,
+          "defensiveAnchor": 0.155335
+        },
+        "baseScore": 57.08,
+        "nonlinear": {
+          "creation": 65.3995118219599,
+          "penetration": 64.34449649830168,
+          "shootingGravity": 64.45,
+          "scalableScoring": 65,
+          "switchability": 72.54359645029945,
+          "rimProtection": 66.0555688161839,
+          "possessionControl": 68.541,
+          "synergyBonus": 0.3889738263412318,
+          "weaknessPenalty": -0.3105441,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.913365
+          }
+        },
+        "production": {
+          "score": 47.27985,
+          "weight": 0.16150001146668566,
+          "confidence": "high",
+          "sampleGames": 81,
+          "sampleMinutes": 2608.2000000000003,
+          "shrinkage": 0.42500003017548854
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00221875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 58,
         "offenseRating": 63,
         "defenseRating": 68
       },
@@ -8639,16 +9379,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-200793",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -8680,8 +9420,8 @@
         "teamGames": 49,
         "teamMinutes": 449
       },
-      "selectionScore": 53.778,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 42.316,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 49,
         "minutes": 450,
@@ -8714,8 +9454,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 56,
-        "offenseRating": 49,
+        "overallRating": 37,
+        "offenseRating": 48,
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.038401,
+          "secondaryCreator": 0.065129,
+          "scoringGuard": 0.072593,
+          "movementSpacer": 0.212319,
+          "twoWayWing": 0.133842,
+          "connector": 0.134759,
+          "interiorFinisher": 0.055714,
+          "stretchBig": 0.115735,
+          "rebounder": 0.072567,
+          "defensiveAnchor": 0.098941
+        },
+        "baseScore": 42.5,
+        "nonlinear": {
+          "creation": 54.98203269860645,
+          "penetration": 52.41045961781183,
+          "shootingGravity": 59.25,
+          "scalableScoring": 47,
+          "switchability": 56.87898816778662,
+          "rimProtection": 54.46098902600915,
+          "possessionControl": 55.0685,
+          "synergyBonus": 0,
+          "weaknessPenalty": -3.1902571276600002,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.4352246,
+            "spacingLimitation": 0,
+            "foulRisk": 1.7888187239999997,
+            "deficientRebounding": 1.159065875
+          }
+        },
+        "production": {
+          "score": 8.65519999999999,
+          "weight": 0.021755714163938508,
+          "confidence": "low",
+          "sampleGames": 49,
+          "sampleMinutes": 450.79999999999995,
+          "shrinkage": 0.12722639861952342
+        },
+        "calibratedImpact": {
+          "adjustment": 0.06696875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 37,
+        "offenseRating": 48,
         "defenseRating": 53
       },
       "detailedRatings": {
@@ -9177,16 +9970,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-200794",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -9218,8 +10011,8 @@
         "teamGames": 76,
         "teamMinutes": 2290
       },
-      "selectionScore": 73.522,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 60.36,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 76,
         "minutes": 2287,
@@ -9252,7 +10045,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 79,
+        "overallRating": 57,
+        "offenseRating": 57,
+        "defenseRating": 70
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.034791,
+          "secondaryCreator": 0.045101,
+          "scoringGuard": 0.037277,
+          "movementSpacer": 0.038068,
+          "twoWayWing": 0.186437,
+          "connector": 0.080467,
+          "interiorFinisher": 0.089238,
+          "stretchBig": 0.070636,
+          "rebounder": 0.160411,
+          "defensiveAnchor": 0.257574
+        },
+        "baseScore": 55.88,
+        "nonlinear": {
+          "creation": 65.91909277822674,
+          "penetration": 64.8715411671635,
+          "shootingGravity": 52.2525,
+          "scalableScoring": 54,
+          "switchability": 71.91386304081406,
+          "rimProtection": 70.31316908822723,
+          "possessionControl": 67.82,
+          "synergyBonus": 0.294856662008273,
+          "weaknessPenalty": -1.365196263095,
+          "weaknesses": {
+            "turnoverLiability": 0.4762411199999997,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.6420928827500003,
+            "foulRisk": 2.8969491240000003,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 52.397,
+          "weight": 0.1503679156303145,
+          "confidence": "high",
+          "sampleGames": 76,
+          "sampleMinutes": 2287.6,
+          "shrinkage": 0.3957050411324066
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0440625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 57,
         "offenseRating": 57,
         "defenseRating": 70
       },
@@ -9715,16 +10561,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-201178",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -9756,8 +10602,8 @@
         "teamGames": 49,
         "teamMinutes": 407
       },
-      "selectionScore": 54.106,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 44.66,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 49,
         "minutes": 406,
@@ -9790,7 +10636,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 56,
+        "overallRating": 40,
+        "offenseRating": 50,
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026234,
+          "secondaryCreator": 0.035664,
+          "scoringGuard": 0.037562,
+          "movementSpacer": 0.065268,
+          "twoWayWing": 0.14782,
+          "connector": 0.070917,
+          "interiorFinisher": 0.131527,
+          "stretchBig": 0.124711,
+          "rebounder": 0.162959,
+          "defensiveAnchor": 0.197338
+        },
+        "baseScore": 44.18,
+        "nonlinear": {
+          "creation": 52.91954090518347,
+          "penetration": 53.17209986742011,
+          "shootingGravity": 52,
+          "scalableScoring": 50.333333333333336,
+          "switchability": 61.96182179558127,
+          "rimProtection": 62.25469494546568,
+          "possessionControl": 55.356,
+          "synergyBonus": 0,
+          "weaknessPenalty": -4.0378343271,
+          "weaknesses": {
+            "turnoverLiability": 3.9602054399999984,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.659676,
+            "foulRisk": 6,
+            "deficientRebounding": 1.2561018750000001
+          }
+        },
+        "production": {
+          "score": 17.697800000000004,
+          "weight": 0.02008140012481121,
+          "confidence": "low",
+          "sampleGames": 49,
+          "sampleMinutes": 406.70000000000005,
+          "shrinkage": 0.11743508844918836
+        },
+        "calibratedImpact": {
+          "adjustment": 0.03325,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 40,
         "offenseRating": 50,
         "defenseRating": 53
       },
@@ -10250,16 +11149,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-201585",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -10291,8 +11190,8 @@
         "teamGames": 48,
         "teamMinutes": 565
       },
-      "selectionScore": 59.63,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.779,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 48,
         "minutes": 566,
@@ -10325,7 +11224,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
+        "overallRating": 47,
+        "offenseRating": 55,
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.027244,
+          "secondaryCreator": 0.037623,
+          "scoringGuard": 0.044566,
+          "movementSpacer": 0.066247,
+          "twoWayWing": 0.159545,
+          "connector": 0.072279,
+          "interiorFinisher": 0.120883,
+          "stretchBig": 0.118744,
+          "rebounder": 0.151277,
+          "defensiveAnchor": 0.201592
+        },
+        "baseScore": 48.94,
+        "nonlinear": {
+          "creation": 54.87464564262502,
+          "penetration": 54.81480410590562,
+          "shootingGravity": 57.75,
+          "scalableScoring": 52.666666666666664,
+          "switchability": 64.04740953303917,
+          "rimProtection": 64.04000154397575,
+          "possessionControl": 60.617999999999995,
+          "synergyBonus": 0.042980783414307194,
+          "weaknessPenalty": -1.3879732909,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.027735825000000002,
+            "foulRisk": 2.9620425599999995,
+            "deficientRebounding": 1.0924960000000001
+          }
+        },
+        "production": {
+          "score": 24.78235,
+          "weight": 0.025566043712385175,
+          "confidence": "low",
+          "sampleGames": 48,
+          "sampleMinutes": 566.4000000000001,
+          "shrinkage": 0.14950902755780804
+        },
+        "calibratedImpact": {
+          "adjustment": 0.10196875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
         "offenseRating": 55,
         "defenseRating": 57
       },
@@ -10785,16 +11737,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-202083",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -10828,8 +11780,8 @@
         "teamGames": 82,
         "teamMinutes": 2024
       },
-      "selectionScore": 67.914,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 58.914,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 2025,
@@ -10862,7 +11814,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 70,
+        "overallRating": 55,
+        "offenseRating": 63,
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.02448,
+          "secondaryCreator": 0.046136,
+          "scoringGuard": 0.065425,
+          "movementSpacer": 0.238849,
+          "twoWayWing": 0.142184,
+          "connector": 0.128829,
+          "interiorFinisher": 0.055402,
+          "stretchBig": 0.160115,
+          "rebounder": 0.049809,
+          "defensiveAnchor": 0.088771
+        },
+        "baseScore": 56.89,
+        "nonlinear": {
+          "creation": 58.54889136036755,
+          "penetration": 59.22712416644793,
+          "shootingGravity": 78.2475,
+          "scalableScoring": 65.33333333333333,
+          "switchability": 65.24640203684592,
+          "rimProtection": 61.244362178400024,
+          "possessionControl": 62.317499999999995,
+          "synergyBonus": 0.9136518443693292,
+          "weaknessPenalty": -0.6855921977700002,
+          "weaknesses": {
+            "turnoverLiability": 0.1213249200000003,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.5605961580000003,
+            "deficientRebounding": 1.3345265625
+          }
+        },
+        "production": {
+          "score": 36.02245,
+          "weight": 0.14673713109638994,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 2025.3999999999999,
+          "shrinkage": 0.3861503449904999
+        },
+        "calibratedImpact": {
+          "adjustment": -0.02509375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
         "offenseRating": 63,
         "defenseRating": 59
       },
@@ -11325,16 +12330,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2052",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -11368,8 +12373,8 @@
         "teamGames": 54,
         "teamMinutes": 1513
       },
-      "selectionScore": 66.49,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 52.286,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 80,
         "minutes": 2448,
@@ -11402,7 +12407,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
+        "overallRating": 47,
+        "offenseRating": 57,
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.046349,
+          "secondaryCreator": 0.061787,
+          "scoringGuard": 0.063329,
+          "movementSpacer": 0.11032,
+          "twoWayWing": 0.172084,
+          "connector": 0.116092,
+          "interiorFinisher": 0.090448,
+          "stretchBig": 0.108197,
+          "rebounder": 0.091357,
+          "defensiveAnchor": 0.140037
+        },
+        "baseScore": 50.93,
+        "nonlinear": {
+          "creation": 61.93680692738203,
+          "penetration": 62.22223403249966,
+          "shootingGravity": 56.565,
+          "scalableScoring": 55,
+          "switchability": 66.51931901441863,
+          "rimProtection": 61.489835483271946,
+          "possessionControl": 65.406,
+          "synergyBonus": 0.10497409434851895,
+          "weaknessPenalty": -0.3733690373500001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.1681052275000003,
+            "foulRisk": 0,
+            "deficientRebounding": 0.930039
+          }
+        },
+        "production": {
+          "score": 33.04495,
+          "weight": 0.1570820668693009,
+          "confidence": "high",
+          "sampleGames": 80,
+          "sampleMinutes": 2448,
+          "shrinkage": 0.41337386018237077
+        },
+        "calibratedImpact": {
+          "adjustment": -0.02278125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
         "offenseRating": 57,
         "defenseRating": 60
       },
@@ -11865,16 +12923,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2078",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -11906,8 +12964,8 @@
         "teamGames": 57,
         "teamMinutes": 605
       },
-      "selectionScore": 57.043,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 49.931,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 57,
         "minutes": 604,
@@ -11940,7 +12998,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 58,
+        "overallRating": 46,
+        "offenseRating": 56,
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.033481,
+          "secondaryCreator": 0.05948,
+          "scoringGuard": 0.086631,
+          "movementSpacer": 0.205989,
+          "twoWayWing": 0.148564,
+          "connector": 0.1199,
+          "interiorFinisher": 0.053495,
+          "stretchBig": 0.130656,
+          "rebounder": 0.068151,
+          "defensiveAnchor": 0.093653
+        },
+        "baseScore": 48.75,
+        "nonlinear": {
+          "creation": 55.640985600433524,
+          "penetration": 53.01399891279183,
+          "shootingGravity": 65.6575,
+          "scalableScoring": 54.666666666666664,
+          "switchability": 58.93366095356909,
+          "rimProtection": 55.725426616471786,
+          "possessionControl": 59.963,
+          "synergyBonus": 0.16201040624999996,
+          "weaknessPenalty": -1.41566959621,
+          "weaknesses": {
+            "turnoverLiability": 0.28684902399999984,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.32693880000000003,
+            "spacingLimitation": 0,
+            "foulRisk": 2.33388597,
+            "deficientRebounding": 1.2160603125
+          }
+        },
+        "production": {
+          "score": 11.183199999999992,
+          "weight": 0.028853130263772897,
+          "confidence": "low",
+          "sampleGames": 57,
+          "sampleMinutes": 604.1999999999999,
+          "shrinkage": 0.16873175592849649
+        },
+        "calibratedImpact": {
+          "adjustment": 0,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 46,
         "offenseRating": 56,
         "defenseRating": 53
       },
@@ -12403,16 +13514,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2221",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -12444,8 +13555,8 @@
         "teamGames": 82,
         "teamMinutes": 1622
       },
-      "selectionScore": 63.596,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 51.596,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 1623,
@@ -12478,7 +13589,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 65,
+        "overallRating": 45,
+        "offenseRating": 59,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.056188,
+          "secondaryCreator": 0.09337,
+          "scoringGuard": 0.083883,
+          "movementSpacer": 0.174933,
+          "twoWayWing": 0.138201,
+          "connector": 0.155308,
+          "interiorFinisher": 0.051133,
+          "stretchBig": 0.103416,
+          "rebounder": 0.052502,
+          "defensiveAnchor": 0.091066
+        },
+        "baseScore": 50.11,
+        "nonlinear": {
+          "creation": 64.96360882100207,
+          "penetration": 60.105370398548196,
+          "shootingGravity": 68.7175,
+          "scalableScoring": 56.333333333333336,
+          "switchability": 61.32071521563456,
+          "rimProtection": 57.94701423811216,
+          "possessionControl": 60.9405,
+          "synergyBonus": 0.2679379815703243,
+          "weaknessPenalty": -3.24470037651,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.196413964,
+            "deficientRebounding": 1.3468224375
+          }
+        },
+        "production": {
+          "score": 27.661250000000003,
+          "weight": 0.1327581668062702,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 1623.6000000000001,
+          "shrinkage": 0.3493635968586058
+        },
+        "calibratedImpact": {
+          "adjustment": -0.011625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 45,
         "offenseRating": 59,
         "defenseRating": 56
       },
@@ -12941,20 +14105,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2246",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2005-06",
+      "seasonKey": "2008-09",
       "firstName": "Mehmet",
       "lastName": "Okur",
       "displayName": "Mehmet Okur",
@@ -12965,7 +14129,7 @@
         "photoUrl": null
       },
       "positions": {
-        "primary": "SF",
+        "primary": "C",
         "secondary": [],
         "playable": [
           "C",
@@ -12978,111 +14142,164 @@
         "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
-      "weightLbs": 249,
+      "weightLbs": 263,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 82,
-        "teamMinutes": 2944
+        "teamGames": 72,
+        "teamMinutes": 2409
       },
-      "selectionScore": 78.523,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 71.339,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 82,
-        "minutes": 2943,
-        "points": 1476,
-        "rebounds": 746,
-        "offensiveRebounds": 213,
-        "defensiveRebounds": 533,
-        "assists": 196,
-        "steals": 41,
-        "blocks": 73,
-        "turnovers": 164,
-        "fieldGoalsMade": 516,
-        "fieldGoalsAttempted": 1131,
-        "threesMade": 82,
-        "threesAttempted": 237,
-        "freeThrowsMade": 352,
-        "freeThrowsAttempted": 451,
-        "per": 16.16,
-        "boxPlusMinus": 1.1250000000000018,
-        "usageRate": 23.1,
-        "tsPct": 0.554,
-        "efgPct": 0.496
+        "gamesPlayed": 72,
+        "minutes": 2412,
+        "points": 1224,
+        "rebounds": 554,
+        "offensiveRebounds": 122,
+        "defensiveRebounds": 432,
+        "assists": 122,
+        "steals": 57,
+        "blocks": 50,
+        "turnovers": 129,
+        "fieldGoalsMade": 432,
+        "fieldGoalsAttempted": 885,
+        "threesMade": 93,
+        "threesAttempted": 201,
+        "freeThrowsMade": 273,
+        "freeThrowsAttempted": 331,
+        "per": 14.545,
+        "boxPlusMinus": 0.9749999999999996,
+        "usageRate": 21.4,
+        "tsPct": 0.592,
+        "efgPct": 0.536
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2005-06",
+        "seasonKey": "2008-09",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
-        "offenseRating": 69,
+        "overallRating": 70,
+        "offenseRating": 71,
+        "defenseRating": 68
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.021152,
+          "secondaryCreator": 0.036514,
+          "scoringGuard": 0.050125,
+          "movementSpacer": 0.163798,
+          "twoWayWing": 0.149908,
+          "connector": 0.11243,
+          "interiorFinisher": 0.074469,
+          "stretchBig": 0.181743,
+          "rebounder": 0.086027,
+          "defensiveAnchor": 0.123834
+        },
+        "baseScore": 64.66,
+        "nonlinear": {
+          "creation": 65.9951021771014,
+          "penetration": 67.81205309508898,
+          "shootingGravity": 78.69,
+          "scalableScoring": 78.33333333333333,
+          "switchability": 73.94688177298846,
+          "rimProtection": 71.77974304128854,
+          "possessionControl": 68.612,
+          "synergyBonus": 1.0625440297386033,
+          "weaknessPenalty": -0.38880255959999993,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.1435369399999997,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 56.31624999999999,
+          "weight": 0.15061787905346188,
+          "confidence": "high",
+          "sampleGames": 72,
+          "sampleMinutes": 2412,
+          "shrinkage": 0.3963628396143734
+        },
+        "calibratedImpact": {
+          "adjustment": 0.02053125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 70,
+        "offenseRating": 71,
         "defenseRating": 68
       },
       "detailedRatings": {
-        "threePoint": 68,
-        "freeThrow": 83,
-        "insideScoring": 73,
-        "closeShot": 72,
-        "midrange": 61,
-        "passing": 66,
-        "ballHandling": 64,
-        "offensiveRebound": 62,
-        "defensiveRebound": 69,
-        "perimeterDefense": 71,
-        "interiorDefense": 76,
-        "steal": 65,
-        "block": 70,
-        "defensiveIq": 63,
-        "speed": 73,
-        "strength": 74,
-        "vertical": 60,
-        "offensiveIq": 78
+        "threePoint": 88,
+        "freeThrow": 89,
+        "insideScoring": 71,
+        "closeShot": 70,
+        "midrange": 65,
+        "passing": 62,
+        "ballHandling": 61,
+        "offensiveRebound": 54,
+        "defensiveRebound": 66,
+        "perimeterDefense": 72,
+        "interiorDefense": 77,
+        "steal": 68,
+        "block": 68,
+        "defensiveIq": 61,
+        "speed": 72,
+        "strength": 78,
+        "vertical": 65,
+        "offensiveIq": 76
       },
       "tendencies": {
-        "usageRate": 23.1,
-        "passRate": 7.74,
-        "shotRate": 28.75,
+        "usageRate": 21.4,
+        "passRate": 6.07,
+        "shotRate": 25.63,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 29.2,
+        "rimFrequency": 28.4,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 8.16,
-        "aboveBreakThreeFrequency": 13.6,
-        "threePointRate": 21.01,
-        "freeThrowRate": 39.86,
-        "turnoverRate": 10.98,
-        "isolationRate": 6.93,
+        "cornerThreeFrequency": 10.56,
+        "aboveBreakThreeFrequency": 17.6,
+        "threePointRate": 22.76,
+        "freeThrowRate": 37.4,
+        "turnoverRate": 11.16,
+        "isolationRate": 6.42,
         "pickAndRollBallHandlerRate": 20,
-        "pickAndRollRollManRate": 10,
+        "pickAndRollRollManRate": 25,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 6.68,
-        "stealAttemptRate": 10.2,
-        "blockAttemptRate": 10.6,
-        "crashOffensiveGlassRate": 17.44
+        "foulRate": 6.3,
+        "stealAttemptRate": 10.44,
+        "blockAttemptRate": 10.44,
+        "crashOffensiveGlassRate": 16.48
       },
       "anchors": {
-        "gamesPlayed": 82,
-        "minutesPerGame": 35.9,
-        "pointsPerGame": 18,
-        "reboundsPerGame": 9.1,
-        "offensiveReboundsPerGame": 2.6,
-        "defensiveReboundsPerGame": 6.5,
-        "assistsPerGame": 2.4,
-        "stealsPerGame": 0.5,
-        "blocksPerGame": 0.8999999999999999,
-        "turnoversPerGame": 2,
-        "fieldGoalPct": 0.45652173913043476,
-        "threePointPct": 0.3448275862068966,
-        "freeThrowPct": 0.7818181818181817,
-        "threePointAttemptRate": 0.21014492753623185,
-        "freeThrowAttemptRate": 0.3985507246376811
+        "gamesPlayed": 72,
+        "minutesPerGame": 33.5,
+        "pointsPerGame": 17,
+        "reboundsPerGame": 7.699999999999999,
+        "offensiveReboundsPerGame": 1.7,
+        "defensiveReboundsPerGame": 6,
+        "assistsPerGame": 1.7,
+        "stealsPerGame": 0.8,
+        "blocksPerGame": 0.7,
+        "turnoversPerGame": 1.7999999999999998,
+        "fieldGoalPct": 0.4878048780487805,
+        "threePointPct": 0.46428571428571436,
+        "freeThrowPct": 0.826086956521739,
+        "threePointAttemptRate": 0.22764227642276422,
+        "freeThrowAttemptRate": 0.37398373983739835
       },
       "provenance": {
         "threePoint": {
@@ -13481,20 +14698,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2260",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2005-06",
+      "seasonKey": "2001-02",
       "firstName": "Jarron",
       "lastName": "Collins",
       "displayName": "Jarron Collins",
@@ -13516,35 +14733,35 @@
         "normalizationVersion": "position-v3"
       },
       "heightInches": 83,
-      "weightLbs": 255,
+      "weightLbs": 252,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 79,
-        "teamMinutes": 1729
+        "teamGames": 70,
+        "teamMinutes": 1444
       },
-      "selectionScore": 62.137,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.764,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 79,
-        "minutes": 1730,
-        "points": 418,
-        "rebounds": 331,
-        "offensiveRebounds": 134,
-        "defensiveRebounds": 197,
-        "assists": 94,
-        "steals": 39,
-        "blocks": 23,
-        "turnovers": 63,
-        "fieldGoalsMade": 126,
-        "fieldGoalsAttempted": 276,
+        "gamesPlayed": 70,
+        "minutes": 1442,
+        "points": 448,
+        "rebounds": 294,
+        "offensiveRebounds": 140,
+        "defensiveRebounds": 161,
+        "assists": 56,
+        "steals": 28,
+        "blocks": 21,
+        "turnovers": 56,
+        "fieldGoalsMade": 161,
+        "fieldGoalsAttempted": 343,
         "threesMade": 0,
         "threesAttempted": 0,
-        "freeThrowsMade": 158,
-        "freeThrowsAttempted": 221,
-        "per": 6.27,
-        "boxPlusMinus": -1.6139999999999999,
-        "usageRate": 11.799999999999999,
-        "tsPct": 0.551,
+        "freeThrowsMade": 133,
+        "freeThrowsAttempted": 182,
+        "per": 6.42,
+        "boxPlusMinus": -1.7419999999999995,
+        "usageRate": 15,
+        "tsPct": 0.532,
         "efgPct": 0.461
       },
       "historicalTeamIdentity": {
@@ -13552,75 +14769,128 @@
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2005-06",
+        "seasonKey": "2001-02",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 65,
-        "offenseRating": 54,
-        "defenseRating": 58
+        "overallRating": 46,
+        "offenseRating": 55,
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026548,
+          "secondaryCreator": 0.040923,
+          "scoringGuard": 0.046366,
+          "movementSpacer": 0.067607,
+          "twoWayWing": 0.178025,
+          "connector": 0.075973,
+          "interiorFinisher": 0.108403,
+          "stretchBig": 0.119291,
+          "rebounder": 0.144769,
+          "defensiveAnchor": 0.192095
+        },
+        "baseScore": 49.5,
+        "nonlinear": {
+          "creation": 55.491138373585855,
+          "penetration": 56.372096923119784,
+          "shootingGravity": 57.25,
+          "scalableScoring": 52.666666666666664,
+          "switchability": 67.04281810426205,
+          "rimProtection": 67.06092087276119,
+          "possessionControl": 60.320499999999996,
+          "synergyBonus": 0.11812469644884896,
+          "weaknessPenalty": -1.7741497880800001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.08353777500000001,
+            "foulRisk": 4.402666212,
+            "deficientRebounding": 0.7318836249999999
+          }
+        },
+        "production": {
+          "score": 27.4647,
+          "weight": 0.0888940732958408,
+          "confidence": "medium",
+          "sampleGames": 70,
+          "sampleMinutes": 1442,
+          "shrinkage": 0.31190902910821333
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0139375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 46,
+        "offenseRating": 55,
+        "defenseRating": 57
       },
       "detailedRatings": {
         "threePoint": 44,
-        "freeThrow": 75,
-        "insideScoring": 50,
-        "closeShot": 52,
+        "freeThrow": 77,
+        "insideScoring": 52,
+        "closeShot": 54,
         "midrange": 58,
-        "passing": 54,
+        "passing": 52,
         "ballHandling": 53,
-        "offensiveRebound": 51,
-        "defensiveRebound": 47,
-        "perimeterDefense": 62,
-        "interiorDefense": 67,
-        "steal": 65,
+        "offensiveRebound": 53,
+        "defensiveRebound": 46,
+        "perimeterDefense": 61,
+        "interiorDefense": 66,
+        "steal": 63,
         "block": 63,
         "defensiveIq": 56,
-        "speed": 64,
+        "speed": 65,
         "strength": 76,
-        "vertical": 65,
-        "offensiveIq": 63
+        "vertical": 64,
+        "offensiveIq": 62
       },
       "tendencies": {
-        "usageRate": 11.8,
-        "passRate": 9.9,
-        "shotRate": 7.29,
+        "usageRate": 15,
+        "passRate": 6.4,
+        "shotRate": 10.21,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 20,
+        "rimFrequency": 20.8,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
         "cornerThreeFrequency": 5.28,
         "aboveBreakThreeFrequency": 8.8,
         "threePointRate": 0,
-        "freeThrowRate": 80,
-        "turnoverRate": 14.46,
-        "isolationRate": 3.54,
+        "freeThrowRate": 53.06,
+        "turnoverRate": 11.69,
+        "isolationRate": 4.5,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 25,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 9.01,
-        "stealAttemptRate": 10.2,
+        "foulRate": 9.69,
+        "stealAttemptRate": 10.04,
         "blockAttemptRate": 10.04,
-        "crashOffensiveGlassRate": 16.12
+        "crashOffensiveGlassRate": 16.36
       },
       "anchors": {
-        "gamesPlayed": 79,
-        "minutesPerGame": 21.9,
-        "pointsPerGame": 5.3,
+        "gamesPlayed": 70,
+        "minutesPerGame": 20.6,
+        "pointsPerGame": 6.4,
         "reboundsPerGame": 4.2,
-        "offensiveReboundsPerGame": 1.6999999999999997,
-        "defensiveReboundsPerGame": 2.5,
-        "assistsPerGame": 1.2,
-        "stealsPerGame": 0.5,
+        "offensiveReboundsPerGame": 2,
+        "defensiveReboundsPerGame": 2.3,
+        "assistsPerGame": 0.8,
+        "stealsPerGame": 0.4,
         "blocksPerGame": 0.3,
         "turnoversPerGame": 0.8,
-        "fieldGoalPct": 0.4571428571428572,
+        "fieldGoalPct": 0.46938775510204084,
         "threePointPct": null,
-        "freeThrowPct": 0.7142857142857143,
+        "freeThrowPct": 0.7307692307692307,
         "threePointAttemptRate": 0,
-        "freeThrowAttemptRate": 0.7999999999999999
+        "freeThrowAttemptRate": 0.5306122448979592
       },
       "provenance": {
         "threePoint": {
@@ -14016,16 +15286,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2306",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -14057,8 +15327,8 @@
         "teamGames": 71,
         "teamMinutes": 2002
       },
-      "selectionScore": 72.04,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 59.657,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 71,
         "minutes": 2002,
@@ -14091,9 +15361,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 55,
         "offenseRating": 65,
-        "defenseRating": 59
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.062979,
+          "secondaryCreator": 0.095337,
+          "scoringGuard": 0.074173,
+          "movementSpacer": 0.154026,
+          "twoWayWing": 0.140858,
+          "connector": 0.163932,
+          "interiorFinisher": 0.062707,
+          "stretchBig": 0.103144,
+          "rebounder": 0.050359,
+          "defensiveAnchor": 0.092485
+        },
+        "baseScore": 55.35,
+        "nonlinear": {
+          "creation": 72.27671294243397,
+          "penetration": 67.60789329302793,
+          "shootingGravity": 66.7025,
+          "scalableScoring": 62.666666666666664,
+          "switchability": 65.34178936317673,
+          "rimProtection": 60.23170986007753,
+          "possessionControl": 70.8515,
+          "synergyBonus": 0.3524909158218157,
+          "weaknessPenalty": -1.62324083721,
+          "weaknesses": {
+            "turnoverLiability": 2.8971912239999997,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.7145474700000001,
+            "deficientRebounding": 1.1624990625
+          }
+        },
+        "production": {
+          "score": 41.4643,
+          "weight": 0.1389586159742062,
+          "confidence": "high",
+          "sampleGames": 71,
+          "sampleMinutes": 2002.2,
+          "shrinkage": 0.3656805683531742
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0638125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
+        "offenseRating": 65,
+        "defenseRating": 60
       },
       "detailedRatings": {
         "threePoint": 61,
@@ -14554,16 +15877,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2414",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -14595,8 +15918,8 @@
         "teamGames": 67,
         "teamMinutes": 856
       },
-      "selectionScore": 56.916,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 45.599,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 67,
         "minutes": 857,
@@ -14629,7 +15952,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 59,
+        "overallRating": 40,
+        "offenseRating": 51,
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.026494,
+          "secondaryCreator": 0.042548,
+          "scoringGuard": 0.043413,
+          "movementSpacer": 0.071668,
+          "twoWayWing": 0.170822,
+          "connector": 0.07838,
+          "interiorFinisher": 0.101921,
+          "stretchBig": 0.132657,
+          "rebounder": 0.144117,
+          "defensiveAnchor": 0.18798
+        },
+        "baseScore": 45.26,
+        "nonlinear": {
+          "creation": 53.88590450440876,
+          "penetration": 53.02455252590259,
+          "shootingGravity": 56.25,
+          "scalableScoring": 50.666666666666664,
+          "switchability": 63.97297035679023,
+          "rimProtection": 64.79976761759194,
+          "possessionControl": 54.17,
+          "synergyBonus": 0.044345623985213196,
+          "weaknessPenalty": -4.3638039287499995,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.19467962500000002,
+            "foulRisk": 5.640029999999999,
+            "deficientRebounding": 1.0000078125
+          }
+        },
+        "production": {
+          "score": 17.427249999999994,
+          "weight": 0.06491581808206667,
+          "confidence": "medium",
+          "sampleGames": 67,
+          "sampleMinutes": 857.6,
+          "shrinkage": 0.22777480028795322
+        },
+        "calibratedImpact": {
+          "adjustment": -0.015625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 40,
         "offenseRating": 51,
         "defenseRating": 55
       },
@@ -15089,20 +16465,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2430",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2007-08",
+      "seasonKey": "2004-05",
       "firstName": "Carlos",
       "lastName": "Boozer",
       "displayName": "Carlos Boozer",
@@ -15127,40 +16503,40 @@
       "weightLbs": 266,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 81,
-        "teamMinutes": 2826
+        "teamGames": 51,
+        "teamMinutes": 1780
       },
-      "selectionScore": 81.223,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 79.931,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 81,
-        "minutes": 2826,
-        "points": 1709,
-        "rebounds": 842,
-        "offensiveRebounds": 194,
-        "defensiveRebounds": 648,
-        "assists": 234,
-        "steals": 97,
-        "blocks": 40,
-        "turnovers": 210,
-        "fieldGoalsMade": 712,
-        "fieldGoalsAttempted": 1296,
+        "gamesPlayed": 51,
+        "minutes": 1779,
+        "points": 907,
+        "rebounds": 459,
+        "offensiveRebounds": 142,
+        "defensiveRebounds": 316,
+        "assists": 142,
+        "steals": 40,
+        "blocks": 25,
+        "turnovers": 137,
+        "fieldGoalsMade": 362,
+        "fieldGoalsAttempted": 693,
         "threesMade": 0,
         "threesAttempted": 0,
-        "freeThrowsMade": 291,
-        "freeThrowsAttempted": 396,
-        "per": 18.715,
-        "boxPlusMinus": 1.9120000000000008,
-        "usageRate": 26.3,
-        "tsPct": 0.581,
-        "efgPct": 0.547
+        "freeThrowsMade": 188,
+        "freeThrowsAttempted": 270,
+        "per": 15.674999999999999,
+        "boxPlusMinus": 0.49600000000000044,
+        "usageRate": 24.2,
+        "tsPct": 0.56,
+        "efgPct": 0.521
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2007-08",
+        "seasonKey": "2004-05",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
@@ -15624,16 +17000,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2484",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -15667,8 +17043,8 @@
         "teamGames": 81,
         "teamMinutes": 1711
       },
-      "selectionScore": 62.637,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 51.742,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 81,
         "minutes": 1709,
@@ -15701,9 +17077,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
-        "offenseRating": 58,
-        "defenseRating": 56
+        "overallRating": 46,
+        "offenseRating": 57,
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.033551,
+          "secondaryCreator": 0.050983,
+          "scoringGuard": 0.064827,
+          "movementSpacer": 0.189018,
+          "twoWayWing": 0.147684,
+          "connector": 0.122262,
+          "interiorFinisher": 0.063348,
+          "stretchBig": 0.150646,
+          "rebounder": 0.070211,
+          "defensiveAnchor": 0.10747
+        },
+        "baseScore": 51.13,
+        "nonlinear": {
+          "creation": 57.92638301752928,
+          "penetration": 57.6418677083961,
+          "shootingGravity": 68.27,
+          "scalableScoring": 57.666666666666664,
+          "switchability": 64.21056945639897,
+          "rimProtection": 60.47705795200896,
+          "possessionControl": 61.036500000000004,
+          "synergyBonus": 0.32317881836826634,
+          "weaknessPenalty": -1.2290514279400002,
+          "weaknesses": {
+            "turnoverLiability": 1.2865974160000002,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.1022066000000001,
+            "deficientRebounding": 1.226053125
+          }
+        },
+        "production": {
+          "score": 25.401499999999995,
+          "weight": 0.13547759200270096,
+          "confidence": "high",
+          "sampleGames": 81,
+          "sampleMinutes": 1709.1000000000001,
+          "shrinkage": 0.35651997895447624
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0256875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 46,
+        "offenseRating": 57,
+        "defenseRating": 57
       },
       "detailedRatings": {
         "threePoint": 63,
@@ -16164,16 +17593,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-252",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -16205,8 +17634,8 @@
         "teamGames": 80,
         "teamMinutes": 3037
       },
-      "selectionScore": 85.601,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 75.56,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 80,
         "minutes": 3040,
@@ -16239,9 +17668,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 90,
+        "overallRating": 73,
         "offenseRating": 73,
-        "defenseRating": 75
+        "defenseRating": 76
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.044682,
+          "secondaryCreator": 0.05959,
+          "scoringGuard": 0.049659,
+          "movementSpacer": 0.074481,
+          "twoWayWing": 0.186625,
+          "connector": 0.124444,
+          "interiorFinisher": 0.091688,
+          "stretchBig": 0.102457,
+          "rebounder": 0.088978,
+          "defensiveAnchor": 0.177396
+        },
+        "baseScore": 65.18,
+        "nonlinear": {
+          "creation": 79.17868010978518,
+          "penetration": 76.94435739434844,
+          "shootingGravity": 65.1775,
+          "scalableScoring": 77.66666666666667,
+          "switchability": 76.86725878821392,
+          "rimProtection": 71.30481097314751,
+          "possessionControl": 77.0365,
+          "synergyBonus": 0.7203445647090609,
+          "weaknessPenalty": -0.7315109724000001,
+          "weaknesses": {
+            "turnoverLiability": 1.2923373360000003,
+            "inefficientUsage": 0.2807999999999994,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.5783655240000001,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 68.4682,
+          "weight": 0.16963289280469895,
+          "confidence": "high",
+          "sampleGames": 80,
+          "sampleMinutes": 3040,
+          "shrinkage": 0.4464023494860499
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0359375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 73,
+        "offenseRating": 73,
+        "defenseRating": 76
       },
       "detailedRatings": {
         "threePoint": 66,
@@ -16702,16 +18184,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2562",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -16743,8 +18225,8 @@
         "teamGames": 79,
         "teamMinutes": 1136
       },
-      "selectionScore": 59.271,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 47.438,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 1137,
@@ -16777,9 +18259,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 61,
+        "overallRating": 41,
         "offenseRating": 53,
-        "defenseRating": 55
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.034356,
+          "secondaryCreator": 0.046615,
+          "scoringGuard": 0.053291,
+          "movementSpacer": 0.122691,
+          "twoWayWing": 0.177719,
+          "connector": 0.110076,
+          "interiorFinisher": 0.078497,
+          "stretchBig": 0.139786,
+          "rebounder": 0.088949,
+          "defensiveAnchor": 0.14802
+        },
+        "baseScore": 46.26,
+        "nonlinear": {
+          "creation": 54.902858833016,
+          "penetration": 54.70141224280367,
+          "shootingGravity": 61.1875,
+          "scalableScoring": 51,
+          "switchability": 61.951575090946676,
+          "rimProtection": 61.9475518940633,
+          "possessionControl": 59.0175,
+          "synergyBonus": 0,
+          "weaknessPenalty": -2.2669336086,
+          "weaknesses": {
+            "turnoverLiability": 0.9285210400000002,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 4.365755999999999,
+            "deficientRebounding": 1.37317475
+          }
+        },
+        "production": {
+          "score": 18.218399999999992,
+          "weight": 0.08160290867939532,
+          "confidence": "medium",
+          "sampleGames": 79,
+          "sampleMinutes": 1137.6000000000001,
+          "shrinkage": 0.2863259953662994
+        },
+        "calibratedImpact": {
+          "adjustment": 0.067375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 41,
+        "offenseRating": 53,
+        "defenseRating": 56
       },
       "detailedRatings": {
         "threePoint": 46,
@@ -17240,16 +18775,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2590",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -17281,8 +18816,8 @@
         "teamGames": 57,
         "teamMinutes": 773
       },
-      "selectionScore": 58.934,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 47.426,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 57,
         "minutes": 775,
@@ -17315,8 +18850,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 61,
-        "offenseRating": 55,
+        "overallRating": 42,
+        "offenseRating": 54,
+        "defenseRating": 53
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.048681,
+          "secondaryCreator": 0.066406,
+          "scoringGuard": 0.089992,
+          "movementSpacer": 0.170049,
+          "twoWayWing": 0.147833,
+          "connector": 0.124631,
+          "interiorFinisher": 0.062938,
+          "stretchBig": 0.111827,
+          "rebounder": 0.074761,
+          "defensiveAnchor": 0.102882
+        },
+        "baseScore": 46.82,
+        "nonlinear": {
+          "creation": 55.95766357964547,
+          "penetration": 55.038540480102824,
+          "shootingGravity": 62.3025,
+          "scalableScoring": 52,
+          "switchability": 58.846002687598265,
+          "rimProtection": 55.470699811127446,
+          "possessionControl": 59.5475,
+          "synergyBonus": 0.011219406578947442,
+          "weaknessPenalty": -1.6162256666800006,
+          "weaknesses": {
+            "turnoverLiability": 1.3392979600000006,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.33076185,
+            "spacingLimitation": 0,
+            "foulRisk": 1.858208592,
+            "deficientRebounding": 1.2253365
+          }
+        },
+        "production": {
+          "score": 16.034750000000003,
+          "weight": 0.05706136630562444,
+          "confidence": "medium",
+          "sampleGames": 57,
+          "sampleMinutes": 775.1999999999999,
+          "shrinkage": 0.20021532037061204
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00796875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 42,
+        "offenseRating": 54,
         "defenseRating": 53
       },
       "detailedRatings": {
@@ -17778,20 +19366,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2594",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2008-09",
+      "seasonKey": "2009-10",
       "firstName": "Kyle",
       "lastName": "Korver",
       "displayName": "Kyle Korver",
@@ -17818,108 +19406,161 @@
       "weightLbs": 212,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 78,
-        "teamMinutes": 1874
+        "teamGames": 52,
+        "teamMinutes": 951
       },
-      "selectionScore": 68.916,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 61.768,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 78,
-        "minutes": 1872,
-        "points": 702,
-        "rebounds": 257,
-        "offensiveRebounds": 31,
-        "defensiveRebounds": 226,
-        "assists": 140,
-        "steals": 46,
-        "blocks": 31,
-        "turnovers": 93,
-        "fieldGoalsMade": 241,
-        "fieldGoalsAttempted": 561,
-        "threesMade": 101,
-        "threesAttempted": 265,
-        "freeThrowsMade": 109,
-        "freeThrowsAttempted": 124,
-        "per": 7.93,
-        "boxPlusMinus": -1.1049999999999995,
-        "usageRate": 16.400000000000002,
-        "tsPct": 0.572,
-        "efgPct": 0.529
+        "gamesPlayed": 52,
+        "minutes": 951,
+        "points": 374,
+        "rebounds": 109,
+        "offensiveRebounds": 10,
+        "defensiveRebounds": 98,
+        "assists": 88,
+        "steals": 26,
+        "blocks": 10,
+        "turnovers": 41,
+        "fieldGoalsMade": 140,
+        "fieldGoalsAttempted": 280,
+        "threesMade": 57,
+        "threesAttempted": 109,
+        "freeThrowsMade": 41,
+        "freeThrowsAttempted": 46,
+        "per": 6.234999999999999,
+        "boxPlusMinus": -1.7810000000000001,
+        "usageRate": 15.4,
+        "tsPct": 0.62,
+        "efgPct": 0.598
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2008-09",
+        "seasonKey": "2009-10",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
-        "offenseRating": 64,
-        "defenseRating": 61
+        "overallRating": 61,
+        "offenseRating": 65,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.017705,
+          "secondaryCreator": 0.037627,
+          "scoringGuard": 0.049602,
+          "movementSpacer": 0.263833,
+          "twoWayWing": 0.129796,
+          "connector": 0.126991,
+          "interiorFinisher": 0.047426,
+          "stretchBig": 0.204001,
+          "rebounder": 0.044824,
+          "defensiveAnchor": 0.078195
+        },
+        "baseScore": 59.07,
+        "nonlinear": {
+          "creation": 57.6193864784605,
+          "penetration": 57.89358211412985,
+          "shootingGravity": 83.7225,
+          "scalableScoring": 68.33333333333333,
+          "switchability": 62.63278435990347,
+          "rimProtection": 61.66328817517367,
+          "possessionControl": 61.5785,
+          "synergyBonus": 1.3479811768128984,
+          "weaknessPenalty": -0.7227958438600002,
+          "weaknesses": {
+            "turnoverLiability": 0.10191313600000061,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.7669408679999997,
+            "deficientRebounding": 1.257016125
+          }
+        },
+        "production": {
+          "score": 33.93285,
+          "weight": 0.06252665517461534,
+          "confidence": "medium",
+          "sampleGames": 52,
+          "sampleMinutes": 951.6,
+          "shrinkage": 0.21939177254250994
+        },
+        "calibratedImpact": {
+          "adjustment": 0.05490625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 61,
+        "offenseRating": 65,
+        "defenseRating": 58
       },
       "detailedRatings": {
-        "threePoint": 76,
-        "freeThrow": 94,
-        "insideScoring": 57,
-        "closeShot": 58,
-        "midrange": 64,
-        "passing": 58,
-        "ballHandling": 57,
-        "offensiveRebound": 41,
-        "defensiveRebound": 49,
-        "perimeterDefense": 65,
-        "interiorDefense": 70,
-        "steal": 66,
-        "block": 64,
+        "threePoint": 89,
+        "freeThrow": 90,
+        "insideScoring": 55,
+        "closeShot": 56,
+        "midrange": 67,
+        "passing": 56,
+        "ballHandling": 56,
+        "offensiveRebound": 40,
+        "defensiveRebound": 47,
+        "perimeterDefense": 60,
+        "interiorDefense": 65,
+        "steal": 62,
+        "block": 59,
         "defensiveIq": 57,
-        "speed": 66,
-        "strength": 66,
-        "vertical": 60,
-        "offensiveIq": 65
+        "speed": 63,
+        "strength": 65,
+        "vertical": 58,
+        "offensiveIq": 61
       },
       "tendencies": {
-        "usageRate": 16.4,
-        "passRate": 9.86,
-        "shotRate": 15,
+        "usageRate": 15.4,
+        "passRate": 10.79,
+        "shotRate": 11.25,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 22.8,
+        "rimFrequency": 22,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 9.12,
-        "aboveBreakThreeFrequency": 15.2,
-        "threePointRate": 47.22,
-        "freeThrowRate": 22.22,
-        "turnoverRate": 13.18,
-        "isolationRate": 4.92,
+        "cornerThreeFrequency": 10.68,
+        "aboveBreakThreeFrequency": 17.8,
+        "threePointRate": 38.89,
+        "freeThrowRate": 16.67,
+        "turnoverRate": 12.13,
+        "isolationRate": 4.62,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 6.4,
-        "stealAttemptRate": 10.28,
-        "blockAttemptRate": 10.12,
-        "crashOffensiveGlassRate": 14.92
+        "foulRate": 5.93,
+        "stealAttemptRate": 9.96,
+        "blockAttemptRate": 9.72,
+        "crashOffensiveGlassRate": 14.8
       },
       "anchors": {
-        "gamesPlayed": 78,
-        "minutesPerGame": 24,
-        "pointsPerGame": 9,
-        "reboundsPerGame": 3.3,
-        "offensiveReboundsPerGame": 0.4,
-        "defensiveReboundsPerGame": 2.9,
-        "assistsPerGame": 1.8,
-        "stealsPerGame": 0.6,
-        "blocksPerGame": 0.4,
-        "turnoversPerGame": 1.2,
-        "fieldGoalPct": 0.4305555555555556,
-        "threePointPct": 0.3823529411764706,
-        "freeThrowPct": 0.8749999999999998,
-        "threePointAttemptRate": 0.4722222222222222,
-        "freeThrowAttemptRate": 0.22222222222222224
+        "gamesPlayed": 52,
+        "minutesPerGame": 18.3,
+        "pointsPerGame": 7.200000000000001,
+        "reboundsPerGame": 2.1,
+        "offensiveReboundsPerGame": 0.2,
+        "defensiveReboundsPerGame": 1.9,
+        "assistsPerGame": 1.6999999999999997,
+        "stealsPerGame": 0.5,
+        "blocksPerGame": 0.2,
+        "turnoversPerGame": 0.8,
+        "fieldGoalPct": 0.5,
+        "threePointPct": 0.5238095238095238,
+        "freeThrowPct": 0.8888888888888888,
+        "threePointAttemptRate": 0.3888888888888889,
+        "freeThrowAttemptRate": 0.16666666666666669
       },
       "provenance": {
         "threePoint": {
@@ -18318,16 +19959,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2693",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -18359,8 +20000,8 @@
         "teamGames": 53,
         "teamMinutes": 1381
       },
-      "selectionScore": 63.993,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 51.325,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 53,
         "minutes": 1383,
@@ -18393,8 +20034,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 67,
-        "offenseRating": 57,
+        "overallRating": 46,
+        "offenseRating": 56,
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.057409,
+          "secondaryCreator": 0.087934,
+          "scoringGuard": 0.064538,
+          "movementSpacer": 0.140184,
+          "twoWayWing": 0.157991,
+          "connector": 0.158825,
+          "interiorFinisher": 0.056043,
+          "stretchBig": 0.096483,
+          "rebounder": 0.059381,
+          "defensiveAnchor": 0.121212
+        },
+        "baseScore": 49.28,
+        "nonlinear": {
+          "creation": 67.62626571728148,
+          "penetration": 60.39023422947803,
+          "shootingGravity": 59.795,
+          "scalableScoring": 52,
+          "switchability": 64.72459411843576,
+          "rimProtection": 60.19482678500273,
+          "possessionControl": 66.103,
+          "synergyBonus": 0.09913942604331538,
+          "weaknessPenalty": -2.5614621213099995,
+          "weaknesses": {
+            "turnoverLiability": 4.808192591999998,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.4237710920000002,
+            "deficientRebounding": 1.3017484375
+          }
+        },
+        "production": {
+          "score": 28.015150000000002,
+          "weight": 0.07792275987527733,
+          "confidence": "medium",
+          "sampleGames": 53,
+          "sampleMinutes": 1383.3000000000002,
+          "shrinkage": 0.27341319254483276
+        },
+        "calibratedImpact": {
+          "adjustment": -0.034375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 46,
+        "offenseRating": 56,
         "defenseRating": 60
       },
       "detailedRatings": {
@@ -18856,20 +20550,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2743",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2004-05",
+      "seasonKey": "2005-06",
       "firstName": "Kris",
       "lastName": "Humphries",
       "displayName": "Kris Humphries",
@@ -18894,108 +20588,161 @@
       "weightLbs": 235,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 67,
-        "teamMinutes": 869
+        "teamGames": 62,
+        "teamMinutes": 619
       },
-      "selectionScore": 57.724,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 44.249,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 67,
-        "minutes": 871,
-        "points": 274,
-        "rebounds": 194,
-        "offensiveRebounds": 73,
-        "defensiveRebounds": 127,
-        "assists": 40,
-        "steals": 26,
-        "blocks": 20,
-        "turnovers": 53,
-        "fieldGoalsMade": 113,
-        "fieldGoalsAttempted": 288,
+        "gamesPlayed": 62,
+        "minutes": 620,
+        "points": 186,
+        "rebounds": 155,
+        "offensiveRebounds": 55,
+        "defensiveRebounds": 99,
+        "assists": 31,
+        "steals": 24,
+        "blocks": 18,
+        "turnovers": 31,
+        "fieldGoalsMade": 74,
+        "fieldGoalsAttempted": 204,
         "threesMade": 0,
         "threesAttempted": 6,
-        "freeThrowsMade": 46,
-        "freeThrowsAttempted": 100,
-        "per": 4.34,
-        "boxPlusMinus": -2.253,
-        "usageRate": 19.8,
-        "tsPct": 0.419,
-        "efgPct": 0.408
+        "freeThrowsMade": 31,
+        "freeThrowsAttempted": 62,
+        "per": 3.7,
+        "boxPlusMinus": -2.255,
+        "usageRate": 18.7,
+        "tsPct": 0.406,
+        "efgPct": 0.379
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2004-05",
+        "seasonKey": "2005-06",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 61,
+        "overallRating": 39,
         "offenseRating": 47,
-        "defenseRating": 57
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.038077,
+          "secondaryCreator": 0.043059,
+          "scoringGuard": 0.038542,
+          "movementSpacer": 0.063636,
+          "twoWayWing": 0.213415,
+          "connector": 0.095264,
+          "interiorFinisher": 0.09286,
+          "stretchBig": 0.10356,
+          "rebounder": 0.127242,
+          "defensiveAnchor": 0.184345
+        },
+        "baseScore": 44.17,
+        "nonlinear": {
+          "creation": 54.568076979806094,
+          "penetration": 53.01933553442167,
+          "shootingGravity": 45.7575,
+          "scalableScoring": 42.666666666666664,
+          "switchability": 61.54857686285338,
+          "rimProtection": 61.11946588581441,
+          "possessionControl": 59.5155,
+          "synergyBonus": 0,
+          "weaknessPenalty": -1.8269352045800002,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 1.3707657915,
+            "foulRisk": 2.931565608,
+            "deficientRebounding": 1.0710074375
+          }
+        },
+        "production": {
+          "score": 11.857749999999994,
+          "weight": 0.030397891231964482,
+          "confidence": "low",
+          "sampleGames": 62,
+          "sampleMinutes": 620,
+          "shrinkage": 0.17776544580096187
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00934375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 39,
+        "offenseRating": 47,
+        "defenseRating": 56
       },
       "detailedRatings": {
-        "threePoint": 19,
-        "freeThrow": 51,
-        "insideScoring": 47,
-        "closeShot": 53,
-        "midrange": 53,
+        "threePoint": 23,
+        "freeThrow": 56,
+        "insideScoring": 46,
+        "closeShot": 52,
+        "midrange": 51,
         "passing": 51,
-        "ballHandling": 55,
-        "offensiveRebound": 46,
+        "ballHandling": 54,
+        "offensiveRebound": 45,
         "defensiveRebound": 48,
-        "perimeterDefense": 59,
-        "interiorDefense": 64,
-        "steal": 61,
-        "block": 59,
+        "perimeterDefense": 58,
+        "interiorDefense": 63,
+        "steal": 60,
+        "block": 58,
         "defensiveIq": 56,
-        "speed": 62,
+        "speed": 60,
         "strength": 67,
-        "vertical": 58,
+        "vertical": 57,
         "offensiveIq": 59
       },
       "tendencies": {
-        "usageRate": 19.8,
-        "passRate": 6.58,
-        "shotRate": 8.96,
+        "usageRate": 18.7,
+        "passRate": 6.67,
+        "shotRate": 6.87,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 18.8,
+        "rimFrequency": 18.4,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 2.28,
-        "aboveBreakThreeFrequency": 3.8,
-        "threePointRate": 2.33,
-        "freeThrowRate": 34.88,
-        "turnoverRate": 13.89,
-        "isolationRate": 5.94,
+        "cornerThreeFrequency": 2.76,
+        "aboveBreakThreeFrequency": 4.6,
+        "threePointRate": 3.03,
+        "freeThrowRate": 30.3,
+        "turnoverRate": 11.79,
+        "isolationRate": 5.61,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 7.17,
-        "stealAttemptRate": 9.88,
-        "blockAttemptRate": 9.72,
-        "crashOffensiveGlassRate": 15.52
+        "foulRate": 8.24,
+        "stealAttemptRate": 9.8,
+        "blockAttemptRate": 9.64,
+        "crashOffensiveGlassRate": 15.4
       },
       "anchors": {
-        "gamesPlayed": 67,
-        "minutesPerGame": 13,
-        "pointsPerGame": 4.1,
-        "reboundsPerGame": 2.9,
-        "offensiveReboundsPerGame": 1.1,
-        "defensiveReboundsPerGame": 1.9,
-        "assistsPerGame": 0.6,
+        "gamesPlayed": 62,
+        "minutesPerGame": 10,
+        "pointsPerGame": 3,
+        "reboundsPerGame": 2.5,
+        "offensiveReboundsPerGame": 0.9,
+        "defensiveReboundsPerGame": 1.6,
+        "assistsPerGame": 0.5,
         "stealsPerGame": 0.4,
         "blocksPerGame": 0.3,
-        "turnoversPerGame": 0.8,
-        "fieldGoalPct": 0.39534883720930236,
+        "turnoversPerGame": 0.5,
+        "fieldGoalPct": 0.3636363636363636,
         "threePointPct": 0,
-        "freeThrowPct": 0.4666666666666667,
-        "threePointAttemptRate": 0.023255813953488375,
-        "freeThrowAttemptRate": 0.34883720930232565
+        "freeThrowPct": 0.5,
+        "threePointAttemptRate": 0.030303030303030304,
+        "freeThrowAttemptRate": 0.30303030303030304
       },
       "provenance": {
         "threePoint": {
@@ -19394,16 +21141,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-2745",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -19437,8 +21184,8 @@
         "teamGames": 68,
         "teamMinutes": 900
       },
-      "selectionScore": 58.89,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 46.972,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 68,
         "minutes": 897,
@@ -19471,7 +21218,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 61,
+        "overallRating": 41,
+        "offenseRating": 53,
+        "defenseRating": 54
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.035247,
+          "secondaryCreator": 0.042761,
+          "scoringGuard": 0.063001,
+          "movementSpacer": 0.189033,
+          "twoWayWing": 0.142921,
+          "connector": 0.112826,
+          "interiorFinisher": 0.06561,
+          "stretchBig": 0.158721,
+          "rebounder": 0.077934,
+          "defensiveAnchor": 0.111946
+        },
+        "baseScore": 46.59,
+        "nonlinear": {
+          "creation": 54.54164535688666,
+          "penetration": 54.38713561871313,
+          "shootingGravity": 63.019999999999996,
+          "scalableScoring": 53,
+          "switchability": 61.26659275572651,
+          "rimProtection": 58.45449893084415,
+          "possessionControl": 58.1625,
+          "synergyBonus": 0.04667224736842086,
+          "weaknessPenalty": -2.04064082367,
+          "weaknesses": {
+            "turnoverLiability": 1.8288162,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.160575675,
+            "spacingLimitation": 0,
+            "foulRisk": 2.6983145879999997,
+            "deficientRebounding": 1.3141783125
+          }
+        },
+        "production": {
+          "score": 17.525000000000002,
+          "weight": 0.06717940162384606,
+          "confidence": "medium",
+          "sampleGames": 68,
+          "sampleMinutes": 897.5999999999999,
+          "shrinkage": 0.23571719868016164
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0536875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 41,
         "offenseRating": 53,
         "defenseRating": 54
       },
@@ -19934,20 +21734,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-304",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2001-02",
+      "seasonKey": "2000-01",
       "firstName": "John",
       "lastName": "Stockton",
       "displayName": "John Stockton",
@@ -19973,107 +21773,160 @@
       "eligibility": {
         "minimumTeamGames": 40,
         "teamGames": 82,
-        "teamMinutes": 2569
+        "teamMinutes": 2395
       },
-      "selectionScore": 77.172,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 70.424,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
-        "minutes": 2566,
-        "points": 1098,
-        "rebounds": 262,
+        "minutes": 2394,
+        "points": 943,
+        "rebounds": 229,
         "offensiveRebounds": 57,
-        "defensiveRebounds": 205,
-        "assists": 672,
-        "steals": 155,
+        "defensiveRebounds": 172,
+        "assists": 713,
+        "steals": 131,
         "blocks": 24,
         "turnovers": 205,
-        "fieldGoalsMade": 401,
-        "fieldGoalsAttempted": 779,
-        "threesMade": 24,
-        "threesAttempted": 82,
-        "freeThrowsMade": 278,
-        "freeThrowsAttempted": 319,
-        "per": 15.094999999999999,
-        "boxPlusMinus": 1.9379999999999997,
-        "usageRate": 18.9,
-        "tsPct": 0.601,
-        "efgPct": 0.534
+        "fieldGoalsMade": 328,
+        "fieldGoalsAttempted": 647,
+        "threesMade": 57,
+        "threesAttempted": 131,
+        "freeThrowsMade": 229,
+        "freeThrowsAttempted": 278,
+        "per": 13.979999999999999,
+        "boxPlusMinus": 1.2100000000000009,
+        "usageRate": 17.8,
+        "tsPct": 0.61,
+        "efgPct": 0.551
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2001-02",
+        "seasonKey": "2000-01",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 79,
-        "offenseRating": 72,
-        "defenseRating": 68
+        "overallRating": 68,
+        "offenseRating": 73,
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.052882,
+          "secondaryCreator": 0.114131,
+          "scoringGuard": 0.053727,
+          "movementSpacer": 0.188083,
+          "twoWayWing": 0.117826,
+          "connector": 0.23418,
+          "interiorFinisher": 0.033951,
+          "stretchBig": 0.104139,
+          "rebounder": 0.028277,
+          "defensiveAnchor": 0.072804
+        },
+        "baseScore": 64.12,
+        "nonlinear": {
+          "creation": 83.5715141457855,
+          "penetration": 70.02448123305209,
+          "shootingGravity": 77.5625,
+          "scalableScoring": 73,
+          "switchability": 68.13798394612814,
+          "rimProtection": 62.758822696279616,
+          "possessionControl": 76.439,
+          "synergyBonus": 0.8794872295838518,
+          "weaknessPenalty": -2.6257137823,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.7063274700000002,
+            "deficientRebounding": 1.016360125
+          }
+        },
+        "production": {
+          "score": 54.12749999999999,
+          "weight": 0.15703402615946227,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 2394.4,
+          "shrinkage": 0.4132474372617428
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00671875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 68,
+        "offenseRating": 73,
+        "defenseRating": 66
       },
       "detailedRatings": {
-        "threePoint": 66,
-        "freeThrow": 94,
-        "insideScoring": 61,
-        "closeShot": 65,
-        "midrange": 65,
-        "passing": 95,
-        "ballHandling": 79,
+        "threePoint": 85,
+        "freeThrow": 88,
+        "insideScoring": 58,
+        "closeShot": 62,
+        "midrange": 67,
+        "passing": 96,
+        "ballHandling": 80,
         "offensiveRebound": 43,
-        "defensiveRebound": 47,
-        "perimeterDefense": 78,
-        "interiorDefense": 75,
-        "steal": 79,
+        "defensiveRebound": 45,
+        "perimeterDefense": 75,
+        "interiorDefense": 72,
+        "steal": 76,
         "block": 63,
-        "defensiveIq": 63,
-        "speed": 75,
+        "defensiveIq": 62,
+        "speed": 74,
         "strength": 57,
         "vertical": 60,
-        "offensiveIq": 78
+        "offensiveIq": 76
       },
       "tendencies": {
-        "usageRate": 18.9,
-        "passRate": 20.63,
-        "shotRate": 19.79,
+        "usageRate": 17.8,
+        "passRate": 22.52,
+        "shotRate": 16.46,
         "driveRate": 18,
         "postUpRate": 5,
-        "rimFrequency": 24.4,
+        "rimFrequency": 23.2,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 7.92,
-        "aboveBreakThreeFrequency": 13.2,
-        "threePointRate": 10.53,
-        "freeThrowRate": 41.05,
-        "turnoverRate": 18.23,
-        "isolationRate": 5.67,
+        "cornerThreeFrequency": 10.2,
+        "aboveBreakThreeFrequency": 17,
+        "threePointRate": 20.25,
+        "freeThrowRate": 43.04,
+        "turnoverRate": 21.02,
+        "isolationRate": 5.34,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 5.83,
-        "stealAttemptRate": 11.32,
+        "foulRate": 5.95,
+        "stealAttemptRate": 11.08,
         "blockAttemptRate": 10.04,
         "crashOffensiveGlassRate": 15.16
       },
       "anchors": {
         "gamesPlayed": 82,
-        "minutesPerGame": 31.299999999999997,
-        "pointsPerGame": 13.399999999999999,
-        "reboundsPerGame": 3.2000000000000006,
+        "minutesPerGame": 29.200000000000003,
+        "pointsPerGame": 11.5,
+        "reboundsPerGame": 2.8,
         "offensiveReboundsPerGame": 0.7,
-        "defensiveReboundsPerGame": 2.5,
-        "assistsPerGame": 8.2,
-        "stealsPerGame": 1.8999999999999997,
+        "defensiveReboundsPerGame": 2.1,
+        "assistsPerGame": 8.7,
+        "stealsPerGame": 1.6000000000000003,
         "blocksPerGame": 0.3,
         "turnoversPerGame": 2.5,
-        "fieldGoalPct": 0.5157894736842106,
-        "threePointPct": 0.3,
-        "freeThrowPct": 0.8717948717948718,
-        "threePointAttemptRate": 0.10526315789473684,
-        "freeThrowAttemptRate": 0.4105263157894737
+        "fieldGoalPct": 0.5063291139240506,
+        "threePointPct": 0.43749999999999994,
+        "freeThrowPct": 0.8235294117647058,
+        "threePointAttemptRate": 0.20253164556962025,
+        "freeThrowAttemptRate": 0.430379746835443
       },
       "provenance": {
         "threePoint": {
@@ -20472,16 +22325,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-317",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -20513,8 +22366,8 @@
         "teamGames": 75,
         "teamMinutes": 2126
       },
-      "selectionScore": 68.178,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 55.97,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 75,
         "minutes": 2122,
@@ -20547,8 +22400,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
-        "offenseRating": 62,
+        "overallRating": 51,
+        "offenseRating": 61,
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.032528,
+          "secondaryCreator": 0.055417,
+          "scoringGuard": 0.061473,
+          "movementSpacer": 0.202668,
+          "twoWayWing": 0.149715,
+          "connector": 0.136943,
+          "interiorFinisher": 0.058587,
+          "stretchBig": 0.148313,
+          "rebounder": 0.054393,
+          "defensiveAnchor": 0.099963
+        },
+        "baseScore": 54.4,
+        "nonlinear": {
+          "creation": 61.962863643509024,
+          "penetration": 60.39736257360677,
+          "shootingGravity": 71.5925,
+          "scalableScoring": 61.333333333333336,
+          "switchability": 66.55726501181805,
+          "rimProtection": 61.489835483271946,
+          "possessionControl": 65.0375,
+          "synergyBonus": 0.532773180755834,
+          "weaknessPenalty": -1.00902069008,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.568166912,
+            "deficientRebounding": 1.3995410000000001
+          }
+        },
+        "production": {
+          "score": 29.269150000000003,
+          "weight": 0.14520658925195787,
+          "confidence": "high",
+          "sampleGames": 75,
+          "sampleMinutes": 2122.5,
+          "shrinkage": 0.382122603294626
+        },
+        "calibratedImpact": {
+          "adjustment": -0.01546875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
+        "offenseRating": 61,
         "defenseRating": 59
       },
       "detailedRatings": {
@@ -21010,16 +22916,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-330",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -21051,8 +22957,8 @@
         "teamGames": 82,
         "teamMinutes": 1300
       },
-      "selectionScore": 64.252,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 53.452,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 1303,
@@ -21085,7 +22991,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
+        "overallRating": 48,
+        "offenseRating": 58,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.031722,
+          "secondaryCreator": 0.043707,
+          "scoringGuard": 0.055785,
+          "movementSpacer": 0.106372,
+          "twoWayWing": 0.195348,
+          "connector": 0.099405,
+          "interiorFinisher": 0.083405,
+          "stretchBig": 0.147031,
+          "rebounder": 0.083943,
+          "defensiveAnchor": 0.153282
+        },
+        "baseScore": 51.05,
+        "nonlinear": {
+          "creation": 57.907899805356365,
+          "penetration": 58.523987532879765,
+          "shootingGravity": 63.480000000000004,
+          "scalableScoring": 60,
+          "switchability": 65.59531991200272,
+          "rimProtection": 64.85595795356228,
+          "possessionControl": 60.2995,
+          "synergyBonus": 0.1417598676539354,
+          "weaknessPenalty": -2.7701818731300003,
+          "weaknesses": {
+            "turnoverLiability": 2.3424661920000003,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 4.53507249,
+            "deficientRebounding": 1.2700550625
+          }
+        },
+        "production": {
+          "score": 29.651699999999998,
+          "weight": 0.08907643490859593,
+          "confidence": "medium",
+          "sampleGames": 82,
+          "sampleMinutes": 1303.8,
+          "shrinkage": 0.3125488944161261
+        },
+        "calibratedImpact": {
+          "adjustment": 0.06659375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 48,
         "offenseRating": 58,
         "defenseRating": 58
       },
@@ -21548,16 +23507,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-349",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -21589,8 +23548,8 @@
         "teamGames": 82,
         "teamMinutes": 1468
       },
-      "selectionScore": 61.758,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 48.908,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 1467,
@@ -21623,8 +23582,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
-        "offenseRating": 55,
+        "overallRating": 43,
+        "offenseRating": 54,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.05084,
+          "secondaryCreator": 0.087323,
+          "scoringGuard": 0.059661,
+          "movementSpacer": 0.173783,
+          "twoWayWing": 0.131505,
+          "connector": 0.153747,
+          "interiorFinisher": 0.051498,
+          "stretchBig": 0.13236,
+          "rebounder": 0.062452,
+          "defensiveAnchor": 0.096831
+        },
+        "baseScore": 48.09,
+        "nonlinear": {
+          "creation": 65.87349505135597,
+          "penetration": 57.33687857411516,
+          "shootingGravity": 63.417500000000004,
+          "scalableScoring": 50.666666666666664,
+          "switchability": 61.85920183003928,
+          "rimProtection": 58.23525955737795,
+          "possessionControl": 59.221,
+          "synergyBonus": 0.08301134090933408,
+          "weaknessPenalty": -2.5245169065,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.054945600000000004,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.3701041250000001
+          }
+        },
+        "production": {
+          "score": 22.63035,
+          "weight": 0.09473951008585041,
+          "confidence": "medium",
+          "sampleGames": 82,
+          "sampleMinutes": 1467.8,
+          "shrinkage": 0.33241933363456283
+        },
+        "calibratedImpact": {
+          "adjustment": -0.10175,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 43,
+        "offenseRating": 54,
         "defenseRating": 56
       },
       "detailedRatings": {
@@ -22086,16 +24098,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-384",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -22127,8 +24139,8 @@
         "teamGames": 81,
         "teamMinutes": 2352
       },
-      "selectionScore": 67.583,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 53.19,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 81,
         "minutes": 2349,
@@ -22161,7 +24173,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
+        "overallRating": 47,
+        "offenseRating": 58,
+        "defenseRating": 61
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.033466,
+          "secondaryCreator": 0.053889,
+          "scoringGuard": 0.050426,
+          "movementSpacer": 0.115096,
+          "twoWayWing": 0.174018,
+          "connector": 0.115517,
+          "interiorFinisher": 0.082435,
+          "stretchBig": 0.13179,
+          "rebounder": 0.087471,
+          "defensiveAnchor": 0.155892
+        },
+        "baseScore": 51.67,
+        "nonlinear": {
+          "creation": 60.58955841112801,
+          "penetration": 60.08506452862499,
+          "shootingGravity": 58.1875,
+          "scalableScoring": 60.333333333333336,
+          "switchability": 65.97979179298054,
+          "rimProtection": 64.15551440491897,
+          "possessionControl": 63.1245,
+          "synergyBonus": 0.09112571160932723,
+          "weaknessPenalty": -1.21902759588,
+          "weaknesses": {
+            "turnoverLiability": 1.142416968,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.425521064,
+            "deficientRebounding": 1.01743725
+          }
+        },
+        "production": {
+          "score": 31.120050000000006,
+          "weight": 0.15524526065587496,
+          "confidence": "high",
+          "sampleGames": 81,
+          "sampleMinutes": 2349,
+          "shrinkage": 0.4085401596207236
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0755,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
         "offenseRating": 58,
         "defenseRating": 61
       },
@@ -22624,16 +24689,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-458",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -22665,8 +24730,8 @@
         "teamGames": 74,
         "teamMinutes": 1429
       },
-      "selectionScore": 61.336,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 49.731,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 74,
         "minutes": 1428,
@@ -22699,8 +24764,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 63,
-        "offenseRating": 57,
+        "overallRating": 44,
+        "offenseRating": 56,
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.045181,
+          "secondaryCreator": 0.078659,
+          "scoringGuard": 0.073742,
+          "movementSpacer": 0.194716,
+          "twoWayWing": 0.139941,
+          "connector": 0.149235,
+          "interiorFinisher": 0.051024,
+          "stretchBig": 0.1218,
+          "rebounder": 0.052465,
+          "defensiveAnchor": 0.093237
+        },
+        "baseScore": 48.38,
+        "nonlinear": {
+          "creation": 62.64382875871463,
+          "penetration": 57.03188940923203,
+          "shootingGravity": 68.1125,
+          "scalableScoring": 53.333333333333336,
+          "switchability": 61.49573636910441,
+          "rimProtection": 58.235558295484054,
+          "possessionControl": 60.978,
+          "synergyBonus": 0.2583937996246691,
+          "weaknessPenalty": -3.17633805738,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.7562766319999998,
+            "deficientRebounding": 1.5858941250000003
+          }
+        },
+        "production": {
+          "score": 21.89529999999999,
+          "weight": 0.09023188306809646,
+          "confidence": "medium",
+          "sampleGames": 74,
+          "sampleMinutes": 1428.2,
+          "shrinkage": 0.316603098484549
+        },
+        "calibratedImpact": {
+          "adjustment": 0.13828125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 44,
+        "offenseRating": 56,
         "defenseRating": 55
       },
       "detailedRatings": {
@@ -23162,16 +25280,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-680",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -23203,8 +25321,8 @@
         "teamGames": 54,
         "teamMinutes": 586
       },
-      "selectionScore": 55.252,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 45.931,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 54,
         "minutes": 588,
@@ -23237,9 +25355,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 57,
+        "overallRating": 41,
         "offenseRating": 50,
-        "defenseRating": 54
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.032179,
+          "secondaryCreator": 0.040294,
+          "scoringGuard": 0.04631,
+          "movementSpacer": 0.093258,
+          "twoWayWing": 0.204824,
+          "connector": 0.097125,
+          "interiorFinisher": 0.086767,
+          "stretchBig": 0.139672,
+          "rebounder": 0.11237,
+          "defensiveAnchor": 0.147201
+        },
+        "baseScore": 45.59,
+        "nonlinear": {
+          "creation": 53.5894796312417,
+          "penetration": 53.69582065410987,
+          "shootingGravity": 53.5,
+          "scalableScoring": 51.666666666666664,
+          "switchability": 61.103648920489476,
+          "rimProtection": 60.339605802234566,
+          "possessionControl": 54.107,
+          "synergyBonus": 0,
+          "weaknessPenalty": -3.2975052507,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.052969575000000005,
+            "spacingLimitation": 0.5034523500000001,
+            "foulRisk": 2.0328616800000003,
+            "deficientRebounding": 1.10926125
+          }
+        },
+        "production": {
+          "score": 10.062599999999993,
+          "weight": 0.02768388271895457,
+          "confidence": "low",
+          "sampleGames": 54,
+          "sampleMinutes": 588.6,
+          "shrinkage": 0.1618940509880384
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0748125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 41,
+        "offenseRating": 50,
+        "defenseRating": 55
       },
       "detailedRatings": {
         "threePoint": 51,
@@ -23697,20 +25868,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-731",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2003-04",
+      "seasonKey": "2005-06",
       "firstName": "Greg",
       "lastName": "Ostertag",
       "displayName": "Greg Ostertag",
@@ -23735,40 +25906,40 @@
       "weightLbs": 280,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 78,
-        "teamMinutes": 2153
+        "teamGames": 60,
+        "teamMinutes": 807
       },
-      "selectionScore": 67.685,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 66.7,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 78,
-        "minutes": 2152,
-        "points": 530,
-        "rebounds": 577,
-        "offensiveRebounds": 218,
-        "defensiveRebounds": 358,
-        "assists": 124,
-        "steals": 31,
-        "blocks": 140,
-        "turnovers": 101,
-        "fieldGoalsMade": 210,
-        "fieldGoalsAttempted": 436,
+        "gamesPlayed": 60,
+        "minutes": 810,
+        "points": 144,
+        "rebounds": 228,
+        "offensiveRebounds": 84,
+        "defensiveRebounds": 144,
+        "assists": 60,
+        "steals": 6,
+        "blocks": 66,
+        "turnovers": 48,
+        "fieldGoalsMade": 60,
+        "fieldGoalsAttempted": 126,
         "threesMade": 0,
         "threesAttempted": 0,
-        "freeThrowsMade": 109,
-        "freeThrowsAttempted": 195,
-        "per": 10.265,
-        "boxPlusMinus": 1.2960000000000012,
-        "usageRate": 13.3,
-        "tsPct": 0.506,
-        "efgPct": 0.476
+        "freeThrowsMade": 24,
+        "freeThrowsAttempted": 48,
+        "per": 4.83,
+        "boxPlusMinus": -1.342,
+        "usageRate": 11.1,
+        "tsPct": 0.503,
+        "efgPct": 0.492
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2003-04",
+        "seasonKey": "2005-06",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
@@ -24232,16 +26403,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-763",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -24273,8 +26444,8 @@
         "teamGames": 58,
         "teamMinutes": 789
       },
-      "selectionScore": 58.84,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 47.574,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 58,
         "minutes": 788,
@@ -24307,7 +26478,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 61,
+        "overallRating": 42,
+        "offenseRating": 54,
+        "defenseRating": 55
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.031192,
+          "secondaryCreator": 0.04343,
+          "scoringGuard": 0.056499,
+          "movementSpacer": 0.09117,
+          "twoWayWing": 0.195364,
+          "connector": 0.092812,
+          "interiorFinisher": 0.089556,
+          "stretchBig": 0.13432,
+          "rebounder": 0.107525,
+          "defensiveAnchor": 0.158132
+        },
+        "baseScore": 46.33,
+        "nonlinear": {
+          "creation": 53.87235511874721,
+          "penetration": 54.474330699957264,
+          "shootingGravity": 59.5,
+          "scalableScoring": 54,
+          "switchability": 61.888631149795536,
+          "rimProtection": 61.64868812959613,
+          "possessionControl": 56.524,
+          "synergyBonus": 0,
+          "weaknessPenalty": -3.329221532580001,
+          "weaknesses": {
+            "turnoverLiability": 3.477154176,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 5.201449236,
+            "deficientRebounding": 1.113224625
+          }
+        },
+        "production": {
+          "score": 20.522850000000002,
+          "weight": 0.05813073778969819,
+          "confidence": "medium",
+          "sampleGames": 58,
+          "sampleMinutes": 788.8,
+          "shrinkage": 0.20396750101648486
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00296875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 42,
         "offenseRating": 54,
         "defenseRating": 55
       },
@@ -24767,20 +26991,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-923",
       "franchiseId": "jazz",
       "eraId": "2000s",
-      "seasonKey": "2000-01",
+      "seasonKey": "2001-02",
       "firstName": "Donyell",
       "lastName": "Marshall",
       "displayName": "Donyell Marshall",
@@ -24805,108 +27029,161 @@
       "weightLbs": 230,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 81,
-        "teamMinutes": 2328
+        "teamGames": 58,
+        "teamMinutes": 1749
       },
-      "selectionScore": 75.503,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 64.8,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 81,
-        "minutes": 2324,
-        "points": 1101,
-        "rebounds": 567,
-        "offensiveRebounds": 170,
-        "defensiveRebounds": 396,
-        "assists": 129,
-        "steals": 81,
-        "blocks": 81,
-        "turnovers": 129,
-        "fieldGoalsMade": 429,
-        "fieldGoalsAttempted": 850,
-        "threesMade": 40,
-        "threesAttempted": 129,
-        "freeThrowsMade": 202,
-        "freeThrowsAttempted": 275,
-        "per": 13,
-        "boxPlusMinus": 1.4819999999999993,
-        "usageRate": 21.3,
-        "tsPct": 0.568,
-        "efgPct": 0.527
+        "gamesPlayed": 58,
+        "minutes": 1751,
+        "points": 858,
+        "rebounds": 440,
+        "offensiveRebounds": 156,
+        "defensiveRebounds": 284,
+        "assists": 98,
+        "steals": 52,
+        "blocks": 69,
+        "turnovers": 121,
+        "fieldGoalsMade": 342,
+        "fieldGoalsAttempted": 661,
+        "threesMade": 11,
+        "threesAttempted": 40,
+        "freeThrowsMade": 162,
+        "freeThrowsAttempted": 226,
+        "per": 13.760000000000002,
+        "boxPlusMinus": 1.5659999999999998,
+        "usageRate": 22.3,
+        "tsPct": 0.565,
+        "efgPct": 0.529
       },
       "historicalTeamIdentity": {
         "teamId": "1610612762",
         "displayName": "Utah Jazz",
         "city": "Utah",
         "abbreviation": "UTA",
-        "seasonKey": "2000-01",
+        "seasonKey": "2001-02",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 79,
+        "overallRating": 62,
         "offenseRating": 64,
-        "defenseRating": 70
+        "defenseRating": 71
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.028855,
+          "secondaryCreator": 0.041158,
+          "scoringGuard": 0.046026,
+          "movementSpacer": 0.081226,
+          "twoWayWing": 0.186498,
+          "connector": 0.099004,
+          "interiorFinisher": 0.082139,
+          "stretchBig": 0.116491,
+          "rebounder": 0.110718,
+          "defensiveAnchor": 0.207885
+        },
+        "baseScore": 59.09,
+        "nonlinear": {
+          "creation": 65.63836492724909,
+          "penetration": 66.53227370447019,
+          "shootingGravity": 64.035,
+          "scalableScoring": 68,
+          "switchability": 72.9461666032672,
+          "rimProtection": 71.3039834649283,
+          "possessionControl": 66.91,
+          "synergyBonus": 0.38434917420570724,
+          "weaknessPenalty": -0.8349652455600002,
+          "weaknesses": {
+            "turnoverLiability": 1.4270961600000005,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.028683974,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 52.42389999999999,
+          "weight": 0.12114997702857744,
+          "confidence": "high",
+          "sampleGames": 58,
+          "sampleMinutes": 1751.6,
+          "shrinkage": 0.3188157290225722
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0643125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 62,
+        "offenseRating": 64,
+        "defenseRating": 71
       },
       "detailedRatings": {
-        "threePoint": 64,
-        "freeThrow": 78,
-        "insideScoring": 66,
-        "closeShot": 65,
+        "threePoint": 60,
+        "freeThrow": 76,
+        "insideScoring": 68,
+        "closeShot": 67,
         "midrange": 64,
-        "passing": 60,
-        "ballHandling": 60,
-        "offensiveRebound": 57,
+        "passing": 61,
+        "ballHandling": 61,
+        "offensiveRebound": 62,
         "defensiveRebound": 60,
-        "perimeterDefense": 76,
-        "interiorDefense": 81,
-        "steal": 70,
-        "block": 72,
-        "defensiveIq": 62,
-        "speed": 70,
-        "strength": 70,
+        "perimeterDefense": 77,
+        "interiorDefense": 82,
+        "steal": 69,
+        "block": 74,
+        "defensiveIq": 63,
+        "speed": 71,
+        "strength": 71,
         "vertical": 60,
-        "offensiveIq": 75
+        "offensiveIq": 76
       },
       "tendencies": {
-        "usageRate": 21.3,
-        "passRate": 6.81,
-        "shotRate": 21.88,
+        "usageRate": 22.3,
+        "passRate": 6.73,
+        "shotRate": 23.75,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 26.4,
+        "rimFrequency": 27.2,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 7.68,
-        "aboveBreakThreeFrequency": 12.8,
-        "threePointRate": 15.24,
-        "freeThrowRate": 32.38,
-        "turnoverRate": 11.77,
-        "isolationRate": 6.39,
+        "cornerThreeFrequency": 7.2,
+        "aboveBreakThreeFrequency": 12,
+        "threePointRate": 6.14,
+        "freeThrowRate": 34.21,
+        "turnoverRate": 13.8,
+        "isolationRate": 6.69,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 6.01,
-        "stealAttemptRate": 10.6,
-        "blockAttemptRate": 10.76,
-        "crashOffensiveGlassRate": 16.84
+        "foulRate": 6.13,
+        "stealAttemptRate": 10.52,
+        "blockAttemptRate": 10.92,
+        "crashOffensiveGlassRate": 17.44
       },
       "anchors": {
-        "gamesPlayed": 81,
-        "minutesPerGame": 28.7,
-        "pointsPerGame": 13.6,
-        "reboundsPerGame": 7,
-        "offensiveReboundsPerGame": 2.1,
+        "gamesPlayed": 58,
+        "minutesPerGame": 30.2,
+        "pointsPerGame": 14.8,
+        "reboundsPerGame": 7.6,
+        "offensiveReboundsPerGame": 2.7,
         "defensiveReboundsPerGame": 4.9,
-        "assistsPerGame": 1.5999999999999999,
-        "stealsPerGame": 1,
-        "blocksPerGame": 1,
-        "turnoversPerGame": 1.5999999999999999,
-        "fieldGoalPct": 0.5047619047619047,
-        "threePointPct": 0.3125,
-        "freeThrowPct": 0.7352941176470589,
-        "threePointAttemptRate": 0.15238095238095237,
-        "freeThrowAttemptRate": 0.32380952380952377
+        "assistsPerGame": 1.7,
+        "stealsPerGame": 0.9,
+        "blocksPerGame": 1.2,
+        "turnoversPerGame": 2.1,
+        "fieldGoalPct": 0.5175438596491229,
+        "threePointPct": 0.2857142857142858,
+        "freeThrowPct": 0.7179487179487178,
+        "threePointAttemptRate": 0.061403508771929814,
+        "freeThrowAttemptRate": 0.3421052631578947
       },
       "provenance": {
         "threePoint": {
@@ -25305,16 +27582,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-935",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -25346,8 +27623,8 @@
         "teamGames": 78,
         "teamMinutes": 2474
       },
-      "selectionScore": 72.967,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 62.787,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 78,
         "minutes": 2472,
@@ -25380,7 +27657,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 59,
+        "offenseRating": 65,
+        "defenseRating": 65
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.023009,
+          "secondaryCreator": 0.041413,
+          "scoringGuard": 0.047911,
+          "movementSpacer": 0.201113,
+          "twoWayWing": 0.149487,
+          "connector": 0.13362,
+          "interiorFinisher": 0.062204,
+          "stretchBig": 0.169203,
+          "rebounder": 0.056405,
+          "defensiveAnchor": 0.115635
+        },
+        "baseScore": 59.09,
+        "nonlinear": {
+          "creation": 63.15774695384524,
+          "penetration": 63.84058632887163,
+          "shootingGravity": 75.555,
+          "scalableScoring": 70.33333333333333,
+          "switchability": 68.98536411551135,
+          "rimProtection": 66.0171796171964,
+          "possessionControl": 66.098,
+          "synergyBonus": 0.8164453864733687,
+          "weaknessPenalty": -0.64753866507,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.1704747979999996,
+            "deficientRebounding": 0.7340506875
+          }
+        },
+        "production": {
+          "score": 42.894499999999994,
+          "weight": 0.15634183990845768,
+          "confidence": "high",
+          "sampleGames": 78,
+          "sampleMinutes": 2472.6,
+          "shrinkage": 0.41142589449594125
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0806875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 59,
         "offenseRating": 65,
         "defenseRating": 65
       },
@@ -25843,16 +28173,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-965",
       "franchiseId": "jazz",
       "eraId": "2000s",
@@ -25884,8 +28214,8 @@
         "teamGames": 82,
         "teamMinutes": 2286
       },
-      "selectionScore": 68.393,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.543,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 82,
         "minutes": 2287,
@@ -25918,9 +28248,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
+        "overallRating": 51,
         "offenseRating": 62,
-        "defenseRating": 59
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.042619,
+          "secondaryCreator": 0.074681,
+          "scoringGuard": 0.070634,
+          "movementSpacer": 0.197479,
+          "twoWayWing": 0.145486,
+          "connector": 0.162577,
+          "interiorFinisher": 0.054079,
+          "stretchBig": 0.109903,
+          "rebounder": 0.046779,
+          "defensiveAnchor": 0.095763
+        },
+        "baseScore": 53.96,
+        "nonlinear": {
+          "creation": 64.98445387580051,
+          "penetration": 61.78629161493222,
+          "shootingGravity": 70.5425,
+          "scalableScoring": 60.333333333333336,
+          "switchability": 64.32130093158436,
+          "rimProtection": 59.94492421283765,
+          "possessionControl": 66.468,
+          "synergyBonus": 0.4066739423770033,
+          "weaknessPenalty": -1.35164600756,
+          "weaknesses": {
+            "turnoverLiability": 1.0544305280000001,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.5599896560000002,
+            "deficientRebounding": 1.36100925
+          }
+        },
+        "production": {
+          "score": 33.690799999999996,
+          "weight": 0.1542654371801097,
+          "confidence": "high",
+          "sampleGames": 82,
+          "sampleMinutes": 2287.7999999999997,
+          "shrinkage": 0.4059616767897624
+        },
+        "calibratedImpact": {
+          "adjustment": -0.06675,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
+        "offenseRating": 62,
+        "defenseRating": 60
       },
       "detailedRatings": {
         "threePoint": 63,
@@ -26381,9 +28764,9 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"

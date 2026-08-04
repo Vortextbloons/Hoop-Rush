@@ -8,4 +8,6 @@ export * from './v2.js';
 export * from './traits.js';
 export * from './contracts.js';
 export * from './compute.js';
+export * from './v3.js';
+export * from './artifact.js';
 export type { StatsRow } from './stats.js';

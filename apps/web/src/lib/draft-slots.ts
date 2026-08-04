@@ -1,4 +1,4 @@
-import type { PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
+import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
 import { canPlay, slotRequirement } from '@hoop-rush/engine';
 
 /**
@@ -19,7 +19,7 @@ export const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
 
 /** Whether a player's career-wide playable positions fill the slot. */
 export function canFillSlot(player: PlayersIndexEntry, slotIndex: number): boolean {
-  return canPlay(player.positionsPlayable, slotRequirement(slotIndex as SlotIndex));
+  return canPlay(player.positionsPlayable, slotRequirement(slotIndex));
 }
 
 /**

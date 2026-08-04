@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 3,
-  "dataVersion": "m6",
+  "schemaVersion": 4,
+  "dataVersion": "m7-ratings-v3",
   "franchiseId": "celtics",
   "eraId": "2020s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1626196",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -69,8 +69,8 @@
         "teamGames": 44,
         "teamMinutes": 1086
       },
-      "selectionScore": 68.799,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 62.322,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 65,
         "minutes": 1599,
@@ -103,7 +103,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 61,
+        "offenseRating": 65,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.020727,
+          "secondaryCreator": 0.039535,
+          "scoringGuard": 0.052918,
+          "movementSpacer": 0.291711,
+          "twoWayWing": 0.122954,
+          "connector": 0.138178,
+          "interiorFinisher": 0.041251,
+          "stretchBig": 0.174187,
+          "rebounder": 0.03986,
+          "defensiveAnchor": 0.078679
+        },
+        "baseScore": 60.46,
+        "nonlinear": {
+          "creation": 61.20472289010724,
+          "penetration": 59.826908543380476,
+          "shootingGravity": 84.58500000000001,
+          "scalableScoring": 67,
+          "switchability": 67.25159727737481,
+          "rimProtection": 62.97182539871299,
+          "possessionControl": 65.4725,
+          "synergyBonus": 1.4694751607424141,
+          "weaknessPenalty": -0.52867121458,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.4081969619999998,
+            "deficientRebounding": 1.1467183749999998
+          }
+        },
+        "production": {
+          "score": 38.35060000000001,
+          "weight": 0.1213764808924538,
+          "confidence": "high",
+          "sampleGames": 65,
+          "sampleMinutes": 1599,
+          "shrinkage": 0.3194117918222468
+        },
+        "calibratedImpact": {
+          "adjustment": -0.103375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 61,
         "offenseRating": 65,
         "defenseRating": 62
       },
@@ -566,16 +619,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1627759",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -609,8 +662,8 @@
         "teamGames": 71,
         "teamMinutes": 2442
       },
-      "selectionScore": 83.99,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 76.828,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 71,
         "minutes": 2442,
@@ -643,7 +696,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 88,
+        "overallRating": 76,
+        "offenseRating": 76,
+        "defenseRating": 68
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.061949,
+          "secondaryCreator": 0.072179,
+          "scoringGuard": 0.065089,
+          "movementSpacer": 0.141755,
+          "twoWayWing": 0.130868,
+          "connector": 0.157725,
+          "interiorFinisher": 0.093315,
+          "stretchBig": 0.123872,
+          "rebounder": 0.056679,
+          "defensiveAnchor": 0.096569
+        },
+        "baseScore": 65.89,
+        "nonlinear": {
+          "creation": 82.31565819375115,
+          "penetration": 79.93327770048845,
+          "shootingGravity": 74.3175,
+          "scalableScoring": 79.66666666666667,
+          "switchability": 71.57152931078298,
+          "rimProtection": 66.71510717854896,
+          "possessionControl": 79.8255,
+          "synergyBonus": 0.9811113142643835,
+          "weaknessPenalty": -0.4220016739599999,
+          "weaknesses": {
+            "turnoverLiability": 0.5070304239999999,
+            "inefficientUsage": 0.10101000000000004,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.6331409699999997,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 77.37784999999998,
+          "weight": 0.15058269714519718,
+          "confidence": "high",
+          "sampleGames": 71,
+          "sampleMinutes": 2442.4,
+          "shrinkage": 0.3962702556452557
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00453125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 76,
         "offenseRating": 76,
         "defenseRating": 68
       },
@@ -1106,16 +1212,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1627763",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -1147,8 +1253,8 @@
         "teamGames": 67,
         "teamMinutes": 1743
       },
-      "selectionScore": 73.841,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 69.572,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 67,
         "minutes": 1742,
@@ -1181,9 +1287,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
-        "offenseRating": 72,
-        "defenseRating": 61
+        "overallRating": 69,
+        "offenseRating": 71,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.030164,
+          "secondaryCreator": 0.055089,
+          "scoringGuard": 0.061957,
+          "movementSpacer": 0.281944,
+          "twoWayWing": 0.107841,
+          "connector": 0.156174,
+          "interiorFinisher": 0.043502,
+          "stretchBig": 0.162593,
+          "rebounder": 0.037846,
+          "defensiveAnchor": 0.06289
+        },
+        "baseScore": 64.8,
+        "nonlinear": {
+          "creation": 69.96624222619991,
+          "penetration": 66.45326205039875,
+          "shootingGravity": 86.0925,
+          "scalableScoring": 73.66666666666667,
+          "switchability": 66.84765266086566,
+          "rimProtection": 61.987769534466885,
+          "possessionControl": 71.428,
+          "synergyBonus": 1.535105647279994,
+          "weaknessPenalty": -0.25717738125,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.7564040624999999
+          }
+        },
+        "production": {
+          "score": 52.74619999999999,
+          "weight": 0.12785265816070612,
+          "confidence": "high",
+          "sampleGames": 67,
+          "sampleMinutes": 1742,
+          "shrinkage": 0.3364543635808056
+        },
+        "calibratedImpact": {
+          "adjustment": 0.014125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 69,
+        "offenseRating": 71,
+        "defenseRating": 62
       },
       "detailedRatings": {
         "threePoint": 89,
@@ -1644,16 +1803,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628369",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -1685,8 +1844,8 @@
         "teamGames": 74,
         "teamMinutes": 2732
       },
-      "selectionScore": 90.031,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 84.054,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 74,
         "minutes": 2730,
@@ -1719,7 +1878,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 96,
+        "overallRating": 86,
+        "offenseRating": 78,
+        "defenseRating": 73
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.040929,
+          "secondaryCreator": 0.053648,
+          "scoringGuard": 0.049028,
+          "movementSpacer": 0.165142,
+          "twoWayWing": 0.130372,
+          "connector": 0.160064,
+          "interiorFinisher": 0.083516,
+          "stretchBig": 0.152807,
+          "rebounder": 0.059232,
+          "defensiveAnchor": 0.105262
+        },
+        "baseScore": 69.08,
+        "nonlinear": {
+          "creation": 82.52107205841743,
+          "penetration": 80.1986210462258,
+          "shootingGravity": 81.02,
+          "scalableScoring": 82.66666666666667,
+          "switchability": 75.26872489799229,
+          "rimProtection": 70.02436045849338,
+          "possessionControl": 81.2415,
+          "synergyBonus": 1.333821470523238,
+          "weaknessPenalty": 0,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 85.37029999999999,
+          "weight": 0.15920862289037016,
+          "confidence": "high",
+          "sampleGames": 74,
+          "sampleMinutes": 2730.6,
+          "shrinkage": 0.4189700602378162
+        },
+        "calibratedImpact": {
+          "adjustment": 0.121,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 86,
         "offenseRating": 78,
         "defenseRating": 73
       },
@@ -2182,16 +2394,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628400",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -2223,8 +2435,8 @@
         "teamGames": 56,
         "teamMinutes": 949
       },
-      "selectionScore": 59.988,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 53.62,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 56,
         "minutes": 952,
@@ -2257,9 +2469,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
+        "overallRating": 51,
         "offenseRating": 57,
-        "defenseRating": 56
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.01404,
+          "secondaryCreator": 0.025575,
+          "scoringGuard": 0.029453,
+          "movementSpacer": 0.325754,
+          "twoWayWing": 0.093397,
+          "connector": 0.12409,
+          "interiorFinisher": 0.040163,
+          "stretchBig": 0.229602,
+          "rebounder": 0.04881,
+          "defensiveAnchor": 0.069116
+        },
+        "baseScore": 53.06,
+        "nonlinear": {
+          "creation": 53.53824382895708,
+          "penetration": 53.709690347129836,
+          "shootingGravity": 79.4475,
+          "scalableScoring": 57.666666666666664,
+          "switchability": 60.56939422552683,
+          "rimProtection": 59.93812658000026,
+          "possessionControl": 60.432,
+          "synergyBonus": 1.2749439223684214,
+          "weaknessPenalty": -0.35840524125000006,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.0541330625
+          }
+        },
+        "production": {
+          "score": 22.6943,
+          "weight": 0.064547308319739,
+          "confidence": "medium",
+          "sampleGames": 56,
+          "sampleMinutes": 952,
+          "shrinkage": 0.22648178357803156
+        },
+        "calibratedImpact": {
+          "adjustment": 0.02925,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
+        "offenseRating": 57,
+        "defenseRating": 57
       },
       "detailedRatings": {
         "threePoint": 65,
@@ -2720,20 +2985,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628401",
       "franchiseId": "celtics",
       "eraId": "2020s",
-      "seasonKey": "2025-26",
+      "seasonKey": "2023-24",
       "firstName": "Derrick",
       "lastName": "White",
       "displayName": "Derrick White",
@@ -2758,108 +3023,161 @@
       "weightLbs": 190,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 77,
-        "teamMinutes": 2625
+        "teamGames": 73,
+        "teamMinutes": 2381
       },
-      "selectionScore": 79.168,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 73.792,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 77,
-        "minutes": 2625,
-        "points": 1270,
-        "rebounds": 338,
-        "offensiveRebounds": 84,
-        "defensiveRebounds": 254,
-        "assists": 415,
-        "steals": 84,
-        "blocks": 100,
-        "turnovers": 130,
-        "fieldGoalsMade": 438,
-        "fieldGoalsAttempted": 1108,
-        "threesMade": 207,
-        "threesAttempted": 639,
-        "freeThrowsMade": 184,
-        "freeThrowsAttempted": 200,
-        "per": 16.065000000000005,
-        "boxPlusMinus": 2.8500000000000014,
-        "usageRate": 21.6,
-        "tsPct": 0.529,
-        "efgPct": 0.489
+        "gamesPlayed": 73,
+        "minutes": 2379,
+        "points": 1109,
+        "rebounds": 306,
+        "offensiveRebounds": 51,
+        "defensiveRebounds": 255,
+        "assists": 379,
+        "steals": 73,
+        "blocks": 87,
+        "turnovers": 109,
+        "fieldGoalsMade": 386,
+        "fieldGoalsAttempted": 839,
+        "threesMade": 197,
+        "threesAttempted": 496,
+        "freeThrowsMade": 138,
+        "freeThrowsAttempted": 153,
+        "per": 15.094999999999999,
+        "boxPlusMinus": 2.404,
+        "usageRate": 18.3,
+        "tsPct": 0.611,
+        "efgPct": 0.578
       },
       "historicalTeamIdentity": {
         "teamId": "1610612738",
         "displayName": "Boston Celtics",
         "city": "Boston",
         "abbreviation": "BOS",
-        "seasonKey": "2025-26",
+        "seasonKey": "2023-24",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
-        "offenseRating": 71,
-        "defenseRating": 71
+        "overallRating": 73,
+        "offenseRating": 73,
+        "defenseRating": 70
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025848,
+          "secondaryCreator": 0.0526,
+          "scoringGuard": 0.040742,
+          "movementSpacer": 0.290675,
+          "twoWayWing": 0.108702,
+          "connector": 0.196137,
+          "interiorFinisher": 0.031389,
+          "stretchBig": 0.14873,
+          "rebounder": 0.027308,
+          "defensiveAnchor": 0.077869
+        },
+        "baseScore": 67.29,
+        "nonlinear": {
+          "creation": 76.19708771990997,
+          "penetration": 68.04092115953367,
+          "shootingGravity": 89.2825,
+          "scalableScoring": 73.33333333333333,
+          "switchability": 71.61874086790712,
+          "rimProtection": 67.63119527630451,
+          "possessionControl": 76.3265,
+          "synergyBonus": 1.7881879052610627,
+          "weaknessPenalty": -0.27391113455999994,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.06940598399999988,
+            "deficientRebounding": 0.736215
+          }
+        },
+        "production": {
+          "score": 58.6666,
+          "weight": 0.1505771714352578,
+          "confidence": "high",
+          "sampleGames": 73,
+          "sampleMinutes": 2379.8,
+          "shrinkage": 0.39625571430331
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00225,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 73,
+        "offenseRating": 73,
+        "defenseRating": 70
       },
       "detailedRatings": {
-        "threePoint": 66,
-        "freeThrow": 100,
+        "threePoint": 81,
+        "freeThrow": 98,
         "insideScoring": 60,
-        "closeShot": 69,
-        "midrange": 60,
-        "passing": 81,
-        "ballHandling": 72,
-        "offensiveRebound": 47,
-        "defensiveRebound": 51,
-        "perimeterDefense": 81,
-        "interiorDefense": 78,
-        "steal": 71,
-        "block": 75,
-        "defensiveIq": 65,
-        "speed": 76,
-        "strength": 63,
+        "closeShot": 67,
+        "midrange": 69,
+        "passing": 80,
+        "ballHandling": 70,
+        "offensiveRebound": 43,
+        "defensiveRebound": 52,
+        "perimeterDefense": 79,
+        "interiorDefense": 76,
+        "steal": 70,
+        "block": 74,
+        "defensiveIq": 64,
+        "speed": 75,
+        "strength": 62,
         "vertical": 60,
-        "offensiveIq": 81
+        "offensiveIq": 79
       },
       "tendencies": {
-        "usageRate": 21.6,
-        "passRate": 14.74,
-        "shotRate": 30,
+        "usageRate": 18.3,
+        "passRate": 15.07,
+        "shotRate": 23.96,
         "driveRate": 18,
         "postUpRate": 5,
         "rimFrequency": 24,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 7.92,
-        "aboveBreakThreeFrequency": 13.2,
-        "threePointRate": 57.64,
-        "freeThrowRate": 18.06,
-        "turnoverRate": 9.86,
-        "isolationRate": 6.48,
+        "cornerThreeFrequency": 9.72,
+        "aboveBreakThreeFrequency": 16.2,
+        "threePointRate": 59.13,
+        "freeThrowRate": 18.26,
+        "turnoverRate": 10.77,
+        "isolationRate": 5.49,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 4.11,
-        "stealAttemptRate": 10.68,
-        "blockAttemptRate": 11,
-        "crashOffensiveGlassRate": 15.64
+        "foulRate": 5.09,
+        "stealAttemptRate": 10.6,
+        "blockAttemptRate": 10.92,
+        "crashOffensiveGlassRate": 15.16
       },
       "anchors": {
-        "gamesPlayed": 77,
-        "minutesPerGame": 34.1,
-        "pointsPerGame": 16.5,
-        "reboundsPerGame": 4.4,
-        "offensiveReboundsPerGame": 1.1,
-        "defensiveReboundsPerGame": 3.3,
-        "assistsPerGame": 5.4,
-        "stealsPerGame": 1.1,
-        "blocksPerGame": 1.3,
-        "turnoversPerGame": 1.7000000000000002,
-        "fieldGoalPct": 0.39583333333333337,
-        "threePointPct": 0.3253012048192771,
-        "freeThrowPct": 0.9230769230769229,
-        "threePointAttemptRate": 0.576388888888889,
-        "freeThrowAttemptRate": 0.18055555555555558
+        "gamesPlayed": 73,
+        "minutesPerGame": 32.6,
+        "pointsPerGame": 15.2,
+        "reboundsPerGame": 4.2,
+        "offensiveReboundsPerGame": 0.7,
+        "defensiveReboundsPerGame": 3.5,
+        "assistsPerGame": 5.2,
+        "stealsPerGame": 1,
+        "blocksPerGame": 1.2,
+        "turnoversPerGame": 1.5,
+        "fieldGoalPct": 0.46086956521739125,
+        "threePointPct": 0.39705882352941185,
+        "freeThrowPct": 0.9047619047619047,
+        "threePointAttemptRate": 0.591304347826087,
+        "freeThrowAttemptRate": 0.1826086956521739
       },
       "provenance": {
         "threePoint": {
@@ -3258,16 +3576,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628436",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -3299,8 +3617,8 @@
         "teamGames": 73,
         "teamMinutes": 1361
       },
-      "selectionScore": 67.829,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 58.271,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 73,
         "minutes": 1357,
@@ -3333,7 +3651,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
+        "overallRating": 55,
+        "offenseRating": 60,
+        "defenseRating": 64
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.022953,
+          "secondaryCreator": 0.045554,
+          "scoringGuard": 0.04107,
+          "movementSpacer": 0.07115,
+          "twoWayWing": 0.211241,
+          "connector": 0.095396,
+          "interiorFinisher": 0.073159,
+          "stretchBig": 0.117936,
+          "rebounder": 0.115147,
+          "defensiveAnchor": 0.206394
+        },
+        "baseScore": 55.03,
+        "nonlinear": {
+          "creation": 59.37348066287665,
+          "penetration": 56.79148189396043,
+          "shootingGravity": 62.5,
+          "scalableScoring": 57.333333333333336,
+          "switchability": 69.4940387896382,
+          "rimProtection": 69.42227489094796,
+          "possessionControl": 65.14099999999999,
+          "synergyBonus": 0.2207356905213108,
+          "weaknessPenalty": -0.41324839572,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.0255672079999998,
+            "deficientRebounding": 0.18986925000000002
+          }
+        },
+        "production": {
+          "score": 42.673249999999996,
+          "weight": 0.08747687279713277,
+          "confidence": "medium",
+          "sampleGames": 73,
+          "sampleMinutes": 1357.8000000000002,
+          "shrinkage": 0.30693639577941323
+        },
+        "calibratedImpact": {
+          "adjustment": 0.04559375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
         "offenseRating": 60,
         "defenseRating": 64
       },
@@ -3793,16 +4164,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1628464",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -3834,8 +4205,8 @@
         "teamGames": 42,
         "teamMinutes": 1026
       },
-      "selectionScore": 68.937,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 60.259,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 65,
         "minutes": 1599,
@@ -3868,9 +4239,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 73,
+        "overallRating": 58,
         "offenseRating": 62,
-        "defenseRating": 65
+        "defenseRating": 66
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.021545,
+          "secondaryCreator": 0.038308,
+          "scoringGuard": 0.039303,
+          "movementSpacer": 0.168673,
+          "twoWayWing": 0.150281,
+          "connector": 0.125759,
+          "interiorFinisher": 0.058016,
+          "stretchBig": 0.17462,
+          "rebounder": 0.074975,
+          "defensiveAnchor": 0.14852
+        },
+        "baseScore": 56.96,
+        "nonlinear": {
+          "creation": 61.74592519566367,
+          "penetration": 60.15543034246088,
+          "shootingGravity": 72.485,
+          "scalableScoring": 65.66666666666667,
+          "switchability": 68.64580801497533,
+          "rimProtection": 68.25633241739479,
+          "possessionControl": 65.351,
+          "synergyBonus": 0.6050218130655931,
+          "weaknessPenalty": -0.7164839174300003,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.8085147020000005,
+            "deficientRebounding": 0.2987909375
+          }
+        },
+        "production": {
+          "score": 43.371549999999985,
+          "weight": 0.1213764808924538,
+          "confidence": "high",
+          "sampleGames": 65,
+          "sampleMinutes": 1599,
+          "shrinkage": 0.3194117918222468
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0730625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 58,
+        "offenseRating": 62,
+        "defenseRating": 66
       },
       "detailedRatings": {
         "threePoint": 70,
@@ -4331,16 +4755,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629004",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -4374,8 +4798,8 @@
         "teamGames": 41,
         "teamMinutes": 413
       },
-      "selectionScore": 57.018,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 52.902,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 41,
         "minutes": 414,
@@ -4408,7 +4832,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 58,
+        "overallRating": 51,
+        "offenseRating": 56,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.014335,
+          "secondaryCreator": 0.022813,
+          "scoringGuard": 0.024385,
+          "movementSpacer": 0.33886,
+          "twoWayWing": 0.094115,
+          "connector": 0.13237,
+          "interiorFinisher": 0.03783,
+          "stretchBig": 0.232194,
+          "rebounder": 0.043514,
+          "defensiveAnchor": 0.059584
+        },
+        "baseScore": 51.9,
+        "nonlinear": {
+          "creation": 54.271155573536035,
+          "penetration": 54.17501514977181,
+          "shootingGravity": 77.6975,
+          "scalableScoring": 57,
+          "switchability": 59.5522221181531,
+          "rimProtection": 58.63405903788546,
+          "possessionControl": 61.2785,
+          "synergyBonus": 1.179489495394737,
+          "weaknessPenalty": -0.3885998805000001,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0.051538325,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.0914025
+          }
+        },
+        "production": {
+          "score": 22.846499999999992,
+          "weight": 0.018725591952121392,
+          "confidence": "low",
+          "sampleGames": 41,
+          "sampleMinutes": 414.09999999999997,
+          "shrinkage": 0.10950638568492041
+        },
+        "calibratedImpact": {
+          "adjustment": -0.05171875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
         "offenseRating": 56,
         "defenseRating": 56
       },
@@ -4871,16 +5348,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629014",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -4912,8 +5389,8 @@
         "teamGames": 49,
         "teamMinutes": 1201
       },
-      "selectionScore": 70.423,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 65.012,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 55,
         "minutes": 1369,
@@ -4946,9 +5423,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
-        "offenseRating": 68,
-        "defenseRating": 57
+        "overallRating": 65,
+        "offenseRating": 67,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025655,
+          "secondaryCreator": 0.042704,
+          "scoringGuard": 0.067642,
+          "movementSpacer": 0.352883,
+          "twoWayWing": 0.095859,
+          "connector": 0.135539,
+          "interiorFinisher": 0.040913,
+          "stretchBig": 0.156592,
+          "rebounder": 0.031523,
+          "defensiveAnchor": 0.05069
+        },
+        "baseScore": 61.37,
+        "nonlinear": {
+          "creation": 63.964009712635715,
+          "penetration": 64.07673088570178,
+          "shootingGravity": 87.6175,
+          "scalableScoring": 67.33333333333333,
+          "switchability": 63.75360994551954,
+          "rimProtection": 58.995762255314744,
+          "possessionControl": 68.1545,
+          "synergyBonus": 1.7572272458120983,
+          "weaknessPenalty": -0.45418466466000007,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.2149926240000002,
+            "deficientRebounding": 1.120844625
+          }
+        },
+        "production": {
+          "score": 44.09365,
+          "weight": 0.07874803972817565,
+          "confidence": "medium",
+          "sampleGames": 55,
+          "sampleMinutes": 1369.5,
+          "shrinkage": 0.2763089113269321
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0005625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 65,
+        "offenseRating": 67,
+        "defenseRating": 58
       },
       "detailedRatings": {
         "threePoint": 77,
@@ -5409,16 +5939,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629052",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -5450,8 +5980,8 @@
         "teamGames": 55,
         "teamMinutes": 630
       },
-      "selectionScore": 58.281,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.584,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 55,
         "minutes": 632,
@@ -5484,7 +6014,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 60,
+        "overallRating": 47,
+        "offenseRating": 55,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.022711,
+          "secondaryCreator": 0.03699,
+          "scoringGuard": 0.03673,
+          "movementSpacer": 0.186639,
+          "twoWayWing": 0.156451,
+          "connector": 0.131166,
+          "interiorFinisher": 0.059904,
+          "stretchBig": 0.180538,
+          "rebounder": 0.081267,
+          "defensiveAnchor": 0.107604
+        },
+        "baseScore": 48.98,
+        "nonlinear": {
+          "creation": 54.581283194498795,
+          "penetration": 53.44283059576135,
+          "shootingGravity": 65.92750000000001,
+          "scalableScoring": 54.333333333333336,
+          "switchability": 60.22140422015156,
+          "rimProtection": 59.6453400028631,
+          "possessionControl": 60.302,
+          "synergyBonus": 0.18974837730263203,
+          "weaknessPenalty": -0.63736694559,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.0033777259999999,
+            "deficientRebounding": 0.8712309375
+          }
+        },
+        "production": {
+          "score": 20.90985,
+          "weight": 0.029363423212192263,
+          "confidence": "low",
+          "sampleGames": 55,
+          "sampleMinutes": 632.5,
+          "shrinkage": 0.17171592521749862
+        },
+        "calibratedImpact": {
+          "adjustment": -0.04178125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
         "offenseRating": 55,
         "defenseRating": 56
       },
@@ -5947,16 +6530,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629057",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -5988,8 +6571,8 @@
         "teamGames": 61,
         "teamMinutes": 1804
       },
-      "selectionScore": 73.689,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 69.68,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 61,
         "minutes": 1805,
@@ -6022,9 +6605,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 69,
         "offenseRating": 64,
-        "defenseRating": 78
+        "defenseRating": 79
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.017985,
+          "secondaryCreator": 0.037384,
+          "scoringGuard": 0.030946,
+          "movementSpacer": 0.050247,
+          "twoWayWing": 0.204052,
+          "connector": 0.091541,
+          "interiorFinisher": 0.052074,
+          "stretchBig": 0.085062,
+          "rebounder": 0.127169,
+          "defensiveAnchor": 0.30354
+        },
+        "baseScore": 63.14,
+        "nonlinear": {
+          "creation": 66.13745457898925,
+          "penetration": 61.77161902078877,
+          "shootingGravity": 66.25,
+          "scalableScoring": 65,
+          "switchability": 75.54343070846551,
+          "rimProtection": 76.40077248392863,
+          "possessionControl": 68.07249999999999,
+          "synergyBonus": 0.44908414388512174,
+          "weaknessPenalty": -0.45686058060000023,
+          "weaknesses": {
+            "turnoverLiability": 0.8075046000000005,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.5362029900000003,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 63.477999999999994,
+          "weight": 0.12536124716053407,
+          "confidence": "high",
+          "sampleGames": 61,
+          "sampleMinutes": 1805.6000000000001,
+          "shrinkage": 0.32989801884351067
+        },
+        "calibratedImpact": {
+          "adjustment": 0.05196875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 69,
+        "offenseRating": 64,
+        "defenseRating": 79
       },
       "detailedRatings": {
         "threePoint": 52,
@@ -6482,16 +7118,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629641",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -6523,8 +7159,8 @@
         "teamGames": 44,
         "teamMinutes": 728
       },
-      "selectionScore": 59.718,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.639,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 48,
         "minutes": 772,
@@ -6557,8 +7193,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
-        "offenseRating": 56,
+        "overallRating": 47,
+        "offenseRating": 55,
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.021211,
+          "secondaryCreator": 0.033974,
+          "scoringGuard": 0.037516,
+          "movementSpacer": 0.232025,
+          "twoWayWing": 0.13131,
+          "connector": 0.134602,
+          "interiorFinisher": 0.055131,
+          "stretchBig": 0.180186,
+          "rebounder": 0.065534,
+          "defensiveAnchor": 0.108511
+        },
+        "baseScore": 49.91,
+        "nonlinear": {
+          "creation": 53.48481241239364,
+          "penetration": 53.419362025894166,
+          "shootingGravity": 68.5,
+          "scalableScoring": 56,
+          "switchability": 60.653776327145806,
+          "rimProtection": 60.70338610122249,
+          "possessionControl": 61.7355,
+          "synergyBonus": 0.35254888157894737,
+          "weaknessPenalty": -0.38647885,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.1367025
+          }
+        },
+        "production": {
+          "score": 21.325250000000004,
+          "weight": 0.05285782854948641,
+          "confidence": "medium",
+          "sampleGames": 48,
+          "sampleMinutes": 772.8000000000001,
+          "shrinkage": 0.18546606508591723
+        },
+        "calibratedImpact": {
+          "adjustment": -0.013,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
+        "offenseRating": 55,
         "defenseRating": 58
       },
       "detailedRatings": {
@@ -7020,16 +7709,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629674",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -7061,8 +7750,8 @@
         "teamGames": 76,
         "teamMinutes": 1926
       },
-      "selectionScore": 71.771,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 62.199,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 76,
         "minutes": 1922,
@@ -7095,7 +7784,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 60,
+        "offenseRating": 58,
+        "defenseRating": 71
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025665,
+          "secondaryCreator": 0.041041,
+          "scoringGuard": 0.032982,
+          "movementSpacer": 0.038584,
+          "twoWayWing": 0.193908,
+          "connector": 0.077606,
+          "interiorFinisher": 0.08,
+          "stretchBig": 0.078989,
+          "rebounder": 0.161792,
+          "defensiveAnchor": 0.269433
+        },
+        "baseScore": 57.83,
+        "nonlinear": {
+          "creation": 64.17109169086412,
+          "penetration": 61.1521776008069,
+          "shootingGravity": 56.88,
+          "scalableScoring": 53.666666666666664,
+          "switchability": 74.8301936117986,
+          "rimProtection": 75.19170815078058,
+          "possessionControl": 67.11449999999999,
+          "synergyBonus": 0.3346839804108778,
+          "weaknessPenalty": -0.7912485643999999,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.12316505599999973,
+            "foulRisk": 2.2040366039999997,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 54.1906,
+          "weight": 0.13985944155420243,
+          "confidence": "high",
+          "sampleGames": 76,
+          "sampleMinutes": 1922.8,
+          "shrinkage": 0.36805116198474325
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0179375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 60,
         "offenseRating": 58,
         "defenseRating": 71
       },
@@ -7558,20 +8300,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1629684",
       "franchiseId": "celtics",
       "eraId": "2020s",
-      "seasonKey": "2022-23",
+      "seasonKey": "2021-22",
       "firstName": "Grant",
       "lastName": "Williams",
       "displayName": "Grant Williams",
@@ -7596,108 +8338,161 @@
       "weightLbs": 236,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 79,
-        "teamMinutes": 2044
+        "teamGames": 77,
+        "teamMinutes": 1875
       },
-      "selectionScore": 68.557,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 63.846,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 79,
-        "minutes": 2046,
-        "points": 639,
-        "rebounds": 363,
-        "offensiveRebounds": 86,
-        "defensiveRebounds": 276,
-        "assists": 134,
-        "steals": 39,
-        "blocks": 31,
-        "turnovers": 79,
-        "fieldGoalsMade": 213,
-        "fieldGoalsAttempted": 474,
-        "threesMade": 118,
-        "threesAttempted": 292,
-        "freeThrowsMade": 94,
-        "freeThrowsAttempted": 118,
-        "per": 8.235,
-        "boxPlusMinus": -1.0780000000000003,
-        "usageRate": 12.8,
-        "tsPct": 0.605,
-        "efgPct": 0.575
+        "gamesPlayed": 77,
+        "minutes": 1878,
+        "points": 600,
+        "rebounds": 277,
+        "offensiveRebounds": 61,
+        "defensiveRebounds": 207,
+        "assists": 77,
+        "steals": 38,
+        "blocks": 53,
+        "turnovers": 61,
+        "fieldGoalsMade": 207,
+        "fieldGoalsAttempted": 431,
+        "threesMade": 107,
+        "threesAttempted": 261,
+        "freeThrowsMade": 84,
+        "freeThrowsAttempted": 92,
+        "per": 7.41,
+        "boxPlusMinus": -0.7239999999999998,
+        "usageRate": 12.3,
+        "tsPct": 0.635,
+        "efgPct": 0.597
       },
       "historicalTeamIdentity": {
         "teamId": "1610612738",
         "displayName": "Boston Celtics",
         "city": "Boston",
         "abbreviation": "BOS",
-        "seasonKey": "2022-23",
+        "seasonKey": "2021-22",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
-        "offenseRating": 63,
-        "defenseRating": 61
+        "overallRating": 62,
+        "offenseRating": 65,
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.012544,
+          "secondaryCreator": 0.028425,
+          "scoringGuard": 0.042269,
+          "movementSpacer": 0.317708,
+          "twoWayWing": 0.112938,
+          "connector": 0.125849,
+          "interiorFinisher": 0.036587,
+          "stretchBig": 0.201852,
+          "rebounder": 0.038518,
+          "defensiveAnchor": 0.08331
+        },
+        "baseScore": 61.4,
+        "nonlinear": {
+          "creation": 56.72443167589686,
+          "penetration": 57.3636340043044,
+          "shootingGravity": 91.42750000000001,
+          "scalableScoring": 68,
+          "switchability": 65.65476291681247,
+          "rimProtection": 65.84808637769443,
+          "possessionControl": 61.3975,
+          "synergyBonus": 2.0660675676709177,
+          "weaknessPenalty": -0.8063426124599999,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.4037955439999998,
+            "deficientRebounding": 0.967800375
+          }
+        },
+        "production": {
+          "score": 37.6554,
+          "weight": 0.13906137717431666,
+          "confidence": "high",
+          "sampleGames": 77,
+          "sampleMinutes": 1878.8,
+          "shrinkage": 0.3659509925639912
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0270625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 62,
+        "offenseRating": 65,
+        "defenseRating": 63
       },
       "detailedRatings": {
-        "threePoint": 80,
-        "freeThrow": 86,
-        "insideScoring": 54,
-        "closeShot": 57,
-        "midrange": 69,
-        "passing": 58,
-        "ballHandling": 55,
-        "offensiveRebound": 47,
-        "defensiveRebound": 52,
-        "perimeterDefense": 64,
-        "interiorDefense": 69,
+        "threePoint": 84,
+        "freeThrow": 100,
+        "insideScoring": 55,
+        "closeShot": 56,
+        "midrange": 71,
+        "passing": 54,
+        "ballHandling": 52,
+        "offensiveRebound": 44,
+        "defensiveRebound": 48,
+        "perimeterDefense": 67,
+        "interiorDefense": 72,
         "steal": 65,
-        "block": 64,
-        "defensiveIq": 57,
+        "block": 68,
+        "defensiveIq": 58,
         "speed": 66,
         "strength": 64,
         "vertical": 60,
-        "offensiveIq": 66
+        "offensiveIq": 65
       },
       "tendencies": {
-        "usageRate": 12.8,
-        "passRate": 10.07,
-        "shotRate": 12.5,
+        "usageRate": 12.3,
+        "passRate": 6.78,
+        "shotRate": 11.67,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 21.6,
+        "rimFrequency": 22,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 9.6,
-        "aboveBreakThreeFrequency": 16,
-        "threePointRate": 61.67,
-        "freeThrowRate": 25,
-        "turnoverRate": 13.05,
-        "isolationRate": 3.84,
+        "cornerThreeFrequency": 10.08,
+        "aboveBreakThreeFrequency": 16.8,
+        "threePointRate": 60.71,
+        "freeThrowRate": 21.43,
+        "turnoverRate": 11.55,
+        "isolationRate": 3.69,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 6.45,
+        "foulRate": 6.72,
         "stealAttemptRate": 10.2,
-        "blockAttemptRate": 10.12,
-        "crashOffensiveGlassRate": 15.64
+        "blockAttemptRate": 10.44,
+        "crashOffensiveGlassRate": 15.28
       },
       "anchors": {
-        "gamesPlayed": 79,
-        "minutesPerGame": 25.9,
-        "pointsPerGame": 8.1,
-        "reboundsPerGame": 4.6,
-        "offensiveReboundsPerGame": 1.1,
-        "defensiveReboundsPerGame": 3.5,
-        "assistsPerGame": 1.6999999999999997,
+        "gamesPlayed": 77,
+        "minutesPerGame": 24.4,
+        "pointsPerGame": 7.800000000000001,
+        "reboundsPerGame": 3.5999999999999996,
+        "offensiveReboundsPerGame": 0.8,
+        "defensiveReboundsPerGame": 2.7,
+        "assistsPerGame": 1,
         "stealsPerGame": 0.5,
-        "blocksPerGame": 0.4,
-        "turnoversPerGame": 1,
-        "fieldGoalPct": 0.45,
-        "threePointPct": 0.4054054054054054,
-        "freeThrowPct": 0.7999999999999999,
-        "threePointAttemptRate": 0.6166666666666667,
-        "freeThrowAttemptRate": 0.25
+        "blocksPerGame": 0.7,
+        "turnoversPerGame": 0.8,
+        "fieldGoalPct": 0.48214285714285715,
+        "threePointPct": 0.4117647058823529,
+        "freeThrowPct": 0.9166666666666667,
+        "threePointAttemptRate": 0.6071428571428572,
+        "freeThrowAttemptRate": 0.21428571428571427
       },
       "provenance": {
         "threePoint": {
@@ -8096,16 +8891,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630174",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -8137,8 +8932,8 @@
         "teamGames": 46,
         "teamMinutes": 668
       },
-      "selectionScore": 59.246,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 54.678,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 46,
         "minutes": 667,
@@ -8171,9 +8966,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 61,
+        "overallRating": 53,
         "offenseRating": 58,
-        "defenseRating": 55
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.015692,
+          "secondaryCreator": 0.028479,
+          "scoringGuard": 0.036943,
+          "movementSpacer": 0.303192,
+          "twoWayWing": 0.122472,
+          "connector": 0.138021,
+          "interiorFinisher": 0.040477,
+          "stretchBig": 0.193359,
+          "rebounder": 0.049687,
+          "defensiveAnchor": 0.071678
+        },
+        "baseScore": 53.42,
+        "nonlinear": {
+          "creation": 53.88590450440876,
+          "penetration": 54.129547218088526,
+          "shootingGravity": 80.7425,
+          "scalableScoring": 59.333333333333336,
+          "switchability": 59.96052959603605,
+          "rimProtection": 59.706492233620054,
+          "possessionControl": 59.604,
+          "synergyBonus": 1.2245535680921058,
+          "weaknessPenalty": -1.2184980644099996,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.675166773999999,
+            "deficientRebounding": 0.9086510624999999
+          }
+        },
+        "production": {
+          "score": 24.985099999999992,
+          "weight": 0.028152853049441408,
+          "confidence": "low",
+          "sampleGames": 46,
+          "sampleMinutes": 667,
+          "shrinkage": 0.16463656754059303
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00759375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 53,
+        "offenseRating": 58,
+        "defenseRating": 56
       },
       "detailedRatings": {
         "threePoint": 69,
@@ -8634,20 +9482,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630202",
       "franchiseId": "celtics",
       "eraId": "2020s",
-      "seasonKey": "2025-26",
+      "seasonKey": "2024-25",
       "firstName": "Payton",
       "lastName": "Pritchard",
       "displayName": "Payton Pritchard",
@@ -8672,108 +9520,161 @@
       "weightLbs": 195,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 79,
-        "teamMinutes": 2555
+        "teamGames": 80,
+        "teamMinutes": 2270
       },
-      "selectionScore": 78.781,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 70.379,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 79,
-        "minutes": 2551,
-        "points": 1343,
-        "rebounds": 308,
-        "offensiveRebounds": 71,
-        "defensiveRebounds": 244,
-        "assists": 410,
-        "steals": 55,
-        "blocks": 7,
-        "turnovers": 110,
-        "fieldGoalsMade": 505,
-        "fieldGoalsAttempted": 1090,
-        "threesMade": 213,
-        "threesAttempted": 560,
-        "freeThrowsMade": 118,
-        "freeThrowsAttempted": 134,
-        "per": 14.489999999999998,
-        "boxPlusMinus": 0.125,
-        "usageRate": 21,
-        "tsPct": 0.584,
-        "efgPct": 0.561
+        "gamesPlayed": 80,
+        "minutes": 2272,
+        "points": 1144,
+        "rebounds": 304,
+        "offensiveRebounds": 104,
+        "defensiveRebounds": 208,
+        "assists": 280,
+        "steals": 72,
+        "blocks": 16,
+        "turnovers": 80,
+        "fieldGoalsMade": 408,
+        "fieldGoalsAttempted": 864,
+        "threesMade": 256,
+        "threesAttempted": 624,
+        "freeThrowsMade": 72,
+        "freeThrowsAttempted": 88,
+        "per": 12.405,
+        "boxPlusMinus": 0.266,
+        "usageRate": 18.6,
+        "tsPct": 0.633,
+        "efgPct": 0.62
       },
       "historicalTeamIdentity": {
         "teamId": "1610612738",
         "displayName": "Boston Celtics",
         "city": "Boston",
         "abbreviation": "BOS",
-        "seasonKey": "2025-26",
+        "seasonKey": "2024-25",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 83,
-        "offenseRating": 73,
-        "defenseRating": 61
+        "overallRating": 70,
+        "offenseRating": 70,
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.020438,
+          "secondaryCreator": 0.039778,
+          "scoringGuard": 0.042707,
+          "movementSpacer": 0.403065,
+          "twoWayWing": 0.07594,
+          "connector": 0.165237,
+          "interiorFinisher": 0.027758,
+          "stretchBig": 0.15363,
+          "rebounder": 0.02555,
+          "defensiveAnchor": 0.045897
+        },
+        "baseScore": 65.7,
+        "nonlinear": {
+          "creation": 68.25280751643757,
+          "penetration": 65.08061004892308,
+          "shootingGravity": 91.805,
+          "scalableScoring": 71.33333333333333,
+          "switchability": 65.65012280746963,
+          "rimProtection": 60.930225867254876,
+          "possessionControl": 71.773,
+          "synergyBonus": 2.247735691415553,
+          "weaknessPenalty": -0.2239684125,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.6587306249999999
+          }
+        },
+        "production": {
+          "score": 52.7459,
+          "weight": 0.15259102156238954,
+          "confidence": "high",
+          "sampleGames": 80,
+          "sampleMinutes": 2272,
+          "shrinkage": 0.4015553199010251
+        },
+        "calibratedImpact": {
+          "adjustment": 0.04309375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 70,
+        "offenseRating": 70,
+        "defenseRating": 63
       },
       "detailedRatings": {
-        "threePoint": 77,
-        "freeThrow": 95,
-        "insideScoring": 62,
-        "closeShot": 70,
-        "midrange": 68,
-        "passing": 79,
-        "ballHandling": 71,
-        "offensiveRebound": 45,
-        "defensiveRebound": 50,
-        "perimeterDefense": 65,
-        "interiorDefense": 62,
-        "steal": 67,
-        "block": 61,
+        "threePoint": 83,
+        "freeThrow": 88,
+        "insideScoring": 59,
+        "closeShot": 66,
+        "midrange": 74,
+        "passing": 69,
+        "ballHandling": 64,
+        "offensiveRebound": 48,
+        "defensiveRebound": 48,
+        "perimeterDefense": 68,
+        "interiorDefense": 65,
+        "steal": 69,
+        "block": 62,
         "defensiveIq": 60,
-        "speed": 75,
+        "speed": 73,
         "strength": 57,
         "vertical": 60,
-        "offensiveIq": 74
+        "offensiveIq": 72
       },
       "tendencies": {
-        "usageRate": 21,
-        "passRate": 14.15,
-        "shotRate": 28.75,
+        "usageRate": 18.6,
+        "passRate": 12.02,
+        "shotRate": 22.5,
         "driveRate": 18,
         "postUpRate": 5,
-        "rimFrequency": 24.8,
+        "rimFrequency": 23.6,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 9.24,
-        "aboveBreakThreeFrequency": 15.4,
-        "threePointRate": 51.45,
-        "freeThrowRate": 12.32,
-        "turnoverRate": 8.78,
-        "isolationRate": 6.3,
+        "cornerThreeFrequency": 9.96,
+        "aboveBreakThreeFrequency": 16.6,
+        "threePointRate": 72.22,
+        "freeThrowRate": 10.19,
+        "turnoverRate": 8.14,
+        "isolationRate": 5.58,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 4.23,
-        "stealAttemptRate": 10.36,
-        "blockAttemptRate": 9.88,
-        "crashOffensiveGlassRate": 15.4
+        "foulRate": 4.54,
+        "stealAttemptRate": 10.52,
+        "blockAttemptRate": 9.96,
+        "crashOffensiveGlassRate": 15.76
       },
       "anchors": {
-        "gamesPlayed": 79,
-        "minutesPerGame": 32.3,
-        "pointsPerGame": 17,
-        "reboundsPerGame": 3.8999999999999995,
-        "offensiveReboundsPerGame": 0.9000000000000001,
-        "defensiveReboundsPerGame": 3.1,
-        "assistsPerGame": 5.2,
-        "stealsPerGame": 0.7,
-        "blocksPerGame": 0.1,
-        "turnoversPerGame": 1.4,
-        "fieldGoalPct": 0.463768115942029,
-        "threePointPct": 0.3802816901408451,
-        "freeThrowPct": 0.8823529411764707,
-        "threePointAttemptRate": 0.5144927536231884,
-        "freeThrowAttemptRate": 0.12318840579710143
+        "gamesPlayed": 80,
+        "minutesPerGame": 28.4,
+        "pointsPerGame": 14.3,
+        "reboundsPerGame": 3.8,
+        "offensiveReboundsPerGame": 1.3,
+        "defensiveReboundsPerGame": 2.6,
+        "assistsPerGame": 3.5,
+        "stealsPerGame": 0.9,
+        "blocksPerGame": 0.2,
+        "turnoversPerGame": 1,
+        "fieldGoalPct": 0.4722222222222222,
+        "threePointPct": 0.41025641025641024,
+        "freeThrowPct": 0.8181818181818182,
+        "threePointAttemptRate": 0.7222222222222222,
+        "freeThrowAttemptRate": 0.10185185185185185
       },
       "provenance": {
         "threePoint": {
@@ -9172,16 +10073,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630568",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -9213,8 +10114,8 @@
         "teamGames": 69,
         "teamMinutes": 1117
       },
-      "selectionScore": 69.073,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 60.279,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 69,
         "minutes": 1117,
@@ -9247,9 +10148,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 73,
+        "overallRating": 58,
         "offenseRating": 64,
-        "defenseRating": 57
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.017059,
+          "secondaryCreator": 0.031736,
+          "scoringGuard": 0.043759,
+          "movementSpacer": 0.197044,
+          "twoWayWing": 0.124816,
+          "connector": 0.101735,
+          "interiorFinisher": 0.067674,
+          "stretchBig": 0.226449,
+          "rebounder": 0.081835,
+          "defensiveAnchor": 0.107893
+        },
+        "baseScore": 57.09,
+        "nonlinear": {
+          "creation": 57.49703828475341,
+          "penetration": 57.89358211412985,
+          "shootingGravity": 80.155,
+          "scalableScoring": 68,
+          "switchability": 65.46327798053343,
+          "rimProtection": 65.86425118316617,
+          "possessionControl": 62.4585,
+          "synergyBonus": 1.068524726239245,
+          "weaknessPenalty": -1.3623766887400002,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 3.392083386000001,
+            "deficientRebounding": 0.614906875
+          }
+        },
+        "production": {
+          "score": 41.70055000000001,
+          "weight": 0.07703624305302932,
+          "confidence": "medium",
+          "sampleGames": 69,
+          "sampleMinutes": 1117.8,
+          "shrinkage": 0.27030260720361166
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0055,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 58,
+        "offenseRating": 64,
+        "defenseRating": 58
       },
       "detailedRatings": {
         "threePoint": 84,
@@ -9710,16 +10664,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1630573",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -9751,8 +10705,8 @@
         "teamGames": 79,
         "teamMinutes": 1740
       },
-      "selectionScore": 69.569,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 67.172,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 79,
         "minutes": 1738,
@@ -9785,7 +10739,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 71,
+        "overallRating": 67,
+        "offenseRating": 67,
+        "defenseRating": 61
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.00989,
+          "secondaryCreator": 0.021406,
+          "scoringGuard": 0.033143,
+          "movementSpacer": 0.395174,
+          "twoWayWing": 0.078957,
+          "connector": 0.113,
+          "interiorFinisher": 0.029665,
+          "stretchBig": 0.236987,
+          "rebounder": 0.029098,
+          "defensiveAnchor": 0.05268
+        },
+        "baseScore": 65.01,
+        "nonlinear": {
+          "creation": 57.44253868973917,
+          "penetration": 58.143126500601014,
+          "shootingGravity": 98.525,
+          "scalableScoring": 69.33333333333333,
+          "switchability": 64.6545778703949,
+          "rimProtection": 64.17799750435901,
+          "possessionControl": 65.3515,
+          "synergyBonus": 3.065694477620102,
+          "weaknessPenalty": -0.34255361250000005,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 1.007510625
+          }
+        },
+        "production": {
+          "score": 38.80775,
+          "weight": 0.1354056088154842,
+          "confidence": "high",
+          "sampleGames": 79,
+          "sampleMinutes": 1738,
+          "shrinkage": 0.3563305495144321
+        },
+        "calibratedImpact": {
+          "adjustment": -0.042125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 67,
         "offenseRating": 67,
         "defenseRating": 61
       },
@@ -10248,16 +11255,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1631248",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -10289,8 +11296,8 @@
         "teamGames": 77,
         "teamMinutes": 1429
       },
-      "selectionScore": 62.902,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 63.501,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 77,
         "minutes": 1432,
@@ -10323,7 +11330,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 63,
+        "overallRating": 64,
+        "offenseRating": 63,
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.011095,
+          "secondaryCreator": 0.026256,
+          "scoringGuard": 0.03977,
+          "movementSpacer": 0.398128,
+          "twoWayWing": 0.08038,
+          "connector": 0.111581,
+          "interiorFinisher": 0.025947,
+          "stretchBig": 0.225785,
+          "rebounder": 0.034184,
+          "defensiveAnchor": 0.046874
+        },
+        "baseScore": 62.39,
+        "nonlinear": {
+          "creation": 56.87898816778662,
+          "penetration": 54.66417960791854,
+          "shootingGravity": 94.605,
+          "scalableScoring": 63.666666666666664,
+          "switchability": 63.60169292594263,
+          "rimProtection": 59.94659540770435,
+          "possessionControl": 61.248999999999995,
+          "synergyBonus": 2.6936088739983246,
+          "weaknessPenalty": -0.48439456260000013,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.48780114000000024,
+            "deficientRebounding": 0.93688875
+          }
+        },
+        "production": {
+          "score": 31.662749999999996,
+          "weight": 0.09161356922867053,
+          "confidence": "medium",
+          "sampleGames": 77,
+          "sampleMinutes": 1432.2,
+          "shrinkage": 0.32145112010059834
+        },
+        "calibratedImpact": {
+          "adjustment": 0.03625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 64,
         "offenseRating": 63,
         "defenseRating": 57
       },
@@ -10786,16 +11846,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1641775",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -10827,8 +11887,8 @@
         "teamGames": 68,
         "teamMinutes": 1212
       },
-      "selectionScore": 63.937,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 57.531,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 68,
         "minutes": 1210,
@@ -10861,9 +11921,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
+        "overallRating": 55,
         "offenseRating": 60,
-        "defenseRating": 59
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.016191,
+          "secondaryCreator": 0.032247,
+          "scoringGuard": 0.045796,
+          "movementSpacer": 0.277417,
+          "twoWayWing": 0.121561,
+          "connector": 0.122313,
+          "interiorFinisher": 0.040133,
+          "stretchBig": 0.194548,
+          "rebounder": 0.059191,
+          "defensiveAnchor": 0.090603
+        },
+        "baseScore": 55.74,
+        "nonlinear": {
+          "creation": 55.7196876512957,
+          "penetration": 54.084230686262124,
+          "shootingGravity": 79.5375,
+          "scalableScoring": 62,
+          "switchability": 64.6545778703949,
+          "rimProtection": 61.971364142125374,
+          "possessionControl": 61.214,
+          "synergyBonus": 1.1315499115793517,
+          "weaknessPenalty": -0.9005557559999999,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.9853371499999997,
+            "deficientRebounding": 0.66335625
+          }
+        },
+        "production": {
+          "score": 33.5027,
+          "weight": 0.0801356093401548,
+          "confidence": "medium",
+          "sampleGames": 68,
+          "sampleMinutes": 1210.4,
+          "shrinkage": 0.2811775766321221
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00759375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
+        "offenseRating": 60,
+        "defenseRating": 60
       },
       "detailedRatings": {
         "threePoint": 75,
@@ -11324,16 +12437,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-1642864",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -11365,8 +12478,8 @@
         "teamGames": 74,
         "teamMinutes": 1083
       },
-      "selectionScore": 60.127,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.913,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 74,
         "minutes": 1080,
@@ -11399,8 +12512,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
-        "offenseRating": 55,
+        "overallRating": 47,
+        "offenseRating": 54,
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.018436,
+          "secondaryCreator": 0.030822,
+          "scoringGuard": 0.038805,
+          "movementSpacer": 0.278275,
+          "twoWayWing": 0.112503,
+          "connector": 0.122171,
+          "interiorFinisher": 0.044389,
+          "stretchBig": 0.20019,
+          "rebounder": 0.063216,
+          "defensiveAnchor": 0.091193
+        },
+        "baseScore": 50.59,
+        "nonlinear": {
+          "creation": 54.136486014116095,
+          "penetration": 52.639538094572494,
+          "shootingGravity": 70.62,
+          "scalableScoring": 57,
+          "switchability": 62.64382875871463,
+          "rimProtection": 59.72337994347823,
+          "possessionControl": 58.831,
+          "synergyBonus": 0.5522106535317993,
+          "weaknessPenalty": -1.2158615335599998,
+          "weaknesses": {
+            "turnoverLiability": 0.44686123200000005,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.1740273519999995,
+            "deficientRebounding": 0.95517475
+          }
+        },
+        "production": {
+          "score": 24.446950000000005,
+          "weight": 0.07745853356068827,
+          "confidence": "medium",
+          "sampleGames": 74,
+          "sampleMinutes": 1080.3999999999999,
+          "shrinkage": 0.2717843282831167
+        },
+        "calibratedImpact": {
+          "adjustment": -0.02075,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
+        "offenseRating": 54,
         "defenseRating": 57
       },
       "detailedRatings": {
@@ -11862,20 +13028,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-201143",
       "franchiseId": "celtics",
       "eraId": "2020s",
-      "seasonKey": "2021-22",
+      "seasonKey": "2023-24",
       "firstName": "Al",
       "lastName": "Horford",
       "displayName": "Al Horford",
@@ -11902,108 +13068,161 @@
       "weightLbs": 240,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 69,
-        "teamMinutes": 2004
+        "teamGames": 65,
+        "teamMinutes": 1739
       },
-      "selectionScore": 74.242,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 69.152,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 69,
-        "minutes": 2007,
-        "points": 703,
-        "rebounds": 531,
-        "offensiveRebounds": 110,
-        "defensiveRebounds": 420,
-        "assists": 234,
-        "steals": 48,
-        "blocks": 89,
-        "turnovers": 62,
-        "fieldGoalsMade": 269,
-        "fieldGoalsAttempted": 565,
-        "threesMade": 89,
-        "threesAttempted": 262,
-        "freeThrowsMade": 82,
-        "freeThrowsAttempted": 96,
-        "per": 13.594999999999999,
-        "boxPlusMinus": 2.029000000000001,
-        "usageRate": 14.7,
-        "tsPct": 0.574,
-        "efgPct": 0.546
+        "gamesPlayed": 65,
+        "minutes": 1742,
+        "points": 559,
+        "rebounds": 416,
+        "offensiveRebounds": 84,
+        "defensiveRebounds": 331,
+        "assists": 169,
+        "steals": 39,
+        "blocks": 65,
+        "turnovers": 45,
+        "fieldGoalsMade": 214,
+        "fieldGoalsAttempted": 416,
+        "threesMade": 110,
+        "threesAttempted": 260,
+        "freeThrowsMade": 26,
+        "freeThrowsAttempted": 32,
+        "per": 11.165,
+        "boxPlusMinus": 0.9020000000000001,
+        "usageRate": 11.899999999999999,
+        "tsPct": 0.65,
+        "efgPct": 0.64
       },
       "historicalTeamIdentity": {
         "teamId": "1610612738",
         "displayName": "Boston Celtics",
         "city": "Boston",
         "abbreviation": "BOS",
-        "seasonKey": "2021-22",
+        "seasonKey": "2023-24",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 69,
         "offenseRating": 68,
-        "defenseRating": 72
+        "defenseRating": 68
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.012252,
+          "secondaryCreator": 0.029377,
+          "scoringGuard": 0.028518,
+          "movementSpacer": 0.269643,
+          "twoWayWing": 0.106047,
+          "connector": 0.1315,
+          "interiorFinisher": 0.032984,
+          "stretchBig": 0.24255,
+          "rebounder": 0.051105,
+          "defensiveAnchor": 0.096024
+        },
+        "baseScore": 64.93,
+        "nonlinear": {
+          "creation": 64.41398304959503,
+          "penetration": 60.149258022456294,
+          "shootingGravity": 90.125,
+          "scalableScoring": 71.33333333333333,
+          "switchability": 69.63620787460948,
+          "rimProtection": 69.46533396660483,
+          "possessionControl": 68.24199999999999,
+          "synergyBonus": 2.0058948923424147,
+          "weaknessPenalty": 0,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 47.4653,
+          "weight": 0.12639875444317147,
+          "confidence": "high",
+          "sampleGames": 65,
+          "sampleMinutes": 1742,
+          "shrinkage": 0.3326283011662407
+        },
+        "calibratedImpact": {
+          "adjustment": 0.08690625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 69,
+        "offenseRating": 68,
+        "defenseRating": 68
       },
       "detailedRatings": {
-        "threePoint": 70,
-        "freeThrow": 92,
-        "insideScoring": 57,
-        "closeShot": 60,
-        "midrange": 66,
-        "passing": 70,
-        "ballHandling": 62,
-        "offensiveRebound": 53,
-        "defensiveRebound": 66,
-        "perimeterDefense": 77,
-        "interiorDefense": 82,
-        "steal": 67,
-        "block": 75,
-        "defensiveIq": 64,
-        "speed": 69,
-        "strength": 71,
+        "threePoint": 86,
+        "freeThrow": 86,
+        "insideScoring": 56,
+        "closeShot": 57,
+        "midrange": 76,
+        "passing": 64,
+        "ballHandling": 58,
+        "offensiveRebound": 50,
+        "defensiveRebound": 61,
+        "perimeterDefense": 72,
+        "interiorDefense": 77,
+        "steal": 66,
+        "block": 72,
+        "defensiveIq": 61,
+        "speed": 67,
+        "strength": 70,
         "vertical": 60,
-        "offensiveIq": 77
+        "offensiveIq": 72
       },
       "tendencies": {
-        "usageRate": 14.7,
-        "passRate": 14.32,
-        "shotRate": 17.08,
+        "usageRate": 11.9,
+        "passRate": 13.16,
+        "shotRate": 13.33,
         "driveRate": 10,
         "postUpRate": 13,
-        "rimFrequency": 22.8,
+        "rimFrequency": 22.4,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 8.4,
-        "aboveBreakThreeFrequency": 14,
-        "threePointRate": 46.34,
-        "freeThrowRate": 17.07,
-        "turnoverRate": 9.26,
-        "isolationRate": 4.41,
+        "cornerThreeFrequency": 10.32,
+        "aboveBreakThreeFrequency": 17.2,
+        "threePointRate": 62.5,
+        "freeThrowRate": 7.81,
+        "turnoverRate": 9.56,
+        "isolationRate": 3.57,
         "pickAndRollBallHandlerRate": 20,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 5.13,
-        "stealAttemptRate": 10.36,
-        "blockAttemptRate": 11,
-        "crashOffensiveGlassRate": 16.36
+        "foulRate": 4.51,
+        "stealAttemptRate": 10.28,
+        "blockAttemptRate": 10.76,
+        "crashOffensiveGlassRate": 16
       },
       "anchors": {
-        "gamesPlayed": 69,
-        "minutesPerGame": 29.1,
-        "pointsPerGame": 10.2,
-        "reboundsPerGame": 7.700000000000001,
-        "offensiveReboundsPerGame": 1.6,
-        "defensiveReboundsPerGame": 6.1,
-        "assistsPerGame": 3.4,
-        "stealsPerGame": 0.7,
-        "blocksPerGame": 1.3,
-        "turnoversPerGame": 0.9,
-        "fieldGoalPct": 0.47560975609756095,
-        "threePointPct": 0.34210526315789475,
-        "freeThrowPct": 0.8571428571428572,
-        "threePointAttemptRate": 0.4634146341463415,
-        "freeThrowAttemptRate": 0.17073170731707318
+        "gamesPlayed": 65,
+        "minutesPerGame": 26.8,
+        "pointsPerGame": 8.6,
+        "reboundsPerGame": 6.4,
+        "offensiveReboundsPerGame": 1.3,
+        "defensiveReboundsPerGame": 5.1,
+        "assistsPerGame": 2.6,
+        "stealsPerGame": 0.6,
+        "blocksPerGame": 1,
+        "turnoversPerGame": 0.7,
+        "fieldGoalPct": 0.515625,
+        "threePointPct": 0.425,
+        "freeThrowPct": 0.8,
+        "threePointAttemptRate": 0.625,
+        "freeThrowAttemptRate": 0.078125
       },
       "provenance": {
         "threePoint": {
@@ -12402,16 +13621,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-201933",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -12443,8 +13662,8 @@
         "teamGames": 41,
         "teamMinutes": 568
       },
-      "selectionScore": 59.537,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 53.069,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 41,
         "minutes": 569,
@@ -12477,7 +13696,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
+        "overallRating": 51,
+        "offenseRating": 57,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.016758,
+          "secondaryCreator": 0.031997,
+          "scoringGuard": 0.030163,
+          "movementSpacer": 0.226812,
+          "twoWayWing": 0.135134,
+          "connector": 0.129208,
+          "interiorFinisher": 0.050069,
+          "stretchBig": 0.223196,
+          "rebounder": 0.068755,
+          "defensiveAnchor": 0.087908
+        },
+        "baseScore": 51.72,
+        "nonlinear": {
+          "creation": 56.27332366100711,
+          "penetration": 54.81480410590562,
+          "shootingGravity": 73.5,
+          "scalableScoring": 58.333333333333336,
+          "switchability": 61.5308854054652,
+          "rimProtection": 60.34375670555786,
+          "possessionControl": 60.463,
+          "synergyBonus": 0.6809331578947369,
+          "weaknessPenalty": -1.2646410812800002,
+          "weaknesses": {
+            "turnoverLiability": 0.2594656959999999,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.7626208960000005,
+            "deficientRebounding": 0.697446
+          }
+        },
+        "production": {
+          "score": 27.97079999999999,
+          "weight": 0.02383110831977927,
+          "confidence": "low",
+          "sampleGames": 41,
+          "sampleMinutes": 569.9,
+          "shrinkage": 0.13936320654841677
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00446875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 51,
         "offenseRating": 57,
         "defenseRating": 56
       },
@@ -12940,16 +14212,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-201950",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -12981,8 +14253,8 @@
         "teamGames": 69,
         "teamMinutes": 2263
       },
-      "selectionScore": 76.175,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 70.213,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 69,
         "minutes": 2263,
@@ -13015,7 +14287,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 79,
+        "overallRating": 69,
+        "offenseRating": 71,
+        "defenseRating": 67
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.02544,
+          "secondaryCreator": 0.056167,
+          "scoringGuard": 0.046451,
+          "movementSpacer": 0.26928,
+          "twoWayWing": 0.111852,
+          "connector": 0.177323,
+          "interiorFinisher": 0.03314,
+          "stretchBig": 0.162338,
+          "rebounder": 0.040362,
+          "defensiveAnchor": 0.077647
+        },
+        "baseScore": 64.97,
+        "nonlinear": {
+          "creation": 72.86890840912437,
+          "penetration": 65.23763118016856,
+          "shootingGravity": 87.25,
+          "scalableScoring": 71.66666666666667,
+          "switchability": 69.44624312970802,
+          "rimProtection": 65.10622543722846,
+          "possessionControl": 71.65950000000001,
+          "synergyBonus": 1.5940831333925018,
+          "weaknessPenalty": -0.8430937054600003,
+          "weaknesses": {
+            "turnoverLiability": 2.1746297440000006,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.305057625
+          }
+        },
+        "production": {
+          "score": 51.6395,
+          "weight": 0.14466778225051485,
+          "confidence": "high",
+          "sampleGames": 69,
+          "sampleMinutes": 2263.2,
+          "shrinkage": 0.38070469013293384
+        },
+        "calibratedImpact": {
+          "adjustment": -0.04790625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 69,
         "offenseRating": 71,
         "defenseRating": 67
       },
@@ -13478,16 +14803,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-202684",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -13521,8 +14846,8 @@
         "teamGames": 54,
         "teamMinutes": 1286
       },
-      "selectionScore": 62.58,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 51.335,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 54,
         "minutes": 1285,
@@ -13555,7 +14880,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 67,
+        "overallRating": 48,
+        "offenseRating": 51,
+        "defenseRating": 62
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.030393,
+          "secondaryCreator": 0.04169,
+          "scoringGuard": 0.033612,
+          "movementSpacer": 0.045371,
+          "twoWayWing": 0.177943,
+          "connector": 0.076634,
+          "interiorFinisher": 0.08563,
+          "stretchBig": 0.093565,
+          "rebounder": 0.19906,
+          "defensiveAnchor": 0.216102
+        },
+        "baseScore": 50.25,
+        "nonlinear": {
+          "creation": 59.093789352164215,
+          "penetration": 57.3636340043044,
+          "shootingGravity": 48.417500000000004,
+          "scalableScoring": 46,
+          "switchability": 66.30164952933436,
+          "rimProtection": 65.36810384803834,
+          "possessionControl": 62.0035,
+          "synergyBonus": 0.10071689765767673,
+          "weaknessPenalty": -1.2634002069950003,
+          "weaknesses": {
+            "turnoverLiability": 1.2788262800000005,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 1.0595322337499995,
+            "foulRisk": 1.3775244480000004,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 35.69255,
+          "weight": 0.07554836964991246,
+          "confidence": "medium",
+          "sampleGames": 54,
+          "sampleMinutes": 1285.2,
+          "shrinkage": 0.2650819987716227
+        },
+        "calibratedImpact": {
+          "adjustment": -0.09846875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 48,
         "offenseRating": 51,
         "defenseRating": 62
       },
@@ -14018,16 +15396,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-202689",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -14059,8 +15437,8 @@
         "teamGames": 43,
         "teamMinutes": 1369
       },
-      "selectionScore": 76.974,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 69.322,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 43,
         "minutes": 1367,
@@ -14093,7 +15471,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 69,
+        "offenseRating": 71,
+        "defenseRating": 64
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.042082,
+          "secondaryCreator": 0.064171,
+          "scoringGuard": 0.066206,
+          "movementSpacer": 0.300324,
+          "twoWayWing": 0.099426,
+          "connector": 0.188687,
+          "interiorFinisher": 0.039666,
+          "stretchBig": 0.11296,
+          "rebounder": 0.028476,
+          "defensiveAnchor": 0.058002
+        },
+        "baseScore": 63.5,
+        "nonlinear": {
+          "creation": 74.96852012207913,
+          "penetration": 70.54004063162273,
+          "shootingGravity": 82.5575,
+          "scalableScoring": 71,
+          "switchability": 66.09582041421544,
+          "rimProtection": 60.59269906812263,
+          "possessionControl": 75.53,
+          "synergyBonus": 1.2878693928914562,
+          "weaknessPenalty": -0.26614656,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0.043679999999999844,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0,
+            "deficientRebounding": 0.739104
+          }
+        },
+        "production": {
+          "score": 58.63640000000001,
+          "weight": 0.07041132514994063,
+          "confidence": "medium",
+          "sampleGames": 43,
+          "sampleMinutes": 1367.4,
+          "shrinkage": 0.24705728122786186
+        },
+        "calibratedImpact": {
+          "adjustment": 0.11828125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 69,
         "offenseRating": 71,
         "defenseRating": 64
       },
@@ -14556,16 +15987,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-203471",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -14597,8 +16028,8 @@
         "teamGames": 49,
         "teamMinutes": 1433
       },
-      "selectionScore": 71.726,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 61.002,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 64,
         "minutes": 1836,
@@ -14631,9 +16062,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
-        "offenseRating": 67,
-        "defenseRating": 59
+        "overallRating": 58,
+        "offenseRating": 66,
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.048338,
+          "secondaryCreator": 0.079135,
+          "scoringGuard": 0.070417,
+          "movementSpacer": 0.227648,
+          "twoWayWing": 0.116881,
+          "connector": 0.172772,
+          "interiorFinisher": 0.04829,
+          "stretchBig": 0.120998,
+          "rebounder": 0.04286,
+          "defensiveAnchor": 0.072661
+        },
+        "baseScore": 57.52,
+        "nonlinear": {
+          "creation": 70.96751803892751,
+          "penetration": 66.19714545487183,
+          "shootingGravity": 76.3775,
+          "scalableScoring": 64,
+          "switchability": 64.24902974608125,
+          "rimProtection": 59.463399886570755,
+          "possessionControl": 70.06049999999999,
+          "synergyBonus": 0.7778524673333105,
+          "weaknessPenalty": -1.42496605131,
+          "weaknesses": {
+            "turnoverLiability": 2.4805216800000003,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.7785942539999998,
+            "deficientRebounding": 0.9319606874999999
+          }
+        },
+        "production": {
+          "score": 44.10325000000001,
+          "weight": 0.12872471091603194,
+          "confidence": "high",
+          "sampleGames": 64,
+          "sampleMinutes": 1836.8,
+          "shrinkage": 0.3387492392527156
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0436875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 58,
+        "offenseRating": 66,
+        "defenseRating": 60
       },
       "detailedRatings": {
         "threePoint": 67,
@@ -15094,20 +16578,20 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-203935",
       "franchiseId": "celtics",
       "eraId": "2020s",
-      "seasonKey": "2021-22",
+      "seasonKey": "2020-21",
       "firstName": "Marcus",
       "lastName": "Smart",
       "displayName": "Marcus Smart",
@@ -15128,112 +16612,165 @@
         ],
         "normalizationVersion": "position-v3"
       },
-      "heightInches": 76,
+      "heightInches": 75,
       "weightLbs": 220,
       "eligibility": {
         "minimumTeamGames": 40,
-        "teamGames": 71,
-        "teamMinutes": 2295
+        "teamGames": 48,
+        "teamMinutes": 1581
       },
-      "selectionScore": 75.335,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 65.647,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
-        "gamesPlayed": 71,
-        "minutes": 2293,
-        "points": 859,
-        "rebounds": 269,
-        "offensiveRebounds": 42,
-        "defensiveRebounds": 227,
-        "assists": 418,
-        "steals": 120,
-        "blocks": 21,
-        "turnovers": 156,
-        "fieldGoalsMade": 298,
-        "fieldGoalsAttempted": 717,
-        "threesMade": 120,
-        "threesAttempted": 362,
-        "freeThrowsMade": 142,
-        "freeThrowsAttempted": 177,
-        "per": 13.105,
-        "boxPlusMinus": 1.2620000000000005,
+        "gamesPlayed": 48,
+        "minutes": 1579,
+        "points": 628,
+        "rebounds": 168,
+        "offensiveRebounds": 38,
+        "defensiveRebounds": 129,
+        "assists": 273,
+        "steals": 72,
+        "blocks": 24,
+        "turnovers": 96,
+        "fieldGoalsMade": 201,
+        "fieldGoalsAttempted": 508,
+        "threesMade": 91,
+        "threesAttempted": 283,
+        "freeThrowsMade": 129,
+        "freeThrowsAttempted": 163,
+        "per": 13.425,
+        "boxPlusMinus": 1.4370000000000012,
         "usageRate": 17.9,
-        "tsPct": 0.54,
-        "efgPct": 0.501
+        "tsPct": 0.539,
+        "efgPct": 0.489
       },
       "historicalTeamIdentity": {
         "teamId": "1610612738",
         "displayName": "Boston Celtics",
         "city": "Boston",
         "abbreviation": "BOS",
-        "seasonKey": "2021-22",
+        "seasonKey": "2020-21",
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 79,
+        "overallRating": 64,
+        "offenseRating": 67,
+        "defenseRating": 67
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.034559,
+          "secondaryCreator": 0.061967,
+          "scoringGuard": 0.043469,
+          "movementSpacer": 0.262812,
+          "twoWayWing": 0.115177,
+          "connector": 0.199893,
+          "interiorFinisher": 0.035455,
+          "stretchBig": 0.132376,
+          "rebounder": 0.032635,
+          "defensiveAnchor": 0.081657
+        },
+        "baseScore": 60.68,
+        "nonlinear": {
+          "creation": 75.89019229924577,
+          "penetration": 66.80913974885712,
+          "shootingGravity": 78.66499999999999,
+          "scalableScoring": 65.33333333333333,
+          "switchability": 69.93190657180868,
+          "rimProtection": 64.53455565337678,
+          "possessionControl": 74.1955,
+          "synergyBonus": 1.0723579511429695,
+          "weaknessPenalty": -1.11040121178,
+          "weaknesses": {
+            "turnoverLiability": 1.7782712399999994,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.607726302,
+            "deficientRebounding": 0.8798883750000001
+          }
+        },
+        "production": {
+          "score": 48.70455,
+          "weight": 0.07972649330404591,
+          "confidence": "medium",
+          "sampleGames": 48,
+          "sampleMinutes": 1579.1999999999998,
+          "shrinkage": 0.2797420817685821
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0115,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 64,
         "offenseRating": 67,
         "defenseRating": 67
       },
       "detailedRatings": {
-        "threePoint": 66,
-        "freeThrow": 86,
-        "insideScoring": 54,
-        "closeShot": 63,
-        "midrange": 62,
-        "passing": 82,
+        "threePoint": 64,
+        "freeThrow": 85,
+        "insideScoring": 56,
+        "closeShot": 64,
+        "midrange": 60,
+        "passing": 81,
         "ballHandling": 71,
-        "offensiveRebound": 42,
-        "defensiveRebound": 51,
+        "offensiveRebound": 44,
+        "defensiveRebound": 48,
         "perimeterDefense": 76,
         "interiorDefense": 73,
-        "steal": 77,
-        "block": 63,
+        "steal": 75,
+        "block": 66,
         "defensiveIq": 62,
-        "speed": 74,
-        "strength": 62,
+        "speed": 75,
+        "strength": 60,
         "vertical": 60,
-        "offensiveIq": 75
+        "offensiveIq": 76
       },
       "tendencies": {
         "usageRate": 17.9,
-        "passRate": 18.22,
-        "shotRate": 21.04,
+        "passRate": 17.21,
+        "shotRate": 22.08,
         "driveRate": 18,
         "postUpRate": 5,
-        "rimFrequency": 21.6,
+        "rimFrequency": 22.4,
         "shortMidFrequency": 15,
         "longMidFrequency": 10,
-        "cornerThreeFrequency": 7.92,
-        "aboveBreakThreeFrequency": 13.2,
-        "threePointRate": 50.5,
-        "freeThrowRate": 24.75,
-        "turnoverRate": 16.42,
+        "cornerThreeFrequency": 7.68,
+        "aboveBreakThreeFrequency": 12.8,
+        "threePointRate": 55.66,
+        "freeThrowRate": 32.08,
+        "turnoverRate": 14.19,
         "isolationRate": 5.37,
         "pickAndRollBallHandlerRate": 35,
         "pickAndRollRollManRate": 10,
         "spotUpRate": 20,
         "transitionRate": 15,
         "cutRate": 10,
-        "foulRate": 5.42,
-        "stealAttemptRate": 11.16,
-        "blockAttemptRate": 10.04,
-        "crashOffensiveGlassRate": 15.04
+        "foulRate": 5.79,
+        "stealAttemptRate": 11,
+        "blockAttemptRate": 10.28,
+        "crashOffensiveGlassRate": 15.28
       },
       "anchors": {
-        "gamesPlayed": 71,
-        "minutesPerGame": 32.3,
-        "pointsPerGame": 12.1,
-        "reboundsPerGame": 3.8000000000000003,
-        "offensiveReboundsPerGame": 0.6,
-        "defensiveReboundsPerGame": 3.2,
-        "assistsPerGame": 5.9,
-        "stealsPerGame": 1.7,
-        "blocksPerGame": 0.3,
-        "turnoversPerGame": 2.2,
-        "fieldGoalPct": 0.4158415841584158,
-        "threePointPct": 0.33333333333333337,
-        "freeThrowPct": 0.8,
-        "threePointAttemptRate": 0.5049504950495048,
-        "freeThrowAttemptRate": 0.24752475247524752
+        "gamesPlayed": 48,
+        "minutesPerGame": 32.9,
+        "pointsPerGame": 13.1,
+        "reboundsPerGame": 3.5,
+        "offensiveReboundsPerGame": 0.8000000000000002,
+        "defensiveReboundsPerGame": 2.7000000000000006,
+        "assistsPerGame": 5.7,
+        "stealsPerGame": 1.5,
+        "blocksPerGame": 0.5,
+        "turnoversPerGame": 2,
+        "fieldGoalPct": 0.3962264150943397,
+        "threePointPct": 0.32203389830508466,
+        "freeThrowPct": 0.7941176470588237,
+        "threePointAttemptRate": 0.5566037735849058,
+        "freeThrowAttemptRate": 0.32075471698113206
       },
       "provenance": {
         "threePoint": {
@@ -15632,16 +17169,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-204001",
       "franchiseId": "celtics",
       "eraId": "2020s",
@@ -15678,8 +17215,8 @@
         "teamGames": 57,
         "teamMinutes": 1689
       },
-      "selectionScore": 79.299,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 75.743,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 57,
         "minutes": 1687,
@@ -15712,7 +17249,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 76,
+        "offenseRating": 72,
+        "defenseRating": 75
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.022054,
+          "secondaryCreator": 0.034378,
+          "scoringGuard": 0.041417,
+          "movementSpacer": 0.163918,
+          "twoWayWing": 0.158581,
+          "connector": 0.132425,
+          "interiorFinisher": 0.064543,
+          "stretchBig": 0.157385,
+          "rebounder": 0.062413,
+          "defensiveAnchor": 0.162886
+        },
+        "baseScore": 67.29,
+        "nonlinear": {
+          "creation": 70.43538166392413,
+          "penetration": 69.54700682751476,
+          "shootingGravity": 82.16,
+          "scalableScoring": 78.66666666666667,
+          "switchability": 79.79279713381172,
+          "rimProtection": 79.45095566618835,
+          "possessionControl": 73.113,
+          "synergyBonus": 1.3121326856791398,
+          "weaknessPenalty": -0.40742334504,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.198303956,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 69.5188,
+          "weight": 0.11820721028443673,
+          "confidence": "high",
+          "sampleGames": 57,
+          "sampleMinutes": 1687.2,
+          "shrinkage": 0.3110716060116756
+        },
+        "calibratedImpact": {
+          "adjustment": 0.1334375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 76,
         "offenseRating": 72,
         "defenseRating": 75
       },
@@ -16175,9 +17765,9 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"

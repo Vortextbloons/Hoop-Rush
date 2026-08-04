@@ -4,7 +4,7 @@
   import { X } from '@lucide/svelte';
   import type { ChallengeRun, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { BEST_OF_ATTEMPTS } from '@hoop-rush/engine';
+  import { BEST_OF_ATTEMPTS, evaluateLineupMatchup } from '@hoop-rush/engine';
   import type { RunnerPhase } from '$lib/challenge-runner';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
@@ -50,6 +50,23 @@
     if (!latest) return null;
     const entry = run.bracket.schedule[latest.gameNumber - 1];
     return run.bracket.opponents.find((o) => o.opponentId === entry?.opponentId) ?? null;
+  });
+
+  const upcomingOpponent = $derived.by(() => {
+    const entry = run.bracket.schedule[run.games.length];
+    return run.bracket.opponents.find((o) => o.opponentId === entry?.opponentId) ?? null;
+  });
+
+  const upcomingMatchup = $derived.by(() => {
+    if (!upcomingOpponent || run.players.length !== 5) return null;
+    return evaluateLineupMatchup(
+      { teamId: 'user', displayName: run.homeDisplayName, players: run.players },
+      {
+        teamId: upcomingOpponent.teamId,
+        displayName: upcomingOpponent.displayName,
+        players: upcomingOpponent.players,
+      },
+    );
   });
 
   const franchise = $derived(
@@ -137,6 +154,28 @@
         </div>
       </div>
     </div>
+
+    {#if upcomingOpponent && upcomingMatchup}
+      <div class="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p class="font-mono text-[10px] tracking-[0.14em] text-primary uppercase">
+            Next matchup · {upcomingOpponent.displayName}
+          </p>
+          <span class="font-mono text-xs font-bold"
+            >MATCHUP {upcomingMatchup.matchupDelta > 0
+              ? '+'
+              : ''}{upcomingMatchup.matchupDelta}</span
+          >
+        </div>
+        {#if upcomingMatchup.reasons[0]}
+          <p class="mt-2 text-xs text-muted-foreground">
+            <span class="font-semibold text-foreground">{upcomingMatchup.reasons[0].label}.</span>
+            Measured {upcomingMatchup.reasons[0].measuredValue.toFixed(0)} vs
+            {upcomingMatchup.reasons[0].comparisonValue.toFixed(0)}.
+          </p>
+        {/if}
+      </div>
+    {/if}
 
     <!-- The 82-cell strip -->
     <div class="mt-6 rounded-xl border border-border bg-card p-4 sm:p-5">

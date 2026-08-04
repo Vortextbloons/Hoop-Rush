@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 3,
-  "dataVersion": "m6",
+  "schemaVersion": 4,
+  "dataVersion": "m7-ratings-v3",
   "franchiseId": "magic",
   "eraId": "1980s",
   "eligibility": {
@@ -35,7 +35,7 @@
   },
   "players": [
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-101",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -67,8 +67,8 @@
         "teamGames": 70,
         "teamMinutes": 1460
       },
-      "selectionScore": 64.493,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 57.683,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 70,
         "minutes": 1460,
@@ -101,8 +101,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 66,
-        "offenseRating": 64,
+        "overallRating": 55,
+        "offenseRating": 63,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.031835,
+          "secondaryCreator": 0.079838,
+          "scoringGuard": 0.062213,
+          "movementSpacer": 0.249726,
+          "twoWayWing": 0.116501,
+          "connector": 0.172991,
+          "interiorFinisher": 0.040492,
+          "stretchBig": 0.134356,
+          "rebounder": 0.041965,
+          "defensiveAnchor": 0.070083
+        },
+        "baseScore": 55.85,
+        "nonlinear": {
+          "creation": 66.16548615746291,
+          "penetration": 58.29967763807448,
+          "shootingGravity": 76.1125,
+          "scalableScoring": 61.666666666666664,
+          "switchability": 61.13398837379675,
+          "rimProtection": 57.978441384086565,
+          "possessionControl": 66.588,
+          "synergyBonus": 0.7306533522135304,
+          "weaknessPenalty": -1.54428403104,
+          "weaknesses": {
+            "turnoverLiability": 2.3830689919999997,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.8802368639999997,
+            "deficientRebounding": 1.2787060000000001
+          }
+        },
+        "production": {
+          "score": 30.578595528706728,
+          "weight": 0.08945638820638821,
+          "confidence": "medium",
+          "sampleGames": 70,
+          "sampleMinutes": 1460,
+          "shrinkage": 0.3138820638820639
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00940625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 55,
+        "offenseRating": 63,
         "defenseRating": 56
       },
       "detailedRatings": {
@@ -564,16 +617,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76009",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -605,8 +658,8 @@
         "teamGames": 80,
         "teamMinutes": 1691
       },
-      "selectionScore": 63.129,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 55.687,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 80,
         "minutes": 1691,
@@ -639,8 +692,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 64,
-        "offenseRating": 61,
+        "overallRating": 52,
+        "offenseRating": 60,
+        "defenseRating": 59
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.013056,
+          "secondaryCreator": 0.032781,
+          "scoringGuard": 0.03922,
+          "movementSpacer": 0.161037,
+          "twoWayWing": 0.148348,
+          "connector": 0.097708,
+          "interiorFinisher": 0.059014,
+          "stretchBig": 0.216927,
+          "rebounder": 0.103906,
+          "defensiveAnchor": 0.128003
+        },
+        "baseScore": 55.96,
+        "nonlinear": {
+          "creation": 53.68818926783181,
+          "penetration": 52.55422967865467,
+          "shootingGravity": 71.1,
+          "scalableScoring": 70,
+          "switchability": 66.70861804014108,
+          "rimProtection": 67.57492545323413,
+          "possessionControl": 56.0565,
+          "synergyBonus": 0.5444719038182693,
+          "weaknessPenalty": -2.6784474616800003,
+          "weaknesses": {
+            "turnoverLiability": 3.9707957520000012,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 3.6550283999999986,
+            "deficientRebounding": 0.2519625
+          }
+        },
+        "production": {
+          "score": 24.599786684155998,
+          "weight": 0.13424840697795884,
+          "confidence": "high",
+          "sampleGames": 80,
+          "sampleMinutes": 1691,
+          "shrinkage": 0.3532852815209443
+        },
+        "calibratedImpact": {
+          "adjustment": 0.020125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 52,
+        "offenseRating": 60,
         "defenseRating": 59
       },
       "detailedRatings": {
@@ -1102,16 +1208,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76050",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -1143,8 +1249,8 @@
         "teamGames": 72,
         "teamMinutes": 1221
       },
-      "selectionScore": 67.06,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 51.685,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 72,
         "minutes": 1221,
@@ -1177,9 +1283,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 73,
+        "overallRating": 47,
         "offenseRating": 57,
-        "defenseRating": 57
+        "defenseRating": 58
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.024454,
+          "secondaryCreator": 0.044662,
+          "scoringGuard": 0.047329,
+          "movementSpacer": 0.091786,
+          "twoWayWing": 0.187227,
+          "connector": 0.10095,
+          "interiorFinisher": 0.091525,
+          "stretchBig": 0.123545,
+          "rebounder": 0.125055,
+          "defensiveAnchor": 0.163467
+        },
+        "baseScore": 50.03,
+        "nonlinear": {
+          "creation": 55.00275468296565,
+          "penetration": 55.45083978397728,
+          "shootingGravity": 59.25,
+          "scalableScoring": 57,
+          "switchability": 62.617485682118556,
+          "rimProtection": 62.68444495388014,
+          "possessionControl": 62.0285,
+          "synergyBonus": 0.015211841027106689,
+          "weaknessPenalty": -1.0206952986400002,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.6884224960000003,
+            "deficientRebounding": 0.3136225
+          }
+        },
+        "production": {
+          "score": 31.919451494019114,
+          "weight": 0.0822141282091668,
+          "confidence": "medium",
+          "sampleGames": 72,
+          "sampleMinutes": 1221,
+          "shrinkage": 0.28847062529532214
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00984375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 47,
+        "offenseRating": 57,
+        "defenseRating": 58
       },
       "detailedRatings": {
         "threePoint": 52,
@@ -1637,16 +1796,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-767",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -1678,8 +1837,8 @@
         "teamGames": 74,
         "teamMinutes": 2462
       },
-      "selectionScore": 75.32,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 60.379,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 74,
         "minutes": 2462,
@@ -1712,7 +1871,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 82,
+        "overallRating": 57,
+        "offenseRating": 62,
+        "defenseRating": 61
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.03373,
+          "secondaryCreator": 0.044463,
+          "scoringGuard": 0.056572,
+          "movementSpacer": 0.078208,
+          "twoWayWing": 0.161433,
+          "connector": 0.085469,
+          "interiorFinisher": 0.120795,
+          "stretchBig": 0.116351,
+          "rebounder": 0.151598,
+          "defensiveAnchor": 0.151381
+        },
+        "baseScore": 55.92,
+        "nonlinear": {
+          "creation": 62.6908512860486,
+          "penetration": 67.06268730113725,
+          "shootingGravity": 58.9225,
+          "scalableScoring": 65,
+          "switchability": 67.89545642686149,
+          "rimProtection": 64.63611363989223,
+          "possessionControl": 65.815,
+          "synergyBonus": 0.2087593347074767,
+          "weaknessPenalty": -0.28905066,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.8501489999999999,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 50.558296420862504,
+          "weight": 0.15327948847383477,
+          "confidence": "high",
+          "sampleGames": 74,
+          "sampleMinutes": 2462,
+          "shrinkage": 0.40336707493114415
+        },
+        "calibratedImpact": {
+          "adjustment": -0.10340625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 57,
         "offenseRating": 62,
         "defenseRating": 61
       },
@@ -2175,16 +2387,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-76876",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -2216,8 +2428,8 @@
         "teamGames": 73,
         "teamMinutes": 1860
       },
-      "selectionScore": 68.839,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.294,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 73,
         "minutes": 1860,
@@ -2250,7 +2462,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 73,
+        "overallRating": 52,
+        "offenseRating": 59,
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.023418,
+          "secondaryCreator": 0.040387,
+          "scoringGuard": 0.039252,
+          "movementSpacer": 0.087552,
+          "twoWayWing": 0.161832,
+          "connector": 0.093954,
+          "interiorFinisher": 0.0781,
+          "stretchBig": 0.145091,
+          "rebounder": 0.154601,
+          "defensiveAnchor": 0.175813
+        },
+        "baseScore": 54.36,
+        "nonlinear": {
+          "creation": 60.00999833379615,
+          "penetration": 58.73345240918854,
+          "shootingGravity": 59.6125,
+          "scalableScoring": 62.333333333333336,
+          "switchability": 67.6455023178688,
+          "rimProtection": 66.09550167199228,
+          "possessionControl": 62.7975,
+          "synergyBonus": 0.12021354356649266,
+          "weaknessPenalty": -1.3504776744000002,
+          "weaknesses": {
+            "turnoverLiability": 1.2127906800000006,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 2.75920248,
+            "deficientRebounding": 0
+          }
+        },
+        "production": {
+          "score": 36.59699823824488,
+          "weight": 0.1358944374209861,
+          "confidence": "high",
+          "sampleGames": 73,
+          "sampleMinutes": 1860,
+          "shrinkage": 0.35761694058154236
+        },
+        "calibratedImpact": {
+          "adjustment": -0.018,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 52,
         "offenseRating": 59,
         "defenseRating": 63
       },
@@ -2713,16 +2978,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-77946",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -2754,8 +3019,8 @@
         "teamGames": 67,
         "teamMinutes": 1817
       },
-      "selectionScore": 70.773,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 56.826,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 67,
         "minutes": 1817,
@@ -2788,8 +3053,61 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
-        "offenseRating": 56,
+        "overallRating": 53,
+        "offenseRating": 55,
+        "defenseRating": 69
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.038671,
+          "secondaryCreator": 0.055367,
+          "scoringGuard": 0.039625,
+          "movementSpacer": 0.052588,
+          "twoWayWing": 0.212255,
+          "connector": 0.103063,
+          "interiorFinisher": 0.087102,
+          "stretchBig": 0.077419,
+          "rebounder": 0.099833,
+          "defensiveAnchor": 0.234077
+        },
+        "baseScore": 53.67,
+        "nonlinear": {
+          "creation": 66.38071971308864,
+          "penetration": 61.93680692738203,
+          "shootingGravity": 52.2225,
+          "scalableScoring": 51.666666666666664,
+          "switchability": 73.21547643739213,
+          "rimProtection": 68.74926675010262,
+          "possessionControl": 67.5145,
+          "synergyBonus": 0.3355194425320417,
+          "weaknessPenalty": -1.2466250238349998,
+          "weaknesses": {
+            "turnoverLiability": 1.2991579439999994,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.6549737982500003,
+            "foulRisk": 1.1507950080000002,
+            "deficientRebounding": 0.5616174374999999
+          }
+        },
+        "production": {
+          "score": 41.73061289281792,
+          "weight": 0.13034190899895468,
+          "confidence": "high",
+          "sampleGames": 67,
+          "sampleMinutes": 1817,
+          "shrinkage": 0.3430050236814597
+        },
+        "calibratedImpact": {
+          "adjustment": -0.07296875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 53,
+        "offenseRating": 55,
         "defenseRating": 69
       },
       "detailedRatings": {
@@ -3251,16 +3569,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78198",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -3292,8 +3610,8 @@
         "teamGames": 65,
         "teamMinutes": 1644
       },
-      "selectionScore": 71.939,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 60.039,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 65,
         "minutes": 1644,
@@ -3326,7 +3644,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 76,
+        "overallRating": 56,
+        "offenseRating": 62,
+        "defenseRating": 68
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.032597,
+          "secondaryCreator": 0.05696,
+          "scoringGuard": 0.049304,
+          "movementSpacer": 0.093989,
+          "twoWayWing": 0.193212,
+          "connector": 0.131824,
+          "interiorFinisher": 0.077219,
+          "stretchBig": 0.093052,
+          "rebounder": 0.075852,
+          "defensiveAnchor": 0.195991
+        },
+        "baseScore": 55.86,
+        "nonlinear": {
+          "creation": 64.6646236408907,
+          "penetration": 62.22498901151212,
+          "shootingGravity": 62.9125,
+          "scalableScoring": 63.333333333333336,
+          "switchability": 68.4557051086524,
+          "rimProtection": 68.0406908684811,
+          "possessionControl": 67.568,
+          "synergyBonus": 0.2002929962177652,
+          "weaknessPenalty": -0.79209711498,
+          "weaknesses": {
+            "turnoverLiability": 0,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.7997582719999998,
+            "deficientRebounding": 0.529939125
+          }
+        },
+        "production": {
+          "score": 45.44508425788239,
+          "weight": 0.12300617957106509,
+          "confidence": "high",
+          "sampleGames": 65,
+          "sampleMinutes": 1644,
+          "shrinkage": 0.32370047255543444
+        },
+        "calibratedImpact": {
+          "adjustment": -0.015625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 56,
         "offenseRating": 62,
         "defenseRating": 68
       },
@@ -3789,16 +4160,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78310",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -3830,8 +4201,8 @@
         "teamGames": 76,
         "teamMinutes": 2350
       },
-      "selectionScore": 76.9,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 62.093,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 76,
         "minutes": 2350,
@@ -3864,9 +4235,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 83,
+        "overallRating": 58,
         "offenseRating": 67,
-        "defenseRating": 59
+        "defenseRating": 60
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.059718,
+          "secondaryCreator": 0.091962,
+          "scoringGuard": 0.069781,
+          "movementSpacer": 0.107668,
+          "twoWayWing": 0.159227,
+          "connector": 0.141545,
+          "interiorFinisher": 0.098246,
+          "stretchBig": 0.108383,
+          "rebounder": 0.060923,
+          "defensiveAnchor": 0.102547
+        },
+        "baseScore": 56.6,
+        "nonlinear": {
+          "creation": 74.57358014289261,
+          "penetration": 70.89994502805008,
+          "shootingGravity": 65.22749999999999,
+          "scalableScoring": 64,
+          "switchability": 68.17565600874515,
+          "rimProtection": 61.97214564676491,
+          "possessionControl": 73.2285,
+          "synergyBonus": 0.43498537368467527,
+          "weaknessPenalty": -1.2918475118700004,
+          "weaknesses": {
+            "turnoverLiability": 1.8683695440000005,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.789177024,
+            "deficientRebounding": 1.1420049374999999
+          }
+        },
+        "production": {
+          "score": 51.24237792859033,
+          "weight": 0.15196596506941334,
+          "confidence": "high",
+          "sampleGames": 76,
+          "sampleMinutes": 2350,
+          "shrinkage": 0.399910434393193
+        },
+        "calibratedImpact": {
+          "adjustment": 0.01346875,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 58,
+        "offenseRating": 67,
+        "defenseRating": 60
       },
       "detailedRatings": {
         "threePoint": 54,
@@ -4327,16 +4751,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78381",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -4368,8 +4792,8 @@
         "teamGames": 60,
         "teamMinutes": 1105
       },
-      "selectionScore": 58.676,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 46.36,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 60,
         "minutes": 1105,
@@ -4402,9 +4826,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 62,
+        "overallRating": 41,
         "offenseRating": 52,
-        "defenseRating": 56
+        "defenseRating": 57
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.023027,
+          "secondaryCreator": 0.044771,
+          "scoringGuard": 0.042894,
+          "movementSpacer": 0.084229,
+          "twoWayWing": 0.197737,
+          "connector": 0.09421,
+          "interiorFinisher": 0.089135,
+          "stretchBig": 0.131945,
+          "rebounder": 0.120577,
+          "defensiveAnchor": 0.171475
+        },
+        "baseScore": 46.69,
+        "nonlinear": {
+          "creation": 53.47082579763131,
+          "penetration": 52.635207048140686,
+          "shootingGravity": 58.0625,
+          "scalableScoring": 50.666666666666664,
+          "switchability": 62.89037793776636,
+          "rimProtection": 62.65028301097669,
+          "possessionControl": 56.7085,
+          "synergyBonus": 0.02316587661580351,
+          "weaknessPenalty": -2.50098677844,
+          "weaknesses": {
+            "turnoverLiability": 2.7835942079999993,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 3.622438008,
+            "deficientRebounding": 0.9498112499999999
+          }
+        },
+        "production": {
+          "score": 18.130771770440685,
+          "weight": 0.07253550863723608,
+          "confidence": "medium",
+          "sampleGames": 60,
+          "sampleMinutes": 1105,
+          "shrinkage": 0.254510556621881
+        },
+        "calibratedImpact": {
+          "adjustment": -0.0548125,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 41,
+        "offenseRating": 52,
+        "defenseRating": 57
       },
       "detailedRatings": {
         "threePoint": 44,
@@ -4865,16 +5342,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78417",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -4906,8 +5383,8 @@
         "teamGames": 63,
         "teamMinutes": 1657
       },
-      "selectionScore": 69.238,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 54.873,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 63,
         "minutes": 1657,
@@ -4940,9 +5417,62 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 74,
-        "offenseRating": 60,
-        "defenseRating": 62
+        "overallRating": 50,
+        "offenseRating": 59,
+        "defenseRating": 63
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.062668,
+          "secondaryCreator": 0.116626,
+          "scoringGuard": 0.061127,
+          "movementSpacer": 0.075923,
+          "twoWayWing": 0.177078,
+          "connector": 0.154119,
+          "interiorFinisher": 0.072175,
+          "stretchBig": 0.069732,
+          "rebounder": 0.0689,
+          "defensiveAnchor": 0.141652
+        },
+        "baseScore": 51.58,
+        "nonlinear": {
+          "creation": 72.16391410390663,
+          "penetration": 63.17370387628307,
+          "shootingGravity": 58.62,
+          "scalableScoring": 51.333333333333336,
+          "switchability": 65.74233791981192,
+          "rimProtection": 61.67596200682557,
+          "possessionControl": 70.0595,
+          "synergyBonus": 0.18215131059194822,
+          "weaknessPenalty": -1.8452651929500001,
+          "weaknesses": {
+            "turnoverLiability": 4.202906328,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 0.10549180199999991,
+            "deficientRebounding": 1.1188524375000002
+          }
+        },
+        "production": {
+          "score": 41.65103488706368,
+          "weight": 0.12199298215400513,
+          "confidence": "high",
+          "sampleGames": 63,
+          "sampleMinutes": 1657,
+          "shrinkage": 0.3210341635631714
+        },
+        "calibratedImpact": {
+          "adjustment": 0.0049375,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 50,
+        "offenseRating": 59,
+        "defenseRating": 63
       },
       "detailedRatings": {
         "threePoint": 30,
@@ -5403,16 +5933,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-78528",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -5444,8 +5974,8 @@
         "teamGames": 40,
         "teamMinutes": 638
       },
-      "selectionScore": 60.58,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 49.414,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 40,
         "minutes": 638,
@@ -5478,7 +6008,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 65,
+        "overallRating": 46,
+        "offenseRating": 55,
+        "defenseRating": 56
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.025597,
+          "secondaryCreator": 0.05824,
+          "scoringGuard": 0.064771,
+          "movementSpacer": 0.212501,
+          "twoWayWing": 0.147969,
+          "connector": 0.132737,
+          "interiorFinisher": 0.056173,
+          "stretchBig": 0.140773,
+          "rebounder": 0.064845,
+          "defensiveAnchor": 0.096394
+        },
+        "baseScore": 48.64,
+        "nonlinear": {
+          "creation": 57.92399874969574,
+          "penetration": 54.65860149376193,
+          "shootingGravity": 66.53,
+          "scalableScoring": 57.333333333333336,
+          "switchability": 60.63166008951434,
+          "rimProtection": 56.995613528768175,
+          "possessionControl": 56.455,
+          "synergyBonus": 0.2105698973684211,
+          "weaknessPenalty": -2.9466268648500002,
+          "weaknesses": {
+            "turnoverLiability": 6,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0,
+            "foulRisk": 1.5401817899999997,
+            "deficientRebounding": 1.1263678125
+          }
+        },
+        "production": {
+          "score": 23.72366654409698,
+          "weight": 0.025514031805425632,
+          "confidence": "low",
+          "sampleGames": 40,
+          "sampleMinutes": 638,
+          "shrinkage": 0.1492048643592142
+        },
+        "calibratedImpact": {
+          "adjustment": -0.00940625,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 46,
         "offenseRating": 55,
         "defenseRating": 56
       },
@@ -5941,16 +6524,16 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
       }
     },
     {
-      "schemaVersion": 3,
+      "schemaVersion": 4,
       "playerId": "p-98",
       "franchiseId": "magic",
       "eraId": "1980s",
@@ -5984,8 +6567,8 @@
         "teamGames": 81,
         "teamMinutes": 1785
       },
-      "selectionScore": 66.663,
-      "selectionScoreVersion": "selection-v2",
+      "selectionScore": 50.471,
+      "selectionScoreVersion": "selection-v3-ratings-v3",
       "stats": {
         "gamesPlayed": 81,
         "minutes": 1785,
@@ -6018,7 +6601,60 @@
         "lineageRuleVersion": "lineage-v1"
       },
       "summaryRatings": {
-        "overallRating": 72,
+        "overallRating": 45,
+        "offenseRating": 53,
+        "defenseRating": 61
+      },
+      "ratingProfile": {
+        "schemaVersion": 1,
+        "modelVersion": "ratings-model-v3",
+        "memberships": {
+          "primaryCreator": 0.03839,
+          "secondaryCreator": 0.058641,
+          "scoringGuard": 0.052605,
+          "movementSpacer": 0.067721,
+          "twoWayWing": 0.19665,
+          "connector": 0.100202,
+          "interiorFinisher": 0.103952,
+          "stretchBig": 0.087191,
+          "rebounder": 0.109516,
+          "defensiveAnchor": 0.185132
+        },
+        "baseScore": 48.94,
+        "nonlinear": {
+          "creation": 59.78907418874183,
+          "penetration": 58.95697332188402,
+          "shootingGravity": 53.315,
+          "scalableScoring": 49,
+          "switchability": 66.98009358866716,
+          "rimProtection": 63.46575990292494,
+          "possessionControl": 62.465,
+          "synergyBonus": 0.12885992160676274,
+          "weaknessPenalty": -1.20149512273,
+          "weaknesses": {
+            "turnoverLiability": 1.3935049599999993,
+            "inefficientUsage": 0,
+            "defensiveTargeting": 0,
+            "spacingLimitation": 0.5386044660000002,
+            "foulRisk": 0.6775206959999999,
+            "deficientRebounding": 0.9241790624999999
+          }
+        },
+        "production": {
+          "score": 36.65377989691734,
+          "weight": 0.1382248386731575,
+          "confidence": "high",
+          "sampleGames": 81,
+          "sampleMinutes": 1785,
+          "shrinkage": 0.3637495754556776
+        },
+        "calibratedImpact": {
+          "adjustment": 0.00675,
+          "confidence": 0.03125,
+          "sampleCount": 40,
+          "artifactVersion": "ratings-model-v3"
+        },
+        "canonicalOverall": 45,
         "offenseRating": 53,
         "defenseRating": 61
       },
@@ -6481,9 +7117,9 @@
         }
       },
       "source": {
-        "dataVersion": "m6",
-        "ratingsVersion": "ratings-v9-smooth-elite-band",
-        "selectionScoreVersion": "selection-v2",
+        "dataVersion": "m7-ratings-v3",
+        "ratingsVersion": "ratings-v3",
+        "selectionScoreVersion": "selection-v3-ratings-v3",
         "sourceVersion": "source-v1",
         "derivationMethodVersion": "derive-v3",
         "lineageRuleVersion": "lineage-v1"
