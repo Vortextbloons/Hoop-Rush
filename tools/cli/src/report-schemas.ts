@@ -365,3 +365,36 @@ export const bracketGenerateReportSchema = z.object({
   schedule: z.array(z.string().min(1).max(64)),
 });
 export type BracketGenerateReport = z.infer<typeof bracketGenerateReportSchema>;
+
+export const seasonScheduleGenerateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season schedule generate'),
+  seed: z.string().regex(/^[0-9a-f]{16,64}$/),
+  scheduleVersion: z.string().min(1).max(64),
+  formulaVersion: z.string().min(1).max(64),
+  leagueVersion: z.string().min(1).max(64),
+  rounds: z.number().int().positive(),
+  games: z.number().int().positive(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+  wrote: z.boolean(),
+  outPath: z.string().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonScheduleGenerateReport = z.infer<typeof seasonScheduleGenerateReportSchema>;
+
+export const seasonScheduleAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season schedule audit'),
+  scheduleVersion: z.string().min(1).max(64),
+  formulaVersion: z.string().min(1).max(64),
+  leagueVersion: z.string().min(1).max(64),
+  seed: z.string().regex(/^[0-9a-f]{16,64}$/),
+  rounds: z.number().int().positive(),
+  games: z.number().int().positive(),
+  auditFailures: z.number().int().nonnegative(),
+  regenerationIdentical: z.boolean(),
+  /** Null when the manifest carries no season artifact references. */
+  manifestVerified: z.boolean().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonScheduleAuditReport = z.infer<typeof seasonScheduleAuditReportSchema>;

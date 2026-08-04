@@ -44,6 +44,34 @@ export {
   chooseBestRunSeed,
   simulateChallengeBestOf,
 } from './modes/sandbox/selection.js';
+// Season Run (2.0 M2.0) league skeleton: league membership, the deterministic
+// schedule generator and auditor, pure standings reduction, and the
+// Play-In/playoff state machine.
+export {
+  conferenceOf,
+  divisionOf,
+  franchisesInConference,
+  divisionOpponentsOf,
+  conferenceNonDivisionOpponentsOf,
+  oppositeConferenceOpponentsOf,
+} from './season/league.js';
+export {
+  generateSeasonSchedule,
+  auditSeasonSchedule,
+  type GenerateSeasonScheduleInput,
+} from './season/schedule.js';
+export { reduceSeasonStandings, auditSeasonStandings } from './season/standings.js';
+export {
+  setPlayInRankings,
+  submitPlayInGame,
+  createPlayoffBracket,
+  submitPlayoffGame,
+  currentSeriesId,
+  auditSeasonPostseason,
+  type PostseasonRankings,
+  type PlayInGameResult,
+  type PlayoffGameResult,
+} from './season/postseason.js';
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
 export * as classic from './modes/classic/draft.js';

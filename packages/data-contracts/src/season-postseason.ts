@@ -105,36 +105,65 @@ export const playoffSeriesGameSchema = z.object({
 });
 export type PlayoffSeriesGame = z.infer<typeof playoffSeriesGameSchema>;
 
-/**
- * One best-of-seven series. The `homeCourtFranchiseId` side follows the
- * 2-2-1-1-1 pattern (games 1, 2, 5, 7 at home); for seeded series that is
- * the higher seed, for the Finals it is the caller-supplied home-court team.
- */
-export const playoffSeriesSchema = z.object({
+const playoffSeriesBaseSchema = z.object({
   seriesId: z.string().min(1).max(64),
   round: playoffRoundSchema,
-  /** Null for the Finals. */
+  /** Null for the Finals and for unpaired slots. */
   conference: conferenceIdSchema.nullable(),
-  /** Seed number of the home-court side; null for the Finals. */
+  /** Seed number of the home-court side; null for the Finals and unpaired slots. */
   higherSeed: z.number().int().min(1).max(8).nullable(),
-  /** Seed number of the challenger; null for the Finals. */
+  /** Seed number of the challenger; null for the Finals and unpaired slots. */
   lowerSeed: z.number().int().min(1).max(8).nullable(),
-  homeCourtFranchiseId: franchiseIdSchema,
-  challengerFranchiseId: franchiseIdSchema,
+  /** Null until the slot's matchup resolves. */
+  homeCourtFranchiseId: franchiseIdSchema.nullable(),
+  /** Null until the slot's matchup resolves. */
+  challengerFranchiseId: franchiseIdSchema.nullable(),
   homeCourtWins: z.number().int().min(0).max(4),
   challengerWins: z.number().int().min(0).max(4),
   games: z.array(playoffSeriesGameSchema).max(7),
   winnerFranchiseId: franchiseIdSchema.nullable(),
 });
-export type PlayoffSeries = z.infer<typeof playoffSeriesSchema>;
+
+/**
+ * One best-of-seven series. The `homeCourtFranchiseId` side follows the
+ * 2-2-1-1-1 pattern (games 1, 2, 5, 7 at home); for seeded series that is
+ * the higher seed, for the Finals it is the caller-supplied home-court team.
+ * A slot that is not yet paired has both team ids null; a series that has
+ * started must name both teams.
+ */
+export const playoffSeriesSchema = playoffSeriesBaseSchema.superRefine((series, ctx) => {
+  if (series.games.length > 0 || series.winnerFranchiseId !== null) {
+    if (series.homeCourtFranchiseId === null || series.challengerFranchiseId === null) {
+      ctx.addIssue({ code: 'custom', message: 'started playoff series must name both teams' });
+    }
+  }
+  if (series.games.length !== series.homeCourtWins + series.challengerWins) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'series wins must equal played games (series stops immediately at four wins)',
+    });
+  }
+  if (series.winnerFranchiseId !== null) {
+    if (series.homeCourtWins !== 4 && series.challengerWins !== 4) {
+      ctx.addIssue({ code: 'custom', message: 'series winner requires four wins' });
+    }
+    const teams = [series.homeCourtFranchiseId, series.challengerFranchiseId];
+    if (!teams.includes(series.winnerFranchiseId)) {
+      ctx.addIssue({ code: 'custom', message: 'series winner must be a participant' });
+    }
+  } else if (series.games.length === 7) {
+    ctx.addIssue({ code: 'custom', message: 'a seven-game series must name a winner' });
+  }
+});
+export type PlayoffSeries = z.infer<typeof playoffSeriesBaseSchema>;
 
 export const playoffConferenceBracketSchema = z.object({
   conference: conferenceIdSchema,
   /** Seeds 1-8 in order; pairings are 1-8, 4-5, 3-6, 2-7. */
   seeds: z.array(franchiseIdSchema).length(8),
-  firstRound: z.array(playoffSeriesSchema).length(4),
-  semifinals: z.array(playoffSeriesSchema).length(2),
-  conferenceFinal: playoffSeriesSchema,
+  firstRound: z.array(playoffSeriesBaseSchema).length(4),
+  semifinals: z.array(playoffSeriesBaseSchema).length(2),
+  conferenceFinal: playoffSeriesBaseSchema,
 });
 export type PlayoffConferenceBracket = z.infer<typeof playoffConferenceBracketSchema>;
 
@@ -143,7 +172,7 @@ export const playoffBracketSchema = z.object({
   postseasonVersion: z.literal(SEASON_POSTSEASON_VERSION),
   east: playoffConferenceBracketSchema,
   west: playoffConferenceBracketSchema,
-  finals: playoffSeriesSchema,
+  finals: playoffSeriesBaseSchema,
   championFranchiseId: franchiseIdSchema.nullable(),
 });
 export type PlayoffBracket = z.infer<typeof playoffBracketSchema>;

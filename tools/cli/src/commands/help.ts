@@ -79,6 +79,20 @@ Commands:
                          --exceptions <path>  Exclusion list, one relative path per
                                               line, # comments allowed (default
                                               <dir>/combine-exceptions.txt)
+  season schedule generate
+                         Generate the deterministic Season Run schedule from
+                         the frozen league manifest (82 rounds, 1,230 games).
+                         Without --out this only previews the report and hash.
+                         --out <path>         Write the artifact (required for writes)
+                         --league <path>      League artifact (default packaged)
+                         --seed <hex>         Generation seed (default committed)
+  season schedule audit  Audit the packaged Season Run league and schedule:
+                         schema and versions, counts, identities, rounds,
+                         opponent frequencies, home/away balance, duplicate
+                         games, byte-identical regeneration, manifest hashes.
+                         --schedule <path>    Schedule artifact (default packaged)
+                         --league <path>      League artifact (default packaged)
+                         --manifest <path>    Manifest for hash cross-check
   import ratings         Derive ratings/tendencies/traits/contracts from fetched
                          raw-data roster + season-stats (Python stays the fetch
                          layer only). --seasons 2024-25,2023-24 (comma-separated)

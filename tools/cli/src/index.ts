@@ -13,6 +13,12 @@ import { bracketGenerate, BRACKET_GENERATE_OPTIONS } from './commands/bracket-ge
 import { benchmark, BENCHMARK_OPTIONS } from './commands/benchmark.js';
 import { replay, REPLAY_OPTIONS } from './commands/replay.js';
 import { combineDocs, COMBINE_DOCS_OPTIONS } from './commands/docs-combine.js';
+import {
+  seasonScheduleAudit,
+  seasonScheduleGenerate,
+  SEASON_SCHEDULE_AUDIT_OPTIONS,
+  SEASON_SCHEDULE_GENERATE_OPTIONS,
+} from './commands/season-schedule.js';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.js';
 import { calibrateRatings, CALIBRATE_RATINGS_OPTIONS } from './commands/calibrate-ratings.js';
 import {
@@ -225,6 +231,25 @@ const COMMANDS: Record<string, CommandDef> = {
         exceptions: getOptionString(args, 'exceptions') ?? undefined,
       }),
   },
+  'season schedule generate': {
+    options: SEASON_SCHEDULE_GENERATE_OPTIONS,
+    run: (args) =>
+      seasonScheduleGenerate({
+        out: getOptionString(args, 'out'),
+        league: getOptionString(args, 'league'),
+        seed: getOptionString(args, 'seed'),
+      }),
+  },
+  'season schedule audit': {
+    options: SEASON_SCHEDULE_AUDIT_OPTIONS,
+    run: (args) =>
+      seasonScheduleAudit({
+        schedule: getOptionString(args, 'schedule'),
+        league: getOptionString(args, 'league'),
+        manifest: getOptionString(args, 'manifest'),
+        verbose: hasOption(args, 'verbose'),
+      }),
+  },
   'import ratings': {
     options: IMPORT_RATINGS_OPTIONS,
     run: (args) =>
@@ -295,11 +320,15 @@ async function main(argv: string[]): Promise<{ report: CliReport; format: 'text'
   let parsed: ReturnType<typeof parseArgs>;
   let commandKey: string;
   try {
-    // Resolve the command: two-word commands (sim game, data validate, ...)
-    // first, then single-word commands (replay, help) when the next token is
-    // an option or the first word alone is registered.
-    commandKey = argv.slice(0, 2).join(' ');
+    // Resolve the command: three-word and two-word commands first, then
+    // single-word commands when the next token is an option or the first
+    // word alone is registered.
+    commandKey = argv.slice(0, 3).join(' ');
     let def = COMMANDS[commandKey];
+    if (!def) {
+      commandKey = argv.slice(0, 2).join(' ');
+      def = COMMANDS[commandKey];
+    }
     if (!def) {
       const candidate = argv[0];
       if (candidate !== undefined && COMMANDS[candidate]) {

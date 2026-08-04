@@ -73,7 +73,7 @@ function maximumMatching(adjacency: readonly number[][]): number[] {
   const lca = (left: number, right: number): number => {
     const seen = new Array<boolean>(n).fill(false);
     let a = left;
-    while (true) {
+    for (;;) {
       a = base[a] ?? a;
       seen[a] = true;
       const paired = match[a] ?? -1;
@@ -83,7 +83,7 @@ function maximumMatching(adjacency: readonly number[][]): number[] {
       a = next;
     }
     let b = right;
-    while (true) {
+    for (;;) {
       b = base[b] ?? b;
       if (seen[b]) return b;
       const paired = match[b] ?? -1;
@@ -283,7 +283,6 @@ function orientThreeGamePairs(
   const incident = new Map<string, string[]>();
   for (const pair of pairs) {
     const [a, b] = pair;
-    if (a === undefined || b === undefined) throw new Error('empty three-game pair');
     result.set(a, new Set());
     result.set(b, new Set());
     incident.set(a, [...(incident.get(a) ?? []), b]);
@@ -306,7 +305,6 @@ function orientThreeGamePairs(
     const pair = pairs[index];
     if (pair === undefined) throw new Error('missing three-game pair');
     const [a, b] = pair;
-    if (a === undefined || b === undefined) throw new Error('empty three-game pair');
     decided.add(pairKey(a, b));
     const hosts = [a, b];
     for (const host of hosts) {
@@ -547,18 +545,6 @@ export function auditSeasonSchedule(schedule: SeasonSchedule, league: SeasonLeag
   if (!parsed.success) {
     failures.push(`schedule fails the schema: ${parsed.error.issues[0]?.message ?? 'invalid'}`);
   }
-  if (schedule.scheduleVersion !== SEASON_SCHEDULE_VERSION) {
-    failures.push(`scheduleVersion must be ${SEASON_SCHEDULE_VERSION}`);
-  }
-  if (schedule.formulaVersion !== SEASON_SCHEDULE_FORMULA_VERSION) {
-    failures.push(`formulaVersion must be ${SEASON_SCHEDULE_FORMULA_VERSION}`);
-  }
-  if (schedule.leagueVersion !== SEASON_LEAGUE_VERSION) {
-    failures.push(`leagueVersion must be ${SEASON_LEAGUE_VERSION}`);
-  }
-  if (schedule.rounds !== SEASON_ROUND_COUNT) {
-    failures.push(`rounds must be ${String(SEASON_ROUND_COUNT)}`);
-  }
   if (schedule.games.length !== SEASON_GAME_COUNT) {
     failures.push(
       `games must be ${String(SEASON_GAME_COUNT)} (got ${String(schedule.games.length)})`,
@@ -624,11 +610,11 @@ export function auditSeasonSchedule(schedule: SeasonSchedule, league: SeasonLeag
     awayCounts.set(game.awayFranchiseId, (awayCounts.get(game.awayFranchiseId) ?? 0) + 1);
     totalCounts.set(game.homeFranchiseId, (totalCounts.get(game.homeFranchiseId) ?? 0) + 1);
     totalCounts.set(game.awayFranchiseId, (totalCounts.get(game.awayFranchiseId) ?? 0) + 1);
-    const against = opponentCounts.get(game.homeFranchiseId) ?? new Map();
+    const against = opponentCounts.get(game.homeFranchiseId) ?? new Map<string, number>();
     against.set(game.awayFranchiseId, (against.get(game.awayFranchiseId) ?? 0) + 1);
-    const awayAgainst = opponentCounts.get(game.awayFranchiseId) ?? new Map();
+    const awayAgainst = opponentCounts.get(game.awayFranchiseId) ?? new Map<string, number>();
     awayAgainst.set(game.homeFranchiseId, (awayAgainst.get(game.homeFranchiseId) ?? 0) + 1);
-    const homeVersusMap = homeVersus.get(game.homeFranchiseId) ?? new Map();
+    const homeVersusMap = homeVersus.get(game.homeFranchiseId) ?? new Map<string, number>();
     homeVersusMap.set(game.awayFranchiseId, (homeVersusMap.get(game.awayFranchiseId) ?? 0) + 1);
   }
 
@@ -650,7 +636,7 @@ export function auditSeasonSchedule(schedule: SeasonSchedule, league: SeasonLeag
         `${id} must play ${String(SEASON_ROUND_COUNT / 2)} away games (got ${String(away)})`,
       );
     }
-    const counts = opponentCounts.get(id) ?? new Map();
+    const counts = opponentCounts.get(id) ?? new Map<string, number>();
     for (const opponent of divisionOpponentsOf(league, id)) {
       if ((counts.get(opponent) ?? 0) !== 4) {
         failures.push(`${id} must play division opponent ${opponent} exactly 4 times`);

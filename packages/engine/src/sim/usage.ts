@@ -417,7 +417,7 @@ export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone
   // of dragging the whole league toward the paint.
   weights[0] = (weights[0] ?? 0) * (action === 'transition' ? 1.1 : action === 'postUp' ? 1.02 : 1);
   if (action === 'isolation' || action === 'pickAndRoll') {
-    weights[0] = (weights[0] ?? 0) * (0.9 + Math.min(40, prep.driveRate) / 100);
+    weights[0] = weights[0] * (0.9 + Math.min(40, prep.driveRate) / 100);
   }
   weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
   return rng.weightedPick(ZONES, weights);

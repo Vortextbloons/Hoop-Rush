@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
 import { buildLegalSimulationTeam } from '@hoop-rush/test-fixtures';
 import { foulerWeights, shootingFoulProbability } from './fouls.js';
 import { rebounderWeights, teamMean } from './rebounding.js';
 import { stealerWeights } from './security.js';
 import { blockProbability } from './shooting.js';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
+
+function playerAt(team: SimulationTeam, index: number): SimulationPlayer {
+  const player = team.players[index];
+  if (!player) throw new Error(`fixture player ${String(index)} missing`);
+  return player;
+}
+
+function headWeight(weights: readonly number[]): number {
+  const head = weights[0];
+  if (head === undefined) throw new Error('expected a non-empty weight list');
+  return head;
+}
 
 function withTendency(key: string, value: number) {
   const team = buildLegalSimulationTeam();
@@ -20,22 +33,24 @@ describe('player tendencies affect possession mechanics', () => {
   it('uses foul aggression in foul probability and attribution', () => {
     const low = withTendency('foulRate', 3);
     const high = withTendency('foulRate', 12);
-    const shooter = low.players[1]!;
-    expect(foulerWeights(high)[0]).toBeGreaterThan(foulerWeights(low)[0]!);
+    const shooter = playerAt(low, 1);
+    expect(headWeight(foulerWeights(high))).toBeGreaterThan(headWeight(foulerWeights(low)));
     expect(
-      shootingFoulProbability(shooter, high.players[0]!, 'rim', buildEraSimulationProfile()),
+      shootingFoulProbability(shooter, playerAt(high, 0), 'rim', buildEraSimulationProfile()),
     ).toBeGreaterThan(
-      shootingFoulProbability(shooter, low.players[0]!, 'rim', buildEraSimulationProfile()),
+      shootingFoulProbability(shooter, playerAt(low, 0), 'rim', buildEraSimulationProfile()),
     );
   });
 
   it('uses steal, block, and offensive-glass aggression', () => {
     const lowSteal = withTendency('stealAttemptRate', 4);
     const highSteal = withTendency('stealAttemptRate', 18);
-    expect(stealerWeights(highSteal)[0]).toBeGreaterThan(stealerWeights(lowSteal)[0]!);
+    expect(headWeight(stealerWeights(highSteal))).toBeGreaterThan(
+      headWeight(stealerWeights(lowSteal)),
+    );
 
-    const lowBlock = withTendency('blockAttemptRate', 4).players[0]!;
-    const highBlock = withTendency('blockAttemptRate', 18).players[0]!;
+    const lowBlock = playerAt(withTendency('blockAttemptRate', 4), 0);
+    const highBlock = playerAt(withTendency('blockAttemptRate', 18), 0);
     expect(blockProbability(highBlock, 'rim', 'pickAndRoll')).toBeGreaterThan(
       blockProbability(lowBlock, 'rim', 'pickAndRoll'),
     );
@@ -45,8 +60,8 @@ describe('player tendencies affect possession mechanics', () => {
     expect(teamMean(highCrash, 'offensiveRebound')).toBeGreaterThan(
       teamMean(lowCrash, 'offensiveRebound'),
     );
-    expect(rebounderWeights(highCrash, true)[0]).toBeGreaterThan(
-      rebounderWeights(lowCrash, true)[0]!,
+    expect(headWeight(rebounderWeights(highCrash, true))).toBeGreaterThan(
+      headWeight(rebounderWeights(lowCrash, true)),
     );
   });
 });

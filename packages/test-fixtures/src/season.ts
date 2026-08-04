@@ -93,7 +93,7 @@ export function buildSeasonRosters(league: SeasonLeague, seed: string): SeasonRo
   return league.teams.map((team, teamIndex) => ({
     franchiseId: team.franchiseId,
     players: Array.from({ length: SEASON_ROSTER_SIZE }, (_, slot) => {
-      const playerId = `p-synth-${seeded.slice(0, 6)}-${teamIndex + 1}-${slot + 1}`;
+      const playerId = `p-synth-${seeded.slice(0, 6)}-${String(teamIndex + 1)}-${String(slot + 1)}`;
       return {
         playerVersionId: playerVersionId(playerId, team.franchiseId, '1990s', '1995-96'),
         playerId,

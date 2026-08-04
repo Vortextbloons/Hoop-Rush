@@ -4,6 +4,7 @@ import {
   seasonGameSchema,
   seasonLeagueSchema,
   seasonPostseasonStateSchema,
+  playoffSeriesSchema,
   seasonRunSchema,
   seasonScheduleSchema,
   seasonStandingsSchema,
@@ -205,7 +206,7 @@ function buildRun(): SeasonRun {
           3 + 32,
           '0',
         ),
-      playerId: `p-synth-${teamIndex + 1}-${slot + 1}`,
+      playerId: `p-synth-${String(teamIndex + 1)}-${String(slot + 1)}`,
       franchiseId: team.franchiseId,
       eraId: '1990s',
       seasonKey: '1995-96',
@@ -504,7 +505,7 @@ describe('season postseason schema', () => {
         ...state.playIn,
         east: {
           ...state.playIn.east,
-          ranking: Array.from({ length: 10 }, (_, i) => `team-${i + 1}`),
+          ranking: Array.from({ length: 10 }, (_, i) => `team-${String(i + 1)}`),
           games: {
             sevenEight: {
               gameId: 'seven-eight',
@@ -602,6 +603,140 @@ describe('season postseason schema', () => {
         postseasonVersion: 'postseason-v2',
       }),
     ).toThrow();
+  });
+
+  it('round-trips unpaired and paired playoff series slots', () => {
+    const pending = {
+      seriesId: 'east-semifinal-1',
+      round: 'conference-semifinal' as const,
+      conference: 'east' as const,
+      higherSeed: null,
+      lowerSeed: null,
+      homeCourtFranchiseId: null,
+      challengerFranchiseId: null,
+      homeCourtWins: 0,
+      challengerWins: 0,
+      games: [],
+      winnerFranchiseId: null,
+    };
+    expect(playoffSeriesSchema.safeParse(pending).success).toBe(true);
+    const paired = {
+      seriesId: 'east-first-round-1',
+      round: 'first-round' as const,
+      conference: 'east' as const,
+      higherSeed: 1,
+      lowerSeed: 8,
+      homeCourtFranchiseId: 'team-1',
+      challengerFranchiseId: 'team-8',
+      homeCourtWins: 3,
+      challengerWins: 2,
+      games: [
+        {
+          gameNumber: 1,
+          homeFranchiseId: 'team-1',
+          awayFranchiseId: 'team-8',
+          status: 'final',
+          homeScore: 100,
+          awayScore: 90,
+          winnerFranchiseId: 'team-1',
+        },
+        {
+          gameNumber: 2,
+          homeFranchiseId: 'team-1',
+          awayFranchiseId: 'team-8',
+          status: 'final',
+          homeScore: 110,
+          awayScore: 95,
+          winnerFranchiseId: 'team-1',
+        },
+        {
+          gameNumber: 3,
+          homeFranchiseId: 'team-8',
+          awayFranchiseId: 'team-1',
+          status: 'final',
+          homeScore: 99,
+          awayScore: 101,
+          winnerFranchiseId: 'team-1',
+        },
+        {
+          gameNumber: 4,
+          homeFranchiseId: 'team-8',
+          awayFranchiseId: 'team-1',
+          status: 'final',
+          homeScore: 102,
+          awayScore: 100,
+          winnerFranchiseId: 'team-8',
+        },
+        {
+          gameNumber: 5,
+          homeFranchiseId: 'team-1',
+          awayFranchiseId: 'team-8',
+          status: 'final',
+          homeScore: 105,
+          awayScore: 98,
+          winnerFranchiseId: 'team-1',
+        },
+      ],
+      winnerFranchiseId: null,
+    };
+    expect(playoffSeriesSchema.safeParse(paired).success).toBe(true);
+  });
+
+  it('rejects corrupt playoff series records', () => {
+    const base = {
+      seriesId: 'east-first-round-1',
+      round: 'first-round' as const,
+      conference: 'east' as const,
+      higherSeed: 1,
+      lowerSeed: 8,
+      homeCourtFranchiseId: 'team-1',
+      challengerFranchiseId: 'team-8',
+      homeCourtWins: 0,
+      challengerWins: 0,
+      games: [],
+      winnerFranchiseId: null,
+    };
+    const schema = playoffSeriesSchema;
+    // A started series must name both teams.
+    expect(
+      schema.safeParse({
+        ...base,
+        games: [
+          {
+            gameNumber: 1,
+            homeFranchiseId: 'team-1',
+            awayFranchiseId: 'team-8',
+            status: 'final',
+            homeScore: 100,
+            awayScore: 90,
+            winnerFranchiseId: 'team-1',
+          },
+        ],
+        homeCourtWins: 1,
+        homeCourtFranchiseId: null,
+      }).success,
+    ).toBe(false);
+    // A winner requires four wins.
+    expect(schema.safeParse({ ...base, winnerFranchiseId: 'team-1' }).success).toBe(false);
+    // A seven-game series must name a winner.
+    expect(
+      schema.safeParse({
+        ...base,
+        games: Array.from({ length: 7 }, (_, i) => ({
+          gameNumber: i + 1,
+          homeFranchiseId: 'team-1',
+          awayFranchiseId: 'team-8',
+          status: 'final',
+          homeScore: 100,
+          awayScore: 90,
+          winnerFranchiseId: 'team-1',
+        })),
+        homeCourtWins: 4,
+        challengerWins: 3,
+      }).success,
+    ).toBe(false);
+    // Wins must equal played games.
+    expect(schema.safeParse({ ...base, homeCourtWins: 2 }).success).toBe(false);
   });
 });
 
@@ -718,5 +853,35 @@ describe('season seed derivation', () => {
       expect(derived).toMatch(/^[0-9a-f]{32}$/);
       expect(derived).not.toBe(seed);
     }
+  });
+
+  it('pins stable derivation vectors for the committed run seed', async () => {
+    const mod = await import('./index.js');
+    const { seasonNamespaceSeed, SEASON_SEED_NAMESPACES, playerVersionId } = mod;
+    const seed = 'c0ffee2026a1b2c3d4e5f60718293a4b';
+    expect(seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.draft)).toBe(
+      'bf6f373420fee6f04bf1da36074ce784',
+    );
+    expect(seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.aiRosters)).toBe(
+      'd5edcf36a61755a2ff9f80582bb5ee46',
+    );
+    expect(
+      seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.scheduleGames, 'lakers', 'celtics'),
+    ).toBe('c70523e788d2756bde47e3a90fadf0d7');
+    expect(seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.postseasonTies)).toBe(
+      'cc022296a9b3989a9ea1d1943d6e5186',
+    );
+    expect(seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.injuries)).toBe(
+      '3c4fc7a600628bba49f5d95c9815f3f6',
+    );
+    expect(seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.trades)).toBe(
+      '5a0b6036864e4e3a80a4a8b460544a46',
+    );
+    expect(seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.upgrades)).toBe(
+      '4b8c47c4507c7a30616462d624a142f4',
+    );
+    expect(playerVersionId('p-synth-1', 'lakers', '1990s', '1995-96')).toBe(
+      'pv-345baf6811b5d914c163685a20974538',
+    );
   });
 });
