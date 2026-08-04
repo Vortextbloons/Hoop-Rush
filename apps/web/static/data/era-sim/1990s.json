@@ -28,21 +28,21 @@
     "assistRate": 0.6095,
     "foulsPerPossession": 0.2361,
     "shootingFoulShare": 0.55,
-    "freeThrowAnchorRating": 77,
+    "freeThrowAnchorRating": 76,
     "assistAnchorRating": 62,
     "zoneMix": {
-      "rim": 0.4171,
-      "shortMid": 0.2611,
-      "longMid": 0.1741,
-      "cornerThree": 0.0554,
-      "aboveBreakThree": 0.0923
+      "rim": 0.2609,
+      "shortMid": 0.3334,
+      "longMid": 0.2581,
+      "cornerThree": 0.0568,
+      "aboveBreakThree": 0.0909
     },
     "source": "packaged stints 1990-91..1999-00 + Lakers 1990s pool rating anchors; zone-mix three-point share normalized to the league 3P rate",
     "parameterProvenance": {
       "pace": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "fga",
@@ -54,7 +54,7 @@
       "league3PARate": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "tpa",
@@ -64,7 +64,7 @@
       "leagueTsPct": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "points",
@@ -77,7 +77,7 @@
       "leagueFtaPerFga": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "fta",
@@ -87,7 +87,7 @@
       "leagueFtPct": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "ftm",
@@ -97,7 +97,7 @@
       "turnoverPerPossession": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "tov",
@@ -107,7 +107,7 @@
       "stealShareOfTurnovers": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "stl",
@@ -117,7 +117,7 @@
       "offensiveReboundRate": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "oreb",
@@ -127,7 +127,7 @@
       "assistRate": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "ast",
@@ -137,7 +137,7 @@
       "foulsPerPossession": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "pf",
@@ -147,7 +147,7 @@
       "shootingFoulShare": {
         "kind": "estimated",
         "confidence": "low",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "prior"
@@ -158,7 +158,7 @@
       "freeThrowAnchorRating": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "lakers-pool",
@@ -168,7 +168,7 @@
       "assistAnchorRating": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "lakers-pool",
@@ -178,7 +178,7 @@
       "zoneMix": {
         "kind": "derived",
         "confidence": "medium",
-        "methodVersion": "derive-v3",
+        "methodVersion": "derive-v6",
         "sourceVersion": "source-v1",
         "sourceFields": [
           "pool-tendencies",
@@ -276,27 +276,27 @@
     },
     "zoneMix": {
       "rim": {
-        "value": 0.4171,
+        "value": 0.2609,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "shortMid": {
-        "value": 0.2611,
+        "value": 0.3334,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "longMid": {
-        "value": 0.1741,
+        "value": 0.2581,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "cornerThree": {
-        "value": 0.0554,
+        "value": 0.0568,
         "tolerance": 0.015,
         "minimumSample": 200
       },
       "aboveBreakThree": {
-        "value": 0.0923,
+        "value": 0.0909,
         "tolerance": 0.02,
         "minimumSample": 200
       }

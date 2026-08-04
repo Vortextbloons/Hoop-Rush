@@ -8,7 +8,7 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v7';
+export const ENGINE_VERSION = 'm3-engine-v8';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -170,6 +170,8 @@ export const ENGINE_CONSTANTS = {
   observedThreePointBlend: 0.65,
   /** How strongly observed free-throw percentage anchors the shot result. */
   observedFreeThrowBlend: 0.82,
+  /** Small population calibration after observed-season free-throw blending. */
+  freeThrowCalibrationOffset: -0.001,
 
   /** Residual three-point skill range when an observed season percentage exists. */
   anchoredThreePointSkillRange: 0.04,

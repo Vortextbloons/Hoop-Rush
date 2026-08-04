@@ -115,5 +115,5 @@ export function freeThrowProbability(
       ? ratingProbability
       : observedProbability * ENGINE_CONSTANTS.observedFreeThrowBlend +
         ratingProbability * (1 - ENGINE_CONSTANTS.observedFreeThrowBlend);
-  return Math.min(0.97, Math.max(0.1, probability));
+  return Math.min(0.97, Math.max(0.1, probability + ENGINE_CONSTANTS.freeThrowCalibrationOffset));
 }
