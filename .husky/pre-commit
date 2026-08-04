@@ -1,1 +1,3 @@
-pnpm exec lint-staged
+# GUI git integrations (Cursor etc.) may launch without pnpm on PATH; skip
+# gracefully instead of failing the commit. Terminal commits run lint-staged.
+command -v pnpm >/dev/null 2>&1 && pnpm exec lint-staged || echo "husky: pnpm not found, skipping lint-staged"

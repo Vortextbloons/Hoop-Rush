@@ -1,2 +1,8 @@
 # Normalize line endings to LF (matches Prettier output) and let git auto-detect text files.
 * text=auto eol=lf
+
+# Generated data: treat as binary for diffs so editors/CLI never render
+# 300k+ line JSON changes (Cursor/VS Code crashes on these). linguist-generated
+# also keeps them out of GitHub code statistics.
+raw-data/**/*.json -diff linguist-generated
+apps/web/static/data/** -diff linguist-generated

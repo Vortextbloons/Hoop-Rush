@@ -7,10 +7,14 @@ if command -v pnpm >/dev/null 2>&1; then
   if [ -f "$PNPM_ENTRY" ]; then
     PNPM_NODE_PATH="$PNPM_ENTRY"
   fi
+else
+  echo "husky: pnpm not found, skipping push checks"
+  exit 0
 fi
 
 run_pnpm() {
   if [ -n "$PNPM_NODE_PATH" ]; then node "$PNPM_NODE_PATH" "$@"; else pnpm "$@"; fi
 }
 
-run_pnpm check && run_pnpm lint && run_pnpm test:quick
+# Fast gate for every push; the full test suite runs in CI.
+run_pnpm check && run_pnpm lint
