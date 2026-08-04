@@ -92,32 +92,26 @@
   }
 </script>
 
-<section class="mx-auto w-full max-w-6xl px-4 pb-24 sm:px-6">
-  <div class="flex flex-col items-start gap-8 py-16 md:py-24">
+<section class="mx-auto w-full max-w-4xl px-4 pb-24 sm:px-6 md:pb-10">
+  <div class="flex flex-col items-center gap-8 py-16 text-center md:py-24">
     <div>
-      <p class="font-mono text-[11px] tracking-[0.18em] text-primary uppercase">
-        Pick a mode · Chase the run
-      </p>
+      <p class="text-label text-primary">Pick a mode · Chase the run</p>
       <h1
-        class="font-display mt-4 max-w-4xl text-4xl leading-[0.95] font-extrabold tracking-tight uppercase sm:text-5xl md:text-6xl lg:text-7xl"
+        class="font-display mt-4 max-w-3xl text-4xl leading-[0.95] font-extrabold tracking-tight uppercase sm:text-5xl md:text-6xl"
       >
         Every dynasty has a first loss.
         <span class="text-primary">Make yours never.</span>
       </h1>
     </div>
-    <p class="max-w-xl text-sm leading-relaxed text-muted-foreground">
+    <p class="max-w-lg text-sm leading-relaxed text-muted-foreground">
       Build five players, face all 30 teams, and do not lose a single game.
     </p>
-    <div class="w-full max-w-xl" aria-hidden="true">
+    <div class="road-strip w-full max-w-lg" aria-hidden="true">
       <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-          82 games
-        </span>
-        <span class="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">
-          30 opponents · 0 losses allowed
-        </span>
+        <span class="text-label text-muted-foreground">82 games</span>
+        <span class="text-label text-muted-foreground">30 opponents · 0 losses allowed</span>
       </div>
-      <div class="mt-2 flex flex-wrap gap-[3px]">
+      <div class="mt-2 flex flex-wrap justify-center gap-[3px]">
         {#each road as i (i)}
           <span
             class="h-2 w-2 rounded-[2px] {i === 20
@@ -149,7 +143,7 @@
     {/if}
   </div>
 
-  <div class="grid gap-4 lg:grid-cols-3">
+  <div class="grid gap-4 sm:grid-cols-2">
     {#each modes as mode (mode.code)}
       {#if mode.status === 'available'}
         <a
@@ -157,7 +151,7 @@
           onpointerenter={() => warmPlayersIndex()}
           onfocus={() => warmPlayersIndex()}
           ontouchstart={() => warmPlayersIndex()}
-          class="group flex h-full flex-col rounded-xl border border-border bg-card p-6 outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
+          class="group flex h-full flex-col rounded-xl bg-card p-6 outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
         >
           <div class="flex items-center justify-between gap-3">
             <span class="font-display text-sm font-extrabold text-accent">{mode.code}</span>
@@ -182,7 +176,7 @@
         </a>
       {:else}
         <div
-          class="flex h-full flex-col rounded-xl border border-dashed border-border bg-surface-1 p-6 sm:p-7"
+          class="flex h-full flex-col rounded-xl bg-surface-1 p-6 sm:p-7"
           aria-disabled="true"
         >
           <div class="flex items-center justify-between gap-3">
@@ -210,7 +204,7 @@
   </div>
 
   {#if recent.length > 0}
-    <section aria-labelledby="recent-heading" class="mt-12">
+    <section aria-labelledby="recent-heading" class="mt-12 text-left">
       <div class="flex items-end justify-between gap-4">
         <h2
           id="recent-heading"
@@ -220,7 +214,7 @@
         </h2>
         <a
           href={historyHref}
-          class="font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
+          class="text-label text-muted-foreground underline-offset-4 hover:underline"
         >
           All history
         </a>
@@ -232,7 +226,7 @@
               href={row.mode === 'classic'
                 ? resolve(`/classic/result?runId=${encodeURIComponent(row.runId)}`)
                 : resolve(`/sandbox/result?runId=${encodeURIComponent(row.runId)}`)}
-              class="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card p-4 transition-colors hover:border-line-strong"
+              class="scoreboard-panel flex flex-wrap items-center gap-x-4 gap-y-2 p-4 transition-colors hover:bg-surface-2"
             >
               <span class="min-w-0 flex-1">
                 <span
@@ -246,11 +240,13 @@
                     {eraName(row.eraId)} · 5-player lineup
                   {/if}
                 </span>
-                <span class="block font-mono text-[10px] text-muted-foreground">
+                <span class="mt-0.5 block text-xs text-muted-foreground">
                   {#if row.franchiseId !== null}{franchiseAbbreviation(row.franchiseId)} ·
                   {/if}completed {new Date(row.completedAtIso).toLocaleDateString()}
                 </span>
-                <span class="font-display text-xl font-extrabold tracking-tight">
+              </span>
+              <span class="flex shrink-0 flex-col items-end gap-1">
+                <span class="text-stat text-3xl font-extrabold tracking-tight">
                   {row.wins}<span class="text-muted-foreground">–</span>{row.losses}
                 </span>
                 <SeasonTierBadge wins={row.wins} />

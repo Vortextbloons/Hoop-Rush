@@ -74,9 +74,9 @@ test.describe('roster browser', () => {
     // row advertises the selected position. It also excludes a known center.
     await filterLakers1990s(page);
     await page.getByRole('button', { name: 'SG', exact: true }).click();
-    const playerRows = page.locator('tbody tr:has(td:nth-child(2))');
+    const playerRows = page.locator('tbody tr[role="button"]');
     await expect(playerRows.first()).toBeVisible();
-    const positions = await playerRows.locator('td:nth-child(2)').allInnerTexts();
+    const positions = await playerRows.locator('td:nth-child(3)').allInnerTexts();
     expect(positions.length).toBeGreaterThan(0);
     expect(positions.every((value) => value.split('/').includes('SG'))).toBe(true);
     await expect(
@@ -88,13 +88,13 @@ test.describe('roster browser', () => {
     await page.goto('/roster');
     await page.getByRole('button', { name: 'Overall', exact: true }).click();
 
-    // Highest overall first: every row's overall (column index 4) is ordered.
+    // Highest overall first: every row's overall (column index 6) is ordered.
     const overallOf = (row: number) =>
       page
-        .locator('tbody tr')
+        .locator('tbody tr[role="button"]')
         .nth(row)
         .locator('td')
-        .nth(4)
+        .nth(5)
         .innerText()
         .then((text) => Number(text.trim()));
     const first = await overallOf(0);

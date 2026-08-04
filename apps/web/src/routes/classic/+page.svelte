@@ -465,7 +465,7 @@
           <button
             type="button"
             onclick={() => startDraft('ratings')}
-            class="group flex h-full flex-col rounded-xl border border-border bg-card p-6 text-left outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
+            class="group flex h-full flex-col rounded-xl bg-card p-6 text-left outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
           >
             <h3 class="font-display text-4xl font-extrabold tracking-tight uppercase">Ratings</h3>
             <p class="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
@@ -483,7 +483,7 @@
           <button
             type="button"
             onclick={() => startDraft('ball-knowledge')}
-            class="group flex h-full flex-col rounded-xl border border-border bg-card p-6 text-left outline-none transition-colors hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
+            class="group flex h-full flex-col rounded-xl bg-card p-6 text-left outline-none transition-colors hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-ring sm:p-7"
           >
             <h3 class="font-display text-4xl font-extrabold tracking-tight uppercase">
               Ball Knowledge
@@ -513,9 +513,9 @@
     {:else}
       <div class="mt-10 flex flex-col gap-6 pb-32">
         {#if draft.status === 'drafting' && roll}
-          <div class="rounded-xl border border-border bg-card">
+          <div class="rounded-xl bg-surface-1">
             <div
-              class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3"
+              class="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
             >
               <span
                 data-round-heading
@@ -541,7 +541,7 @@
                 aria-label={`Round ${draft.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`}
               >
                 <span
-                  class="flex min-w-0 items-center gap-2 rounded-lg border border-line-strong bg-surface-1 px-3 py-2 shadow-[0_0_14px_hsl(13_100%_62%/0.12)]"
+                  class="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 px-3 py-2"
                   data-indicator="franchise"
                 >
                   {#if rollFranchise}
@@ -564,7 +564,7 @@
                   </span>
                 </span>
                 <span
-                  class="flex items-center justify-center rounded-lg border border-line-strong bg-surface-1 px-3 py-2 shadow-[0_0_14px_hsl(13_100%_62%/0.12)]"
+                  class="flex items-center justify-center rounded-lg bg-surface-2 px-3 py-2"
                   data-indicator="era"
                 >
                   <span class="font-display text-sm font-extrabold tracking-tight">
@@ -582,7 +582,7 @@
                       ? 'Already used'
                       : 'No alternative'}
                   onclick={rerollFranchise}
-                  class="flex min-w-0 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+                  class="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Reroll franchise
                   {#if draft.rerolls.franchiseSpent}
@@ -602,7 +602,7 @@
                       ? 'Already used'
                       : 'No alternative'}
                   onclick={rerollEra}
-                  class="flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+                  class="flex items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Reroll era
                   {#if draft.rerolls.eraSpent}
@@ -663,8 +663,8 @@
               {actionError}
             </p>
           {/if}
-          <div class="rounded-xl border border-border bg-card">
-            <div class="border-b border-border px-4 py-3">
+          <div class="rounded-xl bg-surface-1">
+            <div class="px-4 py-3">
               <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
                 Your five
               </h3>

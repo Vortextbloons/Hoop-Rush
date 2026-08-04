@@ -26,6 +26,8 @@ export interface RosterColumn {
   label: string;
   sort?: RosterSortId;
   numeric?: boolean;
+  /** Hide column below this breakpoint (table only). */
+  hideBelow?: 'md' | 'lg';
 }
 
 export type RosterSortId =

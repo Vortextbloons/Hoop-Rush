@@ -51,8 +51,8 @@
   }
 </script>
 
-<section class="rounded-xl border border-border bg-card" aria-labelledby="draft-value-heading">
-  <div class="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+<section class="rounded-xl bg-surface-1" aria-labelledby="draft-value-heading">
+  <div class="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
     <div>
       <p class="font-mono text-[10px] tracking-[0.14em] text-primary uppercase">Context</p>
       <h2

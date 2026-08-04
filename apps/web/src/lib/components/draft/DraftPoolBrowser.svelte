@@ -160,20 +160,20 @@
   );
 </script>
 
-<div class="rounded-xl border border-border bg-card">
-  <div class="flex min-w-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
+<div class="rounded-xl bg-surface-1">
+  <div class="flex min-w-0 items-center justify-between gap-3 px-4 py-3">
     <h2
       class="min-w-0 truncate font-display text-lg font-extrabold tracking-tight uppercase"
       title={heading}
     >
       {heading}
     </h2>
-    <span class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
+    <span class="shrink-0 text-label text-muted-foreground">
       {countLabel}
     </span>
   </div>
   {#if filtersEditable}
-    <div class="flex flex-col gap-2 border-b border-border p-2">
+    <div class="flex flex-col gap-2 px-2 pb-2">
       <div class="relative">
         <Search
           class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -183,7 +183,7 @@
           bind:value={searchInput}
           placeholder="Search players…"
           aria-label="Search players by name"
-          class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
+          class="h-10 w-full rounded-lg bg-surface-2 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
       <div
@@ -195,10 +195,10 @@
           type="button"
           aria-pressed={positionFilter === null}
           onclick={() => (positionFilter = null)}
-          class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
+          class="shrink-0 rounded-md px-2.5 py-1 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
           null
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
         >
           All
         </button>
@@ -207,15 +207,15 @@
             type="button"
             aria-pressed={positionFilter === i}
             onclick={() => (positionFilter = positionFilter === i ? null : i)}
-            class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
+            class="shrink-0 rounded-md px-2.5 py-1 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
             i
-              ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
           >
             {SLOT_LABELS[i]}
           </button>
         {/each}
-        <span class="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">
+        <span class="ml-auto shrink-0 pl-1 text-xs text-muted-foreground">
           {filteredRows.length}/{rows.length}
         </span>
       </div>
@@ -248,14 +248,14 @@
             disabled={cardState === 'blocked'}
             aria-disabled={cardState === 'blocked' ? 'true' : undefined}
             onclick={() => onpick(player)}
-            class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left {cardState ===
+            class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left {cardState ===
             'lineup'
-              ? 'border-primary/50 bg-primary/10 opacity-60'
+              ? 'bg-primary/10 opacity-60'
               : cardState === 'displace'
-                ? 'border-accent/50 bg-accent/10 opacity-90 shadow-[0_0_8px_hsl(42_91%_61%/0.15)] hover:bg-accent/20 hover:opacity-100'
+                ? 'bg-accent/10 opacity-90 shadow-[0_0_8px_hsl(42_91%_61%/0.15)] hover:bg-accent/20 hover:opacity-100'
                 : cardState === 'blocked'
-                  ? 'border-transparent opacity-40 disabled:cursor-not-allowed'
-                  : 'border-transparent hover:border-border hover:bg-surface-2'}"
+                  ? 'opacity-40 disabled:cursor-not-allowed'
+                  : 'hover:bg-surface-2'}"
           >
             <PlayerFace
               {player}

@@ -81,226 +81,264 @@
   function compareLabel(player: RosterDetailRow): string {
     const added = isCompared(player);
     const suffix = !added && compareFull ? ' (comparison full)' : '';
-    return `${added ? 'Remove' : 'Add'} ${player.displayName}${suffix}`;
+    return `${added ? 'Remove' : 'Add'} ${player.displayName} to comparison${suffix}`;
+  }
+
+  function hideClass(hideBelow?: 'md' | 'lg'): string {
+    if (!hideBelow) return '';
+    return hideBelow === 'md' ? 'hidden md:table-cell' : 'hidden lg:table-cell';
+  }
+
+  function cellValue(player: RosterDetailRow, key: string): string {
+    switch (key) {
+      case 'pos':
+        return player.positionsPlayable.join('/');
+      case 'decade':
+        return eraLabel.get(player.eraId) ?? player.eraId;
+      case 'season':
+        return player.seasonKey;
+      case 'overall':
+        return String(player.overall);
+      case 'points':
+        return formatPerGame(perGame(player.stats, 'points'));
+      case 'rebounds':
+        return formatPerGame(perGame(player.stats, 'rebounds'));
+      case 'assists':
+        return formatPerGame(perGame(player.stats, 'assists'));
+      case 'ts':
+        return formatPct(player.stats.tsPct ?? 0);
+      case 'per':
+        return formatDecimal(player.stats.per ?? 0);
+      default:
+        return '';
+    }
+  }
+
+  function rowActionTarget(target: EventTarget | null): boolean {
+    return target instanceof HTMLElement && target.closest('input,button,label,a') !== null;
   }
 </script>
 
-<div class="hidden overflow-x-auto sm:block" aria-label={heading}>
-  <table class="w-full border-separate border-spacing-0 text-left text-sm">
-    <thead>
-      <tr>
-        {#each columns as col (col.key)}
+<div class="hidden sm:block" aria-label={heading}>
+  <p class="mb-2 text-xs text-muted-foreground lg:hidden">
+    Scroll horizontally for more stats
+  </p>
+  <div
+    class="overflow-x-auto overscroll-x-contain [scrollbar-gutter:stable]"
+    style="scrollbar-gutter: stable;"
+  >
+    <table class="min-w-[720px] w-full border-separate border-spacing-0 text-left">
+      <thead>
+        <tr>
           <th
             scope="col"
-            class="border-b border-border px-2 py-2 font-mono text-[10px] font-bold tracking-[0.14em] whitespace-nowrap text-muted-foreground uppercase first:pl-3 last:pr-3 {col.numeric
-              ? 'text-right'
-              : ''}"
+            class="sticky left-0 z-20 w-10 border-b border-border bg-card px-2 py-3"
           >
-            {#if col.sort}
-              <button
-                type="button"
-                aria-pressed={sortId === col.sort}
-                onclick={() => onSort(col.sort!)}
-                class="inline-flex items-center gap-1 rounded outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring {sortId ===
-                col.sort
-                  ? 'text-primary'
-                  : ''}"
-              >
-                {col.label}
-                {#if sortId === col.sort}
-                  <span aria-hidden="true">{sortArrow}</span>
-                {/if}
-              </button>
-            {:else}
-              {col.label}
-            {/if}
+            <span class="sr-only">Compare</span>
           </th>
-        {/each}
-      </tr>
-    </thead>
-    <tbody>
-      {#each items as item (groupKey(item))}
-        {#if item.type === 'group'}
-          <tr>
-            <td
-              colspan={columns.length}
-              class="border-b border-border/60 bg-surface-1 px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+          {#each columns as col (col.key)}
+            <th
+              scope="col"
+              class="border-b border-border px-2 py-3 text-xs font-bold tracking-[0.1em] whitespace-nowrap text-muted-foreground uppercase {col.key ===
+              'player'
+                ? 'sticky left-10 z-20 min-w-[180px] bg-card pl-3 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)]'
+                : ''} {col.numeric ? 'text-right' : ''} {hideClass(col.hideBelow)}"
             >
-              {groupLabel(item.franchiseId, item.eraId)} · {eraLabel.get(item.eraId) ?? item.eraId} ·
-              {item.count}
-              players
-            </td>
-          </tr>
-        {:else}
-          {@const player = item.player}
-          <tr
-            class="border-b border-border/40 transition-colors last:border-b-0 hover:bg-surface-2"
-          >
-            <td class="px-3 py-2">
-              <button
-                type="button"
-                aria-label={`View ${player.displayName} stats`}
-                onclick={() => onOpen(player)}
-                class="flex min-w-0 items-center gap-2.5 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              {#if col.sort}
+                <button
+                  type="button"
+                  aria-pressed={sortId === col.sort}
+                  onclick={() => onSort(col.sort!)}
+                  class="inline-flex items-center gap-1 rounded outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring {sortId ===
+                  col.sort
+                    ? 'text-primary'
+                    : ''}"
+                >
+                  {col.label}
+                  {#if sortId === col.sort}
+                    <span aria-hidden="true">{sortArrow}</span>
+                  {/if}
+                </button>
+              {:else}
+                {col.label}
+              {/if}
+            </th>
+          {/each}
+        </tr>
+      </thead>
+      <tbody>
+        {#each items as item (groupKey(item))}
+          {#if item.type === 'group'}
+            <tr>
+              <td
+                colspan={columns.length + 1}
+                class="border-b border-border/60 bg-surface-1 px-3 py-2 text-xs font-bold tracking-[0.1em] text-muted-foreground uppercase"
               >
-                <PlayerFace
-                  {player}
-                  {manifest}
-                  size="sm"
-                  fallbackInitials={player.firstName[0]! + player.lastName[0]!}
-                />
-                <span class="min-w-0">
-                  <span class="block truncate text-sm font-bold">{player.displayName}</span>
-                  <span class="block font-mono text-[10px] text-muted-foreground">
-                    {teamLabelFor(player)}
+                {groupLabel(item.franchiseId, item.eraId)} · {eraLabel.get(item.eraId) ??
+                  item.eraId} · {item.count} players
+              </td>
+            </tr>
+          {:else}
+            {@const player = item.player}
+            <tr
+              role="button"
+              tabindex="0"
+              aria-label={`View ${player.displayName} stats`}
+              onclick={(event) => {
+                if (!rowActionTarget(event.target)) onOpen(player);
+              }}
+              onkeydown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onOpen(player);
+                }
+              }}
+              class="cursor-pointer border-b border-border/40 transition-colors last:border-b-0 hover:bg-surface-2 group"
+            >
+              <td
+                class="sticky left-0 z-10 bg-card px-2 py-3 group-hover:bg-surface-2"
+              >
+                <label class="flex cursor-pointer items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={isCompared(player)}
+                    disabled={compareFull && !isCompared(player)}
+                    aria-label={compareLabel(player)}
+                    onclick={(event) => event.stopPropagation()}
+                    onchange={() => onToggleCompare(player)}
+                    class="h-4 w-4 rounded border-border accent-primary"
+                  />
+                </label>
+              </td>
+              <td
+                class="sticky left-10 z-10 min-w-[180px] bg-card px-3 py-3 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.4)] group-hover:bg-surface-2"
+              >
+                <div class="flex min-w-0 items-center gap-2.5">
+                  <PlayerFace
+                    {player}
+                    {manifest}
+                    size="md"
+                    fallbackInitials={player.firstName[0]! + player.lastName[0]!}
+                  />
+                  <span class="min-w-0">
+                    <span class="block truncate text-base font-bold">{player.displayName}</span>
+                    <span class="block text-xs text-muted-foreground">
+                      {teamLabelFor(player)}
+                    </span>
                   </span>
-                </span>
-              </button>
-            </td>
-            <td class="px-2 py-2 font-mono text-[11px] whitespace-nowrap text-muted-foreground">
-              {player.positionsPlayable.join('/')}
-            </td>
-            <td class="px-2 py-2 font-mono text-[11px] whitespace-nowrap text-muted-foreground">
-              {eraLabel.get(player.eraId) ?? player.eraId}
-            </td>
-            <td class="px-2 py-2 font-mono text-[11px] whitespace-nowrap text-muted-foreground">
-              {player.seasonKey}
-            </td>
-            <td class="px-2 py-2 text-right font-mono text-[11px] font-bold tabular-nums">
-              {player.overall}
-            </td>
-            <td class="px-2 py-2 text-right font-mono text-[11px] tabular-nums">
-              {formatPerGame(perGame(player.stats, 'points'))}
-            </td>
-            <td class="px-2 py-2 text-right font-mono text-[11px] tabular-nums">
-              {formatPerGame(perGame(player.stats, 'rebounds'))}
-            </td>
-            <td class="px-2 py-2 text-right font-mono text-[11px] tabular-nums">
-              {formatPerGame(perGame(player.stats, 'assists'))}
-            </td>
-            <td class="px-2 py-2 text-right font-mono text-[11px] tabular-nums">
-              {formatPct(player.stats.tsPct ?? 0)}
-            </td>
-            <td class="px-3 py-2 text-right font-mono text-[11px] tabular-nums">
-              {formatDecimal(player.stats.per ?? 0)}
-            </td>
-            <td class="px-3 py-2 text-right">
-              <button
-                type="button"
-                aria-pressed={isCompared(player)}
-                aria-label={compareLabel(player)}
-                disabled={compareFull && !isCompared(player)}
-                onclick={() => onToggleCompare(player)}
-                class="rounded-md border px-2 py-1 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(
-                  player,
-                )
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
-              >
-                {isCompared(player) ? 'Added' : 'Compare'}
-              </button>
-            </td>
-          </tr>
-        {/if}
-      {/each}
-    </tbody>
-  </table>
+                </div>
+              </td>
+              {#each columns.filter((c) => c.key !== 'player') as col (col.key)}
+                <td
+                  class="px-2 py-3 text-sm whitespace-nowrap {col.numeric
+                    ? 'text-right font-mono tabular-nums'
+                    : 'text-muted-foreground'} {col.key === 'overall' ? 'font-bold text-foreground' : ''} {hideClass(
+                    col.hideBelow,
+                  )}"
+                >
+                  {cellValue(player, col.key)}
+                </td>
+              {/each}
+            </tr>
+          {/if}
+        {/each}
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <ul class="flex flex-col gap-2 sm:hidden" aria-label={heading}>
   {#each items as item (groupKey(item))}
     {#if item.type === 'group'}
-      <li
-        class="px-1 pt-3 pb-1 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
-      >
+      <li class="px-1 pt-3 pb-1 text-xs font-bold tracking-[0.1em] text-muted-foreground uppercase">
         {groupLabel(item.franchiseId, item.eraId)} · {eraLabel.get(item.eraId) ?? item.eraId} · {item.count}
         players
       </li>
     {:else}
       {@const player = item.player}
-      <li class="rounded-lg border border-border bg-card px-3 py-3">
-        <div class="flex items-start gap-3">
-          <button
-            type="button"
-            aria-label={`View ${player.displayName} stats`}
-            onclick={() => onOpen(player)}
-            class="flex min-w-0 flex-1 items-start gap-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
+      <li>
+        <div
+          role="button"
+          tabindex="0"
+          aria-label={`View ${player.displayName} stats`}
+          onclick={(event) => {
+            if (!rowActionTarget(event.target)) onOpen(player);
+          }}
+          onkeydown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onOpen(player);
+            }
+          }}
+          class="cursor-pointer rounded-lg bg-card px-3 py-4 transition-colors hover:bg-surface-2"
+        >
+          <div class="flex items-start gap-3">
+            <span class="mt-1 flex shrink-0 items-center">
+              <input
+                type="checkbox"
+                checked={isCompared(player)}
+                disabled={compareFull && !isCompared(player)}
+                aria-label={compareLabel(player)}
+                onclick={(event) => event.stopPropagation()}
+                onchange={() => onToggleCompare(player)}
+                class="h-4 w-4 cursor-pointer rounded border-border accent-primary"
+              />
+            </span>
             <PlayerFace
               {player}
               {manifest}
-              size="sm"
+              size="md"
               fallbackInitials={player.firstName[0]! + player.lastName[0]!}
             />
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm font-bold">{player.displayName}</span>
-              <span class="mt-0.5 block font-mono text-[10px] leading-snug text-muted-foreground">
+              <span class="block truncate text-base font-bold">{player.displayName}</span>
+              <span class="mt-0.5 block text-xs leading-snug text-muted-foreground">
                 {teamLabelFor(player)} · {eraLabel.get(player.eraId) ?? player.eraId} · {player.seasonKey}
                 · {player.positionsPlayable.join('/')}
               </span>
             </span>
-          </button>
-          <button
-            type="button"
-            aria-pressed={isCompared(player)}
-            aria-label={compareLabel(player)}
-            disabled={compareFull && !isCompared(player)}
-            onclick={(event) => {
-              event.stopPropagation();
-              onToggleCompare(player);
-            }}
-            class="shrink-0 rounded-md border px-2.5 py-2 font-mono text-[10px] font-bold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-35 {isCompared(
-              player,
-            )
-              ? 'border-primary bg-primary/10 text-primary'
-              : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+          </div>
+          <div
+            class="mt-3 grid grid-cols-4 gap-1 rounded-md bg-surface-1 p-2 text-center text-xs"
           >
-            {isCompared(player) ? 'Added' : 'Compare'}
-          </button>
+            <span class="rounded px-1 py-0.5">
+              <span class="block text-[10px] text-muted-foreground uppercase">O</span>
+              <span class="text-stat block font-bold">{player.overall}</span>
+            </span>
+            <span class="rounded px-1 py-0.5">
+              <span class="block text-[10px] text-muted-foreground uppercase">PTS</span>
+              <span class="text-stat block font-bold"
+                >{formatPerGame(perGame(player.stats, 'points'))}</span
+              >
+            </span>
+            <span class="rounded px-1 py-0.5">
+              <span class="block text-[10px] text-muted-foreground uppercase">REB</span>
+              <span class="text-stat block font-bold"
+                >{formatPerGame(perGame(player.stats, 'rebounds'))}</span
+              >
+            </span>
+            <span class="rounded px-1 py-0.5">
+              <span class="block text-[10px] text-muted-foreground uppercase">AST</span>
+              <span class="text-stat block font-bold"
+                >{formatPerGame(perGame(player.stats, 'assists'))}</span
+              >
+            </span>
+          </div>
         </div>
-        <button
-          type="button"
-          aria-label={`View ${player.displayName} stats`}
-          onclick={() => onOpen(player)}
-          class="mt-2.5 grid w-full grid-cols-4 gap-1 rounded-md bg-surface-1 p-2 text-center font-mono text-[10px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <span class="rounded px-1 py-0.5">
-            <span class="block text-[9px] text-muted-foreground uppercase">O</span>
-            <span class="block font-bold tabular-nums">{player.overall}</span>
-          </span>
-          <span class="rounded px-1 py-0.5">
-            <span class="block text-[9px] text-muted-foreground uppercase">PTS</span>
-            <span class="block font-bold tabular-nums"
-              >{formatPerGame(perGame(player.stats, 'points'))}</span
-            >
-          </span>
-          <span class="rounded px-1 py-0.5">
-            <span class="block text-[9px] text-muted-foreground uppercase">REB</span>
-            <span class="block font-bold tabular-nums"
-              >{formatPerGame(perGame(player.stats, 'rebounds'))}</span
-            >
-          </span>
-          <span class="rounded px-1 py-0.5">
-            <span class="block text-[9px] text-muted-foreground uppercase">AST</span>
-            <span class="block font-bold tabular-nums"
-              >{formatPerGame(perGame(player.stats, 'assists'))}</span
-            >
-          </span>
-        </button>
       </li>
     {/if}
   {/each}
 </ul>
 
 {#if hasMore}
-  <div class="flex items-center justify-between gap-3 px-1 pb-1">
-    <span class="font-mono text-[10px] text-muted-foreground">
+  <div class="flex items-center justify-between gap-3 px-1 pb-1 pt-2">
+    <span class="text-xs text-muted-foreground">
       Showing {visiblePlayers.toLocaleString()} of {filteredCount.toLocaleString()} players
     </span>
     <button
       type="button"
       onclick={onShowMore}
-      class="rounded-md border border-border px-3 py-1.5 font-mono text-[11px] font-bold text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+      class="rounded-md bg-surface-2 px-3 py-1.5 text-xs font-bold text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3"
     >
       {moreLabel}
     </button>

@@ -1,11 +1,13 @@
 <script lang="ts">
   import { asset, resolve } from '$app/paths';
   import { page } from '$app/state';
+  import type { RouteId } from '$app/types';
   import { Home, Users } from '@lucide/svelte';
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
   import { Toaster } from 'svelte-sonner';
   import BottomNav, { type BottomNavItem } from '$lib/components/BottomNav.svelte';
+  import { warmPlayersIndex } from '$lib/data';
 
   let { children } = $props();
 
@@ -20,6 +22,16 @@
 
   const routeId = $derived(page.route.id);
   const showBottomNav = $derived(routeId === '/' || routeId === '/roster');
+
+  function isNavActive(item: BottomNavItem): boolean {
+    if (item.href === null || routeId === null) return false;
+    if (item.href === '/') return routeId === '/';
+    return routeId === item.href || routeId.startsWith(`${item.href}/`);
+  }
+
+  function warmForRoster(itemId: string): void {
+    if (itemId === 'roster') warmPlayersIndex();
+  }
 </script>
 
 <svelte:head>
@@ -46,6 +58,25 @@
         Hoop <span class="text-primary">Rush</span>
       </span>
     </a>
+    {#if showBottomNav}
+      <nav aria-label="Main navigation" class="hidden items-center gap-1 md:flex">
+        {#each navItems as item (item.id)}
+          {@const active = isNavActive(item)}
+          <a
+            href={resolve(item.href as RouteId)}
+            aria-current={active ? 'page' : undefined}
+            onpointerenter={() => warmForRoster(item.id)}
+            onfocus={() => warmForRoster(item.id)}
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
+          >
+            <item.icon class="h-4 w-4 shrink-0" />
+            {item.label}
+          </a>
+        {/each}
+      </nav>
+    {/if}
   </div>
 </header>
 

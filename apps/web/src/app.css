@@ -25,7 +25,7 @@
   --color-secondary-foreground: hsl(40 20% 94%);
 
   --color-muted: hsl(222 16% 14%);
-  --color-muted-foreground: hsl(222 10% 60%);
+  --color-muted-foreground: hsl(222 10% 68%);
 
   /* Accent = championship gold */
   --color-accent: hsl(42 91% 61%);
@@ -52,7 +52,7 @@
   --color-negative: hsl(0 72% 58%);
 
   /* Fonts (loaded via app.html <link>) */
-  --font-display: 'Barlow Condensed', 'Archivo Black', system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -116,7 +116,7 @@
   }
 }
 
-/* Display utility */
+/* Typography utilities */
 .font-display {
   font-family: var(--font-display);
   letter-spacing: -0.01em;
@@ -124,6 +124,65 @@
 
 .font-mono {
   font-family: var(--font-mono);
+}
+
+/* Condensed display for titles, records, and important numbers */
+.text-stat {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Mono uppercase for eyebrows, labels, and metadata */
+.text-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Scoreboard panel — subtle court-line geometry */
+.scoreboard-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-surface-1);
+}
+
+.scoreboard-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 49.5%, color-mix(in oklab, var(--color-primary) 12%, transparent) 49.5%, color-mix(in oklab, var(--color-primary) 12%, transparent) 50.5%, transparent 50.5%),
+    linear-gradient(0deg, transparent 49.5%, color-mix(in oklab, var(--color-primary) 8%, transparent) 49.5%, color-mix(in oklab, var(--color-primary) 8%, transparent) 50.5%, transparent 50.5%);
+  opacity: 0.35;
+}
+
+/* 82-game road strip with court-line accent */
+.road-strip {
+  position: relative;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  background: var(--color-surface-1);
+}
+
+.road-strip::after {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 0.5rem;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--color-primary) 30%, transparent) 20%,
+    color-mix(in oklab, var(--color-primary) 30%, transparent) 80%,
+    transparent
+  );
 }
 
 /* Scrollbar polish */

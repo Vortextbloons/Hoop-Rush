@@ -30,7 +30,7 @@
 
 <nav
   aria-label="Main navigation"
-  class="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+  class="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
 >
   <div
     class="flex items-center gap-1 rounded-2xl border border-border bg-background/90 p-1.5 shadow-2xl shadow-black/30 backdrop-blur supports-[backdrop-filter]:bg-background/80"

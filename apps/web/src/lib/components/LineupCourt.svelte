@@ -81,9 +81,9 @@
   });
 </script>
 
-<div id="your-five" class="scroll-mt-4 rounded-xl border border-border bg-card">
+<div id="your-five" class="scroll-mt-4">
   <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
-  <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+  <div class="flex items-center justify-between gap-3 px-1 py-3">
     <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h2>
     <span class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
       {filledCount}/5
@@ -143,12 +143,8 @@
     </div>
   </div>
   {#if ready}
-    <div class="border-t border-border px-4 py-3">
-      <p
-        class="rounded-lg border border-line-strong bg-surface-2 p-3 text-xs text-muted-foreground"
-      >
-        Lineup ready.
-      </p>
+    <div class="px-1 py-3">
+      <p class="text-xs text-muted-foreground">Lineup ready.</p>
     </div>
   {/if}
 </div>

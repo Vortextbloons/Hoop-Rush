@@ -273,16 +273,15 @@
 
   const columns: RosterColumn[] = [
     { key: 'player', label: 'Player', sort: 'name' },
-    { key: 'pos', label: 'Pos', sort: 'position' },
-    { key: 'decade', label: 'Decade', sort: 'decade' },
-    { key: 'season', label: 'Season', sort: 'season' },
+    { key: 'pos', label: 'Pos', sort: 'position', hideBelow: 'md' },
+    { key: 'decade', label: 'Decade', sort: 'decade', hideBelow: 'lg' },
+    { key: 'season', label: 'Season', sort: 'season', hideBelow: 'md' },
     { key: 'overall', label: 'O', sort: 'overall', numeric: true },
     { key: 'points', label: 'PTS', sort: 'points', numeric: true },
-    { key: 'rebounds', label: 'REB', numeric: true },
-    { key: 'assists', label: 'AST', numeric: true },
-    { key: 'ts', label: 'TS%', numeric: true },
-    { key: 'per', label: 'PER', sort: 'per', numeric: true },
-    { key: 'compare', label: 'Compare' },
+    { key: 'rebounds', label: 'REB', hideBelow: 'lg', numeric: true },
+    { key: 'assists', label: 'AST', hideBelow: 'lg', numeric: true },
+    { key: 'ts', label: 'TS%', hideBelow: 'lg', numeric: true },
+    { key: 'per', label: 'PER', sort: 'per', hideBelow: 'lg', numeric: true },
   ];
 </script>
 
@@ -292,7 +291,7 @@
 
 <section
   class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10 {compareSelection.length > 0
-    ? 'pb-40 sm:pb-10'
+    ? 'pb-40 md:pb-10'
     : ''}"
 >
   <div class="flex items-end justify-between gap-4">
@@ -525,7 +524,7 @@
         <AsyncState kind="loading" title="Loading player index" message="One moment…" />
       </div>
     {:else}
-      <div class="mt-8 flex flex-col gap-4 rounded-xl border border-border bg-card p-2 sm:p-3">
+      <div class="mt-8 flex flex-col gap-4 rounded-xl bg-surface-1 p-2 sm:p-3">
         <div class="flex flex-col gap-2">
           <div class="relative">
             <Search
@@ -536,7 +535,7 @@
               bind:value={searchInput}
               placeholder="Search players…"
               aria-label="Search players by name"
-              class="h-10 w-full rounded-lg border border-input bg-surface-1 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground hover:border-line-strong focus-visible:ring-2 focus-visible:ring-ring"
+              class="h-11 w-full rounded-lg bg-surface-2 pr-3 pl-9 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
           <div
@@ -548,10 +547,10 @@
               type="button"
               aria-pressed={positionFilter === null}
               onclick={() => (positionFilter = null)}
-              class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
+              class="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
               null
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
             >
               All
             </button>
@@ -560,15 +559,15 @@
                 type="button"
                 aria-pressed={positionFilter === pos}
                 onclick={() => (positionFilter = positionFilter === pos ? null : pos)}
-                class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
+                class="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {positionFilter ===
                 pos
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
               >
                 {pos}
               </button>
             {/each}
-            <span class="ml-auto shrink-0 pl-1 font-mono text-[10px] text-muted-foreground">
+            <span class="ml-auto shrink-0 pl-1 text-xs text-muted-foreground">
               {filteredRows.length.toLocaleString()} players
             </span>
           </div>
@@ -577,20 +576,16 @@
             role="group"
             aria-label="Sort players"
           >
-            <span
-              class="shrink-0 pr-1 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase"
-            >
-              Sort
-            </span>
+            <span class="text-label shrink-0 pr-1 text-muted-foreground">Sort</span>
             {#each SORT_OPTIONS as opt (opt.id)}
               <button
                 type="button"
                 aria-pressed={sortId === opt.id}
                 onclick={() => chooseSort(opt.id)}
-                class="shrink-0 rounded-md border px-2.5 py-1 font-mono text-[11px] font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {sortId ===
+                class="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-bold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {sortId ===
                 opt.id
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border text-muted-foreground hover:border-line-strong hover:text-foreground'}"
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
               >
                 {opt.label}
               </button>
@@ -600,7 +595,7 @@
                 type="button"
                 onclick={() => chooseSort(sortId)}
                 aria-label={`Sort direction: ${sortDir === 'asc' ? 'ascending' : 'descending'}`}
-                class="shrink-0 rounded-md border border-border px-2.5 py-1 font-mono text-[11px] font-bold text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong"
+                class="shrink-0 rounded-md bg-surface-2 px-2.5 py-1.5 text-xs font-bold text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3"
               >
                 {sortDir === 'asc' ? '↑' : '↓'}
               </button>
