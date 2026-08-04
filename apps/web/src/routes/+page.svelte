@@ -175,10 +175,7 @@
           </span>
         </a>
       {:else}
-        <div
-          class="flex h-full flex-col rounded-xl bg-surface-1 p-6 sm:p-7"
-          aria-disabled="true"
-        >
+        <div class="flex h-full flex-col rounded-xl bg-surface-1 p-6 sm:p-7" aria-disabled="true">
           <div class="flex items-center justify-between gap-3">
             <span class="font-display text-sm font-extrabold text-accent/50">{mode.code}</span>
             <span

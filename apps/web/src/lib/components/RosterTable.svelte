@@ -120,9 +120,7 @@
 </script>
 
 <div class="hidden sm:block" aria-label={heading}>
-  <p class="mb-2 text-xs text-muted-foreground lg:hidden">
-    Scroll horizontally for more stats
-  </p>
+  <p class="mb-2 text-xs text-muted-foreground lg:hidden">Scroll horizontally for more stats</p>
   <div
     class="overflow-x-auto overscroll-x-contain [scrollbar-gutter:stable]"
     style="scrollbar-gutter: stable;"
@@ -130,10 +128,7 @@
     <table class="min-w-[720px] w-full border-separate border-spacing-0 text-left">
       <thead>
         <tr>
-          <th
-            scope="col"
-            class="sticky left-0 z-20 w-10 border-b border-border bg-card px-2 py-3"
-          >
+          <th scope="col" class="sticky left-0 z-20 w-10 border-b border-border bg-card px-2 py-3">
             <span class="sr-only">Compare</span>
           </th>
           {#each columns as col (col.key)}
@@ -195,9 +190,7 @@
               }}
               class="cursor-pointer border-b border-border/40 transition-colors last:border-b-0 hover:bg-surface-2 group"
             >
-              <td
-                class="sticky left-0 z-10 bg-card px-2 py-3 group-hover:bg-surface-2"
-              >
+              <td class="sticky left-0 z-10 bg-card px-2 py-3 group-hover:bg-surface-2">
                 <label class="flex cursor-pointer items-center justify-center">
                   <input
                     type="checkbox"
@@ -232,9 +225,9 @@
                 <td
                   class="px-2 py-3 text-sm whitespace-nowrap {col.numeric
                     ? 'text-right font-mono tabular-nums'
-                    : 'text-muted-foreground'} {col.key === 'overall' ? 'font-bold text-foreground' : ''} {hideClass(
-                    col.hideBelow,
-                  )}"
+                    : 'text-muted-foreground'} {col.key === 'overall'
+                    ? 'font-bold text-foreground'
+                    : ''} {hideClass(col.hideBelow)}"
                 >
                   {cellValue(player, col.key)}
                 </td>
@@ -298,9 +291,7 @@
               </span>
             </span>
           </div>
-          <div
-            class="mt-3 grid grid-cols-4 gap-1 rounded-md bg-surface-1 p-2 text-center text-xs"
-          >
+          <div class="mt-3 grid grid-cols-4 gap-1 rounded-md bg-surface-1 p-2 text-center text-xs">
             <span class="rounded px-1 py-0.5">
               <span class="block text-[10px] text-muted-foreground uppercase">O</span>
               <span class="text-stat block font-bold">{player.overall}</span>

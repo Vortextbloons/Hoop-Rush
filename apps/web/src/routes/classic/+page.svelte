@@ -514,9 +514,7 @@
       <div class="mt-10 flex flex-col gap-6 pb-32">
         {#if draft.status === 'drafting' && roll}
           <div class="rounded-xl bg-surface-1">
-            <div
-              class="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-            >
+            <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <span
                 data-round-heading
                 class="font-display text-lg font-extrabold tracking-tight uppercase"
