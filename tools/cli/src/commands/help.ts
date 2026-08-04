@@ -12,24 +12,38 @@ Commands:
                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
                          --verbose        Show per-artifact hash verification details
   data overalls          Show packaged detailed, summary, and selection Overalls.
-                         --franchise <id> Filter by franchise id
-                         --era <id>       Filter by era id
-                         --player <text>  Filter by player name
-                         --limit <n>      Maximum rows (default 50, max 1000)
+                          --franchise <id> Filter by franchise id
+                          --era <id>       Filter by era id
+                          --player <text>  Filter by player name
+                          --limit <n>      Maximum rows (default 50, max 1000)
+  data coverage          Field availability, provenance, confidence, and playable
+                         status by season, era, franchise, and pool.
+                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
+                          --franchise <id> --era <id> --status <available|unavailable>
   data lineage-audit     Prove lineage ranges map to exactly one slot, detect
                          gaps/overlaps/duplicates, verify pool ownership and
                          per-segment historical logo metadata.
-                         --input <path>   Manifest path (default apps/web/static/data/manifest.json)
-                         --verify-logos   Fetch each segment's primary logo candidate
+                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
+                          --verify-logos   Fetch each segment's primary logo candidate
+  data derive            Reproduce one player-season's complete derivation trace:
+                         source inputs, field-method registry, priors, shrinkage,
+                         unclamped values, and version boundaries.
+                          --player <id> --season <2024-25> --franchise <id>
   sim game               Simulate one game from a fixture with an explicit seed.
-                         --input <fixture-id>   equal|strong-medium|strong-weak (default none)
-                         --seed <hex>           Explicit game seed (required)
-                         --profile <path>       Override the packaged 1990s era profile
+                          --input <fixture-id>   equal|strong-medium|strong-weak (default none)
+                          --seed <hex>           Explicit game seed (required)
+                          --profile <path>       Override the packaged 1990s era profile
   sim batch              Run seeded games over a deterministic seed range.
-                         --fixture <id>         Fixture id (default equal)
-                         --seed-from N --seed-to N   Inclusive seed range
-                         --samples N           Convenience for seed-to = seed-from + N - 1
-                         --workers N           Chunks; results never depend on the count
+                          --fixture <id>         Fixture id (default equal)
+                          --seed-from N --seed-to N   Inclusive seed range
+                          --samples N           Convenience for seed-to = seed-from + N - 1
+                          --workers N           Chunks; results never depend on the count
+  sim diagnose           Aggregate per-player usage, shot-mix, assist, rebound, and
+                         contest data across a seeded batch of games.
+                          --fixture <id> (default equal) --samples N (default 200)
+  sim season             Simulate 82-game seasons and check per-game shooting
+                         variance against independent per-shot binomial draws.
+                          --fixture <id> (default equal) --samples N (default 1, max 10)
   sim challenge          Run one complete 82-game challenge against the frozen bracket.
                          --lineup <fixture-id|team.json>  User five (default challenge-user)
                          --seed <hex>          Run seed (required)

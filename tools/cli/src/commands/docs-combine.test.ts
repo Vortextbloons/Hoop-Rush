@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { combineDocs } from './docs-combine.js';
+import { combineDocs, rewriteLinksForRoot } from './docs-combine.js';
 import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.js';
 
 let dir: string;
@@ -70,5 +70,41 @@ describe('combineDocs', () => {
     const report = combineDocs({ input: dir, exceptions: join(dir, 'ex.txt') });
     expect(report.ok).toBe(false);
     expect(report.exitCode).toBe(EXIT_USAGE_OR_DATA_ERROR);
+  });
+});
+
+describe('rewriteLinksForRoot', () => {
+  it('rewrites embedded relative links to resolve from the docs root', () => {
+    const rewritten = rewriteLinksForRoot(
+      [
+        '[sibling](../persistence/indexeddb.md)',
+        '[peer](./README.md)',
+        '[anchor](#section)',
+        '[external](https://example.com)',
+        '```ts',
+        '// [not](a/link)',
+        '```',
+      ].join('\n'),
+      'architecture',
+      dir,
+    );
+    expect(rewritten).toContain('[sibling](persistence/indexeddb.md)');
+    expect(rewritten).toContain('[peer](architecture/README.md)');
+    expect(rewritten).toContain('[anchor](#section)');
+    expect(rewritten).toContain('[external](https://example.com)');
+    expect(rewritten).toContain('// [not](a/link)');
+  });
+
+  it('rewrites links in embedded sections inside the combined output', async () => {
+    await mkdir(join(dir, 'sub'));
+    await writeFile(join(dir, 'README.md'), '# Root readme');
+    await writeFile(join(dir, 'sub', 'page.md'), '[up](../README.md)');
+    await writeFile(join(dir, 'combine-exceptions.txt'), 'combined.md\n');
+
+    const report = combineDocs({ input: dir });
+    expect(report.ok).toBe(true);
+    const combined = readFileSync(join(dir, 'combined.md'), 'utf8');
+    expect(combined).toContain('## sub/page.md');
+    expect(combined).toContain('[up](README.md)');
   });
 });

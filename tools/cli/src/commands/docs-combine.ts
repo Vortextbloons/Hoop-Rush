@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
 import { REPO_ROOT } from './data-loader.js';
 import { UsageError } from '../args.js';
@@ -8,6 +8,10 @@ import { UsageError } from '../args.js';
  * `combine docs`: merges every markdown file under a docs directory into a
  * single combined file. The output and an optional exception list live in the
  * docs root, outside the subfolders that hold the sources.
+ *
+ * Relative markdown links inside embedded sections are rewritten so they still
+ * resolve from the docs root once the sections are concatenated into the
+ * combined file. Links inside fenced code blocks are left untouched.
  */
 
 export const COMBINE_DOCS_OPTIONS: Record<string, boolean> = {
@@ -24,6 +28,51 @@ export const DEFAULT_COMBINED_OUTPUT = 'combined.md';
 /** Relative paths use forward slashes so exclusion matching is platform-stable. */
 function toSlashPath(path: string): string {
   return path.replaceAll('\\', '/');
+}
+
+/**
+ * Rewrites `[text](target)` links in `content` so they resolve from the docs
+ * root. `sourceRelDir` is the directory of the source file relative to the
+ * docs root (e.g. `architecture`); each link target is resolved against it and
+ * re-emitted relative to the docs root. Links inside fenced code blocks and
+ * links that are already absolute, fragment-only, or external are preserved.
+ */
+export function rewriteLinksForRoot(
+  content: string,
+  sourceRelDir: string,
+  docsDir: string,
+): string {
+  const lines = content.split('\n');
+  let inFence = false;
+  const rewritten: string[] = [];
+  for (const line of lines) {
+    if (/^\s*(```+|~~~+)/.test(line)) {
+      inFence = !inFence;
+      rewritten.push(line);
+      continue;
+    }
+    if (inFence) {
+      rewritten.push(line);
+      continue;
+    }
+    const transformed = line.replace(
+      /\[([^\]]*)\]\(([^)]+)\)/g,
+      (_match, text: string | undefined, target: string | undefined) => {
+        if (text === undefined || target === undefined) return _match;
+        const hashIndex = target.indexOf('#');
+        const pathPart = hashIndex === -1 ? target : target.slice(0, hashIndex);
+        const fragment = hashIndex === -1 ? '' : target.slice(hashIndex);
+        if (pathPart === '' || /^(https?:|mailto:|#)/.test(pathPart)) {
+          return `[${text}](${target})`;
+        }
+        const abs = resolve(docsDir, sourceRelDir, pathPart);
+        const rewrittenLink = toSlashPath(relative(docsDir, abs));
+        return `[${text}](${rewrittenLink}${fragment})`;
+      },
+    );
+    rewritten.push(transformed);
+  }
+  return rewritten.join('\n');
 }
 
 /** One relative path per line; blank lines and `#` comments are ignored. */
@@ -96,7 +145,9 @@ export function combineDocs(args: {
 
   const sections = files.map(({ rel, path }) => {
     const content = readFileSync(path, 'utf8').trimEnd();
-    return `## ${rel}\n\n${content}`;
+    const relDir = rel.includes('/') ? dirname(rel) : '.';
+    const rewritten = rewriteLinksForRoot(content, relDir, docsDir);
+    return `## ${rel}\n\n${rewritten}`;
   });
 
   const combined = [
