@@ -114,6 +114,11 @@ export const simulationAnchorsSchema = z.object({
   freeThrowPct: z.number().min(0).max(1),
   threePointAttemptRate: z.number().min(0).max(1),
   freeThrowAttemptRate: z.number().min(0).max(1),
+  threePointPctShrunk: z.number().min(0).max(1).nullable().optional(),
+  freeThrowPctShrunk: z.number().min(0).max(1).nullable().optional(),
+  threePointPctPrior: z.number().min(0).max(1).nullable().optional(),
+  freeThrowPctPrior: z.number().min(0).max(1).nullable().optional(),
+  rateShrinkAttempts: z.number().int().nonnegative().optional(),
 });
 export type SimulationAnchors = z.infer<typeof simulationAnchorsSchema>;
 

@@ -20,6 +20,17 @@ Commands:
                          status by season, era, franchise, and pool.
                           --input <path>   Manifest path (default apps/web/static/data/manifest.json)
                           --franchise <id> --era <id> --status <available|unavailable>
+  data overalls-distribution
+                         Cohort percentile Overall distribution over every
+                         packaged franchise-era row: band counts/percentages
+                         vs targets, medians, min/max, and per-era breakdowns.
+                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
+  data defense-bpm-correlation
+                         Pearson correlation between packaged defenseRating
+                         and the raw source season box plus/minus (matched by
+                         playerExternalId and season). Passes when the sample
+                         is >= 1000 rows and r <= 0.92.
+                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
   data lineage-audit     Prove lineage ranges map to exactly one slot, detect
                          gaps/overlaps/duplicates, verify pool ownership and
                          per-segment historical logo metadata.

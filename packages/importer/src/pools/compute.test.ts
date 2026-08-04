@@ -12,6 +12,7 @@ import {
   type MockInstance,
 } from 'vitest';
 import { parsePool } from '@hoop-rush/data-contracts';
+import { COHORT_NORMALIZATION_VERSION } from '@hoop-rush/data-contracts';
 import { readJson, sha256File, writeJson } from '../json.js';
 import { normalizePositionLabels } from './positions.js';
 import {
@@ -30,6 +31,8 @@ import {
   defaultPoolWorkers,
   loadBbrefIds,
   loadCareerPositionLabels,
+  normalizePoolOveralls,
+  overallBandForPercentile,
   parsePoolTargets,
   partitionPoolTargets,
   run,
@@ -610,24 +613,133 @@ describe('sanitizeAnchors', () => {
 
 describe('selectionScore', () => {
   it('computes the rating blend with a modest availability adjustment', () => {
-    expect(
-      selectionScore({ overallRating: 90, offenseRating: 85, defenseRating: 80 }, 25, 2400, 80),
-    ).toBe(89.013);
+    expect(selectionScore(90, 85, 80, 25, 2400, 80)).toBe(89.013);
   });
 
   it('clamps usage to 40 and mpg to 48', () => {
-    expect(
-      selectionScore({ overallRating: 60, offenseRating: 60, defenseRating: 60 }, 50, 4000, 50),
-    ).toBe(61.977);
+    expect(selectionScore(60, 60, 60, 50, 4000, 50)).toBe(61.977);
   });
 
   it('treats null usage as 0 and guards zero team games', () => {
-    expect(
-      selectionScore({ overallRating: 60, offenseRating: 60, defenseRating: 60 }, null, 1200, 60),
-    ).toBe(59.752);
-    expect(
-      selectionScore({ overallRating: 60, offenseRating: 60, defenseRating: 60 }, 10, 30, 0),
-    ).toBe(58.656);
+    expect(selectionScore(60, 60, 60, null, 1200, 60)).toBe(59.752);
+    expect(selectionScore(60, 60, 60, 10, 30, 0)).toBe(58.656);
+  });
+});
+
+describe('overallBandForPercentile', () => {
+  it('assigns the exact band endpoints', () => {
+    expect(overallBandForPercentile(0)).toBe(99);
+    expect(overallBandForPercentile(0.005)).toBe(94);
+    expect(overallBandForPercentile(0.05)).toBe(89);
+    expect(overallBandForPercentile(0.19)).toBe(84);
+    expect(overallBandForPercentile(0.8)).toBe(71);
+    expect(overallBandForPercentile(1)).toBe(40);
+  });
+
+  it('interpolates within each band', () => {
+    expect(overallBandForPercentile(0.004)).toBe(96); // 99 - (p/0.005)*4
+    expect(overallBandForPercentile(0.02)).toBe(93); // 94 - ((p-0.005)/0.045)*4
+    expect(overallBandForPercentile(0.1)).toBe(88); // 89 - ((p-0.05)/0.14)*4
+    expect(overallBandForPercentile(0.5)).toBe(78); // 84 - ((p-0.19)/0.61)*12
+    expect(overallBandForPercentile(0.9)).toBe(56); // 71 - ((p-0.8)/0.2)*31
+  });
+
+  it('clamps to the 40..99 contract', () => {
+    expect(overallBandForPercentile(-0.1)).toBe(99);
+    expect(overallBandForPercentile(1.5)).toBe(40);
+  });
+});
+
+describe('normalizePoolOveralls', () => {
+  function row(
+    playerId: string,
+    franchiseId: string,
+    rawOverallScore?: number,
+    canonicalOverall?: number,
+  ) {
+    return {
+      playerId,
+      franchiseId,
+      seasonKey: '1996-97',
+      summaryRatings: { overallRating: 60, offenseRating: 60, defenseRating: 60 },
+      ...(rawOverallScore !== undefined || canonicalOverall !== undefined
+        ? {
+            ratingProfile: {
+              schemaVersion: 2 as const,
+              modelVersion: 'ratings-model-v3.2',
+              canonicalOverall: canonicalOverall ?? 70,
+              ...(rawOverallScore !== undefined ? { rawOverallScore } : {}),
+              overallPercentile: undefined,
+              overallCohortVersion: undefined,
+            },
+          }
+        : {}),
+    };
+  }
+
+  it('ranks globally by raw overall and stamps the percentile band + profile fields', () => {
+    const rows = [
+      row('p-4', 'lakers', 60),
+      row('p-1', 'lakers', 90),
+      row('p-2', 'celtics', 80),
+      row('p-3', 'lakers', 80),
+    ];
+    const diagnostics = normalizePoolOveralls(rows);
+    expect(diagnostics).toEqual({ totalRowCount: 4, rowsWithoutRawOverall: 0 });
+    const [p4, p1, p2, p3] = rows;
+    // Rank order: p-1 (90), p-2 (80; id tie-break), p-3 (80), p-4 (60).
+    expect(p1?.summaryRatings.overallRating).toBe(99); // p = 0
+    expect(p1?.ratingProfile).toEqual({
+      schemaVersion: 2,
+      modelVersion: 'ratings-model-v3.2',
+      canonicalOverall: 70,
+      rawOverallScore: 90,
+      overallPercentile: 0.25,
+      overallCohortVersion: COHORT_NORMALIZATION_VERSION,
+    });
+    expect(p2?.summaryRatings.overallRating).toBe(83); // p = 0.25
+    expect(p2?.ratingProfile?.overallPercentile).toBe(0.5);
+    expect(p3?.summaryRatings.overallRating).toBe(78); // p = 0.5
+    expect(p3?.ratingProfile?.overallPercentile).toBe(0.75);
+    expect(p4?.summaryRatings.overallRating).toBe(73); // p = 0.75
+    expect(p4?.ratingProfile?.overallPercentile).toBe(1);
+    // Tie-break: identical raw overall, playerId ascending.
+    expect(p2?.playerId).toBe('p-2');
+    expect(p3?.playerId).toBe('p-3');
+    // Only overallRating and the profile percentile fields may change.
+    expect(p4?.summaryRatings.offenseRating).toBe(60);
+    expect(p4?.summaryRatings.defenseRating).toBe(60);
+  });
+
+  it('ranks rows without rawOverallScore by canonical overall and leaves profile fields untouched', () => {
+    const rows = [row('p-1', 'lakers', undefined, 55), row('p-2', 'lakers', undefined, 95)];
+    const diagnostics = normalizePoolOveralls(rows);
+    expect(diagnostics).toEqual({ totalRowCount: 2, rowsWithoutRawOverall: 2 });
+    const [p1, p2] = rows;
+    expect(p2?.summaryRatings.overallRating).toBe(99); // canonical 95 ranks first
+    expect(p2?.ratingProfile).toEqual({
+      schemaVersion: 2,
+      modelVersion: 'ratings-model-v3.2',
+      canonicalOverall: 95,
+      overallPercentile: undefined,
+      overallCohortVersion: undefined,
+    });
+    expect(p1?.summaryRatings.overallRating).toBe(78); // p = 0.5
+    expect(p1?.ratingProfile).toEqual({
+      schemaVersion: 2,
+      modelVersion: 'ratings-model-v3.2',
+      canonicalOverall: 55,
+      overallPercentile: undefined,
+      overallCohortVersion: undefined,
+    });
+  });
+
+  it('handles empty and single-row inputs', () => {
+    expect(normalizePoolOveralls([])).toEqual({ totalRowCount: 0, rowsWithoutRawOverall: 0 });
+    const single = [row('p-1', 'lakers', 75)];
+    expect(normalizePoolOveralls(single)).toEqual({ totalRowCount: 1, rowsWithoutRawOverall: 0 });
+    expect(single[0]?.summaryRatings.overallRating).toBe(99); // p = 0
+    expect(single[0]?.ratingProfile?.overallPercentile).toBe(1);
   });
 });
 

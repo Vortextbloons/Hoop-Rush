@@ -1,6 +1,14 @@
 import { parseArgs, UsageError, getOptionString, hasOption } from './args.js';
 import { dataValidate, DATA_VALIDATE_OPTIONS, DEFAULT_MANIFEST } from './commands/data-validate.js';
 import { dataOveralls, DATA_OVERALLS_OPTIONS } from './commands/data-overalls.js';
+import {
+  dataOverallsDistribution,
+  DATA_OVERALLS_DISTRIBUTION_OPTIONS,
+} from './commands/data-overalls-distribution.js';
+import {
+  defenseBpmCorrelation,
+  DATA_DEFENSE_BPM_CORRELATION_OPTIONS,
+} from './commands/data-defense-bpm-correlation.js';
 import { dataCoverage, DATA_COVERAGE_OPTIONS } from './commands/data-coverage.js';
 import { dataLineageAudit, DATA_LINEAGE_AUDIT_OPTIONS } from './commands/data-lineage-audit.js';
 import { dataDerive, DATA_DERIVE_OPTIONS } from './commands/data-derive.js';
@@ -82,6 +90,16 @@ const COMMANDS: Record<string, CommandDef> = {
         player: getOptionString(args, 'player') ?? undefined,
         limit: getOptionString(args, 'limit') ?? undefined,
       }),
+  },
+  'data overalls-distribution': {
+    options: DATA_OVERALLS_DISTRIBUTION_OPTIONS,
+    run: (args) =>
+      dataOverallsDistribution({ input: getOptionString(args, 'input') ?? DEFAULT_MANIFEST }),
+  },
+  'data defense-bpm-correlation': {
+    options: DATA_DEFENSE_BPM_CORRELATION_OPTIONS,
+    run: (args) =>
+      defenseBpmCorrelation({ input: getOptionString(args, 'input') ?? DEFAULT_MANIFEST }),
   },
   'data coverage': {
     options: DATA_COVERAGE_OPTIONS,

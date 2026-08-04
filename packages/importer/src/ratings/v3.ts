@@ -449,7 +449,16 @@ function historicalDefenseEvidenceLift(input: RatingProfileInput): number {
   return reboundLift + anchorLift;
 }
 
-function summaryRatings(
+/**
+ * Authoritative Offense/Defense summary computation for ratings v3.
+ *
+ * Offense blends scoring, creation, and possession-safety skills with a
+ * tendency-derived turnover guard. Defense blends perimeter/interior
+ * defense, ball disruption, rebounding, and a tendency-derived foul guard.
+ * Profile assembly and compatibility summaries must call this function so
+ * every surface reports the same Offense/Defense values.
+ */
+export function computeOffenseDefense(
   ratings: SimulationRatings,
   tendencies: SimulationTendencies,
 ): { offenseRating: number; defenseRating: number } {
@@ -519,7 +528,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     safeFloat(input.stats.tsPct, 0) >= 0.62 &&
     safeFloat(input.stats.boxPlusMinus, 0) >= 4 &&
     nonlinear.creation >= 85 &&
-    summaryRatings(input.ratings, input.tendencies).defenseRating >= 72;
+    computeOffenseDefense(input.ratings, input.tendencies).defenseRating >= 72;
   const eliteEvidenceLift = completeEliteEvidence
     ? 4
     : eliteScoringEvidence
@@ -533,9 +542,9 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     calibratedImpact.adjustment +
     eliteEvidenceLift;
   const canonicalOverall = canonicalCurve(raw);
-  const summary = summaryRatings(input.ratings, input.tendencies);
+  const summary = computeOffenseDefense(input.ratings, input.tendencies);
   const profile: RatingProfile = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     modelVersion: RATING_MODEL_VERSION,
     memberships,
     baseScore: Math.round(baseScore * 100) / 100,
@@ -543,6 +552,9 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     production,
     calibratedImpact,
     canonicalOverall,
+    // Pre-percentile raw overall; pool packaging derives the cohort
+    // percentile and overwrites the packaged summary overall from it.
+    rawOverallScore: Math.round(raw * 100) / 100,
     offenseRating: summary.offenseRating,
     defenseRating: summary.defenseRating,
   };

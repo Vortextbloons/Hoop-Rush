@@ -531,3 +531,64 @@ export const seasonRostersCalibrateReportSchema = z.object({
   pass: z.boolean(),
 });
 export type SeasonRostersCalibrateReport = z.infer<typeof seasonRostersCalibrateReportSchema>;
+
+/**
+ * Overall cohort percentile bands (spec: percentile Overall normalization).
+ * `range` is the value envelope of the band; median may be null for the
+ * 40-71 band when its values are spread across the whole envelope.
+ */
+export const overallsDistributionBandSchema = z.object({
+  label: z.string().min(1),
+  targetPercent: z.number().min(0).max(100),
+  count: z.number().int().nonnegative(),
+  percentage: z.number().min(0).max(100),
+  median: z.number().min(0).max(100).nullable(),
+  min: z.number().min(0).max(100),
+  max: z.number().min(0).max(100),
+});
+
+/** Per-era Overall percentile band breakdown (spec: percentile normalization). */
+export const overallsDistributionEraSchema = z.object({
+  count: z.number().int().nonnegative(),
+  bands: z.array(overallsDistributionBandSchema),
+});
+
+/** `data overalls-distribution` report payload (spec: cohort percentile check). */
+export const overallsDistributionReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('data overalls-distribution'),
+  dataVersion: z.string().min(1).max(64),
+  cohortVersion: z.string().min(1).max(64),
+  total: z.number().int().nonnegative(),
+  overall: z.object({
+    median: z.number().min(0).max(100).nullable(),
+    range: z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]),
+    min: z.number().min(0).max(100),
+    max: z.number().min(0).max(100),
+    sample: z.number().int().nonnegative(),
+  }),
+  bands: z.array(overallsDistributionBandSchema),
+  perEra: z.record(z.string().min(1), overallsDistributionEraSchema),
+});
+export type OverallsDistributionReport = z.infer<typeof overallsDistributionReportSchema>;
+
+/** One era entry in the defense-vs-BPM correlation report. */
+export const defenseBpmEraSchema = z.object({
+  eraId: z.string().min(1),
+  sample: z.number().int().nonnegative(),
+  correlation: z.number().min(-1).max(1).nullable(),
+});
+
+/** `data defense-bpm-correlation` report payload (spec: defensive BPM audit). */
+export const defenseBpmCorrelationReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('data defense-bpm-correlation'),
+  dataVersion: z.string().min(1).max(64),
+  totalRows: z.number().int().nonnegative(),
+  sample: z.number().int().nonnegative(),
+  excluded: z.number().int().nonnegative(),
+  correlation: z.number().min(-1).max(1).nullable(),
+  pass: z.boolean(),
+  perEra: z.array(defenseBpmEraSchema),
+});
+export type DefenseBpmCorrelationReport = z.infer<typeof defenseBpmCorrelationReportSchema>;

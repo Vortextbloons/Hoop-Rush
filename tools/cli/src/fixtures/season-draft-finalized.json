@@ -261,6 +261,84 @@
       "franchiseId": "spurs",
       "eraId": "1990s",
       "attemptIndex": 0,
+      "usable": false
+    },
+    {
+      "franchiseId": "sixers",
+      "eraId": "2010s",
+      "attemptIndex": 1,
+      "usable": false
+    },
+    {
+      "franchiseId": "kings",
+      "eraId": "1980s",
+      "attemptIndex": 2,
+      "usable": false
+    },
+    {
+      "franchiseId": "spurs",
+      "eraId": "1970s",
+      "attemptIndex": 3,
+      "usable": false
+    },
+    {
+      "franchiseId": "pistons",
+      "eraId": "2010s",
+      "attemptIndex": 4,
+      "usable": false
+    },
+    {
+      "franchiseId": "hornets",
+      "eraId": "1990s",
+      "attemptIndex": 5,
+      "usable": false
+    },
+    {
+      "franchiseId": "warriors",
+      "eraId": "2000s",
+      "attemptIndex": 6,
+      "usable": false
+    },
+    {
+      "franchiseId": "pacers",
+      "eraId": "1990s",
+      "attemptIndex": 7,
+      "usable": false
+    },
+    {
+      "franchiseId": "grizzlies",
+      "eraId": "2000s",
+      "attemptIndex": 8,
+      "usable": false
+    },
+    {
+      "franchiseId": "spurs",
+      "eraId": "2020s",
+      "attemptIndex": 9,
+      "usable": false
+    },
+    {
+      "franchiseId": "cavaliers",
+      "eraId": "1990s",
+      "attemptIndex": 10,
+      "usable": false
+    },
+    {
+      "franchiseId": "celtics",
+      "eraId": "1960s",
+      "attemptIndex": 11,
+      "usable": false
+    },
+    {
+      "franchiseId": "bucks",
+      "eraId": "1980s",
+      "attemptIndex": 12,
+      "usable": false
+    },
+    {
+      "franchiseId": "hornets",
+      "eraId": "2000s",
+      "attemptIndex": 13,
       "usable": true
     }
   ],
@@ -312,8 +390,8 @@
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "spurs",
-      "eraId": "1990s"
+      "franchiseId": "hornets",
+      "eraId": "2000s"
     }
   ],
   "picks": [
@@ -330,7 +408,7 @@
       "participantId": "fixture-human",
       "round": 2,
       "pickOrdinal": 2,
-      "playerVersionId": "pv-cd80b46d697f56b959869843737d4f7d",
+      "playerVersionId": "pv-4a3f0cc28e40497e01aab31808b16092",
       "franchiseId": "suns",
       "eraId": "2000s",
       "rollAttempts": 1
@@ -402,10 +480,10 @@
       "participantId": "fixture-human",
       "round": 10,
       "pickOrdinal": 10,
-      "playerVersionId": "pv-aa16e2d27f3442f668997c10c9233d82",
-      "franchiseId": "spurs",
-      "eraId": "1990s",
-      "rollAttempts": 1
+      "playerVersionId": "pv-480dc092ec6c654647c936288e143502",
+      "franchiseId": "hornets",
+      "eraId": "2000s",
+      "rollAttempts": 14
     }
   ],
   "commandLog": [
@@ -698,14 +776,14 @@
       "commandId": "fixture-pick-1",
       "revisionBefore": 6,
       "revisionAfter": 7,
-      "stateDigest": "5ee91bf98b2d67b5355272b335428649",
+      "stateDigest": "2e64bbbd076427b15b576daf7ddae5ed",
       "command": {
         "commandId": "fixture-pick-1",
         "expectedRevision": 6,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-cd80b46d697f56b959869843737d4f7d"
+          "playerVersionId": "pv-4a3f0cc28e40497e01aab31808b16092"
         }
       }
     },
@@ -714,7 +792,7 @@
       "commandId": "fixture-reveal-2",
       "revisionBefore": 7,
       "revisionAfter": 8,
-      "stateDigest": "09d9444da7d82df9ffb7f43bb665e3dd",
+      "stateDigest": "79bb8fb8525997a4c0a60bca4dd2ddc8",
       "command": {
         "commandId": "fixture-reveal-2",
         "expectedRevision": 7,
@@ -729,7 +807,7 @@
       "commandId": "fixture-claim-2",
       "revisionBefore": 8,
       "revisionAfter": 9,
-      "stateDigest": "b7a754d965c47a5d225cabdba0be3dc9",
+      "stateDigest": "00dae1bf544629d328207071cbb592ef",
       "command": {
         "commandId": "fixture-claim-2",
         "expectedRevision": 8,
@@ -746,7 +824,7 @@
       "commandId": "fixture-pick-2",
       "revisionBefore": 9,
       "revisionAfter": 10,
-      "stateDigest": "b845069d30e9c6697ac52f77885b6fed",
+      "stateDigest": "0dbc9c9c4d51b6f81520f8c660e7844c",
       "command": {
         "commandId": "fixture-pick-2",
         "expectedRevision": 9,
@@ -762,7 +840,7 @@
       "commandId": "fixture-reveal-3",
       "revisionBefore": 10,
       "revisionAfter": 11,
-      "stateDigest": "9eebe6508f0489d4a0e7429ac14bf1e0",
+      "stateDigest": "ecf80f63d141f1ef830d2cb1c1b4f5b3",
       "command": {
         "commandId": "fixture-reveal-3",
         "expectedRevision": 10,
@@ -777,7 +855,7 @@
       "commandId": "fixture-claim-3",
       "revisionBefore": 11,
       "revisionAfter": 12,
-      "stateDigest": "89700b09a25b385515d88fb3f554b2d9",
+      "stateDigest": "5b936f1ff4f0fe33d2240be5e64296af",
       "command": {
         "commandId": "fixture-claim-3",
         "expectedRevision": 11,
@@ -794,7 +872,7 @@
       "commandId": "fixture-pick-3",
       "revisionBefore": 12,
       "revisionAfter": 13,
-      "stateDigest": "d02fa9ba1e11ceae878c7b68542bc3ea",
+      "stateDigest": "c197265e02a5344a5ae47d98b337114e",
       "command": {
         "commandId": "fixture-pick-3",
         "expectedRevision": 12,
@@ -810,7 +888,7 @@
       "commandId": "fixture-reveal-4",
       "revisionBefore": 13,
       "revisionAfter": 14,
-      "stateDigest": "edc2b9c0fd09e3244e3846b2ba6e0850",
+      "stateDigest": "590ba848013940648171f67679347ab8",
       "command": {
         "commandId": "fixture-reveal-4",
         "expectedRevision": 13,
@@ -825,7 +903,7 @@
       "commandId": "fixture-claim-4",
       "revisionBefore": 14,
       "revisionAfter": 15,
-      "stateDigest": "5c01adb9858e3d5daac062e77bbb05e9",
+      "stateDigest": "d4dad3807393755c12be8166789a7e50",
       "command": {
         "commandId": "fixture-claim-4",
         "expectedRevision": 14,
@@ -842,7 +920,7 @@
       "commandId": "fixture-pick-4",
       "revisionBefore": 15,
       "revisionAfter": 16,
-      "stateDigest": "155381f380519ecf1337406d459ee903",
+      "stateDigest": "029a2e0ffdb0e083fcbb897d093b6bff",
       "command": {
         "commandId": "fixture-pick-4",
         "expectedRevision": 15,
@@ -858,7 +936,7 @@
       "commandId": "fixture-reveal-5",
       "revisionBefore": 16,
       "revisionAfter": 17,
-      "stateDigest": "fc9dc060f2d39224cfeceaaeebe57890",
+      "stateDigest": "2042d1efba5cea2384f80b6d021e59df",
       "command": {
         "commandId": "fixture-reveal-5",
         "expectedRevision": 16,
@@ -873,7 +951,7 @@
       "commandId": "fixture-claim-5",
       "revisionBefore": 17,
       "revisionAfter": 18,
-      "stateDigest": "5e19091595173fc91afe230b26ab09c5",
+      "stateDigest": "55add33f9d931af347b2508d47ac304f",
       "command": {
         "commandId": "fixture-claim-5",
         "expectedRevision": 17,
@@ -890,7 +968,7 @@
       "commandId": "fixture-pick-5",
       "revisionBefore": 18,
       "revisionAfter": 19,
-      "stateDigest": "3c23a3ca95efc6d60c1260240c9f521a",
+      "stateDigest": "b5bedefdbe331071aa2459ab81fc00ed",
       "command": {
         "commandId": "fixture-pick-5",
         "expectedRevision": 18,
@@ -906,7 +984,7 @@
       "commandId": "fixture-reveal-6",
       "revisionBefore": 19,
       "revisionAfter": 20,
-      "stateDigest": "e55003c09dc3fe3c801167ee898bda50",
+      "stateDigest": "74b135ac3bc364f8158aea8e78ac46bc",
       "command": {
         "commandId": "fixture-reveal-6",
         "expectedRevision": 19,
@@ -921,7 +999,7 @@
       "commandId": "fixture-claim-6",
       "revisionBefore": 20,
       "revisionAfter": 21,
-      "stateDigest": "e91ab0e1a896c8fd5fc80b1bb9d662d1",
+      "stateDigest": "82f7e74b183cfc57986bbfb584edd37b",
       "command": {
         "commandId": "fixture-claim-6",
         "expectedRevision": 20,
@@ -938,7 +1016,7 @@
       "commandId": "fixture-pick-6",
       "revisionBefore": 21,
       "revisionAfter": 22,
-      "stateDigest": "aeeb1100ead010b4ca3eddaa1e003350",
+      "stateDigest": "77604f265e78c1c2805244e048942e56",
       "command": {
         "commandId": "fixture-pick-6",
         "expectedRevision": 21,
@@ -954,7 +1032,7 @@
       "commandId": "fixture-reveal-7",
       "revisionBefore": 22,
       "revisionAfter": 23,
-      "stateDigest": "3fda1b7a9c9fec2ef9a634e84997e72a",
+      "stateDigest": "cda71caa47ac310689cbc53c948e113a",
       "command": {
         "commandId": "fixture-reveal-7",
         "expectedRevision": 22,
@@ -969,7 +1047,7 @@
       "commandId": "fixture-claim-7",
       "revisionBefore": 23,
       "revisionAfter": 24,
-      "stateDigest": "9e1492cdb4146e51112285771aea665d",
+      "stateDigest": "ecbdb492677a2beea059651cf4bb29e2",
       "command": {
         "commandId": "fixture-claim-7",
         "expectedRevision": 23,
@@ -986,7 +1064,7 @@
       "commandId": "fixture-pick-7",
       "revisionBefore": 24,
       "revisionAfter": 25,
-      "stateDigest": "379be961da6840cd4ab75fbb7d013a31",
+      "stateDigest": "8ecfc997aeb5194bb09856f9b80fb367",
       "command": {
         "commandId": "fixture-pick-7",
         "expectedRevision": 24,
@@ -1002,7 +1080,7 @@
       "commandId": "fixture-reveal-8",
       "revisionBefore": 25,
       "revisionAfter": 26,
-      "stateDigest": "4cd589c84fe8a0949d62abbed28a5ed8",
+      "stateDigest": "4e9e1ff9610109259de7881b1eebe389",
       "command": {
         "commandId": "fixture-reveal-8",
         "expectedRevision": 25,
@@ -1017,7 +1095,7 @@
       "commandId": "fixture-claim-8",
       "revisionBefore": 26,
       "revisionAfter": 27,
-      "stateDigest": "c09b10d3229bbfcf2946ee85613f8563",
+      "stateDigest": "15755a420e88fda6ab7cfd502bed8e12",
       "command": {
         "commandId": "fixture-claim-8",
         "expectedRevision": 26,
@@ -1034,7 +1112,7 @@
       "commandId": "fixture-pick-8",
       "revisionBefore": 27,
       "revisionAfter": 28,
-      "stateDigest": "36624132840bfd5657d250883c969842",
+      "stateDigest": "e517c894eb82b140956104be4d9a1184",
       "command": {
         "commandId": "fixture-pick-8",
         "expectedRevision": 27,
@@ -1050,7 +1128,7 @@
       "commandId": "fixture-reveal-9",
       "revisionBefore": 28,
       "revisionAfter": 29,
-      "stateDigest": "22f612c58ed678d95b0d3e176dbe2b75",
+      "stateDigest": "18c566ea6c139bae8d16935862d8c07a",
       "command": {
         "commandId": "fixture-reveal-9",
         "expectedRevision": 28,
@@ -1065,15 +1143,15 @@
       "commandId": "fixture-claim-9",
       "revisionBefore": 29,
       "revisionAfter": 30,
-      "stateDigest": "21c1a8f2579c5cfec80ffb204c437d22",
+      "stateDigest": "ebfe97f86facdc14487ea19e316b1368",
       "command": {
         "commandId": "fixture-claim-9",
         "expectedRevision": 29,
         "payload": {
           "kind": "claim-draft-pool",
           "participantId": "fixture-human",
-          "franchiseId": "spurs",
-          "eraId": "1990s"
+          "franchiseId": "hornets",
+          "eraId": "2000s"
         }
       }
     },
@@ -1082,14 +1160,14 @@
       "commandId": "fixture-pick-9",
       "revisionBefore": 30,
       "revisionAfter": 31,
-      "stateDigest": "012bfc20e0ace914f12f09f65ae54510",
+      "stateDigest": "415f3ed21c2c00e6af5577d42b2123a2",
       "command": {
         "commandId": "fixture-pick-9",
         "expectedRevision": 30,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-aa16e2d27f3442f668997c10c9233d82"
+          "playerVersionId": "pv-480dc092ec6c654647c936288e143502"
         }
       }
     },
@@ -1098,7 +1176,7 @@
       "commandId": "fixture-finalize",
       "revisionBefore": 31,
       "revisionAfter": 32,
-      "stateDigest": "340dbcb2e7ea9506693e398ceb758022",
+      "stateDigest": "544e1d572a2d3a33c9a00d4d095b7a87",
       "command": {
         "commandId": "fixture-finalize",
         "expectedRevision": 31,
@@ -1112,7 +1190,7 @@
       "commandId": "fixture-generate",
       "revisionBefore": 32,
       "revisionAfter": 33,
-      "stateDigest": "c4f7424cf17625b852ff51aeee781c1c",
+      "stateDigest": "a4d4e6047eb7bbf8bdc3b736345905d4",
       "command": {
         "commandId": "fixture-generate",
         "expectedRevision": 32,

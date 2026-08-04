@@ -230,8 +230,12 @@ describe('derivePlayerRecord (field-method registry)', () => {
           offensiveRebounds: 98,
           defensiveRebounds: 516,
           assists: 554,
-          steals: 129,
-          blocks: 68,
+          // Strengthened stock totals (129 -> 165 steals, 68 -> 90 blocks):
+          // after BPM left the defensive ratings, the real 2012-13 counts no
+          // longer reach the 95+ band; the boosted defense is the only way the
+          // fixture still demonstrates a complete elite season.
+          steals: 165,
+          blocks: 90,
           turnovers: 228,
           fgm: 767,
           fga: 1352,
@@ -479,5 +483,171 @@ describe('derivePlayerRecord (field-method registry)', () => {
     // Pre-1974 -> estimated.
     const early = derivePlayerRecord(input('1970-71', pre1974Stats()));
     expect(early.provenance['perimeterDefense']?.kind).toBe('estimated');
+  });
+
+  // --- Shooting-rate shrinkage regression fixtures (spec/12) ----------------
+
+  it('shrinks tiny 3P/FT samples far below the large-sample ratings in low-minute seasons', () => {
+    // 1-for-1 samples get 80 equivalent prior attempts (0.36 3P / 0.80 FT for
+    // guards), landing the shrunk rates at ~0.368 and ~0.802 instead of 1.000.
+    const tiny = derivePlayerRecord(
+      input(
+        '2005-06',
+        starterStats({ gamesPlayed: 12, minutes: 180, tpm: 1, tpa: 1, ftm: 1, fta: 1 }),
+      ),
+    );
+    expect(tiny.anchors.threePointPctShrunk).toBeCloseTo((1 + 0.36 * 80) / 81, 3);
+    expect(tiny.anchors.freeThrowPctShrunk).toBeCloseTo((1 + 0.8 * 80) / 81, 3);
+    expect(tiny.ratings.threePoint).toBeLessThan(90);
+    expect(tiny.ratings.freeThrow).toBeLessThan(90);
+    // The same shooting percentages at full sample stay at least 10 points up.
+    const large = derivePlayerRecord(
+      input('2005-06', starterStats({ tpm: 300, tpa: 600, ftm: 250, fta: 300 })),
+    );
+    expect(tiny.ratings.threePoint).toBeLessThan(large.ratings.threePoint - 10);
+    expect(tiny.ratings.freeThrow).toBeLessThan(large.ratings.freeThrow - 10);
+  });
+
+  it('pulls a perfect 6-for-6 three-point sample toward the prior', () => {
+    // Observed 1.000 shrinks to (6 + 0.36*80) / 86 ~= 0.405; the rating must
+    // stay below 90 instead of reading as a perfect shooter.
+    const sixForSix = derivePlayerRecord(input('2005-06', starterStats({ tpm: 6, tpa: 6 })));
+    expect(sixForSix.anchors.threePointPctShrunk).toBeCloseTo((6 + 0.36 * 80) / 86, 3);
+    expect(sixForSix.ratings.threePoint).toBeLessThan(90);
+  });
+
+  it('shrinks large samples with exact formula anchors and ratings near the observed rate', () => {
+    const large = derivePlayerRecord(
+      input('2005-06', starterStats({ tpm: 300, tpa: 600, ftm: 250, fta: 300 })),
+    );
+    // Exact shrunkRate formula: (made + prior*80) / (attempted + 80).
+    const shrunkThree = (300 + 0.36 * 80) / 680;
+    const shrunkFt = (250 + 0.8 * 80) / 380;
+    expect(large.anchors.threePointPctShrunk).toBeCloseTo(shrunkThree, 3);
+    expect(large.anchors.freeThrowPctShrunk).toBeCloseTo(shrunkFt, 3);
+    // 300/600 and 250/300 are large enough that the anchors stay within 0.02
+    // of the observed rates (0.500 and 0.833).
+    expect(Math.abs((large.anchors.threePointPctShrunk ?? 0) - 0.5)).toBeLessThanOrEqual(0.02);
+    expect(Math.abs((large.anchors.freeThrowPctShrunk ?? 0) - 250 / 300)).toBeLessThanOrEqual(0.02);
+    // Re-deriving with a huge prior leaves the shrunk rate ~ the observed rate;
+    // the resulting ratings are the unshrunk-derived values and must stay
+    // within 4 points of the default-prior ratings.
+    const unshrunk = derivePlayerRecord(
+      input('2005-06', starterStats({ tpm: 300, tpa: 600, ftm: 250, fta: 300 }), 'SG', {
+        ratePriors: { threePointPctPrior: 0.5, freeThrowPctPrior: 250 / 300 },
+      }),
+    );
+    expect(Math.abs(unshrunk.ratings.threePoint - large.ratings.threePoint)).toBeLessThanOrEqual(4);
+    expect(Math.abs(unshrunk.ratings.freeThrow - large.ratings.freeThrow)).toBeLessThanOrEqual(4);
+  });
+
+  it('honors explicit ratePriors in the shrunk anchors', () => {
+    const stats = starterStats({ tpm: 300, tpa: 600, ftm: 250, fta: 300 });
+    const explicit = derivePlayerRecord(
+      input('2005-06', stats, 'SG', {
+        ratePriors: { threePointPctPrior: 0.45, freeThrowPctPrior: 0.75 },
+      }),
+    );
+    expect(explicit.anchors.threePointPctShrunk).toBeCloseTo((300 + 0.45 * 80) / 680, 3);
+    expect(explicit.anchors.freeThrowPctShrunk).toBeCloseTo((250 + 0.75 * 80) / 380, 3);
+    expect(explicit.anchors.threePointPctPrior).toBe(0.45);
+    expect(explicit.anchors.freeThrowPctPrior).toBe(0.75);
+    // A different prior must produce a different shrunk rate than the
+    // league-default prior (0.36 / 0.80 for guards).
+    const defaultPrior = derivePlayerRecord(input('2005-06', stats));
+    expect(explicit.anchors.threePointPctShrunk ?? 0).not.toBeCloseTo(
+      defaultPrior.anchors.threePointPctShrunk ?? 0,
+      6,
+    );
+    expect(explicit.anchors.freeThrowPctShrunk ?? 0).not.toBeCloseTo(
+      defaultPrior.anchors.freeThrowPctShrunk ?? 0,
+      6,
+    );
+  });
+
+  it('records shrink-80-attempts provenance and the prior anchors for shooting rates', () => {
+    const derived = derivePlayerRecord(input('2005-06', starterStats()));
+    expect(derived.provenance['threePoint']?.sourceFields).toEqual(
+      expect.arrayContaining(['shrink-80-attempts', 'prior']),
+    );
+    expect(derived.provenance['freeThrow']?.sourceFields).toEqual(
+      expect.arrayContaining(['shrink-80-attempts', 'prior']),
+    );
+    // Guard group defaults from LEAGUE_RATE_DEFAULTS (v2.ts).
+    expect(derived.anchors.threePointPctPrior).toBe(0.36);
+    expect(derived.anchors.freeThrowPctPrior).toBe(0.8);
+    expect(derived.anchors.rateShrinkAttempts).toBe(80);
+  });
+
+  // --- Defensive attribute independence from box plus/minus ----------------
+
+  it('keeps perimeter/interior/defensiveIq independent of box plus/minus', () => {
+    const highBpm = derivePlayerRecord(input('1996-97', starterStats({ boxPlusMinus: 8 })));
+    const lowBpm = derivePlayerRecord(input('1996-97', starterStats({ boxPlusMinus: -2 })));
+    for (const field of ['perimeterDefense', 'interiorDefense', 'defensiveIq'] as const) {
+      // BPM never appears in the defensive source fields...
+      expect(highBpm.provenance[field]?.sourceFields).not.toContain('boxPlusMinus');
+      // ...and changing it must not move any of the three attributes.
+      expect(highBpm.ratings[field]).toBe(lowBpm.ratings[field]);
+    }
+    // BPM still feeds offensiveIq (and only offensiveIq).
+    expect(highBpm.provenance['offensiveIq']?.sourceFields).toContain('boxPlusMinus');
+    expect(highBpm.ratings.offensiveIq).not.toBe(lowBpm.ratings.offensiveIq);
+  });
+
+  it('defensiveIq is derived when stocks are observed and estimated otherwise', () => {
+    const modern = derivePlayerRecord(input('1996-97', starterStats()));
+    expect(modern.provenance['defensiveIq']?.kind).toBe('derived');
+    const early = derivePlayerRecord(input('1970-71', pre1974Stats()));
+    expect(early.provenance['defensiveIq']?.kind).toBe('estimated');
+    expect(early.provenance['defensiveIq']?.sourceFields).toEqual(
+      expect.arrayContaining(['rebounds', 'prior']),
+    );
+  });
+
+  // --- resolveCounting: per-36 evidence blend with position priors ----------
+
+  it('resolveCounting uses the position prior: changing G to C changes estimated steals', () => {
+    // POSITION_PRIORS (v2.ts): G stealsPer36 1.5, C stealsPer36 0.8.
+    const guard = derivePlayerRecord(input('1970-71', pre1974Stats(), 'SG'));
+    const center = derivePlayerRecord(input('1970-71', pre1974Stats(), 'C'));
+    const mpg = 2850 / 78;
+    expect(guard.anchors.stealsPerGame).toBeCloseTo((1.5 * mpg) / 36, 9);
+    expect(center.anchors.stealsPerGame).toBeCloseTo((0.8 * mpg) / 36, 9);
+    expect(guard.anchors.stealsPerGame).toBeGreaterThan(center.anchors.stealsPerGame);
+    expect(guard.provenance['steal']?.kind).toBe('estimated');
+  });
+
+  it('estimated steals per game equal priorPer36 * (mpg / 36) with no related evidence', () => {
+    const derived = derivePlayerRecord(input('1970-71', pre1974Stats(), 'SG'));
+    const mpg = 2850 / 78;
+    // Steals have no related-evidence fallback, so the per-36 blend collapses
+    // to the prior and the per-game conversion is exactly priorPer36 * mpg/36.
+    expect(derived.anchors.stealsPerGame).toBeCloseTo((1.5 * mpg) / 36, 9);
+    expect(derived.provenance['steal']?.sourceFields.at(-1)).toBe('prior');
+  });
+
+  it('estimates rebound splits from total rebounds when the split is unpublished', () => {
+    const derived = derivePlayerRecord(input('1970-71', pre1974Stats(), 'SG'));
+    const reboundsPerGame = 420 / 78;
+    // Total rebounds are shared out with the prior shares, so the estimated
+    // split reconciles with the observed rebound total.
+    const splitTotal =
+      derived.anchors.offensiveReboundsPerGame + derived.anchors.defensiveReboundsPerGame;
+    expect(splitTotal).toBeCloseTo(reboundsPerGame, 1);
+    expect(derived.provenance['offensiveRebound']?.sourceFields.at(-1)).toBe('rebounds');
+    expect(derived.provenance['defensiveRebound']?.sourceFields.at(-1)).toBe('rebounds');
+    expect(derived.provenance['offensiveRebound']?.kind).toBe('estimated');
+  });
+
+  it('falls back to the pure prior (fields ending in "prior") when rebounds are absent too', () => {
+    const derived = derivePlayerRecord(input('1970-71', pre1974Stats({ rebounds: null }), 'SG'));
+    const mpg = 2850 / 78;
+    // No related evidence: the value is exactly priorPer36 * mpg/36 and the
+    // provenance admits the prior instead of fabricating rebound evidence.
+    expect(derived.anchors.offensiveReboundsPerGame).toBeCloseTo((1.1 * mpg) / 36, 9);
+    expect(derived.anchors.defensiveReboundsPerGame).toBeCloseTo((4.2 * mpg) / 36, 9);
+    expect(derived.provenance['offensiveRebound']?.sourceFields.at(-1)).toBe('prior');
+    expect(derived.provenance['defensiveRebound']?.sourceFields.at(-1)).toBe('prior');
   });
 });

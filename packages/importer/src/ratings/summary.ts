@@ -2,65 +2,74 @@
  * Ratings v3 summary adapters.
  *
  * Summary ratings remain UI-facing and never enter possession resolution.
- * Canonical Overall is produced by the versioned profile in v3.ts; the
- * production helper is retained as a diagnostic compatibility export.
+ * Offense and Defense come from the authoritative v3 computation
+ * (computeOffenseDefense); the packaged Overall is produced by the versioned
+ * profile in v3.ts. The compatibility helpers below are provisional
+ * diagnostics and never feed packaging.
  */
 import { clamp, clampRating, safeFloat } from '../json.js';
 import { computeOverall } from './weights.js';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.js';
-import { deriveRatingProfile, tendenciesForProfile } from './v3.js';
-import type { SimulationRatings } from '@hoop-rush/data-contracts';
+import { computeOffenseDefense, deriveRatingProfile, tendenciesForProfile } from './v3.js';
+import type { SimulationRatings, SimulationTendencies } from '@hoop-rush/data-contracts';
 import type { StatsRow } from './stats.js';
 
-function turnoverSecurity(tendencies: Record<string, number>, ballHandling: number): number {
-  const rate = tendencies['turnoverRate'] || 12;
-  const penalty = clamp((rate - 5) * 5, 0, 100);
-  return 0.5 * ballHandling + 0.5 * (100 - penalty);
+const RATING_KEYS: readonly (keyof SimulationRatings)[] = [
+  'insideScoring',
+  'closeShot',
+  'threePoint',
+  'midrange',
+  'freeThrow',
+  'ballHandling',
+  'passing',
+  'offensiveIq',
+  'offensiveRebound',
+  'defensiveRebound',
+  'perimeterDefense',
+  'interiorDefense',
+  'steal',
+  'block',
+  'defensiveIq',
+  'speed',
+  'strength',
+  'vertical',
+];
+
+const TENDENCY_DEFAULTS: Pick<SimulationTendencies, 'turnoverRate' | 'foulRate'> = {
+  turnoverRate: 12,
+  foulRate: 2,
+};
+
+/** Neutral-complete shape for the shared computation; missing keys default to 50. */
+function completeRatings(ratings: Record<string, number>): SimulationRatings {
+  const filled = Object.fromEntries(RATING_KEYS.map((key) => [key, 50])) as Record<
+    keyof SimulationRatings,
+    number
+  >;
+  return { ...filled, ...ratings };
 }
 
-function offBallSpacing(ratings: Record<string, number>): number {
-  return 0.6 * (ratings['threePoint'] ?? 50) + 0.4 * (ratings['passing'] ?? 50);
-}
-
-function foulDiscipline(tendencies: Record<string, number>): number {
-  const rate = tendencies['foulRate'] || 2;
-  return clamp(100 - rate * 8, 0, 100);
-}
-
-/** Offense and Defense summaries are consistent projections of the v3 profile. */
+/**
+ * Offense and Defense summaries are the authoritative v3 computation; the
+ * returned overallRating is a 55/45 blend of them and is NOT packaged.
+ */
 export function computeSummaryRatings(
   ratings: Record<string, number>,
   tendencies: Record<string, number>,
 ): { offenseRating: number; defenseRating: number; overallRating: number } {
-  const offense =
-    0.14 * (ratings['insideScoring'] ?? 50) +
-    0.14 * (ratings['threePoint'] ?? 50) +
-    0.08 * (ratings['midrange'] ?? 50) +
-    0.08 * (ratings['freeThrow'] ?? 50) +
-    0.16 * (ratings['ballHandling'] ?? 50) +
-    0.12 * (ratings['passing'] ?? 50) +
-    0.1 * turnoverSecurity(tendencies, ratings['ballHandling'] ?? 50) +
-    0.1 * (ratings['offensiveIq'] ?? 50) +
-    0.04 * (ratings['offensiveRebound'] ?? 50) +
-    0.04 * offBallSpacing(ratings);
-  const defense =
-    0.22 * (ratings['perimeterDefense'] ?? 50) +
-    0.22 * (ratings['interiorDefense'] ?? 50) +
-    0.18 * (ratings['defensiveIq'] ?? 50) +
-    0.1 * (ratings['steal'] ?? 50) +
-    0.1 * (ratings['block'] ?? 50) +
-    0.12 * (ratings['defensiveRebound'] ?? 50) +
-    0.06 * foulDiscipline(tendencies);
-  const offenseRating = clampRating(offense);
-  const defenseRating = clampRating(defense);
+  const { offenseRating, defenseRating } = computeOffenseDefense(completeRatings(ratings), {
+    ...TENDENCY_DEFAULTS,
+    ...tendencies,
+  } as SimulationTendencies);
   return {
     offenseRating,
     defenseRating,
+    /** Provisional diagnostic only; packaged Overall comes from the rating profile. */
     overallRating: clampRating(0.55 * offenseRating + 0.45 * defenseRating),
   };
 }
 
-/** Diagnostic production score used by calibration reports, not canonical OVR. */
+/** Provisional diagnostic production score for calibration reports; never the packaged Overall. */
 export function computeProductionImpact(stats: StatsRow): number {
   const gp = Math.max(0, Math.trunc(safeFloat(stats.gamesPlayed)));
   const minutes = safeFloat(stats.minutes);
@@ -90,7 +99,11 @@ export function computeProductionImpact(stats: StatsRow): number {
   return clamp(impact, 55, 99);
 }
 
-/** Compatibility entry point; complete inputs always use the Ratings v3 curve. */
+/**
+ * Provisional diagnostic compatibility entry point; never used by packaging.
+ * Complete inputs return the authoritative profile curve (canonicalOverall);
+ * partial inputs blend legacy position weights with measured impact metrics.
+ */
 export function computeRealOverall(
   ratings: Record<string, number>,
   position: string,

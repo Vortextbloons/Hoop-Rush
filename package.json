@@ -30,7 +30,9 @@
   },
   "packageManager": "pnpm@11.11.0",
   "lint-staged": {
-    "*.{ts,js,svelte,json,css,html,yml,yaml}": "prettier --write"
+    "*.{ts,js,svelte,json,css,html,yml,yaml}": "prettier --write",
+    "!raw-data/**": [],
+    "!apps/web/static/data/**": []
   },
   "devDependencies": {
     "@sveltejs/mcp": "^0.1.25",

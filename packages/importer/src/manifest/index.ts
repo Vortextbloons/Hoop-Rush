@@ -34,7 +34,7 @@ type Manifest = Record<string, unknown>;
 
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
 
-export const DATA_VERSION = 'm10-ratings-v3.4';
+export const DATA_VERSION = 'm10-ratings-v3.5';
 
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
@@ -299,6 +299,27 @@ export function run(dataDir = PUBLIC_DATA): void {
       url: 'opponents/bracket.json',
       contentHash: sha256File(join(opponentsDir, 'bracket.json')),
     };
+  }
+
+  // Season Run artifacts (2.0): league, schedule, draft catalog, and roster
+  // targets hashes when the packaged season assets exist (optional so 1.0
+  // manifests stay valid; the season generators update these entries in
+  // place).
+  const seasonDir = join(dataDir, 'season');
+  const seasonRefs: Record<string, { url: string; contentHash: string }> = {};
+  for (const [key, name] of [
+    ['league', 'league.json'],
+    ['schedule', 'schedule.json'],
+    ['draftCatalog', 'draft-catalog.json'],
+    ['rosterTargets', 'roster-targets.json'],
+  ] as const) {
+    const path = join(seasonDir, name);
+    if (fileExists(path)) {
+      seasonRefs[key] = { url: `season/${name}`, contentHash: sha256File(path) };
+    }
+  }
+  if (Object.keys(seasonRefs).length > 0) {
+    manifest['season'] = seasonRefs;
   }
 
   writeJsonRetry(manifestPath, manifest, true);

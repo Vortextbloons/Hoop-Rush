@@ -14,7 +14,7 @@ import { DEFAULT_SEASONS, ensureOutputDir } from '../config.js';
 import { fileExists, readJson, safeFloat, writeJsonRetry } from '../json.js';
 import { deriveTraits } from './traits.js';
 import { deriveContract } from './contracts.js';
-import { derivePlayerRecord, fieldPublished, type SeasonContext } from './v2.js';
+import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext } from './v2.js';
 import { getEra } from './era.js';
 import { canonicalPlayerName } from '../identity.js';
 import { positionOverrideFor } from '../positions/overrides.js';
@@ -85,6 +85,56 @@ function seasonContext(season: string): SeasonContext {
   return { leaguePpg: era.leaguePpg, league3PARate: era.league3PARate, pace: era.pace };
 }
 
+/**
+ * Pooled season×position-group three-point and free-throw rates used as
+ * shrinkage priors (made/attempted ratios summed over the whole season
+ * cohort). Positions come from the roster with the same override-corrected
+ * primary position the derivation loop uses, collapsed to G/F/C groups.
+ * Cohorts without valid made/attempted pairs stay absent so derivePlayerRecord
+ * falls back to the documented league defaults per field.
+ */
+export function pooledRatePriors(
+  roster: readonly RosterPlayer[],
+  statsList: readonly StatsRow[],
+): Map<string, { threePointPctPrior?: number; freeThrowPctPrior?: number }> {
+  const groupByExtId = new Map<string, 'G' | 'F' | 'C'>();
+  for (const player of roster) {
+    const extId = player.externalId ?? '';
+    if (extId === '') continue;
+    const override = positionOverrideFor(extId);
+    const pos = override !== null ? override.primary : mapPosition(player.position ?? 'SF');
+    groupByExtId.set(extId, positionGroup(pos));
+  }
+  const sums = new Map<'G' | 'F' | 'C', { tpm: number; tpa: number; ftm: number; fta: number }>();
+  for (const s of statsList) {
+    const extId = s['playerExternalId'];
+    const group = typeof extId === 'string' ? groupByExtId.get(extId) : undefined;
+    if (group === undefined) continue;
+    const tpm = safeFloat(s['tpm']);
+    const tpa = safeFloat(s['tpa']);
+    const ftm = safeFloat(s['ftm']);
+    const fta = safeFloat(s['fta']);
+    const acc = sums.get(group) ?? { tpm: 0, tpa: 0, ftm: 0, fta: 0 };
+    if (Number.isFinite(tpm) && Number.isFinite(tpa) && tpa > 0) {
+      acc.tpm += tpm;
+      acc.tpa += tpa;
+    }
+    if (Number.isFinite(ftm) && Number.isFinite(fta) && fta > 0) {
+      acc.ftm += ftm;
+      acc.fta += fta;
+    }
+    sums.set(group, acc);
+  }
+  const priors = new Map<string, { threePointPctPrior?: number; freeThrowPctPrior?: number }>();
+  for (const [group, acc] of sums) {
+    const prior: { threePointPctPrior?: number; freeThrowPctPrior?: number } = {};
+    if (acc.tpa > 0) prior.threePointPctPrior = acc.tpm / acc.tpa;
+    if (acc.fta > 0) prior.freeThrowPctPrior = acc.ftm / acc.fta;
+    priors.set(group, prior);
+  }
+  return priors;
+}
+
 export function computeForSeason(season: string, force = false): void {
   const out = ensureOutputDir(season);
   const rosterPath = `${out}/roster.json`;
@@ -127,6 +177,7 @@ export function computeForSeason(season: string, force = false): void {
 
   const context = seasonContext(season);
   const artifact = loadRatingsModelArtifact();
+  const ratePriorsByGroup = pooledRatePriors(roster, statsList);
 
   let computed = 0;
   for (const player of roster) {
@@ -200,6 +251,7 @@ export function computeForSeason(season: string, force = false): void {
       stats,
       era: context,
       artifact,
+      ratePriors: ratePriorsByGroup.get(positionGroup(pos)),
     });
     player.ratings = derived.ratings;
     player.tendencies = derived.tendencies;

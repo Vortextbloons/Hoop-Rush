@@ -34,6 +34,7 @@ import {
 import { clamp, clampRating, clampUnitInterval, safeFloat } from '../json.js';
 import { FIELD_AVAILABILITY } from '../config.js';
 import { deriveRatingProfile } from './v3.js';
+import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.js';
 import type { StatsRow } from './stats.js';
 
 /** League context used for era-relative translation (spec/12 environment). */
@@ -53,6 +54,8 @@ export interface DerivationInput {
   stats: StatsRow;
   era: SeasonContext;
   artifact?: RatingsModelArtifact;
+  /** Pooled season×position-group shooting priors (made/attempted ratios). */
+  ratePriors?: { threePointPctPrior?: number; freeThrowPctPrior?: number };
 }
 
 export interface DerivedRecord {
@@ -105,6 +108,28 @@ const POSITION_PRIORS: Readonly<Record<string, Readonly<PriorTable>>> = {
     threePointRatePrior: 0.04,
   },
 };
+
+/**
+ * League-default shooting priors per position group, used only when a season
+ * cohort has no valid pooled made/attempted observations. 3P: guards shoot
+ * most efficiently and bigs least. FT: guards convert most, bigs least.
+ */
+const LEAGUE_RATE_DEFAULTS: Readonly<
+  Record<'G' | 'F' | 'C', Readonly<{ threePointPctPrior: number; freeThrowPctPrior: number }>>
+> = {
+  G: { threePointPctPrior: 0.36, freeThrowPctPrior: 0.8 },
+  F: { threePointPctPrior: 0.35, freeThrowPctPrior: 0.77 },
+  C: { threePointPctPrior: 0.31, freeThrowPctPrior: 0.71 },
+};
+
+/** Collapses a detailed position into the prior position group (PG/SG -> G, PF/SF -> F). */
+export function positionGroup(detailPos: string): 'G' | 'F' | 'C' {
+  return detailPos === 'PG' || detailPos === 'SG'
+    ? 'G'
+    : detailPos === 'PF' || detailPos === 'SF'
+      ? 'F'
+      : 'C';
+}
 
 /** Whether the source publishes the field for this season (spec/12 table). */
 export function fieldPublished(field: string, season: string): boolean {
@@ -192,8 +217,8 @@ interface Resolved {
 
 /**
  * Resolves one counting stat with the ladder: observed when the source
- * publishes the field and the row carries a value; reconstructed from
- * per-minute context; shrunk toward the position-era-role prior.
+ * publishes the field and the row carries a value; else an estimated per-game
+ * value from a per-36 blend of player evidence and the position-era-role prior.
  */
 function resolveCounting(
   observed: number | null,
@@ -202,21 +227,26 @@ function resolveCounting(
   minutes: number,
   games: number,
   fields: string[],
+  relatedPer36?: number | null,
+  share?: number,
+  relatedField?: string,
 ): Resolved {
   if (published && observed !== null && games > 0) {
     return { value: observed / games, kind: 'observed', fields };
   }
-  const perGame = minutes / Math.max(1, games);
-  const reconstructed = (priorPer36 * perGame) / 36;
-  const priorMinutes = 1500;
-  const weight = minutes / Math.max(1, minutes + priorMinutes);
+  // Related player evidence (e.g. total rebounds when the split is missing)
+  // scales by the prior share; without it the prior is used directly and no
+  // evidence is fabricated. Both sides of the blend stay in per-36 units,
+  // then the blended per-36 value is converted to the caller's per-game unit.
+  const usedRelated = relatedPer36 !== null && relatedPer36 !== undefined && share !== undefined;
+  const estimatePer36 = usedRelated ? relatedPer36 * share : priorPer36;
+  const evidenceWeight = minutes / Math.max(1, minutes + 1500);
+  const valuePer36 = estimatePer36 * evidenceWeight + priorPer36 * (1 - evidenceWeight);
+  const mpg = minutes / Math.max(1, games);
   return {
-    // Both sides of the shrinkage blend must use the same unit. The previous
-    // fallback mixed a per-game reconstruction with a per-36 prior, which
-    // inflated sparse historical seasons.
-    value: reconstructed * weight + reconstructed * (1 - weight),
+    value: (valuePer36 * mpg) / 36,
     kind: 'estimated',
-    fields: [...fields, 'prior'],
+    fields: [...fields, usedRelated && relatedField !== undefined ? relatedField : 'prior'],
   };
 }
 
@@ -232,13 +262,7 @@ function perGame(total: number | null, games: number): number | null {
 export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const totals = seasonTotals(input.stats);
   const { gamesPlayed: gp, minutes } = totals;
-  const detailPos = input.position;
-  const position =
-    detailPos === 'PG' || detailPos === 'SG'
-      ? 'G'
-      : detailPos === 'PF' || detailPos === 'SF'
-        ? 'F'
-        : 'C';
+  const position = positionGroup(input.position);
   const priors = POSITION_PRIORS[position] ??
     POSITION_PRIORS['F'] ??
     POSITION_PRIORS['G'] ?? {
@@ -281,6 +305,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const ppg = perGame(totals.points, gp);
   const rpg = perGame(totals.rebounds, gp);
   const apg = perGame(totals.assists, gp);
+  const mpg = gp > 0 ? minutes / gp : 0;
   const spg = resolveCounting(
     totals.steals,
     fieldPublished('steals', input.season),
@@ -297,6 +322,11 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     gp,
     ['blocks'],
   );
+  // When the rebound split is missing, total rebounds are still evidence:
+  // the split is estimated by sharing total rebounds with the prior shares.
+  const reboundShare =
+    priors.offensiveReboundsPer36 / (priors.offensiveReboundsPer36 + priors.defensiveReboundsPer36);
+  const rebsPer36 = rpg !== null && mpg > 0 ? (rpg * 36) / mpg : null;
   const oreb = resolveCounting(
     totals.offensiveRebounds,
     fieldPublished('offensiveRebounds', input.season),
@@ -304,6 +334,9 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     minutes,
     gp,
     ['offensiveRebounds'],
+    rebsPer36,
+    reboundShare,
+    'rebounds',
   );
   const dreb = resolveCounting(
     totals.defensiveRebounds,
@@ -312,8 +345,10 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     minutes,
     gp,
     ['defensiveRebounds'],
+    rebsPer36,
+    1 - reboundShare,
+    'rebounds',
   );
-  const mpg = gp > 0 ? minutes / gp : 0;
 
   const fga = totals.fieldGoalsAttempted;
   const fgm = totals.fieldGoalsMade;
@@ -334,25 +369,47 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
 
   const ppgNorm = ppg !== null ? ppg * (114.7 / Math.max(1, input.era.leaguePpg)) : null;
 
+  // Shooting rates shrink toward the pooled season×position-group prior with
+  // 80 equivalent prior attempts (Bayesian attempt-weighted average); the raw
+  // rates remain for anchors as historical facts. Per-field fallbacks use the
+  // documented league defaults when a cohort has no pooled observations.
+  const ratePriors = {
+    threePointPctPrior:
+      input.ratePriors?.threePointPctPrior ?? LEAGUE_RATE_DEFAULTS[position].threePointPctPrior,
+    freeThrowPctPrior:
+      input.ratePriors?.freeThrowPctPrior ?? LEAGUE_RATE_DEFAULTS[position].freeThrowPctPrior,
+  };
+  const shrunkRate = (
+    made: number | null,
+    attempted: number | null,
+    priorRate: number,
+  ): number | null => {
+    if (made === null || attempted === null || attempted <= 0) return null;
+    const clampedMade = Math.min(made, attempted);
+    return (clampedMade + priorRate * 80) / (attempted + 80);
+  };
+  const threePctShrunk = shrunkRate(tpm, tpa, ratePriors.threePointPctPrior);
+  const ftPctShrunk = shrunkRate(ftm, fta, ratePriors.freeThrowPctPrior);
+
   const weight = clamp(0.6 * Math.min(1, minutes / 1500) + 0.4 * Math.min(1, gp / 45), 0, 1);
   const blend = (raw: number, mean: number): number => raw * weight + mean * (1 - weight);
 
   const tsComponent = tsPct !== null ? (tsPct - 0.5) * 60 : 0;
-  const ftComponent = ftPct !== null ? (ftPct - 0.7) * 15 : 0;
+  const ftComponent = ftPctShrunk !== null ? (ftPctShrunk - 0.7) * 15 : 0;
 
   // Three-point skill: observed three-point shooting when available; else a
   // conservative spacing estimate from free-throw evidence (estimated).
   let threeRaw: number;
   let threeKind: ProvenanceKind;
   let threeFields: string[];
-  if (tpa !== null && tpa > 0 && threePct !== null) {
-    threeRaw = 58 + tsComponent + (threePct - 0.3) * 140 + ftComponent;
+  if (tpa !== null && tpa > 0 && threePctShrunk !== null) {
+    threeRaw = 58 + tsComponent + (threePctShrunk - 0.3) * 140 + ftComponent;
     threeKind = 'derived';
-    threeFields = ['tpm', 'tpa', 'tsPct', 'ftm', 'fta'];
-  } else if (ftPct !== null) {
+    threeFields = ['tpm', 'tpa', 'prior', 'shrink-80-attempts'];
+  } else if (ftPctShrunk !== null) {
     threeRaw = 52 + ftComponent * 1.2 - (position === 'C' ? 8 : 0);
     threeKind = 'estimated';
-    threeFields = ['ftm', 'fta'];
+    threeFields = ['ftm', 'fta', 'prior', 'shrink-80-attempts'];
   } else {
     threeRaw = 45;
     threeKind = 'estimated';
@@ -360,11 +417,13 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   }
   record('threePoint', blend(threeRaw, 54), threeKind, threeFields);
 
-  const freeThrowRaw = ftPct !== null ? 50 + (ftPct - 0.5) * 120 : 62;
-  record('freeThrow', blend(freeThrowRaw, 69), ftPct !== null ? 'derived' : 'estimated', [
-    'ftm',
-    'fta',
-  ]);
+  const freeThrowRaw = ftPctShrunk !== null ? 50 + (ftPctShrunk - 0.5) * 120 : 62;
+  record(
+    'freeThrow',
+    blend(freeThrowRaw, 69),
+    ftPctShrunk !== null ? 'derived' : 'estimated',
+    ftPctShrunk !== null ? ['ftm', 'fta', 'prior', 'shrink-80-attempts'] : ['prior'],
+  );
 
   // Scoring production is evidence of interior offense, but it is not the
   // same thing as a 100-rated rim finisher. The former coefficients pushed
@@ -418,38 +477,44 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     'offensiveRebound',
     blend(offensiveReboundRaw, 45),
     oreb.kind === 'observed' ? 'derived' : oreb.kind,
-    reboundEvidence ? ['rebounds', ...oreb.fields] : oreb.fields,
+    reboundEvidence && !oreb.fields.includes('rebounds')
+      ? ['rebounds', ...oreb.fields]
+      : oreb.fields,
   );
   record(
     'defensiveRebound',
     blend(defensiveReboundRaw, 59),
     dreb.kind === 'observed' ? 'derived' : dreb.kind,
-    reboundEvidence ? ['rebounds', ...dreb.fields] : dreb.fields,
+    reboundEvidence && !dreb.fields.includes('rebounds')
+      ? ['rebounds', ...dreb.fields]
+      : dreb.fields,
   );
 
   const stealSignal = spg.value * 9;
   const blockSignal = bpg.value * 10;
-  const impactSignal = (bpm ?? 0) * 1.4;
   const defensiveKind: ProvenanceKind =
     spg.kind === 'observed' && bpg.kind === 'observed' ? 'derived' : 'estimated';
+  // Perimeter defense is steal- and position-driven; the steals prior anchors
+  // the signal so the same steal rate means more for a guard than a big.
   const perimeterRaw =
-    55 + stealSignal + impactSignal + (position === 'G' ? 3 : position === 'C' ? -7 : 0);
-  record('perimeterDefense', blend(perimeterRaw, 54), defensiveKind, [
-    'steals',
-    'blocks',
-    'boxPlusMinus',
-  ]);
+    55 +
+    stealSignal +
+    (priors.stealsPer36 - 1.2) * 6 +
+    (position === 'G' ? 3 : position === 'C' ? -7 : 0);
+  record('perimeterDefense', blend(perimeterRaw, 54), defensiveKind, ['steals', 'position']);
+  // Interior defense is block-, rebound-, and size-driven; the blocks prior
+  // supplies the size baseline (bigs are expected to contest shots).
   const interior =
     54 +
     blockSignal +
     Math.max(0, (rpg ?? 4) - 4) * 1.2 +
-    impactSignal +
+    (priors.blocksPer36 - 0.9) * 4 +
     (position === 'C' ? 7 : position === 'F' ? 2 : -6);
   record(
     'interiorDefense',
     blend(interior, position === 'C' || position === 'F' ? 59 : 49),
     defensiveKind,
-    ['steals', 'blocks', 'boxPlusMinus'],
+    ['blocks', 'rebounds', 'position'],
   );
   record(
     'steal',
@@ -464,11 +529,17 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     bpg.fields,
   );
   const reboundDefenseSignal = rpg !== null ? Math.max(0, rpg - 8) * 0.8 : 0;
+  const foulDisciplineSignal =
+    totals.fouls !== null && minutes > 0
+      ? -Math.max(0, (totals.fouls / minutes) * 48 - 4) * 1.5
+      : 0;
+  const stockSignal = spg.value * 4 + bpg.value * 3;
+  const stockObserved = spg.kind === 'observed' || bpg.kind === 'observed';
   record(
     'defensiveIq',
-    blend(60 + (bpm ?? 0) * 2.0 + reboundDefenseSignal, 59),
-    bpm !== null ? 'derived' : 'estimated',
-    bpm !== null ? ['boxPlusMinus', 'rebounds'] : ['rebounds', 'prior'],
+    blend(60 + stockSignal + reboundDefenseSignal + foulDisciplineSignal, 59),
+    stockObserved ? 'derived' : 'estimated',
+    stockObserved ? ['steals', 'blocks', 'rebounds', 'fouls'] : ['rebounds', 'prior'],
   );
 
   // PER, usage, and minutes describe opportunity and production, not running
@@ -733,39 +804,23 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     freeThrowPct: ftPct ?? 0.75,
     threePointAttemptRate: clampUnitInterval(threePointAttemptRate) ?? 0,
     freeThrowAttemptRate: clampUnitInterval(Math.min(1, freeThrowAttemptRate)) ?? 0,
+    threePointPctShrunk: threePctShrunk,
+    freeThrowPctShrunk: ftPctShrunk,
+    threePointPctPrior: ratePriors.threePointPctPrior,
+    freeThrowPctPrior: ratePriors.freeThrowPctPrior,
+    rateShrinkAttempts: 80,
   };
 
   const v3 = deriveRatingProfile({
     ratings,
     tendencies,
     stats: input.stats,
-    position: detailPos,
+    position: input.position,
     heightInches: input.heightInches,
     playerId:
       input.playerId ??
       (typeof input.stats.playerExternalId === 'string' ? input.stats.playerExternalId : undefined),
-    artifact: input.artifact ?? {
-      schemaVersion: 1,
-      modelVersion: 'ratings-model-v3.1',
-      ratingsVersion: 'ratings-v3.4',
-      benchmarkVersion: 'ratings-benchmarks-v1',
-      seedVersion: 'ratings-seeds-v1',
-      sampleCountPerContext: 256,
-      contexts: ['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'],
-      mapping: {
-        impactPerNetRating: 0.22,
-        impactPerWinProbability: 8,
-        impactPerEfficiency: 0.12,
-        impactPerDefensiveEfficiency: 0.08,
-        impactPerTurnovers: 0.15,
-        impactPerRebound: 0.1,
-        impactPerShotQuality: 4,
-        shrinkageGames: 120,
-      },
-      distributionTargets: { exceptionalMin: 95, mvpMin: 90, rotationMax: 89 },
-      regressionGates: [],
-      generatedAt: '2026-08-03T00:00:00.000Z',
-    },
+    artifact: input.artifact ?? DEFAULT_RATINGS_MODEL_ARTIFACT,
   });
   const summaryRatings: SummaryRatings = v3.summaryRatings;
 

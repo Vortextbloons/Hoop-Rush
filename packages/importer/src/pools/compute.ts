@@ -20,6 +20,7 @@ import { basename, join } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { parsePool } from '@hoop-rush/data-contracts';
 import {
+  COHORT_NORMALIZATION_VERSION,
   DERIVATION_METHOD_VERSION,
   LINEAGE_RULE_VERSION,
   POSITION_NORMALIZATION_VERSION,
@@ -32,6 +33,7 @@ import {
   type CoverageSummary,
   type HistoricalValueProvenance,
   type Position,
+  type RatingProfile,
   type UnavailabilityReason,
 } from '@hoop-rush/data-contracts';
 import { playableSlotGroups } from '@hoop-rush/data-contracts';
@@ -94,7 +96,7 @@ export function manifestPath(): string {
 
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm10-ratings-v3.4';
+export const DATA_VERSION = 'm10-ratings-v3.5';
 /** Confidence policy v1: maximum allowed low-confidence share of required fields. */
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
@@ -574,13 +576,36 @@ export interface SummaryRatingsRaw {
   defenseRating?: unknown;
 }
 
+/**
+ * Pre-percentile raw overall score for selection scoring: the rating
+ * profile's rawOverallScore when present, else the canonical curve overall
+ * (should not happen once ratings v3.5+ packaged every candidate).
+ */
+export function rawOverallScoreFor(
+  player: Record<string, unknown>,
+  summary: SummaryRatingsRaw | undefined,
+): number {
+  const raw = (player.ratingProfile as { rawOverallScore?: unknown } | undefined)?.rawOverallScore;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return raw;
+  }
+  // Fallback: the canonical curve value, never a percentile-shifted overall.
+  return safeFloat(summary?.overallRating);
+}
+
+/**
+ * selection-v2: rating blend plus modest season-availability adjustment.
+ * The raw overall is the pre-percentile rawOverallScore from the rating
+ * profile so peak selection never depends on cohort-normalized values.
+ */
 export function selectionScore(
-  summary: SummaryRatingsRaw,
+  rawOverallScore: number,
+  offenseRating: number,
+  defenseRating: number,
   usageRate: number | null,
   teamMinutes: number,
   teamGames: number,
 ): number {
-  /* selection-v2: rating blend plus modest season-availability adjustment. */
   const usage = Math.min(Math.max(usageRate || 0, 0), 40.0);
   const mpg = Math.min(teamMinutes / Math.max(1, teamGames), 48.0);
   const availability = 0.96 + 0.04 * Math.min(Math.max(teamGames, 0) / 82, 1);
@@ -589,11 +614,7 @@ export function selectionScore(
   // creators are not buried, while retaining offense/defense as balance
   // signals for season selection.
   const raw =
-    0.6 * Number(summary.overallRating) +
-    0.25 * Number(summary.offenseRating) +
-    0.15 * Number(summary.defenseRating) +
-    0.05 * usage +
-    0.02 * mpg;
+    0.6 * rawOverallScore + 0.25 * offenseRating + 0.15 * defenseRating + 0.05 * usage + 0.02 * mpg;
   return Math.round(raw * availability * 1000) / 1000;
 }
 
@@ -612,7 +633,14 @@ export function candidateKey(candidate: Candidate): readonly number[] {
   const minutes = Math.trunc(num(stint, 'minutes'));
   const games = Math.trunc(num(stint, 'gamesPlayed'));
   return [
-    selectionScore(summary ?? {}, nullableValue(candidate.stats, 'usageRate'), minutes, games),
+    selectionScore(
+      rawOverallScoreFor(candidate.player, summary),
+      safeFloat(summary?.offenseRating),
+      safeFloat(summary?.defenseRating),
+      nullableValue(candidate.stats, 'usageRate'),
+      minutes,
+      games,
+    ),
     minutes,
     games,
     -seasonStart,
@@ -648,6 +676,108 @@ function compareKeys(a: readonly number[], b: readonly number[]): number {
     if (av < bv) return -1;
   }
   return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Global cohort Overall normalization (COHORT_NORMALIZATION_VERSION)
+// ---------------------------------------------------------------------------
+/**
+ * Minimal row shape the cohort pass needs; every PoolPlayer satisfies it.
+ * Only overallRating (summary) and the optional ratingProfile percentile
+ * fields are written — offense/defense/detailedRatings/tendencies/anchors/
+ * provenance never change.
+ */
+export interface PoolOverallRow {
+  playerId: string;
+  franchiseId: string;
+  seasonKey: string;
+  summaryRatings: { overallRating: number; offenseRating: number; defenseRating: number };
+  ratingProfile?: {
+    rawOverallScore?: number | null;
+    canonicalOverall?: number;
+    overallPercentile?: number;
+    overallCohortVersion?: string;
+  } | null;
+}
+
+export interface PoolOverallDiagnostics {
+  /** Total rows ranked and normalized. */
+  totalRowCount: number;
+  /** Rows without rawOverallScore; ranked by canonical overall, profile fields untouched. */
+  rowsWithoutRawOverall: number;
+}
+
+/**
+ * Packaged Overall for a cumulative rank fraction p (0 = best, 1 = worst).
+ * Band boundaries match the target shares 0.5/4.5/14/61/20 percent.
+ */
+export function overallBandForPercentile(p: number): number {
+  let value: number;
+  if (p < 0.005) {
+    value = 99 - (p / 0.005) * 4; // band 95-99
+  } else if (p < 0.05) {
+    value = 94 - ((p - 0.005) / 0.045) * 4; // band 90-94
+  } else if (p < 0.19) {
+    value = 89 - ((p - 0.05) / 0.14) * 4; // band 85-89
+  } else if (p < 0.8) {
+    value = 84 - ((p - 0.19) / 0.61) * 12; // band 72-84
+  } else {
+    value = 71 - ((p - 0.8) / 0.2) * 31; // band 40-71
+  }
+  return clamp(Math.round(value), 40, 99);
+}
+
+/** True when the row carries a usable pre-percentile raw overall score. */
+function hasRawOverallScore(row: PoolOverallRow): boolean {
+  const raw = row.ratingProfile?.rawOverallScore;
+  return typeof raw === 'number' && Number.isFinite(raw);
+}
+
+/** Ranking proxy: rawOverallScore, else canonicalOverall, else the summary overall. */
+function rankingProxy(row: PoolOverallRow): number {
+  if (hasRawOverallScore(row)) {
+    return row.ratingProfile?.rawOverallScore as number;
+  }
+  const canonical = row.ratingProfile?.canonicalOverall;
+  if (typeof canonical === 'number' && Number.isFinite(canonical)) {
+    return canonical;
+  }
+  return row.summaryRatings.overallRating;
+}
+
+/**
+ * Post-pass over the complete set of packaged rows: ranks every row globally
+ * by raw overall score (descending; ties break ascending by playerId, then
+ * seasonKey, then franchiseId), replaces summaryRatings.overallRating with
+ * the percentile band value, and stamps the profile percentile fields with
+ * COHORT_NORMALIZATION_VERSION. Rows without rawOverallScore are ranked by
+ * canonicalOverall and their profile fields are left untouched.
+ */
+export function normalizePoolOveralls(rows: PoolOverallRow[]): PoolOverallDiagnostics {
+  const totalRowCount = rows.length;
+  let rowsWithoutRawOverall = 0;
+  for (const row of rows) {
+    if (!hasRawOverallScore(row)) rowsWithoutRawOverall += 1;
+  }
+  const ranked = [...rows].sort((a, b) => {
+    const score = rankingProxy(b) - rankingProxy(a);
+    if (score !== 0) return score;
+    return (
+      a.playerId.localeCompare(b.playerId) ||
+      a.seasonKey.localeCompare(b.seasonKey) ||
+      a.franchiseId.localeCompare(b.franchiseId)
+    );
+  });
+  ranked.forEach((row, index) => {
+    const p = index / totalRowCount;
+    row.summaryRatings.overallRating = overallBandForPercentile(p);
+    if (hasRawOverallScore(row) && row.ratingProfile != null) {
+      row.ratingProfile.overallPercentile =
+        Math.round(((index + 1) / totalRowCount) * 10000) / 10000;
+      row.ratingProfile.overallCohortVersion = COHORT_NORMALIZATION_VERSION;
+    }
+  });
+  return { totalRowCount, rowsWithoutRawOverall };
 }
 
 export function loadBbrefIds(): Record<string, string> {
@@ -731,6 +861,8 @@ export interface PoolPlayer {
     lineageRuleVersion: string;
   };
   summaryRatings: { overallRating: number; offenseRating: number; defenseRating: number };
+  /** Ratings v3 explanation and calibration profile (raw pre-percentile overall). */
+  ratingProfile?: RatingProfile;
   detailedRatings: Record<string, number>;
   tendencies: Record<string, number>;
   anchors: Record<string, unknown>;
@@ -1162,7 +1294,9 @@ export function computePool(
         teamMinutes,
       },
       selectionScore: selectionScore(
-        summary ?? {},
+        rawOverallScoreFor(player, summary),
+        safeFloat(summary?.offenseRating),
+        safeFloat(summary?.defenseRating),
         nullableValue(stats, 'usageRate'),
         teamMinutes,
         teamGames,
@@ -1182,7 +1316,9 @@ export function computePool(
         offenseRating: safeInt(summary?.offenseRating),
         defenseRating: safeInt(summary?.defenseRating),
       },
-      ...(player.ratingProfile !== undefined ? { ratingProfile: player.ratingProfile } : {}),
+      ...(player.ratingProfile != null
+        ? { ratingProfile: player.ratingProfile as RatingProfile }
+        : {}),
       detailedRatings,
       tendencies: tendenciesOut,
       anchors: anchorsOut,
@@ -1376,6 +1512,56 @@ export function buildPoolForTarget(
   };
 }
 
+/**
+ * Cohort percentile post-pass (COHORT_NORMALIZATION_VERSION): every packaged
+ * franchise-era row is ranked globally by raw overall and its summary
+ * overallRating replaced with the percentile band value. Pools are written
+ * by workers during the build, so the pass re-reads every pool file and
+ * rewrites it before the manifest refresh — content hashes therefore always
+ * describe the normalized bytes.
+ */
+function applyOverallCohortNormalization(): Array<{
+  franchiseId: string;
+  eraId: string;
+  url: string;
+  contentHash: string;
+}> {
+  const pools: Pool[] = [];
+  for (const name of sortedJsonFiles(poolDir())) {
+    const [franchiseId, eraId] = name.slice(0, -5).split('-', 2);
+    if (franchiseId === undefined || eraId === undefined) continue;
+    try {
+      const pool = readJsonLoose(join(poolDir(), name)) as Pool;
+      if (!Array.isArray(pool.players) || pool.players.length === 0) continue;
+      pools.push(pool);
+    } catch {
+      // Unreadable pool files surface in the manifest/audit layer instead.
+    }
+  }
+  const diagnostics = normalizePoolOveralls(pools.flatMap((pool) => pool.players));
+  const rewritten: Array<{
+    franchiseId: string;
+    eraId: string;
+    url: string;
+    contentHash: string;
+  }> = [];
+  for (const pool of pools) {
+    const digest = writePool(pool);
+    rewritten.push({
+      franchiseId: pool.franchiseId,
+      eraId: pool.eraId,
+      url: `pools/${pool.franchiseId}-${pool.eraId}.json`,
+      contentHash: digest,
+    });
+  }
+  if (diagnostics.totalRowCount > 0) {
+    console.log(
+      `  [OK] overall cohort normalization (${COHORT_NORMALIZATION_VERSION}): ${String(diagnostics.totalRowCount)} rows across ${String(rewritten.length)} pools (${String(diagnostics.rowsWithoutRawOverall)} without rawOverallScore)`,
+    );
+  }
+  return rewritten;
+}
+
 export async function run(
   targets: Array<[string, string]> | null = null,
   withAssets = true,
@@ -1412,7 +1598,12 @@ export async function run(
       (entry): entry is { franchiseId: string; eraId: string; url: string; contentHash: string } =>
         entry !== null,
     );
-  updateManifest(entries);
+  const normalizedEntries = applyOverallCohortNormalization();
+  const entriesByKey = new Map<string, (typeof entries)[number]>();
+  for (const entry of [...entries, ...normalizedEntries]) {
+    entriesByKey.set(`${entry.franchiseId}/${entry.eraId}`, entry);
+  }
+  updateManifest([...entriesByKey.values()]);
   recordCoverageReport(results.map((result) => result.coverage));
   refreshPlayersIndexInManifest();
 }

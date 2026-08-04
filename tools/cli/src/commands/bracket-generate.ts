@@ -401,6 +401,48 @@ export function buildCandidateCatalog(
       details.push(`catalog ${slot.franchiseId}: ${String(players.length)} players`);
     }
   }
+
+  // Every player appears in exactly one franchise's catalog: keep the peak
+  // stint with the highest selection score and remove duplicate entries from
+  // the other catalogs. A fixed bracket opponent can only field a player
+  // once, so a player with qualifying stints on two franchises (trades)
+  // represents the franchise where their peak is best.
+  {
+    const owner = new Map<string, { franchiseId: string; score: number; seasonStart: number }>();
+    for (const candidate of candidates) {
+      for (const player of candidate.players) {
+        const seasonStart = Number.parseInt(player.seasonKey.slice(0, 4), 10);
+        const current = owner.get(player.playerId);
+        if (
+          current === undefined ||
+          player.score > current.score ||
+          (player.score === current.score &&
+            (seasonStart < current.seasonStart ||
+              (seasonStart === current.seasonStart && candidate.franchiseId < current.franchiseId)))
+        ) {
+          owner.set(player.playerId, {
+            franchiseId: candidate.franchiseId,
+            score: player.score,
+            seasonStart,
+          });
+        }
+      }
+    }
+    for (const candidate of candidates) {
+      const before = candidate.players.length;
+      candidate.players = candidate.players.filter(
+        (player) => owner.get(player.playerId)?.franchiseId === candidate.franchiseId,
+      );
+      if (candidate.players.length === 0) {
+        throw new Error(`no candidate players for franchise ${candidate.franchiseId}`);
+      }
+      if (verbose) {
+        details.push(
+          `catalog ${candidate.franchiseId}: ${String(candidate.players.length)}/${String(before)} after cross-franchise dedup`,
+        );
+      }
+    }
+  }
   return { candidates, details };
 }
 

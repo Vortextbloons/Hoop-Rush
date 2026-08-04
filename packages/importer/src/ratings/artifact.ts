@@ -10,11 +10,12 @@ import { PUBLIC_DATA } from '../config.js';
 
 /** The checked-in fallback is itself a frozen artifact, never an implicit sim. */
 export const DEFAULT_RATINGS_MODEL_ARTIFACT: RatingsModelArtifact = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   modelVersion: RATING_MODEL_VERSION,
   ratingsVersion: RATINGS_VERSION,
   benchmarkVersion: 'ratings-benchmarks-v1',
   seedVersion: 'ratings-seeds-v1',
+  confidenceTargetSamplesPerContext: 256,
   sampleCountPerContext: 256,
   contexts: ['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'],
   mapping: {
@@ -46,6 +47,11 @@ export function loadRatingsModelArtifact(
   if (parsed.data.ratingsVersion !== RATINGS_VERSION) {
     throw new Error(
       `ratings model artifact ${path} is ${parsed.data.ratingsVersion}; expected ${RATINGS_VERSION}`,
+    );
+  }
+  if (parsed.data.modelVersion !== RATING_MODEL_VERSION) {
+    throw new Error(
+      `ratings model artifact ${path} is ${parsed.data.modelVersion}; expected ${RATING_MODEL_VERSION}`,
     );
   }
   return parsed.data;

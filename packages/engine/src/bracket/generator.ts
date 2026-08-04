@@ -248,7 +248,12 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     return used;
   }
 
-  /** Band violations dominate player conflicts, then target distance. */
+  /**
+   * Band violations dominate target distance; player duplication dominates
+   * both. Duplication is a hard validity constraint (a player can appear in
+   * exactly one opponent), so its penalty must exceed any in-band distance
+   * cost, otherwise a conflict-free proposal is never swapped in.
+   */
   function proposalScore(
     proposal: Proposal,
     target: number,
@@ -261,7 +266,7 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     const pct = percentileOf(proposal.strength, population);
     const outOfBand = pct < band[0] || pct > band[1] ? 1 : 0;
     const distance = Math.abs(pct - target);
-    return { score: outOfBand * 100 + conflicts * 10 + distance, conflicts };
+    return { score: outOfBand * 100 + conflicts * 1000 + distance, conflicts };
   }
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -396,17 +401,18 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
 
   // Confirm the committed selection is clean.
   {
-    let totalConflicts = 0;
+    const conflictDetails: string[] = [];
     for (const [franchiseId, current] of selected) {
       const used = usedPlayerIds(franchiseId);
-      totalConflicts += current.proposal.players.reduce(
-        (count, p) => count + (used.has(p.playerId) ? 1 : 0),
-        0,
-      );
+      for (const player of current.proposal.players) {
+        if (used.has(player.playerId)) {
+          conflictDetails.push(`${franchiseId}:${player.playerId}`);
+        }
+      }
     }
-    if (totalConflicts > 0) {
+    if (conflictDetails.length > 0) {
       throw new Error(
-        `selection could not resolve player duplication (${String(totalConflicts)} conflicts)`,
+        `selection could not resolve player duplication (${String(conflictDetails.length)} conflicts: ${conflictDetails.join(', ')})`,
       );
     }
   }

@@ -49,7 +49,36 @@ function newAccumulator(): PairAccumulator {
 }
 
 function seedFor(playerId: string, context: string, index: number): string {
-  return fixtureSeed(`ratings-v3.4|${playerId}|${context}`, index);
+  return fixtureSeed(`${RATINGS_VERSION}|${playerId}|${context}`, index);
+}
+
+/**
+ * Calibration confidence for one context: the fraction of the confidence
+ * target reached by the actual samples used. The target is a declared
+ * artifact property, never the previous artifact's sample count.
+ */
+export function calibrationConfidence(samples: number, confidenceTarget: number): number {
+  return Math.min(1, samples / confidenceTarget);
+}
+
+/**
+ * Assemble the next artifact from the loaded one: versions advance, the
+ * actual samples used are recorded, and the confidence target carries
+ * through from the loaded artifact (never recomputed from samples).
+ */
+export function buildRatingsModelArtifact(input: {
+  artifact: RatingsModelArtifact;
+  playerAdjustments: NonNullable<RatingsModelArtifact['playerAdjustments']>;
+  samples: number;
+}): RatingsModelArtifact {
+  return ratingsModelArtifactSchema.parse({
+    ...input.artifact,
+    modelVersion: RATING_MODEL_VERSION,
+    ratingsVersion: RATINGS_VERSION,
+    confidenceTargetSamplesPerContext: input.artifact.confidenceTargetSamplesPerContext,
+    sampleCountPerContext: input.samples,
+    playerAdjustments: input.playerAdjustments,
+  });
 }
 
 function teamMetric(result: ReturnType<typeof simulateGame>, side: 'home' | 'away') {
@@ -342,10 +371,7 @@ export function calibrateRatings(args: {
             metrics.shotQuality * artifact.mapping.impactPerShotQuality,
         ),
       );
-      const confidence = Math.min(
-        1,
-        (samples * totals.length) / (artifact.sampleCountPerContext * CONTEXTS.length),
-      );
+      const confidence = calibrationConfidence(samples, artifact.confidenceTargetSamplesPerContext);
       playerAdjustments[player.playerId] = {
         adjustment: Math.round(adjustment * 1000) / 1000,
         confidence,
@@ -354,13 +380,7 @@ export function calibrateRatings(args: {
       };
     }
   }
-  const outputArtifact = ratingsModelArtifactSchema.parse({
-    ...artifact,
-    modelVersion: RATING_MODEL_VERSION,
-    ratingsVersion: RATINGS_VERSION,
-    playerAdjustments,
-    sampleCountPerContext: samples,
-  });
+  const outputArtifact = buildRatingsModelArtifact({ artifact, playerAdjustments, samples });
   writeFileSync(output, `${JSON.stringify(outputArtifact, null, 2)}\n`, 'utf8');
   return makeReport(
     'calibrate ratings',

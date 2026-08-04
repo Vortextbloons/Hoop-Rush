@@ -11,6 +11,7 @@ import {
   playersIndexSchema,
   rosterDetailsSchema,
   REQUIRED_RATING_KEYS,
+  SELECTION_SCORE_VERSION,
   unavailabilityReasonSchema,
   POSITIONS,
   POSITION_NORMALIZATION_VERSION,
@@ -402,10 +403,16 @@ function auditPoolContent(
     }
   }
 
-  // Peak reproducibility: selectionScore recomputed from packaged fields.
+  // Peak reproducibility: selectionScore recomputed from packaged fields
+  // under the current selection-score version. The raw overall is the
+  // pre-percentile rawOverallScore from the rating profile (canonical curve
+  // fallback for legacy rows without a profile).
   for (const player of pool.players) {
+    const rawOverall = player.ratingProfile?.rawOverallScore ?? player.summaryRatings.overallRating;
     const recomputed = pools.selectionScore(
-      player.summaryRatings,
+      rawOverall,
+      player.summaryRatings.offenseRating,
+      player.summaryRatings.defenseRating,
       player.stats.usageRate,
       player.eligibility.teamMinutes,
       player.eligibility.teamGames,
@@ -413,6 +420,11 @@ function auditPoolContent(
     if (Math.abs(recomputed - player.selectionScore) > 1e-9) {
       failures.push(
         `pools: ${key} ${player.displayName} selectionScore not reproducible (packaged ${String(player.selectionScore)}, recomputed ${String(recomputed)})`,
+      );
+    }
+    if (player.selectionScoreVersion !== SELECTION_SCORE_VERSION) {
+      failures.push(
+        `pools: ${key} ${player.displayName} selectionScoreVersion ${player.selectionScoreVersion} != ${SELECTION_SCORE_VERSION}`,
       );
     }
   }

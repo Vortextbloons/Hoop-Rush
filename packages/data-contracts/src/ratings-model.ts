@@ -78,9 +78,13 @@ export const calibratedImpactSchema = z.object({
 });
 export type CalibratedImpact = z.infer<typeof calibratedImpactSchema>;
 
-/** Full profile loaded only for selected players; the index keeps its compact summary. */
+/**
+ * Full profile loaded only for selected players; the index keeps its compact summary.
+ * schemaVersion 2 adds the pre-percentile raw overall score and the packaged
+ * cohort percentile fields written during pool packaging.
+ */
 export const ratingProfileSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   modelVersion: z.string().min(1).max(64),
   memberships: archetypeMembershipsSchema,
   baseScore: z.number().min(0).max(100),
@@ -88,6 +92,9 @@ export const ratingProfileSchema = z.object({
   production: productionEvidenceSchema,
   calibratedImpact: calibratedImpactSchema,
   canonicalOverall: z.number().int().min(0).max(100),
+  rawOverallScore: z.number().min(-10).max(120),
+  overallPercentile: z.number().min(0).max(1).optional(),
+  overallCohortVersion: z.string().min(1).max(64).optional(),
   offenseRating: z.number().int().min(0).max(100),
   defenseRating: z.number().int().min(0).max(100),
 });
@@ -95,11 +102,17 @@ export type RatingProfile = z.infer<typeof ratingProfileSchema>;
 
 /** Frozen inputs and gates written by the deterministic ratings calibration CLI. */
 export const ratingsModelArtifactSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   modelVersion: z.string().min(1).max(64),
   ratingsVersion: z.string().min(1).max(64),
   benchmarkVersion: z.string().min(1).max(64),
   seedVersion: z.string().min(1).max(64),
+  /**
+   * Confidence denominator: the sample count per context that yields full
+   * (1.0) calibration confidence. The generated artifact records the actual
+   * samples used under sampleCountPerContext.
+   */
+  confidenceTargetSamplesPerContext: z.number().int().positive(),
   sampleCountPerContext: z.number().int().positive(),
   contexts: z.array(z.enum(['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'])),
   mapping: z.object({
