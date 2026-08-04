@@ -398,3 +398,136 @@ export const seasonScheduleAuditReportSchema = z.object({
   pass: z.boolean(),
 });
 export type SeasonScheduleAuditReport = z.infer<typeof seasonScheduleAuditReportSchema>;
+
+/** Season Run draft command replay report (M2.1). */
+export const seasonDraftReproduceReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season draft reproduce'),
+  seed: z.string().regex(/^[0-9a-f]{16,64}$/),
+  catalogVersion: z.string().min(1).max(64),
+  commandCount: z.number().int().nonnegative(),
+  acceptedCount: z.number().int().nonnegative(),
+  rejectedCount: z.number().int().nonnegative(),
+  finalRevision: z.number().int().nonnegative(),
+  finalStatus: z.string().min(1).max(32),
+  finalDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  expectedDigest: z
+    .string()
+    .regex(/^[0-9a-f]{32}$/)
+    .nullable(),
+  /** True when the final digest matches the expected digest. */
+  identical: z.boolean(),
+  rolls: z.array(
+    z.object({
+      participantId: z.string().min(1).max(64),
+      franchiseId: z.string().min(1).max(64),
+      eraId: z.string().min(1).max(24),
+      attemptIndex: z.number().int().nonnegative(),
+      usable: z.boolean(),
+    }),
+  ),
+  claims: z.array(
+    z.object({
+      participantId: z.string().min(1).max(64),
+      franchiseId: z.string().min(1).max(64),
+      eraId: z.string().min(1).max(24),
+    }),
+  ),
+  picks: z.array(
+    z.object({
+      participantId: z.string().min(1).max(64),
+      round: z.number().int().min(1).max(10),
+      playerVersionId: z.string().min(1).max(64),
+    }),
+  ),
+  rejections: z.array(
+    z.object({
+      commandId: z.string().min(1).max(64),
+      errorCode: z.string().min(1).max(64),
+      message: z.string().min(1).max(512),
+    }),
+  ),
+  divergences: z.array(z.string().min(1)),
+  pass: z.boolean(),
+});
+export type SeasonDraftReproduceReport = z.infer<typeof seasonDraftReproduceReportSchema>;
+
+/** Season Run AI roster generation report (M2.1). */
+export const seasonRostersGenerateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season rosters generate'),
+  seed: z.string().regex(/^[0-9a-f]{16,64}$/),
+  teams: z.number().int().positive(),
+  ownershipRows: z.number().int().positive(),
+  digest: z.string().regex(/^[0-9a-f]{32}$/),
+  diagnostics: z.object({
+    teamsGenerated: z.number().int().nonnegative(),
+    teamsRepaired: z.number().int().nonnegative(),
+    backtracks: z.number().int().nonnegative(),
+    nodesVisited: z.number().int().nonnegative(),
+  }),
+  wrote: z.boolean(),
+  outPath: z.string().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonRostersGenerateReport = z.infer<typeof seasonRostersGenerateReportSchema>;
+
+/** Season Run roster audit report (M2.1). */
+export const seasonRostersAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season rosters audit'),
+  input: z.string().min(1),
+  teams: z.number().int().positive(),
+  ownershipRows: z.number().int().positive(),
+  quotaFailures: z.number().int().nonnegative(),
+  identityFailures: z.number().int().nonnegative(),
+  legalityFailures: z.number().int().nonnegative(),
+  roleCoverageFailures: z.number().int().nonnegative(),
+  rotationFailures: z.number().int().nonnegative(),
+  versionFailures: z.number().int().nonnegative(),
+  digestVerified: z.boolean(),
+  auditFailures: z.number().int().nonnegative(),
+  pass: z.boolean(),
+});
+export type SeasonRostersAuditReport = z.infer<typeof seasonRostersAuditReportSchema>;
+
+/** One distribution entry in the calibration report. */
+const distributionEntrySchema = z.object({
+  median: z.number().min(0).max(100),
+  range: z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]),
+  min: z.number().min(0).max(100),
+  max: z.number().min(0).max(100),
+  sample: z.number().int().nonnegative(),
+});
+
+/** Season Run AI roster calibration report (M2.1). */
+export const seasonRostersCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season rosters calibrate'),
+  calibrationSeeds: z.number().int().positive(),
+  validationSeeds: z.number().int().positive(),
+  failures: z.number().int().nonnegative(),
+  repairRate: z.number().min(0).max(1),
+  backtrackRate: z.number().min(0).max(1),
+  durationMs: z.number().nonnegative(),
+  bands: z.object({
+    contender: distributionEntrySchema,
+    playoff: distributionEntrySchema,
+    average: distributionEntrySchema,
+    weaker: distributionEntrySchema,
+  }),
+  identities: z.record(z.string().min(1), distributionEntrySchema),
+  gates: z.object({
+    orderedBandMedians: z.boolean(),
+    quotas: z.boolean(),
+    roleCoverage: z.boolean(),
+    identities: z.boolean(),
+    zeroIllegal: z.boolean(),
+    heldOutPassShare: z.number().min(0).max(1),
+    heldOutPass: z.boolean(),
+  }),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonRostersCalibrateReport = z.infer<typeof seasonRostersCalibrateReportSchema>;

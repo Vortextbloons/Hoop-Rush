@@ -17,6 +17,7 @@ import {
   type CompletedRunIndex,
   type StoredRunRecord,
 } from '../schemas/run-record.js';
+import type { StoredSeasonDraft } from '../schemas/season-draft-record.js';
 
 /**
  * Concrete IndexedDB challenge repository (spec/04, spec/07 reduced reuse).
@@ -30,12 +31,13 @@ import {
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 
-class HoopRushDatabase extends Dexie {
+export class HoopRushDatabase extends Dexie {
   active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
   activeGames!: Table<ActiveGameRow, [string, number]>;
   completed!: EntityTable<StoredRunRecord, 'recordId'>;
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
   classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
+  seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
 
   constructor() {
     super('hoop-rush-saves');
@@ -82,6 +84,12 @@ class HoopRushDatabase extends Dexie {
     // v4 is additive (one new table). The checkpoint fields variant and
     // classicDraft are optional, so existing saves (v1 split rows, v2 full
     // records, v3 checkpoints) all remain valid under v4.
+    this.version(5).stores({
+      seasonDrafts: 'recordId',
+    });
+    // v5 is additive (one new self-contained table for the M2.1 Season draft).
+    // Older saves keep every existing table and row untouched, so no upgrade
+    // hook is needed: v5 only creates the new table in the database.
   }
 }
 

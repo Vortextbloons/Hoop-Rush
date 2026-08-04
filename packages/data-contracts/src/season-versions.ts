@@ -7,8 +7,13 @@
  * or method changes. Runtime boundaries never infer a version from content.
  */
 
-/** Season Run persistence snapshot schema layout. */
-export const SEASON_RUN_SCHEMA_VERSION = 1;
+/**
+ * Season Run persistence snapshot schema layout. Bumped to 2 by M2.1: the
+ * run now freezes completed draft facts, AI assignments, generated rotations,
+ * the generation audit summary, and the new material versions below. The
+ * M2.0 schema v1 data is development scaffolding, not a migration target.
+ */
+export const SEASON_RUN_SCHEMA_VERSION = 2;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -35,6 +40,32 @@ export const SEASON_SEED_DERIVATION_VERSION = 'season-seeds-v1';
 
 /** Deterministic playerVersionId derivation version. */
 export const PLAYER_VERSION_ID_VERSION = 'player-version-id-v1';
+
+/** M2.1 ten-round human Season Run draft state machine and commands. */
+export const SEASON_DRAFT_VERSION = 'season-draft-v1';
+
+/** Pure ten-player Season Run roster legality rule set (game minimums). */
+export const SEASON_ROSTER_RULES_VERSION = 'season-roster-v1';
+
+/** Deterministic AI league roster generation and repair/backtracking rules. */
+export const SEASON_ROSTER_GENERATION_VERSION = 'roster-generation-v1';
+
+/** AI decision identities, strength bands, and roster evaluation weights. */
+export const SEASON_AI_VERSION = 'season-ai-v1';
+
+/** M2.1 initial rotation contract (32/16 minute targets, closing five). */
+export const SEASON_ROTATION_VERSION = 'season-rotation-v1';
+
+/** Frozen calibration cohort targets for AI roster strength and coverage. */
+export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v1';
+
+/**
+ * Committed authoring seed of the packaged `season/draft-catalog.json`-driven
+ * M2.1 draft fixture. Replaying the committed draft commands with this root
+ * seed must reproduce the committed `season-run.json` and every command record
+ * byte-for-byte.
+ */
+export const SEASON_COMMITTED_DRAFT_SEED = 'd00d2026a1b2c3d4e5f60718293a4b5c6';
 
 /** Exactly 30 franchises in a Season Run league. */
 export const SEASON_TEAM_COUNT = 30;

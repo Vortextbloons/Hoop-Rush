@@ -1,7 +1,9 @@
 /**
- * Generates the committed Season Run assets (spec/2.0 M2.0): the frozen
- * league artifact, the complete 30-team fixture under `src/fixtures/`, and
- * the manifest `season` hash references. Run with
+ * Generates the committed Season Run assets (spec/2.0 M2.0/M2.1): the frozen
+ * league artifact, the complete 30-team fixture under `src/fixtures/` built
+ * through the authoritative ten-player draft and AI league generation, the
+ * committed draft-commands reproduction fixture, and the manifest `season`
+ * hash references. Run with
  * `pnpm --filter @hoop-rush/cli gen-season-assets` AFTER the schedule
  * artifact exists (`hoop-rush season schedule generate --out
  * apps/web/static/data/season/schedule.json`); the script refuses to touch
@@ -14,11 +16,32 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  SEASON_AI_VERSION,
+  SEASON_COMMITTED_DRAFT_SEED,
   SEASON_COMMITTED_SCHEDULE_SEED,
+  SEASON_DRAFT_VERSION,
+  SEASON_ROSTER_GENERATION_VERSION,
+  SEASON_ROSTER_RULES_VERSION,
+  SEASON_ROSTER_TARGETS_VERSION,
+  SEASON_ROTATION_VERSION,
+  seasonDraftCatalogSchema,
+  seasonDraftStateSchema,
   seasonLeagueSchema,
+  seasonRunSchema,
   seasonScheduleSchema,
+  type SeasonDraftCommand,
+  type SeasonDraftState,
+  type SeasonLeague,
+  type SeasonLeagueGenerationResult,
+  type SeasonRun,
+  type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
-import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
+import {
+  applySeasonDraftCommand,
+  generateAiLeague,
+  seasonDraftStateDigest,
+} from '@hoop-rush/engine';
+import { buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
@@ -30,43 +53,419 @@ function sha256Hex(content: Buffer | string): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
-const league = buildSeasonLeague();
-const leagueJson = JSON.stringify(league, null, 2);
-mkdirSync(SEASON_DIR, { recursive: true });
-writeFileSync(resolve(SEASON_DIR, 'league.json'), `${leagueJson}\n`);
-console.log(`wrote ${resolve(SEASON_DIR, 'league.json')}`);
+function readJson(path: string): unknown {
+  return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+}
 
-const schedulePath = resolve(SEASON_DIR, 'schedule.json');
-if (!existsSync(schedulePath)) {
-  console.log(`SKIP manifest update: ${schedulePath} missing (run season schedule generate first)`);
-} else {
+function cmd(
+  commandId: string,
+  expectedRevision: number,
+  payload: SeasonDraftCommand['payload'],
+): SeasonDraftCommand {
+  return { commandId, expectedRevision, payload };
+}
+
+/**
+ * Deterministic fixture pick policy: the feasible candidate in the revealed
+ * pool with the highest summary overall rating. Returns the accepted command
+ * so the reproduction fixture records it.
+ */
+function pickBest(
+  state: SeasonDraftState,
+  catalog: ReturnType<typeof seasonDraftCatalogSchema.parse>,
+  commandId: string,
+): { state: SeasonDraftState; command: SeasonDraftCommand } {
+  const reveal = state.currentReveal;
+  if (reveal === null) throw new Error('no reveal for the fixture pick');
+  const last = reveal.attempts[reveal.attempts.length - 1];
+  if (!last?.usable) throw new Error('revealed pool is not usable');
+  const owned = new Set(state.picks.map((p) => p.playerVersionId));
+  const candidates = catalog.candidates
+    .filter(
+      (c) =>
+        c.franchiseId === last.franchiseId &&
+        c.eraId === last.eraId &&
+        !owned.has(c.playerVersionId),
+    )
+    .sort(
+      (a, b) =>
+        b.summaryRatings.overallRating - a.summaryRatings.overallRating ||
+        a.playerVersionId.localeCompare(b.playerVersionId),
+    );
+  for (const candidate of candidates) {
+    const command = cmd(commandId, state.revision, {
+      kind: 'select-draft-player',
+      participantId: reveal.participantId,
+      playerVersionId: candidate.playerVersionId,
+    });
+    const result = applySeasonDraftCommand(state, catalog, command, {
+      generate: (input) => generateAiLeague(input),
+    });
+    if (result.record.status === 'accepted') {
+      if (result.state === null) throw new Error('fixture pick produced no state');
+      return { state: result.state, command };
+    }
+  }
+  throw new Error('fixture pick found no legal candidate');
+}
+
+/** Plays the committed one-human draft to completion through real commands. */
+function playCommittedDraft(
+  catalog: ReturnType<typeof seasonDraftCatalogSchema.parse>,
+  league: SeasonLeague,
+): {
+  state: SeasonDraftState;
+  commands: SeasonDraftCommand[];
+  generation: SeasonLeagueGenerationResult;
+} {
+  const commands: SeasonDraftCommand[] = [];
+  let state: SeasonDraftState | null = null;
+  let sequence = 0;
+  const apply = (command: SeasonDraftCommand): void => {
+    const result = applySeasonDraftCommand(state, catalog, command, {
+      generate: (input) => generateAiLeague(input),
+    });
+    if (result.record.status !== 'accepted' || result.state === null) {
+      const message =
+        result.record.status === 'rejected' ? result.record.message : 'no state produced';
+      throw new Error(`fixture command ${command.commandId} rejected: ${message}`);
+    }
+    commands.push(command);
+    state = result.state;
+  };
+  apply(
+    cmd('fixture-create', 0, {
+      kind: 'create-season-draft',
+      runId: 'fixture-season-run-1',
+      rootSeed: SEASON_COMMITTED_DRAFT_SEED,
+      league,
+      humanParticipantIds: ['fixture-human'],
+      catalogVersion: SEASON_DRAFT_VERSION,
+    }),
+  );
+  while (state !== null && state.status === 'drafting' && state.currentTurnParticipantId !== null) {
+    const pid = state.currentTurnParticipantId;
+    apply(
+      cmd(`fixture-reveal-${String(sequence)}`, state.revision, {
+        kind: 'reveal-draft-roll',
+        participantId: pid,
+      }),
+    );
+    const reveal = state.currentReveal;
+    const last = reveal?.attempts[reveal.attempts.length - 1];
+    if (!last) throw new Error('no reveal attempts');
+    apply(
+      cmd(`fixture-claim-${String(sequence)}`, state.revision, {
+        kind: 'claim-draft-pool',
+        participantId: pid,
+        franchiseId: last.franchiseId,
+        eraId: last.eraId,
+      }),
+    );
+    const picked = pickBest(state, catalog, `fixture-pick-${String(sequence)}`);
+    commands.push(picked.command);
+    state = picked.state;
+    sequence += 1;
+  }
+  if (state === null) throw new Error('fixture draft produced no state');
+  const finalState: SeasonDraftState = state;
+  apply(cmd('fixture-finalize', finalState.revision, { kind: 'finalize-human-rosters' }));
+  const humanRosters = finalState.participants.map((participant) => ({
+    franchiseId: participant.franchiseId,
+    playerVersionIds: finalState.picks
+      .filter((pick) => pick.participantId === participant.participantId)
+      .map((pick) => pick.playerVersionId),
+  }));
+  const generation = generateAiLeague({
+    seed: SEASON_COMMITTED_DRAFT_SEED,
+    catalog,
+    league,
+    humanFranchiseIds: humanRosters.map((roster) => roster.franchiseId),
+    humanRosters,
+    targets: null,
+  });
+  apply(cmd('fixture-generate', state.revision, { kind: 'generate-ai-league' }));
+  return { state, commands, generation };
+}
+
+/** Builds the v2 Season Run snapshot from the committed draft + generation. */
+function buildRun(
+  schedule: SeasonSchedule,
+  league: SeasonLeague,
+  draft: SeasonDraftState,
+  generation: SeasonLeagueGenerationResult,
+): SeasonRun {
+  const humanFranchiseIds = draft.participants.map((p) => p.franchiseId);
+  const correctedLeague: SeasonLeague = {
+    ...league,
+    teams: league.teams.map((team) => ({
+      ...team,
+      control: humanFranchiseIds.includes(team.franchiseId) ? 'human' : 'ai',
+    })),
+  };
+  const run: SeasonRun = {
+    schemaVersion: 2,
+    runId: 'fixture-season-run-1',
+    rootSeed: SEASON_COMMITTED_DRAFT_SEED,
+    versions: {
+      runSchemaVersion: 2,
+      leagueVersion: league.leagueVersion,
+      scheduleVersion: schedule.scheduleVersion,
+      scheduleFormulaVersion: schedule.formulaVersion,
+      standingsVersion: 'standings-v1',
+      postseasonVersion: 'postseason-v1',
+      seedDerivationVersion: 'season-seeds-v1',
+      playerVersionIdVersion: 'player-version-id-v1',
+      draftVersion: SEASON_DRAFT_VERSION,
+      rosterRulesVersion: SEASON_ROSTER_RULES_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
+      aiVersion: SEASON_AI_VERSION,
+      rotationVersion: SEASON_ROTATION_VERSION,
+      rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
+    },
+    league: correctedLeague,
+    rosters: generation.rosters,
+    ownership: generation.ownership,
+    schedule: {
+      leagueVersion: schedule.leagueVersion,
+      scheduleVersion: schedule.scheduleVersion,
+      formulaVersion: schedule.formulaVersion,
+      generationSeed: schedule.generationSeed,
+      contentHash: sha256Hex(`${JSON.stringify(schedule)}\n`),
+    },
+    games: schedule.games.map((game) => ({
+      gameId: game.gameId,
+      round: game.round,
+      homeFranchiseId: game.homeFranchiseId,
+      awayFranchiseId: game.awayFranchiseId,
+      status: 'scheduled' as const,
+      homeScore: null,
+      awayScore: null,
+      forfeitLoserFranchiseId: null,
+    })),
+    standings: {
+      schemaVersion: 1,
+      standingsVersion: 'standings-v1',
+      rows: correctedLeague.teams.map((team) => ({
+        franchiseId: team.franchiseId,
+        wins: 0,
+        losses: 0,
+        gamesPlayed: 0,
+        homeWins: 0,
+        homeLosses: 0,
+        awayWins: 0,
+        awayLosses: 0,
+        conferenceWins: 0,
+        conferenceLosses: 0,
+        divisionWins: 0,
+        divisionLosses: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        headToHead: correctedLeague.teams
+          .filter((other) => other.franchiseId !== team.franchiseId)
+          .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
+      })),
+    },
+    cursor: { schemaVersion: 1, completedRounds: 0 },
+    postseason: {
+      schemaVersion: 1,
+      postseasonVersion: 'postseason-v1',
+      seed: SEASON_COMMITTED_DRAFT_SEED,
+      playIn: {
+        east: {
+          conference: 'east',
+          ranking: null,
+          games: {
+            sevenEight: {
+              gameId: 'seven-eight',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+            nineTen: {
+              gameId: 'nine-ten',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+            final: {
+              gameId: 'final',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+          },
+          playoffSeeds: null,
+        },
+        west: {
+          conference: 'west',
+          ranking: null,
+          games: {
+            sevenEight: {
+              gameId: 'seven-eight',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+            nineTen: {
+              gameId: 'nine-ten',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+            final: {
+              gameId: 'final',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+          },
+          playoffSeeds: null,
+        },
+      },
+      bracket: null,
+      championFranchiseId: null,
+    },
+    draft: {
+      draftVersion: SEASON_DRAFT_VERSION,
+      participants: draft.participants.map((participant) => ({
+        participantId: participant.participantId,
+        franchiseId: participant.franchiseId,
+        rolls: draft.rolls.map((roll) => ({
+          franchiseId: roll.franchiseId,
+          eraId: roll.eraId,
+          attemptIndex: roll.attemptIndex,
+          usable: roll.usable,
+        })),
+        claims: draft.claims
+          .filter((claim) => claim.participantId === participant.participantId)
+          .map((claim) => ({
+            franchiseId: claim.franchiseId,
+            eraId: claim.eraId,
+          })),
+        picks: draft.picks
+          .filter((pick) => pick.participantId === participant.participantId)
+          .map((pick) => ({
+            round: pick.round,
+            playerVersionId: pick.playerVersionId,
+            franchiseId: pick.franchiseId,
+            eraId: pick.eraId,
+          })),
+      })),
+    },
+    aiAssignments: generation.aiAssignments,
+    rotations: generation.rotations,
+    generationAudit: {
+      seed: SEASON_COMMITTED_DRAFT_SEED,
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
+      rotationVersion: SEASON_ROTATION_VERSION,
+      rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
+      digest: generation.digest,
+      diagnostics: generation.diagnostics,
+    },
+    evaluations: generation.evaluations,
+  };
+  return seasonRunSchema.parse(run);
+}
+
+function main(): void {
+  const league = seasonLeagueSchema.parse(readJson(resolve(SEASON_DIR, 'league.json')));
+  const leagueJson = JSON.stringify(league, null, 2);
+  mkdirSync(SEASON_DIR, { recursive: true });
+  writeFileSync(resolve(SEASON_DIR, 'league.json'), `${leagueJson}\n`);
+
+  const schedulePath = resolve(SEASON_DIR, 'schedule.json');
+  if (!existsSync(schedulePath)) {
+    console.log(
+      `SKIP fixture regeneration: ${schedulePath} missing (run season schedule generate first)`,
+    );
+    return;
+  }
   const scheduleBytes = readFileSync(schedulePath);
   const schedule = seasonScheduleSchema.parse(JSON.parse(scheduleBytes.toString('utf8')));
-  const fixture = buildSeasonRunFixture({
-    schedule,
-    scheduleContentHash: sha256Hex(scheduleBytes),
-  });
+  const catalog = seasonDraftCatalogSchema.parse(
+    readJson(resolve(SEASON_DIR, 'draft-catalog.json')),
+  );
+
+  const { state, commands, generation } = playCommittedDraft(catalog, league);
+  const fixture = buildRun(schedule, league, state, generation);
   mkdirSync(FIXTURES_DIR, { recursive: true });
   writeFileSync(resolve(FIXTURES_DIR, 'season-run.json'), `${JSON.stringify(fixture, null, 2)}\n`);
   console.log(`wrote ${resolve(FIXTURES_DIR, 'season-run.json')}`);
 
-  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as {
-    season?: {
-      league?: { url?: string; contentHash?: string };
-      schedule?: { url?: string; contentHash?: string };
-    };
+  const finalDigest = seasonDraftStateDigest(state);
+  const reproduceFixture = {
+    schemaVersion: 1,
+    command: 'season draft reproduce',
+    seed: SEASON_COMMITTED_DRAFT_SEED,
+    catalogVersion: SEASON_DRAFT_VERSION,
+    initialState: null,
+    commands,
+    expected: { finalDigest, finalRevision: state.revision },
   };
-  const leagueHash = sha256Hex(`${leagueJson}\n`);
-  const scheduleHash = sha256Hex(scheduleBytes);
-  manifest.season = {
-    league: { url: 'season/league.json', contentHash: leagueHash },
-    schedule: { url: 'season/schedule.json', contentHash: scheduleHash },
+  writeFileSync(
+    resolve(FIXTURES_DIR, 'season-draft-commands.json'),
+    `${JSON.stringify(reproduceFixture, null, 2)}\n`,
+  );
+  console.log(
+    `wrote ${resolve(FIXTURES_DIR, 'season-draft-commands.json')} (${String(commands.length)} commands, digest ${finalDigest})`,
+  );
+
+  const finalizedState = seasonDraftStateSchema.parse(state);
+  writeFileSync(
+    resolve(FIXTURES_DIR, 'season-draft-finalized.json'),
+    `${JSON.stringify(finalizedState, null, 2)}\n`,
+  );
+  console.log(`wrote ${resolve(FIXTURES_DIR, 'season-draft-finalized.json')}`);
+
+  // Legacy builders stay available for tests; the committed fixture now
+  // reflects the real pipeline.
+  void buildSeasonRunFixture;
+  void seasonDraftStateSchema;
+
+  const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as {
+    season?: Record<string, { url?: string; contentHash?: string }>;
+  };
+  if (manifest.season === undefined) {
+    console.log('SKIP manifest update: season section missing');
+    return;
+  }
+  manifest.season.league = { url: 'season/league.json', contentHash: sha256Hex(`${leagueJson}\n`) };
+  manifest.season.schedule = { url: 'season/schedule.json', contentHash: sha256Hex(scheduleBytes) };
+  const draftCatalogBytes = readFileSync(resolve(SEASON_DIR, 'draft-catalog.json'));
+  manifest.season.draftCatalog = {
+    url: 'season/draft-catalog.json',
+    contentHash: sha256Hex(draftCatalogBytes),
   };
   writeFileSync(MANIFEST_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
-  console.log(`wrote ${MANIFEST_PATH} (league ${leagueHash}, schedule ${scheduleHash})`);
-
+  console.log(`manifest season hashes updated (league, schedule, draftCatalog)`);
   console.log(`schedule schema check: ok; seed ${SEASON_COMMITTED_SCHEDULE_SEED}`);
+  console.log(`draft seed ${SEASON_COMMITTED_DRAFT_SEED} · final digest ${finalDigest}`);
 }
-console.log(
-  `league schema check: ${seasonLeagueSchema.safeParse(league).success ? 'ok' : 'FAILED'}`,
-);
+
+main();

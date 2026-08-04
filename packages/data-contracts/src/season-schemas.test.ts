@@ -8,6 +8,16 @@ import {
   seasonRunSchema,
   seasonScheduleSchema,
   seasonStandingsSchema,
+  seasonDraftCatalogSchema,
+  seasonDraftStateSchema,
+  seasonDraftCommandSchema,
+  seasonDraftCommandRecordSchema,
+  seasonRotationSchema,
+  seasonAiAssignmentSchema,
+  seasonGenerationDiagnosticsSchema,
+  seasonLeagueGenerationResultSchema,
+  seasonRosterTargetsSchema,
+  seasonDraftRejectedRecordSchema,
   type SeasonGame,
   type SeasonLeague,
   type SeasonPostseasonState,
@@ -214,11 +224,11 @@ function buildRun(): SeasonRun {
     })),
   }));
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: 'fixture-run-1',
     rootSeed: SEED,
     versions: {
-      runSchemaVersion: 1,
+      runSchemaVersion: 2,
       leagueVersion: 'league-v1',
       scheduleVersion: 'schedule-v1',
       scheduleFormulaVersion: 'schedule-formula-v1',
@@ -226,6 +236,12 @@ function buildRun(): SeasonRun {
       postseasonVersion: 'postseason-v1',
       seedDerivationVersion: 'season-seeds-v1',
       playerVersionIdVersion: 'player-version-id-v1',
+      draftVersion: 'season-draft-v1',
+      rosterRulesVersion: 'season-roster-v1',
+      rosterGenerationVersion: 'roster-generation-v1',
+      aiVersion: 'season-ai-v1',
+      rotationVersion: 'season-rotation-v1',
+      rosterTargetsVersion: 'roster-targets-v1',
     },
     league,
     rosters,
@@ -268,10 +284,134 @@ function buildRun(): SeasonRun {
     },
     cursor: { schemaVersion: 1, completedRounds: 0 },
     postseason: buildPostseason(SEED),
+    draft: {
+      draftVersion: 'season-draft-v1',
+      participants: [
+        {
+          participantId: 'p1',
+          franchiseId: 'hawks',
+          rolls: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
+          claims: [{ franchiseId: 'lakers', eraId: '1990s' }],
+          picks: [
+            {
+              round: 1,
+              playerVersionId: `pv-${'0'.repeat(32)}`,
+              franchiseId: 'lakers',
+              eraId: '1990s',
+            },
+          ],
+        },
+      ],
+    },
+    aiAssignments: league.teams.map((team, index) => ({
+      franchiseId: team.franchiseId,
+      band:
+        index < 4
+          ? ('contender' as const)
+          : index < 12
+            ? ('playoff' as const)
+            : index < 22
+              ? ('average' as const)
+              : ('weaker' as const),
+      identity:
+        index < 5
+          ? ('star-chaser' as const)
+          : index < 10
+            ? ('depth-builder' as const)
+            : index < 15
+              ? ('defense-first' as const)
+              : index < 20
+                ? ('shooting-first' as const)
+                : index < 25
+                  ? ('continuity' as const)
+                  : ('active-trader' as const),
+    })),
+    rotations: league.teams.map((team, teamIndex) => {
+      const players = rosters[teamIndex]?.players;
+      if (!players) throw new Error('missing roster');
+      const ids = players.map((p) => p.playerVersionId);
+      if (ids.length !== 10) throw new Error('roster size');
+      return {
+        franchiseId: team.franchiseId,
+        starters: ids.slice(0, 5),
+        benchOrder: ids.slice(5),
+        targetMinutes: [
+          ...ids.slice(0, 5).map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
+          ...ids.slice(5).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
+        ],
+        closingFive: ids.slice(0, 5),
+        rotationVersion: 'season-rotation-v1',
+      };
+    }),
+    generationAudit: {
+      seed: SEED,
+      aiVersion: 'season-ai-v1',
+      rosterGenerationVersion: 'roster-generation-v1',
+      rotationVersion: 'season-rotation-v1',
+      rosterTargetsVersion: 'roster-targets-v1',
+      digest: '0'.repeat(32),
+      diagnostics: {
+        seed: SEED,
+        aiVersion: 'season-ai-v1',
+        rosterGenerationVersion: 'roster-generation-v1',
+        teamsGenerated: 29,
+        teamsRepaired: 0,
+        backtracks: 0,
+        nodesVisited: 29,
+        nodeBudget: 100000,
+        failedTeams: [],
+        unmetConstraints: [],
+      },
+    },
+    evaluations: league.teams.map((team, index) => ({
+      franchiseId: team.franchiseId,
+      band:
+        index < 4
+          ? ('contender' as const)
+          : index < 12
+            ? ('playoff' as const)
+            : index < 22
+              ? ('average' as const)
+              : ('weaker' as const),
+      identity:
+        index < 5
+          ? ('star-chaser' as const)
+          : index < 10
+            ? ('depth-builder' as const)
+            : index < 15
+              ? ('defense-first' as const)
+              : index < 20
+                ? ('shooting-first' as const)
+                : index < 25
+                  ? ('continuity' as const)
+                  : ('active-trader' as const),
+      strengthScore: 60,
+      roleScores: {
+        'primary-creation': 60,
+        'secondary-creation': 60,
+        'perimeter-shooting': 60,
+        'rim-finishing-interior-scoring': 60,
+        'perimeter-defense': 60,
+        'interior-defense': 60,
+        'offensive-rebounding': 60,
+        'defensive-rebounding': 60,
+      },
+      rolesCovered: [
+        'primary-creation',
+        'secondary-creation',
+        'perimeter-shooting',
+        'rim-finishing-interior-scoring',
+        'perimeter-defense',
+        'interior-defense',
+        'offensive-rebounding',
+        'defensive-rebounding',
+      ],
+      overallReport: 80,
+    })),
   };
 }
 
-function roundTrip<T>(schema: { parse: (input: unknown) => T }, value: T): T {
+function roundTrip<T>(schema: { parse: (input: unknown) => T }, value: unknown): T {
   return schema.parse(JSON.parse(JSON.stringify(value)));
 }
 
@@ -883,5 +1023,409 @@ describe('season seed derivation', () => {
     expect(playerVersionId('p-synth-1', 'lakers', '1990s', '1995-96')).toBe(
       'pv-345baf6811b5d914c163685a20974538',
     );
+  });
+});
+
+describe('season draft catalog schema (M2.1)', () => {
+  function buildCatalog() {
+    const candidate = (n: number, positions: string[]) => ({
+      playerVersionId: `pv-${String(n).padStart(32, '0')}`,
+      playerId: `p-${String(n)}`,
+      franchiseId: 'lakers',
+      eraId: '1990s',
+      seasonKey: '1995-96',
+      displayName: `Candidate ${String(n)}`,
+      playerExternalId: '101',
+      positions: {
+        primary: 'SG',
+        secondary: [],
+        playable: positions,
+        normalizationVersion: 'position-v3',
+      },
+      heightInches: 79,
+      weightLbs: 215,
+      summaryRatings: { overallRating: 80, offenseRating: 82, defenseRating: 74 },
+      detailedRatings: {
+        insideScoring: 70,
+        closeShot: 68,
+        midrange: 66,
+        threePoint: 62,
+        freeThrow: 74,
+        ballHandling: 70,
+        passing: 70,
+        offensiveIq: 70,
+        offensiveRebound: 60,
+        defensiveRebound: 65,
+        perimeterDefense: 62,
+        interiorDefense: 62,
+        steal: 60,
+        block: 60,
+        defensiveIq: 62,
+        speed: 70,
+        strength: 65,
+        vertical: 66,
+      },
+      tendencies: {
+        usageRate: 20,
+        passRate: 30,
+        shotRate: 25,
+        driveRate: 18,
+        postUpRate: 5,
+        rimFrequency: 30,
+        shortMidFrequency: 20,
+        longMidFrequency: 14,
+        cornerThreeFrequency: 8,
+        aboveBreakThreeFrequency: 12,
+        threePointRate: 20,
+        freeThrowRate: 22,
+        turnoverRate: 12,
+        isolationRate: 10,
+        pickAndRollBallHandlerRate: 25,
+        pickAndRollRollManRate: 10,
+        spotUpRate: 20,
+        transitionRate: 15,
+        cutRate: 10,
+        foulRate: 2,
+        stealAttemptRate: 8,
+        blockAttemptRate: 10,
+        crashOffensiveGlassRate: 12,
+      },
+    });
+    const candidates = [candidate(1, ['PG']), candidate(2, ['SG']), candidate(3, ['SF'])];
+    return {
+      schemaVersion: 1,
+      catalogVersion: 'season-draft-v1',
+      dataVersion: 'm10-ratings-v3.4',
+      ratingsVersion: 'ratings-v3.4',
+      positionNormalizationVersion: 'position-v3',
+      playerVersionIdVersion: 'player-version-id-v1',
+      pools: [
+        {
+          franchiseId: 'lakers',
+          eraId: '1990s',
+          playerVersionIds: candidates.map((c) => c.playerVersionId),
+        },
+      ],
+      candidates,
+    };
+  }
+
+  it('round-trips a valid catalog', () => {
+    const catalog = roundTrip(seasonDraftCatalogSchema, buildCatalog());
+    expect(catalog.pools).toHaveLength(1);
+    expect(catalog.candidates).toHaveLength(3);
+  });
+
+  it('rejects wrong catalog and identity versions', () => {
+    expect(() =>
+      seasonDraftCatalogSchema.parse({ ...buildCatalog(), catalogVersion: 'season-draft-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonDraftCatalogSchema.parse({ ...buildCatalog(), playerVersionIdVersion: 'pv-v2' }),
+    ).toThrow();
+  });
+
+  it('rejects duplicate candidate version ids', () => {
+    const catalog = buildCatalog();
+    const duplicated = [...catalog.candidates, catalog.candidates[0]];
+    expect(() => seasonDraftCatalogSchema.parse({ ...catalog, candidates: duplicated })).toThrow();
+  });
+});
+
+describe('season draft state schema (M2.1)', () => {
+  const baseState = {
+    schemaVersion: 1,
+    draftVersion: 'season-draft-v1',
+    runId: 'run-1',
+    rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+    league: buildLeague(),
+    catalogVersion: 'season-draft-v1',
+    participants: [
+      { participantId: 'p1', franchiseId: 'lakers' },
+      { participantId: 'p2', franchiseId: 'celtics' },
+    ],
+    firstPickParticipantId: 'p1',
+    round: 2,
+    currentTurnParticipantId: 'p2',
+    status: 'drafting',
+    revision: 4,
+    currentReveal: {
+      participantId: 'p2',
+      round: 2,
+      pickOrdinal: 2,
+      attempts: [
+        { franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: false },
+        { franchiseId: 'celtics', eraId: '1980s', attemptIndex: 1, usable: true },
+      ],
+    },
+    rolls: [
+      { franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: false },
+      { franchiseId: 'celtics', eraId: '1980s', attemptIndex: 1, usable: true },
+    ],
+    claims: [{ participantId: 'p1', franchiseId: 'lakers', eraId: '1990s' }],
+    picks: [
+      {
+        participantId: 'p1',
+        round: 1,
+        pickOrdinal: 1,
+        playerVersionId: `pv-${'0'.repeat(32)}`,
+        franchiseId: 'lakers',
+        eraId: '1990s',
+        rollAttempts: 1,
+      },
+    ],
+    commandLog: [
+      {
+        status: 'accepted',
+        commandId: 'c1',
+        revisionBefore: 0,
+        revisionAfter: 1,
+        stateDigest: '0'.repeat(32),
+        command: {
+          commandId: 'c1',
+          expectedRevision: 0,
+          payload: {
+            kind: 'create-season-draft',
+            runId: 'run-1',
+            rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+            league: buildLeague(),
+            humanParticipantIds: ['p1', 'p2'],
+            catalogVersion: 'season-draft-v1',
+          },
+        },
+      },
+    ],
+  };
+
+  it('round-trips a valid drafting state', () => {
+    const state = roundTrip(seasonDraftStateSchema, baseState);
+    expect(state.participants).toHaveLength(2);
+    expect(state.picks).toHaveLength(1);
+  });
+
+  it('rejects wrong draft version and malformed rolls', () => {
+    expect(() =>
+      seasonDraftStateSchema.parse({ ...baseState, draftVersion: 'season-draft-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonDraftStateSchema.parse({
+        ...baseState,
+        currentReveal: { ...baseState.currentReveal, attempts: [] },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season draft command records (M2.1)', () => {
+  const command = {
+    commandId: 'c-claim-1',
+    expectedRevision: 2,
+    payload: {
+      kind: 'claim-draft-pool',
+      participantId: 'p1',
+      franchiseId: 'lakers',
+      eraId: '1990s',
+    },
+  };
+
+  it('round-trips an accepted record and rejects mismatched kinds', () => {
+    const record = {
+      status: 'accepted',
+      commandId: 'c-claim-1',
+      revisionBefore: 2,
+      revisionAfter: 3,
+      stateDigest: '0'.repeat(32),
+      command,
+    };
+    const parsed = seasonDraftCommandRecordSchema.parse(record);
+    expect(parsed.status).toBe('accepted');
+    expect(() =>
+      seasonDraftCommandRecordSchema.parse({
+        status: 'accepted',
+        commandId: 'x',
+        revisionBefore: 0,
+        revisionAfter: 1,
+        stateDigest: 'not-a-digest',
+        command,
+      }),
+    ).toThrow();
+  });
+
+  it('round-trips a rejected record with a typed error code', () => {
+    const record = {
+      status: 'rejected',
+      commandId: 'c-bad',
+      revision: 2,
+      errorCode: 'GENERATION_EXHAUSTED',
+      message: 'node budget exhausted',
+      command,
+    };
+    expect(roundTrip(seasonDraftRejectedRecordSchema, record).errorCode).toBe(
+      'GENERATION_EXHAUSTED',
+    );
+    expect(() =>
+      seasonDraftRejectedRecordSchema.parse({ ...record, errorCode: 'NOT_A_CODE' }),
+    ).toThrow();
+  });
+
+  it('validates command envelope shapes', () => {
+    expect(() => seasonDraftCommandSchema.parse({ ...command, expectedRevision: -1 })).toThrow();
+    expect(() =>
+      seasonDraftCommandSchema.parse({
+        ...command,
+        payload: { kind: 'reveal-draft-roll', participantId: 'p1' },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      seasonDraftCommandSchema.parse({
+        ...command,
+        payload: {
+          kind: 'create-season-draft',
+          runId: 'r',
+          rootSeed: 'a1b2c3d4e5f60718',
+          league: buildLeague(),
+          humanParticipantIds: ['p1'],
+          catalogVersion: 'season-draft-v1',
+        },
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe('season rotation schema (M2.1)', () => {
+  const ids = Array.from({ length: 10 }, (_, i) => `pv-${String(i).padStart(32, '0')}`);
+  const rotation = {
+    franchiseId: 'lakers',
+    starters: ids.slice(0, 5),
+    benchOrder: ids.slice(5),
+    targetMinutes: [
+      ...ids.slice(0, 5).map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
+      ...ids.slice(5).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
+    ],
+    closingFive: ids.slice(0, 5),
+    rotationVersion: 'season-rotation-v1',
+  };
+
+  it('round-trips a legal rotation', () => {
+    expect(roundTrip(seasonRotationSchema, rotation).starters).toHaveLength(5);
+  });
+
+  it('rejects illegal rotations', () => {
+    expect(() =>
+      seasonRotationSchema.parse({
+        ...rotation,
+        targetMinutes: rotation.targetMinutes.slice(0, 9),
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRotationSchema.parse({ ...rotation, rotationVersion: 'season-rotation-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonRotationSchema.parse({
+        ...rotation,
+        targetMinutes: rotation.targetMinutes.map((m, i) => ({
+          ...m,
+          minutes: i === 0 ? 8 : m.minutes,
+        })),
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe('season AI contracts (M2.1)', () => {
+  it('round-trips assignments and diagnostics', () => {
+    const assignment = {
+      franchiseId: 'lakers',
+      band: 'contender',
+      identity: 'star-chaser',
+    };
+    expect(roundTrip(seasonAiAssignmentSchema, assignment).band).toBe('contender');
+    expect(() => seasonAiAssignmentSchema.parse({ ...assignment, band: 'super' })).toThrow();
+    const diagnostics = {
+      seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+      aiVersion: 'season-ai-v1',
+      rosterGenerationVersion: 'roster-generation-v1',
+      teamsGenerated: 29,
+      teamsRepaired: 1,
+      backtracks: 2,
+      nodesVisited: 500,
+      nodeBudget: 100000,
+      failedTeams: [],
+      unmetConstraints: [],
+    };
+    expect(roundTrip(seasonGenerationDiagnosticsSchema, diagnostics).backtracks).toBe(2);
+  });
+
+  it('rejects wrong versions in the generation result and targets', () => {
+    const run = buildRun();
+    const rosters = run.rosters;
+    const rotations = run.rotations;
+    const aiAssignments = run.aiAssignments;
+    const evaluations = run.evaluations;
+    const ownership = run.ownership;
+    const result = {
+      schemaVersion: 1,
+      seed: SEED,
+      aiVersion: 'season-ai-v1',
+      rosterGenerationVersion: 'roster-generation-v1',
+      rotationVersion: 'season-rotation-v1',
+      rosters,
+      ownership,
+      rotations,
+      aiAssignments,
+      evaluations,
+      diagnostics: {
+        seed: SEED,
+        aiVersion: 'season-ai-v1',
+        rosterGenerationVersion: 'roster-generation-v1',
+        teamsGenerated: 29,
+        teamsRepaired: 0,
+        backtracks: 0,
+        nodesVisited: 29,
+        nodeBudget: 100000,
+        failedTeams: [],
+        unmetConstraints: [],
+      },
+      digest: '0'.repeat(32),
+    };
+    expect(roundTrip(seasonLeagueGenerationResultSchema, result).rosters).toHaveLength(30);
+    expect(() =>
+      seasonLeagueGenerationResultSchema.parse({ ...result, aiVersion: 'season-ai-v2' }),
+    ).toThrow();
+    const targets = {
+      schemaVersion: 1,
+      targetsVersion: 'roster-targets-v1',
+      calibration: {
+        calibrationSeedCount: 256,
+        validationSeedCount: 64,
+        generatedAtIso: '2026-08-04T00:00:00.000Z',
+        aiVersion: 'season-ai-v1',
+        rosterGenerationVersion: 'roster-generation-v1',
+      },
+      bands: {
+        contender: { range: [50, 90], median: 72 },
+        playoff: { range: [44, 80], median: 63 },
+        average: { range: [38, 70], median: 55 },
+        weaker: { range: [30, 62], median: 47 },
+      },
+      identities: {
+        'star-chaser': { range: [40, 85], median: 62 },
+        'depth-builder': { range: [40, 85], median: 62 },
+        'defense-first': { range: [40, 85], median: 62 },
+        'shooting-first': { range: [40, 85], median: 62 },
+        continuity: { range: [40, 85], median: 62 },
+        'active-trader': { range: [40, 85], median: 62 },
+      },
+      roleCoverageMinimum: 8,
+      heldOutPassShare: 0.95,
+      quotas: {
+        soloBands: { contender: 4, playoff: 8, average: 10, weaker: 7 },
+        duoBands: { contender: 4, playoff: 8, average: 9, weaker: 7 },
+      },
+    };
+    expect(roundTrip(seasonRosterTargetsSchema, targets).roleCoverageMinimum).toBe(8);
+    expect(() =>
+      seasonRosterTargetsSchema.parse({ ...targets, targetsVersion: 'roster-targets-v2' }),
+    ).toThrow();
   });
 });

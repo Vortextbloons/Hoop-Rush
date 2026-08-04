@@ -1,0 +1,494 @@
+{
+  "schemaVersion": 1,
+  "command": "season draft reproduce",
+  "seed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
+  "catalogVersion": "season-draft-v1",
+  "initialState": null,
+  "commands": [
+    {
+      "commandId": "fixture-create",
+      "expectedRevision": 0,
+      "payload": {
+        "kind": "create-season-draft",
+        "runId": "fixture-season-run-1",
+        "rootSeed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
+        "league": {
+          "schemaVersion": 1,
+          "leagueVersion": "league-v1",
+          "teams": [
+            {
+              "franchiseId": "hawks",
+              "control": "ai",
+              "conference": "east",
+              "division": "southeast"
+            },
+            {
+              "franchiseId": "celtics",
+              "control": "ai",
+              "conference": "east",
+              "division": "atlantic"
+            },
+            {
+              "franchiseId": "nets",
+              "control": "ai",
+              "conference": "east",
+              "division": "atlantic"
+            },
+            {
+              "franchiseId": "hornets",
+              "control": "ai",
+              "conference": "east",
+              "division": "southeast"
+            },
+            {
+              "franchiseId": "bulls",
+              "control": "ai",
+              "conference": "east",
+              "division": "central"
+            },
+            {
+              "franchiseId": "cavaliers",
+              "control": "ai",
+              "conference": "east",
+              "division": "central"
+            },
+            {
+              "franchiseId": "pistons",
+              "control": "ai",
+              "conference": "east",
+              "division": "central"
+            },
+            {
+              "franchiseId": "pacers",
+              "control": "ai",
+              "conference": "east",
+              "division": "central"
+            },
+            {
+              "franchiseId": "heat",
+              "control": "ai",
+              "conference": "east",
+              "division": "southeast"
+            },
+            {
+              "franchiseId": "bucks",
+              "control": "ai",
+              "conference": "east",
+              "division": "central"
+            },
+            {
+              "franchiseId": "knicks",
+              "control": "ai",
+              "conference": "east",
+              "division": "atlantic"
+            },
+            {
+              "franchiseId": "magic",
+              "control": "ai",
+              "conference": "east",
+              "division": "southeast"
+            },
+            {
+              "franchiseId": "sixers",
+              "control": "ai",
+              "conference": "east",
+              "division": "atlantic"
+            },
+            {
+              "franchiseId": "raptors",
+              "control": "ai",
+              "conference": "east",
+              "division": "atlantic"
+            },
+            {
+              "franchiseId": "wizards",
+              "control": "ai",
+              "conference": "east",
+              "division": "southeast"
+            },
+            {
+              "franchiseId": "mavericks",
+              "control": "ai",
+              "conference": "west",
+              "division": "southwest"
+            },
+            {
+              "franchiseId": "nuggets",
+              "control": "ai",
+              "conference": "west",
+              "division": "northwest"
+            },
+            {
+              "franchiseId": "warriors",
+              "control": "ai",
+              "conference": "west",
+              "division": "pacific"
+            },
+            {
+              "franchiseId": "rockets",
+              "control": "ai",
+              "conference": "west",
+              "division": "southwest"
+            },
+            {
+              "franchiseId": "clippers",
+              "control": "ai",
+              "conference": "west",
+              "division": "pacific"
+            },
+            {
+              "franchiseId": "lakers",
+              "control": "human",
+              "conference": "west",
+              "division": "pacific"
+            },
+            {
+              "franchiseId": "grizzlies",
+              "control": "ai",
+              "conference": "west",
+              "division": "southwest"
+            },
+            {
+              "franchiseId": "timberwolves",
+              "control": "ai",
+              "conference": "west",
+              "division": "northwest"
+            },
+            {
+              "franchiseId": "pelicans",
+              "control": "ai",
+              "conference": "west",
+              "division": "southwest"
+            },
+            {
+              "franchiseId": "thunder",
+              "control": "ai",
+              "conference": "west",
+              "division": "northwest"
+            },
+            {
+              "franchiseId": "suns",
+              "control": "ai",
+              "conference": "west",
+              "division": "pacific"
+            },
+            {
+              "franchiseId": "blazers",
+              "control": "ai",
+              "conference": "west",
+              "division": "northwest"
+            },
+            {
+              "franchiseId": "kings",
+              "control": "ai",
+              "conference": "west",
+              "division": "pacific"
+            },
+            {
+              "franchiseId": "spurs",
+              "control": "ai",
+              "conference": "west",
+              "division": "southwest"
+            },
+            {
+              "franchiseId": "jazz",
+              "control": "ai",
+              "conference": "west",
+              "division": "northwest"
+            }
+          ]
+        },
+        "humanParticipantIds": ["fixture-human"],
+        "catalogVersion": "season-draft-v1"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-0",
+      "expectedRevision": 1,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-0",
+      "expectedRevision": 2,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "blazers",
+        "eraId": "1980s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-0",
+      "expectedRevision": 3,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-342ce81658b7ea22c7b932ac06191106"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-1",
+      "expectedRevision": 4,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-1",
+      "expectedRevision": 5,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "suns",
+        "eraId": "2000s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-1",
+      "expectedRevision": 6,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-cd80b46d697f56b959869843737d4f7d"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-2",
+      "expectedRevision": 7,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-2",
+      "expectedRevision": 8,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "kings",
+        "eraId": "1970s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-2",
+      "expectedRevision": 9,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-1cf4be981c538ffc7ecf922a4ad47bc8"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-3",
+      "expectedRevision": 10,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-3",
+      "expectedRevision": 11,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "timberwolves",
+        "eraId": "2000s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-3",
+      "expectedRevision": 12,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-a0ae590569a19379a21189bf082ea9d5"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-4",
+      "expectedRevision": 13,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-4",
+      "expectedRevision": 14,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "sixers",
+        "eraId": "1970s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-4",
+      "expectedRevision": 15,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-3afdf6b5e5396b797c2b873740b1e225"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-5",
+      "expectedRevision": 16,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-5",
+      "expectedRevision": 17,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "heat",
+        "eraId": "1990s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-5",
+      "expectedRevision": 18,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-369d34bf09fcee2b503a0f9deccf44cf"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-6",
+      "expectedRevision": 19,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-6",
+      "expectedRevision": 20,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "bucks",
+        "eraId": "2010s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-6",
+      "expectedRevision": 21,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-f089b89f0c80b6bb44d03a8d5b49b5af"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-7",
+      "expectedRevision": 22,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-7",
+      "expectedRevision": 23,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "blazers",
+        "eraId": "2010s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-7",
+      "expectedRevision": 24,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-488c51b152bd94b520b4794b9a583da1"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-8",
+      "expectedRevision": 25,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-8",
+      "expectedRevision": 26,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "wizards",
+        "eraId": "1990s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-8",
+      "expectedRevision": 27,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-1f053a1c79ab7110f7f3adfaef1e482c"
+      }
+    },
+    {
+      "commandId": "fixture-reveal-9",
+      "expectedRevision": 28,
+      "payload": {
+        "kind": "reveal-draft-roll",
+        "participantId": "fixture-human"
+      }
+    },
+    {
+      "commandId": "fixture-claim-9",
+      "expectedRevision": 29,
+      "payload": {
+        "kind": "claim-draft-pool",
+        "participantId": "fixture-human",
+        "franchiseId": "spurs",
+        "eraId": "1990s"
+      }
+    },
+    {
+      "commandId": "fixture-pick-9",
+      "expectedRevision": 30,
+      "payload": {
+        "kind": "select-draft-player",
+        "participantId": "fixture-human",
+        "playerVersionId": "pv-aa16e2d27f3442f668997c10c9233d82"
+      }
+    },
+    {
+      "commandId": "fixture-finalize",
+      "expectedRevision": 31,
+      "payload": {
+        "kind": "finalize-human-rosters"
+      }
+    },
+    {
+      "commandId": "fixture-generate",
+      "expectedRevision": 32,
+      "payload": {
+        "kind": "generate-ai-league"
+      }
+    }
+  ],
+  "expected": {
+    "finalDigest": "5ebcfa93ff8d327791421d3d828cff03",
+    "finalRevision": 33
+  }
+}

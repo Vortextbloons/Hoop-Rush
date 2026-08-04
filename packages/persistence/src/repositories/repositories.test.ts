@@ -11,6 +11,7 @@ import {
 import type { GameResult, RunAggregates } from '@hoop-rush/data-contracts';
 import { DexieChallengeRepository } from './dexie.js';
 import type { StoredClassicDraft } from '../schemas/classic-draft-record.js';
+import type { StoredSeasonDraft } from '../schemas/season-draft-record.js';
 import type {
   ActiveGameAppend,
   ActiveGameRow,
@@ -177,6 +178,7 @@ class TestDatabase extends Dexie {
   completed!: EntityTable<StoredRunRecord, 'recordId'>;
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
   classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
+  seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
 
   constructor(name: string) {
     super(name);
@@ -192,6 +194,9 @@ class TestDatabase extends Dexie {
     });
     this.version(4).stores({
       classicDrafts: 'recordId',
+    });
+    this.version(5).stores({
+      seasonDrafts: 'recordId',
     });
   }
 }

@@ -1,6 +1,12 @@
 import {
+  SEASON_AI_VERSION,
+  SEASON_DRAFT_VERSION,
   SEASON_POSTSEASON_VERSION,
+  SEASON_ROSTER_GENERATION_VERSION,
+  SEASON_ROSTER_RULES_VERSION,
+  SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROSTER_SIZE,
+  SEASON_ROTATION_VERSION,
   SEASON_SEED_NAMESPACES,
   seasonNamespaceSeed,
   playerVersionId,
@@ -12,12 +18,20 @@ import {
   type SeasonSchedule,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
+import {
+  buildFixtureEvaluations,
+  buildFixtureGenerationAudit,
+  buildFixtureSeasonDraftFacts,
+  buildSeasonAiAssignments,
+  buildSeasonRotation,
+} from './season-draft.js';
 
 /**
- * Deterministic Season Run fixture builders (spec/2.0 M2.0). Every builder
- * returns schema-valid records so engine tests and CLI fixtures can rely on
- * the frozen contracts. Rosters are synthetic: ten peak player-versions per
- * team with derived, unique playerVersionIds.
+ * Deterministic Season Run fixture builders (spec/2.0 M2.0, M2.1). Every
+ * builder returns schema-valid records so engine tests and CLI fixtures can
+ * rely on the frozen contracts. Rosters are synthetic: ten peak
+ * player-versions per team with derived, unique playerVersionIds, plus the
+ * M2.1 draft facts, AI assignments, rotations, evaluations, and audit fields.
  */
 
 interface AlignmentEntry {
@@ -180,7 +194,9 @@ function emptyPostseason(rootSeed: string): SeasonPostseasonState {
  * Complete 30-team Season Run snapshot: committed schedule (caller-supplied
  * schedule — use the packaged artifact or regenerate it with
  * SEASON_COMMITTED_SCHEDULE_SEED), empty results, initial standings, block
- * cursor at round 0, and postseason-ready derived seeds.
+ * cursor at round 0, postseason-ready derived seeds, and schema-v2 M2.1
+ * fields (synthetic draft facts, assignments, rotations, evaluations, and
+ * the generation audit).
  */
 export function buildSeasonRunFixture(input: {
   schedule: SeasonSchedule;
@@ -194,12 +210,19 @@ export function buildSeasonRunFixture(input: {
   const league =
     input.league ?? buildSeasonLeague({}, { humanFranchiseId: input.humanFranchiseId });
   const rosters = buildSeasonRosters(league, seed);
+  const aiAssignments = buildSeasonAiAssignments(league);
+  const rotations = rosters.map((roster) =>
+    buildSeasonRotation(
+      roster.franchiseId,
+      roster.players.map((player) => player.playerVersionId),
+    ),
+  );
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     runId: 'fixture-season-run-1',
     rootSeed: seed,
     versions: {
-      runSchemaVersion: 1,
+      runSchemaVersion: 2,
       leagueVersion: league.leagueVersion,
       scheduleVersion: input.schedule.scheduleVersion,
       scheduleFormulaVersion: input.schedule.formulaVersion,
@@ -207,6 +230,12 @@ export function buildSeasonRunFixture(input: {
       postseasonVersion: SEASON_POSTSEASON_VERSION,
       seedDerivationVersion: 'season-seeds-v1',
       playerVersionIdVersion: 'player-version-id-v1',
+      draftVersion: SEASON_DRAFT_VERSION,
+      rosterRulesVersion: SEASON_ROSTER_RULES_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
+      aiVersion: SEASON_AI_VERSION,
+      rotationVersion: SEASON_ROTATION_VERSION,
+      rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
     },
     league,
     rosters,
@@ -227,5 +256,10 @@ export function buildSeasonRunFixture(input: {
     standings: zeroStandings(league),
     cursor: { schemaVersion: 1, completedRounds: 0 },
     postseason: emptyPostseason(seed),
+    draft: buildFixtureSeasonDraftFacts(),
+    aiAssignments,
+    rotations,
+    generationAudit: buildFixtureGenerationAudit(seed),
+    evaluations: buildFixtureEvaluations(rosters, aiAssignments),
   };
 }

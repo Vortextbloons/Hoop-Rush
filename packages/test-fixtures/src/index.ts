@@ -1029,3 +1029,5 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
 export * from './classic.js';
 
 export * from './season.js';
+
+export * from './season-draft.js';

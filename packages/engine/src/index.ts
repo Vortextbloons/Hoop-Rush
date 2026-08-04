@@ -72,6 +72,44 @@ export {
   type PlayInGameResult,
   type PlayoffGameResult,
 } from './season/postseason.js';
+// Season Run (2.0 M2.1) ten-player draft, roster legality, AI generation,
+// rotations, and generation digests.
+export {
+  SEASON_ROSTER_RULES,
+  groupMaskOf,
+  rosterGroupCounts,
+  legalFiveExists,
+  legalFiveAfterAnyRemoval,
+  completionTargetsMet,
+  validateSeasonRoster,
+  rosterFeasible,
+  anyMemberPlays,
+  type SeasonRosterMemberInput,
+} from './season/roster-rules.js';
+export {
+  matchStartingFive,
+  buildMinimalRotation,
+  rotationTargetMinutes,
+  auditSeasonRotation,
+} from './season/rotation.js';
+export { seasonGenerationDigest, type SeasonGenerationDigestInput } from './season/digest.js';
+export {
+  seasonDraftStateDigest,
+  seasonDraftStateCanonical,
+  applySeasonDraftCommand,
+  type SeasonAiGenerationDeps,
+  type SeasonAiGenerationInput,
+} from './season/draft.js';
+export {
+  SOLO_BAND_QUOTAS,
+  DUO_BAND_QUOTAS,
+  AI_GENERATION_NODE_BUDGET,
+  SeasonAiGenerationError,
+  generateAiLeague,
+  assignAiBandsAndIdentities,
+  evaluateSeasonRoster,
+  runSeasonRosterCalibrationSeeds,
+} from './season/ai.js';
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
 export * as classic from './modes/classic/draft.js';

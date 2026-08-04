@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "roster-targets-v1",
+  "calibration": {
+    "calibrationSeedCount": 256,
+    "validationSeedCount": 64,
+    "generatedAtIso": "2026-08-04T20:16:49.390Z",
+    "aiVersion": "season-ai-v1",
+    "rosterGenerationVersion": "roster-generation-v1"
+  },
+  "bands": {
+    "contender": {
+      "range": [
+        88.11458095238093,
+        89.81131428571429
+      ],
+      "median": 88.88098095238097
+    },
+    "playoff": {
+      "range": [
+        82.90376867469878,
+        90.78598795180723
+      ],
+      "median": 86.69329156626506
+    },
+    "average": {
+      "range": [
+        80.50975,
+        86.28401818181817
+      ],
+      "median": 83.90845454545455
+    },
+    "weaker": {
+      "range": [
+        77.59615,
+        83.74255000000001
+      ],
+      "median": 81.43886585365856
+    }
+  },
+  "identities": {
+    "star-chaser": {
+      "median": 88.76474761904763,
+      "range": [
+        84.8024380952381,
+        90.02065238095238
+      ],
+      "min": 84.3912476190476,
+      "max": 90.25874761904763,
+      "sample": 1556
+    },
+    "depth-builder": {
+      "median": 86.6770265060241,
+      "range": [
+        82.59028674698796,
+        90.78598795180723
+      ],
+      "min": 82.29932289156628,
+      "max": 90.78598795180723,
+      "sample": 1543
+    },
+    "defense-first": {
+      "median": 85.04494999999999,
+      "range": [
+        82.66500909090908,
+        89.30005454545454
+      ],
+      "min": 80.51796818181818,
+      "max": 89.65228181818182,
+      "sample": 1559
+    },
+    "shooting-first": {
+      "median": 83.66349000000002,
+      "range": [
+        80.71133500000003,
+        85.79036500000002
+      ],
+      "min": 80.17841500000003,
+      "max": 87.47161500000001,
+      "sample": 1534
+    },
+    "continuity": {
+      "median": 82.20305,
+      "range": [
+        77.38,
+        86.2674
+      ],
+      "min": 77.005,
+      "max": 87.4602,
+      "sample": 1543
+    },
+    "active-trader": {
+      "median": 81.54618292682927,
+      "range": [
+        78.93618536585367,
+        83.64691707317075
+      ],
+      "min": 78.93100731707318,
+      "max": 84.28749024390244,
+      "sample": 1545
+    }
+  },
+  "roleCoverageMinimum": 8,
+  "heldOutPassShare": 0.95,
+  "quotas": {
+    "soloBands": {
+      "contender": 4,
+      "playoff": 8,
+      "average": 10,
+      "weaker": 7
+    },
+    "duoBands": {
+      "contender": 4,
+      "playoff": 8,
+      "average": 9,
+      "weaker": 7
+    }
+  }
+}

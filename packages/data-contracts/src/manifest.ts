@@ -99,6 +99,10 @@ export const hoopRushManifestSchema = z.object({
     .object({
       league: seasonArtifactIndexEntrySchema,
       schedule: seasonArtifactIndexEntrySchema,
+      /** M2.1 compact draft catalog (pools + deduplicated candidates). */
+      draftCatalog: seasonArtifactIndexEntrySchema,
+      /** M2.1 frozen calibration targets for AI roster strength. */
+      rosterTargets: seasonArtifactIndexEntrySchema,
     })
     .optional(),
   assets: assetConfigSchema,

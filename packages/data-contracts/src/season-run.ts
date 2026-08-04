@@ -1,12 +1,5 @@
 import { z } from 'zod';
-import {
-  contentHashSchema,
-  eraIdSchema,
-  franchiseIdSchema,
-  playerIdSchema,
-  seasonKeySchema,
-  seedSchema,
-} from './ids.js';
+import { contentHashSchema, eraIdSchema, franchiseIdSchema, seedSchema } from './ids.js';
 import { seasonLeagueSchema } from './season-league.js';
 import { seasonGameSchema } from './season-game.js';
 import { seasonStandingsSchema } from './season-standings.js';
@@ -15,10 +8,16 @@ import { seasonPostseasonStateSchema } from './season-postseason.js';
 import { playerVersionIdSchema } from './season-identity.js';
 import {
   PLAYER_VERSION_ID_VERSION,
+  SEASON_AI_VERSION,
+  SEASON_DRAFT_VERSION,
   SEASON_GAME_COUNT,
   SEASON_LEAGUE_VERSION,
   SEASON_POSTSEASON_VERSION,
+  SEASON_ROSTER_GENERATION_VERSION,
+  SEASON_ROSTER_RULES_VERSION,
+  SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROSTER_SIZE,
+  SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_SCHEDULE_FORMULA_VERSION,
   SEASON_SCHEDULE_VERSION,
@@ -26,36 +25,73 @@ import {
   SEASON_STANDINGS_VERSION,
   SEASON_TEAM_COUNT,
 } from './season-versions.js';
+import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.js';
+import {
+  seasonAiAssignmentSchema,
+  seasonGenerationDiagnosticsSchema,
+  seasonRosterEvaluationSchema,
+} from './season-ai.js';
+import { seasonRotationSchema } from './season-rotation.js';
 
 /**
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
  * validated record covers the frozen league, ten-player rosters, ownership,
  * schedule reference, all league games, reduced standings, the block cursor,
- * and postseason state, so a saved run can be resumed, audited, and
- * reproduced from its root seed and versions.
+ * postseason state, and — since schema version 2 (M2.1) — the completed draft
+ * facts, AI assignments, generated rotations, and the generation audit
+ * summary, so a saved run can be resumed, audited, and reproduced from its
+ * root seed and versions.
  */
 
-export const seasonRosterEntrySchema = z.object({
-  playerVersionId: playerVersionIdSchema,
-  playerId: playerIdSchema,
-  franchiseId: franchiseIdSchema,
-  eraId: eraIdSchema,
-  seasonKey: seasonKeySchema,
-  displayName: z.string().min(1).max(96),
-});
-export type SeasonRosterEntry = z.infer<typeof seasonRosterEntrySchema>;
+export {
+  seasonRosterEntrySchema,
+  seasonRosterSchema,
+  seasonOwnershipSchema,
+} from './season-roster.js';
+export type { SeasonRosterEntry, SeasonRoster, SeasonOwnership } from './season-roster.js';
 
-export const seasonRosterSchema = z.object({
-  franchiseId: franchiseIdSchema,
-  players: z.array(seasonRosterEntrySchema).length(SEASON_ROSTER_SIZE),
+/** Completed draft facts for the human participants (M2.1). */
+export const seasonDraftFactsSchema = z.object({
+  draftVersion: z.literal(SEASON_DRAFT_VERSION),
+  participants: z.array(
+    z.object({
+      participantId: z.string().min(1).max(64),
+      franchiseId: franchiseIdSchema,
+      /** Every roll attempt recorded for this participant, in order. */
+      rolls: z.array(
+        z.object({
+          franchiseId: franchiseIdSchema,
+          eraId: eraIdSchema,
+          attemptIndex: z.number().int().nonnegative(),
+          usable: z.boolean(),
+        }),
+      ),
+      claims: z.array(z.object({ franchiseId: franchiseIdSchema, eraId: eraIdSchema })),
+      picks: z.array(
+        z.object({
+          round: z.number().int().min(1).max(10),
+          playerVersionId: playerVersionIdSchema,
+          franchiseId: franchiseIdSchema,
+          eraId: eraIdSchema,
+        }),
+      ),
+    }),
+  ),
 });
-export type SeasonRoster = z.infer<typeof seasonRosterSchema>;
+export type SeasonDraftFacts = z.infer<typeof seasonDraftFactsSchema>;
 
-export const seasonOwnershipSchema = z.object({
-  playerVersionId: playerVersionIdSchema,
-  ownerFranchiseId: franchiseIdSchema,
+/** M2.1 generation audit summary attached to the run. */
+export const seasonGenerationAuditSchema = z.object({
+  seed: seedSchema,
+  aiVersion: z.literal(SEASON_AI_VERSION),
+  rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
+  rotationVersion: z.literal(SEASON_ROTATION_VERSION),
+  rosterTargetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
+  /** Canonical digest of the generation result (engine season/digest). */
+  digest: z.string().regex(/^[0-9a-f]{32}$/),
+  diagnostics: seasonGenerationDiagnosticsSchema,
 });
-export type SeasonOwnership = z.infer<typeof seasonOwnershipSchema>;
+export type SeasonGenerationAudit = z.infer<typeof seasonGenerationAuditSchema>;
 
 /** Reference to the committed schedule artifact the run plays. */
 export const seasonScheduleReferenceSchema = z.object({
@@ -77,6 +113,12 @@ export const seasonRunVersionsSchema = z.object({
   postseasonVersion: z.literal(SEASON_POSTSEASON_VERSION),
   seedDerivationVersion: z.literal(SEASON_SEED_DERIVATION_VERSION),
   playerVersionIdVersion: z.literal(PLAYER_VERSION_ID_VERSION),
+  draftVersion: z.literal(SEASON_DRAFT_VERSION),
+  rosterRulesVersion: z.literal(SEASON_ROSTER_RULES_VERSION),
+  rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
+  aiVersion: z.literal(SEASON_AI_VERSION),
+  rotationVersion: z.literal(SEASON_ROTATION_VERSION),
+  rosterTargetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
 });
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
 
@@ -98,5 +140,15 @@ export const seasonRunSchema = z.object({
   standings: seasonStandingsSchema,
   cursor: seasonCursorSchema,
   postseason: seasonPostseasonStateSchema,
+  /** M2.1: completed human draft facts. */
+  draft: seasonDraftFactsSchema,
+  /** M2.1: band + identity assignment for every franchise (30 rows). */
+  aiAssignments: z.array(seasonAiAssignmentSchema).length(SEASON_TEAM_COUNT),
+  /** M2.1: one legal rotation per franchise (30 rows). */
+  rotations: z.array(seasonRotationSchema).length(SEASON_TEAM_COUNT),
+  /** M2.1: generation audit summary (digest, diagnostics, versions). */
+  generationAudit: seasonGenerationAuditSchema,
+  /** M2.1: per-roster strength evaluations (30 rows). */
+  evaluations: z.array(seasonRosterEvaluationSchema).length(SEASON_TEAM_COUNT),
 });
 export type SeasonRun = z.infer<typeof seasonRunSchema>;

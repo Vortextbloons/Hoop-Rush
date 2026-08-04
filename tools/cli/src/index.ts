@@ -19,6 +19,15 @@ import {
   SEASON_SCHEDULE_AUDIT_OPTIONS,
   SEASON_SCHEDULE_GENERATE_OPTIONS,
 } from './commands/season-schedule.js';
+import { seasonDraftReproduce, SEASON_DRAFT_REPRODUCE_OPTIONS } from './commands/season-draft.js';
+import {
+  seasonRostersAudit,
+  seasonRostersCalibrate,
+  seasonRostersGenerate,
+  SEASON_ROSTERS_AUDIT_OPTIONS,
+  SEASON_ROSTERS_CALIBRATE_OPTIONS,
+  SEASON_ROSTERS_GENERATE_OPTIONS,
+} from './commands/season-rosters.js';
 import { calibrateRun, calibrateSensitivity, CALIBRATE_OPTIONS } from './commands/calibrate.js';
 import { calibrateRatings, CALIBRATE_RATINGS_OPTIONS } from './commands/calibrate-ratings.js';
 import {
@@ -248,6 +257,44 @@ const COMMANDS: Record<string, CommandDef> = {
         league: getOptionString(args, 'league'),
         manifest: getOptionString(args, 'manifest'),
         verbose: hasOption(args, 'verbose'),
+      }),
+  },
+  'season draft reproduce': {
+    options: SEASON_DRAFT_REPRODUCE_OPTIONS,
+    run: (args) =>
+      seasonDraftReproduce({
+        input: getOptionString(args, 'input') ?? null,
+        manifest: getOptionString(args, 'manifest'),
+      }),
+  },
+  'season rosters generate': {
+    options: SEASON_ROSTERS_GENERATE_OPTIONS,
+    run: (args) =>
+      seasonRostersGenerate({
+        seed: getOptionString(args, 'seed') ?? null,
+        draft: getOptionString(args, 'draft') ?? null,
+        out: getOptionString(args, 'out'),
+        manifest: getOptionString(args, 'manifest'),
+      }),
+  },
+  'season rosters audit': {
+    options: SEASON_ROSTERS_AUDIT_OPTIONS,
+    run: (args) =>
+      seasonRostersAudit({
+        input: getOptionString(args, 'input') ?? null,
+        manifest: getOptionString(args, 'manifest') ?? null,
+        'human-franchises': getOptionString(args, 'human-franchises') ?? null,
+      }),
+  },
+  'season rosters calibrate': {
+    options: SEASON_ROSTERS_CALIBRATE_OPTIONS,
+    run: (args) =>
+      seasonRostersCalibrate({
+        workers: getOptionString(args, 'workers') ?? undefined,
+        'calibration-seeds': getOptionString(args, 'calibration-seeds') ?? undefined,
+        'validation-seeds': getOptionString(args, 'validation-seeds') ?? undefined,
+        out: getOptionString(args, 'out') ?? undefined,
+        manifest: getOptionString(args, 'manifest') ?? undefined,
       }),
   },
   'import ratings': {
