@@ -99,8 +99,16 @@ function toSimulationPlayer(player: BracketCandidatePlayer): SimulationPlayer {
 
 function percentileOf(value: number, population: readonly number[]): number {
   let below = 0;
-  for (const v of population) if (v < value) below += 1;
-  return below / population.length;
+  let equal = 0;
+  for (const v of population) {
+    if (v < value) below += 1;
+    else if (v === value) equal += 1;
+  }
+  // Strength measurements are intentionally discrete at small sample counts.
+  // Use the tie group's midpoint rank rather than assigning every tied value
+  // to its lower edge; lower-edge ranks created artificial holes in the
+  // selectable percentile band for otherwise valid alternate seeds.
+  return (below + equal / 2) / population.length;
 }
 
 /**

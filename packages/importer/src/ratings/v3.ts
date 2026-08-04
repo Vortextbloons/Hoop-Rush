@@ -322,10 +322,15 @@ function deriveNonlinear(
     defensiveTargeting: clamp(
       (Math.max(
         0,
-        58 - mean([skill(ratings, 'perimeterDefense'), skill(ratings, 'interiorDefense')]),
+        64 -
+          mean([
+            skill(ratings, 'perimeterDefense'),
+            skill(ratings, 'interiorDefense'),
+            skill(ratings, 'defensiveIq'),
+          ]),
       ) *
-        (0.8 + primaryRole * 0.4)) /
-        8,
+        (0.9 + primaryRole * 0.65)) /
+        7,
       0,
       6,
     ),
@@ -421,7 +426,27 @@ function canonicalCurve(raw: number): number {
     return clampRating(50 + (raw - 50) * 1.635);
   }
   const upper = raw - 70;
-  return Math.min(99, clampRating(82.7 + upper * 1.6 - upper * upper * 0.025));
+  // Stretch the historic-season tail instead of mapping every raw score near
+  // 83 to 99. Rough anchors: 75 -> 88, 80 -> 93, 85 -> 97, 88+ -> 99.
+  return Math.min(99, clampRating(82.7 + upper * 1.27 - upper * upper * 0.018));
+}
+
+/**
+ * Before steals and blocks were recorded, exceptional center rebounding is
+ * the strongest available season-level evidence of defensive possession
+ * control. Credit only high-minute centers with missing event stats; modern
+ * players and ordinary historical rebounders receive no lift.
+ */
+function historicalDefenseEvidenceLift(input: RatingProfileInput): number {
+  if (input.stats.steals != null || input.stats.blocks != null) return 0;
+  if (input.position !== 'C' && input.position !== 'PF') return 0;
+  const games = Math.max(1, safeFloat(input.stats.gamesPlayed));
+  const minutes = Math.max(0, safeFloat(input.stats.minutes));
+  if (games < 50 || minutes < 1_500) return 0;
+  const reboundsPerGame = safeFloat(input.stats.rebounds) / games;
+  const reboundLift = clamp((reboundsPerGame - 12) * 0.55, 0, 6);
+  const anchorLift = clamp((skill(input.ratings, 'interiorDefense') - 80) / 10, 0, 2);
+  return reboundLift + anchorLift;
 }
 
 function summaryRatings(
@@ -462,8 +487,13 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     0,
   );
   const weakSizePrior = input.position === 'SF' && (input.heightInches ?? 0) >= 82 ? 0.75 : 0;
+  const historicalDefenseLift = historicalDefenseEvidenceLift(input);
   const baseScore = clamp(
-    archetypeWeighted + nonlinear.synergyBonus + nonlinear.weaknessPenalty + weakSizePrior,
+    archetypeWeighted +
+      nonlinear.synergyBonus +
+      nonlinear.weaknessPenalty +
+      weakSizePrior +
+      historicalDefenseLift,
     0,
     100,
   );
@@ -476,12 +506,23 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     sampleCount: calibrated?.sampleCount ?? 0,
     artifactVersion: input.artifact.modelVersion,
   };
-  const eliteEvidenceLift =
+  const eliteScoringEvidence =
     production.score >= 88 &&
     production.sampleGames >= 55 &&
     safeFloat(input.stats.points) / Math.max(1, production.sampleGames) >= 28 &&
     safeFloat(input.stats.tsPct, 0) >= 0.6 &&
-    safeFloat(input.stats.boxPlusMinus, 0) >= 3
+    safeFloat(input.stats.boxPlusMinus, 0) >= 3;
+  const completeEliteEvidence =
+    production.score >= 86 &&
+    production.sampleGames >= 65 &&
+    safeFloat(input.stats.points) / Math.max(1, production.sampleGames) >= 25 &&
+    safeFloat(input.stats.tsPct, 0) >= 0.62 &&
+    safeFloat(input.stats.boxPlusMinus, 0) >= 4 &&
+    nonlinear.creation >= 85 &&
+    summaryRatings(input.ratings, input.tendencies).defenseRating >= 72;
+  const eliteEvidenceLift = completeEliteEvidence
+    ? 4
+    : eliteScoringEvidence
       ? 3
       : production.score >= 82 && production.sampleGames >= 50
         ? 1

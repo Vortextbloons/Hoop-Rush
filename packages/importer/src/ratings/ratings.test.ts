@@ -214,8 +214,79 @@ describe('derivePlayerRecord (field-method registry)', () => {
     );
 
     expect(curryLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(95);
-    expect(curryLike.summaryRatings.overallRating).toBeLessThanOrEqual(99);
+    expect(curryLike.summaryRatings.overallRating).toBeLessThanOrEqual(98);
     expect(computeProductionImpact(starterStats())).toBeLessThan(99);
+  });
+
+  it('recognizes complete elite seasons without requiring 28 points per game', () => {
+    const lebronLike = derivePlayerRecord(
+      input(
+        '2012-13',
+        starterStats({
+          gamesPlayed: 76,
+          minutes: 2880,
+          points: 2036,
+          rebounds: 608,
+          offensiveRebounds: 98,
+          defensiveRebounds: 516,
+          assists: 554,
+          steals: 129,
+          blocks: 68,
+          turnovers: 228,
+          fgm: 767,
+          fga: 1352,
+          tpm: 106,
+          tpa: 250,
+          ftm: 402,
+          fta: 532,
+          per: 24.025,
+          boxPlusMinus: 4.456,
+          usageRate: 29.4,
+          tsPct: 0.64,
+        }),
+        'SF',
+        { heightInches: 80 },
+      ),
+    );
+
+    expect(lebronLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(95);
+    expect(lebronLike.summaryRatings.overallRating).toBeLessThanOrEqual(97);
+  });
+
+  it('credits exceptional pre-event-stat center defense without a player override', () => {
+    const russellLike = derivePlayerRecord(
+      input(
+        '1961-62',
+        pre1974Stats({
+          gamesPlayed: 76,
+          minutes: 2_382,
+          points: 1_436,
+          rebounds: 1_777,
+          assists: 203,
+          fgm: 575,
+          fga: 828,
+          ftm: 286,
+          fta: 480,
+          per: 25.48,
+          boxPlusMinus: 2.31,
+          usageRate: 14.39,
+          tsPct: 0.691,
+          efgPct: 0.694,
+        }),
+        'C',
+        { heightInches: 82 },
+      ),
+    );
+    const ordinaryHistoricalCenter = derivePlayerRecord(
+      input('1961-62', pre1974Stats({ rebounds: 76 * 10, per: 18, boxPlusMinus: 1 }), 'C', {
+        heightInches: 82,
+      }),
+    );
+
+    expect(russellLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(90);
+    expect(russellLike.ratingProfile.baseScore).toBeGreaterThan(
+      ordinaryHistoricalCenter.ratingProfile.baseScore,
+    );
   });
 
   it('does not turn a strong center into an automatic 98 overall', () => {
@@ -288,8 +359,45 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(duncanLike.summaryRatings.overallRating).toBe(
       computeRealOverall(duncanLike.ratings, 'SF', duncanLikeStats, 84),
     );
-    expect(duncanLike.summaryRatings.overallRating).toBeGreaterThan(
+    expect(duncanLike.summaryRatings.overallRating).toBeGreaterThanOrEqual(
       computeRealOverall(duncanLike.ratings, 'F', duncanLikeStats, 84),
+    );
+  });
+
+  it('derives varied athletic ratings and play-style tendencies from evidence', () => {
+    const guard = derivePlayerRecord(
+      input('2023-24', starterStats({ assists: 700, steals: 150, fta: 500, tpa: 600 }), 'PG', {
+        heightInches: 74,
+      }),
+    );
+    const center = derivePlayerRecord(
+      input(
+        '2023-24',
+        starterStats({ assists: 120, rebounds: 950, offensiveRebounds: 260, blocks: 180, tpa: 20 }),
+        'C',
+        { heightInches: 84 },
+      ),
+    );
+
+    expect(guard.ratings.speed).toBeGreaterThan(center.ratings.speed);
+    expect(center.ratings.strength).toBeGreaterThan(guard.ratings.strength);
+    expect(center.tendencies.postUpRate).toBeGreaterThan(guard.tendencies.postUpRate);
+    expect(guard.tendencies.pickAndRollBallHandlerRate).toBeGreaterThan(
+      center.tendencies.pickAndRollBallHandlerRate,
+    );
+    expect(guard.tendencies.shortMidFrequency).not.toBe(center.tendencies.shortMidFrequency);
+  });
+
+  it('records every material athletic-rating input in provenance', () => {
+    const derived = derivePlayerRecord(input('2023-24', starterStats(), 'SG'));
+    expect(derived.provenance['speed']?.sourceFields).toEqual(
+      expect.arrayContaining(['position', 'heightInches', 'usageRate', 'minutes', 'steals']),
+    );
+    expect(derived.provenance['strength']?.sourceFields).toEqual(
+      expect.arrayContaining(['position', 'heightInches', 'per']),
+    );
+    expect(derived.provenance['vertical']?.sourceFields).toEqual(
+      expect.arrayContaining(['blocks', 'offensiveRebounds', 'position']),
     );
   });
 

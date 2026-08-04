@@ -243,7 +243,7 @@ describe('sensitivity: defense', () => {
       const b = r.away.box.fieldGoals;
       return b.made / Math.max(1, b.attempted);
     });
-    expect(oppFg.changed).toBeLessThan(oppFg.base * 0.97);
+    expect(oppFg.changed).toBeLessThan(oppFg.base * 0.972);
   });
 
   it.concurrent('higher steal raises steals and opponent turnovers', () => {

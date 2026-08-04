@@ -41,7 +41,9 @@ export function shootingFoulProbability(
     tendencyFactor * (1 - ENGINE_CONSTANTS.observedFoulDrawBlend) +
     anchorFactor * ENGINE_CONSTANTS.observedFoulDrawBlend;
   const zoneFactor = zone === 'rim' ? 1.4 : isThreePointZone(zone) ? 0.7 : 1;
-  const discipline = 1 - (defender.ratings.defensiveIq - 50) / 200;
+  const discipline =
+    (1 - (defender.ratings.defensiveIq - 50) / 200) *
+    (0.85 + Math.min(15, defender.tendencies.foulRate) / 50);
   return Math.min(0.25, Math.max(0.01, base * drawsFouls * zoneFactor * discipline));
 }
 
@@ -54,7 +56,11 @@ export function nonShootingFoulProbability(profile: EraSimulationProfile): numbe
 /** Fouler weights for a team, in team index order (interior activity and matchup). */
 export function foulerWeights(defense: SimulationTeam): number[] {
   return defense.players.map((d) =>
-    Math.max(0.5, (d.ratings.strength + d.ratings.interiorDefense) / 2),
+    Math.max(
+      0.5,
+      ((d.ratings.strength + d.ratings.interiorDefense) / 2) *
+        (0.55 + Math.min(20, d.tendencies.foulRate) / 10),
+    ),
   );
 }
 

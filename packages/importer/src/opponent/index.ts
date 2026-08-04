@@ -13,7 +13,7 @@ import { parseOpponentTeam } from '@hoop-rush/data-contracts';
 import { playableSlotGroups, type Position } from '@hoop-rush/data-contracts';
 import { join } from 'node:path';
 import { PUBLIC_DATA } from '../config.js';
-import { clamp, readJson, writeJson } from '../json.js';
+import { clamp, readJson, writeJsonRetry } from '../json.js';
 
 export const OPPONENT_ID = 'lakers-1990s-opening';
 export const BRACKET_VERSION = 'bracket-m3-v3';
@@ -322,7 +322,10 @@ export function run(options?: { poolPath?: string; outPath?: string }): void {
   // validate before writing.
   parseOpponentTeam(artifact);
   const out = options?.outPath ?? join(OPPONENTS_DIR, `${OPPONENT_ID}.json`);
-  writeJson(out, artifact, true);
+  // Dev servers, sync clients, and antivirus scanners can briefly hold this
+  // packaged artifact open on Windows. Use the import pipeline's bounded
+  // retry writer instead of failing the entire rebuild on a transient lock.
+  writeJsonRetry(out, artifact, true);
   for (const player of artifact.players) {
     console.log(
       `${player.playerId}: ${player.displayName} ${player.positions.join('/')} ft=${String(player.ratings.freeThrow)} pass=${String(player.ratings.passing)}`,

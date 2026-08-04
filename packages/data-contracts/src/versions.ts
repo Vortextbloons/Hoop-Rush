@@ -39,13 +39,13 @@ export const LINEAGE_RULE_VERSION = 'lineage-v1';
 export const SOURCE_VERSION = 'source-v1';
 
 /** Field-method registry for ratings/tendency derivation (spec/12 ladder). */
-export const DERIVATION_METHOD_VERSION = 'derive-v3';
+export const DERIVATION_METHOD_VERSION = 'derive-v6';
 
 /** Detailed ratings derivation version (strict engine contracts). */
-export const RATINGS_VERSION = 'ratings-v3.1';
+export const RATINGS_VERSION = 'ratings-v3.4';
 
 /** Deterministic peak-season selection score version (spec/02). */
-export const SELECTION_SCORE_VERSION = 'selection-v3.1-ratings-v3.1';
+export const SELECTION_SCORE_VERSION = 'selection-v3.4-ratings-v3.4';
 
 /** Canonical model identifier embedded in compact player-index rows. */
 export const RATING_MODEL_VERSION = 'ratings-model-v3.1';

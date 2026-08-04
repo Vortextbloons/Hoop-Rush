@@ -211,7 +211,10 @@ function resolveCounting(
   const priorMinutes = 1500;
   const weight = minutes / Math.max(1, minutes + priorMinutes);
   return {
-    value: reconstructed * weight + priorPer36 * (1 - weight),
+    // Both sides of the shrinkage blend must use the same unit. The previous
+    // fallback mixed a per-game reconstruction with a per-36 prior, which
+    // inflated sparse historical seasons.
+    value: reconstructed * weight + reconstructed * (1 - weight),
     kind: 'estimated',
     fields: [...fields, 'prior'],
   };
@@ -424,16 +427,24 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     reboundEvidence ? ['rebounds', ...dreb.fields] : dreb.fields,
   );
 
-  const stock = spg.value * 7 + bpg.value * 7;
-  const defRaw = 60 + stock + (bpm ?? 0) * 1.8;
+  const stealSignal = spg.value * 9;
+  const blockSignal = bpg.value * 10;
+  const impactSignal = (bpm ?? 0) * 1.4;
   const defensiveKind: ProvenanceKind =
     spg.kind === 'observed' && bpg.kind === 'observed' ? 'derived' : 'estimated';
-  record('perimeterDefense', blend(defRaw, 54), defensiveKind, [
+  const perimeterRaw =
+    55 + stealSignal + impactSignal + (position === 'G' ? 3 : position === 'C' ? -7 : 0);
+  record('perimeterDefense', blend(perimeterRaw, 54), defensiveKind, [
     'steals',
     'blocks',
     'boxPlusMinus',
   ]);
-  const interior = position === 'C' || position === 'F' ? defRaw + 5 : defRaw - 3;
+  const interior =
+    54 +
+    blockSignal +
+    Math.max(0, (rpg ?? 4) - 4) * 1.2 +
+    impactSignal +
+    (position === 'C' ? 7 : position === 'F' ? 2 : -6);
   record(
     'interiorDefense',
     blend(interior, position === 'C' || position === 'F' ? 59 : 49),
@@ -464,13 +475,21 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   // speed. Use a conservative activity signal for speed and reserve size and
   // height for strength so high-production centers do not become 100-rated
   // athletes by construction.
-  const activity = 58 + ((usage ?? 18) - 18) * 0.2 + mpg * 0.3 + (per ?? 12) * 0.25;
+  const positionSpeedPrior = position === 'G' ? 75 : position === 'F' ? 67 : 59;
+  const heightSpeedPenalty =
+    input.heightInches === null ? 0 : Math.max(0, input.heightInches - 78) * 0.7;
+  const activity =
+    positionSpeedPrior +
+    ((usage ?? 18) - 18) * 0.18 +
+    (mpg - 24) * 0.16 +
+    (spg.value - 1) * 1.5 -
+    heightSpeedPenalty;
   const heightSignal = input.heightInches === null ? 0 : Math.max(0, input.heightInches - 72) * 1.7;
   record(
     'speed',
     blend(activity + (position === 'G' ? 4 : 0), 59),
     usage !== null ? 'derived' : 'estimated',
-    ['usageRate', 'minutes'],
+    ['position', 'heightInches', 'usageRate', 'minutes', 'steals'],
   );
   record(
     'strength',
@@ -478,10 +497,20 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       53 + heightSignal + (position === 'C' ? 4 : 0) + (per ?? 12) * 0.2,
       position === 'C' || position === 'F' ? 64 : 54,
     ),
-    usage !== null ? 'derived' : 'estimated',
-    ['usageRate', 'minutes'],
+    input.heightInches !== null ? 'derived' : 'estimated',
+    ['position', 'heightInches', 'per'],
   );
-  record('vertical', blend(60 + (position === 'C' ? 5 : 0), 54), 'estimated', ['prior']);
+  const verticalRaw =
+    51 +
+    bpg.value * 4 +
+    Math.max(0, (oreb.value - 1.5) * 1.8) +
+    (position === 'G' ? 5 : position === 'F' ? 3 : 0);
+  record(
+    'vertical',
+    blend(verticalRaw, 56),
+    bpg.kind === 'observed' || oreb.kind === 'observed' ? 'derived' : 'estimated',
+    ['blocks', 'offensiveRebounds', 'position'],
+  );
 
   record(
     'offensiveIq',
@@ -525,13 +554,73 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     fgaPerGame !== null ? 'derived' : 'estimated',
     ['fga'],
   );
-  t('driveRate', 10 + (position === 'G' ? 8 : 0), 'estimated', ['prior']);
-  t('postUpRate', 5 + (position === 'C' || position === 'F' ? 8 : 0), 'estimated', ['prior']);
-  t('rimFrequency', (ratings.insideScoring / 100) * 40, 'derived', ['insideScoring']);
-  t('shortMidFrequency', 15, 'estimated', ['prior']);
-  t('longMidFrequency', 10, 'estimated', ['prior']);
-  t('cornerThreeFrequency', (ratings.threePoint / 100) * 12, 'derived', ['threePoint']);
-  t('aboveBreakThreeFrequency', (ratings.threePoint / 100) * 20, 'derived', ['threePoint']);
+  const threeRate =
+    tpa !== null && fga !== null && fga > 0 ? tpa / fga : priors.threePointRatePrior;
+  const freeThrowPressure = fta !== null && fga !== null && fga > 0 ? fta / fga : usageVal / 100;
+  const assistRole = clamp((apg ?? 2) / 8, 0, 1);
+  const interiorRole = clamp((oreb.value / 4 + Math.max(0, (rpg ?? 4) - 4) / 12) / 2, 0, 1);
+  const guardRole = position === 'G' ? 1 : position === 'F' ? 0.45 : 0.1;
+  const driveRate = clamp(
+    6 + guardRole * 10 + freeThrowPressure * 22 + (usageVal - 18) * 0.25,
+    3,
+    35,
+  );
+  const postUpRate = clamp(
+    3 + interiorRole * 18 + (1 - threeRate) * (position === 'C' ? 7 : 2),
+    2,
+    32,
+  );
+  const rimFrequency = clamp(
+    12 + freeThrowPressure * 25 + interiorRole * 16 + guardRole * 2,
+    8,
+    48,
+  );
+  const nonThreeShare = clamp(100 - threeRate * 100 - rimFrequency, 5, 80);
+  const longMidShare = clamp(nonThreeShare * (0.34 + guardRole * 0.12), 4, 30);
+  const shortMidShare = clamp(nonThreeShare - longMidShare, 5, 35);
+  const cornerShare = clamp(threeRate * 100 * (0.28 + (1 - assistRole) * 0.18), 0, 35);
+  const aboveBreakShare = clamp(threeRate * 100 - cornerShare, 0, 55);
+  t('driveRate', driveRate, fta !== null ? 'derived' : 'estimated', [
+    'fta',
+    'fga',
+    'usageRate',
+    'position',
+  ]);
+  t('postUpRate', postUpRate, oreb.kind === 'observed' ? 'derived' : 'estimated', [
+    'offensiveRebounds',
+    'rebounds',
+    'tpa',
+    'fga',
+    'position',
+  ]);
+  t('rimFrequency', rimFrequency, fta !== null ? 'derived' : 'estimated', [
+    'fta',
+    'fga',
+    'offensiveRebounds',
+    'position',
+  ]);
+  t('shortMidFrequency', shortMidShare, fga !== null ? 'derived' : 'estimated', [
+    'fga',
+    'tpa',
+    'fta',
+    'position',
+  ]);
+  t('longMidFrequency', longMidShare, fga !== null ? 'derived' : 'estimated', [
+    'fga',
+    'tpa',
+    'fta',
+    'position',
+  ]);
+  t('cornerThreeFrequency', cornerShare, tpa !== null ? 'derived' : 'estimated', [
+    'tpa',
+    'fga',
+    'assists',
+  ]);
+  t('aboveBreakThreeFrequency', aboveBreakShare, tpa !== null ? 'derived' : 'estimated', [
+    'tpa',
+    'fga',
+    'assists',
+  ]);
 
   // Three-point volume tendency: pre-1979 the shot did not exist (league
   // rule, not-applicable). From 1979-80 the rate is observed; absent
@@ -571,12 +660,42 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     t('turnoverRate', (usageVal / 20) * 12 + 4, 'estimated', ['usageRate', 'prior']);
   }
 
-  t('isolationRate', usageVal * 0.3, usage !== null ? 'derived' : 'estimated', ['usageRate']);
-  t('pickAndRollBallHandlerRate', 20 + (position === 'G' ? 15 : 0), 'estimated', ['prior']);
-  t('pickAndRollRollManRate', 10 + (position === 'C' ? 15 : 0), 'estimated', ['prior']);
-  t('spotUpRate', 20, 'estimated', ['prior']);
-  t('transitionRate', 15, 'estimated', ['prior']);
-  t('cutRate', 10, 'estimated', ['prior']);
+  t(
+    'isolationRate',
+    clamp((usageVal - 10) * (0.22 + guardRole * 0.12), 1, 18),
+    usage !== null ? 'derived' : 'estimated',
+    ['usageRate', 'position'],
+  );
+  t(
+    'pickAndRollBallHandlerRate',
+    clamp(8 + guardRole * 13 + assistRole * 17 + Math.max(0, usageVal - 20) * 0.45, 5, 45),
+    apg !== null ? 'derived' : 'estimated',
+    ['assists', 'usageRate', 'position'],
+  );
+  t(
+    'pickAndRollRollManRate',
+    clamp(5 + interiorRole * 22 + (position === 'C' ? 5 : 0), 3, 35),
+    oreb.kind === 'observed' ? 'derived' : 'estimated',
+    ['offensiveRebounds', 'rebounds', 'position'],
+  );
+  t(
+    'spotUpRate',
+    clamp(9 + threeRate * 34 + (1 - clamp(usageVal / 32, 0, 1)) * 10, 7, 32),
+    tpa !== null ? 'derived' : 'estimated',
+    ['tpa', 'fga', 'usageRate'],
+  );
+  t(
+    'transitionRate',
+    clamp(7 + (ratings.speed - 50) * 0.3 + spg.value * 1.2, 5, 28),
+    spg.kind === 'observed' ? 'derived' : 'estimated',
+    ['speed', 'steals'],
+  );
+  t(
+    'cutRate',
+    clamp(5 + (1 - clamp(usageVal / 32, 0, 1)) * 8 + interiorRole * 6, 4, 22),
+    usage !== null ? 'derived' : 'estimated',
+    ['usageRate', 'offensiveRebounds', 'rebounds'],
+  );
   t(
     'foulRate',
     2 + ((totals.fouls ?? 0) / Math.max(1, minutes)) * 48,
@@ -628,7 +747,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     artifact: input.artifact ?? {
       schemaVersion: 1,
       modelVersion: 'ratings-model-v3.1',
-      ratingsVersion: 'ratings-v3.1',
+      ratingsVersion: 'ratings-v3.4',
       benchmarkVersion: 'ratings-benchmarks-v1',
       seedVersion: 'ratings-seeds-v1',
       sampleCountPerContext: 256,

@@ -34,7 +34,7 @@ type Manifest = Record<string, unknown>;
 
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
 
-export const DATA_VERSION = 'm7-ratings-v3.1';
+export const DATA_VERSION = 'm10-ratings-v3.4';
 
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {

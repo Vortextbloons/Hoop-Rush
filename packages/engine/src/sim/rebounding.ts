@@ -16,7 +16,13 @@ import { ENGINE_CONSTANTS } from './constants.js';
 
 /** Team-average rating helper. */
 export function teamMean(team: SimulationTeam, rating: keyof SimulationPlayer['ratings']): number {
-  return team.players.reduce((sum, p) => sum + p.ratings[rating], 0) / team.players.length;
+  return (
+    team.players.reduce((sum, p) => {
+      const tendencyFactor =
+        rating === 'offensiveRebound' ? 0.75 + p.tendencies.crashOffensiveGlassRate / 40 : 1;
+      return sum + p.ratings[rating] * tendencyFactor;
+    }, 0) / team.players.length
+  );
 }
 
 export interface ReboundResult {
@@ -77,7 +83,7 @@ export function rebounderWeights(team: SimulationTeam, offensive: boolean): numb
     const weightContribution = p.weightLbs === null ? 0 : Math.max(0, p.weightLbs - 180) * 0.03;
     return Math.max(
       0.5,
-      p.ratings[rating] +
+      p.ratings[rating] * (offensive ? 0.75 + p.tendencies.crashOffensiveGlassRate / 40 : 1) +
         p.ratings.vertical * 0.25 +
         historical * ENGINE_CONSTANTS.observedReboundWeight +
         heightContribution +

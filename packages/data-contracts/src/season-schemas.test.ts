@@ -1,0 +1,722 @@
+import { describe, expect, it } from 'vitest';
+import {
+  seasonCursorSchema,
+  seasonGameSchema,
+  seasonLeagueSchema,
+  seasonPostseasonStateSchema,
+  seasonRunSchema,
+  seasonScheduleSchema,
+  seasonStandingsSchema,
+  type SeasonGame,
+  type SeasonLeague,
+  type SeasonPostseasonState,
+  type SeasonRun,
+  type SeasonSchedule,
+} from './index.js';
+
+/**
+ * Season Run contract tests (M2.0): every runtime schema round-trips valid
+ * state and rejects wrong versions, invalid team counts, duplicate
+ * ownership, malformed rosters, invalid cursors, and corrupt postseason
+ * states. Fixtures here are self-contained so the contract layer stays
+ * dependency-free.
+ */
+
+const CONFERENCE_TEAMS: Record<'east' | 'west', string[]> = {
+  east: [
+    'hawks',
+    'celtics',
+    'nets',
+    'hornets',
+    'bulls',
+    'cavaliers',
+    'pistons',
+    'pacers',
+    'heat',
+    'bucks',
+    'knicks',
+    'magic',
+    'sixers',
+    'raptors',
+    'wizards',
+  ],
+  west: [
+    'mavericks',
+    'nuggets',
+    'warriors',
+    'rockets',
+    'clippers',
+    'lakers',
+    'grizzlies',
+    'timberwolves',
+    'pelicans',
+    'thunder',
+    'suns',
+    'blazers',
+    'kings',
+    'spurs',
+    'jazz',
+  ],
+};
+
+const DIVISION_OF: Record<string, string> = {
+  hawks: 'southeast',
+  celtics: 'atlantic',
+  nets: 'atlantic',
+  hornets: 'southeast',
+  bulls: 'central',
+  cavaliers: 'central',
+  pistons: 'central',
+  pacers: 'central',
+  heat: 'southeast',
+  bucks: 'central',
+  knicks: 'atlantic',
+  magic: 'southeast',
+  sixers: 'atlantic',
+  raptors: 'atlantic',
+  wizards: 'southeast',
+  mavericks: 'southwest',
+  nuggets: 'northwest',
+  warriors: 'pacific',
+  rockets: 'southwest',
+  clippers: 'pacific',
+  lakers: 'pacific',
+  grizzlies: 'southwest',
+  timberwolves: 'northwest',
+  pelicans: 'southwest',
+  thunder: 'northwest',
+  suns: 'pacific',
+  blazers: 'northwest',
+  kings: 'pacific',
+  spurs: 'southwest',
+  jazz: 'northwest',
+};
+
+function buildLeague(): SeasonLeague {
+  return {
+    schemaVersion: 1,
+    leagueVersion: 'league-v1',
+    teams: [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west].map((franchiseId, index) => ({
+      franchiseId,
+      control: index === 0 ? ('human' as const) : ('ai' as const),
+      conference: index < 15 ? ('east' as const) : ('west' as const),
+      division: DIVISION_OF[franchiseId] as SeasonLeague['teams'][number]['division'],
+    })),
+  };
+}
+
+function buildSchedule(): SeasonSchedule {
+  const games: SeasonSchedule['games'] = [];
+  const teams = [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west];
+  let sequence = 0;
+  for (let round = 1; round <= 82; round += 1) {
+    for (let g = 0; g < 15; g += 1) {
+      const home = teams[g];
+      const away = teams[g + 15];
+      if (home === undefined || away === undefined) throw new Error('fixture teams out of range');
+      sequence += 1;
+      games.push({
+        gameId: `s${String(sequence).padStart(6, '0')}`,
+        round,
+        homeFranchiseId: home,
+        awayFranchiseId: away,
+      });
+    }
+  }
+  return {
+    schemaVersion: 1,
+    scheduleVersion: 'schedule-v1',
+    formulaVersion: 'schedule-formula-v1',
+    leagueVersion: 'league-v1',
+    generationSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+    rounds: 82,
+    games,
+  };
+}
+
+function buildGames(schedule: SeasonSchedule): SeasonGame[] {
+  return schedule.games.map((game) => ({
+    ...game,
+    status: 'scheduled' as const,
+    homeScore: null,
+    awayScore: null,
+    forfeitLoserFranchiseId: null,
+  }));
+}
+
+function buildPostseason(seed: string): SeasonPostseasonState {
+  const conferenceState = (conference: 'east' | 'west') => ({
+    conference,
+    ranking: null,
+    games: {
+      sevenEight: {
+        gameId: 'seven-eight' as const,
+        status: 'scheduled' as const,
+        homeFranchiseId: null,
+        awayFranchiseId: null,
+        winnerFranchiseId: null,
+        loserFranchiseId: null,
+        homeScore: null,
+        awayScore: null,
+      },
+      nineTen: {
+        gameId: 'nine-ten' as const,
+        status: 'scheduled' as const,
+        homeFranchiseId: null,
+        awayFranchiseId: null,
+        winnerFranchiseId: null,
+        loserFranchiseId: null,
+        homeScore: null,
+        awayScore: null,
+      },
+      final: {
+        gameId: 'final' as const,
+        status: 'scheduled' as const,
+        homeFranchiseId: null,
+        awayFranchiseId: null,
+        winnerFranchiseId: null,
+        loserFranchiseId: null,
+        homeScore: null,
+        awayScore: null,
+      },
+    },
+    playoffSeeds: null,
+  });
+  return {
+    schemaVersion: 1,
+    postseasonVersion: 'postseason-v1',
+    seed,
+    playIn: { east: conferenceState('east'), west: conferenceState('west') },
+    bracket: null,
+    championFranchiseId: null,
+  };
+}
+
+const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+
+function buildRun(): SeasonRun {
+  const league = buildLeague();
+  const schedule = buildSchedule();
+  const rosters = league.teams.map((team, teamIndex) => ({
+    franchiseId: team.franchiseId,
+    players: Array.from({ length: 10 }, (_, slot) => ({
+      playerVersionId:
+        `pv-${String(teamIndex).padStart(2, '0')}${String(slot).padStart(2, '0')}`.padEnd(
+          3 + 32,
+          '0',
+        ),
+      playerId: `p-synth-${teamIndex + 1}-${slot + 1}`,
+      franchiseId: team.franchiseId,
+      eraId: '1990s',
+      seasonKey: '1995-96',
+      displayName: `Synthetic ${String(slot + 1)}`,
+    })),
+  }));
+  return {
+    schemaVersion: 1,
+    runId: 'fixture-run-1',
+    rootSeed: SEED,
+    versions: {
+      runSchemaVersion: 1,
+      leagueVersion: 'league-v1',
+      scheduleVersion: 'schedule-v1',
+      scheduleFormulaVersion: 'schedule-formula-v1',
+      standingsVersion: 'standings-v1',
+      postseasonVersion: 'postseason-v1',
+      seedDerivationVersion: 'season-seeds-v1',
+      playerVersionIdVersion: 'player-version-id-v1',
+    },
+    league,
+    rosters,
+    ownership: rosters.flatMap((roster) =>
+      roster.players.map((player) => ({
+        playerVersionId: player.playerVersionId,
+        ownerFranchiseId: roster.franchiseId,
+      })),
+    ),
+    schedule: {
+      leagueVersion: 'league-v1',
+      scheduleVersion: 'schedule-v1',
+      formulaVersion: 'schedule-formula-v1',
+      generationSeed: SEED,
+      contentHash: '0'.repeat(64),
+    },
+    games: buildGames(schedule),
+    standings: {
+      schemaVersion: 1,
+      standingsVersion: 'standings-v1',
+      rows: league.teams.map((team) => ({
+        franchiseId: team.franchiseId,
+        wins: 0,
+        losses: 0,
+        gamesPlayed: 0,
+        homeWins: 0,
+        homeLosses: 0,
+        awayWins: 0,
+        awayLosses: 0,
+        conferenceWins: 0,
+        conferenceLosses: 0,
+        divisionWins: 0,
+        divisionLosses: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        headToHead: league.teams
+          .filter((other) => other.franchiseId !== team.franchiseId)
+          .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
+      })),
+    },
+    cursor: { schemaVersion: 1, completedRounds: 0 },
+    postseason: buildPostseason(SEED),
+  };
+}
+
+function roundTrip<T>(schema: { parse: (input: unknown) => T }, value: T): T {
+  return schema.parse(JSON.parse(JSON.stringify(value)));
+}
+
+describe('season league schema', () => {
+  it('round-trips a valid league', () => {
+    const league = roundTrip(seasonLeagueSchema, buildLeague());
+    expect(league.teams).toHaveLength(30);
+    expect(league.teams.filter((t) => t.conference === 'east')).toHaveLength(15);
+    expect(league.teams.filter((t) => t.conference === 'west')).toHaveLength(15);
+    for (const division of [
+      'atlantic',
+      'central',
+      'southeast',
+      'northwest',
+      'pacific',
+      'southwest',
+    ]) {
+      expect(league.teams.filter((t) => t.division === division)).toHaveLength(5);
+    }
+    expect(league.teams[0]?.control).toBe('human');
+  });
+
+  it('rejects a wrong league version', () => {
+    expect(() =>
+      seasonLeagueSchema.parse({ ...buildLeague(), leagueVersion: 'league-v2' }),
+    ).toThrow();
+  });
+
+  it('rejects a wrong schema version', () => {
+    expect(() => seasonLeagueSchema.parse({ ...buildLeague(), schemaVersion: 2 })).toThrow();
+  });
+
+  it('rejects invalid team counts', () => {
+    const league = buildLeague();
+    expect(() =>
+      seasonLeagueSchema.parse({ ...league, teams: league.teams.slice(0, 29) }),
+    ).toThrow();
+    const duplicated = [...league.teams, { ...league.teams[0], franchiseId: 'extra' }];
+    expect(() => seasonLeagueSchema.parse({ ...league, teams: duplicated })).toThrow();
+  });
+
+  it('rejects an unknown franchise id and division', () => {
+    const league = buildLeague();
+    const bad = {
+      ...league,
+      teams: league.teams.map((t, i) => (i === 0 ? { ...t, franchiseId: 'Expansion' } : t)),
+    };
+    expect(() => seasonLeagueSchema.parse(bad)).toThrow();
+    expect(() =>
+      seasonLeagueSchema.parse({
+        ...league,
+        teams: league.teams.map((t, i) => (i === 0 ? { ...t, division: 'north' } : t)),
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season schedule schema', () => {
+  it('round-trips the full schedule artifact', () => {
+    const schedule = roundTrip(seasonScheduleSchema, buildSchedule());
+    expect(schedule.games).toHaveLength(1230);
+    expect(schedule.rounds).toBe(82);
+    expect(schedule.games[0]?.gameId).toBe('s000001');
+  });
+
+  it('rejects wrong versions and wrong counts', () => {
+    const schedule = buildSchedule();
+    expect(() =>
+      seasonScheduleSchema.parse({ ...schedule, scheduleVersion: 'schedule-v9' }),
+    ).toThrow();
+    expect(() => seasonScheduleSchema.parse({ ...schedule, formulaVersion: 'old' })).toThrow();
+    expect(() => seasonScheduleSchema.parse({ ...schedule, leagueVersion: 'league-v2' })).toThrow();
+    expect(() => seasonScheduleSchema.parse({ ...schedule, rounds: 81 })).toThrow();
+    expect(() =>
+      seasonScheduleSchema.parse({ ...schedule, games: schedule.games.slice(0, 1229) }),
+    ).toThrow();
+  });
+
+  it('rejects malformed game records', () => {
+    const schedule = buildSchedule();
+    const games = [...schedule.games];
+    const first = games[0];
+    if (!first) throw new Error('no games');
+    games[0] = {
+      ...first,
+      homeFranchiseId: first.awayFranchiseId,
+      awayFranchiseId: first.homeFranchiseId,
+    };
+    expect(() => seasonScheduleSchema.parse({ ...schedule, games })).not.toThrow();
+    games[0] = { ...first, round: 83 };
+    expect(() => seasonScheduleSchema.parse({ ...schedule, games })).toThrow();
+    games[0] = { ...first, gameId: 's-00001' };
+    expect(() => seasonScheduleSchema.parse({ ...schedule, games })).toThrow();
+  });
+});
+
+describe('season game schema', () => {
+  it('round-trips scheduled, final, and forfeit games', () => {
+    const scheduled = roundTrip(seasonGameSchema, {
+      gameId: 's000001',
+      round: 1,
+      homeFranchiseId: 'lakers',
+      awayFranchiseId: 'celtics',
+      status: 'scheduled',
+      homeScore: null,
+      awayScore: null,
+      forfeitLoserFranchiseId: null,
+    });
+    expect(scheduled.status).toBe('scheduled');
+    const final = roundTrip(seasonGameSchema, {
+      ...scheduled,
+      status: 'final',
+      homeScore: 104,
+      awayScore: 99,
+    });
+    expect(final.homeScore).toBe(104);
+    const forfeit = {
+      ...scheduled,
+      status: 'forfeit' as const,
+      forfeitLoserFranchiseId: 'celtics',
+    };
+    expect(forfeit.forfeitLoserFranchiseId).toBe('celtics');
+    const roundTrippedForfeit = roundTrip(seasonGameSchema, forfeit);
+    expect(roundTrippedForfeit.status).toBe('forfeit');
+  });
+
+  it('rejects corrupt game states', () => {
+    const base = {
+      gameId: 's000001',
+      round: 1,
+      homeFranchiseId: 'lakers',
+      awayFranchiseId: 'celtics',
+      status: 'final' as const,
+      homeScore: 104,
+      awayScore: 99,
+      forfeitLoserFranchiseId: null,
+    };
+    expect(() => seasonGameSchema.parse({ ...base, status: 'overtime' })).toThrow();
+    expect(() => seasonGameSchema.parse({ ...base, homeScore: -1 })).toThrow();
+    expect(() => seasonGameSchema.parse({ ...base, awayScore: null })).toThrow();
+    // A forfeit without a named loser, or carrying scores, is corrupt.
+    expect(() => seasonGameSchema.parse({ ...base, status: 'forfeit' })).toThrow();
+    const forfeit = { ...base, status: 'forfeit' as const, homeScore: null, awayScore: null };
+    expect(() => seasonGameSchema.parse(forfeit)).toThrow();
+    expect(() =>
+      seasonGameSchema.parse({ ...forfeit, forfeitLoserFranchiseId: 'celtics' }),
+    ).not.toThrow();
+    // The forfeit loser must be one of the two teams.
+    expect(() =>
+      seasonGameSchema.parse({ ...forfeit, forfeitLoserFranchiseId: 'bulls' }),
+    ).toThrow();
+    // A scheduled game carrying any result is corrupt.
+    expect(() =>
+      seasonGameSchema.parse({ ...base, status: 'scheduled', homeScore: null, awayScore: null }),
+    ).not.toThrow();
+    expect(() => seasonGameSchema.parse({ ...base, status: 'scheduled', homeScore: 5 })).toThrow();
+  });
+});
+
+describe('season standings schema', () => {
+  it('round-trips a standings table', () => {
+    const run = buildRun();
+    const standings = roundTrip(seasonStandingsSchema, run.standings);
+    expect(standings.rows).toHaveLength(30);
+    expect(standings.rows[0]?.headToHead).toHaveLength(29);
+  });
+
+  it('rejects wrong versions and team counts', () => {
+    const run = buildRun();
+    const standings = run.standings;
+    expect(() =>
+      seasonStandingsSchema.parse({ ...standings, standingsVersion: 'standings-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonStandingsSchema.parse({ ...standings, rows: standings.rows.slice(0, 29) }),
+    ).toThrow();
+  });
+
+  it('carries accounting invariants as domain facts, not schema rules', () => {
+    // The schema validates shape; reconciling wins/losses with game records
+    // is the standings audit's job (engine season/standings tests).
+    const run = buildRun();
+    const standings = run.standings;
+    const rows = standings.rows.map((row, index) =>
+      index === 0 ? { ...row, wins: 5, losses: 2, gamesPlayed: 6 } : row,
+    );
+    expect(() => seasonStandingsSchema.parse({ ...standings, rows })).not.toThrow();
+  });
+});
+
+describe('season cursor schema', () => {
+  it('round-trips every cursor position', () => {
+    for (const completedRounds of [0, 1, 10, 80, 81, 82]) {
+      const cursor = roundTrip(seasonCursorSchema, { schemaVersion: 1, completedRounds });
+      expect(cursor.completedRounds).toBe(completedRounds);
+    }
+  });
+
+  it('rejects invalid cursors', () => {
+    expect(() => seasonCursorSchema.parse({ schemaVersion: 1, completedRounds: -1 })).toThrow();
+    expect(() => seasonCursorSchema.parse({ schemaVersion: 1, completedRounds: 83 })).toThrow();
+    expect(() => seasonCursorSchema.parse({ schemaVersion: 2, completedRounds: 0 })).toThrow();
+  });
+});
+
+describe('season postseason schema', () => {
+  it('round-trips an empty postseason state', () => {
+    const state = roundTrip(seasonPostseasonStateSchema, buildPostseason(SEED));
+    expect(state.bracket).toBeNull();
+    expect(state.playIn.east.playoffSeeds).toBeNull();
+    expect(state.playIn.west.ranking).toBeNull();
+  });
+
+  it('rejects corrupt play-in states', () => {
+    const state = buildPostseason(SEED);
+    const bad = {
+      ...state,
+      playIn: {
+        ...state.playIn,
+        east: {
+          ...state.playIn.east,
+          ranking: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'],
+        },
+      },
+    };
+    expect(() => seasonPostseasonStateSchema.parse(bad)).toThrow();
+    // A final play-in game whose winner is not a participant is corrupt.
+    const winnerNotInGame = {
+      ...state,
+      playIn: {
+        ...state.playIn,
+        east: {
+          ...state.playIn.east,
+          ranking: Array.from({ length: 10 }, (_, i) => `team-${i + 1}`),
+          games: {
+            sevenEight: {
+              gameId: 'seven-eight',
+              status: 'final',
+              homeFranchiseId: 'team-7',
+              awayFranchiseId: 'team-8',
+              winnerFranchiseId: 'team-99',
+              loserFranchiseId: 'team-8',
+              homeScore: 100,
+              awayScore: 90,
+            },
+            nineTen: {
+              gameId: 'nine-ten',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+            final: {
+              gameId: 'final',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+          },
+        },
+      },
+    };
+    expect(() => seasonPostseasonStateSchema.parse(winnerNotInGame)).toThrow();
+    // A final play-in game naming only participating teams is valid.
+    const winnerParticipates = {
+      ...winnerNotInGame,
+      playIn: {
+        ...winnerNotInGame.playIn,
+        east: {
+          ...winnerNotInGame.playIn.east,
+          games: {
+            sevenEight: {
+              gameId: 'seven-eight',
+              status: 'final',
+              homeFranchiseId: 'team-7',
+              awayFranchiseId: 'team-8',
+              winnerFranchiseId: 'team-7',
+              loserFranchiseId: 'team-8',
+              homeScore: 100,
+              awayScore: 90,
+            },
+            nineTen: {
+              gameId: 'nine-ten',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+            final: {
+              gameId: 'final',
+              status: 'scheduled',
+              homeFranchiseId: null,
+              awayFranchiseId: null,
+              winnerFranchiseId: null,
+              loserFranchiseId: null,
+              homeScore: null,
+              awayScore: null,
+            },
+          },
+        },
+      },
+    };
+    expect(() => seasonPostseasonStateSchema.parse(winnerParticipates)).not.toThrow();
+    expect(() =>
+      seasonPostseasonStateSchema.parse({
+        ...state,
+        playIn: {
+          ...state.playIn,
+          east: { ...state.playIn.east, playoffSeeds: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] },
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('rejects a wrong postseason version', () => {
+    expect(() =>
+      seasonPostseasonStateSchema.parse({
+        ...buildPostseason(SEED),
+        postseasonVersion: 'postseason-v2',
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season run schema', () => {
+  it('round-trips a complete snapshot', () => {
+    const run = roundTrip(seasonRunSchema, buildRun());
+    expect(run.rosters).toHaveLength(30);
+    expect(run.ownership).toHaveLength(300);
+    expect(run.games).toHaveLength(1230);
+  });
+
+  it('rejects duplicate ownership rows', () => {
+    const run = buildRun();
+    const duplicated = [...run.ownership];
+    const first = duplicated[0];
+    if (!first) throw new Error('no ownership rows');
+    duplicated.push({ ...first });
+    expect(() => seasonRunSchema.parse({ ...run, ownership: duplicated })).toThrow();
+  });
+
+  it('rejects malformed rosters', () => {
+    const run = buildRun();
+    const rosters = run.rosters.map((roster, index) =>
+      index === 0 ? { ...roster, players: roster.players.slice(0, 9) } : roster,
+    );
+    expect(() => seasonRunSchema.parse({ ...run, rosters })).toThrow();
+  });
+
+  it('rejects a roster entry with an undecodable playerVersionId', () => {
+    const run = buildRun();
+    const rosters = run.rosters.map((roster, index) =>
+      index === 0
+        ? {
+            ...roster,
+            players: roster.players.map((player, slot) =>
+              slot === 0 ? { ...player, playerVersionId: 'pv-nothex' } : player,
+            ),
+          }
+        : roster,
+    );
+    expect(() => seasonRunSchema.parse({ ...run, rosters })).toThrow();
+  });
+
+  it('rejects mismatched version boundaries', () => {
+    const run = buildRun();
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, seedDerivationVersion: 'season-seeds-v9' },
+      }),
+    ).toThrow();
+  });
+
+  it('rejects an invalid cursor and wrong game count', () => {
+    const run = buildRun();
+    expect(() =>
+      seasonRunSchema.parse({ ...run, cursor: { schemaVersion: 1, completedRounds: 99 } }),
+    ).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, games: run.games.slice(0, 100) })).toThrow();
+  });
+});
+
+describe('player version identity', () => {
+  it('is deterministic and field-sensitive', async () => {
+    const mod = await import('./index.js');
+    const { playerVersionId } = mod;
+    const a = playerVersionId('p-1', 'lakers', '1990s', '1996-97');
+    const b = playerVersionId('p-1', 'lakers', '1990s', '1996-97');
+    expect(a).toBe(b);
+    expect(a).toMatch(/^pv-[0-9a-f]{32}$/);
+    expect(playerVersionId('p-2', 'lakers', '1990s', '1996-97')).not.toBe(a);
+    expect(playerVersionId('p-1', 'celtics', '1990s', '1996-97')).not.toBe(a);
+    expect(playerVersionId('p-1', 'lakers', '1980s', '1996-97')).not.toBe(a);
+    expect(playerVersionId('p-1', 'lakers', '1990s', '1986-87')).not.toBe(a);
+  });
+
+  it('derives distinct ids for two versions of the same person', async () => {
+    const mod = await import('./index.js');
+    const { playerVersionId } = mod;
+    const peak = playerVersionId('p-23', 'bulls', '1990s', '1997-98');
+    const second = playerVersionId('p-23', 'bulls', '1990s', '1996-97');
+    expect(peak).not.toBe(second);
+  });
+});
+
+describe('season seed derivation', () => {
+  it('is deterministic, namespaced, and order-independent', async () => {
+    const mod = await import('./index.js');
+    const { seasonNamespaceSeed, SEASON_SEED_NAMESPACES } = mod;
+    const seed = 'c0ffee1a2b3c4d5e6f708192a3b4c5d6e';
+    const draft = seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.draft);
+    expect(draft).toBe(seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.draft));
+    expect(draft).toMatch(/^[0-9a-f]{32}$/);
+    const ai = seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.aiRosters);
+    expect(ai).not.toBe(draft);
+    const games = seasonNamespaceSeed(
+      seed,
+      SEASON_SEED_NAMESPACES.scheduleGames,
+      'lakers',
+      'celtics',
+    );
+    const gamesSwapped = seasonNamespaceSeed(
+      seed,
+      SEASON_SEED_NAMESPACES.scheduleGames,
+      'celtics',
+      'lakers',
+    );
+    expect(games).not.toBe(gamesSwapped);
+    expect(games).toBe(
+      seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.scheduleGames, 'lakers', 'celtics'),
+    );
+    for (const namespace of Object.values(SEASON_SEED_NAMESPACES)) {
+      const derived = seasonNamespaceSeed(seed, namespace);
+      expect(derived).toMatch(/^[0-9a-f]{32}$/);
+      expect(derived).not.toBe(seed);
+    }
+  });
+});

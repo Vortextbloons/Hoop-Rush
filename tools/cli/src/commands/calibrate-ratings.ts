@@ -49,7 +49,7 @@ function newAccumulator(): PairAccumulator {
 }
 
 function seedFor(playerId: string, context: string, index: number): string {
-  return fixtureSeed(`ratings-v3.1|${playerId}|${context}`, index);
+  return fixtureSeed(`ratings-v3.4|${playerId}|${context}`, index);
 }
 
 function teamMetric(result: ReturnType<typeof simulateGame>, side: 'home' | 'away') {

@@ -65,6 +65,15 @@ export const playersIndexAssetSchema = z.object({
 });
 export type PlayersIndexAsset = z.infer<typeof playersIndexAssetSchema>;
 
+/** Hashed reference to a Season Run packaged artifact (M2.0). */
+export const seasonArtifactIndexEntrySchema = z.object({
+  /** Relative or absolute URL of the Season Run artifact. */
+  url: z.string().min(1).max(512),
+  /** SHA-256 content hash of the referenced artifact. */
+  contentHash: contentHashSchema,
+});
+export type SeasonArtifactIndexEntry = z.infer<typeof seasonArtifactIndexEntrySchema>;
+
 export const hoopRushManifestSchema = z.object({
   schemaVersion: z.union([z.literal(3), z.literal(MANIFEST_SCHEMA_VERSION)]),
   dataVersion: z.string().min(1).max(64),
@@ -85,6 +94,13 @@ export const hoopRushManifestSchema = z.object({
   playersIndex: playersIndexAssetSchema.optional(),
   /** Heavy roster-browser details (stats, height/weight); loaded by the Roster screen only. */
   rosterDetails: playersIndexAssetSchema.optional(),
+  /** Season Run frozen league and schedule artifacts (2.0). Optional so 1.0 manifests stay valid. */
+  season: z
+    .object({
+      league: seasonArtifactIndexEntrySchema,
+      schedule: seasonArtifactIndexEntrySchema,
+    })
+    .optional(),
   assets: assetConfigSchema,
 });
 export type HoopRushManifest = z.infer<typeof hoopRushManifestSchema>;

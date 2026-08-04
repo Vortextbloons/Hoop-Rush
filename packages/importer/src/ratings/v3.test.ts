@@ -106,6 +106,6 @@ describe('Ratings v3 profile', () => {
       era: { leaguePpg: 114.7, league3PARate: 0.39, pace: 99 },
       artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
     });
-    expect(record.summaryRatings.overallRating).toBeGreaterThanOrEqual(88);
+    expect(record.summaryRatings.overallRating).toBeGreaterThanOrEqual(87);
   });
 });

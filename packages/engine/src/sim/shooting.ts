@@ -158,26 +158,30 @@ export function blockProbability(
     per48 > c.blockAnchorFloorPer48
       ? Math.min(c.blockAnchorMax, (per48 - c.blockAnchorFloorPer48) * c.blockAnchorScale)
       : 0;
+  const attemptFactor = 0.75 + Math.min(20, defender.tendencies.blockAttemptRate) / 40;
   if (zone === 'rim') {
     const base = Math.min(
       c.blockRimMax,
       Math.max(0, ((defender.ratings.block - 40) / 60) * c.blockRimMax),
     );
-    return (
-      base +
-      (action === 'isolation' || action === 'pickAndRoll' ? c.blockDriveBonus : 0) +
-      anchorBonus
+    return Math.min(
+      c.blockRimMax + c.blockDriveBonus + c.blockAnchorMax,
+      (base +
+        (action === 'isolation' || action === 'pickAndRoll' ? c.blockDriveBonus : 0) +
+        anchorBonus) *
+        attemptFactor,
     );
   }
   if (zone === 'shortMid') {
     return Math.min(
       c.blockMidMax,
-      Math.max(0, ((defender.ratings.block - 50) / 50) * c.blockMidMax) + anchorBonus * 0.5,
+      (Math.max(0, ((defender.ratings.block - 50) / 50) * c.blockMidMax) + anchorBonus * 0.5) *
+        attemptFactor,
     );
   }
   return Math.min(
     c.blockThreeMax,
-    Math.max(0, ((defender.ratings.perimeterDefense - 60) / 40) * c.blockThreeMax),
+    Math.max(0, ((defender.ratings.perimeterDefense - 60) / 40) * c.blockThreeMax) * attemptFactor,
   );
 }
 
@@ -204,7 +208,8 @@ export function makeProbability(
     : ENGINE_CONSTANTS.zoneBaseMake[zone] * (twoAnchor ?? 1);
   const skill = threePointZone
     ? hasObservedThree
-      ? ((zoneSkillRating(shooter, zone) - 70) / 100) * 0.05
+      ? ((zoneSkillRating(shooter, zone) - 70) / 100) *
+        ENGINE_CONSTANTS.anchoredThreePointSkillRange
       : ((zoneSkillRating(shooter, zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange
     : ((zoneSkillRating(shooter, zone) - 70) / 30) *
       ENGINE_CONSTANTS.skillRange *
@@ -222,6 +227,7 @@ export function makeProbability(
     periodSecondsRemaining <= 4
       ? -(0.04 + Math.min(1, Math.max(0, (4 - periodSecondsRemaining) / 4)) * 0.06)
       : 0;
-  const raw = base + skill + contest + era + spacing + quality + latePenalty;
+  const calibration = threePointZone ? ENGINE_CONSTANTS.threePointCalibrationOffset : 0;
+  const raw = base + skill + contest + era + spacing + quality + latePenalty + calibration;
   return Math.min(0.97, Math.max(ENGINE_CONSTANTS.zoneMakeFloor[zone], Math.max(0.03, raw)));
 }

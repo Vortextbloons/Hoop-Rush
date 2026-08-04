@@ -351,6 +351,7 @@ export function blendedZoneWeights(
 export interface ZonePrep {
   blend: number[];
   threePointTarget: number;
+  driveRate: number;
 }
 
 /** Computes the pristine zone prep for one player. */
@@ -358,6 +359,7 @@ export function zonePrep(shooter: SimulationPlayer, profile: EraSimulationProfil
   return {
     blend: blendedZoneWeights(shooter, profile),
     threePointTarget: threePointTarget(shooter, profile),
+    driveRate: shooter.tendencies.driveRate,
   };
 }
 
@@ -414,6 +416,9 @@ export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone
   // Play-type zone pulls stay modest so they refine the shot profile instead
   // of dragging the whole league toward the paint.
   weights[0] = (weights[0] ?? 0) * (action === 'transition' ? 1.1 : action === 'postUp' ? 1.02 : 1);
+  if (action === 'isolation' || action === 'pickAndRoll') {
+    weights[0] = (weights[0] ?? 0) * (0.9 + Math.min(40, prep.driveRate) / 100);
+  }
   weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
   return rng.weightedPick(ZONES, weights);
 }

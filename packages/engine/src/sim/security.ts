@@ -98,7 +98,9 @@ export function isSteal(rng: Rng, stealAbility: number, profile: EraSimulationPr
 
 /** Steal attribution weights for a team, in team index order. */
 export function stealerWeights(defense: SimulationTeam): number[] {
-  return defense.players.map((d) => Math.max(0.5, d.ratings.steal));
+  return defense.players.map((d) =>
+    Math.max(0.5, d.ratings.steal * (0.6 + d.tendencies.stealAttemptRate / 20)),
+  );
 }
 
 /** Credits the stealer against precomputed steal-rating weights. */

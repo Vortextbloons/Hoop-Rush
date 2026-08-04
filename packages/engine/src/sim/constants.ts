@@ -8,7 +8,7 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v6';
+export const ENGINE_VERSION = 'm3-engine-v7';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -126,7 +126,7 @@ export const ENGINE_CONSTANTS = {
    * raised the population-mean foul-draw factor, so the scale was reduced to
    * keep the free-throw-attempt gate on target.
    */
-  shootingFoulScale: 1.35,
+  shootingFoulScale: 1.36,
   /**
    * Fouled shots convert close to their normal rate: contact on a shooting
    * foul usually arrives after the release, so an and-one should not be
@@ -167,9 +167,14 @@ export const ENGINE_CONSTANTS = {
    */
   estimateToTripsFactor: 0.93,
   /** How strongly observed three-point percentage anchors the shot result. */
-  observedThreePointBlend: 0.7,
+  observedThreePointBlend: 0.65,
   /** How strongly observed free-throw percentage anchors the shot result. */
-  observedFreeThrowBlend: 0.8,
+  observedFreeThrowBlend: 0.82,
+
+  /** Residual three-point skill range when an observed season percentage exists. */
+  anchoredThreePointSkillRange: 0.04,
+  /** Small population calibration after contest and observed-season blending. */
+  threePointCalibrationOffset: -0.003,
 
   /**
    * Three-point volume evidence gates (usage.ts pickZone). A player with no
