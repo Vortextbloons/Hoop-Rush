@@ -54,6 +54,7 @@ vi.mock('../config.js', () => ({
   get RAW_CACHE() {
     return env.cache;
   },
+  FIELD_AVAILABILITY: {},
 }));
 
 // ---------------------------------------------------------------------------

@@ -8,7 +8,11 @@
     PlayersIndex,
     PlayersIndexEntry,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
+  import {
+    franchiseAbbreviation,
+    resolveEraTeamIdentity,
+    LINEUP_STRUCTURE,
+  } from '@hoop-rush/data-contracts';
   import { validateLineup } from '@hoop-rush/engine';
   import { clearDataLoaderCaches, getManifest, getPlayersIndex, getPool } from '$lib/data';
   import { resolvePlayerRefs } from '$lib/player-refs';
@@ -165,6 +169,17 @@
   );
   const era = $derived(manifest?.eras.find((e) => e.eraId === eraFilter) ?? null);
 
+  /**
+   * Era-scoped historical identity for the selected franchise+decade. When
+   * both filters are set the pool header, select trigger, and logos show the
+   * historical team(s); franchise-only contexts keep the modern slot.
+   */
+  const eraIdentity = $derived(
+    manifest && franchise && era
+      ? resolveEraTeamIdentity(manifest, franchise.franchiseId, era.eraId)
+      : null,
+  );
+
   const franchiseItems = $derived([
     { value: '', label: 'Any team' },
     ...(manifest?.modernFranchiseSlots ?? []).map((entry) => ({
@@ -191,8 +206,8 @@
   const sortedRows = $derived(sortDraftRows(poolRows, 'sandbox'));
 
   const poolHeading = $derived(
-    franchise && era
-      ? `${franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
+    franchise && era && eraIdentity
+      ? `${eraIdentity.abbreviationLabel ?? franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
       : franchise
         ? franchiseAbbreviation(franchise.franchiseId)
         : era
@@ -396,9 +411,14 @@
                           manifest={manifest!}
                           franchiseId={franchise.franchiseId}
                           teamExternalId={franchise.teamExternalId}
+                          logoCandidates={eraIdentity?.logoCandidates ?? []}
                         />
-                        <span class="truncate" title={franchise.displayName}>
-                          {franchiseAbbreviation(franchise.franchiseId)}
+                        <span
+                          class="truncate"
+                          title={eraIdentity?.displayLabel ?? franchise.displayName}
+                        >
+                          {eraIdentity?.abbreviationLabel ??
+                            franchiseAbbreviation(franchise.franchiseId)}
                         </span>
                       </span>
                     {:else}

@@ -627,8 +627,8 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
       (typeof input.stats.playerExternalId === 'string' ? input.stats.playerExternalId : undefined),
     artifact: input.artifact ?? {
       schemaVersion: 1,
-      modelVersion: 'ratings-model-v3',
-      ratingsVersion: 'ratings-v3',
+      modelVersion: 'ratings-model-v3.1',
+      ratingsVersion: 'ratings-v3.1',
       benchmarkVersion: 'ratings-benchmarks-v1',
       seedVersion: 'ratings-seeds-v1',
       sampleCountPerContext: 256,

@@ -2,8 +2,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { ARTIFACT_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
-import { run, DATA_VERSION } from './index.js';
+import { MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
+import { run, DATA_VERSION, ASSET_CACHE_VERSION } from './index.js';
 import { sha256File, writeJson } from '../json.js';
 
 // The availability-matrix classification scans packaged season dirs; allow
@@ -95,23 +95,32 @@ describe('manifest run', () => {
         schemaVersion: number;
         dataVersion: string;
         modernFranchiseSlots: { franchiseId: string }[];
-        franchiseLineage: { modernFranchiseId: string; lineageRuleVersion: string }[];
+        franchiseLineage: {
+          modernFranchiseId: string;
+          lineageRuleVersion: string;
+          logoCandidates?: { url: string; source: string }[];
+        }[];
         eras: { eraId: string }[];
-        assets: { source: string };
+        assets: { source: string; cacheVersion: string };
         pools: ManifestEntry[];
         availability: Array<Record<string, unknown>>;
         eraSimulationProfiles: ManifestEntry[];
         bracket: ManifestEntry;
       };
 
-      // The v2 contract: 30 slots, lineage segments, preserved eras/assets.
-      expect(manifest.schemaVersion).toBe(ARTIFACT_SCHEMA_VERSION);
+      // The manifest contract: 30 slots, lineage segments with historical
+      // logo candidates, preserved eras/assets, and the new cache version.
+      expect(manifest.schemaVersion).toBe(MANIFEST_SCHEMA_VERSION);
       expect(manifest.dataVersion).toBe(DATA_VERSION);
       expect(manifest.modernFranchiseSlots).toHaveLength(30);
       expect(manifest.franchiseLineage.length).toBeGreaterThan(30);
       expect(manifest.franchiseLineage[0]?.lineageRuleVersion).toBe('lineage-v1');
+      expect(
+        manifest.franchiseLineage.every((segment) => (segment.logoCandidates?.length ?? 0) > 0),
+      ).toBe(true);
       expect(manifest.eras[0]?.eraId).toBe('1990s');
       expect(manifest.assets.source).toBe('NBA.com');
+      expect(manifest.assets.cacheVersion).toBe(ASSET_CACHE_VERSION);
 
       // Pools index recomputed with content hashes.
       expect(manifest.pools).toHaveLength(1);

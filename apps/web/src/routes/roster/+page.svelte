@@ -10,7 +10,7 @@
     RosterDetails,
     RosterDetailsEntry,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { clearDataLoaderCaches, getManifest, getPlayersIndex, getRosterDetails } from '$lib/data';
   import {
     defaultDirection,
@@ -255,9 +255,15 @@
 
   onDestroy(clearCompare);
 
+  const eraIdentity = $derived(
+    manifest && franchise && era
+      ? resolveEraTeamIdentity(manifest, franchise.franchiseId, era.eraId)
+      : null,
+  );
+
   const poolHeading = $derived(
-    franchise && era
-      ? `${franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
+    franchise && era && eraIdentity
+      ? `${eraIdentity.abbreviationLabel ?? franchiseAbbreviation(franchise.franchiseId)} · ${era.label}`
       : franchise
         ? franchiseAbbreviation(franchise.franchiseId)
         : era
@@ -354,9 +360,14 @@
                       manifest={manifest!}
                       franchiseId={franchise.franchiseId}
                       teamExternalId={franchise.teamExternalId}
+                      logoCandidates={eraIdentity?.logoCandidates ?? []}
                     />
-                    <span class="truncate" title={franchise.displayName}>
-                      {franchiseAbbreviation(franchise.franchiseId)}
+                    <span
+                      class="truncate"
+                      title={eraIdentity?.displayLabel ?? franchise.displayName}
+                    >
+                      {eraIdentity?.abbreviationLabel ??
+                        franchiseAbbreviation(franchise.franchiseId)}
                     </span>
                   </span>
                 {:else}

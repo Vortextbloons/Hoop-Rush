@@ -11,7 +11,7 @@
     PeakPlayerSeason,
     SlotIndex,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { classic, createEngineContext } from '@hoop-rush/engine';
   import { Dialog } from 'bits-ui';
   import { getManifest, getPlayersIndex } from '$lib/data';
@@ -147,12 +147,17 @@
     roll ? (manifest?.eras.find((e) => e.eraId === roll.eraId) ?? null) : null,
   );
 
+  /** Era-scoped historical identity for the landed roll (franchise + era). */
+  const rollIdentity = $derived(
+    manifest && roll ? resolveEraTeamIdentity(manifest, roll.franchiseId, roll.eraId) : null,
+  );
+
   /** The complete eligible pool for the current roll, sorted per presentation. */
   const rollRows = $derived(index && roll ? classicPoolRows(index, roll, presentation) : []);
 
   const poolHeading = $derived(
-    roll && rollFranchise && rollEra
-      ? `${franchiseAbbreviation(rollFranchise.franchiseId)} · ${rollEra.label}`
+    roll && rollFranchise && rollEra && rollIdentity
+      ? `${rollIdentity.abbreviationLabel ?? franchiseAbbreviation(rollFranchise.franchiseId)} · ${rollEra.label}`
       : 'Draft pool',
   );
 
@@ -160,9 +165,9 @@
 
   const reelAnnouncement = $derived(
     roll
-      ? `Round ${draft!.round} of 5 · ${rollFranchise?.displayName ?? roll.franchiseId} · ${
-          rollEra?.label ?? roll.eraId
-        }`
+      ? `Round ${draft!.round} of 5 · ${
+          rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId
+        } · ${rollEra?.label ?? roll.eraId}`
       : '',
   );
 
@@ -533,7 +538,7 @@
             <div class="flex flex-col gap-3 p-4">
               <div
                 class="grid w-full grid-cols-[minmax(0,1fr)_8.5rem] gap-2"
-                aria-label={`Round ${draft.round} of 5 · ${rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`}
+                aria-label={`Round ${draft.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`}
               >
                 <span
                   class="flex min-w-0 items-center gap-2 rounded-lg border border-line-strong bg-surface-1 px-3 py-2 shadow-[0_0_14px_hsl(13_100%_62%/0.12)]"
@@ -544,15 +549,16 @@
                       {manifest}
                       franchiseId={rollFranchise.franchiseId}
                       teamExternalId={rollFranchise.teamExternalId}
+                      logoCandidates={rollIdentity?.logoCandidates ?? []}
                     />
                   {/if}
                   <span class="min-w-0">
                     <span class="block font-mono text-[10px] font-bold tracking-[0.12em] uppercase">
-                      {franchiseAbbreviation(roll.franchiseId)}
+                      {rollIdentity?.abbreviationLabel ?? franchiseAbbreviation(roll.franchiseId)}
                     </span>
                     {#if rollFranchise}
                       <span class="block truncate text-sm font-bold">
-                        {rollFranchise.displayName}
+                        {rollIdentity?.displayLabel ?? rollFranchise.displayName}
                       </span>
                     {/if}
                   </span>
@@ -684,7 +690,8 @@
                     </span>
                     <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
                       {row.seasonKey} · {row.positionsPlayable.join('/')} ·
-                      {franchiseAbbreviation(row.franchiseId)}
+                      {resolveEraTeamIdentity(manifest!, row.franchiseId, row.eraId)
+                        .abbreviationLabel ?? franchiseAbbreviation(row.franchiseId)}
                     </span>
                   {:else}
                     <span class="min-w-0 flex-1 truncate text-sm font-bold">

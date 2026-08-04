@@ -8,9 +8,11 @@
     "preview": "vite preview",
     "e2e": "playwright test",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "lint": "prettier --check src e2e vitest.config.ts playwright.config.ts svelte.config.js eslint.config.js && eslint --cache .",
+    "lint": "prettier --check src e2e vitest.config.ts vitest.unit.config.ts playwright.config.ts svelte.config.js eslint.config.js && eslint --cache .",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "test:components": "vitest run src/lib/components/__tests__"
   },
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*",

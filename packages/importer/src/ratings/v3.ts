@@ -238,7 +238,11 @@ function archetypeScore(
   const entries = Object.entries(ARCHETYPE_WEIGHTS[archetype]) as Array<[SkillKey, number]>;
   const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
   const weighted = entries.reduce((sum, [key, weight]) => sum + skill(ratings, key) * weight, 0);
-  return (weighted / Math.max(1e-9, totalWeight)) * (0.86 + 0.14 * memberships[archetype]);
+  // Memberships already blend the archetype scores. The previous 0.86 floor
+  // applied a second, nearly universal penalty to every player, compressing
+  // high-skill wings and creators before production evidence was considered.
+  // Keep a small contrast adjustment, but preserve the underlying skill scale.
+  return (weighted / Math.max(1e-9, totalWeight)) * (0.95 + 0.05 * memberships[archetype]);
 }
 
 function deriveNonlinear(
@@ -409,9 +413,15 @@ function deriveMemberships(
 }
 
 function canonicalCurve(raw: number): number {
-  const centered = raw - 50;
-  const upperTail = Math.max(0, raw - 70);
-  return Math.min(99, clampRating(50 + centered * 1.5 + upperTail * 0.65));
+  // The upper tail needs to distinguish excellent seasons from the absolute
+  // peaks. The former linear tail pushed nearly fifty player-seasons to 99.
+  // Keep the middle scale generous, then use a concave curve above 70 so 90+
+  // remains attainable while 99 is reserved for the small exceptional set.
+  if (raw <= 70) {
+    return clampRating(50 + (raw - 50) * 1.635);
+  }
+  const upper = raw - 70;
+  return Math.min(99, clampRating(82.7 + upper * 1.6 - upper * upper * 0.025));
 }
 
 function summaryRatings(

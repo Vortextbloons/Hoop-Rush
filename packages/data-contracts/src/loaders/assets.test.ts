@@ -6,6 +6,7 @@ import {
   resolveHeadshotUrls,
   resolveLogoUrl,
   resolveLogoUrls,
+  resolveLogoUrlsWithHistorical,
   resolveSecondaryHeadshotUrl,
   resolveSecondaryLogoUrl,
   shouldStallTimeoutHeadshot,
@@ -327,5 +328,36 @@ describe('logo URL resolution', () => {
         '1610612747',
       ),
     ).toEqual([]);
+  });
+
+  it('orders verified historical candidates before the modern chain', () => {
+    expect(
+      resolveLogoUrlsWithHistorical(manifest(), 'thunder', '1610612760', [
+        'https://example.com/sea-1.png',
+        'https://example.com/sea-2.png',
+      ]),
+    ).toEqual([
+      'https://example.com/sea-1.png',
+      'https://example.com/sea-2.png',
+      'https://cdn.nba.com/logos/nba/1610612760/global/L/logo.svg',
+      'https://a.espncdn.com/i/teamlogos/nba/500/okc.png',
+    ]);
+  });
+
+  it('deduplicates candidates shared between the historical list and the modern chain', () => {
+    expect(
+      resolveLogoUrlsWithHistorical(manifest(), 'thunder', '1610612760', [
+        'https://cdn.nba.com/logos/nba/1610612760/global/L/logo.svg',
+      ]),
+    ).toEqual([
+      'https://cdn.nba.com/logos/nba/1610612760/global/L/logo.svg',
+      'https://a.espncdn.com/i/teamlogos/nba/500/okc.png',
+    ]);
+  });
+
+  it('equals the modern chain when no historical candidates exist', () => {
+    expect(resolveLogoUrlsWithHistorical(manifest(), 'lakers', '1610612747', [])).toEqual(
+      resolveLogoUrls(manifest(), 'lakers', '1610612747'),
+    );
   });
 });

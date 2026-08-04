@@ -16,6 +16,11 @@ Commands:
                          --era <id>       Filter by era id
                          --player <text>  Filter by player name
                          --limit <n>      Maximum rows (default 50, max 1000)
+  data lineage-audit     Prove lineage ranges map to exactly one slot, detect
+                         gaps/overlaps/duplicates, verify pool ownership and
+                         per-segment historical logo metadata.
+                         --input <path>   Manifest path (default apps/web/static/data/manifest.json)
+                         --verify-logos   Fetch each segment's primary logo candidate
   sim game               Simulate one game from a fixture with an explicit seed.
                          --input <fixture-id>   equal|strong-medium|strong-weak (default none)
                          --seed <hex>           Explicit game seed (required)

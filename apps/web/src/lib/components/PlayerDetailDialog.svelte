@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import { resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { Dialog } from 'bits-ui';
   import { X } from '@lucide/svelte';
   import {
@@ -31,6 +32,12 @@
     eraLabel: Map<string, string>;
     onClose: () => void;
   } = $props();
+
+  /** Historical display name for the row's franchise/era context. */
+  function teamNameFor(row: RosterDetailRow): string {
+    const identity = resolveEraTeamIdentity(manifest, row.franchiseId, row.eraId);
+    return identity.displayLabel ?? franchiseName.get(row.franchiseId) ?? row.franchiseId;
+  }
 
   function statLine(row: RosterDetailRow) {
     const s = row.stats;
@@ -142,7 +149,7 @@
                 {subject.displayName}
               </Dialog.Title>
               <p class="font-mono text-[10px] text-muted-foreground">
-                {franchiseName.get(subject.franchiseId) ?? subject.franchiseId} ·
+                {teamNameFor(subject)} ·
                 {eraLabel.get(subject.eraId) ?? subject.eraId} · {subject.seasonKey}
               </p>
             </div>

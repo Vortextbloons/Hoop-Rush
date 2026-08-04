@@ -12,14 +12,17 @@ import { DEFAULT_MANIFEST } from './data-loader.js';
  * `hoop-rush data lineage-audit`: proves historical team ranges map to
  * exactly one modern slot, detects gaps/overlaps/duplicates, verifies pool
  * ownership (every packaged player-season resolves through the lineage
- * table), checks ABA exclusion, and reports unavailable combinations
- * (spec/09, spec/12).
+ * table), checks ABA exclusion, audits per-segment historical logo metadata,
+ * and reports unavailable combinations (spec/09, spec/12). `--verify-logos`
+ * additionally fetches each segment's primary logo candidate and fails on
+ * unreachable or non-image responses.
  */
 
 export const DATA_LINEAGE_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
   verbose: false,
+  'verify-logos': false,
 };
 
 interface LineageAuditPayload {
@@ -29,10 +32,17 @@ interface LineageAuditPayload {
   overlaps: string[];
   duplicates: string[];
   ownershipFailures: string[];
+  logoFailures: string[];
+  logoVerificationFailures: string[];
   unavailableCombinations: Array<{ franchiseId: string; eraId: string; reason: string }>;
 }
 
-export async function dataLineageAudit(args: { input?: string | null }): Promise<CliReport> {
+const IMAGE_CONTENT_TYPES = /^image\/(png|gif|jpeg|jpg|svg\+xml|webp|avif)/i;
+
+export async function dataLineageAudit(args: {
+  input?: string | null;
+  verifyLogos?: boolean;
+}): Promise<CliReport> {
   const inputPath = args.input ?? DEFAULT_MANIFEST;
   let raw: string;
   try {
@@ -64,6 +74,88 @@ export async function dataLineageAudit(args: { input?: string | null }): Promise
   const overlaps: string[] = [];
   const duplicates: string[] = [];
   const ownershipFailures: string[] = [];
+  const logoFailures: string[] = [];
+  const logoVerificationFailures: string[] = [];
+
+  // Historical logo metadata: every segment carries at least one well-formed
+  // candidate with a source host (spec/12 branding contract). Missing
+  // artwork must never block gameplay, but the manifest must still declare
+  // the verified reference.
+  for (const segment of manifest.franchiseLineage) {
+    const candidates = segment.logoCandidates ?? [];
+    if (candidates.length === 0) {
+      logoFailures.push(
+        `logos: ${segment.modernFranchiseId} ${segment.displayName} (${segment.validFromSeasonKey}) has no logo candidates`,
+      );
+      continue;
+    }
+    for (const [i, candidate] of candidates.entries()) {
+      let url: URL;
+      try {
+        url = new URL(candidate.url);
+      } catch {
+        logoFailures.push(
+          `logos: ${segment.modernFranchiseId} ${segment.displayName} candidate ${String(i)} is not a valid URL: ${candidate.url}`,
+        );
+        continue;
+      }
+      if (url.protocol !== 'https:') {
+        logoFailures.push(
+          `logos: ${segment.modernFranchiseId} ${segment.displayName} candidate ${String(i)} must be https: ${candidate.url}`,
+        );
+      }
+    }
+    if (!candidates[0]?.source) {
+      logoFailures.push(
+        `logos: ${segment.modernFranchiseId} ${segment.displayName} candidate 0 has no source host`,
+      );
+    }
+  }
+
+  // Optional live verification of each segment's primary logo candidate.
+  if (args.verifyLogos) {
+    for (const segment of manifest.franchiseLineage) {
+      const primary = segment.logoCandidates?.[0];
+      if (!primary) continue;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => {
+          controller.abort();
+        }, 15000);
+        const response = await fetch(primary.url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'hoop-rush lineage-audit (build tooling)',
+            Accept: 'image/*',
+          },
+        });
+        clearTimeout(timer);
+        if (!response.ok) {
+          logoVerificationFailures.push(
+            `logos: ${segment.modernFranchiseId} ${segment.displayName} primary candidate returned HTTP ${String(response.status)}: ${primary.url}`,
+          );
+          continue;
+        }
+        const contentType = response.headers.get('content-type') ?? '';
+        const bytes = (await response.arrayBuffer()).byteLength;
+        if (!IMAGE_CONTENT_TYPES.test(contentType)) {
+          logoVerificationFailures.push(
+            `logos: ${segment.modernFranchiseId} ${segment.displayName} primary candidate is not an image (${contentType}): ${primary.url}`,
+          );
+          continue;
+        }
+        if (bytes < 500) {
+          logoVerificationFailures.push(
+            `logos: ${segment.modernFranchiseId} ${segment.displayName} primary candidate is suspiciously small (${String(bytes)} bytes): ${primary.url}`,
+          );
+        }
+      } catch {
+        logoVerificationFailures.push(
+          `logos: ${segment.modernFranchiseId} ${segment.displayName} primary candidate could not be fetched: ${primary.url}`,
+        );
+      }
+    }
+  }
 
   // Per-slot segments sorted; detect overlaps (gaps are legal: Hornets 2002-03).
   const bySlot = new Map<string, typeof manifest.franchiseLineage>();
@@ -161,8 +253,13 @@ export async function dataLineageAudit(args: { input?: string | null }): Promise
     `slots=${String(manifest.modernFranchiseSlots.length)} segments=${String(manifest.franchiseLineage.length)} pools=${String(manifest.pools.length)}`,
   );
   details.push(`unavailable combinations: ${String(unavailableCombinations.length)}`);
+  details.push(
+    `logos: segments with candidates=${String(
+      manifest.franchiseLineage.filter((s) => (s.logoCandidates?.length ?? 0) > 0).length,
+    )}/${String(manifest.franchiseLineage.length)}`,
+  );
 
-  failures.push(...ownershipFailures);
+  failures.push(...ownershipFailures, ...logoFailures, ...logoVerificationFailures);
   const payload: LineageAuditPayload = {
     dataVersion: manifest.dataVersion,
     slotCount: manifest.modernFranchiseSlots.length,
@@ -170,6 +267,8 @@ export async function dataLineageAudit(args: { input?: string | null }): Promise
     overlaps,
     duplicates,
     ownershipFailures,
+    logoFailures,
+    logoVerificationFailures,
     unavailableCombinations,
   };
   return makeReport('data lineage-audit', { input: inputPath }, { details, failures, payload });

@@ -85,6 +85,38 @@ describe('DraftPoolBrowser parity', () => {
     expect(getByText(/1996-97 ·/)).not.toBeNull();
   });
 
+  it('shows the historical team label for a relocated franchise-era row', () => {
+    const { getByText } = renderPoolBrowser({
+      rows: [
+        row({
+          playerId: 'sea-2000s',
+          displayName: 'Sonics Star',
+          franchiseId: 'thunder',
+          eraId: '2000s',
+          seasonKey: '2005-06',
+        }),
+      ],
+    });
+
+    expect(getByText(/2005-06 · SEA → OKC · 2000s/)).not.toBeNull();
+  });
+
+  it('falls back to the modern abbreviation when the era has no lineage', () => {
+    const { getByText } = renderPoolBrowser({
+      rows: [
+        row({
+          playerId: 'rak-1960s',
+          displayName: 'Raptor Pioneer',
+          franchiseId: 'raptors',
+          eraId: '1960s',
+          seasonKey: '1960-61',
+        }),
+      ],
+    });
+
+    expect(getByText(/1960-61 · TOR · 1960s/)).not.toBeNull();
+  });
+
   it('resets local filters when a new pool scope is revealed', async () => {
     const rowsA = [
       row({ playerId: 'a', displayName: 'Aaron A', overall: 90 }),

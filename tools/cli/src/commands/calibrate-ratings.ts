@@ -10,6 +10,8 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   playableSlotGroups,
+  RATINGS_VERSION,
+  RATING_MODEL_VERSION,
   ratingsModelArtifactSchema,
   slotGroupOf,
 } from '@hoop-rush/data-contracts';
@@ -47,7 +49,7 @@ function newAccumulator(): PairAccumulator {
 }
 
 function seedFor(playerId: string, context: string, index: number): string {
-  return fixtureSeed(`ratings-v3|${playerId}|${context}`, index);
+  return fixtureSeed(`ratings-v3.1|${playerId}|${context}`, index);
 }
 
 function teamMetric(result: ReturnType<typeof simulateGame>, side: 'home' | 'away') {
@@ -275,9 +277,12 @@ export function calibrateRatings(args: {
       }
     })(),
   );
-  const artifact: RatingsModelArtifact = existing.success
-    ? existing.data
-    : DEFAULT_RATINGS_MODEL_ARTIFACT;
+  const artifact: RatingsModelArtifact =
+    existing.success &&
+    existing.data.ratingsVersion === RATINGS_VERSION &&
+    existing.data.modelVersion === RATING_MODEL_VERSION
+      ? existing.data
+      : DEFAULT_RATINGS_MODEL_ARTIFACT;
   const pools = packaged.manifest.pools
     .map((entry) => data.pool(entry.franchiseId, entry.eraId))
     .filter((pool) => pool.players.length >= 5);
@@ -351,6 +356,8 @@ export function calibrateRatings(args: {
   }
   const outputArtifact = ratingsModelArtifactSchema.parse({
     ...artifact,
+    modelVersion: RATING_MODEL_VERSION,
+    ratingsVersion: RATINGS_VERSION,
     playerAdjustments,
     sampleCountPerContext: samples,
   });

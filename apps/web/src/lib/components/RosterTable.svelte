@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import {
     formatDecimal,
     formatPct,
@@ -66,6 +66,18 @@
       ? `group:${item.franchiseId}/${item.eraId}`
       : `row:${item.player.franchiseId}/${item.player.eraId}/${item.player.playerId}`;
 
+  /** Historical display label for a franchise/era context, modern fallback. */
+  function groupLabel(franchiseId: string, eraId: string): string {
+    const identity = resolveEraTeamIdentity(manifest, franchiseId, eraId);
+    return identity.displayLabel ?? franchiseAbbreviation(franchiseId);
+  }
+
+  /** Historical abbreviation for one row's franchise/era context. */
+  function teamLabelFor(player: RosterDetailRow): string {
+    const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
+    return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
+  }
+
   function compareLabel(player: RosterDetailRow): string {
     const added = isCompared(player);
     const suffix = !added && compareFull ? ' (comparison full)' : '';
@@ -114,7 +126,8 @@
               colspan={columns.length}
               class="border-b border-border/60 bg-surface-1 px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
             >
-              {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ?? item.eraId} · {item.count}
+              {groupLabel(item.franchiseId, item.eraId)} · {eraLabel.get(item.eraId) ?? item.eraId} ·
+              {item.count}
               players
             </td>
           </tr>
@@ -139,7 +152,7 @@
                 <span class="min-w-0">
                   <span class="block truncate text-sm font-bold">{player.displayName}</span>
                   <span class="block font-mono text-[10px] text-muted-foreground">
-                    {franchiseAbbreviation(player.franchiseId)}
+                    {teamLabelFor(player)}
                   </span>
                 </span>
               </button>
@@ -200,7 +213,7 @@
       <li
         class="px-1 pt-3 pb-1 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
       >
-        {franchiseAbbreviation(item.franchiseId)} · {eraLabel.get(item.eraId) ?? item.eraId} · {item.count}
+        {groupLabel(item.franchiseId, item.eraId)} · {eraLabel.get(item.eraId) ?? item.eraId} · {item.count}
         players
       </li>
     {:else}
@@ -222,8 +235,8 @@
             <span class="min-w-0 flex-1">
               <span class="block truncate text-sm font-bold">{player.displayName}</span>
               <span class="mt-0.5 block font-mono text-[10px] leading-snug text-muted-foreground">
-                {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(player.eraId) ??
-                  player.eraId} · {player.seasonKey} · {player.positionsPlayable.join('/')}
+                {teamLabelFor(player)} · {eraLabel.get(player.eraId) ?? player.eraId} · {player.seasonKey}
+                · {player.positionsPlayable.join('/')}
               </span>
             </span>
           </button>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest, PlayersIndexEntry, SlotIndex } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { untrack } from 'svelte';
   import { Search } from '@lucide/svelte';
   import { lowercaseName } from '$lib/roster-browser';
@@ -62,6 +62,15 @@
   let visibleCount = $state(PAGE_SIZE);
 
   const eraLabel = $derived(new Map(manifest.eras.map((e) => [e.eraId, e.label])));
+
+  /**
+   * Historical team label for one draft row's franchise/era context, falling
+   * back to the modern slot abbreviation when the era has no lineage.
+   */
+  function teamLabelFor(player: IndexRow): string {
+    const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
+    return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
+  }
 
   $effect(() => {
     const raw = searchInput;
@@ -152,8 +161,13 @@
 </script>
 
 <div class="rounded-xl border border-border bg-card">
-  <div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-    <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">{heading}</h2>
+  <div class="flex min-w-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
+    <h2
+      class="min-w-0 truncate font-display text-lg font-extrabold tracking-tight uppercase"
+      title={heading}
+    >
+      {heading}
+    </h2>
     <span class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
       {countLabel}
     </span>
@@ -252,9 +266,8 @@
             <span class="min-w-0 flex-1">
               <span class="block truncate text-sm font-bold">{player.displayName}</span>
               <span class="block font-mono text-[10px] text-muted-foreground">
-                {player.seasonKey} · {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(
-                  player.eraId,
-                ) ?? player.eraId} · {player.positionsPlayable.join('/')}
+                {player.seasonKey} · {teamLabelFor(player)} · {eraLabel.get(player.eraId) ??
+                  player.eraId} · {player.positionsPlayable.join('/')}
               </span>
             </span>
             <span class="flex shrink-0 gap-1 font-mono text-[10px]">

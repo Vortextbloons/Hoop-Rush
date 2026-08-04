@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import type { RosterDetailRow } from '$lib/roster-browser';
   import { X } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
@@ -53,6 +53,17 @@
 
   function isSelected(player: RosterDetailRow): boolean {
     return selected.some((entry) => entry.playerId === player.playerId);
+  }
+
+  /** Historical label for a row's franchise/era context, modern fallback. */
+  function teamLabelFor(player: RosterDetailRow): string {
+    const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
+    return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
+  }
+
+  function teamNameFor(player: RosterDetailRow): string {
+    const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
+    return identity.displayLabel ?? franchiseName.get(player.franchiseId) ?? player.franchiseId;
   }
 
   function optional(value: number | null | undefined, digits = 1): string {
@@ -225,8 +236,7 @@
               <div class="min-w-0">
                 <h3 class="truncate text-sm font-bold">{displayName(player)}</h3>
                 <p class="font-mono text-[10px] text-muted-foreground">
-                  {franchiseAbbreviation(player.franchiseId)} · {eraLabel.get(player.eraId) ??
-                    player.eraId}
+                  {teamLabelFor(player)} · {eraLabel.get(player.eraId) ?? player.eraId}
                 </p>
               </div>
             </div>
@@ -241,7 +251,7 @@
               <div class="flex justify-between gap-2">
                 <dt class="text-muted-foreground">Franchise</dt>
                 <dd class="text-right font-semibold">
-                  {franchiseName.get(player.franchiseId) ?? player.franchiseId}
+                  {teamNameFor(player)}
                 </dd>
               </div>
               <div class="flex justify-between gap-2">

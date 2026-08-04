@@ -281,4 +281,32 @@ describe('ClassicRollReel', () => {
     expect(container.querySelector(OVERLAY)).toBeNull();
     expect(onSettled).toHaveBeenCalledTimes(1);
   });
+
+  it('shows the historical crossover identity for a relocated franchise era', async () => {
+    const { container, rerender, onSettled } = renderReel({
+      franchiseId: 'thunder',
+      eraId: '2000s',
+      announceText: 'Round 3 of 5 · Seattle SuperSonics → Oklahoma City Thunder · 2000s',
+    });
+
+    await rerender({ spinKey: 1 });
+
+    const franchiseStrip = container.querySelector(FRANCHISE_STRIP);
+    expect(franchiseStrip?.textContent).toContain('SEA → OKC');
+    expect(franchiseStrip?.textContent).toContain('Seattle SuperSonics → Oklahoma City Thunder');
+
+    await vi.advanceTimersByTimeAsync(950);
+
+    const result = container.querySelector(RESULT);
+    expect(result?.textContent).toContain('SEA → OKC');
+    expect(result?.textContent).toContain('Seattle SuperSonics → Oklahoma City Thunder');
+    expect(result?.textContent).toContain('2000s');
+    expect(container.querySelector(LIVE_REGION)?.textContent).toBe(
+      'Round 3 of 5 · Seattle SuperSonics → Oklahoma City Thunder · 2000s',
+    );
+
+    await vi.advanceTimersByTimeAsync(850);
+    expect(container.querySelector(OVERLAY)).toBeNull();
+    expect(onSettled).toHaveBeenCalledTimes(1);
+  });
 });

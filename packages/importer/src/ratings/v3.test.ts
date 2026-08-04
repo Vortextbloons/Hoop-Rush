@@ -77,4 +77,35 @@ describe('Ratings v3 profile', () => {
     expect(record.ratingProfile.production.weight).toBeLessThan(0.1);
     expect(record.ratingProfile.calibratedImpact.confidence).toBe(0);
   });
+
+  it('keeps a sustained efficient star wing out of the ordinary-starter band', () => {
+    const record = derivePlayerRecord({
+      season: '2025-26',
+      position: 'SF',
+      heightInches: 83,
+      stats: {
+        ...stats,
+        points: 2_028,
+        rebounds: 429,
+        assists: 374,
+        steals: 62,
+        blocks: 70,
+        turnovers: 249,
+        fgm: 717,
+        fga: 1_372,
+        tpm: 187,
+        tpa: 452,
+        ftm: 405,
+        fta: 468,
+        per: 19.2,
+        boxPlusMinus: 1.725,
+        usageRate: 26.3,
+        tsPct: 0.641,
+        efgPct: 0.588,
+      },
+      era: { leaguePpg: 114.7, league3PARate: 0.39, pace: 99 },
+      artifact: DEFAULT_RATINGS_MODEL_ARTIFACT,
+    });
+    expect(record.summaryRatings.overallRating).toBeGreaterThanOrEqual(88);
+  });
 });

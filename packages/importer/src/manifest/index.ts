@@ -15,7 +15,7 @@ import { PUBLIC_DATA } from '../config.js';
 import { fileExists, readJson, sha256File, writeJsonRetry } from '../json.js';
 import {
   LINEAGE_RULE_VERSION,
-  ARTIFACT_SCHEMA_VERSION,
+  MANIFEST_SCHEMA_VERSION,
   parsePool,
   parsePlayersIndex,
   parseRosterDetails,
@@ -34,7 +34,7 @@ type Manifest = Record<string, unknown>;
 
 export const MANIFEST_PATH = join(PUBLIC_DATA, 'manifest.json');
 
-export const DATA_VERSION = 'm7-ratings-v3';
+export const DATA_VERSION = 'm7-ratings-v3.1';
 
 function peakPlayerToDraftEntry(player: ReturnType<typeof parsePool>['players'][number]) {
   return {
@@ -164,13 +164,16 @@ export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
   );
 }
 
+/** Cache-busting version for the historical logo asset set (m7 branding). */
+export const ASSET_CACHE_VERSION = '2026-08-03-historical-logos-v1';
+
 /** Rebuilds the complete v2 manifest from packaged artifacts. */
 export function run(dataDir = PUBLIC_DATA): void {
   const manifestPath = join(dataDir, 'manifest.json');
   const previous = fileExists(manifestPath) ? (readJson(manifestPath) as Manifest) : null;
 
   const manifest: Manifest = {
-    schemaVersion: ARTIFACT_SCHEMA_VERSION,
+    schemaVersion: MANIFEST_SCHEMA_VERSION,
     dataVersion: DATA_VERSION,
     modernFranchiseSlots: MODERN_SLOTS.map((slot) => ({ ...slot })),
     franchiseLineage: LINEAGE_SEGMENTS.map((segment) => ({
@@ -185,12 +188,16 @@ export function run(dataDir = PUBLIC_DATA): void {
       ...(segment.abbreviation !== undefined ? { abbreviation: segment.abbreviation } : {}),
       sourceIdentityIds: [segment.historicalTeamId],
       lineageRuleVersion: LINEAGE_RULE_VERSION,
+      ...(segment.logoCandidates !== undefined ? { logoCandidates: segment.logoCandidates } : {}),
     })),
     eras: previous?.eras ?? [],
     pools: [],
     availability: [],
     eraSimulationProfiles: [],
-    assets: previous?.assets ?? {},
+    assets: {
+      ...(previous?.assets ?? {}),
+      cacheVersion: ASSET_CACHE_VERSION,
+    },
   };
 
   // Pools index + availability matrix from packaged pool assets.

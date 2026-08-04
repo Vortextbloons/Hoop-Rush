@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { franchiseAbbreviation, type HoopRushManifest } from '@hoop-rush/data-contracts';
+  import {
+    franchiseAbbreviation,
+    resolveEraTeamIdentity,
+    type HoopRushManifest,
+  } from '@hoop-rush/data-contracts';
   import { untrack } from 'svelte';
   import TeamLogo from '../TeamLogo.svelte';
 
@@ -80,8 +84,17 @@
     return manifest.modernFranchiseSlots.find((slot) => slot.franchiseId === id);
   }
 
+  /** Historical identity for a franchise row against the landed era. */
+  function franchiseIdentityFor(id: string) {
+    return resolveEraTeamIdentity(manifest, id, eraId);
+  }
+
   function franchiseNameFor(id: string): string {
-    return franchiseSlotFor(id)?.displayName ?? id;
+    return franchiseIdentityFor(id).displayLabel ?? franchiseSlotFor(id)?.displayName ?? id;
+  }
+
+  function franchiseAbbreviationFor(id: string): string {
+    return franchiseIdentityFor(id).abbreviationLabel ?? franchiseAbbreviation(id);
   }
 
   function eraLabelFor(id: string): string {
@@ -276,18 +289,20 @@
 
 {#snippet franchiseRow(id: string)}
   {@const slot = franchiseSlotFor(id)}
+  {@const identity = franchiseIdentityFor(id)}
   <div class="reel-franchise">
     {#if slot}
       <TeamLogo
         {manifest}
         franchiseId={id}
         teamExternalId={slot.teamExternalId}
+        logoCandidates={identity.logoCandidates}
         alt=""
         className="reel-franchise-logo"
       />
     {/if}
     <span class="reel-franchise-text">
-      <span class="reel-abbrev">{franchiseAbbreviation(id)}</span>
+      <span class="reel-abbrev">{franchiseAbbreviationFor(id)}</span>
       <span class="reel-name">{franchiseNameFor(id)}</span>
     </span>
   </div>

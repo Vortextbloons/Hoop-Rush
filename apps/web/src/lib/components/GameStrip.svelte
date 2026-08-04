@@ -71,10 +71,10 @@
         title={cell.result === undefined
           ? `Game ${cell.gameNumber} upcoming`
           : `Game ${cell.gameNumber} vs ${opponentName(cell.gameNumber)}: ${cell.result?.home.box.points ?? 0}-${cell.result?.away.box.points ?? 0} ${cell.won ? 'W' : 'L'}`}
-        class="block aspect-square w-full rounded-[3px] transition-colors {cell.result === undefined
+        class="block aspect-square w-full rounded-[3px] {cell.result === undefined
           ? 'bg-surface-3/70'
           : cell.isFirstLoss
-            ? 'bg-destructive shadow-[0_0_0_2px_hsl(var(--destructive))]'
+            ? 'bg-destructive ring-2 ring-inset ring-destructive'
             : cell.won
               ? 'bg-primary/80'
               : 'bg-destructive/70'}"

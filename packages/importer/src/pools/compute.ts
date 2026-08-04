@@ -50,6 +50,9 @@ import {
 import { buildPlayerPositions } from './positions.js';
 import { positionOverrideFor } from '../positions/overrides.js';
 import { canonicalPlayerName } from '../identity.js';
+import { derivePlayerRecord } from '../ratings/v2.js';
+import { getEra } from '../ratings/era.js';
+import { loadRatingsModelArtifact } from '../ratings/artifact.js';
 
 /** Re-exported so CLI consumers (e.g. bracket generation) share the one normalization. */
 export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.js';
@@ -91,7 +94,7 @@ export function manifestPath(): string {
 
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm7-ratings-v3';
+export const DATA_VERSION = 'm7-ratings-v3.1';
 /** Confidence policy v1: maximum allowed low-confidence share of required fields. */
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
@@ -192,6 +195,42 @@ export interface SeasonData {
 /** Memoized per run so availability scans read each season's JSON once. */
 const seasonDataCache = new Map<string, SeasonData>();
 let fallbackRosterCache: Map<string, Record<string, unknown>> | null = null;
+let ratingsModelArtifactCache: ReturnType<typeof loadRatingsModelArtifact> | null = null;
+
+function currentRatingsModelArtifact(): ReturnType<typeof loadRatingsModelArtifact> {
+  ratingsModelArtifactCache ??= loadRatingsModelArtifact();
+  return ratingsModelArtifactCache;
+}
+
+function refreshedFallbackPlayer(
+  player: Record<string, unknown>,
+  season: string,
+  stats: Record<string, unknown>,
+  playerExternalId: string,
+): Record<string, unknown> {
+  const position = str(player.position) || 'SF';
+  const height = player.heightInches;
+  const heightInches =
+    typeof height === 'number' && Number.isFinite(height) ? Math.trunc(height) : 78;
+  const derived = derivePlayerRecord({
+    season,
+    position,
+    heightInches,
+    stats,
+    playerId: `p-${playerExternalId}`,
+    era: getEra(season),
+    artifact: currentRatingsModelArtifact(),
+  });
+  return {
+    ...player,
+    ratings: derived.ratings,
+    tendencies: derived.tendencies,
+    summaryRatings: derived.summaryRatings,
+    anchors: derived.anchors,
+    provenance: derived.provenance,
+    ratingProfile: derived.ratingProfile,
+  };
+}
 
 /** Return { rosterByExtId, stintsByTeam, statsByPlayer } for a season. */
 export function loadSeasonData(season: string): SeasonData {
@@ -934,14 +973,18 @@ export function computePool(
         continue;
       }
       const pid = str(stint.playerExternalId);
-      const player = rosterByExtId[pid] ?? fallbackRosterPlayers.get(pid);
-      if (player === undefined) {
+      const sourcePlayer = rosterByExtId[pid] ?? fallbackRosterPlayers.get(pid);
+      if (sourcePlayer === undefined) {
         continue;
       }
       const stats = statsByPlayer[pid];
       if (stats === undefined || Math.trunc(num(stats, 'gamesPlayed')) === 0) {
         continue;
       }
+      const player =
+        rosterByExtId[pid] !== undefined
+          ? sourcePlayer
+          : refreshedFallbackPlayer(sourcePlayer, season, stats, pid);
       const summary = player.summaryRatings;
       if (summary === null || summary === undefined) {
         console.log(`  ! ${pid} missing summaryRatings in ${season}; re-run compute_ratings`);

@@ -4,7 +4,7 @@
   import { X } from '@lucide/svelte';
   import type { ChallengeRun, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { BEST_OF_ATTEMPTS, evaluateLineupMatchup } from '@hoop-rush/engine';
+  import { BEST_OF_ATTEMPTS } from '@hoop-rush/engine';
   import type { RunnerPhase } from '$lib/challenge-runner';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
@@ -52,33 +52,32 @@
     return run.bracket.opponents.find((o) => o.opponentId === entry?.opponentId) ?? null;
   });
 
-  const upcomingOpponent = $derived.by(() => {
-    const entry = run.bracket.schedule[run.games.length];
-    return run.bracket.opponents.find((o) => o.opponentId === entry?.opponentId) ?? null;
-  });
-
-  const upcomingMatchup = $derived.by(() => {
-    if (!upcomingOpponent || run.players.length !== 5) return null;
-    return evaluateLineupMatchup(
-      { teamId: 'user', displayName: run.homeDisplayName, players: run.players },
-      {
-        teamId: upcomingOpponent.teamId,
-        displayName: upcomingOpponent.displayName,
-        players: upcomingOpponent.players,
-      },
-    );
-  });
-
   const franchise = $derived(
     manifest?.modernFranchiseSlots.find((e) => e.franchiseId === run.franchiseId) ?? null,
   );
+  const latestOpponentSlot = $derived(
+    latestOpponent && manifest
+      ? (manifest.modernFranchiseSlots.find((e) => e.franchiseId === latestOpponent.teamId) ?? null)
+      : null,
+  );
+
+  $effect(() => {
+    if (typeof document === 'undefined') return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  });
 </script>
 
-<!-- Full-screen presentation overlay -->
+<!-- Full-screen presentation overlay.
+     Layout is fully reserved: top-aligned, fixed scoreboard columns, and
+     reserved logo boxes so paced reveals cannot reflow. -->
 <div
-  class="fixed inset-0 z-50 overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90"
+  class="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-none bg-background [scrollbar-gutter:stable]"
 >
-  <div class="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-center px-4 py-8 sm:px-6">
+  <div class="mx-auto flex w-full max-w-4xl flex-col px-4 py-8 sm:px-6 sm:py-10">
     <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
       {modeLabel} · {franchiseLabel(run.franchiseId)} · {run.eraId}
     </p>
@@ -92,20 +91,22 @@
       {/if}
     </h1>
 
-    <!-- Live scoreboard -->
+    <!-- Live scoreboard: fixed center column so digit/name churn cannot shove sides. -->
     <div
-      class="mt-6 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-line-strong bg-card p-4 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:p-6"
+      class="mt-6 grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-line-strong bg-card p-4 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)] sm:p-6"
     >
       <div class="flex min-w-0 items-center gap-2 sm:gap-3">
-        {#if franchise && manifest}
-          <TeamLogo
-            {manifest}
-            franchiseId={franchise.franchiseId}
-            teamExternalId={franchise.teamExternalId}
-            alt=""
-            className="h-7 w-7 sm:h-8 sm:w-8"
-          />
-        {/if}
+        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center sm:h-8 sm:w-8">
+          {#if franchise && manifest}
+            <TeamLogo
+              {manifest}
+              franchiseId={franchise.franchiseId}
+              teamExternalId={franchise.teamExternalId}
+              alt=""
+              className="h-7 w-7 sm:h-8 sm:w-8"
+            />
+          {/if}
+        </span>
         <div class="min-w-0">
           <p
             class="font-display truncate text-sm font-extrabold tracking-tight uppercase sm:text-base"
@@ -117,65 +118,59 @@
           </p>
         </div>
       </div>
-      <div class="flex flex-col items-center gap-1">
-        <p class="font-display text-4xl font-extrabold tracking-tight sm:text-6xl">
-          <span class={latest?.winner === 'home' ? 'text-primary' : 'text-muted-foreground'}>
+      <div class="flex w-full flex-col items-center gap-1">
+        <p
+          class="font-mono flex w-full items-baseline justify-center gap-2 text-4xl font-extrabold tracking-tight tabular-nums sm:text-5xl"
+        >
+          <span
+            class="inline-block w-[3ch] text-right {latest?.winner === 'home'
+              ? 'text-primary'
+              : 'text-muted-foreground'}"
+          >
             {latest?.home.box.points ?? '–'}
           </span>
-          <span class="mx-2 text-muted-foreground">–</span>
-          <span class={latest?.winner === 'away' ? 'text-primary' : 'text-muted-foreground'}>
+          <span class="text-muted-foreground" aria-hidden="true">–</span>
+          <span
+            class="inline-block w-[3ch] text-left {latest?.winner === 'away'
+              ? 'text-primary'
+              : 'text-muted-foreground'}"
+          >
             {latest?.away.box.points ?? '–'}
           </span>
         </p>
-        <p class="rounded-full border border-border px-3 py-0.5 font-mono text-[10px] uppercase">
-          Game {run.games.length}{run.games.length === 82 ? ' · final' : ''} · {record?.wins ?? 0}-
-          {record?.losses ?? 0}
+        <p
+          class="min-w-[11rem] rounded-full border border-border px-3 py-0.5 text-center font-mono text-[10px] tabular-nums uppercase"
+        >
+          Game {run.games.length}<span class={run.games.length === 82 ? '' : 'invisible'}>
+            · final</span
+          >
+          · {record?.wins ?? 0}-{record?.losses ?? 0}
         </p>
       </div>
       <div class="flex min-w-0 items-center justify-end gap-2 sm:gap-3">
-        {#if latestOpponent && manifest}
-          <TeamLogo
-            {manifest}
-            franchiseId={latestOpponent.teamId}
-            teamExternalId={franchise?.teamExternalId ?? ''}
-            alt=""
-            className="h-7 w-7 sm:h-8 sm:w-8"
-          />
-        {/if}
         <div class="min-w-0 text-right">
           <p
             class="font-display truncate text-sm font-extrabold tracking-tight uppercase sm:text-base"
           >
             {latestOpponent?.displayName ?? 'Waiting for the first tip…'}
           </p>
-          <p class="font-mono text-[10px] text-muted-foreground">
+          <p class="font-mono truncate text-[10px] text-muted-foreground">
             {latestOpponent?.seasonKey ?? 'Medium difficulty'}
           </p>
         </div>
+        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center">
+          {#if latestOpponent && latestOpponentSlot && manifest}
+            <TeamLogo
+              {manifest}
+              franchiseId={latestOpponent.teamId}
+              teamExternalId={latestOpponentSlot.teamExternalId}
+              alt=""
+              className="h-7 w-7 sm:h-8 sm:w-8"
+            />
+          {/if}
+        </span>
       </div>
     </div>
-
-    {#if upcomingOpponent && upcomingMatchup}
-      <div class="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="font-mono text-[10px] tracking-[0.14em] text-primary uppercase">
-            Next matchup · {upcomingOpponent.displayName}
-          </p>
-          <span class="font-mono text-xs font-bold"
-            >MATCHUP {upcomingMatchup.matchupDelta > 0
-              ? '+'
-              : ''}{upcomingMatchup.matchupDelta}</span
-          >
-        </div>
-        {#if upcomingMatchup.reasons[0]}
-          <p class="mt-2 text-xs text-muted-foreground">
-            <span class="font-semibold text-foreground">{upcomingMatchup.reasons[0].label}.</span>
-            Measured {upcomingMatchup.reasons[0].measuredValue.toFixed(0)} vs
-            {upcomingMatchup.reasons[0].comparisonValue.toFixed(0)}.
-          </p>
-        {/if}
-      </div>
-    {/if}
 
     <!-- The 82-cell strip -->
     <div class="mt-6 rounded-xl border border-border bg-card p-4 sm:p-5">
@@ -189,16 +184,22 @@
           <span class="h-2 w-2 rounded-sm bg-destructive/70" aria-hidden="true"></span>
           Loss
         </span>
-        {#if run.firstLossGameNumber !== null && run.firstLossGameNumber <= run.games.length}
-          <span class="flex items-center gap-1.5 text-muted-foreground">
-            <span
-              class="h-2 w-2 rounded-sm bg-destructive shadow-[0_0_0_2px_hsl(var(--destructive))]"
-              aria-hidden="true"
-            ></span>
-            First loss
-          </span>
-        {/if}
-        <span class="ml-auto text-muted-foreground">
+        <span
+          class="flex items-center gap-1.5 text-muted-foreground {run.firstLossGameNumber !==
+            null && run.firstLossGameNumber <= run.games.length
+            ? ''
+            : 'invisible'}"
+          aria-hidden={!(
+            run.firstLossGameNumber !== null && run.firstLossGameNumber <= run.games.length
+          )}
+        >
+          <span
+            class="h-2 w-2 rounded-sm bg-destructive ring-2 ring-destructive/80"
+            aria-hidden="true"
+          ></span>
+          First loss
+        </span>
+        <span class="ml-auto tabular-nums text-muted-foreground">
           {run.games.length}/82 committed
         </span>
       </div>

@@ -287,6 +287,18 @@ export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRu
         abbreviation: 'MNL',
         sourceIdentityIds: ['1610612747'],
         lineageRuleVersion: 'lineage-v1',
+        logoCandidates: [
+          {
+            url: 'https://content.sportslogos.net/logos/6/245/full/fixture-mnl.png',
+            source: 'sportslogos',
+            attribution: 'SportsLogos.net',
+          },
+          {
+            url: 'https://cdn.nba.com/logos/nba/1610612747/global/L/logo.svg',
+            source: 'nba-cdn',
+            attribution: 'NBA.com',
+          },
+        ],
       },
       {
         modernFranchiseId: 'lakers',
@@ -297,6 +309,13 @@ export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRu
         abbreviation: 'LAL',
         sourceIdentityIds: ['1610612747'],
         lineageRuleVersion: 'lineage-v1',
+        logoCandidates: [
+          {
+            url: 'https://cdn.nba.com/logos/nba/1610612747/global/L/logo.svg',
+            source: 'nba-cdn',
+            attribution: 'NBA.com',
+          },
+        ],
       },
       {
         modernFranchiseId: 'thunder',
@@ -308,6 +327,18 @@ export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRu
         abbreviation: 'SEA',
         sourceIdentityIds: ['1610612760'],
         lineageRuleVersion: 'lineage-v1',
+        logoCandidates: [
+          {
+            url: 'https://content.sportslogos.net/logos/6/241/full/fixture-sea.png',
+            source: 'sportslogos',
+            attribution: 'SportsLogos.net',
+          },
+          {
+            url: 'https://cdn.nba.com/logos/nba/1610612760/global/L/logo.svg',
+            source: 'nba-cdn',
+            attribution: 'NBA.com',
+          },
+        ],
       },
       {
         modernFranchiseId: 'thunder',
@@ -318,6 +349,13 @@ export function buildManifest(overrides: Partial<HoopRushManifest> = {}): HoopRu
         abbreviation: 'OKC',
         sourceIdentityIds: ['1610612760'],
         lineageRuleVersion: 'lineage-v1',
+        logoCandidates: [
+          {
+            url: 'https://cdn.nba.com/logos/nba/1610612760/global/L/logo.svg',
+            source: 'nba-cdn',
+            attribution: 'NBA.com',
+          },
+        ],
       },
     ],
     eras: [

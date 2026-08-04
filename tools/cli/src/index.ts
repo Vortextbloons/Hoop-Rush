@@ -80,7 +80,11 @@ const COMMANDS: Record<string, CommandDef> = {
   },
   'data lineage-audit': {
     options: DATA_LINEAGE_AUDIT_OPTIONS,
-    run: (args) => dataLineageAudit({ input: getOptionString(args, 'input') ?? DEFAULT_MANIFEST }),
+    run: (args) =>
+      dataLineageAudit({
+        input: getOptionString(args, 'input') ?? DEFAULT_MANIFEST,
+        verifyLogos: hasOption(args, 'verify-logos'),
+      }),
   },
   'data derive': {
     options: DATA_DERIVE_OPTIONS,
