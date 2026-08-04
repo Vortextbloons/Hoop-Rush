@@ -1,6 +1,7 @@
 export * from './ids.js';
 export * from './positions.js';
 export * from './franchise.js';
+export * from './historical-identity.js';
 export * from './eras.js';
 export * from './player-season.js';
 export * from './lineup.js';
@@ -23,3 +24,5 @@ export * from './loaders/roster-details.js';
 export * from './loaders/assets.js';
 export * from './loaders/simulation.js';
 export * from './loaders/bracket.js';
+export * from './ratings-model.js';
+export * from './contextual-value.js';

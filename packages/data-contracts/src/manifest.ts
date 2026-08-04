@@ -3,6 +3,7 @@ import { contentHashSchema, eraIdSchema, franchiseIdSchema } from './ids.js';
 import { franchiseLineageSchema, modernFranchiseSlotSchema } from './franchise.js';
 import { eraDefSchema } from './eras.js';
 import { poolAvailabilitySchema } from './provenance.js';
+import { MANIFEST_SCHEMA_VERSION } from './versions.js';
 
 /**
  * The single build-time manifest the browser loads first (spec/02, spec/12).
@@ -65,7 +66,7 @@ export const playersIndexAssetSchema = z.object({
 export type PlayersIndexAsset = z.infer<typeof playersIndexAssetSchema>;
 
 export const hoopRushManifestSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(MANIFEST_SCHEMA_VERSION),
   dataVersion: z.string().min(1).max(64),
   /** Exactly 30 stable modern franchise slots (selectable + bracket identity). */
   modernFranchiseSlots: z.array(modernFranchiseSlotSchema).length(30),

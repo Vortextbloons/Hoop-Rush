@@ -23,6 +23,7 @@ import {
   provenanceMapSchema,
   coverageSummarySchema,
 } from './provenance.js';
+import { ratingProfileSchema } from './ratings-model.js';
 
 /**
  * Player-season records and the packaged peak-season pools they feed
@@ -125,7 +126,7 @@ export type PlayersIndexAltIds = z.infer<typeof playersIndexAltIdsSchema>;
  * failures surface at build time, never in the browser.
  */
 export const peakPlayerSeasonSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.union([z.literal(3), z.literal(4)]),
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,
@@ -166,6 +167,8 @@ export const peakPlayerSeasonSchema = z.object({
   /** Historical team that owned this season (e.g. Seattle SuperSonics). */
   historicalTeamIdentity: historicalTeamIdentitySchema,
   summaryRatings: summaryRatingsSchema,
+  /** Ratings v3 explanation and calibration profile. Optional only for legacy frozen assets. */
+  ratingProfile: ratingProfileSchema.optional(),
   /** Strict engine ratings contract; packaging fails on missing keys. */
   detailedRatings: simulationRatingsSchema,
   /** Strict engine tendencies contract; packaging fails on missing keys. */
@@ -180,7 +183,7 @@ export type PeakPlayerSeason = z.infer<typeof peakPlayerSeasonSchema>;
 
 /** Compact, directly indexed franchise/decade pool (spec/02 fast-load artifact). */
 export const franchiseEraPoolSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.union([z.literal(3), z.literal(4)]),
   dataVersion: z.string().min(1).max(64),
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,
@@ -214,6 +217,8 @@ export const playersIndexEntrySchema = z.object({
   offense: z.number().int().min(0).max(100),
   defense: z.number().int().min(0).max(100),
   selectionScore: z.number().min(0).max(999),
+  /** Version of the canonical OVR model used for this compact row. */
+  ratingModelVersion: z.string().min(1).max(64).optional(),
 });
 export type PlayersIndexEntry = z.infer<typeof playersIndexEntrySchema>;
 
@@ -223,7 +228,7 @@ export type PlayersIndexEntry = z.infer<typeof playersIndexEntrySchema>;
  * screens; the Roster screen additionally loads the roster-details asset.
  */
 export const playersIndexSchema = z.object({
-  schemaVersion: z.literal(4),
+  schemaVersion: z.union([z.literal(4), z.literal(5)]),
   dataVersion: z.string().min(1).max(64),
   players: z.array(playersIndexEntrySchema).min(1),
 });

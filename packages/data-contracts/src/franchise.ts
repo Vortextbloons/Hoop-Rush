@@ -25,6 +25,21 @@ export const modernFranchiseSlotSchema = z.object({
 export type ModernFranchiseSlot = z.infer<typeof modernFranchiseSlotSchema>;
 
 /**
+ * One verified remote logo candidate for a historical identity. URLs are
+ * build-time verified assets (never bundled locally); `source` records the
+ * host that serves the mark and `attribution` its required credit.
+ */
+export const historicalLogoCandidateSchema = z.object({
+  /** Remote image URL of the historical mark. */
+  url: z.url(),
+  /** Asset host (e.g. "espn-scoreboard", "sportslogos", "nba-cdn"). */
+  source: z.string().min(1).max(64),
+  /** Required attribution/credit for the asset host, when applicable. */
+  attribution: z.string().min(1).max(256).optional(),
+});
+export type HistoricalLogoCandidate = z.infer<typeof historicalLogoCandidateSchema>;
+
+/**
  * One contiguous NBA lineage segment owned by a modern franchise slot.
  * Segments are explicit: they never infer a rename or relocation from a
  * name or abbreviation.
@@ -48,6 +63,8 @@ export const franchiseLineageEntrySchema = z.object({
   sourceIdentityIds: z.array(z.string().min(1).max(64)).min(1),
   /** Lineage rule version that produced this segment. */
   lineageRuleVersion: z.string().min(1).max(64),
+  /** Verified historical logo candidates, best first. At least one required. */
+  logoCandidates: z.array(historicalLogoCandidateSchema).min(1),
 });
 export type FranchiseLineageEntry = z.infer<typeof franchiseLineageEntrySchema>;
 

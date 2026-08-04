@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { playerIdSchema, seedSchema } from './ids.js';
 import { positionUnionSchema } from './positions.js';
 import { eraSimulationProfileSchema } from './era-sim-profile.js';
+import { ratingProfileSchema } from './ratings-model.js';
 
 /**
  * M2 possession-engine contracts. The engine consumes only these explicit
@@ -128,6 +129,9 @@ export const simulationPlayerSchema = z.object({
   tendencies: simulationTendenciesSchema,
   /** Optional for authored opponents and legacy fixtures without source stats. */
   anchors: simulationAnchorsSchema.optional(),
+  /** Canonical OVR is explanatory metadata; possession resolution ignores it. */
+  overall: z.number().int().min(0).max(100).optional(),
+  ratingProfile: ratingProfileSchema.optional(),
 });
 export type SimulationPlayer = z.infer<typeof simulationPlayerSchema>;
 

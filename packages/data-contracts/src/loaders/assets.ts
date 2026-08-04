@@ -108,3 +108,25 @@ export function resolveLogoUrls(
   if (secondary) urls.push(secondary);
   return urls;
 }
+
+/**
+ * Ordered logo candidates with a verified historical mark first: the era's
+ * historical candidates, then the modern template chain, deduplicated. When
+ * the historical list is empty (unavailable franchise-era) the result equals
+ * `resolveLogoUrls`, so gameplay never depends on historical artwork.
+ */
+export function resolveLogoUrlsWithHistorical(
+  manifest: HoopRushManifest,
+  franchiseId: string,
+  teamExternalId: TeamExternalId,
+  historicalLogoCandidates: readonly string[],
+): string[] {
+  const urls: string[] = [];
+  for (const url of historicalLogoCandidates) {
+    if (!urls.includes(url)) urls.push(url);
+  }
+  for (const url of resolveLogoUrls(manifest, franchiseId, teamExternalId)) {
+    if (!urls.includes(url)) urls.push(url);
+  }
+  return urls;
+}
