@@ -27,13 +27,11 @@ import {
  * four of the other same-conference opponents, and two games against every
  * opposite-conference opponent.
  *
- * Construction: the frozen frequency formula becomes a multiset of 1,230
- * directed meetings (one per game, home team fixed). A seeded shuffle assigns
- * each meeting to a round bucket (15 games per round). Rounds are grouping
- * labels only — teams may appear more than once or not at all within a
- * round. All randomness comes from named seeded streams derived from the
- * authoring seed, so regeneration is byte-identical and call order never
- * matters. Pure TypeScript: no Svelte, persistence, worker, or network code.
+ * Construction: the frozen frequency formula becomes an 82-regular
+ * undirected multigraph. A deterministic blossom-based factorization produces
+ * 82 perfect matchings, and pair-specific orientation produces the required
+ * home/away counts. Pure TypeScript: no Svelte, persistence, worker, or
+ * network code.
  */
 
 export const SEASON_SCHEDULE_GENERATION_VERSION = 'schedule-gen-v2';
@@ -51,6 +49,9 @@ interface ExtraEdge {
   a: number;
   b: number;
   remaining: number;
+  total: number;
+  /** Number of copies hosted by endpoint `a`; the rest are hosted by `b`. */
+  homeCopies: number;
 }
 
 type Factor = Array<{ edgeId: number; a: number; b: number }>;
@@ -166,13 +167,17 @@ function maximumMatching(adjacency: readonly number[][]): number[] {
 }
 
 /**
- * Edge-colors the 24-regular extra-frequency multigraph into 24 perfect
+ * Edge-colors the complete 82-regular schedule multigraph into 82 perfect
  * matchings. Each matching consumes one copy of every selected edge, so the
  * resulting rounds preserve the exact pair counts by construction.
  */
-function factorizeExtraGraph(teamCount: number, edges: ExtraEdge[]): Factor[] {
+function factorizeScheduleGraph(
+  teamCount: number,
+  edges: ExtraEdge[],
+  factorCount: number,
+): Factor[] {
   const factors: Factor[] = [];
-  for (let factorIndex = 0; factorIndex < SEASON_ROUND_COUNT - 58; factorIndex += 1) {
+  for (let factorIndex = 0; factorIndex < factorCount; factorIndex += 1) {
     const adjacency: number[][] = Array.from({ length: teamCount }, () => []);
     for (const edge of edges) {
       if (edge.remaining <= 0) continue;
@@ -332,12 +337,13 @@ function orientThreeGamePairs(
   return result;
 }
 
-/** Builds the undirected extra-frequency multigraph above the base double round robin. */
-function buildExtraEdges(
+/** Builds the complete undirected schedule multigraph with exact pair counts. */
+function buildScheduleEdges(
   league: SeasonLeague,
   teamOrder: readonly string[],
   teamIndex: ReadonlyMap<string, number>,
   fourGame: ReadonlyMap<string, ReadonlySet<string>>,
+  hostsTwice: ReadonlyMap<string, ReadonlySet<string>>,
 ): ExtraEdge[] {
   const teamsById = new Map(league.teams.map((team) => [team.franchiseId, team]));
   const edges: ExtraEdge[] = [];
@@ -349,24 +355,28 @@ function buildExtraEdges(
       const rightId = teamOrder[b];
       const right = rightId === undefined ? undefined : teamsById.get(rightId);
       if (rightId === undefined || right === undefined) continue;
-      let remaining = 0;
+      let remaining = 2;
+      let homeCopies = 1;
       if (left.conference === right.conference) {
         if (left.division === right.division) {
-          remaining = 2;
+          remaining += 2;
+          homeCopies = 2;
         } else if (fourGame.get(leftId)?.has(rightId)) {
-          remaining = 2;
+          remaining += 2;
+          homeCopies = 2;
         } else {
-          remaining = 1;
+          remaining += 1;
+          homeCopies = hostsTwice.get(leftId)?.has(rightId) ? 2 : 1;
         }
       }
-      if (remaining > 0) {
-        edges.push({
-          id: edges.length,
-          a: teamIndex.get(leftId) ?? -1,
-          b: teamIndex.get(rightId) ?? -1,
-          remaining,
-        });
-      }
+      edges.push({
+        id: edges.length,
+        a: teamIndex.get(leftId) ?? -1,
+        b: teamIndex.get(rightId) ?? -1,
+        remaining,
+        total: remaining,
+        homeCopies,
+      });
     }
   }
   const degree = new Array<number>(teamOrder.length).fill(0);
@@ -374,67 +384,47 @@ function buildExtraEdges(
     degree[edge.a] = (degree[edge.a] ?? 0) + edge.remaining;
     degree[edge.b] = (degree[edge.b] ?? 0) + edge.remaining;
   }
-  if (degree.some((value) => value !== SEASON_ROUND_COUNT - 58)) {
-    throw new Error('extra-frequency graph is not 24-regular');
+  if (degree.some((value) => value !== SEASON_ROUND_COUNT)) {
+    throw new Error('schedule-frequency graph is not 82-regular');
   }
   return edges;
 }
 
-/**
- * Orients the extra edge occurrences with equal home and away totals. Every
- * vertex has even degree, so alternating directions around deterministic
- * Euler circuits gives exactly twelve homes and twelve aways per team.
- */
-function orientExtraFactors(factors: readonly Factor[], teamCount: number): Map<string, number> {
-  interface Occurrence {
-    key: string;
-    from: number;
-    to: number;
-  }
-  const incident: Occurrence[][] = Array.from({ length: teamCount }, () => []);
-  const occurrences = new Map<string, Occurrence>();
+/** Orients each pair's factor occurrences to its exact home/away split. */
+function orientScheduleFactors(
+  factors: readonly Factor[],
+  edges: readonly ExtraEdge[],
+  teamCount: number,
+): Map<string, number> {
+  const occurrencesByEdge = new Map<number, string[]>();
   for (let factorIndex = 0; factorIndex < factors.length; factorIndex += 1) {
-    const factor = factors[factorIndex] ?? [];
-    for (const edge of factor) {
+    for (const edge of factors[factorIndex] ?? []) {
       const key = `${String(factorIndex)}:${String(edge.edgeId)}`;
-      const occurrence = { key, from: edge.a, to: edge.b };
-      occurrences.set(key, occurrence);
-      incident[edge.a]?.push(occurrence);
-      incident[edge.b]?.push({ key, from: edge.b, to: edge.a });
+      const occurrences = occurrencesByEdge.get(edge.edgeId) ?? [];
+      occurrences.push(key);
+      occurrencesByEdge.set(edge.edgeId, occurrences);
     }
   }
-  const used = new Set<string>();
   const homeByOccurrence = new Map<string, number>();
-
-  const walk = (vertex: number, trail: Occurrence[]): void => {
-    const choices = incident[vertex] ?? [];
-    for (const choice of choices) {
-      if (used.has(choice.key)) continue;
-      used.add(choice.key);
-      walk(choice.to, trail);
-      trail.push(choice);
-    }
-  };
-
-  for (let start = 0; start < teamCount; start += 1) {
-    while ((incident[start] ?? []).some((occurrence) => !used.has(occurrence.key))) {
-      const reversedTrail: Occurrence[] = [];
-      walk(start, reversedTrail);
-      const trail = reversedTrail.reverse();
-      for (let i = 0; i < trail.length; i += 1) {
-        const occurrence = trail[i];
-        if (occurrence === undefined) continue;
-        homeByOccurrence.set(occurrence.key, i % 2 === 0 ? occurrence.from : occurrence.to);
-      }
-    }
-  }
-  if (homeByOccurrence.size !== occurrences.size) {
-    throw new Error('extra-frequency orientation did not cover every edge occurrence');
-  }
   const homeCounts = new Array<number>(teamCount).fill(0);
-  for (const home of homeByOccurrence.values()) homeCounts[home] = (homeCounts[home] ?? 0) + 1;
-  if (homeCounts.some((count) => count !== (SEASON_ROUND_COUNT - 58) / 2)) {
-    throw new Error('extra-frequency orientation is not home/away balanced');
+  for (const edge of edges) {
+    const occurrences = occurrencesByEdge.get(edge.id) ?? [];
+    if (occurrences.length !== edge.total) {
+      throw new Error(`pair edge ${String(edge.id)} has the wrong factor count`);
+    }
+    for (let i = 0; i < occurrences.length; i += 1) {
+      const occurrence = occurrences[i];
+      if (occurrence === undefined) continue;
+      const home = i < edge.homeCopies ? edge.a : edge.b;
+      homeByOccurrence.set(occurrence, home);
+      homeCounts[home] = (homeCounts[home] ?? 0) + 1;
+    }
+  }
+  if (homeByOccurrence.size !== factors.length * (teamCount / 2)) {
+    throw new Error('schedule orientation did not cover every game');
+  }
+  if (homeCounts.some((count) => count !== SEASON_ROUND_COUNT / 2)) {
+    throw new Error('schedule orientation is not home/away balanced');
   }
   return homeByOccurrence;
 }
@@ -462,44 +452,26 @@ function buildScheduleAttempt(
   for (const teamId of teamOrder) teamIndex.set(teamId, teamIndex.size);
 
   const fourGame = fourGameOpponents(league, seed);
-  const extraEdges = buildExtraEdges(league, teamOrder, teamIndex, fourGame);
-  const extraFactors = factorizeExtraGraph(teamOrder.length, extraEdges);
-  const extraHomes = orientExtraFactors(extraFactors, teamOrder.length);
-
-  // The circle construction is a 1-factorization of K30. Repeating each
-  // factor twice gives two meetings per pair; the extra factors supply the
-  // precise +2/+1 frequency increments for division and same-conference
-  // pairings. This removes all conflict-prone bucket assignment.
-  const baseFactors: Factor[] = [];
-  const fixed = teamOrder.length - 1;
-  const ringSize = teamOrder.length - 1;
-  for (let round = 0; round < ringSize; round += 1) {
-    const factor: Factor = [{ edgeId: -1, a: fixed, b: round }];
-    for (let offset = 1; offset <= (ringSize - 1) / 2; offset += 1) {
-      const a = (round + offset) % ringSize;
-      const b = (round - offset + ringSize) % ringSize;
-      factor.push({ edgeId: -1, a, b });
+  const threeGamePairs: Array<readonly [string, string]> = [];
+  for (const team of league.teams) {
+    for (const opponent of conferenceNonDivisionOpponentsOf(league, team.franchiseId)) {
+      if (fourGame.get(team.franchiseId)?.has(opponent)) continue;
+      const [a, b] = [team.franchiseId, opponent].sort();
+      if (a === team.franchiseId && b !== undefined) threeGamePairs.push([a, b]);
     }
-    baseFactors.push(factor);
   }
+  const hostsTwice = orientThreeGamePairs(threeGamePairs);
+  const scheduleEdges = buildScheduleEdges(league, teamOrder, teamIndex, fourGame, hostsTwice);
+  const factors = factorizeScheduleGraph(teamOrder.length, scheduleEdges, SEASON_ROUND_COUNT);
+  const homes = orientScheduleFactors(factors, scheduleEdges, teamOrder.length);
 
   const rounds: Array<Array<{ home: string; away: string }>> = [];
-  for (const factor of baseFactors) {
-    for (let copy = 0; copy < 2; copy += 1) {
-      rounds.push(
-        factor.map(({ a, b }) => ({
-          home: teamOrder[copy === 0 ? a : b] ?? '',
-          away: teamOrder[copy === 0 ? b : a] ?? '',
-        })),
-      );
-    }
-  }
-  for (let factorIndex = 0; factorIndex < extraFactors.length; factorIndex += 1) {
-    const factor = extraFactors[factorIndex] ?? [];
+  for (let factorIndex = 0; factorIndex < factors.length; factorIndex += 1) {
+    const factor = factors[factorIndex] ?? [];
     rounds.push(
       factor.map((edge) => {
-        const homeIndex = extraHomes.get(`${String(factorIndex)}:${String(edge.edgeId)}`);
-        if (homeIndex === undefined) throw new Error('missing extra-game home orientation');
+        const homeIndex = homes.get(`${String(factorIndex)}:${String(edge.edgeId)}`);
+        if (homeIndex === undefined) throw new Error('missing game home orientation');
         const awayIndex = homeIndex === edge.a ? edge.b : edge.a;
         return { home: teamOrder[homeIndex] ?? '', away: teamOrder[awayIndex] ?? '' };
       }),
@@ -545,94 +517,6 @@ function buildScheduleAttempt(
     throw new Error(`generated schedule fails its own audit: ${failures[0] ?? 'unknown'}`);
   }
   return schedule;
-  /*
-  const rng = createRng(
-    seasonNamespaceSeed(
-      seed,
-      'schedule-rounds',
-      generationVersion,
-      `attempt-${String(attempt)}`,
-      'meeting-order',
-    ),
-  );
-
-  const fourGame = fourGameOpponents(league, seed);
-  const threeGamePairs: Array<readonly [string, string]> = [];
-  for (const team of league.teams) {
-    for (const opponent of conferenceNonDivisionOpponentsOf(league, team.franchiseId)) {
-      if (fourGame.get(team.franchiseId)?.has(opponent)) continue;
-      const [a, b] = [team.franchiseId, opponent].sort();
-      if (a !== team.franchiseId) continue;
-      threeGamePairs.push([a, b]);
-    }
-  }
-  const hostsTwice = orientThreeGamePairs(threeGamePairs);
-
-  const meetings = buildMeetings(league, fourGame, hostsTwice);
-  const teamIndex = new Map<string, number>();
-  for (const team of league.teams) {
-    teamIndex.set(team.franchiseId, teamIndex.size);
-  }
-
-  const rounds = assignRounds(meetings, rng, teamIndex);
-  // eslint-disable-next-line no-console
-  console.error(`DBG attempt ${String(attempt)}: assigned, conflicts=${String(totalConflicts(rounds))}`);
-  const repairStart = Date.now();
-  const repaired = repairRounds(rounds, teamIndex, 200_000);
-  // eslint-disable-next-line no-console
-  console.error(
-    `DBG attempt ${String(attempt)}: repaired=${String(repaired)} ms=${String(Date.now() - repairStart)}`,
-  );
-  if (!repaired) {
-    throw new Error('round repair could not eliminate all team conflicts');
-  }
-  for (const round of rounds) {
-    for (const count of round.counts) {
-      if (count !== 1) {
-        throw new Error('round repair left a franchise appearing more than once');
-      }
-    }
-  }
-
-  const games: Array<{ round: number; homeFranchiseId: string; awayFranchiseId: string }> = [];
-  rounds.forEach((round, index) => {
-    for (const meeting of round.meetings) {
-      games.push({
-        round: index + 1,
-        homeFranchiseId: meeting.team,
-        awayFranchiseId: meeting.opponent,
-      });
-    }
-  });
-  games.sort(
-    (a, b) =>
-      a.round - b.round ||
-      a.homeFranchiseId.localeCompare(b.homeFranchiseId) ||
-      a.awayFranchiseId.localeCompare(b.awayFranchiseId),
-  );
-  const scheduled: SeasonScheduleGame[] = games.map((game, index) => ({
-    gameId: `s${String(index + 1).padStart(6, '0')}`,
-    round: game.round,
-    homeFranchiseId: game.homeFranchiseId,
-    awayFranchiseId: game.awayFranchiseId,
-  }));
-
-  const schedule: SeasonSchedule = {
-    schemaVersion: 1,
-    scheduleVersion: SEASON_SCHEDULE_VERSION,
-    formulaVersion: SEASON_SCHEDULE_FORMULA_VERSION,
-    leagueVersion: SEASON_LEAGUE_VERSION,
-    generationSeed: seed,
-    rounds: SEASON_ROUND_COUNT,
-    games: scheduled,
-  };
-
-  const failures = auditSeasonSchedule(schedule, league);
-  if (failures.length > 0) {
-    throw new Error(`generated schedule fails its own audit: ${failures[0] ?? 'unknown'}`);
-  }
-  return schedule;
-*/
 }
 
 /** Generates the deterministic league schedule for the authoring seed. */
@@ -684,7 +568,6 @@ export function auditSeasonSchedule(schedule: SeasonSchedule, league: SeasonLeag
 
   const franchiseIds = new Set(league.teams.map((team) => team.franchiseId));
   const gameIds = new Set<string>();
-  const pairs = new Set<string>();
   for (const game of schedule.games) {
     if (gameIds.has(game.gameId)) failures.push(`duplicate gameId ${game.gameId}`);
     gameIds.add(game.gameId);
@@ -694,9 +577,6 @@ export function auditSeasonSchedule(schedule: SeasonSchedule, league: SeasonLeag
     if (game.homeFranchiseId === game.awayFranchiseId) {
       failures.push(`game ${game.gameId} is a self-game`);
     }
-    const key = pairKey(game.homeFranchiseId, game.awayFranchiseId);
-    if (pairs.has(key)) failures.push(`duplicate pairing in game ${game.gameId}`);
-    pairs.add(key);
   }
 
   const gamesByRound = new Map<number, SeasonScheduleGame[]>();
