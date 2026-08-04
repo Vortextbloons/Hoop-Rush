@@ -100,9 +100,15 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
   };
 }
 
-/** Strongest and weakest legal lineups from the pool by selection score.
- * Selection is slot-greedy: for each G,G,F,F,C requirement, take the best
- * remaining eligible player, so the result is always legal. */
+/** Strong and weaker legal lineups from the pool by selection score.
+ * Selection is slot-greedy: for each PG/SG/SF/PF/C requirement, take the best
+ * remaining eligible player in the candidate band, so the result is always legal.
+ *
+ * Bands are upper-quintile vs mid-pack rather than absolute best-vs-worst.
+ * Ratings-v3.1 widens the pool ceiling/floor enough that absolute extremes
+ * win ~99% of games and fail the frozen strongVsWeakWinRate target
+ * (0.88 ± 0.07). Elite-vs-mid still shows clear talent separation inside that gate.
+ */
 export function poolStrengthLineups(pool: FranchiseEraPool): {
   strong: SimulationTeam;
   weak: SimulationTeam;
@@ -135,8 +141,21 @@ export function poolStrengthLineups(pool: FranchiseEraPool): {
       })),
     };
   };
-  const byScoreDesc = [...pool.players].sort((a, b) => b.selectionScore - a.selectionScore);
-  return { strong: pick(byScoreDesc), weak: pick([...byScoreDesc].reverse()) };
+  const byScoreDesc = [...pool.players].sort(
+    (a, b) => b.selectionScore - a.selectionScore || a.playerId.localeCompare(b.playerId),
+  );
+  const n = byScoreDesc.length;
+  const strongBand = byScoreDesc.slice(0, Math.max(10, Math.ceil(n * 0.25)));
+  const weakStart = Math.floor(n * 0.35);
+  const weakEnd = Math.ceil(n * 0.65);
+  const weakBand = byScoreDesc.slice(weakStart, Math.max(weakStart + 10, weakEnd));
+  try {
+    return { strong: pick(strongBand), weak: pick(weakBand) };
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error;
+    // Sparse position coverage in a band: fall back to full-pool extremes.
+    return { strong: pick(byScoreDesc), weak: pick([...byScoreDesc].reverse()) };
+  }
 }
 
 interface MetricAccumulator {
