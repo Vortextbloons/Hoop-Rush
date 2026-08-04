@@ -21,22 +21,21 @@ async function filterLakers1990s(page: Page) {
 }
 
 test.describe('roster browser', () => {
-  test('loads the whole dataset grouped by team then decade', async ({ page }) => {
-    await page.goto('/roster');
-    await expect(page.getByRole('heading', { name: 'Player database' })).toBeVisible();
-    await expect(page.getByText(/^[\d,]+ players$/)).toBeVisible();
+  test(
+    'loads the whole dataset grouped by team then decade',
+    { tag: '@smoke' },
+    async ({ page }) => {
+      await page.goto('/roster');
+      await expect(page.getByRole('heading', { name: 'Player database' })).toBeVisible();
+      await expect(page.getByText(/^[\d,]+ players$/)).toBeVisible();
 
-    // Default organization ("None") groups by franchise then decade in pool order.
-    // The header cell wraps before its count, so match the stable prefix and
-    // check the player row below it.
-    await expect(page.locator('tbody').getByText(/POR · 1990s/i)).toBeVisible();
-    await expect(
-      page
-        .locator('tbody')
-        .getByRole('button', { name: /View Walt Williams stats/ })
-        .filter({ hasText: 'POR' }),
-    ).toBeVisible();
-  });
+      // Default organization ("None") begins with a group header followed by
+      // player rows. Avoid pinning this to a particular import order or team.
+      const rows = page.locator('tbody tr');
+      await expect(rows.first()).toContainText(/· \d{4}s ·\s*\d+\s*players/i);
+      await expect(rows.nth(1).getByRole('button', { name: /View .+ stats/ })).toBeVisible();
+    },
+  );
 
   test('filters by franchise and decade', async ({ page }) => {
     await filterLakers1990s(page);
@@ -44,16 +43,20 @@ test.describe('roster browser', () => {
       page.locator('tbody').getByRole('button', { name: /View Shaquille O'Neal stats/ }),
     ).toBeVisible();
 
-    // The filtered count matches the filtered pool's group header.
-    const header = page.locator('tbody').getByText(/LAL · 1990s/i);
+    // The filtered count matches the sole filtered pool's group header.
+    const header = page.locator('tbody tr').first();
     await expect(header).toBeVisible();
     const headerCount = (await header.innerText()).match(/(\d+) players/i)?.[1] ?? '';
     await expect(page.getByText(/^[\d,]+ players$/)).toHaveText(`${headerCount} players`);
 
     // Clearing the decade filter widens the view to every Lakers era.
+    const filteredCount = Number(headerCount);
     await page.getByLabel('Decade').click();
     await page.getByRole('option', { name: 'Any decade' }).click();
-    await expect(page.locator('tbody').getByText(/LAL · 1990s/i)).toBeVisible();
+    const widenedCount = Number(
+      (await page.getByText(/^[\d,]+ players$/).innerText()).replace(/[^\d]/g, ''),
+    );
+    expect(widenedCount).toBeGreaterThan(filteredCount);
   });
 
   test('searches by name and filters by position', async ({ page }) => {
@@ -67,12 +70,15 @@ test.describe('roster browser', () => {
         .filter({ hasText: /1990s/ }),
     ).toBeVisible();
 
-    // Point-guard positions keep Shaq out of the Lakers 1990s pool, PG keeps him excluded.
+    // Position filtering leaves at least one player and every visible player
+    // row advertises the selected position. It also excludes a known center.
     await filterLakers1990s(page);
-    await page.getByRole('button', { name: 'PG', exact: true }).click();
-    await expect(
-      page.locator('tbody').getByRole('button', { name: /View Magic Johnson stats/ }),
-    ).toBeVisible();
+    await page.getByRole('button', { name: 'SG', exact: true }).click();
+    const playerRows = page.locator('tbody tr:has(td:nth-child(2))');
+    await expect(playerRows.first()).toBeVisible();
+    const positions = await playerRows.locator('td:nth-child(2)').allInnerTexts();
+    expect(positions.length).toBeGreaterThan(0);
+    expect(positions.every((value) => value.split('/').includes('SG'))).toBe(true);
     await expect(
       page.locator('tbody').getByRole('button', { name: /View Shaquille O'Neal stats/ }),
     ).toHaveCount(0);

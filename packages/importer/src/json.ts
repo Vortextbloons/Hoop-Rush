@@ -7,7 +7,7 @@
  * `json.dumps` (e.g. `60` vs `60.0`); content hashes are recomputed on rebuild.
  */
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 export function ensureDir(path: string): void {
@@ -15,12 +15,7 @@ export function ensureDir(path: string): void {
 }
 
 export function fileExists(path: string): boolean {
-  try {
-    readFileSync(path);
-    return true;
-  } catch {
-    return false;
-  }
+  return existsSync(path);
 }
 
 export function readJson(path: string): unknown {

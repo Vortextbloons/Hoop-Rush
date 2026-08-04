@@ -7,13 +7,22 @@
     "build": "pnpm --filter @hoop-rush/web build",
     "preview": "pnpm --filter @hoop-rush/web preview",
     "hoop-rush": "pnpm --filter @hoop-rush/cli hoop-rush",
-    "check": "pnpm -r check",
-    "lint": "pnpm -r lint",
+    "check": "pnpm --parallel -r check",
+    "lint": "pnpm --parallel -r lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "pnpm --parallel -r test",
     "test:run": "pnpm --parallel -r test:run",
     "test:quick": "pnpm --parallel -r exec vitest run --exclude **/generator*.test.ts",
+    "static": "pnpm --parallel -r run \"/^(check|lint)$/\"",
+    "e2e": "pnpm --filter @hoop-rush/web e2e",
+    "e2e:smoke": "pnpm --filter @hoop-rush/web e2e:smoke",
+    "verify:quick": "pnpm static && pnpm test:quick",
+    "verify": "pnpm static && pnpm test:run && pnpm build",
+    "verify:changed": "pnpm --filter \"...[HEAD]\" --filter \"!hoop-rush\" --parallel --if-present run \"/^(check|lint)$/\" && pnpm --filter \"...[HEAD]\" --filter \"!hoop-rush\" --parallel --if-present test:run",
+    "check:watch:web": "pnpm --filter @hoop-rush/web check:watch",
+    "test:watch:web": "pnpm --filter @hoop-rush/web test",
+    "test:watch:engine": "pnpm --filter @hoop-rush/engine test",
     "prepare": "husky"
   },
   "engines": {
@@ -24,6 +33,7 @@
     "*.{ts,js,svelte,json,css,html,yml,yaml}": "prettier --write"
   },
   "devDependencies": {
+    "@sveltejs/mcp": "^0.1.25",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",

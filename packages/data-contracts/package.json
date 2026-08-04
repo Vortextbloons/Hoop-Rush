@@ -8,8 +8,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "check": "tsc --noEmit",
-    "lint": "prettier --check src vitest.config.ts eslint.config.js && eslint --cache .",
+    "check": "tsc --noEmit --incremental",
+    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache .",
     "test": "vitest",
     "test:run": "vitest run"
   },

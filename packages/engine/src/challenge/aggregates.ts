@@ -72,7 +72,7 @@ export function zeroRunAggregates(players: readonly SimulationPlayer[]): RunAggr
 /** Adds one accepted game result (user team = home side) to the aggregates. */
 export function addGameToAggregates(aggregates: RunAggregates, result: GameResult): RunAggregates {
   const team = result.home.box;
-  const playerById = new Map(aggregates.players.map((p) => [p.playerId, p]));
+  const boxByPlayerId = new Map(result.home.players.map((player) => [player.playerId, player]));
   const won = result.winner === 'home';
 
   const nextTeam: TeamAggregate = {
@@ -98,12 +98,11 @@ export function addGameToAggregates(aggregates: RunAggregates, result: GameResul
   };
 
   const nextPlayers = aggregates.players.map((aggregate) => {
-    const box = result.home.players.find((p) => p.playerId === aggregate.playerId);
+    const box = boxByPlayerId.get(aggregate.playerId);
     if (!box) return aggregate;
-    const inc = playerById.get(aggregate.playerId)?.gamesPlayed ?? 0;
     return {
       playerId: aggregate.playerId,
-      gamesPlayed: inc + 1,
+      gamesPlayed: aggregate.gamesPlayed + 1,
       minutes: aggregate.minutes + box.minutes,
       points: aggregate.points + box.points,
       fieldGoals: addMa(aggregate.fieldGoals, box.fieldGoals),

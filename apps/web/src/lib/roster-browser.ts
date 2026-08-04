@@ -155,16 +155,18 @@ export function sortRoster(
 
 /** Applies franchise, decade, position, and name-query filters. */
 export function filterRoster(rows: RosterDetailRow[], filters: RosterFilters): RosterDetailRow[] {
-  let list = rows;
-  if (filters.franchiseId) list = list.filter((r) => r.franchiseId === filters.franchiseId);
-  if (filters.eraId) list = list.filter((r) => r.eraId === filters.eraId);
+  const franchiseId = filters.franchiseId;
+  const eraId = filters.eraId;
   const position = filters.position;
-  if (position) list = list.filter((r) => r.positionsPlayable.includes(position));
   const query = filters.query.trim().toLowerCase();
-  if (query) {
-    list = list.filter((r) => lowercaseName(r).includes(query));
-  }
-  return list;
+  if (!franchiseId && !eraId && !position && !query) return rows;
+  return rows.filter(
+    (row) =>
+      (!franchiseId || row.franchiseId === franchiseId) &&
+      (!eraId || row.eraId === eraId) &&
+      (!position || row.positionsPlayable.includes(position)) &&
+      (!query || lowercaseName(row).includes(query)),
+  );
 }
 
 /** One team/decade bucket in dataset order (used by the 'none' organization). */

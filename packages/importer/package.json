@@ -8,10 +8,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit --incremental",
     "test": "vitest",
     "test:run": "vitest run",
-    "lint": "prettier --check src vitest.config.ts eslint.config.js && eslint --cache ."
+    "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache ."
   },
   "dependencies": {
     "@hoop-rush/data-contracts": "workspace:*",

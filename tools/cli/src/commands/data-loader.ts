@@ -23,16 +23,24 @@ import { UsageError } from '../args.js';
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
 export const DEFAULT_MANIFEST = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
 
-function readJson(path: string): unknown {
+function readJsonBytes(path: string): Buffer {
   try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    return readFileSync(path);
   } catch (error) {
     throw new Error(`cannot read ${path}: ${(error as Error).message}`);
   }
 }
 
-function verifyHash(path: string, expected: string): void {
-  const actual = createHash('sha256').update(readFileSync(path)).digest('hex');
+function parseJson(path: string, bytes: Buffer): unknown {
+  try {
+    return JSON.parse(bytes.toString('utf8')) as unknown;
+  } catch (error) {
+    throw new Error(`cannot read ${path}: ${(error as Error).message}`);
+  }
+}
+
+function verifyHash(path: string, bytes: Buffer, expected: string): void {
+  const actual = createHash('sha256').update(bytes).digest('hex');
   if (actual !== expected) {
     throw new Error(`content hash mismatch for ${path}: expected ${expected}, got ${actual}`);
   }
@@ -47,7 +55,8 @@ export function loadPackagedData(manifestPath: string = DEFAULT_MANIFEST): {
   manifest: HoopRushManifest;
   dir: string;
 } {
-  const parsed = hoopRushManifestSchema.safeParse(readJson(manifestPath));
+  const bytes = readJsonBytes(manifestPath);
+  const parsed = hoopRushManifestSchema.safeParse(parseJson(manifestPath, bytes));
   if (!parsed.success) {
     throw new Error(
       `manifest ${manifestPath} fails validation: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
@@ -58,27 +67,35 @@ export function loadPackagedData(manifestPath: string = DEFAULT_MANIFEST): {
 
 export class PackagedData {
   private readonly poolCache = new Map<string, FranchiseEraPool>();
+  private readonly profileCache = new Map<string, EraSimulationProfile>();
+  private bracketCache: OpponentBracket | null = null;
+  private readonly poolEntries: Map<string, HoopRushManifest['pools'][number]>;
 
   constructor(
     readonly manifest: HoopRushManifest,
     readonly dir: string,
-  ) {}
+  ) {
+    this.poolEntries = new Map(
+      manifest.pools.map((entry) => [`${entry.franchiseId}/${entry.eraId}`, entry]),
+    );
+  }
 
-  private artifact(url: string): { path: string; read: () => unknown } {
+  private artifact(url: string): { path: string; bytes: Buffer } {
     const path = resolveArtifact(this.dir, url);
-    return {
-      path,
-      read: () => readJson(path),
-    };
+    const bytes = readJsonBytes(path);
+    return { path, bytes };
   }
 
   eraProfile(eraId = '1990s'): EraSimulationProfile {
+    const cached = this.profileCache.get(eraId);
+    if (cached) return cached;
     const entry = this.manifest.eraSimulationProfiles.find((e) => e.eraId === eraId);
     if (!entry) throw new Error(`no era simulation profile for ${eraId} in the manifest`);
-    const { path, read } = this.artifact(entry.url);
-    verifyHash(path, entry.contentHash);
-    const parsed = eraSimulationProfileSchema.safeParse(read());
+    const { path, bytes } = this.artifact(entry.url);
+    verifyHash(path, bytes, entry.contentHash);
+    const parsed = eraSimulationProfileSchema.safeParse(parseJson(path, bytes));
     if (!parsed.success) throw new Error(`profile ${path} fails validation`);
+    this.profileCache.set(eraId, parsed.data);
     return parsed.data;
   }
 
@@ -86,13 +103,11 @@ export class PackagedData {
     const cacheKey = `${franchiseId}/${eraId}`;
     const cached = this.poolCache.get(cacheKey);
     if (cached) return cached;
-    const entry = this.manifest.pools.find(
-      (p) => p.franchiseId === franchiseId && p.eraId === eraId,
-    );
+    const entry = this.poolEntries.get(cacheKey);
     if (!entry) throw new Error(`no pool for ${franchiseId}/${eraId} in the manifest`);
-    const { path, read } = this.artifact(entry.url);
-    verifyHash(path, entry.contentHash);
-    const parsed = franchiseEraPoolSchema.safeParse(read());
+    const { path, bytes } = this.artifact(entry.url);
+    verifyHash(path, bytes, entry.contentHash);
+    const parsed = franchiseEraPoolSchema.safeParse(parseJson(path, bytes));
     if (!parsed.success) throw new Error(`pool ${path} fails validation`);
     this.poolCache.set(cacheKey, parsed.data);
     return parsed.data;
@@ -100,12 +115,14 @@ export class PackagedData {
 
   /** The single frozen opponent bracket (spec/02), hash-verified. */
   bracket(): OpponentBracket {
+    if (this.bracketCache) return this.bracketCache;
     const entry = this.manifest.bracket;
     if (!entry) throw new Error('no bracket packaged in the manifest');
-    const { path, read } = this.artifact(entry.url);
-    verifyHash(path, entry.contentHash);
-    const parsed = opponentBracketSchema.safeParse(read());
+    const { path, bytes } = this.artifact(entry.url);
+    verifyHash(path, bytes, entry.contentHash);
+    const parsed = opponentBracketSchema.safeParse(parseJson(path, bytes));
     if (!parsed.success) throw new Error(`bracket ${path} fails validation`);
+    this.bracketCache = parsed.data;
     return parsed.data;
   }
 }

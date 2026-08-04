@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openPlayerPicker } from './player-helpers';
 
 /**
  * M3 journeys (spec/08, spec/06): draft five → Play → animated 82-game
@@ -18,11 +19,7 @@ async function draftFive(page: Page) {
     ['Robert Horry', 'Power Forward slot 4'],
     ['Vlade Divac', 'Center slot 5'],
   ] as const) {
-    const search = page.getByRole('searchbox', { name: 'Search players by name' });
-    await search.fill(name);
-    const card = page.getByRole('button', { name: new RegExp(name) }).first();
-    await expect(card).toBeVisible();
-    await card.click();
+    await openPlayerPicker(page, name);
     await page.getByRole('button', { name: `Place ${name} at ${slotLabel}`, exact: true }).click();
   }
 }
@@ -53,63 +50,67 @@ async function expectSeasonReport(page: Page) {
 }
 
 test.describe('m3: draft to 82-game season journey', () => {
-  test('drafts five, plays 82 games, inspects the summary, reloads, and reopens from history', async ({
-    page,
-  }) => {
-    // Headless Chromium defaults to reduced motion, which skips the paced
-    // reveal; opt back in so the overlay is observable.
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await reachPlaying(page);
+  test(
+    'drafts five, plays 82 games, inspects the summary, reloads, and reopens from history',
+    {
+      tag: '@smoke',
+    },
+    async ({ page }) => {
+      // Headless Chromium defaults to reduced motion, which skips the paced
+      // reveal; opt back in so the overlay is observable.
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await reachPlaying(page);
 
-    // The overlay reveals games in the 82-cell strip.
-    await expect(page.getByLabel('82-game strip')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+      // The overlay reveals games in the 82-cell strip.
+      await expect(page.getByLabel('82-game strip')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
 
-    // The overlay completes and navigates to the season report.
-    await expectSeasonReport(page);
+      // The overlay completes and navigates to the season report.
+      await expectSeasonReport(page);
 
-    // Season facts: final record, strip, League MVP, and the five-player table.
-    await expect(
-      page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
-    ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
-    const strip = page.getByLabel('82-game strip');
-    await expect(strip.locator('li')).toHaveCount(82);
+      // Season facts: final record, strip, League MVP, and the five-player table.
+      await expect(
+        page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
+      ).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
+      const strip = page.getByLabel('82-game strip');
+      await expect(strip.locator('li')).toHaveCount(82);
 
-    // The record survives a reload.
-    const recordText = await page.getByText(/^\d+–\d+$/).innerText();
-    await page.reload();
-    await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
-    await expect(page.getByText(/^\d+–\d+$/)).toBeVisible();
-    expect(await page.getByText(/^\d+–\d+$/).innerText()).toBe(recordText);
+      // The record survives a reload.
+      const recordText = await page.getByText(/^\d+–\d+$/).innerText();
+      await page.reload();
+      await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
+      await expect(page.getByText(/^\d+–\d+$/)).toBeVisible();
+      expect(await page.getByText(/^\d+–\d+$/).innerText()).toBe(recordText);
 
-    // Totals toggle switches the season table to totals.
-    await page.getByRole('button', { name: 'Totals' }).click();
-    await expect(page.getByRole('button', { name: 'Totals' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+      // Totals toggle switches the season table to totals.
+      await page.getByRole('button', { name: 'Totals' }).click();
+      await expect(page.getByRole('button', { name: 'Totals' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
 
-    // History reopens the stored summary. Sandbox runs no longer carry a
-    // franchise-era label (every run simulates in the fixed 2010s era), so
-    // the row is identified by its record instead.
-    await page.goto('/sandbox/history');
-    await expect(page.getByRole('heading', { name: 'Challenge history' })).toBeVisible();
-    const row = page.getByRole('link', { name: new RegExp(recordText) });
-    await expect(row).toBeVisible();
-    await row.click();
-    await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
-    await expect(page.getByText(/^\d+–\d+$/)).toBeVisible();
-    expect(await page.getByText(/^\d+–\d+$/).innerText()).toBe(recordText);
+      // History reopens the stored summary. Sandbox runs no longer carry a
+      // franchise-era label (every run simulates in the fixed 2010s era), so
+      // the row is identified by its record instead.
+      await page.goto('/sandbox/history');
+      await expect(page.getByRole('heading', { name: 'Challenge history' })).toBeVisible();
+      const row = page.getByRole('link', { name: new RegExp(recordText) });
+      await expect(row).toBeVisible();
+      await row.click();
+      await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
+      await expect(page.getByText(/^\d+–\d+$/)).toBeVisible();
+      expect(await page.getByText(/^\d+–\d+$/).innerText()).toBe(recordText);
 
-    // The start page lists the completed challenge.
-    await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Recent challenges' })).toBeVisible();
-    await expect(page.getByRole('link', { name: new RegExp(recordText) })).toBeVisible();
-  });
+      // The start page lists the completed challenge.
+      await page.goto('/');
+      await expect(page.getByRole('heading', { name: 'Recent challenges' })).toBeVisible();
+      await expect(page.getByRole('link', { name: new RegExp(recordText) })).toBeVisible();
+    },
+  );
 
   test('result actions: Run again returns to a cleared draft', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -183,19 +184,23 @@ test.describe('m3: draft to 82-game season journey', () => {
     await expectSeasonReport(page);
   });
 
-  test('a reload mid-run resumes and reproduces the same final record', async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await reachPlaying(page);
-    // Give the overlay a moment to commit a few games, then interrupt it.
-    await page.waitForTimeout(1200);
-    await page.reload();
-    await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible({
-      timeout: 15000,
-    });
-    await expectSeasonReport(page);
-    const recordText = await page.getByText(/^\d+–\d+$/).innerText();
-    expect(recordText).toMatch(/^\d+–\d+$/);
-  });
+  test(
+    'a reload mid-run resumes and reproduces the same final record',
+    { tag: '@smoke' },
+    async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await reachPlaying(page);
+      // Give the overlay a moment to commit a few games, then interrupt it.
+      await page.waitForTimeout(1200);
+      await page.reload();
+      await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible({
+        timeout: 15000,
+      });
+      await expectSeasonReport(page);
+      const recordText = await page.getByText(/^\d+–\d+$/).innerText();
+      expect(recordText).toMatch(/^\d+–\d+$/);
+    },
+  );
 });
 
 test.describe('m3: URL state validation', () => {
@@ -215,16 +220,20 @@ test.describe('m3: accessibility and mobile', () => {
     await expect(page).toHaveURL(/\/sandbox\/challenge\/?$/);
   });
 
-  test('mobile: the draft and season report fit without horizontal overflow', async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await page.setViewportSize({ width: 390, height: 844 });
-    await reachPlaying(page);
-    await expectSeasonReport(page);
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    );
-    expect(overflow).toBe(false);
-  });
+  test(
+    'mobile: the draft and season report fit without horizontal overflow',
+    { tag: '@smoke' },
+    async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await reachPlaying(page);
+      await expectSeasonReport(page);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(false);
+    },
+  );
 
   test('reduced motion: the overlay completes without artificial pacing', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });

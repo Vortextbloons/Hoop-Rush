@@ -101,69 +101,73 @@ function roundHeading(page: Page, round: number) {
 test.describe('classic: reel draft, auto-launch, guard, and result journeys', () => {
   test.describe.configure({ timeout: 60_000 });
 
-  test('ratings draft: reels spin, rounds advance, and the fifth pick auto-launches', async ({
-    page,
-  }) => {
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await page.goto('/classic');
-    await expect(page.getByRole('heading', { name: 'Five draft rounds' })).toBeVisible();
-    await page.getByRole('button', { name: 'Start Ratings draft' }).click();
-    await expect(roundHeading(page, 1)).toBeVisible();
+  test(
+    'ratings draft: reels spin, rounds advance, and the fifth pick auto-launches',
+    {
+      tag: '@smoke',
+    },
+    async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.goto('/classic');
+      await expect(page.getByRole('heading', { name: 'Five draft rounds' })).toBeVisible();
+      await page.getByRole('button', { name: 'Start Ratings draft' }).click();
+      await expect(roundHeading(page, 1)).toBeVisible();
 
-    // The very first roll animates too: the modal opens with the spinning
-    // reels, then closes on the landed pair.
-    await expect(page.locator('.roll-overlay')).toBeVisible();
-    await expect(page.locator('[data-axis="franchise"]')).toBeVisible();
-    await expect(page.locator('[data-axis="era"]')).toBeVisible();
-    await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+      // The very first roll animates too: the modal opens with the spinning
+      // reels, then closes on the landed pair.
+      await expect(page.locator('.roll-overlay')).toBeVisible();
+      await expect(page.locator('[data-axis="franchise"]')).toBeVisible();
+      await expect(page.locator('[data-axis="era"]')).toBeVisible();
+      await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
 
-    // The initial roll shows the franchise + era indicators.
-    await expect(page.locator('[data-indicator="franchise"]')).toBeVisible();
-    await expect(page.locator('[data-indicator="era"]')).toBeVisible();
+      // The initial roll shows the franchise + era indicators.
+      await expect(page.locator('[data-indicator="franchise"]')).toBeVisible();
+      await expect(page.locator('[data-indicator="era"]')).toBeVisible();
 
-    // After the first pick the roll modal opens with the spinning reels, then
-    // closes on the new pair; the round advances and the indicators update.
-    await pickOne(page);
-    await expect(page.locator('.roll-overlay')).toBeVisible();
-    await expect(page.locator('[data-axis="franchise"]')).toBeVisible();
-    await expect(page.locator('[data-axis="era"]')).toBeVisible();
-    await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
-    await expect(roundHeading(page, 2)).toBeVisible();
-    await expect(page.locator('[data-indicator="franchise"]')).toBeVisible();
-    await expect(page.locator('[data-indicator="era"]')).toBeVisible();
+      // After the first pick the roll modal opens with the spinning reels, then
+      // closes on the new pair; the round advances and the indicators update.
+      await pickOne(page);
+      await expect(page.locator('.roll-overlay')).toBeVisible();
+      await expect(page.locator('[data-axis="franchise"]')).toBeVisible();
+      await expect(page.locator('[data-axis="era"]')).toBeVisible();
+      await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+      await expect(roundHeading(page, 2)).toBeVisible();
+      await expect(page.locator('[data-indicator="franchise"]')).toBeVisible();
+      await expect(page.locator('[data-indicator="era"]')).toBeVisible();
 
-    // The remaining rounds: pick, spin, settle.
-    await draftRounds(page, 2);
+      // The remaining rounds: pick, spin, settle.
+      await draftRounds(page, 2);
 
-    // The fifth pick auto-launches: no 'Draft complete', no 'Play 82 games'.
-    await expect(page.getByText('Draft complete')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Play 82 games' })).toHaveCount(0);
-    await expect(page).toHaveURL(/\/classic\/challenge\/?$/, { timeout: 15000 });
-    await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible();
+      // The fifth pick auto-launches: no 'Draft complete', no 'Play 82 games'.
+      await expect(page.getByText('Draft complete')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Play 82 games' })).toHaveCount(0);
+      await expect(page).toHaveURL(/\/classic\/challenge\/?$/, { timeout: 15000 });
+      await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible();
 
-    // The shared overlay presents the classic run with its variant label.
-    await expect(page.getByLabel('82-game strip')).toBeVisible();
-    await expect(page.getByText(/Classic · Ratings/)).toBeVisible();
+      // The shared overlay presents the classic run with its variant label.
+      await expect(page.getByLabel('82-game strip')).toBeVisible();
+      await expect(page.getByText(/Classic · Ratings/)).toBeVisible();
 
-    await expectClassicSeasonReport(page);
+      await expectClassicSeasonReport(page);
 
-    // The result report shows the classic mode identity and all sections.
-    await expect(page.getByText('Classic · Ratings')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
+      // The result report shows the classic mode identity and all sections.
+      await expect(page.getByText('Classic · Ratings')).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
 
-    // History reopens the stored classic summary by its record.
-    const record = await recordText(page);
-    await page.goto('/classic/history');
-    await expect(page.getByRole('heading', { name: 'Challenge history' })).toBeVisible();
-    const row = page.getByRole('link', { name: new RegExp(record) });
-    await expect(row).toBeVisible();
-    await row.click();
-    await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
-    expect(await recordText(page)).toBe(record);
-  });
+      // History reopens the stored classic summary by its record.
+      const record = await recordText(page);
+      await page.goto('/classic/history');
+      await expect(page.getByRole('heading', { name: 'Challenge history' })).toBeVisible();
+      const row = page.getByRole('link', { name: new RegExp(record) });
+      await expect(row).toBeVisible();
+      await row.click();
+      await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible();
+      expect(await recordText(page)).toBe(record);
+    },
+  );
 
   test('ball knowledge hides all ratings, sorts by name, and auto-launches', async ({ page }) => {
     await page.goto('/classic');
@@ -251,7 +255,6 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     const eraReroll = page.getByRole('button', { name: /Reroll era/ });
     if (await eraReroll.isEnabled()) {
       const eraBefore2 = (await eraIndicator.innerText()).trim();
-      const franchiseBefore2 = (await franchiseIndicator.innerText()).trim();
       await eraReroll.click();
       await expect(overlay).toBeVisible();
       await expect(eraReel.locator('.reel-strip')).toHaveClass(/reel-spinning/, {
@@ -259,7 +262,9 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
       });
       await expect(franchiseReel.locator('.reel-strip')).not.toHaveClass(/reel-spinning/);
       await expect(overlay).not.toBeVisible({ timeout: 5000 });
-      await expect(franchiseIndicator).toContainText(franchiseBefore2);
+      // The franchise id stays fixed, but its historical display identity can
+      // legitimately change with the era (for example NJN -> BKN). The reel
+      // class assertion above is the stable proof that this axis did not spin.
       await expect(eraIndicator).not.toContainText(eraBefore2);
     } else {
       await expect(eraReroll).toHaveAttribute('title', /\S/);
