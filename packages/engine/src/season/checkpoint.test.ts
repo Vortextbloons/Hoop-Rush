@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   seasonCandidateCheckpointSchema,
   seasonRunSchema,
   type SeasonCandidateCheckpoint,
   type SeasonGameSummary,
+  type SeasonRun,
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
 import {
@@ -152,9 +153,18 @@ describe('season game reconstruction (M2.3)', () => {
 });
 
 describe('season checkpoint digest (M2.3)', () => {
+  // Block 0 simulation costs ~10s; all five tests consume the same simulated
+  // checkpoint, and the digest functions only read from it.
+  let checkpoint: SeasonCandidateCheckpoint;
+  let run: SeasonRun;
+
+  beforeAll(() => {
+    const built = buildTestRun();
+    run = built.run;
+    checkpoint = simulateSeasonBlock(pipelineInput(built.run, built.catalog, 0));
+  }, 60_000);
+
   it('is deterministic regardless of array order', () => {
-    const { run, catalog } = buildTestRun();
-    const checkpoint = simulateSeasonBlock(pipelineInput(run, catalog, 0));
     const digest = seasonCheckpointDigest(checkpoint);
     expect(digest).toMatch(/^[0-9a-f]{32}$/);
     expect(digest).toBe(checkpoint.digest);
@@ -175,8 +185,6 @@ describe('season checkpoint digest (M2.3)', () => {
   });
 
   it('sorts recap arrays canonically inside the canonical serialization', () => {
-    const { run, catalog } = buildTestRun();
-    const checkpoint = simulateSeasonBlock(pipelineInput(run, catalog, 0));
     const recap = checkpoint.recap;
     const reversed = {
       ...recap,
@@ -190,8 +198,6 @@ describe('season checkpoint digest (M2.3)', () => {
   });
 
   it('excludes the digest field itself from the serialization', () => {
-    const { run, catalog } = buildTestRun();
-    const checkpoint = simulateSeasonBlock(pipelineInput(run, catalog, 0));
     const withoutDigest = { ...checkpoint, digest: '' };
     expect(seasonCheckpointDigest(withoutDigest)).toBe(seasonCheckpointDigest(checkpoint));
     // The canonical serialization never contains the digest string.
@@ -199,8 +205,6 @@ describe('season checkpoint digest (M2.3)', () => {
   });
 
   it('is stable across runtime parsing (object key reordering)', () => {
-    const { run, catalog } = buildTestRun();
-    const checkpoint = simulateSeasonBlock(pipelineInput(run, catalog, 0));
     const digest = seasonCheckpointDigest(checkpoint);
     // JSON round-trip + zod parsing reorder object keys; the canonical
     // serialization sorts keys recursively, so the digest is unchanged.
@@ -211,11 +215,7 @@ describe('season checkpoint digest (M2.3)', () => {
   });
 
   it('produces a schema-valid checkpoint for the pipeline output', () => {
-    const { run, catalog } = buildTestRun();
-    const checkpoint = simulateSeasonBlock(pipelineInput(run, catalog, 0));
     expect(seasonCandidateCheckpointSchema.safeParse(checkpoint).success).toBe(true);
     expect(seasonRunSchema.safeParse(run).success).toBe(true);
-    void scheduleOf;
-    void checkpoint;
   });
 });

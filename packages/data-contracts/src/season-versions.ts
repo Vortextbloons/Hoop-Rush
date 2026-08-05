@@ -16,6 +16,13 @@
  * and Season-game-targets material versions). Bumped to 2 by M2.1 (draft
  * facts, AI assignments, rotations, audit, new material versions). The M2.0
  * schema v1 data is development scaffolding, not a migration target.
+ *
+ * Schema layout 4 remains the read schema after the M2.3.5 draft overhaul:
+ * the `draft` facts and the `versions.draftVersion` field widened to a
+ * discriminated union so legacy M2.3 runs (franchise-era draft facts,
+ * `season-draft-v1`) and new runs (global eight-card offer facts,
+ * `season-draft-v2`) both validate as schema 4. The M2.3.5 change records
+ * itself through the draft versions, never through a snapshot layout bump.
  */
 export const SEASON_RUN_SCHEMA_VERSION = 4;
 
@@ -45,8 +52,42 @@ export const SEASON_SEED_DERIVATION_VERSION = 'season-seeds-v1';
 /** Deterministic playerVersionId derivation version. */
 export const PLAYER_VERSION_ID_VERSION = 'player-version-id-v1';
 
-/** M2.1 ten-round human Season Run draft state machine and commands. */
-export const SEASON_DRAFT_VERSION = 'season-draft-v1';
+/**
+ * M2.3.5 ten-round human Season Run draft state machine and commands:
+ * ten deterministic global eight-card offers per participant, feasibility-safe
+ * selections (4/4/3 completion targets), and typed recovery failures. See
+ * `season-draft-v1` (below) for the legacy franchise-era roll contract.
+ */
+export const SEASON_DRAFT_VERSION = 'season-draft-v2';
+
+/**
+ * Legacy M2.1-M2.3 franchise-era roll draft (`season-draft-v1`). New drafts
+ * never use it; unfinished v1 drafts are not convertible and receive an
+ * explicit recovery screen. Runs created under v1 remain playable through
+ * their frozen draft facts.
+ */
+export const SEASON_DRAFT_LEGACY_VERSION = 'season-draft-v1';
+
+/**
+ * M2.3.5 draft offer contract (spec/2.0/03): exactly this many distinct
+ * player-version cards are drawn for each round, and at least
+ * `SEASON_DRAFT_SAFE_MINIMUM` of them must be feasibility-safe selections.
+ */
+export const SEASON_DRAFT_OFFER_SIZE = 8;
+
+/**
+ * M2.3.5: minimum feasibility-safe (4/4/3 completion-safe) cards an offer
+ * must contain. Fewer returns the typed `NO_FEASIBLE_GLOBAL_OFFER` error;
+ * rules are never relaxed.
+ */
+export const SEASON_DRAFT_SAFE_MINIMUM = 3;
+
+/**
+ * Frozen calibration cohort targets for global offer variety, safe-choice
+ * availability, positional coverage, exact-version uniqueness, AI generation
+ * success, and roster strength distributions (`offer-targets-v1`).
+ */
+export const SEASON_OFFER_TARGETS_VERSION = 'offer-targets-v1';
 
 /** Pure ten-player Season Run roster legality rule set (game minimums). */
 export const SEASON_ROSTER_RULES_VERSION = 'season-roster-v1';

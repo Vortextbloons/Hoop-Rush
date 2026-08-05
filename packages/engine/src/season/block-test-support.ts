@@ -41,9 +41,9 @@ import { seasonRotationSetDigest } from './rotation.ts';
 /**
  * Deterministic full-league test support for the M2.3 block pipeline: a
  * synthetic 30-franchise draft catalog, AI-generated rosters and rotations,
- * the committed-format schedule, and a schema-valid run snapshot. Building
- * the league is expensive (AI generation), so the result is cached per test
- * file; run states are cheap clones.
+ * the committed-format schedule, and a schema-valid run snapshot. The league
+ * build runs AI generation, so the result is cached per test file; run
+ * states are cheap clones.
  */
 
 export const TEST_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
@@ -250,8 +250,23 @@ function emptyPostseason(rootSeed: string): SeasonRun['postseason'] {
   };
 }
 
+// The generated schedule is a pure function of (league, seed), and every
+// run clone shares the same league object and generation seed, so a
+// per-league cache is exact. Blocks cost ~10s; the schedule is ~250ms.
+const scheduleByLeague = new WeakMap<
+  SeasonRun['league'],
+  ReturnType<typeof generateSeasonSchedule>
+>();
+
 export function scheduleOf(run: SeasonRun): ReturnType<typeof generateSeasonSchedule> {
-  return generateSeasonSchedule({ league: run.league, seed: run.schedule.generationSeed });
+  const cached = scheduleByLeague.get(run.league);
+  if (cached !== undefined) return cached;
+  const schedule = generateSeasonSchedule({
+    league: run.league,
+    seed: run.schedule.generationSeed,
+  });
+  scheduleByLeague.set(run.league, schedule);
+  return schedule;
 }
 
 export function blockCommand(

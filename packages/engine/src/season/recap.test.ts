@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   type SeasonGameSummary,
   type SeasonPlayerAggregate,
+  type SeasonRun,
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
 import { blockRoundRange } from '@hoop-rush/data-contracts';
@@ -42,12 +43,29 @@ function emptyStandings(franchiseIds: string[]): SeasonStandings {
 }
 
 describe('season block recap (M2.3)', () => {
-  it('builds a recap whose every claim derives from saved facts', () => {
-    const { run, catalog } = buildTestRun();
-    const input = pipelineInput(run, catalog, 0);
-    const checkpoint = simulateSeasonBlock(input);
+  // Block 0 costs ~10s to simulate; the first two tests consume the same
+  // simulated checkpoint and its derived recap scaffolding.
+  let run: SeasonRun;
+  let checkpoint: ReturnType<typeof simulateSeasonBlock>;
+  let zero: SeasonStandings;
+  let rosterPlayerIds: Map<string, string>;
+  let schedule: ReturnType<typeof scheduleOf>;
+
+  beforeAll(() => {
+    const built = buildTestRun();
+    run = built.run;
+    checkpoint = simulateSeasonBlock(pipelineInput(built.run, built.catalog, 0));
     const franchiseIds = run.league.teams.map((team) => team.franchiseId);
-    const zero = emptyStandings(franchiseIds);
+    zero = emptyStandings(franchiseIds);
+    rosterPlayerIds = new Map(
+      run.rosters.flatMap((roster) =>
+        roster.players.map((player) => [player.playerVersionId, player.playerId]),
+      ),
+    );
+    schedule = scheduleOf(run);
+  }, 60_000);
+
+  it('builds a recap whose every claim derives from saved facts', () => {
     const recapInput: SeasonBlockRecapInput = {
       runId: run.runId,
       blockIndex: 0,
@@ -57,12 +75,8 @@ describe('season block recap (M2.3)', () => {
       standingsBefore: zero,
       standingsAfter: checkpoint.standings,
       playerAggregates: checkpoint.playerAggregates,
-      schedule: scheduleOf(run),
-      rosterPlayerIds: new Map(
-        run.rosters.flatMap((roster) =>
-          roster.players.map((player) => [player.playerVersionId, player.playerId]),
-        ),
-      ),
+      schedule,
+      rosterPlayerIds,
     };
     const recap = buildSeasonBlockRecap(recapInput);
     expect(recap.blockIndex).toBe(0);
@@ -78,28 +92,20 @@ describe('season block recap (M2.3)', () => {
   });
 
   it('lists exactly the next block human games from the schedule', () => {
-    const { run, catalog } = buildTestRun();
-    const input = pipelineInput(run, catalog, 0);
-    const checkpoint = simulateSeasonBlock(input);
-    const franchiseIds = run.league.teams.map((team) => team.franchiseId);
     const recap = buildSeasonBlockRecap({
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 10,
       humanFranchiseId: 'lakers',
       summaries: checkpoint.gameSummaries,
-      standingsBefore: emptyStandings(franchiseIds),
+      standingsBefore: zero,
       standingsAfter: checkpoint.standings,
       playerAggregates: checkpoint.playerAggregates,
-      schedule: scheduleOf(run),
-      rosterPlayerIds: new Map(
-        run.rosters.flatMap((roster) =>
-          roster.players.map((player) => [player.playerVersionId, player.playerId]),
-        ),
-      ),
+      schedule,
+      rosterPlayerIds,
     });
     const { fromRound, toRound } = blockRoundRange(1);
-    const expectedCount = scheduleOf(run).games.filter(
+    const expectedCount = schedule.games.filter(
       (game) =>
         game.round >= fromRound &&
         game.round <= toRound &&

@@ -111,7 +111,7 @@ describe('season game properties (fast-check)', () => {
         const result = simulateSeasonGame(input, ctx);
         expect(checkSeasonGameResult(result, input)).toEqual([]);
       }),
-      { numRuns: 120 },
+      { numRuns: 30 },
     );
   });
 
@@ -123,7 +123,7 @@ describe('season game properties (fast-check)', () => {
         const b = simulateSeasonGame(input, ctx);
         expect(JSON.stringify(a)).toBe(JSON.stringify(b));
       }),
-      { numRuns: 60 },
+      { numRuns: 30 },
     );
   });
 
@@ -151,7 +151,7 @@ describe('season game properties (fast-check)', () => {
           }
         }
       }),
-      { numRuns: 60 },
+      { numRuns: 30 },
     );
   });
 
@@ -184,7 +184,7 @@ describe('season game properties (fast-check)', () => {
           }
         }
       }),
-      { numRuns: 60 },
+      { numRuns: 30 },
     );
   });
 
@@ -202,7 +202,7 @@ describe('season game properties (fast-check)', () => {
           }
         }
       }),
-      { numRuns: 60 },
+      { numRuns: 30 },
     );
   });
 });

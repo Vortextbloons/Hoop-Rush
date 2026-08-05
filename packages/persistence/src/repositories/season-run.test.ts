@@ -99,23 +99,31 @@ interface Adapters {
   seam: ReturnType<typeof buildStubSeasonEngineSeam>;
 }
 
+// Read-only full-season fixture data shared by every test in this file.
+// Each test only clones or spreads `run`/`blocks`/`schedule`, so one
+// module-level build (schema parse of the 1,230-game snapshot) replaces a
+// per-test rebuild of the full dataset.
+const sharedDataset = buildFullSeasonDataset({
+  seam: buildStubSeasonEngineSeam(),
+  runId: 'season-run-contract-test',
+});
+
 /** Fresh repositories with one isolated database and the stub engine seam. */
 function makeAdapters(): Adapters {
   const db = new TestDatabase(`season-run-test-${String(Math.random())}`);
   const seam = buildStubSeasonEngineSeam();
-  const dataset = buildFullSeasonDataset({
+  const repo = new DexieSeasonRunRepository(db, {
+    schedule: sharedDataset.schedule,
     seam,
-    runId: `run-${String(Math.random()).slice(2, 8)}`,
   });
-  const repo = new DexieSeasonRunRepository(db, { schedule: dataset.schedule, seam });
   return {
     db,
     repo,
     challenge: new DexieChallengeRepository(db),
     seasonDraft: new DexieSeasonDraftRepository(db),
-    schedule: dataset.schedule,
-    run: dataset.run,
-    blocks: dataset.blocks,
+    schedule: sharedDataset.schedule,
+    run: sharedDataset.run,
+    blocks: sharedDataset.blocks,
     seam,
   };
 }

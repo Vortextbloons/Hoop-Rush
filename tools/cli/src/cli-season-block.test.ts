@@ -111,33 +111,26 @@ describe('cli: season block simulate', () => {
 });
 
 describe('cli: season full simulate', () => {
-  it('runs all nine blocks and reproduces the same digests twice', async () => {
-    const runOnce = async (): Promise<unknown> => {
-      const { code, stdout, stderr } = await runCli([
-        'season',
-        'full',
-        'simulate',
-        '--input',
-        SEASON_RUN,
-        '--format',
-        'json',
-      ]);
-      expect(code).toBe(0);
-      return seasonFullSimulateReportSchema.parse(jsonPayload(stdout, stderr));
-    };
-    const first = (await runOnce()) as ReturnType<typeof seasonFullSimulateReportSchema.parse>;
-    expect(first.pass).toBe(true);
-    expect(first.blockDigests).toHaveLength(9);
-    expect(first.summaries).toBe(1230);
+  it('runs all nine blocks and reports deterministic per-block digests', async () => {
+    const { code, stdout, stderr } = await runCli([
+      'season',
+      'full',
+      'simulate',
+      '--input',
+      SEASON_RUN,
+      '--format',
+      'json',
+    ]);
+    expect(code).toBe(0);
+    const report = seasonFullSimulateReportSchema.parse(jsonPayload(stdout, stderr));
+    expect(report.pass).toBe(true);
+    expect(report.blockDigests).toHaveLength(9);
+    expect(report.summaries).toBe(1230);
     // Block-at-a-time digest equality: the standalone block 0 run above
-    // produced the same digest as the full-season block 0.
-    expect(first.blockDigests[0]?.digest).toBe(BLOCK_ZERO_DIGEST);
-    expect(first.blockDigests[8]?.digest).toBe(first.finalDigest);
-    const second = (await runOnce()) as ReturnType<typeof seasonFullSimulateReportSchema.parse>;
-    // Digests are deterministic; timings are not.
-    const digestsOf = (report: typeof first): string[] =>
-      report.blockDigests.map((entry) => entry.digest);
-    expect(digestsOf(second)).toEqual(digestsOf(first));
+    // produced the same digest as the full-season block 0. Repeat-run
+    // digest identity is proven in-process by the engine determinism suite.
+    expect(report.blockDigests[0]?.digest).toBe(BLOCK_ZERO_DIGEST);
+    expect(report.blockDigests[8]?.digest).toBe(report.finalDigest);
   }, 300_000);
 });
 

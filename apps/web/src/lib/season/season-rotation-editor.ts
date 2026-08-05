@@ -238,3 +238,48 @@ export function createRotationEditor(
 ): RotationEditor {
   return new RotationEditor(rotation, roster);
 }
+
+/**
+ * Splits audit failure strings into per-player failures (messages that name
+ * a playerVersionId) and global failures (totals, duplicates, structure).
+ * The engine's failure strings embed ids positionally; parse them
+ * defensively so the UI can attach each failure to the affected control.
+ */
+export interface RotationFailureIndex {
+  byPlayer: ReadonlyMap<string, readonly string[]>;
+  global: readonly string[];
+}
+
+const FAILURE_ID_PATTERNS = [
+  /\bstarter ([a-z0-9][a-z0-9._:-]*) cannot play slot/,
+  /\bclosing-five player ([a-z0-9][a-z0-9._:-]*) cannot play slot/,
+  /\btarget minutes for ([a-z0-9][a-z0-9._:-]*) must be an integer/,
+  /\bno target minutes for rostered player ([a-z0-9][a-z0-9._:-]*)/,
+  /\bno position data for starter ([a-z0-9][a-z0-9._:-]*)/,
+  /\bno position data for closing-five player ([a-z0-9][a-z0-9._:-]*)/,
+] as const;
+
+/** PlayerVersionId named by a failure message, or null for global failures. */
+export function failurePlayerVersionId(failure: string): string | null {
+  for (const pattern of FAILURE_ID_PATTERNS) {
+    const match = failure.match(pattern);
+    if (match?.[1] !== undefined) return match[1];
+  }
+  return null;
+}
+
+export function indexRotationFailures(failures: readonly string[]): RotationFailureIndex {
+  const byPlayer = new Map<string, string[]>();
+  const global: string[] = [];
+  for (const failure of failures) {
+    const playerVersionId = failurePlayerVersionId(failure);
+    if (playerVersionId === null) {
+      global.push(failure);
+    } else {
+      const list = byPlayer.get(playerVersionId) ?? [];
+      list.push(failure);
+      byPlayer.set(playerVersionId, list);
+    }
+  }
+  return { byPlayer, global };
+}

@@ -15,11 +15,13 @@
     player,
     manifest,
     size = 'md',
+    eager = false,
     fallbackInitials,
   }: {
     player: HeadshotPlayer;
     manifest: HoopRushManifest;
     size?: 'sm' | 'md' | 'court';
+    eager?: boolean;
     fallbackInitials: string;
   } = $props();
 
@@ -83,7 +85,7 @@
         width={size === 'sm' ? 36 : 48}
         height={size === 'sm' ? 36 : 48}
         class="h-full w-full origin-top scale-[1.2] object-cover object-top"
-        loading="lazy"
+        loading={eager ? 'eager' : 'lazy'}
         decoding="async"
         referrerpolicy="no-referrer"
         onerror={onError}

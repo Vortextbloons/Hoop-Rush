@@ -54,14 +54,7 @@ describe('season run persistence benchmark', () => {
     expect(report.storage.perTable.seasonRunSummaries).toBeGreaterThan(0);
     expect(report.storage.perTable.seasonRuns).toBeGreaterThan(0);
     expect(report.storage.budgetBytes).toBe(SEASON_RUN_BUDGET_STORAGE_BYTES);
-  }, 120_000);
-
-  it('reports sane per-table storage accounting', async () => {
-    const report = await benchmarkSeasonRunPersistence({
-      samples: 1,
-      seam: buildStubSeasonEngineSeam(),
-      createDatabase: freshFactoryDatabase,
-    });
+    // Per-table accounting reconciles with the total from the same report.
     const perTable = report.storage.perTable;
     expect(perTable.seasonRunSummaries ?? 0).toBeGreaterThan(perTable.seasonRunBlocks ?? 0);
     expect(perTable.seasonRunDetails ?? 0).toBeGreaterThan(perTable.seasonRunIndex ?? 0);

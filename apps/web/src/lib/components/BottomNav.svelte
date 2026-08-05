@@ -2,41 +2,44 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { RouteId } from '$app/types';
-  import type { Component } from 'svelte';
-  import { warmPlayersIndex } from '$lib/data';
+  import { isNavItemActive, type NavItem } from '$lib/nav-items';
 
-  export type BottomNavItem = {
-    id: string;
-    label: string;
-    href: string | null;
-    icon: Component<{ class?: string }>;
-  };
+  export type { NavItem } from '$lib/nav-items';
 
-  let { items }: { items: BottomNavItem[] } = $props();
+  /** Backward-compatible alias used by the root layout's nav wiring. */
+  export type BottomNavItem = NavItem;
+
+  /**
+   * Shared fixed bottom navigation. Accessible label and an optional intent
+   * callback (used to warm caches on hover/focus) are caller-provided; there
+   * is no hardcoded route behavior.
+   */
+  let {
+    items,
+    label = 'Main navigation',
+    onNavigate,
+  }: {
+    items: NavItem[];
+    label?: string;
+    onNavigate?: (itemId: string) => void;
+  } = $props();
 
   const routeId = $derived(page.route.id);
 
-  function isActive(item: BottomNavItem): boolean {
-    if (item.href === null) return false;
-    if (routeId === null) return false;
-    if (item.href === '/') return routeId === '/';
-    return routeId === item.href || routeId.startsWith(`${item.href}/`);
-  }
-
-  function warmForRoster(itemId: string): void {
-    if (itemId === 'roster') warmPlayersIndex();
+  function intent(itemId: string): void {
+    onNavigate?.(itemId);
   }
 </script>
 
 <nav
-  aria-label="Main navigation"
+  aria-label={label}
   class="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
 >
   <div
     class="flex items-center gap-1 rounded-2xl border border-border bg-background/90 p-1.5 shadow-2xl shadow-black/30 backdrop-blur supports-[backdrop-filter]:bg-background/80"
   >
     {#each items as item (item.id)}
-      {@const active = isActive(item)}
+      {@const active = isNavItemActive(item, routeId)}
       {#if item.href === null}
         <span
           aria-disabled="true"
@@ -50,9 +53,9 @@
         <a
           href={resolve(item.href as RouteId)}
           aria-current={active ? 'page' : undefined}
-          onpointerenter={() => warmForRoster(item.id)}
-          onfocus={() => warmForRoster(item.id)}
-          ontouchstart={() => warmForRoster(item.id)}
+          onpointerenter={() => intent(item.id)}
+          onfocus={() => intent(item.id)}
+          ontouchstart={() => intent(item.id)}
           class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
             ? 'bg-primary text-primary-foreground'
             : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"

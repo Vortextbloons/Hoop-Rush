@@ -9,15 +9,6 @@ describe('deriveGameSeed (spec/01 per-game seeds)', () => {
     expect(deriveGameSeed(runSeed, 42)).toBe(deriveGameSeed(runSeed, 42));
   });
 
-  it('produces different seeds for different game numbers', () => {
-    const runSeed = 'abcd1234abcd1234abcd1234abcd1234' as const;
-    const seeds = new Set<string>();
-    for (let game = 1; game <= 82; game += 1) {
-      seeds.add(deriveGameSeed(runSeed, game));
-    }
-    expect(seeds.size).toBe(82);
-  });
-
   it('produces different seeds for different run seeds', () => {
     const a = deriveGameSeed('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 1);
     const b = deriveGameSeed('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 1);

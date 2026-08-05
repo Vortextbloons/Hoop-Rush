@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { GameResult, SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
+import type { GameResult, SimulationTeam } from '@hoop-rush/data-contracts';
 import {
   DEFAULT_ERA_SIM_PROFILE,
   buildGameSimulationInput,
@@ -82,14 +82,9 @@ function measureRoles(team: SimulationTeam): Map<string, RoleAccumulator> {
   return players;
 }
 
-function byId<T>(map: Map<string, T>): Map<string, T> {
-  return map;
-}
-
 describe('player-role behavior (roles lineup)', () => {
   const team = buildRolesTeam();
   const measured = measureRoles(team);
-  const byPlayerId = byId(measured);
   const teamUsage = [...measured.values()].reduce((sum, a) => sum + a.usage, 0);
   const creator = 'p-roles-creator';
   const spacer = 'p-roles-spacer';
@@ -98,23 +93,23 @@ describe('player-role behavior (roles lineup)', () => {
   const rim = 'p-roles-rim';
 
   const usageShare = (playerId: string) => {
-    const acc = byPlayerId.get(playerId);
+    const acc = measured.get(playerId);
     return acc ? acc.usage / Math.max(1e-9, teamUsage) : 0;
   };
   const threeRate = (playerId: string) => {
-    const acc = byPlayerId.get(playerId);
+    const acc = measured.get(playerId);
     return acc ? acc.threeAttempts / Math.max(1, acc.fieldGoalAttempts) : 0;
   };
   const assistConversion = (playerId: string) => {
-    const acc = byPlayerId.get(playerId);
+    const acc = measured.get(playerId);
     return acc ? acc.assists / Math.max(1, acc.assistOpportunities) : 0;
   };
   const orebPct = (playerId: string) => {
-    const acc = byPlayerId.get(playerId);
+    const acc = measured.get(playerId);
     return acc ? acc.offensiveRebounds / Math.max(1, acc.teamMisses) : 0;
   };
   const drebPct = (playerId: string) => {
-    const acc = byPlayerId.get(playerId);
+    const acc = measured.get(playerId);
     return acc ? acc.defensiveRebounds / Math.max(1, acc.opponentMisses) : 0;
   };
 
@@ -188,20 +183,4 @@ describe('player-role behavior (roles lineup)', () => {
       expect(observed).toBeLessThanOrEqual(value + tolerance);
     }
   });
-
-  it('keeps exact invariants on every role-fixture game', () => {
-    for (let i = 0; i < 20; i += 1) {
-      const input = buildGameSimulationInput({
-        seed: seedFromString(`roles-inv-${String(i)}`),
-        profile: DEFAULT_ERA_SIM_PROFILE,
-        home: team,
-        away: { ...team, teamId: 'roles-away' },
-      });
-      // simulateGameWithCheck enforces invariants; simulateGame is used by
-      // the accumulation above, so a direct invariant pass is implicit.
-      expect(input.home.players).toHaveLength(5);
-    }
-  });
 });
-
-void ({} as SimulationPlayer);

@@ -5,6 +5,8 @@ import { buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
 import {
   ROTATION_PRESETS,
   createRotationEditor,
+  failurePlayerVersionId,
+  indexRotationFailures,
   presetLabel,
   rotationRoleOf,
   type RotationMember,
@@ -236,5 +238,53 @@ describe('RotationEditor', () => {
     }
     expect(rotationRoleOf(e.rotation, starter)).toMatch(/^Starter /);
     expect(rotationRoleOf(e.rotation, benchPlayer)).toBe('Bench 1');
+  });
+});
+
+describe('failurePlayerVersionId', () => {
+  it('extracts ids from per-player audit messages', () => {
+    expect(failurePlayerVersionId('starter pv-a.b:c-1 cannot play slot 4')).toBe('pv-a.b:c-1');
+    expect(failurePlayerVersionId('closing-five player pv-9 cannot play slot 0')).toBe('pv-9');
+    expect(
+      failurePlayerVersionId('target minutes for pv-2 must be an integer from 0-48 (got 7)'),
+    ).toBe('pv-2');
+    expect(failurePlayerVersionId('no target minutes for rostered player pv-3')).toBe('pv-3');
+  });
+
+  it('returns null for global audit messages', () => {
+    expect(failurePlayerVersionId('target minutes must total 240 (got 256)')).toBeNull();
+    expect(failurePlayerVersionId('rotation references duplicate players')).toBeNull();
+    expect(
+      failurePlayerVersionId('rotation must reference exactly ten players (got 5)'),
+    ).toBeNull();
+  });
+});
+
+describe('indexRotationFailures', () => {
+  it('splits failures into per-player and global buckets', () => {
+    const index = indexRotationFailures([
+      'starter pv-1 cannot play slot 4',
+      'closing-five player pv-2 cannot play slot 0',
+      'target minutes must total 240 (got 256)',
+    ]);
+    expect(index.byPlayer.get('pv-1')).toEqual(['starter pv-1 cannot play slot 4']);
+    expect(index.byPlayer.get('pv-2')).toEqual(['closing-five player pv-2 cannot play slot 0']);
+    expect(index.global).toEqual(['target minutes must total 240 (got 256)']);
+  });
+
+  it('groups multiple failures for the same player', () => {
+    const index = indexRotationFailures([
+      'starter pv-1 cannot play slot 0',
+      'no target minutes for rostered player pv-1',
+    ]);
+    expect(index.byPlayer.get('pv-1')).toHaveLength(2);
+    expect(index.global).toEqual([]);
+  });
+
+  it('returns empty buckets for a clean rotation', () => {
+    const e = editor();
+    const index = indexRotationFailures(e.validate());
+    expect(index.byPlayer.size).toBe(0);
+    expect(index.global).toEqual([]);
   });
 });

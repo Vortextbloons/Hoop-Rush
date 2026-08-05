@@ -195,11 +195,7 @@ describe('challenge commands', () => {
       expect(completed.outcome).toBe('eliminated');
       expect(completed.aggregates.team.losses).toBeGreaterThan(0);
     }
-  });
-
-  it('the first loss matches the first losing result', () => {
-    const run = createChallenge(fixtureCreation());
-    const completed = simulateChallenge(run, buildGameSimulationInput().profile, context);
+    // The recorded first loss matches the first losing result.
     const firstLossIndex = completed.games.findIndex((g) => g.winner === 'away');
     expect(completed.firstLossGameNumber).toBe(firstLossIndex === -1 ? null : firstLossIndex + 1);
   });

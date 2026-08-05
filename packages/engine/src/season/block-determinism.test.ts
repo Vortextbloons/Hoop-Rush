@@ -14,20 +14,19 @@ import {
   scheduleOf,
 } from './block-test-support.ts';
 
-describe('season block determinism and golden reproduction (M2.3)', () => {
+describe('season block determinism and accounting (M2.3)', () => {
   it('reproduces block 3 identically across repeated and interrupted runs', () => {
-    const { run } = buildTestRun();
-
     const runThroughBlock3 = (): string => {
       const state = freshState();
       for (let i = 0; i < 3; i += 1) runBlock(state, i);
       return runBlock(state, 3).digest;
     };
     const first = runThroughBlock3();
-    expect(runThroughBlock3()).toBe(first);
 
     // Interrupted run: cancel after half the games of block 3, discard the
-    // partial result, and re-run the whole block from the cursor.
+    // partial result, and re-run the whole block from the cursor. The
+    // cancelled path re-derives the full 0..3 chain, so its equality with
+    // `first` doubles as the repeated-run determinism proof.
     const cancelled = (() => {
       const state = freshState();
       for (let i = 0; i < 3; i += 1) runBlock(state, i);
@@ -40,10 +39,6 @@ describe('season block determinism and golden reproduction (M2.3)', () => {
       return checkpoint.digest;
     })();
     expect(cancelled).toBe(first);
-
-    // The interrupted path leaves no partial state behind: the run cursor
-    // is unchanged and the next submission is the same block.
-    void run;
   }, 120_000);
 
   it('produces identical per-block digests across two complete full-season runs', () => {

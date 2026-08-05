@@ -5,33 +5,14 @@ import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
 /**
  * CLI integration tests for the M2.3 `season benchmark` commands
- * (spec/2.0/12 performance framework): the determinism gate is the M2.3
- * golden exit gate (uninterrupted, repeated, and interrupted-resume runs
- * must produce identical digests), and the block/full benchmarks report
- * measured times against the documented desktop budgets.
+ * (spec/2.0/12 performance framework): the block/full benchmarks report
+ * measured times against the documented desktop budgets. Digest determinism
+ * (repeated and interrupted runs) is proven in-process by the engine suite
+ * (packages/engine/src/season/block-determinism.test.ts); these tests cover
+ * the CLI command surface on top of it.
  */
 
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
-
-describe('cli: season benchmark determinism', () => {
-  it('produces identical digests across repeated and interrupted runs', async () => {
-    const { code, stdout, stderr } = await runCli([
-      'season',
-      'benchmark',
-      'determinism',
-      '--input',
-      SEASON_RUN,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = seasonBenchmarkReportSchema.parse(jsonPayload(stdout, stderr));
-    expect(payload.pass).toBe(true);
-    expect(payload.identicalDigests).toBe(true);
-    expect(payload.perBlock).toHaveLength(9);
-    expect(payload.digest).toMatch(/^[0-9a-f]{32}$/);
-  }, 300_000);
-});
 
 describe('cli: season benchmark block and full', () => {
   it('reports measured block times against the documented budgets', async () => {

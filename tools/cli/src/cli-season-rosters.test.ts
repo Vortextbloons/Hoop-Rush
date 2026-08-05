@@ -7,7 +7,7 @@ import {
   seasonRostersAuditReportSchema,
   seasonRostersGenerateReportSchema,
 } from './report-schemas.ts';
-import { jsonPayload, REPO_ROOT, runCli } from './cli-test-helpers.ts';
+import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
 /**
  * CLI integration tests for the M2.1 Season Run commands: `season draft
@@ -84,7 +84,7 @@ describe('cli: season draft reproduce', () => {
       expected: { finalDigest: string; finalRevision: number };
     };
 
-    const tmpPath = join(REPO_ROOT, 'tools/cli/src/fixtures/season-draft-commands.divergence.json');
+    const tmpPath = join(TMP, 'season-draft-commands.divergence.json');
     try {
       writeFileSync(
         tmpPath,
@@ -133,7 +133,7 @@ describe('cli: season rosters audit', () => {
   });
 
   it('fails on a corrupted league with a nonzero exit', async () => {
-    const tmpPath = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.corrupt.json');
+    const tmpPath = join(TMP, 'season-run.corrupt.json');
     try {
       const parsed = JSON.parse(readFileSync(SEASON_RUN, 'utf8')) as {
         generationAudit: { digest: string };
