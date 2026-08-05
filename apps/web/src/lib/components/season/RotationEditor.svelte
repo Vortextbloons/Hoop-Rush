@@ -171,7 +171,7 @@
     aria-label="Rotation section"
     class="flex gap-1 overflow-x-auto rounded-lg bg-surface-2 p-1 md:hidden [scrollbar-width:none]"
   >
-    {#each [{ id: 'starters' as const, label: 'Starters' }, { id: 'minutes' as const, label: 'Minutes' }, { id: 'closing' as const, label: 'Closing' }] as tab (tab.id)}
+    {#each [{ id: 'starters' as const, label: 'Starters' }, { id: 'minutes' as const, label: 'Bench' }, { id: 'closing' as const, label: 'Closing' }] as tab (tab.id)}
       <button
         type="button"
         aria-pressed={mobileSection === tab.id}
@@ -217,7 +217,7 @@
       {#if mobileSection === 'starters'}
         Starter lineup
       {:else if mobileSection === 'minutes'}
-        Players & minutes
+        Bench order
       {:else}
         Closing five
       {/if}
@@ -235,6 +235,14 @@
               >
                 {slotLabel(slotIndex)}{slotIndex + 1}
               </span>
+              {#if manifest !== null && faceOf(playerVersionId) !== null}
+                <SeasonPlayerFace
+                  face={faceOf(playerVersionId)!}
+                  {manifest}
+                  size="sm"
+                  eager={slotIndex < 2}
+                />
+              {/if}
               <select
                 value={playerVersionId}
                 {disabled}
@@ -286,6 +294,14 @@
               >
                 {slotLabel(slotIndex)}{slotIndex + 1}
               </span>
+              {#if manifest !== null && faceOf(playerVersionId) !== null}
+                <SeasonPlayerFace
+                  face={faceOf(playerVersionId)!}
+                  {manifest}
+                  size="sm"
+                  eager={slotIndex < 2}
+                />
+              {/if}
               <select
                 value={playerVersionId}
                 {disabled}
@@ -326,88 +342,99 @@
       </p>
     {:else}
       <ul class="mt-2 flex flex-col divide-y divide-border/60">
-        {#each rows as row (row.member.playerVersionId)}
-          {@const rowFailures = failureIndex.byPlayer.get(row.member.playerVersionId) ?? null}
-          <li class="py-3">
-            <div class="flex min-w-0 items-center gap-3">
-              {#if manifest !== null}
-                {#if faceOf(row.member.playerVersionId) !== null}
-                  <SeasonPlayerFace
-                    face={faceOf(row.member.playerVersionId)!}
-                    {manifest}
-                    size="sm"
-                  />
-                {:else}
-                  <span
-                    class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display font-extrabold text-muted-foreground"
-                    aria-hidden="true"
-                  >
-                    ?
-                  </span>
-                {/if}
-              {/if}
-              <div class="min-w-0 flex-1">
-                <div class="flex min-w-0 items-center gap-2">
-                  <p class="min-w-0 truncate text-sm font-semibold">{row.member.displayName}</p>
-                  {#if overallByVersion?.has(row.member.playerVersionId)}
+        {#each editor.rotation.benchOrder as playerVersionId, benchIndex (playerVersionId)}
+          {@const row = rows.find((r) => r.member.playerVersionId === playerVersionId)}
+          {#if row !== undefined}
+            {@const rowFailures = failureIndex.byPlayer.get(row.member.playerVersionId) ?? null}
+            <li class="py-3">
+              <div class="flex min-w-0 items-center gap-3">
+                {#if manifest !== null}
+                  {#if faceOf(row.member.playerVersionId) !== null}
+                    <SeasonPlayerFace
+                      face={faceOf(row.member.playerVersionId)!}
+                      {manifest}
+                      size="sm"
+                    />
+                  {:else}
                     <span
-                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+                      class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display font-extrabold text-muted-foreground"
+                      aria-hidden="true"
                     >
-                      OVR {overallByVersion.get(row.member.playerVersionId)}
+                      ?
                     </span>
                   {/if}
+                {/if}
+                <div class="min-w-0 flex-1">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <span
+                      class="w-7 shrink-0 font-mono text-[10px] font-bold text-muted-foreground"
+                    >
+                      {benchIndex + 6}
+                    </span>
+                    <p class="min-w-0 truncate text-sm font-semibold">{row.member.displayName}</p>
+                    {#if overallByVersion?.has(row.member.playerVersionId)}
+                      <span
+                        class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+                      >
+                        OVR {overallByVersion.get(row.member.playerVersionId)}
+                      </span>
+                    {/if}
+                  </div>
+                  <p class="truncate font-mono text-[10px] text-muted-foreground">
+                    {row.role}
+                    {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
+                  </p>
                 </div>
-                <p class="truncate font-mono text-[10px] text-muted-foreground">
-                  {row.role}
-                  {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
-                </p>
               </div>
-            </div>
-            <div class="mt-2 flex items-center justify-end gap-1 pl-12">
-              <div
-                class="flex shrink-0 items-center gap-1"
-                role="group"
-                aria-label={`Minutes for ${row.member.displayName}`}
-              >
-                <button
-                  type="button"
-                  aria-label={`Decrease minutes for ${row.member.displayName}`}
-                  onclick={() => changeMinutes(row.member.playerVersionId, -1)}
-                  {disabled}
-                  class="grid h-11 w-11 place-items-center rounded-lg bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40"
+              <div class="mt-2 flex items-center justify-end gap-1 pl-12">
+                <div
+                  class="flex shrink-0 items-center gap-1"
+                  role="group"
+                  aria-label={`Minutes for ${row.member.displayName}`}
                 >
-                  −
-                </button>
-                <output
-                  class="w-10 text-center font-mono text-sm font-bold tabular-nums"
-                  aria-live="polite"
-                >
-                  {row.minutes}
-                </output>
-                <button
-                  type="button"
-                  aria-label={`Increase minutes for ${row.member.displayName}`}
-                  onclick={() => changeMinutes(row.member.playerVersionId, 1)}
-                  {disabled}
-                  class="grid h-11 w-11 place-items-center rounded-lg bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40"
-                >
-                  +
-                </button>
+                  <button
+                    type="button"
+                    aria-label={`Decrease minutes for ${row.member.displayName}`}
+                    onclick={() => changeMinutes(row.member.playerVersionId, -1)}
+                    {disabled}
+                    class="grid h-11 w-11 place-items-center rounded-lg bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40"
+                  >
+                    −
+                  </button>
+                  <output
+                    class="w-10 text-center font-mono text-sm font-bold tabular-nums"
+                    aria-live="polite"
+                  >
+                    {row.minutes}
+                  </output>
+                  <button
+                    type="button"
+                    aria-label={`Increase minutes for ${row.member.displayName}`}
+                    onclick={() => changeMinutes(row.member.playerVersionId, 1)}
+                    {disabled}
+                    class="grid h-11 w-11 place-items-center rounded-lg bg-surface-2 text-base font-bold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
-            {#if rowFailures !== null}
-              <ul
-                id="rotation-failure-{row.member.playerVersionId}"
-                class="mt-1 list-inside list-disc text-xs text-destructive"
-              >
-                {#each rowFailures as failure (failure)}
-                  <li>{failure}</li>
-                {/each}
-              </ul>
-            {/if}
-          </li>
+              {#if rowFailures !== null}
+                <ul
+                  id="rotation-failure-{row.member.playerVersionId}"
+                  class="mt-1 list-inside list-disc text-xs text-destructive"
+                >
+                  {#each rowFailures as failure (failure)}
+                    <li>{failure}</li>
+                  {/each}
+                </ul>
+              {/if}
+            </li>
+          {/if}
         {/each}
       </ul>
+      <p class="mt-3 text-xs text-muted-foreground">
+        Bench order follows the starting five. Adjust each reserve's target minutes here.
+      </p>
     {/if}
   </section>
 
@@ -431,6 +458,14 @@
               >
                 {slotLabel(slotIndex)}{slotIndex + 1}
               </span>
+              {#if manifest !== null && faceOf(playerVersionId) !== null}
+                <SeasonPlayerFace
+                  face={faceOf(playerVersionId)!}
+                  {manifest}
+                  size="sm"
+                  eager={slotIndex < 2}
+                />
+              {/if}
               <select
                 value={playerVersionId}
                 {disabled}
@@ -484,6 +519,9 @@
             >
               {benchIndex + 6}
             </span>
+            {#if manifest !== null && faceOf(playerVersionId) !== null}
+              <SeasonPlayerFace face={faceOf(playerVersionId)!} {manifest} size="sm" />
+            {/if}
             <span class="min-w-0 flex-1 truncate text-sm font-semibold">
               {row?.member.displayName ?? playerVersionId}
             </span>
@@ -515,6 +553,14 @@
             >
               {slotLabel(slotIndex)}{slotIndex + 1}
             </span>
+            {#if manifest !== null && faceOf(playerVersionId) !== null}
+              <SeasonPlayerFace
+                face={faceOf(playerVersionId)!}
+                {manifest}
+                size="sm"
+                eager={slotIndex < 2}
+              />
+            {/if}
             <select
               value={playerVersionId}
               {disabled}
@@ -566,6 +612,9 @@
         <li class="flex flex-col gap-1 py-2">
           <div class="flex items-center gap-3">
             <div class="flex min-w-0 flex-1 items-center gap-2">
+              {#if manifest !== null && faceOf(row.member.playerVersionId) !== null}
+                <SeasonPlayerFace face={faceOf(row.member.playerVersionId)!} {manifest} size="sm" />
+              {/if}
               <span class="min-w-0 truncate text-sm font-semibold">
                 {row.member.displayName}
               </span>

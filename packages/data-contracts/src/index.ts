@@ -51,5 +51,6 @@ export * from './season-game-summary.ts';
 export * from './season-aggregates.ts';
 export * from './season-recap.ts';
 export * from './season-checkpoint.ts';
+export * from './season-effects.ts';
 export * from './season-block.ts';
 export * from './season-worker.ts';

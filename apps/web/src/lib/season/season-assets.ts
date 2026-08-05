@@ -11,6 +11,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
 import { getManifest } from '$lib/data';
+import { readCachedAsset, writeCachedAsset } from '$lib/pool-cache';
 import { resolve } from '$app/paths';
 
 /**
@@ -114,7 +115,16 @@ export function loadSeasonDraftCatalog(): Promise<SeasonDraftCatalog> {
     const manifest = await getManifest();
     const entry = manifest.season?.draftCatalog;
     if (!entry) throw new Error('The season draft catalog artifact is unavailable.');
-    return loadPackagedSeasonDraftCatalog(resolveAssetUrl(entry.url), entry.contentHash);
+    // The catalog is immutable and content-addressed; a validated copy in
+    // IndexedDB spares a ~10.2 MB re-download and re-parse per reload.
+    const cached = await readCachedAsset<SeasonDraftCatalog>(entry.contentHash);
+    if (cached !== null) return cached;
+    const catalog = await loadPackagedSeasonDraftCatalog(
+      resolveAssetUrl(entry.url),
+      entry.contentHash,
+    );
+    void writeCachedAsset(entry.contentHash, catalog);
+    return catalog;
   });
 }
 

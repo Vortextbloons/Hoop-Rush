@@ -4,7 +4,9 @@ import {
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_CHEMISTRY_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_COUNT,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
@@ -24,19 +26,23 @@ import {
   SEASON_SCHEDULE_FORMULA_VERSION,
   SEASON_SCHEDULE_VERSION,
   SEASON_STANDINGS_VERSION,
+  SEASON_STAMINA_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
   PLAYER_VERSION_ID_VERSION,
+  seasonEffectsStateSchema,
   seasonGameSimulationResultSchema,
   seasonRunSchema,
   type SeasonAiAssignment,
   type SeasonBlockRecap,
   type SeasonCompactPlayerLine,
+  type SeasonEffectsState,
   type SeasonGame,
   type SeasonGameSimulationResult,
   type SeasonGameSummary,
   type SeasonDraftState,
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
+  type SeasonPairChemistryState,
   type SeasonPlayerAggregate,
   type SeasonPostseasonState,
   type SeasonRetainedGameDetail,
@@ -55,14 +61,18 @@ import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/seaso
 
 /**
  * Synthetic-but-schema-valid Season Run fixtures for the persistence tests
- * and the `benchmarkSeasonRunPersistence` harness (spec/2.0/10 M2.3). The
- * builders are self-contained (no @hoop-rush/test-fixtures dependency) so
- * the persistence package never depends on fixture package state. All values
- * derive deterministically from integer arithmetic — no Math.random, no
- * clocks — and the fold helpers mirror the documented engine semantics
+ * and the `benchmarkSeasonRunPersistence` harness (spec/2.0/10 M2.3, M2.4).
+ * The builders are self-contained (no @hoop-rush/test-fixtures dependency)
+ * so the persistence package never depends on fixture package state. All
+ * values derive deterministically from integer arithmetic — no Math.random,
+ * no clocks — and the fold helpers mirror the documented engine semantics
  * (season-aggregates-v1: every aggregate is a pure fold over compact
  * completed-game summaries), so the reload reconciliation audit passes
  * exactly whether the production engine seam or the stub seam is used.
+ * Fixture runs are schema-5 (M2.4) with the stamina, chemistry, and
+ * effect-targets material versions frozen and a valid zero `SeasonEffectsState`
+ * (300 player load states, 1,350 canonical pair states) available for any
+ * roster set through `buildFixtureEffectsState`.
  */
 
 /** Accepted 30-franchise alignment; conference/division follow league-v1. */
@@ -193,6 +203,69 @@ export function buildFixtureRosters(league: SeasonLeague): SeasonRoster[] {
       };
     }),
   }));
+}
+
+/**
+ * Deterministic M2.4 effects state for an arbitrary roster set: one load
+ * state per rostered version (unique, sorted by playerVersionId) and the
+ * canonical a<b pairs per roster (45 per ten-player roster), all with zero
+ * load / zero shared possessions by default. Pass `options` to raise every
+ * player/pair value uniformly (the benchmark folds monotonically increasing
+ * values across blocks). Exported for other lanes' tests.
+ */
+export function buildFixtureEffectsState(
+  rosters: readonly SeasonRoster[],
+  options: {
+    fatigueBasisPoints?: number;
+    recentLoadBasisPoints?: number;
+    lastCompletedRound?: number;
+    sharedPossessions?: number;
+  } = {},
+): SeasonEffectsState {
+  const fatigueBasisPoints = options.fatigueBasisPoints ?? 0;
+  const recentLoadBasisPoints = options.recentLoadBasisPoints ?? 0;
+  const lastCompletedRound = options.lastCompletedRound ?? 0;
+  const sharedPossessions = options.sharedPossessions ?? 0;
+  const playerStates = rosters
+    .flatMap((roster) =>
+      roster.players.map((player) => ({
+        playerVersionId: player.playerVersionId,
+        fatigueBasisPoints,
+        recentLoadBasisPoints,
+        lastCompletedRound,
+      })),
+    )
+    .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
+  const pairStates: SeasonPairChemistryState[] = [];
+  for (const roster of rosters) {
+    const ids = roster.players.map((player) => player.playerVersionId).sort();
+    for (let i = 0; i < ids.length; i += 1) {
+      const a = ids[i];
+      if (a === undefined) continue;
+      for (let j = i + 1; j < ids.length; j += 1) {
+        const b = ids[j];
+        if (b === undefined) continue;
+        pairStates.push({ a, b, sharedPossessions });
+      }
+    }
+  }
+  return seasonEffectsStateSchema.parse({
+    schemaVersion: 1,
+    playerStates,
+    pairStates,
+  });
+}
+
+/** Sorted unique player-version ids across every roster (stub seam helper). */
+export function fixtureRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[] {
+  return [
+    ...new Set(rosters.flatMap((roster) => roster.players.map((player) => player.playerVersionId))),
+  ].sort();
+}
+
+/** Canonical 'a\u0000b' pair key with a < b (stub seam helper). */
+export function fixtureSeasonPairKey(a: string, b: string): string {
+  return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
 }
 
 function fixtureRotation(roster: SeasonRoster): SeasonRotation {
@@ -336,6 +409,9 @@ export function buildFixtureRun(input: {
       leadersVersion: SEASON_LEADERS_VERSION,
       homeCourtVersion: SEASON_HOME_COURT_VERSION,
       checkpointVersion: SEASON_CHECKPOINT_VERSION,
+      staminaVersion: SEASON_STAMINA_VERSION,
+      chemistryVersion: SEASON_CHEMISTRY_VERSION,
+      effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
     },
     league,
     rosters,
@@ -904,6 +980,10 @@ export function buildStubSeasonEngineSeam(): SeasonRunEngineSeam {
     foldSeasonPlayerAggregates: foldPlayerAggregatesFixture,
     reduceSeasonStandings,
     seasonRotationSetDigest: seasonRotationSetDigestFixture,
+    seasonRosterPlayerVersionIds: fixtureRosterPlayerVersionIds,
+    zeroSeasonEffectsState: (rosters) => buildFixtureEffectsState(rosters),
+    seasonPairKey: fixtureSeasonPairKey,
+    seasonPairIsCanonical: (a, b) => a < b,
   };
 }
 

@@ -1,15 +1,28 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
+import { seasonEffectsSideSchema, seasonMechanismSchema } from './season-effects.ts';
 import { SEASON_RECAP_VERSION } from './season-versions.ts';
 
 /**
- * Block recap (spec/2.0/02 recap, spec/2.0/11 block recap, M2.3,
- * season-recap-v1). Every claim derives from saved league facts: game
- * summaries, standings, and aggregates. M2.3 recaps do not report injuries,
- * trades, Influence, stamina, or chemistry claims; those systems ship in
- * later milestones. All arrays are bounded.
+ * Block recap (spec/2.0/02 recap, spec/2.0/11 block recap, M2.4,
+ * season-recap-v2). Every claim derives from saved league facts: game
+ * summaries, standings, aggregates, and — since v2 — the block-level
+ * effects evidence. M2.4 recaps do not report injuries, trades, or
+ * Influence claims; those systems ship in later milestones. All arrays are
+ * bounded.
  */
+
+/** Block-level effects evidence for one mechanism on one side (M2.4). */
+export const seasonBlockEffectsEvidenceSchema = z.object({
+  mechanism: seasonMechanismSchema,
+  side: seasonEffectsSideSchema,
+  /** Total opportunities for the mechanism across the block's games. */
+  blockOpportunities: z.number().int().min(0).max(10_000_000),
+  /** Accumulated probability delta in integer millionths (may be negative). */
+  blockDeltaTotal: z.number().int().min(-10_000_000_000_000).max(10_000_000_000_000),
+});
+export type SeasonBlockEffectsEvidence = z.infer<typeof seasonBlockEffectsEvidenceSchema>;
 
 export const seasonRecordMovementSchema = z.object({
   franchiseId: franchiseIdSchema,
@@ -95,5 +108,11 @@ export const seasonBlockRecapSchema = z.object({
   versionSpotlights: z.array(seasonVersionSpotlightSchema).max(5),
   /** Human games in the upcoming block (empty when the season is complete). */
   upcomingHumanGames: z.array(seasonUpcomingHumanGameSchema).max(10),
+  /**
+   * M2.4 block-level effects evidence (at most one row per mechanism per
+   * side). Optional so M2.3 recaps parse unchanged; a block with the zero
+   * profile emits no evidence.
+   */
+  effectsEvidence: z.array(seasonBlockEffectsEvidenceSchema).max(12).optional(),
 });
 export type SeasonBlockRecap = z.infer<typeof seasonBlockRecapSchema>;

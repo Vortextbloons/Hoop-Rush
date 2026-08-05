@@ -1,15 +1,23 @@
 /**
- * Derives the packaged Season Run draft catalog (spec/2.0 M2.1) from the
- * validated franchise-era pool artifacts and updates the manifest hashes.
- * Run with `pnpm --filter @hoop-rush/cli gen-season-draft-catalog` AFTER the
- * pools exist (they are committed under apps/web/static/data/pools).
+ * Derives the packaged Season Run draft catalog (spec/2.0 M2.1, M2.4) from
+ * the validated franchise-era pool artifacts and updates the manifest
+ * hashes. Run with `pnpm --filter @hoop-rush/cli gen-season-draft-catalog`
+ * AFTER the pools exist (they are committed under apps/web/static/data/pools).
  *
  * The catalog contains one deduplicated candidate record per
  * playerVersionId with every identity, position, summary, physical,
- * simulation-rating, and tendency field roster scoring needs. Conflicting
- * records that derive the same playerVersionId with different content are
- * rejected; the catalog is validated by the seasonDraftCatalogSchema before
- * it is written.
+ * simulation-rating, tendency, and — since season-draft-catalog-v2 (M2.4) —
+ * stamina field roster scoring needs. The stamina profile derives from the
+ * pool's recorded `stats` (season-stamina-v1):
+ *
+ *   historicalMpg = stats.minutes / max(1, stats.gamesPlayed ?? 0)
+ *   staminaRating = round(clamp(45, 95, 45 + 1.25 * historicalMpg))
+ *
+ * Records without usable stats (missing stats, null minutes, or zero games
+ * played) derive the floor profile (0 MPG, rating 45) deterministically.
+ * Conflicting records that derive the same playerVersionId with different
+ * content are rejected; the catalog is validated by the
+ * seasonDraftCatalogSchema before it is written.
  */
 
 import { createHash } from 'node:crypto';
@@ -17,7 +25,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  SEASON_DRAFT_VERSION,
+  SEASON_DRAFT_CATALOG_VERSION,
+  SEASON_STAMINA_VERSION,
   playerVersionId,
   seasonDraftCatalogSchema,
   type SeasonDraftCandidate,
@@ -86,6 +95,7 @@ function main(): void {
         };
         detailedRatings: Record<string, number>;
         tendencies: Record<string, number>;
+        stats?: { minutes: number | null; gamesPlayed: number | null };
       }>;
     };
     dataVersion = pool.dataVersion;
@@ -99,6 +109,10 @@ function main(): void {
         player.seasonKey,
       );
       const existing = candidates.get(versionId);
+      const gamesPlayed = player.stats?.gamesPlayed ?? 0;
+      const minutes = player.stats?.minutes ?? 0;
+      const historicalMpg = minutes / Math.max(1, gamesPlayed);
+      const staminaRating = Math.round(Math.min(95, Math.max(45, 45 + 1.25 * historicalMpg)));
       const record: SeasonDraftCandidate = {
         playerVersionId: versionId,
         playerId: player.playerId,
@@ -118,6 +132,11 @@ function main(): void {
         summaryRatings: player.summaryRatings,
         detailedRatings: player.detailedRatings as SeasonDraftCandidate['detailedRatings'],
         tendencies: player.tendencies as SeasonDraftCandidate['tendencies'],
+        stamina: {
+          rating: staminaRating,
+          historicalMpg,
+          derivationVersion: SEASON_STAMINA_VERSION,
+        },
       };
       if (existing !== undefined) {
         if (JSON.stringify(existing) !== JSON.stringify(record)) {
@@ -139,11 +158,12 @@ function main(): void {
 
   const catalog = {
     schemaVersion: 1,
-    catalogVersion: SEASON_DRAFT_VERSION,
+    catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
     dataVersion,
     ratingsVersion: ratingsVersion || 'ratings-v3.4',
     positionNormalizationVersion: positionNormalizationVersion || 'position-v3',
     playerVersionIdVersion: 'player-version-id-v1',
+    staminaVersion: SEASON_STAMINA_VERSION,
     pools,
     candidates: [...candidates.values()].sort((a, b) =>
       a.playerVersionId < b.playerVersionId ? -1 : 1,

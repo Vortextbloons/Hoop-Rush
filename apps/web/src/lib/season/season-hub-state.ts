@@ -11,6 +11,11 @@ import type {
   SeasonRunnerEvent,
 } from '$lib/season/season-block-runner';
 import type { SeasonRunRepository, SeasonRunSnapshot } from '@hoop-rush/persistence';
+import {
+  cachedSeasonSnapshotMatches,
+  getCachedSeasonSnapshot,
+  setCachedSeasonSnapshot,
+} from './season-state-cache';
 
 /**
  * Season Run hub state (spec/2.0/07 background execution, M2.3): the single
@@ -94,12 +99,27 @@ export class SeasonHubState {
   /** Reloads the accepted snapshot + active-run index from the repository. */
   async refresh(): Promise<void> {
     try {
-      const [snapshot, index] = await Promise.all([
-        this.repo.loadActiveRun(),
-        this.repo.loadActiveRunIndex(),
-      ]);
+      const index = await this.repo.loadActiveRunIndex();
+      if (index !== null && cachedSeasonSnapshotMatches(index.runId, index.revision)) {
+        // The validated snapshot for this exact accepted state is already
+        // loaded; skip the full load + reconciliation audit.
+        this.snapshot = getCachedSeasonSnapshot();
+        this.index = index;
+        this.error = null;
+        this.emit();
+        return;
+      }
+      const snapshot = await this.repo.loadActiveRun();
       this.snapshot = snapshot;
       this.index = index;
+      if (
+        snapshot !== null &&
+        index !== null &&
+        index.runId === snapshot.run.runId &&
+        index.revision === snapshot.acceptedBlocks.length
+      ) {
+        setCachedSeasonSnapshot(snapshot);
+      }
       this.error = null;
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);

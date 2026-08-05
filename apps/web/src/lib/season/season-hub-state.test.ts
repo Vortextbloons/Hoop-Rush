@@ -67,6 +67,7 @@ function repoWith(initial: SeasonRunSnapshot | null) {
   return {
     loadActiveRun: vi.fn(() => Promise.resolve(active)),
     loadActiveRunIndex: vi.fn(() => Promise.resolve(null)),
+    loadActiveRunIncompatible: vi.fn(() => Promise.resolve(null)),
     loadBlockSummaries: vi.fn(),
     loadRetainedDetails: vi.fn(),
     loadBlockHistory: vi.fn(),

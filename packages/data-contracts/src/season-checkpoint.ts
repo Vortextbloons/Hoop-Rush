@@ -4,10 +4,13 @@ import { seasonGameSummarySchema, seasonRetainedGameDetailSchema } from './seaso
 import { seasonPlayerAggregateSchema, seasonTeamAggregateSchema } from './season-aggregates.ts';
 import { seasonStandingsSchema } from './season-standings.ts';
 import { seasonBlockRecapSchema } from './season-recap.ts';
+import { seasonEffectsStateSchema } from './season-effects.ts';
 import {
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_CHEMISTRY_VERSION,
+  SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -15,16 +18,19 @@ import {
   SEASON_LEADERS_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
+  SEASON_STAMINA_VERSION,
 } from './season-versions.ts';
 
 /**
  * Season Run candidate checkpoints and accepted-block history (spec/2.0/07
- * persistence, M2.3, season-checkpoint-v1). One block pipeline run returns
+ * persistence, M2.4, season-checkpoint-v2). One block pipeline run returns
  * one candidate checkpoint; the application layer validates it, computes the
- * canonical digest, and commits it atomically or discards it. The digest is a
- * pure function of recorded facts (see module docstring), so every execution
- * path — uninterrupted, cancelled/retried, terminated/reloaded, single
- * worker, or CLI — produces the same digest for the same cursor.
+ * canonical digest, and commits it atomically or discards it. v2 adds the
+ * frozen effects state (300 player loads + 1,350 pair chemistries) to the
+ * candidate. The digest is a pure function of recorded facts (see module
+ * docstring), so every execution path — uninterrupted, cancelled/retried,
+ * terminated/reloaded, single worker, or CLI — produces the same digest for
+ * the same cursor.
  */
 
 /** Material versions that participate in block output and the digest. */
@@ -38,6 +44,12 @@ export const seasonCheckpointVersionsSchema = z.object({
   gameVersion: z.literal(SEASON_GAME_VERSION),
   gameTargetsVersion: z.literal(SEASON_GAME_TARGETS_VERSION),
   seedDerivationVersion: z.literal(SEASON_SEED_DERIVATION_VERSION),
+  /** M2.4: stamina profile derivation. */
+  staminaVersion: z.literal(SEASON_STAMINA_VERSION),
+  /** M2.4: pair chemistry state rules. */
+  chemistryVersion: z.literal(SEASON_CHEMISTRY_VERSION),
+  /** M2.4: frozen effect-size calibration targets. */
+  effectsTargetsVersion: z.literal(SEASON_EFFECT_TARGETS_VERSION),
 });
 export type SeasonCheckpointVersions = z.infer<typeof seasonCheckpointVersionsSchema>;
 
@@ -79,6 +91,8 @@ export const seasonCandidateCheckpointSchema = z.object({
   gameSummaries: z.array(seasonGameSummarySchema).min(1).max(150),
   retainedDetails: z.array(seasonRetainedGameDetailSchema).max(10),
   recap: seasonBlockRecapSchema,
+  /** M2.4: frozen effects state at this checkpoint (300 loads, 1,350 pairs). */
+  effects: seasonEffectsStateSchema,
   digest: seasonCheckpointDigestSchema,
 });
 export type SeasonCandidateCheckpoint = z.infer<typeof seasonCandidateCheckpointSchema>;

@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonGameSimulationResultSchema } from './season-game-simulation.ts';
+import { seasonEffectsRollupSchema, seasonMechanismEvidenceSchema } from './season-effects.ts';
 import { SEASON_GAME_SUMMARY_VERSION } from './season-versions.ts';
 
 /**
  * Compact completed-game summaries (spec/2.0/02 retention policy, M2.3,
- * season-game-summary-v1). Every league game reduces to one summary that
+ * season-game-summary-v2). Every league game reduces to one summary that
  * carries the identity, result state, complete team boxes, and 20 compact
  * player stat lines; richer facts (substitutions, unit stints, deviations,
  * diagnostics) are retained only for human-team games through
@@ -14,7 +15,9 @@ import { SEASON_GAME_SUMMARY_VERSION } from './season-versions.ts';
  *
  * Compactness is part of the contract: stat lines carry exact integers only,
  * no per-game derived efficiencies, no shot zones, and no diagnostics, so
- * 1,230 summaries stay well inside the storage and message budgets.
+ * 1,230 summaries stay well inside the storage and message budgets. M2.4
+ * adds the optional per-game effects rollup (≤ 12 mechanism-side rows),
+ * which is compact enough to keep in every summary.
  */
 
 /** One compact player stat line (identity = playerVersionId). */
@@ -88,6 +91,12 @@ export const seasonGameSummarySchema = z
     /** Exactly 10 lines for final games; empty for forfeits. */
     homePlayers: z.array(seasonCompactPlayerLineSchema),
     awayPlayers: z.array(seasonCompactPlayerLineSchema),
+    /**
+     * M2.4 compact per-game effects rollup (at most one row per mechanism
+     * per side). Optional so M2.3 summaries parse unchanged; a game with
+     * the zero profile emits no rollup.
+     */
+    effectsRollup: z.array(seasonEffectsRollupSchema).max(12).optional(),
   })
   .superRefine((summary, ctx) => {
     if (summary.status === 'forfeit') {
@@ -123,6 +132,8 @@ export type SeasonGameSummary = z.infer<typeof seasonGameSummarySchema>;
  * substitution logs, unit stints, rotation deviations, foul-outs, removals,
  * shot-zone facts, and diagnostics are preserved exactly where the product
  * explains them; these rows exist only for the human franchise's 82 games.
+ * M2.4 adds the optional full mechanism evidence (≤ 12 rows) that powers
+ * effect explanations; optional so M2.3 rows parse unchanged.
  */
 export const seasonRetainedGameDetailSchema = z.object({
   schemaVersion: z.literal(1),
@@ -133,5 +144,7 @@ export const seasonRetainedGameDetailSchema = z.object({
   awayFranchiseId: franchiseIdSchema,
   /** The full M2.2 result: substitutions, stints, deviations, diagnostics. */
   result: seasonGameSimulationResultSchema,
+  /** M2.4: full per-mechanism evidence for effect explanations. */
+  mechanismEvidence: z.array(seasonMechanismEvidenceSchema).max(12).optional(),
 });
 export type SeasonRetainedGameDetail = z.infer<typeof seasonRetainedGameDetailSchema>;

@@ -9,6 +9,7 @@ import {
 } from './simulation.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { ratingProfileSchema } from './ratings-model.ts';
+import { seasonStaminaInputSchema } from './season-effects.ts';
 import { seasonRotationSchema } from './season-rotation.ts';
 import { seasonHomeCourtProfileSchema, SEASON_NEUTRAL_HOME_COURT } from './season-home-court.ts';
 import {
@@ -19,12 +20,13 @@ import {
 } from './season-versions.ts';
 
 /**
- * M2.2->M2.3 Season Run single-game simulation contracts (spec/2.0/04,
- * season-game-v2, rotation-planner-v1, season-game-targets-v2). The engine
+ * M2.2->M2.4 Season Run single-game simulation contracts (spec/2.0/04,
+ * season-game-v3, rotation-planner-v1, season-game-targets-v3). The engine
  * controller consumes `SeasonGameSimulationInput`, produces the typed
  * `SeasonGameSimulationResult` discriminated union, and records
  * substitutions, unit stints, per-player deviations, foul-outs, and removals.
- * v2 adds the optional home-court profile; the neutral adapter keeps
+ * v2 added the optional home-court profile; v3 (M2.4) adds the optional
+ * per-player stamina profile (the effects seam). The neutral adapter keeps
  * fixed-five Classic and neutral Season games byte-identical to the M2.2
  * engine.
  *
@@ -133,7 +135,12 @@ export const seasonRemovalSchema = z.object({
 });
 export type SeasonRemoval = z.infer<typeof seasonRemovalSchema>;
 
-/** One rostered player exactly as the Season controller sees them. */
+/**
+ * One rostered player exactly as the Season controller sees them. The
+ * optional M2.4 `stamina` profile is the build-time stamina input; omitting
+ * it means the zero profile, so Classic/neutral inputs stay valid and
+ * byte-identical to the M2.3 path.
+ */
 export const seasonGamePlayerInputSchema = z
   .object({
     playerVersionId: playerVersionIdSchema,
@@ -148,6 +155,8 @@ export const seasonGamePlayerInputSchema = z
     anchors: simulationAnchorsSchema.optional(),
     overall: z.number().int().min(0).max(100).optional(),
     ratingProfile: ratingProfileSchema.optional(),
+    /** M2.4: season-stamina-v1 profile; absence = zero profile. */
+    stamina: seasonStaminaInputSchema.optional(),
   })
   .strict();
 export type SeasonGamePlayerInput = z.infer<typeof seasonGamePlayerInputSchema>;

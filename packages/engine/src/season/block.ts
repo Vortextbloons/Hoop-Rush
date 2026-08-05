@@ -6,6 +6,7 @@ import {
   blockRoundRange,
   seasonNamespaceSeed,
   type EraSimulationProfile,
+  type SeasonBlockRunContext,
   type SeasonCandidateCheckpoint,
   type SeasonCheckpointVersions,
   type SeasonDraftCatalog,
@@ -13,7 +14,6 @@ import {
   type SeasonGameSimulationInput,
   type SeasonGameSummary,
   type SeasonRetainedGameDetail,
-  type SeasonRun,
   type SeasonSchedule,
   type SeasonScheduleGame,
   type SeasonSubmitBlockCommand,
@@ -121,8 +121,14 @@ export class SeasonBlockCancelledError extends Error {
 export interface SeasonBlockSimulationInput {
   /** The validated SubmitSeasonBlock command to execute. */
   command: SeasonSubmitBlockCommand;
-  /** The run snapshot (cursor at the block boundary; rotations locked). */
-  run: SeasonRun;
+  /**
+   * The run context at the block boundary (identity, cursor, league,
+   * rosters, locked rotations, versions). The block pipeline never reads the
+   * scheduled games array, standings, draft, ownership, postseason, AI
+   * assignments, evaluations, or generation audit, so the worker wire only
+   * carries this context; a full `SeasonRun` satisfies the same shape.
+   */
+  run: SeasonBlockRunContext;
   /** Expanded roster players keyed by playerVersionId (300 entries). */
   expanded: ReadonlyMap<string, SeasonGamePlayerInput>;
   /** The committed 1,230-game schedule artifact. */
@@ -165,7 +171,7 @@ export interface SeasonBlockSimulationOptions {
  * asserts unique ownership: exactly 300 distinct versions across the league.
  */
 export function expandSeasonRunRosters(
-  run: SeasonRun,
+  run: SeasonBlockRunContext,
   catalog: SeasonDraftCatalog,
 ): Map<string, SeasonGamePlayerInput> {
   const candidates = new Map(
@@ -208,7 +214,7 @@ export function expandSeasonRunRosters(
 }
 
 /** playerVersionId -> person playerId derived from the run rosters. */
-export function rosterPlayerIdsOf(run: SeasonRun): Map<string, string> {
+export function rosterPlayerIdsOf(run: SeasonBlockRunContext): Map<string, string> {
   const ids = new Map<string, string>();
   for (const roster of run.rosters) {
     for (const player of roster.players) {

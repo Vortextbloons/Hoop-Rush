@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { SEASON_GAME_SUMMARY_VERSION, SEASON_RECAP_VERSION } from '@hoop-rush/data-contracts';
 import {
+  buildFixtureEffectsState,
   buildFixtureRun,
   buildFixtureStoredDraft,
   fixtureSeedFromString,
@@ -17,11 +19,14 @@ import {
 import { SEASON_DRAFT_RECORD_ID } from './season-draft-record.ts';
 
 /**
- * Stored-record schema tests for the M2.3 Season Run persistence: the
+ * Stored-record schema tests for the M2.3/M2.4 Season Run persistence: the
  * checkpoint row is the frozen snapshot minus the 1,230 scheduled game
- * records plus cursor facts; summary/detail/block/index rows wrap the frozen
- * contracts. Every row validates at the storage boundary, so corrupt rows
- * throw instead of entering app state.
+ * records plus cursor facts and the M2.4 effects state; summary/detail/
+ * block/index rows wrap the frozen contracts. The record schema is the
+ * saveSchemaVersion union — v2 current rows (with effects) and v1 legacy
+ * schema-4 rows read leniently for typed incompatibility detection. Every
+ * row validates at the storage boundary, so corrupt rows throw instead of
+ * entering app state.
  */
 
 function checkpointRowFixture() {
@@ -29,7 +34,7 @@ function checkpointRowFixture() {
   const { games: _games, ...runWithoutGames } = run;
   return {
     recordId: SEASON_RUN_RECORD_ID,
-    saveSchemaVersion: 1,
+    saveSchemaVersion: 2,
     run: runWithoutGames,
     completedRounds: 0,
     revision: 0,
@@ -40,6 +45,7 @@ function checkpointRowFixture() {
     teamAggregates: foldTeamAggregatesFixture(run.league, []),
     playerAggregates: foldPlayerAggregatesFixture(run.rosters, []),
     recap: null,
+    effects: buildFixtureEffectsState(run.rosters),
     updatedAtIso: '2026-08-04T12:00:00.000Z',
   };
 }
@@ -48,14 +54,17 @@ describe('storedSeasonRunRecordSchema', () => {
   it('accepts a promotion-time checkpoint row without the scheduled games', () => {
     const row = checkpointRowFixture();
     const parsed = storedSeasonRunRecordSchema.parse(row);
+    if (parsed.saveSchemaVersion !== 2) throw new Error('expected a v2 record');
     expect(parsed.run.runId).toBe('fixture-season-run-1');
     expect('games' in parsed.run).toBe(false);
     expect(parsed.completedRounds).toBe(0);
     expect(parsed.revision).toBe(0);
     expect(parsed.recap).toBeNull();
+    expect(parsed.effects.playerStates).toHaveLength(300);
+    expect(parsed.effects.pairStates).toHaveLength(1350);
   });
 
-  it('accepts a post-commit row with cursor facts, aggregates, and recap', () => {
+  it('accepts a post-commit row with cursor facts, aggregates, recap, and effects', () => {
     const base = checkpointRowFixture();
     const row = {
       ...base,
@@ -64,9 +73,14 @@ describe('storedSeasonRunRecordSchema', () => {
       lastCommandId: 'command-8',
       lastRotationDigest: 'a'.repeat(32),
       lastCheckpointDigest: 'b'.repeat(32),
+      effects: buildFixtureEffectsState(buildFixtureRun({}).rosters, {
+        fatigueBasisPoints: 4000,
+        sharedPossessions: 20_000,
+        lastCompletedRound: 82,
+      }),
       recap: {
         schemaVersion: 1,
-        recapVersion: 'season-recap-v1',
+        recapVersion: SEASON_RECAP_VERSION,
         runId: 'fixture-season-run-1',
         blockIndex: 8,
         completedRounds: 82,
@@ -79,8 +93,40 @@ describe('storedSeasonRunRecordSchema', () => {
       },
     };
     const parsed = storedSeasonRunRecordSchema.parse(row);
+    if (parsed.saveSchemaVersion !== 2) throw new Error('expected a v2 record');
     expect(parsed.lastCommandId).toBe('command-8');
     expect(parsed.recap?.blockIndex).toBe(8);
+    expect(parsed.effects.playerStates[0]?.fatigueBasisPoints).toBe(4000);
+  });
+
+  it('reads a legacy v1 row leniently for typed incompatibility detection', () => {
+    const parsed = storedSeasonRunRecordSchema.parse({
+      recordId: SEASON_RUN_RECORD_ID,
+      saveSchemaVersion: 1,
+      run: {
+        runId: 'legacy-run-1',
+        schemaVersion: 4,
+        versions: { runSchemaVersion: 4 },
+      },
+    });
+    expect(parsed.saveSchemaVersion).toBe(1);
+    if (parsed.saveSchemaVersion === 1) {
+      expect(parsed.run.versions.runSchemaVersion).toBe(4);
+      expect(parsed.run.runId).toBe('legacy-run-1');
+    }
+  });
+
+  it('rejects a v2 row without the effects state and a corrupt v1 identity', () => {
+    const row = checkpointRowFixture();
+    const { effects: _effects, ...withoutEffects } = row;
+    expect(storedSeasonRunRecordSchema.safeParse(withoutEffects).success).toBe(false);
+    expect(
+      storedSeasonRunRecordSchema.safeParse({
+        ...row,
+        saveSchemaVersion: 1,
+        run: { runId: 'x', schemaVersion: 'not-a-number', versions: { runSchemaVersion: 4 } },
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects a row with a corrupt snapshot portion or bad cursor facts', () => {
@@ -99,6 +145,9 @@ describe('storedSeasonRunRecordSchema', () => {
     expect(
       storedSeasonRunRecordSchema.safeParse({ ...row, standings: { corrupted: true } }).success,
     ).toBe(false);
+    expect(
+      storedSeasonRunRecordSchema.safeParse({ ...row, effects: { corrupted: true } }).success,
+    ).toBe(false);
   });
 
   it('rejects wrong-length aggregate arrays', () => {
@@ -112,7 +161,7 @@ describe('storedSeasonRunRecordSchema', () => {
 describe('storedSeasonSummaryRowSchema', () => {
   const summary = {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v1',
+    summaryVersion: SEASON_GAME_SUMMARY_VERSION,
     gameId: 's000001',
     round: 1,
     homeFranchiseId: 'hawks',

@@ -1,6 +1,8 @@
 import {
   blockIndexForRound,
   SEASON_GAMES_PER_ROUND,
+  SEASON_ROSTER_SIZE,
+  SEASON_TEAM_COUNT,
   type SeasonAcceptedBlock,
   type SeasonGame,
   type SeasonGameSummary,
@@ -9,15 +11,15 @@ import {
   type SeasonRoster,
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
-import type { StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
+import type { StoredSeasonRunRecordV2 } from '../schemas/season-run-record.ts';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 
 /**
  * Reconciliation audit for a stored Season Run (spec/2.0/07 persistence,
- * M2.3). Every check derives from recorded facts and the pure engine helpers
- * behind the `SeasonRunEngineSeam`, so a fresh fold always agrees with the
- * stored checkpoint and a corrupt row or a half-applied block is detected
- * instead of entering app state.
+ * M2.3, M2.4). Every check derives from recorded facts and the pure engine
+ * helpers behind the `SeasonRunEngineSeam`, so a fresh fold always agrees
+ * with the stored checkpoint and a corrupt row or a half-applied block is
+ * detected instead of entering app state.
  *
  * Checks:
  * - schedule identity: every summary matches its schedule game, every
@@ -34,14 +36,21 @@ import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
  *   the last accepted block.
  * - retention policy: retained detail rows cover human-team games only and
  *   reference a stored summary.
+ * - M2.4 effects state: exactly 300 player load states and 1,350 pair
+ *   states, unique playerVersionIds, unique pairs, canonical a<b pair
+ *   ordering, every pair member present in the player states, all
+ *   fatigue/recentLoad within 0..10,000, lastCompletedRound within 0..82
+ *   and never beyond the checkpoint's completedRounds, sharedPossessions
+ *   within 0..10,000,000, and the effects player set exactly equal to the
+ *   union of the 30 rosters' players.
  */
 export interface SeasonRunAuditFacts {
   league: SeasonLeague;
   rosters: readonly SeasonRoster[];
   schedule: SeasonSchedule;
   humanFranchiseId: string;
-  /** Validated stored checkpoint row (row-level facts are authoritative). */
-  stored: StoredSeasonRunRecord;
+  /** Validated current (v2) stored checkpoint row; row-level facts are authoritative. */
+  stored: StoredSeasonRunRecordV2;
   summaries: readonly SeasonGameSummary[];
   retainedDetails: readonly SeasonRetainedGameDetail[];
   acceptedBlocks: readonly SeasonAcceptedBlock[];
@@ -312,6 +321,71 @@ export function auditSeasonRunState(
         `block ${String(blockIndex)} retains ${String(count)} details, exceeding the 10-game policy`,
       );
     }
+  }
+
+  // M2.4 effects state: player load and pair chemistry.
+  const { effects } = stored;
+  const expectedPlayerCount = SEASON_TEAM_COUNT * SEASON_ROSTER_SIZE;
+  const expectedPairCount = (SEASON_TEAM_COUNT * SEASON_ROSTER_SIZE * (SEASON_ROSTER_SIZE - 1)) / 2;
+  const rosterIds = seam.seasonRosterPlayerVersionIds(facts.rosters);
+  const effectIds = new Set<string>();
+  for (const player of effects.playerStates) {
+    if (effectIds.has(player.playerVersionId)) {
+      failures.push(`duplicate effects player state ${player.playerVersionId}`);
+    }
+    effectIds.add(player.playerVersionId);
+    if (player.fatigueBasisPoints < 0 || player.fatigueBasisPoints > 10_000) {
+      failures.push(
+        `effects player ${player.playerVersionId} fatigueBasisPoints ${String(player.fatigueBasisPoints)} is outside 0..10000`,
+      );
+    }
+    if (player.recentLoadBasisPoints < 0 || player.recentLoadBasisPoints > 10_000) {
+      failures.push(
+        `effects player ${player.playerVersionId} recentLoadBasisPoints ${String(player.recentLoadBasisPoints)} is outside 0..10000`,
+      );
+    }
+    if (player.lastCompletedRound < 0 || player.lastCompletedRound > 82) {
+      failures.push(
+        `effects player ${player.playerVersionId} lastCompletedRound ${String(player.lastCompletedRound)} is outside 0..82`,
+      );
+    }
+    if (player.lastCompletedRound > stored.completedRounds) {
+      failures.push(
+        `effects player ${player.playerVersionId} lastCompletedRound ${String(player.lastCompletedRound)} exceeds checkpoint completedRounds ${String(stored.completedRounds)}`,
+      );
+    }
+  }
+  if (effects.playerStates.length !== expectedPlayerCount) {
+    failures.push(
+      `effects player state count ${String(effects.playerStates.length)} is not ${String(expectedPlayerCount)}`,
+    );
+  }
+  if (effectIds.size !== rosterIds.length || rosterIds.some((id) => !effectIds.has(id))) {
+    failures.push('effects player set does not match the union of the 30 rosters');
+  }
+  const pairKeys = new Set<string>();
+  for (const pair of effects.pairStates) {
+    const key = seam.seasonPairKey(pair.a, pair.b);
+    if (pairKeys.has(key)) {
+      failures.push(`duplicate effects pair ${key}`);
+    }
+    pairKeys.add(key);
+    if (!seam.seasonPairIsCanonical(pair.a, pair.b)) {
+      failures.push(`effects pair ${key} is not canonical (a < b)`);
+    }
+    if (!effectIds.has(pair.a) || !effectIds.has(pair.b)) {
+      failures.push(`effects pair ${key} has a member outside the player states`);
+    }
+    if (pair.sharedPossessions < 0 || pair.sharedPossessions > 10_000_000) {
+      failures.push(
+        `effects pair ${key} sharedPossessions ${String(pair.sharedPossessions)} is outside 0..10000000`,
+      );
+    }
+  }
+  if (effects.pairStates.length !== expectedPairCount) {
+    failures.push(
+      `effects pair state count ${String(effects.pairStates.length)} is not ${String(expectedPairCount)}`,
+    );
   }
 
   return failures;

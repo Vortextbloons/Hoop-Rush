@@ -227,6 +227,12 @@ interface GenerationContext {
   roleScoresByVersion: Map<string, Record<SeasonRosterRole, number>>;
   /** Precomputed coarse group mask per candidate. */
   maskByVersion: Map<string, number>;
+  /**
+   * Precomputed 8-bit role-coverage mask per candidate (bit i set when
+   * ROSTER_ROLES[i] is covered); the exact-coverage DP ANDs this with the
+   * uncovered subset instead of rescanning per role.
+   */
+  coverageMaskByVersion: Map<string, number>;
   /** Candidates bucketed by coarse group mask, each bucket in catalog order. */
   byMask: string[][];
   /** Per-team seeded candidate ranks, computed once (seed and team are fixed). */
@@ -280,20 +286,20 @@ function coverageFeasible(
 ): boolean {
   if (uncovered.length === 0) return true;
   if (uncovered.length > slots) return false;
-  const roleIndex = new Map(uncovered.map((role, i) => [role, i]));
+  // Bit positions follow ROSTER_ROLES order, so the mask of the uncovered
+  // subset is the candidate's precomputed coverage mask AND the subset mask.
+  let subsetMask = 0;
+  for (const role of uncovered) {
+    const index = ROSTER_ROLES.indexOf(role);
+    if (index >= 0) subsetMask |= 1 << index;
+  }
   const maskCounts = new Array<number>(1 << uncovered.length).fill(0);
   for (const candidate of ctx.catalog.candidates) {
     if (!ctx.unowned.has(candidate.playerVersionId)) continue;
-    const scores = ctx.roleScoresByVersion.get(candidate.playerVersionId);
-    if (scores === undefined) continue;
-    let mask = 0;
-    for (const role of uncovered) {
-      const index = roleIndex.get(role);
-      if (index !== undefined && scores[role] >= ROLE_COVERAGE_THRESHOLD) {
-        mask |= 1 << index;
-      }
-    }
-    if (mask !== 0) maskCounts[mask] = (maskCounts[mask] ?? 0) + 1;
+    const covered = ctx.coverageMaskByVersion.get(candidate.playerVersionId);
+    if (covered === undefined) continue;
+    const masked = covered & subsetMask;
+    if (masked !== 0) maskCounts[masked] = (maskCounts[masked] ?? 0) + 1;
   }
   const full = (1 << uncovered.length) - 1;
   const reachable = new Uint8Array((slots + 1) * (full + 1));
@@ -539,11 +545,14 @@ function repairPass(ctx: GenerationContext, aiTeams: readonly { franchiseId: str
       const scoreB = scoreContribution(ctx, b, uncovered);
       return scoreA - scoreB;
     });
+    // The unassigned pool cannot change while this team is being repaired
+    // (ownership only moves on a successful swap, which breaks out), so it
+    // is filtered and sorted once per team instead of once per removable.
+    const unassigned = ctx.catalog.candidates
+      .filter((c) => ctx.unowned.has(c.playerVersionId))
+      .sort((a, b) => b.summaryRatings.overallRating - a.summaryRatings.overallRating);
     for (const removeId of removable) {
       const remaining = ids.filter((id) => id !== removeId);
-      const unassigned = ctx.catalog.candidates
-        .filter((c) => ctx.unowned.has(c.playerVersionId))
-        .sort((a, b) => b.summaryRatings.overallRating - a.summaryRatings.overallRating);
       for (const candidate of unassigned) {
         ctx.nodes += 1;
         const trial = [...remaining, candidate.playerVersionId];
@@ -690,6 +699,7 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
   const humanOwned = new Set(input.humanRosters.flatMap((r) => r.playerVersionIds));
   const roleScoresByVersion = new Map<string, Record<SeasonRosterRole, number>>();
   const maskByVersion = new Map<string, number>();
+  const coverageMaskByVersion = new Map<string, number>();
   const byMask: string[][] = Array.from({ length: 8 }, () => []);
   const identityScoresByVersion = new Map<string, Record<SeasonAiIdentity, number>>();
   for (const candidate of catalog.candidates) {
@@ -699,6 +709,11 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     maskByVersion.set(candidate.playerVersionId, mask);
     const bucket = byMask[mask];
     if (bucket !== undefined) bucket.push(candidate.playerVersionId);
+    let coverageMask = 0;
+    ROSTER_ROLES.forEach((role, roleIndex) => {
+      if (scores[role] >= ROLE_COVERAGE_THRESHOLD) coverageMask |= 1 << roleIndex;
+    });
+    coverageMaskByVersion.set(candidate.playerVersionId, coverageMask);
     const identityScores = {} as Record<SeasonAiIdentity, number>;
     for (const identity of IDENTITIES) {
       identityScores[identity] = identityScore(scores, identity);
@@ -710,6 +725,7 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     byId,
     roleScoresByVersion,
     maskByVersion,
+    coverageMaskByVersion,
     byMask,
     ranksByTeam: new Map(),
     identityScoresByVersion,

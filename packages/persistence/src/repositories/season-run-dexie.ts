@@ -19,7 +19,8 @@ import {
   storedSeasonDetailRowSchema,
   storedSeasonRunRecordSchema,
   storedSeasonSummaryRowSchema,
-  type StoredSeasonRunRecord,
+  type StoredSeasonRunRecordV1,
+  type StoredSeasonRunRecordV2,
 } from '../schemas/season-run-record.ts';
 import {
   SEASON_DRAFT_RECORD_ID,
@@ -32,31 +33,42 @@ import { seasonRunEngineSeam } from '../season/engine-seam.ts';
 import { HoopRushDatabase } from './dexie.ts';
 import type {
   CommitSeasonBlockInput,
+  SeasonRunIncompatibleInfo,
   SeasonRunRepository,
   SeasonRunSnapshot,
 } from './season-run.ts';
 
 /**
  * Concrete IndexedDB Season Run repository (spec/2.0/07 persistence,
- * spec/2.0/10 M2.3). The active Season Run lives in the dedicated v6 tables,
- * isolated from the Challenge and Classic stores:
+ * spec/2.0/10 M2.3, M2.4). The active Season Run lives in the dedicated v6
+ * tables, isolated from the Challenge and Classic stores:
  *
  * - `seasonRuns`      — single checkpoint row at 'season-run' (snapshot
  *   minus the 1,230 scheduled game records, plus cursor facts, standings,
- *   aggregates, recap).
+ *   aggregates, recap, and the M2.4 effects state).
  * - `seasonRunSummaries` — one compact summary per completed league game.
  * - `seasonRunDetails`   — one retained detail per human-team game.
  * - `seasonRunBlocks`    — one accepted block per commit (append-only).
  * - `seasonRunIndex`     — single lightweight active-run index row.
  *
  * `commitSeasonBlock` commits summaries, retained details, aggregates,
- * standings, cursor, revision, command id, recap, and digests in ONE Dexie
- * transaction: either every row commits or none does, so no partial block can
- * ever be accepted. Revision regressions and duplicate command ids are
- * rejected inside the transaction. Reads validate every record through the
- * stored schemas and run the aggregate reconciliation audit; corrupt or
- * half-applied state throws a typed `SeasonRunLoadError` instead of entering
- * app state.
+ * standings, cursor, revision, command id, recap, the M2.4 effects state,
+ * and digests in ONE Dexie transaction: either every row commits or none
+ * does, so no partial block can ever be accepted. Revision regressions and
+ * duplicate command ids are rejected inside the transaction. Reads validate
+ * every record through the stored schemas and run the aggregate + effects
+ * reconciliation audit; corrupt or half-applied state throws a typed
+ * `SeasonRunLoadError` instead of entering app state.
+ *
+ * ## Schema-4 runs (stored save-schema v1)
+ *
+ * Pre-M2.4 runs stored as save-schema-v1 rows are NEVER migrated or
+ * rewritten. A load of a v1 row throws the typed `SeasonRunIncompatibleError`
+ * (carrying `SeasonRunIncompatibleInfo`) so the UI can show the
+ * discard-and-restart screen; `loadActiveRunIncompatible()` offers the same
+ * detection without needing the schedule artifact. Only
+ * `clearSeasonRun(runId)` (after explicit user confirmation) removes the
+ * row.
  *
  * ## Schedule supply
  *
@@ -82,6 +94,34 @@ export class SeasonRunLoadError extends Error {
     this.name = 'SeasonRunLoadError';
     this.failures = failures;
   }
+}
+
+/**
+ * Typed error for a stored schema-4 run (save-schema-v1, pre-M2.4). Thrown
+ * from the load paths instead of a generic parse error so the UI can show a
+ * discard-and-restart screen; the legacy row is left untouched byte-for-byte
+ * until the user confirms `clearSeasonRun(info.runId)`.
+ */
+export class SeasonRunIncompatibleError extends Error {
+  readonly info: SeasonRunIncompatibleInfo;
+
+  constructor(info: SeasonRunIncompatibleInfo) {
+    super(
+      `stored Season Run is incompatible (save schema v${String(info.storedSaveSchemaVersion)}, ` +
+        `run schema v${String(info.storedRunSchemaVersion)}); discard and restart`,
+    );
+    this.name = 'SeasonRunIncompatibleError';
+    this.info = info;
+  }
+}
+
+/** Typed marker for a leniently-read legacy v1 stored row. */
+function incompatibleInfoOf(record: StoredSeasonRunRecordV1): SeasonRunIncompatibleInfo {
+  return {
+    storedSaveSchemaVersion: 1,
+    storedRunSchemaVersion: record.run.versions.runSchemaVersion,
+    runId: record.run.runId,
+  };
 }
 
 interface SeasonRunRepositoryOptions {
@@ -136,8 +176,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
   /**
    * Full validated snapshot; resumes at the last accepted boundary. The
    * caller supplies the schedule artifact (the repository cannot fetch
-   * static assets); every stored row is validated and the aggregate
-   * reconciliation audit runs before anything is returned.
+   * static assets); every stored row is validated and the aggregate +
+   * effects reconciliation audit runs before anything is returned. A stored
+   * schema-4 run (save-schema-v1) throws `SeasonRunIncompatibleError`.
    */
   async loadActiveRunWithSchedule(schedule: SeasonSchedule): Promise<SeasonRunSnapshot | null> {
     seasonScheduleSchema.parse(schedule);
@@ -146,14 +187,41 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     return this.loadValidated(checkpoint, schedule);
   }
 
+  /**
+   * Typed detection of an incompatible stored run (schema-4, save-schema
+   * v1). Needs no schedule artifact: the stored row is read leniently and
+   * returned as a typed marker for the discard screen. Returns null when no
+   * run is stored or the stored row is the current v2 family; throws
+   * `SeasonRunLoadError` when the row is corrupt beyond identification. The
+   * legacy row is never rewritten.
+   */
+  async loadActiveRunIncompatible(): Promise<SeasonRunIncompatibleInfo | null> {
+    const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    if (checkpoint === undefined) return null;
+    const parsed = storedSeasonRunRecordSchema.safeParse(checkpoint);
+    if (!parsed.success) {
+      throw new SeasonRunLoadError(
+        ['stored Season Run checkpoint failed schema validation'],
+        `corrupt Season Run checkpoint: ${errorMessage(parsed.error)}`,
+      );
+    }
+    if (parsed.data.saveSchemaVersion === 1) return incompatibleInfoOf(parsed.data);
+    return null;
+  }
+
   private async loadValidated(
     checkpoint: unknown,
     schedule: SeasonSchedule,
   ): Promise<SeasonRunSnapshot> {
-    let stored: StoredSeasonRunRecord;
+    let stored: StoredSeasonRunRecordV2;
     try {
-      stored = storedSeasonRunRecordSchema.parse(checkpoint);
+      const parsed = storedSeasonRunRecordSchema.parse(checkpoint);
+      if (parsed.saveSchemaVersion === 1) {
+        throw new SeasonRunIncompatibleError(incompatibleInfoOf(parsed));
+      }
+      stored = parsed;
     } catch (error) {
+      if (error instanceof SeasonRunIncompatibleError) throw error;
       throw new SeasonRunLoadError(
         ['stored Season Run checkpoint failed schema validation'],
         `corrupt Season Run checkpoint: ${errorMessage(error)}`,
@@ -273,6 +341,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       summaries: byGameId(summaries),
       retainedDetails: byGameId(retainedDetails),
       acceptedBlocks: byRevision(acceptedBlocks),
+      effects: stored.effects,
     };
   }
 
@@ -346,6 +415,14 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
         if (checkpoint === undefined) {
           throw new Error('commitSeasonBlock: no active run checkpoint to advance');
+        }
+        if (checkpoint.saveSchemaVersion !== 2) {
+          // A legacy save-schema-v1 (schema-4) row is never migrated or
+          // rewritten; committing over it would silently convert it.
+          throw new Error(
+            'commitSeasonBlock: the stored checkpoint is a legacy save-schema-v1 row ' +
+              '(schema-4 run); discard it via clearSeasonRun before starting a new run',
+          );
         }
         const cursor = seasonRunCursorSchema.parse(checkpoint);
         if (cursor.run.runId !== input.runId) {
@@ -439,6 +516,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
           teamAggregates: input.teamAggregates,
           playerAggregates: input.playerAggregates,
           recap: input.recap,
+          effects: input.effects,
           updatedAtIso,
           run: { rotations: input.rotations },
         });
@@ -478,7 +556,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     const { games: _games, ...runWithoutGames } = validatedRun;
     const checkpointRow = storedSeasonRunRecordSchema.parse({
       recordId: SEASON_RUN_RECORD_ID,
-      saveSchemaVersion: 1,
+      saveSchemaVersion: 2,
       run: runWithoutGames,
       completedRounds: 0,
       revision: 0,
@@ -489,6 +567,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       teamAggregates: this.seam.foldSeasonTeamAggregates(validatedRun.league, []),
       playerAggregates: this.seam.foldSeasonPlayerAggregates(validatedRun.rosters, []),
       recap: null,
+      effects: this.seam.zeroSeasonEffectsState(validatedRun.rosters),
     });
     const humanFranchiseId = validatedRun.league.teams.find(
       (team) => team.control === 'human',
@@ -526,11 +605,22 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         }
         const existing = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
         if (existing !== undefined) {
-          const existingRunId = storedSeasonRunRecordSchema.parse(existing).run.runId;
-          if (existingRunId !== validatedRun.runId) {
-            await this.db.seasonRunSummaries.where('runId').equals(existingRunId).delete();
-            await this.db.seasonRunDetails.where('runId').equals(existingRunId).delete();
-            await this.db.seasonRunBlocks.where('runId').equals(existingRunId).delete();
+          const existingRecord = storedSeasonRunRecordSchema.parse(existing);
+          if (existingRecord.saveSchemaVersion === 1) {
+            // A legacy save-schema-v1 (schema-4) row is never migrated or
+            // overwritten; only an explicit clearSeasonRun removes it.
+            throw new Error(
+              'promoteSeasonDraftToRun: the stored checkpoint is a legacy save-schema-v1 row ' +
+                '(schema-4 run); discard it via clearSeasonRun before promoting a new run',
+            );
+          }
+          if (existingRecord.run.runId !== validatedRun.runId) {
+            await this.db.seasonRunSummaries
+              .where('runId')
+              .equals(existingRecord.run.runId)
+              .delete();
+            await this.db.seasonRunDetails.where('runId').equals(existingRecord.run.runId).delete();
+            await this.db.seasonRunBlocks.where('runId').equals(existingRecord.run.runId).delete();
           }
         }
         await this.db.seasonRuns.put(checkpointRow);

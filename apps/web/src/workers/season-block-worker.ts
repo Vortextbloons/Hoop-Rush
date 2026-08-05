@@ -1,15 +1,18 @@
 import {
+  loadEraSimulationProfile,
+  loadSeasonDraftCatalog,
   seasonWorkerMessageSchema,
   seasonWorkerRequestSchema,
+  type SeasonBlockRunContext,
+  type SeasonDraftCatalog,
   type SeasonGameSummary,
   type SeasonRetainedGameDetail,
-  type SeasonRun,
   type SeasonWorkerCompleteMessage,
   type SeasonWorkerErrorMessage,
   type SeasonWorkerProgressMessage,
   type SeasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
-import { loadEraSimulationProfile, loadSeasonDraftCatalog } from '@hoop-rush/data-contracts';
+import { readCachedAsset, writeCachedAsset } from '../lib/pool-cache';
 import {
   assembleSeasonBlockCandidate,
   auditSeasonBlock,
@@ -24,25 +27,40 @@ import {
 
 /**
  * Season Run block worker entry (spec/2.0/07 background execution, M2.3).
- * Receives one validated block input (run snapshot at the boundary, schedule,
- * home-court profile, prior summaries, and the catalog/profile asset urls it
- * fetches and hash-verifies itself), then runs the authoritative block
- * pipeline game by game through the engine's exported pieces — the same code
- * the CLI runs through `simulateSeasonBlock`.
+ * Receives one validated block input (the run context at the boundary,
+ * schedule, home-court profile, compact summaries — a full reset or a
+ * per-block delta into the persistent accumulator — and the catalog/profile
+ * asset urls it fetches and hash-verifies itself), then runs the
+ * authoritative block pipeline game by game through the engine's exported
+ * pieces — the same code the CLI runs through `simulateSeasonBlock`.
  *
- * The worker never touches IndexedDB. It yields to the event loop between
- * games so cancellation is observed and progress streams; progress posts are
- * throttled to at most four per second and carry fixed-size counters plus
- * the latest game id and compact summary. Invariant failures stop the block
- * with seed/version/game diagnostics. The complete message carries one
- * bounded candidate checkpoint (≤ 2 MB) for the main thread to validate,
- * accept, and persist; cancelled or failed work never reaches persistence.
+ * The worker never touches the save database; it only reads the shared
+ * content-addressed asset cache for the draft catalog. It yields to the
+ * event loop between games so cancellation is observed and progress
+ * streams; progress posts are throttled to at most four per second and carry
+ * fixed-size counters plus the latest game id and compact summary. Invariant
+ * failures stop the block with seed/version/game diagnostics. The complete
+ * message carries one bounded candidate checkpoint (≤ 2 MB) for the main
+ * thread to validate, accept, and persist; cancelled or failed work never
+ * reaches persistence.
  */
 
 const PROGRESS_MIN_INTERVAL_MS = 250;
 
 let currentRequestId: string | null = null;
 let cancelled = false;
+
+/**
+ * The worker is persistent and accumulates compact summaries across blocks
+ * so the main thread only ships one block's worth of deltas. The runner
+ * resets the accumulator with `priorSummaries` whenever this worker has no
+ * state for the run (fresh worker or resumed after a route change) and
+ * appends `newSummaries` otherwise. The engine folds standings/aggregates on
+ * top of the accumulated set, so a stale accumulator would fail the
+ * checkpoint audit on the main thread.
+ */
+let accumulatedRunId: string | null = null;
+let accumulatedSummaries: SeasonGameSummary[] = [];
 
 function post(
   message: SeasonWorkerProgressMessage | SeasonWorkerCompleteMessage | SeasonWorkerErrorMessage,
@@ -60,7 +78,7 @@ function postError(
   diagnostics: { seed?: string | null; gameId?: string | null; blockIndex?: number | null } = {},
 ): void {
   const payload: SeasonWorkerErrorMessage = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     type: 'season-block-error',
     requestId,
     code,
@@ -75,6 +93,19 @@ function postError(
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * The packaged draft catalog is immutable and content-addressed; a validated
+ * copy in IndexedDB (shared with the main thread) spares a ~10.2 MB
+ * re-download + hash verify + Zod parse on every block of a season.
+ */
+async function loadCatalogCached(url: string, contentHash: string): Promise<SeasonDraftCatalog> {
+  const cached = await readCachedAsset<SeasonDraftCatalog>(contentHash);
+  if (cached !== null) return cached;
+  const catalog = await loadSeasonDraftCatalog(url, contentHash);
+  void writeCachedAsset(contentHash, catalog);
+  return catalog;
+}
+
 /** Yields to the event loop so cancel messages and progress posts interleave. */
 async function yieldToEventLoop(): Promise<void> {
   await sleep(0);
@@ -88,13 +119,28 @@ function throwIfCancelled(): void {
 }
 
 async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
-  const run: SeasonRun = request.run;
+  const run: SeasonBlockRunContext = request.run;
+
+  if (request.priorSummaries !== undefined) {
+    accumulatedRunId = request.runId;
+    accumulatedSummaries = request.priorSummaries;
+  } else if (request.newSummaries !== undefined) {
+    if (accumulatedRunId !== request.runId) {
+      postError(
+        request.requestId,
+        'internal',
+        'summary delta received for a run the worker has no state for',
+      );
+      return;
+    }
+    accumulatedSummaries = [...accumulatedSummaries, ...request.newSummaries];
+  }
 
   let catalog;
   let profile;
   try {
     [catalog, profile] = await Promise.all([
-      loadSeasonDraftCatalog(request.catalogUrl, request.catalogHash),
+      loadCatalogCached(request.catalogUrl, request.catalogHash),
       loadEraSimulationProfile(request.profileUrl, request.profileHash),
     ]);
   } catch (error) {
@@ -105,7 +151,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const expanded = expandSeasonRunRosters(run, catalog);
   const input: SeasonBlockSimulationInput = {
     command: {
-      schemaVersion: 4,
+      schemaVersion: 5,
       blockVersion: run.versions.blockVersion,
       command: 'submit-season-block',
       commandId: request.commandId,
@@ -121,7 +167,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     profile,
     humanFranchiseId: request.humanFranchiseId,
     rosterPlayerIds: rosterPlayerIdsOf(run),
-    priorSummaries: request.priorSummaries,
+    priorSummaries: accumulatedSummaries,
   };
 
   const rejection = seasonBlockRejection(input);
@@ -156,7 +202,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     if (isLast || now - lastProgressAt >= PROGRESS_MIN_INTERVAL_MS) {
       lastProgressAt = now;
       post({
-        schemaVersion: 2,
+        schemaVersion: 3,
         type: 'season-block-progress',
         requestId: request.requestId,
         blockIndex: request.blockIndex,
@@ -174,7 +220,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     throw new EngineInvariantFailure(auditFailures.join('; '));
   }
   post({
-    schemaVersion: 2,
+    schemaVersion: 3,
     type: 'season-block-complete',
     requestId: request.requestId,
     checkpoint: candidate,

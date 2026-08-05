@@ -42,7 +42,6 @@ jobs:
 
       - name: Unit and integration tests
         run: pnpm test:run
-        retry: 2
 
       - name: Validate packaged data
         run: pnpm hoop-rush data validate
@@ -99,7 +98,6 @@ jobs:
 
       - name: Run Playwright smoke tests
         run: pnpm e2e:smoke
-        retry: 2
 
       - name: Upload Playwright report
         if: failure()

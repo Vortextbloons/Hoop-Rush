@@ -14,7 +14,7 @@ mockSvelteKitApp();
 /**
  * RotationEditor component tests (M2.3 hub, M2.3.5 team workspace): preset
  * buttons, minute steppers, the invalid-rotation alert, the compact mobile
- * rows (closing-five toggles, 44px steppers), and per-player failure
+ * rows (bench controls, closing-five toggles, 44px steppers), and per-player failure
  * placement. The editor's engine-validated commits are unit-tested in
  * season-rotation-editor.test.ts; here we verify the wiring. The component
  * renders both the compact (mobile) and the desktop workspace layouts; the
@@ -88,19 +88,20 @@ function compactRowsList(container: HTMLElement) {
 }
 
 describe('RotationEditor component', () => {
-  it('shows the minute total and every roster member in both layouts', () => {
+  it('shows the minute total and the bench members in the compact layout', async () => {
     const { getByText, getByRole, container } = renderEditor();
     const total = container.querySelector('p strong');
     expect(total?.textContent).toBe('240');
-    expect(getByText('Bench order')).not.toBeNull();
+    expect(container.querySelector('#mobile-rotation-heading')?.textContent).toContain(
+      'Bench order',
+    );
     expect(getByRole('heading', { name: 'Starters' })).not.toBeNull();
     expect(getByText(/Closing five/)).not.toBeNull();
-    // The compact mobile layout renders ten player rows too.
-    expect(
-      compactRowsList(container).getAllByRole('group', {
-        name: /Minutes for/,
-      }),
-    ).toHaveLength(10);
+    // The compact Bench tab keeps the narrow layout focused on reserve controls.
+    await fireEvent.click(getByRole('button', { name: 'Bench' }));
+    expect(compactRowsList(container).getAllByRole('group', { name: /Minutes for/ })).toHaveLength(
+      5,
+    );
   });
 
   it('applies a preset through the engine and reports the new rotation', async () => {
@@ -138,7 +139,7 @@ describe('RotationEditor component', () => {
 
   it('compact rows adjust minutes with touch-sized steppers', async () => {
     const { editor, onchange, container } = renderEditor();
-    const first = editor.rotation.starters[0];
+    const first = editor.rotation.benchOrder[0];
     const label = first === undefined ? undefined : editor.names.get(first);
     if (first === undefined || label === undefined) {
       throw new Error('fixture rotation has no first starter');
@@ -151,7 +152,7 @@ describe('RotationEditor component', () => {
     expect(increase.classList.contains('w-11')).toBe(true);
     await fireEvent.click(increase);
     const [rotation] = onchange.mock.calls.at(-1) as [SeasonRotation, string[]];
-    expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(33);
+    expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(17);
   });
 
   it('closing-five selects swap players while keeping five selected', async () => {
@@ -201,7 +202,7 @@ describe('RotationEditor component', () => {
     expect(alert?.textContent ?? '').toMatch(/rejected/);
   });
 
-  it('surfaces per-player audit failures beside the affected row', () => {
+  it('surfaces per-player audit failures beside the affected row', async () => {
     const editor = createRotationEditor(legalRotation(), members());
     // Promote a bench player who cannot play a guard slot into starter slot 0,
     // demoting the incumbent guard to the bench. The audit fails per-player
@@ -237,12 +238,12 @@ describe('RotationEditor component', () => {
     const { container } = render(RotationEditor, {
       props: { editor: broken, disabled: false, onchange: vi.fn() },
     });
-    // The compact row for the offending player carries the failure.
+    // The compact Starters section carries the failure for the invalid starter.
+    await fireEvent.click(within(container).getByRole('button', { name: 'Starters' }));
     const compact = compactRowsList(container);
-    const row = compact.getByText(benchName).closest('li');
+    const row = compact.getByText(/cannot play slot/).closest('li');
     expect(row).not.toBeNull();
     expect(row?.textContent ?? '').toMatch(/cannot play slot/);
-    expect(row?.querySelector('ul')?.textContent ?? '').toMatch(/cannot play slot/);
     // The desktop starter select for the offending player is marked invalid.
     const select = container.querySelector('select[aria-label="Starter slot 1"]');
     expect(select?.getAttribute('aria-invalid')).toBe('true');

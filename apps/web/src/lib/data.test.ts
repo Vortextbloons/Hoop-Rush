@@ -14,11 +14,13 @@ import {
   getManifest,
   warmPlayersIndex,
 } from './data';
-import { readCachedPool, writeCachedPool } from './pool-cache';
+import { readCachedAsset, readCachedPool, writeCachedAsset, writeCachedPool } from './pool-cache';
 
 vi.mock('./pool-cache', () => ({
   readCachedPool: vi.fn(() => Promise.resolve(null)),
   writeCachedPool: vi.fn(() => Promise.resolve()),
+  readCachedAsset: vi.fn(() => Promise.resolve(null)),
+  writeCachedAsset: vi.fn(() => Promise.resolve()),
 }));
 
 function sha256(text: string): string {
@@ -51,6 +53,8 @@ describe('data asset loading with a stale manifest', () => {
     vi.stubGlobal('fetch', fetchMock);
     vi.mocked(readCachedPool).mockResolvedValue(null);
     vi.mocked(writeCachedPool).mockResolvedValue(undefined);
+    vi.mocked(readCachedAsset).mockResolvedValue(null);
+    vi.mocked(writeCachedAsset).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -216,6 +220,8 @@ describe('warmPlayersIndex', () => {
     vi.stubGlobal('fetch', fetchMock);
     vi.mocked(readCachedPool).mockResolvedValue(null);
     vi.mocked(writeCachedPool).mockResolvedValue(undefined);
+    vi.mocked(readCachedAsset).mockResolvedValue(null);
+    vi.mocked(writeCachedAsset).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -287,5 +293,40 @@ describe('warmPlayersIndex', () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     await expect(getPlayersIndex()).rejects.toThrow();
+  });
+
+  it('serves the players index from the asset cache when the hash still matches', async () => {
+    const index: PlayersIndex = {
+      schemaVersion: 4,
+      dataVersion: 'data-v1',
+      players: [
+        {
+          playerId: 'lakers-1990s-a',
+          franchiseId: 'lakers',
+          eraId: '1990s',
+          seasonKey: '1996-97',
+          firstName: 'Test',
+          lastName: 'Player',
+          displayName: 'Test Player',
+          playerExternalId: '101',
+          positionsPlayable: ['PG', 'SG'],
+          overall: 92,
+          offense: 95,
+          defense: 80,
+          selectionScore: 91.517,
+        },
+      ],
+    };
+    const indexHash = sha256(JSON.stringify(index));
+    const manifest: HoopRushManifest = buildManifest({
+      playersIndex: { url: 'players-index.json', contentHash: indexHash },
+    });
+    routes.set('/data/manifest.json', JSON.stringify(manifest));
+    vi.mocked(readCachedAsset).mockResolvedValue(index);
+
+    const result = await getPlayersIndex();
+
+    expect(result).toBe(index);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

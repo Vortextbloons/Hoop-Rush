@@ -119,6 +119,25 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     input: SeasonBlockStartInput;
   } | null = null;
 
+  /**
+   * Authoritative cursor state for the active run, kept in memory after every
+   * accepted commit so block starts validate without a full repository load
+   * and reconciliation audit. Keyed by runId: the first block after a page
+   * reload (or a new run) loads once from the repository, and the guarded
+   * IndexedDB commit still rejects revision regressions and duplicate
+   * command ids atomically.
+   */
+  let runState: {
+    runId: string;
+    revision: number;
+    completedRounds: number;
+    commandIds: Set<string>;
+    summaries: SeasonGameSummary[];
+  } | null = null;
+  /** The compact summaries the live worker already holds (per run). */
+  let workerSummaryRunId: string | null = null;
+  let workerSummaryCount = 0;
+
   const repositoryPromise = deps.repository !== undefined ? Promise.resolve(deps.repository) : null;
   const schedulePromise = deps.schedule !== undefined ? Promise.resolve(deps.schedule) : null;
 
@@ -251,7 +270,26 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         retainedDetails: checkpoint.retainedDetails,
         recap: checkpoint.recap,
         rotations: state.rotations,
+        effects: checkpoint.effects,
       });
+      // The commit is authoritative: keep the in-memory cursor and the
+      // worker's summary accumulator in sync so the next block starts and
+      // ships deltas without a repository load.
+      if (runState === null || runState.runId !== checkpoint.runId) {
+        runState = {
+          runId: checkpoint.runId,
+          revision: checkpoint.revision,
+          completedRounds: checkpoint.completedRounds,
+          commandIds: new Set(),
+          summaries: [],
+        };
+      }
+      runState.revision = checkpoint.revision + 1;
+      runState.completedRounds = checkpoint.completedRounds;
+      runState.commandIds.add(state.commandId);
+      runState.summaries = [...runState.summaries, ...checkpoint.gameSummaries];
+      workerSummaryRunId = checkpoint.runId;
+      workerSummaryCount = runState.summaries.length;
       emit({ type: 'complete', requestId, checkpoint });
     } catch (error) {
       emit({
@@ -294,18 +332,30 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               : import('./season-assets').then((module) => module.seasonArtifactUrls()),
           ]);
           if (currentRequestId !== requestId) return;
-          const snapshot = await repository.loadActiveRun();
-          if (snapshot === null) throw new Error('no active season run to advance');
-          const revision = snapshot.acceptedBlocks.length;
+          if (runState === null || runState.runId !== input.run.runId) {
+            const snapshot = await repository.loadActiveRun();
+            if (snapshot === null) throw new Error('no active season run to advance');
+            if (snapshot.run.runId !== input.run.runId) {
+              throw new Error('the active run does not match the submitted run');
+            }
+            runState = {
+              runId: snapshot.run.runId,
+              revision: snapshot.acceptedBlocks.length,
+              completedRounds: snapshot.run.cursor.completedRounds,
+              commandIds: new Set(snapshot.acceptedBlocks.map((block) => block.commandId)),
+              summaries: snapshot.summaries,
+            };
+          }
+          const revision = runState.revision;
           if (input.expectedRevision !== revision) {
             throw new Error(
               `stale cursor: the run is at revision ${String(revision)}, command expects ${String(input.expectedRevision)}`,
             );
           }
-          if (snapshot.acceptedBlocks.some((block) => block.commandId === input.commandId)) {
+          if (runState.commandIds.has(input.commandId)) {
             throw new Error(`duplicate command ${input.commandId}`);
           }
-          const next = seasonNextBlockIndex(snapshot.run.cursor.completedRounds);
+          const next = seasonNextBlockIndex(runState.completedRounds);
           if (next === null || next !== input.blockIndex) {
             throw new Error(
               `non-boundary block: the run expects ${String(next)}, command submits ${String(input.blockIndex)}`,
@@ -315,8 +365,24 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             throw new Error('rotation digest does not match the submitted rotations');
           }
           if (currentRequestId !== requestId) return;
+          // The persistent worker accumulates summaries; ship the full set
+          // only when it has no state for this run (fresh worker or resumed
+          // after a route change), otherwise a per-block delta.
+          const summaries = runState.summaries;
+          let priorSummaries: SeasonGameSummary[] | undefined;
+          let newSummaries: SeasonGameSummary[] | undefined;
+          if (workerSummaryRunId === input.run.runId && workerSummaryCount <= summaries.length) {
+            const delta = summaries.slice(workerSummaryCount);
+            if (delta.length <= 150) {
+              newSummaries = delta;
+            } else {
+              priorSummaries = summaries;
+            }
+          } else {
+            priorSummaries = summaries;
+          }
           const start: SeasonWorkerStartRequest = {
-            schemaVersion: 2,
+            schemaVersion: 3,
             type: 'season-block-start',
             requestId,
             runId: input.run.runId,
@@ -325,8 +391,20 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             expectedRevision: input.expectedRevision,
             rotationDigest: input.rotationDigest,
             commandId: input.commandId,
-            // The worker simulates with the LOCKED rotation set.
-            run: { ...input.run, rotations: input.rotations },
+            // The worker simulates with the LOCKED rotation set; the wire
+            // carries only the run context the block pipeline reads (the
+            // scheduled games, standings, draft, and other persisted facts
+            // never cross the worker boundary).
+            run: {
+              schemaVersion: input.run.schemaVersion,
+              runId: input.run.runId,
+              rootSeed: input.run.rootSeed,
+              versions: input.run.versions,
+              league: input.run.league,
+              rosters: input.run.rosters,
+              rotations: input.rotations,
+              cursor: input.run.cursor,
+            },
             schedule,
             homeCourt: input.homeCourt,
             humanFranchiseId: input.humanFranchiseId,
@@ -334,7 +412,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             catalogHash: artifacts.catalogHash,
             profileUrl: artifacts.profileUrl,
             profileHash: artifacts.profileHash,
-            priorSummaries: snapshot.summaries,
+            ...(priorSummaries !== undefined ? { priorSummaries } : {}),
+            ...(newSummaries !== undefined ? { newSummaries } : {}),
           };
           // Parse re-builds the payload as plain data (the reactive shell
           // proxies must never cross the structured-clone boundary).
@@ -376,6 +455,11 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       worker = null;
       currentRequestId = null;
       current = null;
+      // A fresh worker holds no summary state; the next start re-sends the
+      // full prior summaries. The in-memory run cursor survives (keyed by
+      // runId) so resumed blocks still avoid a repository load.
+      workerSummaryRunId = null;
+      workerSummaryCount = 0;
     },
 
     subscribe(listener: (event: SeasonRunnerEvent) => void): () => void {

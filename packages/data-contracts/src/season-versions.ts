@@ -8,23 +8,27 @@
  */
 
 /**
- * Season Run persistence snapshot schema layout. Bumped to 4 by M2.3: the
- * run now freezes the block, game-summary, aggregates, recap, leaders,
- * home-court, and checkpoint material versions; the Season game contract
- * moved to season-game-v2 (home court) with recalibrated
- * season-game-targets-v2. Bumped to 3 by M2.2 (rotation-planner, Season-game,
- * and Season-game-targets material versions). Bumped to 2 by M2.1 (draft
- * facts, AI assignments, rotations, audit, new material versions). The M2.0
- * schema v1 data is development scaffolding, not a migration target.
+ * Season Run persistence snapshot schema layout. Bumped to 5 by M2.4: the
+ * run freezes the stamina, chemistry, and effect-targets material versions
+ * and the candidate checkpoint carries the 300-player / 1,350-pair effects
+ * state; schema 4 runs cannot continue (no effects state exists for them).
+ * Bumped to 4 by M2.3: the run now freezes the block, game-summary,
+ * aggregates, recap, leaders, home-court, and checkpoint material versions;
+ * the Season game contract moved to season-game-v2 (home court) with
+ * recalibrated season-game-targets-v2. Bumped to 3 by M2.2 (rotation-planner,
+ * Season-game, and Season-game-targets material versions). Bumped to 2 by
+ * M2.1 (draft facts, AI assignments, rotations, audit, new material
+ * versions). The M2.0 schema v1 data is development scaffolding, not a
+ * migration target.
  *
- * Schema layout 4 remains the read schema after the M2.3.5 draft overhaul:
+ * Schema layout 5 remains the read schema after the M2.3.5 draft overhaul:
  * the `draft` facts and the `versions.draftVersion` field widened to a
  * discriminated union so legacy M2.3 runs (franchise-era draft facts,
  * `season-draft-v1`) and new runs (global eight-card offer facts,
- * `season-draft-v2`) both validate as schema 4. The M2.3.5 change records
+ * `season-draft-v2`) both validate as schema 5. The M2.3.5 change records
  * itself through the draft versions, never through a snapshot layout bump.
  */
-export const SEASON_RUN_SCHEMA_VERSION = 4;
+export const SEASON_RUN_SCHEMA_VERSION = 5;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -117,42 +121,46 @@ export const SEASON_ROTATION_VERSION = 'season-rotation-v2';
 export const SEASON_ROTATION_PLANNER_VERSION = 'rotation-planner-v1';
 
 /**
- * Season Run single-game controller (spec/2.0/04, season-game-v2, M2.3).
- * v2 applies the versioned home-court profile through named mechanisms only
- * (improved home defensive communication and additional away turnover
- * pressure); the neutral adapter used by Classic remains byte-identical to
- * the M2.2 fixed-five path.
+ * Season Run single-game controller (spec/2.0/04, season-game-v3, M2.4).
+ * v3 adds the stamina/chemistry effects seam on the player input (the
+ * optional per-player `stamina` profile; absence means the zero profile,
+ * so neutral adapters used by Classic stay byte-identical to the M2.3
+ * path). v2 applied the versioned home-court profile through named
+ * mechanisms only; the neutral adapter remains byte-identical to the M2.2
+ * fixed-five path.
  */
-export const SEASON_GAME_VERSION = 'season-game-v2';
+export const SEASON_GAME_VERSION = 'season-game-v3';
 
 /**
  * Frozen Season game calibration cohort and envelopes
- * (season-game-targets-v2, M2.3): recalibrated with the home-court profile
- * applied; seeds 0-1023 calibration with 1024-1279 held out, preset-minute
- * ordering gates, and 95% held-out envelope coverage.
+ * (season-game-targets-v3, M2.4): recalibrated with the stamina/chemistry
+ * effects seam available; seeds 0-1023 calibration with 1024-1279 held out,
+ * preset-minute ordering gates, and 95% held-out envelope coverage.
  */
-export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v2';
+export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v3';
 
 /** Frozen calibration cohort targets for AI roster strength and coverage. */
 export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v1';
 
 /**
- * M2.3 pure block simulation pipeline (spec/2.0/02 ten-game blocks,
- * season-block-v1): validate cursor and locked rotations, expand the 300
- * drafted versions, simulate in stable game-id order, convert to compact
- * summaries, fold standings and aggregates, audit, build the recap, and
- * produce one candidate checkpoint.
+ * M2.4 pure block simulation pipeline (spec/2.0/02 ten-game blocks,
+ * season-block-v2): validate cursor and locked rotations, expand the 300
+ * drafted versions, carry the effects state (load + pair chemistry) across
+ * the block, simulate in stable game-id order, convert to compact summaries
+ * with effects rollups, fold standings and aggregates, audit, build the
+ * recap with block-level effects evidence, and produce one candidate
+ * checkpoint.
  */
-export const SEASON_BLOCK_VERSION = 'season-block-v1';
+export const SEASON_BLOCK_VERSION = 'season-block-v2';
 
-/** Compact completed-game summary conversion (season-game-summary-v1). */
-export const SEASON_GAME_SUMMARY_VERSION = 'season-game-summary-v1';
+/** Compact completed-game summary conversion (season-game-summary-v2). */
+export const SEASON_GAME_SUMMARY_VERSION = 'season-game-summary-v2';
 
 /** Team/player aggregate folding and leaders (season-aggregates-v1). */
 export const SEASON_AGGREGATES_VERSION = 'season-aggregates-v1';
 
-/** Block recap construction from saved game and aggregate facts. */
-export const SEASON_RECAP_VERSION = 'season-recap-v1';
+/** Block recap construction from saved game, aggregate, and effects facts. */
+export const SEASON_RECAP_VERSION = 'season-recap-v2';
 
 /** League leaders derivation, eligibility, and tie-breaking. */
 export const SEASON_LEADERS_VERSION = 'season-leaders-v1';
@@ -166,12 +174,45 @@ export const SEASON_LEADERS_VERSION = 'season-leaders-v1';
 export const SEASON_HOME_COURT_VERSION = 'season-home-court-v1';
 
 /**
- * Canonical candidate-checkpoint contract and digest (season-checkpoint-v1).
- * The digest is a pure function of the checkpoint's recorded facts, so
- * uninterrupted, cancelled/retried, terminated/reloaded, single-worker, and
- * CLI executions must agree byte-for-byte.
+ * Canonical candidate-checkpoint contract and digest (season-checkpoint-v2).
+ * v2 adds the effects state (player load + pair chemistry) to the candidate
+ * checkpoint and freezes the stamina, chemistry, and effect-targets material
+ * versions. The digest is a pure function of the checkpoint's recorded
+ * facts, so uninterrupted, cancelled/retried, terminated/reloaded,
+ * single-worker, and CLI executions must agree byte-for-byte.
  */
-export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v1';
+export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v2';
+
+/**
+ * M2.4 stamina profile derivation (season-stamina-v1): the historical
+ * minutes-per-game formula that maps a pool player-season's recorded
+ * `stats.minutes` and `stats.gamesPlayed` to the catalog stamina rating and
+ * historical MPG the game controller consumes per player.
+ */
+export const SEASON_STAMINA_VERSION = 'season-stamina-v1';
+
+/**
+ * M2.4 pair chemistry state rules (season-chemistry-v1): 45 canonical
+ * playerVersionId pairs per ten-player roster (1,350 per league) that accrue
+ * shared possessions only through recorded on-court play.
+ */
+export const SEASON_CHEMISTRY_VERSION = 'season-chemistry-v1';
+
+/**
+ * M2.4 frozen effect-size calibration targets (season-effect-targets-v1):
+ * bounds and envelopes for the six named possession mechanisms under
+ * fatigue and chemistry inputs (shooter/handler/defensive-unit fatigue and
+ * turnover-security, assist-conversion, help-defense chemistry).
+ */
+export const SEASON_EFFECT_TARGETS_VERSION = 'season-effect-targets-v1';
+
+/**
+ * Packaged Season Run draft catalog artifact contract
+ * (season-draft-catalog-v2, M2.4): the catalog now carries the build-time
+ * stamina profile on every candidate and records the stamina derivation
+ * version; the draft rules version (`season-draft-v2`) is unchanged.
+ */
+export const SEASON_DRAFT_CATALOG_VERSION = 'season-draft-catalog-v2';
 
 /**
  * Frozen held-out home-win-rate calibration target for the season-home-court

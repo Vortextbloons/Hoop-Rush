@@ -1,0 +1,689 @@
+import { describe, expect, it } from 'vitest';
+import {
+  seasonBlockRecapSchema,
+  seasonCandidateCheckpointSchema,
+  seasonCheckpointVersionsSchema,
+  seasonEffectsRollupSchema,
+  seasonEffectsStateSchema,
+  seasonGameEffectsTransitionSchema,
+  seasonGamePlayerInputSchema,
+  seasonGameSummarySchema,
+  seasonMechanismEvidenceSchema,
+  seasonPairChemistryStateSchema,
+  seasonPlayerLoadStateSchema,
+  seasonRetainedGameDetailSchema,
+  seasonRunSchema,
+  seasonStaminaInputSchema,
+  seasonWorkerStartRequestSchema,
+  SEASON_NEUTRAL_HOME_COURT,
+  type SeasonCandidateCheckpoint,
+  type SeasonEffectsState,
+  type SeasonGameSummary,
+  type SeasonPairChemistryState,
+  type SeasonPlayerLoadState,
+  type SeasonWorkerStartRequest,
+} from './index.ts';
+import {
+  buildRun,
+  buildSchedule,
+  SIMULATION_RATINGS,
+  SIMULATION_TENDENCIES,
+} from './season-schemas-fixtures.ts';
+
+/**
+ * M2.4 stamina and chemistry contract tests: stamina inputs, load states,
+ * canonical pair chemistry, the 300-player / 1,350-pair effects state, per
+ * mechanism-side evidence and rollups, the per-game effects transition, and
+ * the checkpoint / worker / recap / summary seams that carry them.
+ */
+
+function playerId(index: number): string {
+  return `pv-${String(index).padStart(32, '0')}`;
+}
+
+function loadState(index: number): SeasonPlayerLoadState {
+  return {
+    playerVersionId: playerId(index),
+    fatigueBasisPoints: 0,
+    recentLoadBasisPoints: 0,
+    lastCompletedRound: 0,
+  };
+}
+
+/** Valid effects state: 300 player loads, 45 canonical pairs per 10-roster. */
+function buildEffectsState(): SeasonEffectsState {
+  const playerStates = Array.from({ length: 300 }, (_, index) => loadState(index));
+  const pairStates: SeasonPairChemistryState[] = [];
+  for (let roster = 0; roster < 30; roster += 1) {
+    for (let a = 0; a < 10; a += 1) {
+      for (let b = a + 1; b < 10; b += 1) {
+        pairStates.push({
+          a: playerId(roster * 10 + a),
+          b: playerId(roster * 10 + b),
+          sharedPossessions: 0,
+        });
+      }
+    }
+  }
+  return { schemaVersion: 1, playerStates, pairStates };
+}
+
+const MECHANISM_EVIDENCE = {
+  mechanism: 'shooter-fatigue' as const,
+  side: 'home' as const,
+  opportunities: 480,
+  inputTotals: { shooter: 2_400_000, handler: 0, defenseMean: 0, unitChemistry: 0 },
+  deltaTotals: -124_000,
+  deltaMin: -900,
+  deltaMax: 0,
+};
+
+function roundTrip<T>(schema: { parse: (input: unknown) => T }, value: unknown): T {
+  return schema.parse(JSON.parse(JSON.stringify(value)));
+}
+
+function buildSummary(): SeasonGameSummary {
+  const zeroLine = (playerVersionId: string) => ({
+    playerVersionId,
+    seconds: 0,
+    points: 0,
+    fieldGoalsMade: 0,
+    fieldGoalsAttempted: 0,
+    threePointersMade: 0,
+    threePointersAttempted: 0,
+    freeThrowsMade: 0,
+    freeThrowsAttempted: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0,
+  });
+  const zeroBox = (franchiseId: string) => ({
+    franchiseId,
+    points: 0,
+    fieldGoalsMade: 0,
+    fieldGoalsAttempted: 0,
+    threePointersMade: 0,
+    threePointersAttempted: 0,
+    freeThrowsMade: 0,
+    freeThrowsAttempted: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0,
+    possessions: 0,
+  });
+  return {
+    schemaVersion: 1,
+    summaryVersion: 'season-game-summary-v2',
+    gameId: 's000001',
+    round: 1,
+    homeFranchiseId: 'lakers',
+    awayFranchiseId: 'celtics',
+    status: 'final' as const,
+    overtimePeriods: 0,
+    homeScore: 0,
+    awayScore: 0,
+    forfeitLoserFranchiseId: null,
+    homeBox: zeroBox('lakers'),
+    awayBox: zeroBox('celtics'),
+    homePlayers: Array.from({ length: 10 }, (_, index) => zeroLine(playerId(index))),
+    awayPlayers: Array.from({ length: 10 }, (_, index) => zeroLine(playerId(10 + index))),
+  };
+}
+
+function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint {
+  const run = buildRun();
+  return {
+    schemaVersion: 1,
+    checkpointVersion: 'season-checkpoint-v2',
+    runId: run.runId,
+    rootSeed: run.rootSeed,
+    versions: {
+      blockVersion: 'season-block-v2',
+      summaryVersion: 'season-game-summary-v2',
+      aggregatesVersion: 'season-aggregates-v1',
+      recapVersion: 'season-recap-v2',
+      leadersVersion: 'season-leaders-v1',
+      homeCourtVersion: 'season-home-court-v1',
+      gameVersion: 'season-game-v3',
+      gameTargetsVersion: 'season-game-targets-v3',
+      seedDerivationVersion: 'season-seeds-v1',
+      staminaVersion: 'season-stamina-v1',
+      chemistryVersion: 'season-chemistry-v1',
+      effectsTargetsVersion: 'season-effect-targets-v1',
+    },
+    blockIndex: 0,
+    completedRounds: 0,
+    revision: 0,
+    rotationDigest: '0'.repeat(32),
+    standings: run.standings,
+    teamAggregates: run.league.teams.map((team) => ({
+      franchiseId: team.franchiseId,
+      gamesPlayed: 0,
+      wins: 0,
+      losses: 0,
+      points: 0,
+      fieldGoalsMade: 0,
+      fieldGoalsAttempted: 0,
+      threePointersMade: 0,
+      threePointersAttempted: 0,
+      freeThrowsMade: 0,
+      freeThrowsAttempted: 0,
+      offensiveRebounds: 0,
+      defensiveRebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+      possessions: 0,
+    })),
+    playerAggregates: run.ownership.map((ownership) => ({
+      playerVersionId: ownership.playerVersionId,
+      franchiseId: ownership.ownerFranchiseId,
+      gamesPlayed: 0,
+      seconds: 0,
+      points: 0,
+      fieldGoalsMade: 0,
+      fieldGoalsAttempted: 0,
+      threePointersMade: 0,
+      threePointersAttempted: 0,
+      freeThrowsMade: 0,
+      freeThrowsAttempted: 0,
+      offensiveRebounds: 0,
+      defensiveRebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+    })),
+    gameSummaries: [buildSummary()],
+    retainedDetails: [],
+    recap: {
+      schemaVersion: 1,
+      recapVersion: 'season-recap-v2',
+      runId: run.runId,
+      blockIndex: 0,
+      completedRounds: 0,
+      humanRecord: null,
+      standingsMovement: [],
+      notablePerformances: [],
+      streaks: [],
+      versionSpotlights: [],
+      upcomingHumanGames: [],
+    },
+    effects,
+    digest: '0'.repeat(32),
+  };
+}
+
+function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWorkerStartRequest {
+  const run = buildRun();
+  return {
+    schemaVersion: 3,
+    type: 'season-block-start',
+    requestId: 'req-1',
+    runId: run.runId,
+    rootSeed: run.rootSeed,
+    blockIndex: 0,
+    expectedRevision: 0,
+    rotationDigest: '0'.repeat(32),
+    commandId: 'cmd-1',
+    run,
+    schedule: buildSchedule(),
+    homeCourt: SEASON_NEUTRAL_HOME_COURT,
+    humanFranchiseId: null,
+    catalogUrl: 'https://example.test/season/draft-catalog.json',
+    catalogHash: '0'.repeat(64),
+    profileUrl: 'https://example.test/season/era-sim.json',
+    profileHash: '0'.repeat(64),
+    priorSummaries: [],
+    priorEffects,
+  };
+}
+
+describe('season stamina input schema (M2.4)', () => {
+  const stamina = {
+    schemaVersion: 1,
+    playerVersionId: playerId(0),
+    rating: 78,
+    historicalMpg: 26.4,
+    derivationVersion: 'season-stamina-v1',
+  };
+
+  it('round-trips a valid profile', () => {
+    const parsed = roundTrip(seasonStaminaInputSchema, stamina);
+    expect(parsed.rating).toBe(78);
+    expect(parsed.derivationVersion).toBe('season-stamina-v1');
+  });
+
+  it('rejects out-of-range ratings, mpg, and derivation versions', () => {
+    expect(() => seasonStaminaInputSchema.parse({ ...stamina, rating: 44 })).toThrow();
+    expect(() => seasonStaminaInputSchema.parse({ ...stamina, rating: 96 })).toThrow();
+    expect(() => seasonStaminaInputSchema.parse({ ...stamina, historicalMpg: 60.1 })).toThrow();
+    expect(() => seasonStaminaInputSchema.parse({ ...stamina, historicalMpg: -0.1 })).toThrow();
+    expect(() =>
+      seasonStaminaInputSchema.parse({ ...stamina, derivationVersion: 'season-stamina-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonStaminaInputSchema.parse({ ...stamina, playerVersionId: 'not-an-id' }),
+    ).toThrow();
+  });
+});
+
+describe('season player load state schema (M2.4)', () => {
+  it('round-trips a valid load state', () => {
+    const state = roundTrip(seasonPlayerLoadStateSchema, {
+      playerVersionId: playerId(1),
+      fatigueBasisPoints: 3200,
+      recentLoadBasisPoints: 250,
+      lastCompletedRound: 41,
+    });
+    expect(state.fatigueBasisPoints).toBe(3200);
+  });
+
+  it('rejects out-of-range basis points and rounds', () => {
+    const base = { playerVersionId: playerId(1), lastCompletedRound: 0 };
+    expect(() =>
+      seasonPlayerLoadStateSchema.parse({ ...base, fatigueBasisPoints: 10001 }),
+    ).toThrow();
+    expect(() =>
+      seasonPlayerLoadStateSchema.parse({ ...base, recentLoadBasisPoints: -1 }),
+    ).toThrow();
+    expect(() =>
+      seasonPlayerLoadStateSchema.parse({ ...base, fatigueBasisPoints: 0, lastCompletedRound: 83 }),
+    ).toThrow();
+  });
+});
+
+describe('season pair chemistry state schema (M2.4)', () => {
+  it('accepts canonical pairs only', () => {
+    const canonical = { a: playerId(1), b: playerId(2), sharedPossessions: 150 };
+    expect(roundTrip(seasonPairChemistryStateSchema, canonical).sharedPossessions).toBe(150);
+    expect(() =>
+      seasonPairChemistryStateSchema.parse({ ...canonical, a: playerId(2), b: playerId(1) }),
+    ).toThrow();
+    expect(() =>
+      seasonPairChemistryStateSchema.parse({ ...canonical, a: playerId(1), b: playerId(1) }),
+    ).toThrow();
+    expect(() =>
+      seasonPairChemistryStateSchema.parse({ ...canonical, sharedPossessions: -1 }),
+    ).toThrow();
+    expect(() =>
+      seasonPairChemistryStateSchema.parse({ ...canonical, sharedPossessions: 10_000_001 }),
+    ).toThrow();
+  });
+});
+
+describe('season effects state schema (M2.4)', () => {
+  it('round-trips the full 300/1350 state', () => {
+    const state = roundTrip(seasonEffectsStateSchema, buildEffectsState());
+    expect(state.playerStates).toHaveLength(300);
+    expect(state.pairStates).toHaveLength(1350);
+    expect(state.schemaVersion).toBe(1);
+  });
+
+  it('rejects wrong player and pair counts', () => {
+    const state = buildEffectsState();
+    expect(() =>
+      seasonEffectsStateSchema.parse({
+        ...state,
+        playerStates: state.playerStates.slice(0, 299),
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonEffectsStateSchema.parse({
+        ...state,
+        pairStates: state.pairStates.slice(0, 1349),
+      }),
+    ).toThrow();
+  });
+
+  it('rejects duplicate player ids, duplicate pairs, and unknown pair members', () => {
+    const state = buildEffectsState();
+    expect(() =>
+      seasonEffectsStateSchema.parse({
+        ...state,
+        playerStates: [...state.playerStates, state.playerStates[0]],
+      }),
+    ).toThrow();
+    const pairStates = [...state.pairStates, { ...state.pairStates[0] }];
+    expect(() => seasonEffectsStateSchema.parse({ ...state, pairStates })).toThrow();
+    const rogue = {
+      ...state.pairStates[0],
+      b: playerId(299),
+      sharedPossessions: 0,
+    };
+    expect(() =>
+      seasonEffectsStateSchema.parse({ ...state, pairStates: [...state.pairStates, rogue] }),
+    ).toThrow();
+  });
+});
+
+describe('season mechanism evidence schema (M2.4)', () => {
+  it('round-trips valid evidence including negative deltas', () => {
+    const parsed = roundTrip(seasonMechanismEvidenceSchema, MECHANISM_EVIDENCE);
+    expect(parsed.deltaTotals).toBe(-124_000);
+    expect(parsed.inputTotals.shooter).toBe(2_400_000);
+  });
+
+  it('rejects unknown mechanisms, sides, and out-of-range accumulators', () => {
+    expect(() =>
+      seasonMechanismEvidenceSchema.parse({ ...MECHANISM_EVIDENCE, mechanism: 'clutch-bonus' }),
+    ).toThrow();
+    expect(() =>
+      seasonMechanismEvidenceSchema.parse({ ...MECHANISM_EVIDENCE, side: 'both' }),
+    ).toThrow();
+    expect(() =>
+      seasonMechanismEvidenceSchema.parse({ ...MECHANISM_EVIDENCE, opportunities: 1_000_001 }),
+    ).toThrow();
+    const noInputTotal = { ...MECHANISM_EVIDENCE, inputTotals: { shooter: 1 } };
+    expect(() => seasonMechanismEvidenceSchema.parse(noInputTotal)).toThrow();
+    expect(() =>
+      seasonMechanismEvidenceSchema.parse({ ...MECHANISM_EVIDENCE, deltaMin: -1_000_001 }),
+    ).toThrow();
+    expect(() =>
+      seasonMechanismEvidenceSchema.parse({ ...MECHANISM_EVIDENCE, deltaMax: 1_000_001 }),
+    ).toThrow();
+  });
+});
+
+describe('season game effects transition schema (M2.4)', () => {
+  function buildTransition() {
+    const state = buildEffectsState();
+    return {
+      schemaVersion: 1,
+      pregamePlayerStates: state.playerStates,
+      postgamePlayerStates: state.playerStates,
+      pairIncrements: [],
+      evidence: [MECHANISM_EVIDENCE],
+    };
+  }
+
+  it('round-trips a valid transition', () => {
+    const transition = roundTrip(seasonGameEffectsTransitionSchema, buildTransition());
+    expect(transition.pregamePlayerStates).toHaveLength(300);
+    expect(transition.evidence).toHaveLength(1);
+  });
+
+  it('rejects non-300 load arrays and oversized increments/evidence', () => {
+    const transition = buildTransition();
+    expect(() =>
+      seasonGameEffectsTransitionSchema.parse({
+        ...transition,
+        pregamePlayerStates: transition.pregamePlayerStates.slice(0, 299),
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonGameEffectsTransitionSchema.parse({
+        ...transition,
+        postgamePlayerStates: transition.postgamePlayerStates.slice(0, 299),
+      }),
+    ).toThrow();
+    const increments = Array.from({ length: 1351 }, (_, i) => ({
+      a: playerId(i),
+      b: playerId(i + 1000),
+      sharedPossessions: 1,
+    }));
+    expect(() =>
+      seasonGameEffectsTransitionSchema.parse({ ...transition, pairIncrements: increments }),
+    ).toThrow();
+    const evidence = Array.from({ length: 13 }, () => MECHANISM_EVIDENCE);
+    expect(() => seasonGameEffectsTransitionSchema.parse({ ...transition, evidence })).toThrow();
+  });
+});
+
+describe('season effects rollup schema (M2.4)', () => {
+  it('round-trips a compact rollup and rejects oversized opportunities', () => {
+    const rollup = {
+      mechanism: 'assist-conversion' as const,
+      side: 'away' as const,
+      opportunities: 240,
+      deltaTotal: 12_500,
+    };
+    expect(roundTrip(seasonEffectsRollupSchema, rollup).deltaTotal).toBe(12_500);
+    expect(() =>
+      seasonEffectsRollupSchema.parse({ ...rollup, opportunities: 1_000_001 }),
+    ).toThrow();
+  });
+});
+
+describe('season game summary effects rollup (M2.4)', () => {
+  it('parses summaries with and without the optional rollup', () => {
+    const summary = buildSummary();
+    expect(() => seasonGameSummarySchema.parse(summary)).not.toThrow();
+    expect(() => seasonGameSummarySchema.parse({ ...summary, effectsRollup: [] })).not.toThrow();
+    const withRollup = seasonGameSummarySchema.parse({
+      ...summary,
+      effectsRollup: [
+        {
+          mechanism: 'shooter-fatigue',
+          side: 'home',
+          opportunities: 100,
+          deltaTotal: -5000,
+        },
+      ],
+    });
+    expect(withRollup.effectsRollup).toHaveLength(1);
+    expect(() =>
+      seasonGameSummarySchema.parse({
+        ...summary,
+        effectsRollup: Array.from({ length: 13 }, () => ({
+          mechanism: 'shooter-fatigue' as const,
+          side: 'home' as const,
+          opportunities: 1,
+          deltaTotal: 0,
+        })),
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season retained game detail mechanism evidence (M2.4)', () => {
+  it('parses retained detail with and without the optional evidence', () => {
+    const detail = {
+      schemaVersion: 1,
+      runId: 'fixture-run-1',
+      gameId: 's000001',
+      round: 1,
+      homeFranchiseId: 'lakers',
+      awayFranchiseId: 'celtics',
+      result: {
+        schemaVersion: 1,
+        outcome: 'no-legal-five-both' as const,
+        seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+        gameNumber: 1,
+        dataVersion: 'm10-ratings-v3.5',
+        engineVersion: 'season-game-v3',
+        profileVersion: 'era-sim-v1',
+      },
+    };
+    expect(() => seasonRetainedGameDetailSchema.parse(detail)).not.toThrow();
+    const withEvidence = seasonRetainedGameDetailSchema.parse({
+      ...detail,
+      mechanismEvidence: [MECHANISM_EVIDENCE],
+    });
+    expect(withEvidence.mechanismEvidence).toHaveLength(1);
+    expect(() =>
+      seasonRetainedGameDetailSchema.parse({
+        ...detail,
+        mechanismEvidence: Array.from({ length: 13 }, () => MECHANISM_EVIDENCE),
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season checkpoint effects (M2.4)', () => {
+  it('round-trips a candidate checkpoint with its effects state', () => {
+    const checkpoint = roundTrip(
+      seasonCandidateCheckpointSchema,
+      buildCheckpoint(buildEffectsState()),
+    );
+    expect(checkpoint.effects.playerStates).toHaveLength(300);
+    expect(checkpoint.effects.pairStates).toHaveLength(1350);
+  });
+
+  it('rejects a checkpoint without effects', () => {
+    const checkpoint = buildCheckpoint(buildEffectsState());
+    expect(() =>
+      seasonCandidateCheckpointSchema.parse({ ...checkpoint, effects: undefined }),
+    ).toThrow();
+  });
+
+  it('freezes the three M2.4 material versions in the checkpoint versions', () => {
+    const checkpoint = buildCheckpoint(buildEffectsState());
+    expect(roundTrip(seasonCheckpointVersionsSchema, checkpoint.versions).staminaVersion).toBe(
+      'season-stamina-v1',
+    );
+    expect(() =>
+      seasonCheckpointVersionsSchema.parse({
+        ...checkpoint.versions,
+        chemistryVersion: 'season-chemistry-v2',
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonCheckpointVersionsSchema.parse({
+        ...checkpoint.versions,
+        effectsTargetsVersion: 'season-effect-targets-v9',
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season worker start request priorEffects (M2.4)', () => {
+  it('accepts null and omitted priorEffects for block 0', () => {
+    expect(() => seasonWorkerStartRequestSchema.parse(buildWorkerRequest(null))).not.toThrow();
+    expect(() =>
+      seasonWorkerStartRequestSchema.parse({
+        ...buildWorkerRequest(null),
+        priorEffects: undefined,
+      }),
+    ).not.toThrow();
+  });
+
+  it('round-trips a carried effects state and rejects corrupt ones', () => {
+    const withState = roundTrip(
+      seasonWorkerStartRequestSchema,
+      buildWorkerRequest(buildEffectsState()),
+    );
+    expect(withState.priorEffects?.pairStates).toHaveLength(1350);
+    const corrupt = { ...buildEffectsState(), schemaVersion: 2 };
+    expect(() =>
+      seasonWorkerStartRequestSchema.parse(buildWorkerRequest(corrupt as never)),
+    ).toThrow();
+  });
+});
+
+describe('season block recap effects evidence (M2.4)', () => {
+  it('parses recaps with and without the optional evidence', () => {
+    const run = buildRun();
+    const recap = {
+      schemaVersion: 1,
+      recapVersion: 'season-recap-v2',
+      runId: run.runId,
+      blockIndex: 0,
+      completedRounds: 0,
+      humanRecord: null,
+      standingsMovement: [],
+      notablePerformances: [],
+      streaks: [],
+      versionSpotlights: [],
+      upcomingHumanGames: [],
+    };
+    expect(() => seasonBlockRecapSchema.parse(recap)).not.toThrow();
+    const withEvidence = seasonBlockRecapSchema.parse({
+      ...recap,
+      effectsEvidence: [
+        {
+          mechanism: 'defensive-unit-fatigue',
+          side: 'home',
+          blockOpportunities: 900,
+          blockDeltaTotal: -40_000,
+        },
+      ],
+    });
+    expect(withEvidence.effectsEvidence).toHaveLength(1);
+    expect(() =>
+      seasonBlockRecapSchema.parse({
+        ...recap,
+        effectsEvidence: Array.from({ length: 13 }, () => ({
+          mechanism: 'help-defense' as const,
+          side: 'home' as const,
+          blockOpportunities: 1,
+          blockDeltaTotal: 0,
+        })),
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season game player input stamina (M2.4)', () => {
+  function buildPlayerInput() {
+    return {
+      playerVersionId: playerId(0),
+      playerId: 'p-1',
+      displayName: 'Test Player',
+      positions: ['PG', 'SG'],
+      heightInches: 79,
+      weightLbs: 215,
+      ratings: SIMULATION_RATINGS,
+      tendencies: SIMULATION_TENDENCIES,
+    };
+  }
+
+  it('parses without stamina (zero profile) and with a full profile', () => {
+    expect(() => seasonGamePlayerInputSchema.parse(buildPlayerInput())).not.toThrow();
+    const withStamina = seasonGamePlayerInputSchema.parse({
+      ...buildPlayerInput(),
+      stamina: {
+        schemaVersion: 1,
+        playerVersionId: playerId(0),
+        rating: 78,
+        historicalMpg: 26.4,
+        derivationVersion: 'season-stamina-v1',
+      },
+    });
+    expect(withStamina.stamina?.rating).toBe(78);
+  });
+
+  it('rejects a corrupt stamina profile', () => {
+    expect(() =>
+      seasonGamePlayerInputSchema.parse({
+        ...buildPlayerInput(),
+        stamina: { schemaVersion: 1, rating: 78, historicalMpg: 26.4 },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season run schema version 5 (M2.4)', () => {
+  it('rejects schema 4 snapshots', () => {
+    const run = buildRun();
+    expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 4 })).toThrow();
+  });
+
+  it('freezes the three M2.4 material versions on the run', () => {
+    const run = buildRun();
+    expect(run.versions.staminaVersion).toBe('season-stamina-v1');
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, chemistryVersion: 'season-chemistry-v9' },
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, effectsTargetsVersion: 'season-effect-targets-v9' },
+      }),
+    ).toThrow();
+  });
+});

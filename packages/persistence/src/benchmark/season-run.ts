@@ -1,5 +1,6 @@
 import {
   type SeasonBlockRecap,
+  type SeasonEffectsState,
   type SeasonGameSummary,
   type SeasonLeague,
   type SeasonPlayerAggregate,
@@ -16,6 +17,7 @@ import { seasonRunEngineSeam } from '../season/engine-seam.ts';
 import { HoopRushDatabase } from '../repositories/dexie.ts';
 import { DexieSeasonRunRepository } from '../repositories/season-run-dexie.ts';
 import {
+  buildFixtureEffectsState,
   buildFixtureFullSeasonSummaries,
   buildFixtureRecap,
   buildFixtureRetainedDetail,
@@ -28,20 +30,22 @@ import {
 
 /**
  * Storage and timing benchmark for the Season Run persistence layer
- * (spec/2.0/10 M2.3, spec/2.0/12 performance framework). Builds a synthetic
- * full-season dataset — 1,230 compact summaries, 82 retained details, nine
- * accepted blocks — commits it through `commitSeasonBlock` (one transaction
+ * (spec/2.0/10 M2.3, spec/2.0/12 performance framework, M2.4). Builds a
+ * synthetic full-season dataset — 1,230 compact summaries, 82 retained
+ * details, nine accepted blocks, and a monotonically increasing M2.4 effects
+ * state per block — commits it through `commitSeasonBlock` (one transaction
  * per block), reloads it through the validated snapshot path, and reports
  * p95 commit and reload times plus the serialized byte size of every stored
- * row. The engine math is provided through the `SeasonRunEngineSeam`, so the
- * harness measures the repository mechanics with the pure helpers behind it;
- * tests and CI run the stub seam, and the `season benchmark persistence` CLI
- * command runs the production engine seam.
+ * row (effects state included). The engine math is provided through the
+ * `SeasonRunEngineSeam`, so the harness measures the repository mechanics
+ * with the pure helpers behind it; tests and CI run the stub seam, and the
+ * `season benchmark persistence` CLI command runs the production engine
+ * seam.
  *
  * Frozen budgets (documented; asserted in the cheap test suite):
  * - commit p95 <= 300 ms per block transaction
  * - reload p95 <= 1,000 ms per full validated load
- * - active-run storage <= 25 MB (serialized rows)
+ * - active-run storage <= 25 MB (serialized rows, effects state included)
  */
 export const SEASON_RUN_BUDGET_COMMIT_P95_MS = 300;
 export const SEASON_RUN_BUDGET_RELOAD_P95_MS = 1000;
@@ -100,6 +104,8 @@ interface BlockDataset {
   teamAggregates: SeasonTeamAggregate[];
   playerAggregates: SeasonPlayerAggregate[];
   recap: SeasonBlockRecap;
+  /** M2.4 authoritative effects state at this boundary. */
+  effects: SeasonEffectsState;
   rotationDigest: string;
   checkpointDigest: string;
   /** The 30 rotations locked by this block commit. */
@@ -202,6 +208,15 @@ export function buildFullSeasonDataset(input: {
     standings = seam.reduceSeasonStandings(league, playedGames);
     teamAggregates = seam.foldSeasonTeamAggregates(league, cumulativeSummaries);
     playerAggregates = seam.foldSeasonPlayerAggregates(rosters, cumulativeSummaries);
+    // M2.4 effects state: monotonically increasing fatigue and shared
+    // possessions per block (bounded well inside the schema ranges) so the
+    // storage measurement reflects the full effects payload.
+    const effects = buildFixtureEffectsState(rosters, {
+      fatigueBasisPoints: 500 + blockIndex * 1000,
+      recentLoadBasisPoints: 400 + blockIndex * 900,
+      lastCompletedRound: completedRounds,
+      sharedPossessions: 3000 + blockIndex * 7000,
+    });
     blocks.push({
       blockIndex,
       completedRounds,
@@ -213,6 +228,7 @@ export function buildFullSeasonDataset(input: {
       teamAggregates,
       playerAggregates,
       recap: buildFixtureRecap({ runId, blockIndex, completedRounds }),
+      effects,
       rotationDigest: seam.seasonRotationSetDigest(run.rotations),
       checkpointDigest: digestOf(seed, blockIndex),
       rotations: run.rotations,
@@ -292,6 +308,7 @@ export async function benchmarkSeasonRunPersistence(
         summaries: block.summaries,
         retainedDetails: block.retainedDetails,
         recap: block.recap,
+        effects: block.effects,
         rotations: block.rotations,
       });
       commitTimes.push(performance.now() - started);

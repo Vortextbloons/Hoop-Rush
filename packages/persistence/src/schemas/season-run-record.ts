@@ -4,6 +4,7 @@ import {
   seasonActiveRunIndexSchema,
   seasonBlockRecapSchema,
   seasonCheckpointDigestSchema,
+  seasonEffectsStateSchema,
   seasonGameSummarySchema,
   seasonPlayerAggregateSchema,
   seasonRetainedGameDetailSchema,
@@ -17,10 +18,22 @@ import {
 
 /**
  * Stored-record schemas for the active Season Run (spec/2.0/07 persistence,
- * spec/2.0/10 M2.3). One active run coexists with the Challenge and Classic
- * stores, isolated in the dedicated v6 tables. Every read and write validates
- * through these schemas at the storage boundary, so corrupt rows surface
- * instead of entering app state.
+ * spec/2.0/10 M2.3, M2.4). One active run coexists with the Challenge and
+ * Classic stores, isolated in the dedicated v6 tables. Every read and write
+ * validates through these schemas at the storage boundary, so corrupt rows
+ * surface instead of entering app state.
+ *
+ * ## Stored save schema versions
+ *
+ * - v2 (M2.4): the current family. The checkpoint delta carries the
+ *   authoritative M2.4 effects state (`effects`: player load + pair
+ *   chemistry), committed atomically with the block checkpoint.
+ * - v1 (M2.3): the legacy family for schema-4 runs. v1 rows are NOT
+ *   migrated: they are read leniently here (only the identity facts the
+ *   typed incompatibility detection needs), preserved byte-for-byte in
+ *   IndexedDB, and removed only through the repository's
+ *   `clearSeasonRun(runId)` after explicit user confirmation on the discard
+ *   screen.
  *
  * ## Why the checkpoint does not persist the 1,230 scheduled game records
  *
@@ -35,25 +48,30 @@ import {
  * holds without duplicating 1,230 identity rows on every checkpoint write.
  * The stored row therefore keeps the entire frozen snapshot except `games`,
  * plus the authoritative current-boundary facts: standings, team/player
- * aggregates, recap, and the cursor facts (completedRounds, revision,
- * lastCommandId, lastRotationDigest, lastCheckpointDigest).
+ * aggregates, recap, the M2.4 effects state, and the cursor facts
+ * (completedRounds, revision, lastCommandId, lastRotationDigest,
+ * lastCheckpointDigest).
  *
- * ## Why row-level standings/aggregates/recap exist next to `run`
+ * ## Why row-level standings/aggregates/recap/effects exist next to `run`
  *
  * `run` is the promotion-time snapshot: its `standings`/`cursor` are the
  * initial (all-zero) values. The row-level `standings`, `teamAggregates`,
- * `playerAggregates`, `recap`, and cursor facts are the block commit's NEW
- * cumulative state and are authoritative on reload; the reassembled snapshot
- * overrides `run.standings` and `run.cursor` with them.
+ * `playerAggregates`, `recap`, `effects`, and cursor facts are the block
+ * commit's NEW cumulative state and are authoritative on reload; the
+ * reassembled snapshot overrides `run.standings` and `run.cursor` with them.
  */
 
 /** Single active Season Run slot; at most one row may exist. */
 export const SEASON_RUN_RECORD_ID = 'season-run';
 
-/** Stored checkpoint row: frozen snapshot minus scheduled game records. */
-export const storedSeasonRunRecordSchema = z.object({
+/**
+ * Shared fields of the current stored checkpoint row: frozen snapshot minus
+ * the scheduled game records plus the authoritative current-boundary facts.
+ * `saveSchemaVersion` and the M2.4 `effects` state are added by the v2
+ * variant; the v1 legacy variant reads only identity facts.
+ */
+const seasonRunRecordFieldsSchema = z.object({
   recordId: z.literal(SEASON_RUN_RECORD_ID),
-  saveSchemaVersion: z.literal(1),
   /** Promotion-time snapshot; the 1,230 scheduled game records are omitted. */
   run: seasonRunSchema.omit({ games: true }),
   /** Rounds completed at the last accepted boundary. */
@@ -77,6 +95,50 @@ export const storedSeasonRunRecordSchema = z.object({
   /** Written by the adapter, never by domain logic. */
   updatedAtIso: z.iso.datetime().optional(),
 });
+
+/**
+ * Legacy v1 stored row (M2.3, schema-4 runs). Read leniently and minimally:
+ * the full snapshot portion is NOT validated because the live
+ * `seasonRunSchema` freezes schema 5 and would reject a stored schema-4
+ * snapshot. These rows are never loaded into app state — they are detected
+ * through the typed `SeasonRunIncompatibleError` / `loadActiveRunIncompatible`
+ * path and removed only by explicit `clearSeasonRun(runId)` after user
+ * confirmation — so only the identity facts that detection and clearing need
+ * are read. Extra fields (standings, aggregates, recap, ...) are left
+ * untouched byte-for-byte in IndexedDB.
+ */
+export const storedSeasonRunRecordV1Schema = z.object({
+  recordId: z.literal(SEASON_RUN_RECORD_ID),
+  saveSchemaVersion: z.literal(1),
+  run: z.object({
+    runId: z.string().min(1).max(64),
+    schemaVersion: z.number().int(),
+    versions: z.object({
+      runSchemaVersion: z.number().int(),
+    }),
+  }),
+});
+export type StoredSeasonRunRecordV1 = z.infer<typeof storedSeasonRunRecordV1Schema>;
+
+/** Current v2 stored checkpoint row (M2.4): adds the effects state. */
+const storedSeasonRunRecordV2Schema = seasonRunRecordFieldsSchema.extend({
+  saveSchemaVersion: z.literal(2),
+  /**
+   * Authoritative M2.4 effects state at the last accepted boundary: 300
+   * player load states and 1,350 canonical pair chemistry states.
+   */
+  effects: seasonEffectsStateSchema,
+});
+export type StoredSeasonRunRecordV2 = z.infer<typeof storedSeasonRunRecordV2Schema>;
+
+/**
+ * Stored Season Run checkpoint record: current v2 or legacy v1 (typed
+ * incompatibility detection and explicit discard only).
+ */
+export const storedSeasonRunRecordSchema = z.discriminatedUnion('saveSchemaVersion', [
+  storedSeasonRunRecordV2Schema,
+  storedSeasonRunRecordV1Schema,
+]);
 export type StoredSeasonRunRecord = z.infer<typeof storedSeasonRunRecordSchema>;
 
 /**
@@ -111,11 +173,11 @@ export type SeasonRunCursor = z.infer<typeof seasonRunCursorSchema>;
  * Narrow write schema for the checkpoint fields a block commit changes. The
  * `run` snapshot portion is promotion-immutable and was fully validated when
  * it was written; the commit validates exactly the fields it writes (cursor
- * facts, standings, aggregates, recap), so the per-commit cost stays inside
- * the persistence budget without weakening the corrupt-rows-throw guarantee
- * (every load re-validates the complete stored row).
+ * facts, standings, aggregates, recap, effects), so the per-commit cost stays
+ * inside the persistence budget without weakening the corrupt-rows-throw
+ * guarantee (every load re-validates the complete stored row).
  */
-export const seasonRunCheckpointDeltaSchema = storedSeasonRunRecordSchema
+export const seasonRunCheckpointDeltaSchema = seasonRunRecordFieldsSchema
   .pick({
     completedRounds: true,
     revision: true,
@@ -137,6 +199,11 @@ export const seasonRunCheckpointDeltaSchema = storedSeasonRunRecordSchema
     run: z.object({
       rotations: z.array(seasonRotationSchema).length(SEASON_TEAM_COUNT),
     }),
+    /**
+     * Authoritative M2.4 effects state at this boundary (post-block player
+     * load + pair chemistry), committed atomically with the block.
+     */
+    effects: seasonEffectsStateSchema,
   });
 export type SeasonRunCheckpointDelta = z.infer<typeof seasonRunCheckpointDeltaSchema>;
 

@@ -12,8 +12,10 @@ import {
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_CHEMISTRY_VERSION,
   SEASON_DRAFT_LEGACY_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_COUNT,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
@@ -33,6 +35,7 @@ import {
   SEASON_SCHEDULE_FORMULA_VERSION,
   SEASON_SCHEDULE_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
+  SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
   SEASON_TEAM_COUNT,
 } from './season-versions.ts';
@@ -48,15 +51,16 @@ import { seasonRotationSchema } from './season-rotation.ts';
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
  * validated record covers the frozen league, ten-player rosters, ownership,
  * schedule reference, all scheduled game identities, the block cursor,
- * postseason state, and — since schema version 4 (M2.3) — the frozen block,
- * summary, aggregates, recap, leaders, home-court, and checkpoint material
- * versions; schema version 3 (M2.2) added the rotation-planner, Season-game,
- * and Season-game-targets material versions; schema version 2 (M2.1) added
- * the completed draft facts, AI assignments, generated rotations, and the
- * generation audit summary. Completed game facts live in per-block compact
- * summary rows (season-game-summary-v1), not in this snapshot's scheduled
- * `games` array; the engine reconstructs finalized game records from the
- * schedule and summaries on demand.
+ * postseason state, and — since schema version 5 (M2.4) — the stamina,
+ * chemistry, and effect-targets material versions; schema version 4 (M2.3)
+ * added the frozen block, summary, aggregates, recap, leaders, home-court,
+ * and checkpoint material versions; schema version 3 (M2.2) added the
+ * rotation-planner, Season-game, and Season-game-targets material versions;
+ * schema version 2 (M2.1) added the completed draft facts, AI assignments,
+ * generated rotations, and the generation audit summary. Completed game
+ * facts live in per-block compact summary rows (season-game-summary-v2), not
+ * in this snapshot's scheduled `games` array; the engine reconstructs
+ * finalized game records from the schedule and summaries on demand.
  */
 
 export {
@@ -206,6 +210,12 @@ export const seasonRunVersionsSchema = z.object({
   homeCourtVersion: z.literal(SEASON_HOME_COURT_VERSION),
   /** M2.3: canonical checkpoint contract and digest. */
   checkpointVersion: z.literal(SEASON_CHECKPOINT_VERSION),
+  /** M2.4: stamina profile derivation (season-stamina-v1). */
+  staminaVersion: z.literal(SEASON_STAMINA_VERSION),
+  /** M2.4: pair chemistry state rules (season-chemistry-v1). */
+  chemistryVersion: z.literal(SEASON_CHEMISTRY_VERSION),
+  /** M2.4: frozen effect-size calibration targets (season-effect-targets-v1). */
+  effectsTargetsVersion: z.literal(SEASON_EFFECT_TARGETS_VERSION),
 });
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
 
@@ -239,3 +249,27 @@ export const seasonRunSchema = z.object({
   evaluations: z.array(seasonRosterEvaluationSchema).length(SEASON_TEAM_COUNT),
 });
 export type SeasonRun = z.infer<typeof seasonRunSchema>;
+
+/**
+ * The run facts the Season block pipeline reads at a submission boundary
+ * (spec/2.0/07): identity, cursor, league, rosters, locked rotations, and
+ * versions. The worker wire carries only this context; the scheduled `games`
+ * array, `standings`, `draft`, `ownership`, `postseason`, `aiAssignments`,
+ * `evaluations`, and `generationAudit` stay in the persisted snapshot and
+ * never cross the worker boundary. A full `SeasonRun` satisfies this shape.
+ */
+export const seasonBlockRunContextSchema = z.object({
+  schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
+  runId: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
+  rootSeed: seedSchema,
+  versions: seasonRunVersionsSchema,
+  league: seasonLeagueSchema,
+  rosters: z.array(seasonRosterSchema).length(SEASON_TEAM_COUNT),
+  rotations: z.array(seasonRotationSchema).length(SEASON_TEAM_COUNT),
+  cursor: seasonCursorSchema,
+});
+export type SeasonBlockRunContext = z.infer<typeof seasonBlockRunContextSchema>;

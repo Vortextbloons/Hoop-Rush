@@ -1,9 +1,12 @@
-import type {
-  SeasonGameSummary,
-  SeasonLeague,
-  SeasonPlayerAggregate,
-  SeasonRoster,
-  SeasonTeamAggregate,
+import {
+  seasonEffectsStateSchema,
+  type SeasonEffectsState,
+  type SeasonGameSummary,
+  type SeasonLeague,
+  type SeasonPairChemistryState,
+  type SeasonPlayerAggregate,
+  type SeasonRoster,
+  type SeasonTeamAggregate,
 } from '@hoop-rush/data-contracts';
 import {
   foldSeasonPlayerAggregates,
@@ -16,11 +19,12 @@ import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 
 /**
  * Production binding of the `SeasonRunEngineSeam` to the pure engine helpers
- * (spec/2.0/07 persistence, M2.3). This file is the single place that
+ * (spec/2.0/07 persistence, M2.3, M2.4). This file is the single place that
  * imports `@hoop-rush/engine`; the repository, the audit, and the test
  * fixtures depend only on the interface in `engine-seam-types.ts`, so a
  * signature drift in the engine implementation is fixed here and nowhere
- * else.
+ * else. The M2.4 effects helpers are pure TypeScript (canonical pair and
+ * zero-state construction) with no engine dependency.
  *
  * Engine exports used:
  *
@@ -43,6 +47,10 @@ export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   foldSeasonPlayerAggregates: paddedPlayerAggregates,
   reduceSeasonStandings,
   seasonRotationSetDigest,
+  seasonRosterPlayerVersionIds,
+  zeroSeasonEffectsState,
+  seasonPairKey,
+  seasonPairIsCanonical,
 };
 
 const ZERO_TEAM_FIELDS: Omit<
@@ -127,4 +135,54 @@ function paddedPlayerAggregates(
       }),
     )
     .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
+}
+
+/** Sorted unique player-version ids across every roster. */
+function seasonRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[] {
+  return [
+    ...new Set(rosters.flatMap((roster) => roster.players.map((player) => player.playerVersionId))),
+  ].sort();
+}
+
+/** Canonical pair key: 'a\u0000b' with a < b (duplicate-detection convention). */
+function seasonPairKey(a: string, b: string): string {
+  return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
+}
+
+/** Canonical pair ordering: a must be lexicographically smaller than b. */
+function seasonPairIsCanonical(a: string, b: string): boolean {
+  return a < b;
+}
+
+/**
+ * Zero effects state for a league: one fresh load state per rostered version
+ * (zero fatigue, zero recent load, no completed round) and the canonical
+ * 1,350 zero-shared-possession pairs (45 per ten-player roster). Validated
+ * through the stored-effects schema before it can be persisted.
+ */
+function zeroSeasonEffectsState(rosters: readonly SeasonRoster[]): SeasonEffectsState {
+  const playerStates = seasonRosterPlayerVersionIds(rosters).map((playerVersionId) => ({
+    playerVersionId,
+    fatigueBasisPoints: 0,
+    recentLoadBasisPoints: 0,
+    lastCompletedRound: 0,
+  }));
+  const pairStates: SeasonPairChemistryState[] = [];
+  for (const roster of rosters) {
+    const ids = roster.players.map((player) => player.playerVersionId).sort();
+    for (let i = 0; i < ids.length; i += 1) {
+      const a = ids[i];
+      if (a === undefined) continue;
+      for (let j = i + 1; j < ids.length; j += 1) {
+        const b = ids[j];
+        if (b === undefined) continue;
+        pairStates.push({ a, b, sharedPossessions: 0 });
+      }
+    }
+  }
+  return seasonEffectsStateSchema.parse({
+    schemaVersion: 1,
+    playerStates,
+    pairStates,
+  });
 }

@@ -16,7 +16,7 @@ import {
   type RosterDetails,
 } from '@hoop-rush/data-contracts';
 import { resolve } from '$app/paths';
-import { readCachedPool, writeCachedPool } from './pool-cache';
+import { readCachedAsset, readCachedPool, writeCachedAsset, writeCachedPool } from './pool-cache';
 
 let manifestPromise: Promise<HoopRushManifest> | null = null;
 
@@ -241,11 +241,18 @@ async function loadPlayersIndexFor(): Promise<PlayersIndex> {
   if (!entry) {
     throw new Error('The global players index is unavailable.');
   }
+  // The index is immutable and content-addressed; a validated copy in
+  // IndexedDB spares a ~4.7 MB re-download and re-parse on every reload.
+  const cached = await readCachedAsset<PlayersIndex>(entry.contentHash);
+  if (cached !== null) return cached;
   const load = (url: string, contentHash: string, bustCache = false) =>
     loadPlayersIndex(
       bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url),
       contentHash,
-    );
+    ).then((index) => {
+      void writeCachedAsset(contentHash, index);
+      return index;
+    });
   try {
     return await load(entry.url, entry.contentHash);
   } catch (error) {
@@ -277,11 +284,18 @@ async function loadRosterDetailsFor(): Promise<RosterDetails> {
   if (!entry) {
     throw new Error('Roster details are unavailable.');
   }
+  // The roster-details asset is immutable and content-addressed; a validated
+  // copy in IndexedDB spares a ~6.5 MB re-download and re-parse per reload.
+  const cached = await readCachedAsset<RosterDetails>(entry.contentHash);
+  if (cached !== null) return cached;
   const load = (url: string, contentHash: string, bustCache = false) =>
     loadRosterDetails(
       bustCache ? cacheBustedUrl(resolveAssetUrl(url)) : resolveAssetUrl(url),
       contentHash,
-    );
+    ).then((details) => {
+      void writeCachedAsset(contentHash, details);
+      return details;
+    });
   try {
     return await load(entry.url, entry.contentHash);
   } catch (error) {

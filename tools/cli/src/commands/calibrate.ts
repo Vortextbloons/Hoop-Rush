@@ -291,9 +291,10 @@ export function calibrateRun(args: {
       away: weak,
     };
     invariantFailures += accumulate(equalAcc, equalInput, true);
-    invariantFailures += accumulate(strongWeakAcc, swInput, false);
-    const swResult = runSingleGame(swInput).result;
-    if (swResult.winner === 'home') strongWeakAcc.homeWins += 1;
+    // `accumulate` already simulates swInput and tracks the strong-side home
+    // win when asked; running the same seed a second time would be a pure
+    // duplicate of a deterministic game.
+    invariantFailures += accumulate(strongWeakAcc, swInput, true);
   }
 
   // Opening opponent vs a strong user lineup (informational difficulty probe).

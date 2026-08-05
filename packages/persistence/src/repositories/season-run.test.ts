@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
+import type { SeasonEffectsState } from '@hoop-rush/data-contracts';
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
+import {
+  storedSeasonActiveRunIndexSchema,
+  storedSeasonRunRecordV1Schema,
+} from '../schemas/season-run-record.ts';
+import { storedSeasonSummaryRowSchema } from '../schemas/season-run-record.ts';
 import { DexieChallengeRepository, HoopRushDatabase } from './dexie.ts';
 import { DexieSeasonDraftRepository } from './season-draft.ts';
 import {
   DexieSeasonRunRepository,
+  SeasonRunIncompatibleError,
   SeasonRunLoadError,
   loadActiveRunWithSchedule,
 } from './season-run-dexie.ts';
@@ -15,6 +22,7 @@ import {
   testDatabaseName,
 } from '../testing/repo-test-support.ts';
 import {
+  buildFixtureEffectsState,
   buildFixtureRun,
   buildFixtureSchedule,
   buildFixtureStoredDraft,
@@ -25,15 +33,18 @@ import type { CommitSeasonBlockInput } from './season-run.ts';
 
 /**
  * Season Run repository contract tests (spec/2.0/07 persistence, spec/2.0/10
- * M2.3). The dedicated v6 tables isolate the active run from the Challenge
- * and Classic stores. `commitSeasonBlock` is one atomic transaction: a
- * failure before or inside the transaction writes nothing and the accepted
- * checkpoint never advances; a failed promotion leaves the draft intact.
- * Every load validates stored rows and audits aggregate reconciliation, so
- * corrupt rows throw a typed `SeasonRunLoadError` instead of entering app
- * state. The engine math comes through the stub seam (documented pure
- * semantics), keeping these tests independent of the engine agent's parallel
- * block-pipeline work.
+ * M2.3, M2.4). The dedicated v6 tables isolate the active run from the
+ * Challenge and Classic stores. `commitSeasonBlock` is one atomic
+ * transaction: a failure before or inside the transaction writes nothing and
+ * the accepted checkpoint never advances; a failed promotion leaves the
+ * draft intact. Every load validates stored rows and audits aggregate and
+ * M2.4 effects-state reconciliation, so corrupt rows throw a typed
+ * `SeasonRunLoadError` instead of entering app state. Stored schema-4 runs
+ * (save-schema-v1) are never migrated or rewritten: loads throw the typed
+ * `SeasonRunIncompatibleError` and `loadActiveRunIncompatible()` reports
+ * them for the discard screen. The engine math comes through the stub seam
+ * (documented pure semantics), keeping these tests independent of the
+ * engine agent's parallel block-pipeline work.
  */
 
 interface Adapters {
@@ -95,6 +106,7 @@ function commitInputFor(
     summaries: block.summaries,
     retainedDetails: block.retainedDetails,
     recap: block.recap,
+    effects: block.effects,
     rotations: block.rotations,
   };
 }
@@ -332,8 +344,10 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined) throw new Error('expected a checkpoint row');
-    await db.seasonRuns.put({ ...row, revision: 5 });
+    if (row === undefined || row.saveSchemaVersion !== 2) {
+      throw new Error('expected a current v2 checkpoint row');
+    }
+    await db.seasonRuns.put({ ...row, revision: 5 } as never);
     await expect(repo.loadActiveRun()).rejects.toThrow(/revision/);
   });
 
@@ -343,12 +357,14 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined) throw new Error('expected a checkpoint row');
+    if (row === undefined || row.saveSchemaVersion !== 2) {
+      throw new Error('expected a current v2 checkpoint row');
+    }
     await db.seasonRuns.put({
       ...row,
       lastCheckpointDigest: 'f'.repeat(32),
       lastRotationDigest: 'e'.repeat(32),
-    });
+    } as never);
     await expect(repo.loadActiveRun()).rejects.toThrow(/lastCheckpointDigest/);
   });
 
@@ -449,6 +465,295 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     const invalidSchedule = { ...schedule, games: schedule.games.slice(0, 100) };
     await expect(repo.loadActiveRunWithSchedule(invalidSchedule as never)).rejects.toThrow();
+  });
+});
+
+describe('season run schema-v4 compatibility (M2.4)', () => {
+  /** Minimal-but-faithful stored save-schema-v1 row (schema-4 run). */
+  function legacyV1Row(
+    runId: string,
+  ): import('../schemas/season-run-record.ts').StoredSeasonRunRecordV1 {
+    return storedSeasonRunRecordV1Schema.parse({
+      recordId: SEASON_RUN_RECORD_ID,
+      saveSchemaVersion: 1,
+      run: {
+        runId,
+        schemaVersion: 4,
+        versions: { runSchemaVersion: 4 },
+      },
+    });
+  }
+
+  async function currentCheckpoint(
+    adapters: Adapters,
+  ): Promise<import('../schemas/season-run-record.ts').StoredSeasonRunRecordV2> {
+    const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    if (row === undefined || row.saveSchemaVersion !== 2) {
+      throw new Error('expected a current v2 checkpoint row');
+    }
+    return row;
+  }
+
+  /** Rewrites the stored row with a mutated effects state (schema-valid writes only). */
+  async function corruptStoredEffects(
+    adapters: Adapters,
+    mutate: (effects: SeasonEffectsState) => SeasonEffectsState,
+  ): Promise<void> {
+    const row = await currentCheckpoint(adapters);
+    await adapters.db.seasonRuns.put({
+      ...row,
+      effects: mutate(structuredClone(row.effects)),
+    } as never);
+  }
+
+  it('loads a stored v1 row through the typed detection path, not a generic parse error', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await db.seasonRuns.put(legacyV1Row(run.runId));
+
+    const error = await repo.loadActiveRun().catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(SeasonRunIncompatibleError);
+    expect(error).not.toBeInstanceOf(SeasonRunLoadError);
+    expect((error as SeasonRunIncompatibleError).info).toEqual({
+      storedSaveSchemaVersion: 1,
+      storedRunSchemaVersion: 4,
+      runId: run.runId,
+    });
+    await expect(repo.loadActiveRunWithSchedule(adapters.schedule)).rejects.toThrow(
+      SeasonRunIncompatibleError,
+    );
+  });
+
+  it('loadActiveRunIncompatible reports the typed marker without a schedule artifact', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    expect(await repo.loadActiveRunIncompatible()).toBeNull();
+
+    await db.seasonRuns.put(legacyV1Row(run.runId));
+    expect(await repo.loadActiveRunIncompatible()).toEqual({
+      storedSaveSchemaVersion: 1,
+      storedRunSchemaVersion: 4,
+      runId: run.runId,
+    });
+
+    await repo.clearSeasonRun(run.runId);
+    await promote(adapters);
+    expect(await repo.loadActiveRunIncompatible()).toBeNull();
+
+    await db.seasonRuns.put({ recordId: SEASON_RUN_RECORD_ID, garbage: true } as never);
+    await expect(repo.loadActiveRunIncompatible()).rejects.toThrow(SeasonRunLoadError);
+  });
+
+  it('leaves the v1 row byte-for-byte untouched across detection and load attempts', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await db.seasonRuns.put(legacyV1Row(run.runId));
+    const before = JSON.stringify(await db.seasonRuns.get(SEASON_RUN_RECORD_ID));
+
+    await expect(repo.loadActiveRun()).rejects.toThrow(SeasonRunIncompatibleError);
+    await expect(repo.loadActiveRunWithSchedule(adapters.schedule)).rejects.toThrow(
+      SeasonRunIncompatibleError,
+    );
+    await repo.loadActiveRunIncompatible();
+
+    expect(JSON.stringify(await db.seasonRuns.get(SEASON_RUN_RECORD_ID))).toBe(before);
+    expect(await db.seasonRunSummaries.count()).toBe(0);
+    expect(await db.seasonRunDetails.count()).toBe(0);
+    expect(await db.seasonRunBlocks.count()).toBe(0);
+  });
+
+  it('clearSeasonRun removes a v1 row and its rows', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await db.seasonRuns.put(legacyV1Row(run.runId));
+    await db.seasonRunIndex.put(
+      storedSeasonActiveRunIndexSchema.parse({
+        recordId: SEASON_RUN_RECORD_ID,
+        index: {
+          runId: run.runId,
+          rootSeed: 'a'.repeat(32),
+          humanFranchiseId: 'lakers',
+          completedRounds: 0,
+          revision: 0,
+          humanWins: 0,
+          humanLosses: 0,
+          updatedAtIso: '2026-08-04T12:00:00.000Z',
+        },
+      }),
+    );
+    const summary = sharedDataset.blocks[0]?.summaries[0];
+    if (summary === undefined) throw new Error('expected a fixture summary');
+    await db.seasonRunSummaries.put(
+      storedSeasonSummaryRowSchema.parse({
+        runId: run.runId,
+        gameId: summary.gameId,
+        blockIndex: 0,
+        round: summary.round,
+        summary,
+      }),
+    );
+
+    await repo.clearSeasonRun(run.runId);
+    expect(await db.seasonRuns.count()).toBe(0);
+    expect(await db.seasonRunIndex.count()).toBe(0);
+    expect(await db.seasonRunSummaries.count()).toBe(0);
+    expect(await repo.loadActiveRunIncompatible()).toBeNull();
+    expect(await repo.loadActiveRun()).toBeNull();
+  });
+
+  it('commit and promotion refuse to touch a stored v1 row', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await db.seasonRuns.put(legacyV1Row(run.runId));
+    const before = JSON.stringify(await db.seasonRuns.get(SEASON_RUN_RECORD_ID));
+
+    await expect(repo.commitSeasonBlock(commitInputFor(adapters, 0))).rejects.toThrow(
+      /clearSeasonRun/,
+    );
+    await expect(repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run)).rejects.toThrow(
+      /clearSeasonRun/,
+    );
+
+    expect(JSON.stringify(await db.seasonRuns.get(SEASON_RUN_RECORD_ID))).toBe(before);
+    expect(await db.seasonRunSummaries.count()).toBe(0);
+    expect(await db.seasonRunIndex.count()).toBe(0);
+  });
+
+  it('a fresh v2 row round-trips the effects state through promotion, commit, and reload', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    let row = await currentCheckpoint(adapters);
+    expect(row.saveSchemaVersion).toBe(2);
+    expect(row.effects).toEqual(buildFixtureEffectsState(run.rosters));
+
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    row = await currentCheckpoint(adapters);
+    expect(row.effects).toEqual(sharedDataset.blocks[0]?.effects);
+
+    const snapshot = await loadOrThrow(adapters);
+    expect(snapshot.effects).toEqual(sharedDataset.blocks[0]?.effects);
+  });
+
+  it('surfaces corrupt v2 effects as SeasonRunLoadError on load', async () => {
+    const adapters = makeAdapters();
+    const { repo } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+
+    const stranger = 'pv-00000000000000000000000000000000';
+    const cases: Array<[string, (effects: SeasonEffectsState) => SeasonEffectsState]> = [
+      [
+        'wrong player count',
+        (effects) => ({ ...effects, playerStates: effects.playerStates.slice(0, 299) }),
+      ],
+      [
+        'wrong pair count',
+        (effects) => ({ ...effects, pairStates: effects.pairStates.slice(0, 1349) }),
+      ],
+      [
+        'noncanonical pair',
+        (effects) => {
+          const first = effects.pairStates[0];
+          if (first === undefined) throw new Error('expected a pair state');
+          return {
+            ...effects,
+            pairStates: [
+              { a: first.b, b: first.a, sharedPossessions: first.sharedPossessions },
+              ...effects.pairStates.slice(1),
+            ],
+          };
+        },
+      ],
+      [
+        'duplicate pair',
+        (effects) => {
+          const first = effects.pairStates[0];
+          if (first === undefined) throw new Error('expected a pair state');
+          return { ...effects, pairStates: [...effects.pairStates.slice(0, -1), first] };
+        },
+      ],
+      [
+        'pair member outside the player states',
+        (effects) => {
+          const first = effects.pairStates[0];
+          if (first === undefined) throw new Error('expected a pair state');
+          return {
+            ...effects,
+            pairStates: [
+              { a: first.a, b: stranger, sharedPossessions: first.sharedPossessions },
+              ...effects.pairStates.slice(1),
+            ],
+          };
+        },
+      ],
+      [
+        'out-of-range fatigue',
+        (effects) => {
+          const first = effects.playerStates[0];
+          if (first === undefined) throw new Error('expected a player state');
+          return {
+            ...effects,
+            playerStates: [
+              { ...first, fatigueBasisPoints: 10_001 },
+              ...effects.playerStates.slice(1),
+            ],
+          };
+        },
+      ],
+      [
+        'out-of-range shared possessions',
+        (effects) => {
+          const first = effects.pairStates[0];
+          if (first === undefined) throw new Error('expected a pair state');
+          return {
+            ...effects,
+            pairStates: [
+              { ...first, sharedPossessions: 10_000_001 },
+              ...effects.pairStates.slice(1),
+            ],
+          };
+        },
+      ],
+      [
+        'lastCompletedRound beyond the checkpoint completedRounds',
+        (effects) => {
+          const first = effects.playerStates[0];
+          if (first === undefined) throw new Error('expected a player state');
+          return {
+            ...effects,
+            playerStates: [{ ...first, lastCompletedRound: 11 }, ...effects.playerStates.slice(1)],
+          };
+        },
+      ],
+      [
+        'player set differing from the rosters',
+        (effects) => {
+          const first = effects.playerStates[0];
+          if (first === undefined) throw new Error('expected a player state');
+          const original = first.playerVersionId;
+          return {
+            ...effects,
+            playerStates: [
+              { ...first, playerVersionId: stranger },
+              ...effects.playerStates.slice(1),
+            ],
+            pairStates: effects.pairStates.map((pair) =>
+              pair.a === original
+                ? { ...pair, a: stranger }
+                : pair.b === original
+                  ? { ...pair, b: stranger }
+                  : pair,
+            ),
+          };
+        },
+      ],
+    ];
+
+    for (const [name, mutate] of cases) {
+      await corruptStoredEffects(adapters, mutate);
+      await expect(repo.loadActiveRun(), name).rejects.toThrow(SeasonRunLoadError);
+    }
   });
 });
 
