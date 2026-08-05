@@ -162,7 +162,7 @@ describe('season roster feasibility', () => {
   });
 });
 
-describe('season rotation (season-rotation-v1)', () => {
+describe('season rotation (season-rotation-v2)', () => {
   it('builds a deterministic 240-minute rotation with starters as closing five', () => {
     const catalog = buildSeasonDraftCatalog({
       franchiseIds: ['lakers'],
@@ -323,7 +323,7 @@ describe('season generation digest', () => {
       seed,
       aiVersion: 'season-ai-v1',
       rosterGenerationVersion: 'roster-generation-v1',
-      rotationVersion: 'season-rotation-v1',
+      rotationVersion: 'season-rotation-v2',
       rosters: [roster('lakers'), roster('celtics')],
       ownership: [
         { playerVersionId: 'pv-2', ownerFranchiseId: 'lakers' },

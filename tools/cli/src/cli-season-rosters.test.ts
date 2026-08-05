@@ -23,10 +23,10 @@ const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 const SEED = 'd00d2026a1b2c3d4e5f60718293a4b5c6';
 
 describe('cli: committed M2.1 fixtures', () => {
-  it('season-run fixture is a schema-valid v2 snapshot with legal ownership', () => {
+  it('season-run fixture is a schema-valid v3 snapshot with legal ownership', () => {
     const parsed = seasonRunSchema.parse(JSON.parse(readFileSync(SEASON_RUN, 'utf8')));
-    expect(parsed.schemaVersion).toBe(2);
-    expect(parsed.versions.runSchemaVersion).toBe(2);
+    expect(parsed.schemaVersion).toBe(3);
+    expect(parsed.versions.runSchemaVersion).toBe(3);
     expect(parsed.rosters).toHaveLength(30);
     expect(parsed.ownership).toHaveLength(300);
     expect(parsed.rotations).toHaveLength(30);

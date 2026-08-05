@@ -4,12 +4,13 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import { SEASON_ROTATION_VERSION } from './season-versions.ts';
 
 /**
- * Season Run rotation contracts (spec/2.0/04, M2.1). M2.1 persists a minimal
- * deterministic rotation: five slot-assigned starters (G, G, F, F, C), a
- * five-player bench order, per-player target minutes totaling exactly 240,
- * and a closing five initially equal to the starters. M2.2 adds presets,
- * editing, substitution execution, and contingency behavior without replacing
- * this persisted rotation contract.
+ * Season Run rotation contracts (spec/2.0/04, M2.2, season-rotation-v2). A
+ * persisted rotation keeps the v1 structural shape: five slot-assigned
+ * starters (G, G, F, F, C), a five-player bench order that doubles as the
+ * deterministic contingency hierarchy, per-player regulation target minutes
+ * totaling exactly 240, and an ordered closing five. Under v2 the closing
+ * five is an independent legal five that may include bench players and may
+ * differ from the starters; validation semantics changed accordingly.
  */
 
 export const seasonRotationTargetMinutesSchema = z.object({
@@ -25,7 +26,11 @@ export const seasonRotationSchema = z.object({
   benchOrder: z.array(playerVersionIdSchema).length(5),
   /** Per-player target minutes; must total exactly 240. */
   targetMinutes: z.array(seasonRotationTargetMinutesSchema).length(10),
-  /** Closing five; M2.1 always equals the starters. */
+  /**
+   * Ordered closing five (G, G, F, F, C), independently legal and possibly
+   * different from the starters. Preferred in the final-five-minute/12-point
+   * window and at every overtime tip (season-rotation-v2).
+   */
   closingFive: z.array(playerVersionIdSchema).length(5),
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
 });

@@ -39,6 +39,7 @@ export * from './season-seeds.ts';
 export * from './season-hash.ts';
 export * from './season-roster.ts';
 export * from './season-rotation.ts';
+export * from './season-game-simulation.ts';
 export * from './season-draft-catalog.ts';
 export * from './season-draft.ts';
 export * from './season-draft-command.ts';

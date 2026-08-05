@@ -224,11 +224,11 @@ function buildRun(): SeasonRun {
     })),
   }));
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     runId: 'fixture-run-1',
     rootSeed: SEED,
     versions: {
-      runSchemaVersion: 2,
+      runSchemaVersion: 3,
       leagueVersion: 'league-v1',
       scheduleVersion: 'schedule-v1',
       scheduleFormulaVersion: 'schedule-formula-v1',
@@ -240,7 +240,10 @@ function buildRun(): SeasonRun {
       rosterRulesVersion: 'season-roster-v1',
       rosterGenerationVersion: 'roster-generation-v1',
       aiVersion: 'season-ai-v1',
-      rotationVersion: 'season-rotation-v1',
+      rotationVersion: 'season-rotation-v2',
+      rotationPlannerVersion: 'rotation-planner-v1',
+      gameVersion: 'season-game-v1',
+      gameTargetsVersion: 'season-game-targets-v1',
       rosterTargetsVersion: 'roster-targets-v1',
     },
     league,
@@ -340,14 +343,14 @@ function buildRun(): SeasonRun {
           ...ids.slice(5).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
         ],
         closingFive: ids.slice(0, 5),
-        rotationVersion: 'season-rotation-v1',
+        rotationVersion: 'season-rotation-v2',
       };
     }),
     generationAudit: {
       seed: SEED,
       aiVersion: 'season-ai-v1',
       rosterGenerationVersion: 'roster-generation-v1',
-      rotationVersion: 'season-rotation-v1',
+      rotationVersion: 'season-rotation-v2',
       rosterTargetsVersion: 'roster-targets-v1',
       digest: '0'.repeat(32),
       diagnostics: {
@@ -1303,7 +1306,7 @@ describe('season rotation schema (M2.1)', () => {
       ...ids.slice(5).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
     ],
     closingFive: ids.slice(0, 5),
-    rotationVersion: 'season-rotation-v1',
+    rotationVersion: 'season-rotation-v2',
   };
 
   it('round-trips a legal rotation', () => {
@@ -1318,7 +1321,7 @@ describe('season rotation schema (M2.1)', () => {
       }),
     ).toThrow();
     expect(() =>
-      seasonRotationSchema.parse({ ...rotation, rotationVersion: 'season-rotation-v2' }),
+      seasonRotationSchema.parse({ ...rotation, rotationVersion: 'season-rotation-v1' }),
     ).toThrow();
     expect(() =>
       seasonRotationSchema.parse({
@@ -1368,7 +1371,7 @@ describe('season AI contracts (M2.1)', () => {
       seed: SEED,
       aiVersion: 'season-ai-v1',
       rosterGenerationVersion: 'roster-generation-v1',
-      rotationVersion: 'season-rotation-v1',
+      rotationVersion: 'season-rotation-v2',
       rosters,
       ownership,
       rotations,

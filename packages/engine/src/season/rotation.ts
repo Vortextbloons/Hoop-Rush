@@ -1,4 +1,11 @@
-import { SEASON_ROTATION_VERSION, type SeasonRotation } from '@hoop-rush/data-contracts';
+import {
+  SEASON_ROTATION_PRESET_TARGETS,
+  SEASON_ROTATION_VERSION,
+  type SeasonRotation,
+  type SeasonRotationCommandResult,
+  type SeasonRotationPreset,
+  type SetSeasonRotationCommand,
+} from '@hoop-rush/data-contracts';
 import type { Position } from '@hoop-rush/data-contracts';
 import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 import { canPlay } from '../domain/positions.ts';
@@ -139,4 +146,55 @@ export function auditSeasonRotation(
   }
   void slotCounts;
   return failures;
+}
+
+/**
+ * M2.2 v2 rotation validation (season-rotation-v2, spec/2.0/04): the
+ * starter/bench partition references exactly the ten rostered versions with
+ * no duplicates, target minutes are integers from 0-48 totaling exactly 240
+ * and covering exactly the roster, the starters form a legal ordered
+ * G, G, F, F, C five in their configured slot order, and the closing five
+ * is an independent ordered legal five (which may differ from the starters
+ * and include bench players). Returns failure strings; empty means valid.
+ */
+export function validateSeasonRotation(
+  rotation: SeasonRotation,
+  memberPlayable: ReadonlyMap<string, readonly Position[]>,
+): string[] {
+  void rotation;
+  void memberPlayable;
+  throw new Error('not implemented: M2.2 rotation validation (subagent A)');
+}
+
+/**
+ * M2.2 preset application: rewrites ONLY the target minutes using the frozen
+ * preset tables (SEASON_ROTATION_PRESET_TARGETS: Balanced 33 each starter /
+ * bench 21,18,15,12,9; Tight 37 / 20,14,9,7,5; Bench-Heavy 29 /
+ * 23,21,19,17,15). The current starter order, bench hierarchy, and closing
+ * five are preserved exactly.
+ */
+export function applySeasonRotationPreset(
+  rotation: SeasonRotation,
+  preset: SeasonRotationPreset,
+): SeasonRotation {
+  void rotation;
+  void preset;
+  throw new Error('not implemented: M2.2 preset application (subagent A)');
+}
+
+/**
+ * M2.2 typed rotation-editing command handler. Preset commands rewrite target
+ * minutes and preserve starters/bench/closing; explicit-rotation commands
+ * replace the rotation wholesale. Rejection codes are fixed as
+ * ROSTER_MISMATCH, DUPLICATE_PLAYER_VERSION, INVALID_TARGETS,
+ * ILLEGAL_STARTERS, and ILLEGAL_CLOSING_FIVE.
+ */
+export function handleSetSeasonRotationCommand(
+  command: SetSeasonRotationCommand,
+  memberPlayable: ReadonlyMap<string, readonly Position[]>,
+): SeasonRotationCommandResult {
+  void command;
+  void memberPlayable;
+  void SEASON_ROTATION_PRESET_TARGETS;
+  throw new Error('not implemented: M2.2 rotation command handling (subagent A)');
 }

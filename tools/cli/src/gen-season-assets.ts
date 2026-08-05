@@ -20,9 +20,12 @@ import {
   SEASON_COMMITTED_DRAFT_SEED,
   SEASON_COMMITTED_SCHEDULE_SEED,
   SEASON_DRAFT_VERSION,
+  SEASON_GAME_TARGETS_VERSION,
+  SEASON_GAME_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
+  SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
@@ -188,7 +191,7 @@ function playCommittedDraft(
   return { state, commands, generation };
 }
 
-/** Builds the v2 Season Run snapshot from the committed draft + generation. */
+/** Builds the v3 Season Run snapshot from the committed draft + generation. */
 function buildRun(
   schedule: SeasonSchedule,
   league: SeasonLeague,
@@ -204,11 +207,11 @@ function buildRun(
     })),
   };
   const run: SeasonRun = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     runId: 'fixture-season-run-1',
     rootSeed: SEASON_COMMITTED_DRAFT_SEED,
     versions: {
-      runSchemaVersion: 2,
+      runSchemaVersion: 3,
       leagueVersion: league.leagueVersion,
       scheduleVersion: schedule.scheduleVersion,
       scheduleFormulaVersion: schedule.formulaVersion,
@@ -221,6 +224,9 @@ function buildRun(
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       aiVersion: SEASON_AI_VERSION,
       rotationVersion: SEASON_ROTATION_VERSION,
+      rotationPlannerVersion: SEASON_ROTATION_PLANNER_VERSION,
+      gameVersion: SEASON_GAME_VERSION,
+      gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
       rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
     },
     league: correctedLeague,

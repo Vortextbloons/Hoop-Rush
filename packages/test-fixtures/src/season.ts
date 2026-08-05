@@ -1,11 +1,14 @@
 import {
   SEASON_AI_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_GAME_TARGETS_VERSION,
+  SEASON_GAME_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROSTER_SIZE,
+  SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
   SEASON_SEED_NAMESPACES,
   seasonNamespaceSeed,
@@ -194,9 +197,9 @@ function emptyPostseason(rootSeed: string): SeasonPostseasonState {
  * Complete 30-team Season Run snapshot: committed schedule (caller-supplied
  * schedule — use the packaged artifact or regenerate it with
  * SEASON_COMMITTED_SCHEDULE_SEED), empty results, initial standings, block
- * cursor at round 0, postseason-ready derived seeds, and schema-v2 M2.1
- * fields (synthetic draft facts, assignments, rotations, evaluations, and
- * the generation audit).
+ * cursor at round 0, postseason-ready derived seeds, and schema-v3 M2.2
+ * fields (synthetic draft facts, assignments, rotations, evaluations, the
+ * generation audit, and the frozen rotation-planner/game/targets versions).
  */
 export function buildSeasonRunFixture(input: {
   schedule: SeasonSchedule;
@@ -218,11 +221,11 @@ export function buildSeasonRunFixture(input: {
     ),
   );
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     runId: 'fixture-season-run-1',
     rootSeed: seed,
     versions: {
-      runSchemaVersion: 2,
+      runSchemaVersion: 3,
       leagueVersion: league.leagueVersion,
       scheduleVersion: input.schedule.scheduleVersion,
       scheduleFormulaVersion: input.schedule.formulaVersion,
@@ -235,6 +238,9 @@ export function buildSeasonRunFixture(input: {
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       aiVersion: SEASON_AI_VERSION,
       rotationVersion: SEASON_ROTATION_VERSION,
+      rotationPlannerVersion: SEASON_ROTATION_PLANNER_VERSION,
+      gameVersion: SEASON_GAME_VERSION,
+      gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
       rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
     },
     league,

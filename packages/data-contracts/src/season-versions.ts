@@ -8,12 +8,14 @@
  */
 
 /**
- * Season Run persistence snapshot schema layout. Bumped to 2 by M2.1: the
- * run now freezes completed draft facts, AI assignments, generated rotations,
- * the generation audit summary, and the new material versions below. The
- * M2.0 schema v1 data is development scaffolding, not a migration target.
+ * Season Run persistence snapshot schema layout. Bumped to 3 by M2.2: the
+ * run now freezes the rotation-planner, Season-game, and Season-game-targets
+ * material versions alongside the M2.1 draft facts, AI assignments,
+ * generated rotations, and generation audit. Bumped to 2 by M2.1 (draft
+ * facts, AI assignments, rotations, audit, new material versions). The M2.0
+ * schema v1 data is development scaffolding, not a migration target.
  */
-export const SEASON_RUN_SCHEMA_VERSION = 2;
+export const SEASON_RUN_SCHEMA_VERSION = 3;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -53,8 +55,37 @@ export const SEASON_ROSTER_GENERATION_VERSION = 'roster-generation-v1';
 /** AI decision identities, strength bands, and roster evaluation weights. */
 export const SEASON_AI_VERSION = 'season-ai-v1';
 
-/** M2.1 initial rotation contract (32/16 minute targets, closing five). */
-export const SEASON_ROTATION_VERSION = 'season-rotation-v1';
+/**
+ * M2.2 rotation contract (spec/2.0/04, season-rotation-v2). Same structural
+ * shape as v1, but the closing five is now an independent, ordered legal five
+ * (G, G, F, F, C) that may include bench players and may differ from the
+ * starters, and validation requires both the starter and closing lineups to
+ * be individually legal against the roster.
+ */
+export const SEASON_ROTATION_VERSION = 'season-rotation-v2';
+
+/**
+ * Deterministic substitution planner rules (spec/2.0/04, rotation-planner-v1,
+ * M2.2): legal-five enumeration, projected target-minute deviation scoring,
+ * tie-breaks (current-player retention, bench hierarchy, canonical
+ * playerVersionId order), the closing-window preference, and overtime
+ * behavior. Planner decisions consume no RNG.
+ */
+export const SEASON_ROTATION_PLANNER_VERSION = 'rotation-planner-v1';
+
+/**
+ * Season Run single-game controller (spec/2.0/04, season-game-v1, M2.2):
+ * resumable possession steps, ten-player rotations, foul-outs, substitutions,
+ * exact seconds, unit stints, deviations, and typed forfeits.
+ */
+export const SEASON_GAME_VERSION = 'season-game-v1';
+
+/**
+ * Frozen Season game calibration cohort and envelopes (season-game-targets-v1,
+ * M2.2): seeds 0-1023 calibration with 1024-1279 held out, preset-minute
+ * ordering gates, and 95% held-out envelope coverage.
+ */
+export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v1';
 
 /** Frozen calibration cohort targets for AI roster strength and coverage. */
 export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v1';

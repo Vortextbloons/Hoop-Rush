@@ -91,7 +91,23 @@ export {
   buildMinimalRotation,
   rotationTargetMinutes,
   auditSeasonRotation,
+  validateSeasonRotation,
+  applySeasonRotationPreset,
+  handleSetSeasonRotationCommand,
 } from './season/rotation.ts';
+export {
+  enumerateLegalFives,
+  chooseInitialUnit,
+  planUnit,
+  type PlannerMember,
+  type PlannerRotationContext,
+  type PlannerUnitRequest,
+} from './season/rotation-planner.ts';
+export {
+  simulateSeasonGame,
+  checkSeasonGameResult,
+  type SeasonGameAvailabilitySeam,
+} from './season/season-game.ts';
 export { seasonGenerationDigest, type SeasonGenerationDigestInput } from './season/digest.ts';
 export {
   seasonDraftStateDigest,

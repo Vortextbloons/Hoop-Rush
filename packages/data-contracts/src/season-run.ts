@@ -11,12 +11,15 @@ import {
   SEASON_AI_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_GAME_COUNT,
+  SEASON_GAME_TARGETS_VERSION,
+  SEASON_GAME_VERSION,
   SEASON_LEAGUE_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROSTER_SIZE,
+  SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_SCHEDULE_FORMULA_VERSION,
@@ -37,10 +40,11 @@ import { seasonRotationSchema } from './season-rotation.ts';
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
  * validated record covers the frozen league, ten-player rosters, ownership,
  * schedule reference, all league games, reduced standings, the block cursor,
- * postseason state, and — since schema version 2 (M2.1) — the completed draft
- * facts, AI assignments, generated rotations, and the generation audit
- * summary, so a saved run can be resumed, audited, and reproduced from its
- * root seed and versions.
+ * postseason state, and — since schema version 3 (M2.2) — the frozen
+ * rotation-planner, Season-game, and Season-game-targets material versions;
+ * schema version 2 (M2.1) added the completed draft facts, AI assignments,
+ * generated rotations, and the generation audit summary, so a saved run can
+ * be resumed, audited, and reproduced from its root seed and versions.
  */
 
 export {
@@ -118,6 +122,12 @@ export const seasonRunVersionsSchema = z.object({
   rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
   aiVersion: z.literal(SEASON_AI_VERSION),
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
+  /** M2.2: substitution planner rules. */
+  rotationPlannerVersion: z.literal(SEASON_ROTATION_PLANNER_VERSION),
+  /** M2.2: Season game controller rules. */
+  gameVersion: z.literal(SEASON_GAME_VERSION),
+  /** M2.2: frozen Season game calibration cohort and envelopes. */
+  gameTargetsVersion: z.literal(SEASON_GAME_TARGETS_VERSION),
   rosterTargetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
 });
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;

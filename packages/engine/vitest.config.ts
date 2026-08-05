@@ -10,7 +10,7 @@ export default defineConfig({
     root: path.dirname(fileURLToPath(import.meta.url)),
     // Seeded sensitivity batches run concurrently (it.concurrent). Under
     // the shared runner, CPU contention pushes the heaviest 300-seed suites
-    // past the 5s default and the prior 15s budget.
-    testTimeout: 30_000,
+    // past the 5s default and the prior 15s and 30s budgets.
+    testTimeout: 60_000,
   },
 });

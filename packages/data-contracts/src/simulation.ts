@@ -3,6 +3,7 @@ import { playerIdSchema, seedSchema } from './ids.ts';
 import { positionUnionSchema } from './positions.ts';
 import { eraSimulationProfileSchema } from './era-sim-profile.ts';
 import { ratingProfileSchema } from './ratings-model.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
 
 /**
  * M2 possession-engine contracts. The engine consumes only these explicit
@@ -125,6 +126,14 @@ export type SimulationAnchors = z.infer<typeof simulationAnchorsSchema>;
 /** One player exactly as the possession engine sees them. */
 export const simulationPlayerSchema = z.object({
   playerId: playerIdSchema,
+  /**
+   * Season Run identity (spec/2.0/04 M2.2). When present it is the
+   * authoritative key for slot lookups and accounting, so two historical
+   * versions of one person (same playerId) can share a side without
+   * collisions. Absent on Classic/sandbox players, where playerId remains
+   * the key and behavior is byte-identical.
+   */
+  playerVersionId: playerVersionIdSchema.optional(),
   displayName: z.string().min(1).max(96),
   /** Career-wide detailed playable union; slot-group legality was validated upstream. */
   positions: positionUnionSchema,

@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "runId": "fixture-season-run-1",
   "rootSeed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
   "versions": {
-    "runSchemaVersion": 2,
+    "runSchemaVersion": 3,
     "leagueVersion": "league-v1",
     "scheduleVersion": "schedule-v1",
     "scheduleFormulaVersion": "schedule-formula-v1",
@@ -15,7 +15,10 @@
     "rosterRulesVersion": "season-roster-v1",
     "rosterGenerationVersion": "roster-generation-v1",
     "aiVersion": "season-ai-v1",
-    "rotationVersion": "season-rotation-v1",
+    "rotationVersion": "season-rotation-v2",
+    "rotationPlannerVersion": "rotation-planner-v1",
+    "gameVersion": "season-game-v1",
+    "gameTargetsVersion": "season-game-targets-v1",
     "rosterTargetsVersion": "roster-targets-v1"
   },
   "league": {
@@ -21721,7 +21724,7 @@
         "pv-3761119d38a63381b71ddd1f069c6ccd",
         "pv-211eee11a3d5a94d0d7d3d13fae6d521"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "celtics",
@@ -21788,7 +21791,7 @@
         "pv-687de8e198e71585de58468bbea1bd91",
         "pv-880a3d0485ae0cb838498cbe25d79834"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "nets",
@@ -21855,7 +21858,7 @@
         "pv-9bf8d99aae5921b6566871e06cd487ea",
         "pv-4b70073cd1026058c1f5052afde86f0c"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "hornets",
@@ -21922,7 +21925,7 @@
         "pv-ca57a3cc2fd8689023905c0ea4e141bc",
         "pv-397d3133d5535f0707420051c7bc0aa3"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "bulls",
@@ -21989,7 +21992,7 @@
         "pv-290cf97a81b8b166b46cdcf0bceb1dea",
         "pv-363f840066f049b4eca50206d97dc8b0"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "cavaliers",
@@ -22056,7 +22059,7 @@
         "pv-75d392166bba6d9afde0bff0c03801a6",
         "pv-94c39c930ef4f367f798b0d56d017f83"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "pistons",
@@ -22123,7 +22126,7 @@
         "pv-25bf018d9aa1ecb16172f4db48973c3d",
         "pv-8d3fbec67aec859228cf9f1c18907056"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "pacers",
@@ -22190,7 +22193,7 @@
         "pv-6dd4d79be1daafa78574f3fd11b0d98b",
         "pv-0e45992d083703c9d1efb7abb139515d"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "heat",
@@ -22257,7 +22260,7 @@
         "pv-d153ea4fe59879ab6f21cbf5e590145f",
         "pv-10a1bf5732a16bbbed54183166683567"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "bucks",
@@ -22324,7 +22327,7 @@
         "pv-1542eee9738262f562e4f69f21196499",
         "pv-2f498d5a9f25c9e6007e815893eaf50a"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "knicks",
@@ -22391,7 +22394,7 @@
         "pv-3ed9acd0928efba48759b83e137957e0",
         "pv-4cd592baad407c06249e1d607d4c400a"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "magic",
@@ -22458,7 +22461,7 @@
         "pv-a2cce4c6368e0452bf3247fc8deb6a76",
         "pv-7db8506555029aa9b3dab4bb5f6a67d5"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "sixers",
@@ -22525,7 +22528,7 @@
         "pv-927600c2ec3714b62f8a1140a32b19f2",
         "pv-032819ba9bb4514ec6f5ed6066537f6a"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "raptors",
@@ -22592,7 +22595,7 @@
         "pv-a561a4127323891e59111524e0f6f202",
         "pv-1052727db7cc32917312d9d3aca2488d"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "wizards",
@@ -22659,7 +22662,7 @@
         "pv-3845892634365b7acc0c8b10897cbdd6",
         "pv-3fdd685aae06a68e0a538d007e1d70ca"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "mavericks",
@@ -22726,7 +22729,7 @@
         "pv-6fa0c82023aef9ec717d769e18253af0",
         "pv-de81cd82d45ae59e0a72d31c90888112"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "nuggets",
@@ -22793,7 +22796,7 @@
         "pv-8b216df95bd65edd2f842c1b63c24ae9",
         "pv-6ec05e3467cc1b9883d331aad6c21fc4"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "warriors",
@@ -22860,7 +22863,7 @@
         "pv-b65e0c1ebc7b311a145082e883ef668e",
         "pv-2b0aeecdf6171539c45de7bbc1a5cabd"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "rockets",
@@ -22927,7 +22930,7 @@
         "pv-76ae5727f7ee61cbc04099d15e001c77",
         "pv-8afafe94681a0bf0d40711fa3d72b8a4"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "clippers",
@@ -22994,7 +22997,7 @@
         "pv-602fb32c6123af8076f552c2edc2929c",
         "pv-498fd33e1fd8bfea600c7db43c8ec2ae"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "lakers",
@@ -23061,7 +23064,7 @@
         "pv-388261d5ab430739e3bc4133301b1ac5",
         "pv-3fdbb5d64baeb5720aa62164900eee66"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "grizzlies",
@@ -23128,7 +23131,7 @@
         "pv-3b941c154e0903895b2c30f70045d805",
         "pv-4f7a00c5d26536e17063056be2957b35"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "timberwolves",
@@ -23195,7 +23198,7 @@
         "pv-8d9f1a150d4bd0f92b6d0ae74a4c7fc5",
         "pv-10f95791e254cf4d4db44127e8a16161"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "pelicans",
@@ -23262,7 +23265,7 @@
         "pv-61cab8bb89cc93070baf3c45e4f87b6b",
         "pv-806418ce4a614892ebf945f891458b9e"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "thunder",
@@ -23329,7 +23332,7 @@
         "pv-3afdf6b5e5396b797c2b873740b1e225",
         "pv-480dc092ec6c654647c936288e143502"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "suns",
@@ -23396,7 +23399,7 @@
         "pv-78ed44a5ee6d4b59d2709a9f82601f55",
         "pv-19ca830de61807016b23d8afd619b51d"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "blazers",
@@ -23463,7 +23466,7 @@
         "pv-53819493f6d5cdcf6b0615d1130802e3",
         "pv-e425d2cbecc9ec4f4eb8c62118ab3f1b"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "kings",
@@ -23530,7 +23533,7 @@
         "pv-73fad6eb0d57108fe29ef5ad30f10a1b",
         "pv-ca0d8171715aea9d846e0dcfa77417e1"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "spurs",
@@ -23597,7 +23600,7 @@
         "pv-4c71dfa9a6b870d587ec36370a7e4599",
         "pv-b3f0e5533c206447c95dbd4d1de80b43"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     },
     {
       "franchiseId": "jazz",
@@ -23664,16 +23667,16 @@
         "pv-33067fe45f74fbb877b98b26a7666e54",
         "pv-39d51d469bee62aadb9c0e2c0daa4176"
       ],
-      "rotationVersion": "season-rotation-v1"
+      "rotationVersion": "season-rotation-v2"
     }
   ],
   "generationAudit": {
     "seed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
     "aiVersion": "season-ai-v1",
     "rosterGenerationVersion": "roster-generation-v1",
-    "rotationVersion": "season-rotation-v1",
+    "rotationVersion": "season-rotation-v2",
     "rosterTargetsVersion": "roster-targets-v1",
-    "digest": "4c32e23b9e161d3f0471e1dd0c89316b",
+    "digest": "212d7b3a6984255e6e525700ce78416a",
     "diagnostics": {
       "seed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
       "aiVersion": "season-ai-v1",
