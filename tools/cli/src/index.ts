@@ -398,6 +398,119 @@ const COMMANDS: Record<string, CommandEntry> = {
         }),
     };
   }),
+  'season block simulate': command(async () => {
+    const { seasonBlockSimulate, SEASON_BLOCK_SIMULATE_OPTIONS } =
+      await import('./commands/season-block.ts');
+    return {
+      options: SEASON_BLOCK_SIMULATE_OPTIONS,
+      run: (args) =>
+        seasonBlockSimulate({
+          input: getOptionString(args, 'input') ?? null,
+          block: getOptionString(args, 'block') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          profile: getOptionString(args, 'profile') ?? null,
+        }),
+    };
+  }),
+  'season block audit': command(async () => {
+    const { seasonBlockAudit, SEASON_BLOCK_AUDIT_OPTIONS } =
+      await import('./commands/season-block.ts');
+    return {
+      options: SEASON_BLOCK_AUDIT_OPTIONS,
+      run: (args) =>
+        seasonBlockAudit({
+          input: getOptionString(args, 'input') ?? null,
+          run: getOptionString(args, 'run') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          profile: getOptionString(args, 'profile') ?? null,
+        }),
+    };
+  }),
+  'season full simulate': command(async () => {
+    const { seasonFullSimulate, SEASON_FULL_SIMULATE_OPTIONS } =
+      await import('./commands/season-block.ts');
+    return {
+      options: SEASON_FULL_SIMULATE_OPTIONS,
+      run: (args) =>
+        seasonFullSimulate({
+          input: getOptionString(args, 'input') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          profile: getOptionString(args, 'profile') ?? null,
+        }),
+    };
+  }),
+  'season home-court calibrate': command(async () => {
+    const { seasonHomeCourtCalibrate, SEASON_HOME_COURT_CALIBRATE_OPTIONS } =
+      await import('./commands/season-home-court.ts');
+    return {
+      options: SEASON_HOME_COURT_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonHomeCourtCalibrate({
+          fixture: getOptionString(args, 'fixture') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          constants: getOptionString(args, 'constants') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
+  'season benchmark block': command(async () => {
+    const { seasonBenchmarkBlock, SEASON_BENCHMARK_OPTIONS } =
+      await import('./commands/season-benchmark.ts');
+    return {
+      options: SEASON_BENCHMARK_OPTIONS,
+      run: (args) =>
+        seasonBenchmarkBlock({
+          input: getOptionString(args, 'input') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          profile: getOptionString(args, 'profile') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+        }),
+    };
+  }),
+  'season benchmark full': command(async () => {
+    const { seasonBenchmarkFull, SEASON_BENCHMARK_OPTIONS } =
+      await import('./commands/season-benchmark.ts');
+    return {
+      options: SEASON_BENCHMARK_OPTIONS,
+      run: (args) =>
+        seasonBenchmarkFull({
+          input: getOptionString(args, 'input') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          profile: getOptionString(args, 'profile') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+        }),
+    };
+  }),
+  'season benchmark determinism': command(async () => {
+    const { seasonBenchmarkDeterminism, SEASON_BENCHMARK_OPTIONS } =
+      await import('./commands/season-benchmark.ts');
+    return {
+      options: SEASON_BENCHMARK_OPTIONS,
+      run: (args) =>
+        seasonBenchmarkDeterminism({
+          input: getOptionString(args, 'input') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          profile: getOptionString(args, 'profile') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+        }),
+    };
+  }),
+  'season benchmark persistence': command(async () => {
+    const { seasonBenchmarkPersistence, SEASON_BENCHMARK_OPTIONS } =
+      await import('./commands/season-benchmark.ts');
+    return {
+      options: SEASON_BENCHMARK_OPTIONS,
+      run: (args) =>
+        seasonBenchmarkPersistence({
+          samples: getOptionString(args, 'samples') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+        }),
+    };
+  }),
   'import ratings': command(async () => {
     const { importRatings, IMPORT_RATINGS_OPTIONS } = await import('./commands/import.ts');
     return {

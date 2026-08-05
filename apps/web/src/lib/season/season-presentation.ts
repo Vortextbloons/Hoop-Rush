@@ -1,0 +1,850 @@
+import {
+  SEASON_LEADER_DEPTH,
+  SEASON_LEADER_MIN_GAME_SHARE,
+  SEASON_ROUND_COUNT,
+  type HoopRushManifest,
+  type SeasonBlockRecap,
+  type SeasonGame,
+  type SeasonGameSummary,
+  type SeasonLeaderCategory,
+  type SeasonLeaderEntry,
+  type SeasonLeague,
+  type SeasonNotablePerformance,
+  type SeasonPlayerAggregate,
+  type SeasonRecordMovement,
+  type SeasonRosterEntry,
+  type SeasonStandings,
+  type SeasonStandingsRow,
+  type SeasonStreak,
+  type SeasonTeamAggregate,
+  type SeasonTeamBox,
+  type SeasonUpcomingHumanGame,
+  type SeasonVersionSpotlight,
+} from '@hoop-rush/data-contracts';
+
+/**
+ * Season Run presentation helpers (M2.3 hub/checkpoint): pure formatting and
+ * derivation of display facts from recorded data. Every value comes from the
+ * frozen contracts — standings rows, aggregate folds, game summaries — so the
+ * UI never invents a fact. Business rules (ranking, eligibility, tie-breaks)
+ * stay in the engine; this module only renders them.
+ */
+
+/** Provisional conference ordering (frozen for M2.3): wins desc, point
+ * differential desc, franchiseId asc. NOT the M2.6 postseason tiebreak. */
+export function provisionalRanking(
+  standings: SeasonStandings,
+  league: SeasonLeague,
+): { row: SeasonStandingsRow; rank: number; conference: 'east' | 'west' }[] {
+  const conferenceOf = new Map(league.teams.map((team) => [team.franchiseId, team.conference]));
+  const rows = [...standings.rows].sort(
+    (a, b) =>
+      b.wins - a.wins ||
+      pointDifferential(b) - pointDifferential(a) ||
+      a.franchiseId.localeCompare(b.franchiseId),
+  );
+  const east: typeof rows = [];
+  const west: typeof rows = [];
+  for (const row of rows) {
+    const conference = conferenceOf.get(row.franchiseId);
+    if (conference === 'east') east.push(row);
+    else west.push(row);
+  }
+  return [
+    ...east.map((row, index) => ({ row, rank: index + 1, conference: 'east' as const })),
+    ...west.map((row, index) => ({ row, rank: index + 1, conference: 'west' as const })),
+  ];
+}
+
+export function pointDifferential(row: SeasonStandingsRow): number {
+  return row.pointsFor - row.pointsAgainst;
+}
+
+export function winPct(wins: number, losses: number): number {
+  if (wins + losses === 0) return 0;
+  return wins / (wins + losses);
+}
+
+export function recordLabel(wins: number, losses: number): string {
+  return `${String(wins)}–${String(losses)}`;
+}
+
+export function streakLabel(kind: 'wins' | 'losses', length: number): string {
+  if (length < 2) return '—';
+  return kind === 'wins' ? `${String(length)} W` : `${String(length)} L`;
+}
+
+export function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${String(n)}th`;
+  switch (n % 10) {
+    case 1:
+      return `${String(n)}st`;
+    case 2:
+      return `${String(n)}nd`;
+    case 3:
+      return `${String(n)}rd`;
+    default:
+      return `${String(n)}th`;
+  }
+}
+
+export function formatClock(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
+}
+
+/** Current winning/losing streak from ordered game summaries (round order). */
+export function franchiseStreak(
+  summaries: readonly SeasonGameSummary[],
+  franchiseId: string,
+): { kind: 'wins' | 'losses'; length: number } | null {
+  const games = summaries
+    .filter(
+      (summary) =>
+        summary.homeFranchiseId === franchiseId || summary.awayFranchiseId === franchiseId,
+    )
+    .sort((a, b) => a.round - b.round);
+  if (games.length === 0) return null;
+  let streak = 0;
+  let kind: 'wins' | 'losses' | null = null;
+  for (let i = games.length - 1; i >= 0; i -= 1) {
+    const game = games[i];
+    if (game === undefined) break;
+    const won = didWin(game, franchiseId);
+    const gameKind = won ? 'wins' : 'losses';
+    if (kind === null) {
+      kind = gameKind;
+      streak = 1;
+    } else if (kind === gameKind) {
+      streak += 1;
+    } else {
+      break;
+    }
+  }
+  if (kind === null) return null;
+  return { kind, length: streak };
+}
+
+export function didWin(summary: SeasonGameSummary, franchiseId: string): boolean {
+  const isHome = summary.homeFranchiseId === franchiseId;
+  if (summary.status === 'forfeit') {
+    return summary.forfeitLoserFranchiseId !== franchiseId;
+  }
+  return isHome ? summary.homeScore > summary.awayScore : summary.awayScore > summary.homeScore;
+}
+
+/** Reconstructs finalized game records by merging summary results into the
+ * run's scheduled games (the engine rebuilds these on demand; this mirror
+ * serves the schedule/results presentation). */
+export function finalizeGameRecords(
+  games: readonly SeasonGame[],
+  summaries: readonly SeasonGameSummary[],
+): SeasonGame[] {
+  const byId = new Map(games.map((game) => [game.gameId, game]));
+  const result: SeasonGame[] = [...games];
+  for (const summary of summaries) {
+    const game = byId.get(summary.gameId);
+    if (!game) continue;
+    const index = result.indexOf(game);
+    result[index] = {
+      ...game,
+      status: summary.status,
+      homeScore: summary.homeScore,
+      awayScore: summary.awayScore,
+      forfeitLoserFranchiseId: summary.forfeitLoserFranchiseId,
+    };
+  }
+  return result;
+}
+
+/** Leader tables derived from the aggregate fold, mirroring the frozen
+ * eligibility (>= 0.7 share of the owner team's games) and depth (5). */
+export function leaderTables(
+  playerAggregates: readonly SeasonPlayerAggregate[],
+  teamAggregates: readonly SeasonTeamAggregate[],
+): Record<SeasonLeaderCategory, SeasonLeaderEntry[]> {
+  const teamGames = new Map(teamAggregates.map((team) => [team.franchiseId, team.gamesPlayed]));
+  const build = (category: SeasonLeaderCategory): SeasonLeaderEntry[] => {
+    const entries = playerAggregates
+      .map((player) => {
+        const teamPlayed = teamGames.get(player.franchiseId) ?? 0;
+        const value =
+          category === 'points'
+            ? player.points
+            : category === 'rebounds'
+              ? player.offensiveRebounds + player.defensiveRebounds
+              : category === 'assists'
+                ? player.assists
+                : category === 'steals'
+                  ? player.steals
+                  : category === 'blocks'
+                    ? player.blocks
+                    : player.threePointersMade;
+        return {
+          playerVersionId: player.playerVersionId,
+          franchiseId: player.franchiseId,
+          gamesPlayed: player.gamesPlayed,
+          value,
+          perGame: player.gamesPlayed > 0 ? value / player.gamesPlayed : 0,
+          eligible:
+            teamPlayed > 0 && player.gamesPlayed >= SEASON_LEADER_MIN_GAME_SHARE * teamPlayed,
+        };
+      })
+      .filter((entry) => entry.eligible && entry.gamesPlayed > 0)
+      .sort(
+        (a, b) =>
+          b.value - a.value ||
+          b.perGame - a.perGame ||
+          a.playerVersionId.localeCompare(b.playerVersionId),
+      )
+      .slice(0, SEASON_LEADER_DEPTH)
+      .map(({ playerVersionId, franchiseId, gamesPlayed, value, perGame }) => ({
+        playerVersionId,
+        franchiseId,
+        gamesPlayed,
+        value,
+        perGame,
+      }));
+    return entries;
+  };
+  return {
+    points: build('points'),
+    rebounds: build('rebounds'),
+    assists: build('assists'),
+    steals: build('steals'),
+    blocks: build('blocks'),
+    threePointersMade: build('threePointersMade'),
+  };
+}
+
+export const LEADER_CATEGORY_LABELS: Record<SeasonLeaderCategory, string> = {
+  points: 'Points',
+  rebounds: 'Rebounds',
+  assists: 'Assists',
+  steals: 'Steals',
+  blocks: 'Blocks',
+  threePointersMade: '3-pointers',
+};
+
+/** Franchise labels from the packaged manifest (display + abbreviation). */
+export function franchiseLabelMap(manifest: HoopRushManifest): Map<string, string> {
+  return new Map(manifest.modernFranchiseSlots.map((slot) => [slot.franchiseId, slot.displayName]));
+}
+
+export interface BoxScoreRow {
+  playerVersionId: string;
+  displayName: string;
+  position: string;
+  seconds: number;
+  points: number;
+  fieldGoalsMade: number;
+  fieldGoalsAttempted: number;
+  threePointersMade: number;
+  threePointersAttempted: number;
+  freeThrowsMade: number;
+  freeThrowsAttempted: number;
+  offensiveRebounds: number;
+  defensiveRebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  turnovers: number;
+  fouls: number;
+}
+
+export interface BoxScore {
+  team: SeasonTeamBox;
+  players: BoxScoreRow[];
+  opponent: { franchiseId: string; points: number };
+  won: boolean;
+}
+
+/** Derives the box score for one side of a completed game from the compact
+ * summary, joined with roster names and position data. Returns null when the
+ * franchise did not play in the game. */
+export function boxScoreFromSummary(
+  summary: SeasonGameSummary,
+  franchiseId: string,
+  names: ReadonlyMap<string, string>,
+  playable: ReadonlyMap<string, readonly string[]>,
+): BoxScore | null {
+  const isHome = summary.homeFranchiseId === franchiseId;
+  if (!isHome && summary.awayFranchiseId !== franchiseId) return null;
+  const box = isHome ? summary.homeBox : summary.awayBox;
+  const lines = isHome ? summary.homePlayers : summary.awayPlayers;
+  return {
+    team: box,
+    players: lines.map((line) => ({
+      playerVersionId: line.playerVersionId,
+      displayName: names.get(line.playerVersionId) ?? line.playerVersionId,
+      position: playable.get(line.playerVersionId)?.[0] ?? '—',
+      seconds: line.seconds,
+      points: line.points,
+      fieldGoalsMade: line.fieldGoalsMade,
+      fieldGoalsAttempted: line.fieldGoalsAttempted,
+      threePointersMade: line.threePointersMade,
+      threePointersAttempted: line.threePointersAttempted,
+      freeThrowsMade: line.freeThrowsMade,
+      freeThrowsAttempted: line.freeThrowsAttempted,
+      offensiveRebounds: line.offensiveRebounds,
+      defensiveRebounds: line.defensiveRebounds,
+      assists: line.assists,
+      steals: line.steals,
+      blocks: line.blocks,
+      turnovers: line.turnovers,
+      fouls: line.fouls,
+    })),
+    opponent: {
+      franchiseId: isHome ? summary.awayFranchiseId : summary.homeFranchiseId,
+      points: isHome ? summary.awayScore : summary.homeScore,
+    },
+    won: didWin(summary, franchiseId),
+  };
+}
+
+/** Human schedule rows for the season view: game, opponent, result, score. */
+export interface ScheduleRow {
+  game: SeasonGame;
+  opponentFranchiseId: string;
+  humanIsHome: boolean;
+  won: boolean | null;
+  humanScore: number | null;
+  opponentScore: number | null;
+}
+
+export function humanScheduleRows(
+  games: readonly SeasonGame[],
+  humanFranchiseId: string,
+): ScheduleRow[] {
+  return games
+    .filter(
+      (game) =>
+        game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId,
+    )
+    .sort((a, b) => a.round - b.round)
+    .map((game) => {
+      const humanIsHome = game.homeFranchiseId === humanFranchiseId;
+      const opponentFranchiseId = humanIsHome ? game.awayFranchiseId : game.homeFranchiseId;
+      const isFinal = game.status === 'final' || game.status === 'forfeit';
+      const humanScore = isFinal ? (humanIsHome ? game.homeScore : game.awayScore) : null;
+      const opponentScore = isFinal ? (humanIsHome ? game.awayScore : game.homeScore) : null;
+      let won: boolean | null = null;
+      if (isFinal) {
+        if (game.status === 'forfeit') {
+          won = game.forfeitLoserFranchiseId !== humanFranchiseId;
+        } else if (humanScore !== null && opponentScore !== null) {
+          won = humanScore > opponentScore;
+        }
+      }
+      return { game, opponentFranchiseId, humanIsHome, won, humanScore, opponentScore };
+    });
+}
+
+/** Rounds completed → display label ("through 20 games", "season complete"). */
+export function progressLabel(completedRounds: number): string {
+  if (completedRounds >= SEASON_ROUND_COUNT) return 'Season complete';
+  return `Rounds 1–${String(completedRounds)} complete`;
+}
+
+/**
+ * Pure fold of compact summaries into the aggregate shapes the checkpoint
+ * commits (the frozen `season-aggregates-v1` fold). The snapshot exposes only
+ * summaries, so the hub folds on demand; a fold over the same facts always
+ * agrees with the stored checkpoint.
+ */
+export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
+  teams: SeasonTeamAggregate[];
+  players: SeasonPlayerAggregate[];
+} {
+  const teams = new Map<string, SeasonTeamAggregate>();
+  const players = new Map<string, SeasonPlayerAggregate>();
+  const touchTeam = (franchiseId: string): SeasonTeamAggregate => {
+    const existing = teams.get(franchiseId);
+    if (existing) return existing;
+    const zero = {
+      franchiseId,
+      gamesPlayed: 0,
+      wins: 0,
+      losses: 0,
+      points: 0,
+      fieldGoalsMade: 0,
+      fieldGoalsAttempted: 0,
+      threePointersMade: 0,
+      threePointersAttempted: 0,
+      freeThrowsMade: 0,
+      freeThrowsAttempted: 0,
+      offensiveRebounds: 0,
+      defensiveRebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+      possessions: 0,
+    };
+    teams.set(franchiseId, zero);
+    return zero;
+  };
+  const touchPlayer = (playerVersionId: string, franchiseId: string): SeasonPlayerAggregate => {
+    const existing = players.get(playerVersionId);
+    if (existing) return existing;
+    const zero = {
+      playerVersionId,
+      franchiseId,
+      gamesPlayed: 0,
+      seconds: 0,
+      points: 0,
+      fieldGoalsMade: 0,
+      fieldGoalsAttempted: 0,
+      threePointersMade: 0,
+      threePointersAttempted: 0,
+      freeThrowsMade: 0,
+      freeThrowsAttempted: 0,
+      offensiveRebounds: 0,
+      defensiveRebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+    };
+    players.set(playerVersionId, zero);
+    return zero;
+  };
+  for (const summary of summaries) {
+    const home = touchTeam(summary.homeFranchiseId);
+    const away = touchTeam(summary.awayFranchiseId);
+    home.gamesPlayed += 1;
+    away.gamesPlayed += 1;
+    if (summary.status === 'forfeit') {
+      const loser = summary.forfeitLoserFranchiseId;
+      if (loser === summary.homeFranchiseId) {
+        away.wins += 1;
+        home.losses += 1;
+      } else {
+        home.wins += 1;
+        away.losses += 1;
+      }
+      continue;
+    }
+    const homeWon = summary.homeScore > summary.awayScore;
+    if (homeWon) {
+      home.wins += 1;
+      away.losses += 1;
+    } else {
+      away.wins += 1;
+      home.losses += 1;
+    }
+    for (const [team, box, lines] of [
+      [home, summary.homeBox, summary.homePlayers],
+      [away, summary.awayBox, summary.awayPlayers],
+    ] as const) {
+      team.points += box.points;
+      team.fieldGoalsMade += box.fieldGoalsMade;
+      team.fieldGoalsAttempted += box.fieldGoalsAttempted;
+      team.threePointersMade += box.threePointersMade;
+      team.threePointersAttempted += box.threePointersAttempted;
+      team.freeThrowsMade += box.freeThrowsMade;
+      team.freeThrowsAttempted += box.freeThrowsAttempted;
+      team.offensiveRebounds += box.offensiveRebounds;
+      team.defensiveRebounds += box.defensiveRebounds;
+      team.assists += box.assists;
+      team.steals += box.steals;
+      team.blocks += box.blocks;
+      team.turnovers += box.turnovers;
+      team.fouls += box.fouls;
+      team.possessions += box.possessions;
+      for (const line of lines) {
+        const player = touchPlayer(line.playerVersionId, team.franchiseId);
+        player.gamesPlayed += 1;
+        player.seconds += line.seconds;
+        player.points += line.points;
+        player.fieldGoalsMade += line.fieldGoalsMade;
+        player.fieldGoalsAttempted += line.fieldGoalsAttempted;
+        player.threePointersMade += line.threePointersMade;
+        player.threePointersAttempted += line.threePointersAttempted;
+        player.freeThrowsMade += line.freeThrowsMade;
+        player.freeThrowsAttempted += line.freeThrowsAttempted;
+        player.offensiveRebounds += line.offensiveRebounds;
+        player.defensiveRebounds += line.defensiveRebounds;
+        player.assists += line.assists;
+        player.steals += line.steals;
+        player.blocks += line.blocks;
+        player.turnovers += line.turnovers;
+        player.fouls += line.fouls;
+      }
+    }
+  }
+  return {
+    teams: [...teams.values()].sort((a, b) => a.franchiseId.localeCompare(b.franchiseId)),
+    players: [...players.values()].sort((a, b) =>
+      a.playerVersionId.localeCompare(b.playerVersionId),
+    ),
+  };
+}
+
+/**
+ * Reconstructs the standings immediately before a block by subtracting the
+ * block's recorded games from the current standings fold (pure reverse fold
+ * over recorded facts; the engine's checkpoint keeps only the post-block
+ * fold). Forfeits subtract their official 2-0 records without points. The
+ * input standings are never mutated: rows and head-to-head records are
+ * cloned before adjustment.
+ */
+export function rebaseStandingsBefore(
+  standings: SeasonStandings,
+  league: SeasonLeague,
+  blockSummaries: readonly SeasonGameSummary[],
+): SeasonStandings {
+  const byId = new Map(
+    standings.rows.map((row) => [
+      row.franchiseId,
+      {
+        ...row,
+        headToHead: row.headToHead.map((record) => ({ ...record })),
+      },
+    ]),
+  );
+  const conferenceOf = new Map(league.teams.map((team) => [team.franchiseId, team.conference]));
+  const divisionOf = new Map(league.teams.map((team) => [team.franchiseId, team.division]));
+  const adjust = (
+    franchiseId: string,
+    delta: {
+      wins?: number;
+      losses?: number;
+      gamesPlayed?: number;
+      home?: number;
+      away?: number;
+      conference?: number;
+      division?: number;
+      pointsFor?: number;
+      pointsAgainst?: number;
+    },
+  ): void => {
+    const row = byId.get(franchiseId);
+    if (!row) return;
+    row.wins += delta.wins ?? 0;
+    row.losses += delta.losses ?? 0;
+    row.gamesPlayed += delta.gamesPlayed ?? 0;
+    row.homeWins += delta.home ?? 0;
+    row.homeLosses += delta.home ?? 0;
+    row.awayWins += delta.away ?? 0;
+    row.awayLosses += delta.away ?? 0;
+    row.conferenceWins += delta.conference ?? 0;
+    row.conferenceLosses += delta.conference ?? 0;
+    row.divisionWins += delta.division ?? 0;
+    row.divisionLosses += delta.division ?? 0;
+    row.pointsFor += delta.pointsFor ?? 0;
+    row.pointsAgainst += delta.pointsAgainst ?? 0;
+  };
+  const headToHead = (
+    franchiseId: string,
+    opponentId: string,
+  ): { wins: number; losses: number } => {
+    const row = byId.get(franchiseId);
+    const record = row?.headToHead.find((h) => h.franchiseId === opponentId);
+    return { wins: record?.wins ?? 0, losses: record?.losses ?? 0 };
+  };
+  for (const summary of blockSummaries) {
+    const home = summary.homeFranchiseId;
+    const away = summary.awayFranchiseId;
+    const homeWon = didWin(summary, home);
+    const winner = homeWon ? home : away;
+    const loser = homeWon ? away : home;
+    const sameConference = conferenceOf.get(home) === conferenceOf.get(away);
+    const sameDivision = divisionOf.get(home) === divisionOf.get(away);
+    const homePoints = summary.homeScore;
+    const awayPoints = summary.awayScore;
+    adjust(winner, {
+      wins: -1,
+      gamesPlayed: -1,
+      home: winner === home ? -1 : 0,
+      away: winner === away ? -1 : 0,
+      conference: sameConference ? -1 : 0,
+      division: sameDivision ? -1 : 0,
+      pointsFor: -(homeWon ? homePoints : awayPoints),
+      pointsAgainst: -(homeWon ? awayPoints : homePoints),
+    });
+    adjust(loser, {
+      losses: -1,
+      gamesPlayed: -1,
+      home: loser === home ? -1 : 0,
+      away: loser === away ? -1 : 0,
+      conference: sameConference ? -1 : 0,
+      division: sameDivision ? -1 : 0,
+      pointsFor: -(homeWon ? awayPoints : homePoints),
+      pointsAgainst: -(homeWon ? homePoints : awayPoints),
+    });
+    const hhWinner = headToHead(winner, loser);
+    const winnerRow = byId.get(winner);
+    const winnerHh = winnerRow?.headToHead.find((h) => h.franchiseId === loser);
+    if (winnerHh) winnerHh.wins = hhWinner.wins - 1;
+    const hhLoser = headToHead(loser, winner);
+    const loserRow = byId.get(loser);
+    const loserHh = loserRow?.headToHead.find((h) => h.franchiseId === winner);
+    if (loserHh) loserHh.losses = hhLoser.losses - 1;
+  }
+  return {
+    ...standings,
+    rows: standings.rows.map((row) => byId.get(row.franchiseId) ?? row),
+  };
+}
+
+/** Notable block lines: human-team first, then league-wide (top 5 each). */
+export function deriveNotablePerformances(
+  blockSummaries: readonly SeasonGameSummary[],
+  humanFranchiseId: string,
+): SeasonNotablePerformance[] {
+  const lines: Array<{
+    playerVersionId: string;
+    franchiseId: string;
+    gameId: string;
+    points: number;
+    rebounds: number;
+    assists: number;
+    humanTeam: boolean;
+  }> = [];
+  for (const summary of blockSummaries) {
+    for (const [franchiseId, players] of [
+      [summary.homeFranchiseId, summary.homePlayers],
+      [summary.awayFranchiseId, summary.awayPlayers],
+    ] as const) {
+      for (const line of players) {
+        lines.push({
+          playerVersionId: line.playerVersionId,
+          franchiseId,
+          gameId: summary.gameId,
+          points: line.points,
+          rebounds: line.offensiveRebounds + line.defensiveRebounds,
+          assists: line.assists,
+          humanTeam: franchiseId === humanFranchiseId,
+        });
+      }
+    }
+  }
+  const sort = (entries: typeof lines) =>
+    [...entries].sort(
+      (a, b) =>
+        b.points - a.points ||
+        b.rebounds - a.rebounds ||
+        b.assists - a.assists ||
+        a.playerVersionId.localeCompare(b.playerVersionId),
+    );
+  const human = sort(lines.filter((line) => line.humanTeam)).slice(0, 5);
+  const league = sort(lines.filter((line) => !line.humanTeam)).slice(0, 5);
+  return [...human, ...league].map((line) => ({
+    playerVersionId: line.playerVersionId,
+    franchiseId: line.franchiseId,
+    gameId: line.gameId,
+    points: line.points,
+    rebounds: line.rebounds,
+    assists: line.assists,
+    humanTeam: line.humanTeam,
+  }));
+}
+
+/** Version-versus-version spotlights for a block, from recorded lines. */
+export function deriveVersionSpotlights(
+  blockSummaries: readonly SeasonGameSummary[],
+  rosters: readonly SeasonRosterEntry[],
+): SeasonVersionSpotlight[] {
+  const byPerson = new Map<string, string[]>();
+  for (const entry of rosters) {
+    const list = byPerson.get(entry.playerId) ?? [];
+    list.push(entry.playerVersionId);
+    byPerson.set(entry.playerId, list);
+  }
+  const totals = new Map<
+    string,
+    { games: number; points: number; rebounds: number; assists: number; franchiseId: string }
+  >();
+  for (const summary of blockSummaries) {
+    for (const [franchiseId, players] of [
+      [summary.homeFranchiseId, summary.homePlayers],
+      [summary.awayFranchiseId, summary.awayPlayers],
+    ] as const) {
+      for (const line of players) {
+        const current = totals.get(line.playerVersionId) ?? {
+          games: 0,
+          points: 0,
+          rebounds: 0,
+          assists: 0,
+          franchiseId,
+        };
+        current.games += 1;
+        current.points += line.points;
+        current.rebounds += line.offensiveRebounds + line.defensiveRebounds;
+        current.assists += line.assists;
+        totals.set(line.playerVersionId, current);
+      }
+    }
+  }
+  const spotlights: SeasonVersionSpotlight[] = [];
+  for (const versions of byPerson.values()) {
+    if (versions.length < 2) continue;
+    for (let i = 0; i < versions.length; i += 1) {
+      for (let j = i + 1; j < versions.length; j += 1) {
+        const a = versions[i];
+        const b = versions[j];
+        if (a === undefined || b === undefined) continue;
+        const ta = totals.get(a);
+        const tb = totals.get(b);
+        if (!ta || !tb) continue;
+        let headToHeadGames = 0;
+        let headToHeadWinsA = 0;
+        let headToHeadWinsB = 0;
+        for (const summary of blockSummaries) {
+          const meeting =
+            (summary.homeFranchiseId === ta.franchiseId &&
+              summary.awayFranchiseId === tb.franchiseId) ||
+            (summary.homeFranchiseId === tb.franchiseId &&
+              summary.awayFranchiseId === ta.franchiseId);
+          if (!meeting) continue;
+          headToHeadGames += 1;
+          if (didWin(summary, ta.franchiseId)) headToHeadWinsA += 1;
+          else headToHeadWinsB += 1;
+        }
+        spotlights.push({
+          versionA: a,
+          versionB: b,
+          sameTeam: ta.franchiseId === tb.franchiseId,
+          gamesPlayedA: ta.games,
+          gamesPlayedB: tb.games,
+          pointsA: ta.points,
+          pointsB: tb.points,
+          reboundsA: ta.rebounds,
+          reboundsB: tb.rebounds,
+          assistsA: ta.assists,
+          assistsB: tb.assists,
+          headToHeadGames,
+          headToHeadWinsA,
+          headToHeadWinsB,
+        });
+      }
+    }
+  }
+  spotlights.sort(
+    (a, b) =>
+      b.pointsA + b.pointsB - (a.pointsA + a.pointsB) || a.versionA.localeCompare(b.versionA),
+  );
+  return spotlights.slice(0, 5);
+}
+
+/**
+ * Derives a recap-shaped presentation from recorded facts when the
+ * repository exposes no recap accessor (the frozen checkpoint contract keeps
+ * recaps inside `CommitSeasonBlockInput` only). Every claim — record and
+ * standings movement, notable performances, streaks, version spotlights, and
+ * upcoming human games — derives from saved summaries, standings, rosters,
+ * and the committed schedule.
+ */
+export function deriveBlockRecap(input: {
+  runId: string;
+  blockIndex: number;
+  completedRounds: number;
+  standings: SeasonStandings;
+  league: SeasonLeague;
+  blockSummaries: readonly SeasonGameSummary[];
+  allSummaries: readonly SeasonGameSummary[];
+  rosters: readonly SeasonRosterEntry[];
+  games: readonly SeasonGame[];
+  humanFranchiseId: string;
+}): SeasonBlockRecap {
+  const {
+    runId,
+    blockIndex,
+    completedRounds,
+    standings,
+    league,
+    blockSummaries,
+    allSummaries,
+    rosters,
+    games,
+    humanFranchiseId,
+  } = input;
+  const before = rebaseStandingsBefore(standings, league, blockSummaries);
+  const rankOf = (rows: SeasonStandingsRow[], franchiseId: string, conference: string): number => {
+    const sorted = [...rows]
+      .filter((row) => conferenceOfLeague(league, row.franchiseId) === conference)
+      .sort(
+        (a, b) =>
+          b.wins - a.wins ||
+          pointDifferential(b) - pointDifferential(a) ||
+          a.franchiseId.localeCompare(b.franchiseId),
+      );
+    const index = sorted.findIndex((row) => row.franchiseId === franchiseId);
+    return index === -1 ? 1 : index + 1;
+  };
+  const movement = (franchiseId: string): SeasonRecordMovement => {
+    const after = standings.rows.find((row) => row.franchiseId === franchiseId);
+    const beforeRow = before.rows.find((row) => row.franchiseId === franchiseId);
+    const conference = conferenceOfLeague(league, franchiseId);
+    return {
+      franchiseId,
+      winsBefore: beforeRow?.wins ?? 0,
+      lossesBefore: beforeRow?.losses ?? 0,
+      winsAfter: after?.wins ?? 0,
+      lossesAfter: after?.losses ?? 0,
+      positionBefore: rankOf(before.rows, franchiseId, conference),
+      positionAfter: rankOf(standings.rows, franchiseId, conference),
+    };
+  };
+  const streaks: SeasonStreak[] = [];
+  for (const team of league.teams) {
+    const streak = franchiseStreak(allSummaries, team.franchiseId);
+    if (streak && streak.length >= 2) {
+      streaks.push({ franchiseId: team.franchiseId, kind: streak.kind, length: streak.length });
+    }
+  }
+  streaks.sort((a, b) => b.length - a.length || a.franchiseId.localeCompare(b.franchiseId));
+  const nextBlockIndex = blockIndex + 1;
+  const upcomingHumanGames: SeasonUpcomingHumanGame[] =
+    nextBlockIndex <= 8 ? humanUpcomingGamesFromGames(games, humanFranchiseId, nextBlockIndex) : [];
+  return {
+    schemaVersion: 1,
+    recapVersion: 'season-recap-v1',
+    runId,
+    blockIndex,
+    completedRounds,
+    humanRecord: movement(humanFranchiseId),
+    standingsMovement: league.teams.map((team) => movement(team.franchiseId)),
+    notablePerformances: deriveNotablePerformances(blockSummaries, humanFranchiseId),
+    streaks: streaks.slice(0, 10),
+    versionSpotlights: deriveVersionSpotlights(blockSummaries, rosters),
+    upcomingHumanGames: upcomingHumanGames.slice(0, 10),
+  };
+}
+
+function conferenceOfLeague(league: SeasonLeague, franchiseId: string): string {
+  return league.teams.find((team) => team.franchiseId === franchiseId)?.conference ?? 'east';
+}
+
+/** Human games in a block's round range (schedule-derived, mirror of the
+ * engine recap's upcoming list). */
+export function humanUpcomingGamesFromGames(
+  games: readonly SeasonGame[],
+  humanFranchiseId: string,
+  blockIndex: number,
+): SeasonUpcomingHumanGame[] {
+  const fromRound = blockIndex * 10 + 1;
+  const toRound = blockIndex === 8 ? SEASON_ROUND_COUNT : (blockIndex + 1) * 10;
+  return games
+    .filter(
+      (game) =>
+        game.round >= fromRound &&
+        game.round <= toRound &&
+        (game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId),
+    )
+    .sort((a, b) => a.round - b.round)
+    .map((game) => ({
+      gameId: game.gameId,
+      round: game.round,
+      homeFranchiseId: game.homeFranchiseId,
+      awayFranchiseId: game.awayFranchiseId,
+      humanIsHome: game.homeFranchiseId === humanFranchiseId,
+      opponentFranchiseId:
+        game.homeFranchiseId === humanFranchiseId ? game.awayFranchiseId : game.homeFranchiseId,
+    }));
+}

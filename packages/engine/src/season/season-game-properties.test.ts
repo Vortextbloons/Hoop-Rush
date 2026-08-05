@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import {
+  SEASON_NEUTRAL_HOME_COURT,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
   playerVersionId,
@@ -98,6 +99,7 @@ function buildInput(seed: string): SeasonGameSimulationInput {
       available: true,
     })),
     removals: [],
+    homeCourt: SEASON_NEUTRAL_HOME_COURT,
   };
 }
 

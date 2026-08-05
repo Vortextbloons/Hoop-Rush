@@ -9,12 +9,19 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import {
   PLAYER_VERSION_ID_VERSION,
   SEASON_AI_VERSION,
+  SEASON_AGGREGATES_VERSION,
+  SEASON_BLOCK_VERSION,
+  SEASON_CHECKPOINT_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_GAME_COUNT,
+  SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
+  SEASON_HOME_COURT_VERSION,
   SEASON_LEAGUE_VERSION,
+  SEASON_LEADERS_VERSION,
   SEASON_POSTSEASON_VERSION,
+  SEASON_RECAP_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
@@ -39,12 +46,16 @@ import { seasonRotationSchema } from './season-rotation.ts';
 /**
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
  * validated record covers the frozen league, ten-player rosters, ownership,
- * schedule reference, all league games, reduced standings, the block cursor,
- * postseason state, and — since schema version 3 (M2.2) — the frozen
- * rotation-planner, Season-game, and Season-game-targets material versions;
- * schema version 2 (M2.1) added the completed draft facts, AI assignments,
- * generated rotations, and the generation audit summary, so a saved run can
- * be resumed, audited, and reproduced from its root seed and versions.
+ * schedule reference, all scheduled game identities, the block cursor,
+ * postseason state, and — since schema version 4 (M2.3) — the frozen block,
+ * summary, aggregates, recap, leaders, home-court, and checkpoint material
+ * versions; schema version 3 (M2.2) added the rotation-planner, Season-game,
+ * and Season-game-targets material versions; schema version 2 (M2.1) added
+ * the completed draft facts, AI assignments, generated rotations, and the
+ * generation audit summary. Completed game facts live in per-block compact
+ * summary rows (season-game-summary-v1), not in this snapshot's scheduled
+ * `games` array; the engine reconstructs finalized game records from the
+ * schedule and summaries on demand.
  */
 
 export {
@@ -124,11 +135,21 @@ export const seasonRunVersionsSchema = z.object({
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
   /** M2.2: substitution planner rules. */
   rotationPlannerVersion: z.literal(SEASON_ROTATION_PLANNER_VERSION),
-  /** M2.2: Season game controller rules. */
+  /** M2.2->M2.3: Season game controller rules (v2 adds the home-court seam). */
   gameVersion: z.literal(SEASON_GAME_VERSION),
-  /** M2.2: frozen Season game calibration cohort and envelopes. */
+  /** M2.2->M2.3: recalibrated Season game cohort and envelopes. */
   gameTargetsVersion: z.literal(SEASON_GAME_TARGETS_VERSION),
   rosterTargetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
+  /** M2.3: block pipeline, compact summaries, aggregates, recap, leaders. */
+  blockVersion: z.literal(SEASON_BLOCK_VERSION),
+  summaryVersion: z.literal(SEASON_GAME_SUMMARY_VERSION),
+  aggregatesVersion: z.literal(SEASON_AGGREGATES_VERSION),
+  recapVersion: z.literal(SEASON_RECAP_VERSION),
+  leadersVersion: z.literal(SEASON_LEADERS_VERSION),
+  /** M2.3: home-court profile. */
+  homeCourtVersion: z.literal(SEASON_HOME_COURT_VERSION),
+  /** M2.3: canonical checkpoint contract and digest. */
+  checkpointVersion: z.literal(SEASON_CHECKPOINT_VERSION),
 });
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
 

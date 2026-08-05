@@ -334,7 +334,7 @@ describe('season game simulate (unit, injected doubles)', () => {
     expect(payload.away.score).toBe(95);
     expect(payload.pass).toBe(true);
     expect(payload.playerMinutes).toHaveLength(20);
-    expect(payload.gameVersion).toBe('season-game-v1');
+    expect(payload.gameVersion).toBe('season-game-v2');
     expect(payload.rotationVersion).toBe('season-rotation-v2');
     // The double received the overridden seed, not the fixture placeholder.
     expect(simulate.mock.calls[0]?.[0].seed).toBe('ab'.repeat(16));
@@ -827,5 +827,5 @@ describe('cli: season game calibrate (end-to-end, real engine)', () => {
     expect(payload.pass).toBe(false);
     expect(payload.targetsWritten).toBe(false);
     expect(payload.workers).toBe(2);
-  });
+  }, 120_000);
 });

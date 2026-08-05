@@ -155,6 +155,13 @@ function buildInput(options: {
     awayRotation: buildRotation(options.away, options.preset),
     availability,
     removals: options.removals ?? [],
+    homeCourt: {
+      schemaVersion: 1,
+      profileVersion: 'season-home-court-v1',
+      homeDefensiveCommunication: 0,
+      awayTurnoverPressure: 0,
+      targetHomeWinRate: 0.575,
+    },
   };
 }
 

@@ -28,6 +28,7 @@ import {
 } from '../sim/possession.ts';
 import { prepareTeam } from '../sim/prepare.ts';
 import { chooseInitialUnit, planUnit, type PlannerRotationContext } from './rotation-planner.ts';
+import { seasonHomeCourtMechanisms } from './home-court.ts';
 
 /**
  * M2.2 Season Run game controller (spec/2.0/04, season-game-v1). Orchestrates
@@ -129,9 +130,7 @@ export function simulateSeasonGame(
   const seam = options.seam ?? defaultSeasonGameSeam(input);
   const controller = new SeasonGameController(input, context, seam);
   return controller.run();
-}
-
-/** Per-side controller state: roster, rotation facts, unit, events, stints. */
+} /** Per-side controller state: roster, rotation facts, unit, events, stints. */
 class SideState {
   readonly side: 'home' | 'away';
   readonly sideIndex: SideIndex;
@@ -266,6 +265,7 @@ class SeasonGameController {
       this.state,
       this.profile,
       placeholder,
+      seasonHomeCourtMechanisms(input.homeCourt),
     );
     this.removalQueue = [...seam.removals].sort((a, b) => {
       const byPeriod = a.period - b.period;
@@ -770,19 +770,21 @@ class SeasonGameController {
 
   private sideResult(index: SideIndex, side: SideState): SeasonGameSideResult {
     const teamInput = side.teamInput;
+    const { teamId: _teamId, ...box } = this.recorder.seasonTeamBox(index, teamInput.teamId);
+    void _teamId;
     return {
       teamId: teamInput.teamId,
       displayName: teamInput.displayName,
       franchiseId: teamInput.franchiseId,
       score: this.recorder.sides[index].points,
       periodScores: this.recorder.sides[index].periodPoints,
-      box: this.recorder.seasonTeamBox(index, teamInput.teamId),
+      box,
       players: teamInput.players.map((player, rosterIndex) => {
-        const box = this.recorder.seasonPlayerBox(index, rosterIndex);
+        const playerBox = this.recorder.seasonPlayerBox(index, rosterIndex);
         return {
           playerVersionId: player.playerVersionId,
           playerId: player.playerId,
-          ...box,
+          ...playerBox,
         };
       }),
       shotZones: this.recorder.zoneSummary(index),

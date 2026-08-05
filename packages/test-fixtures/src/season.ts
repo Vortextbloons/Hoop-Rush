@@ -1,9 +1,16 @@
 import {
   SEASON_AI_VERSION,
+  SEASON_AGGREGATES_VERSION,
+  SEASON_BLOCK_VERSION,
+  SEASON_CHECKPOINT_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
+  SEASON_HOME_COURT_VERSION,
+  SEASON_LEADERS_VERSION,
   SEASON_POSTSEASON_VERSION,
+  SEASON_RECAP_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
@@ -197,9 +204,10 @@ function emptyPostseason(rootSeed: string): SeasonPostseasonState {
  * Complete 30-team Season Run snapshot: committed schedule (caller-supplied
  * schedule — use the packaged artifact or regenerate it with
  * SEASON_COMMITTED_SCHEDULE_SEED), empty results, initial standings, block
- * cursor at round 0, postseason-ready derived seeds, and schema-v3 M2.2
+ * cursor at round 0, postseason-ready derived seeds, and schema-v4 M2.3
  * fields (synthetic draft facts, assignments, rotations, evaluations, the
- * generation audit, and the frozen rotation-planner/game/targets versions).
+ * generation audit, and the frozen block/summary/aggregates/recap/leaders/
+ * home-court/checkpoint versions).
  */
 export function buildSeasonRunFixture(input: {
   schedule: SeasonSchedule;
@@ -221,11 +229,11 @@ export function buildSeasonRunFixture(input: {
     ),
   );
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     runId: 'fixture-season-run-1',
     rootSeed: seed,
     versions: {
-      runSchemaVersion: 3,
+      runSchemaVersion: 4,
       leagueVersion: league.leagueVersion,
       scheduleVersion: input.schedule.scheduleVersion,
       scheduleFormulaVersion: input.schedule.formulaVersion,
@@ -242,6 +250,13 @@ export function buildSeasonRunFixture(input: {
       gameVersion: SEASON_GAME_VERSION,
       gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
       rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
+      blockVersion: SEASON_BLOCK_VERSION,
+      summaryVersion: SEASON_GAME_SUMMARY_VERSION,
+      aggregatesVersion: SEASON_AGGREGATES_VERSION,
+      recapVersion: SEASON_RECAP_VERSION,
+      leadersVersion: SEASON_LEADERS_VERSION,
+      homeCourtVersion: SEASON_HOME_COURT_VERSION,
+      checkpointVersion: SEASON_CHECKPOINT_VERSION,
     },
     league,
     rosters,

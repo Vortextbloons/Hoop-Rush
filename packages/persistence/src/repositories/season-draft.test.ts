@@ -20,20 +20,27 @@ import {
   type SeasonDraftCommandRecord,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
-import { DexieChallengeRepository } from './dexie.js';
-import { DexieSeasonDraftRepository } from './season-draft.js';
+import { DexieChallengeRepository } from './dexie.ts';
+import { DexieSeasonDraftRepository } from './season-draft.ts';
 import {
   recordFromState,
   SEASON_DRAFT_RECORD_ID,
   type StoredSeasonDraft,
-} from '../schemas/season-draft-record.js';
-import type { StoredClassicDraft } from '../schemas/classic-draft-record.js';
+} from '../schemas/season-draft-record.ts';
+import type {
+  StoredSeasonAcceptedBlockRow,
+  StoredSeasonActiveRunIndex,
+  StoredSeasonDetailRow,
+  StoredSeasonRunRecord,
+  StoredSeasonSummaryRow,
+} from '../schemas/season-run-record.ts';
+import type { StoredClassicDraft } from '../schemas/classic-draft-record.ts';
 import type {
   ActiveGameRow,
   ActiveRunCheckpoint,
   CompletedRunIndex,
   StoredRunRecord,
-} from '../schemas/run-record.js';
+} from '../schemas/run-record.ts';
 
 /**
  * Season draft repository contract tests (spec/2.0/03, M2.1): the dedicated
@@ -59,6 +66,11 @@ class TestDatabase extends Dexie {
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
   classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
   seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
+  seasonRuns!: EntityTable<StoredSeasonRunRecord, 'recordId'>;
+  seasonRunSummaries!: Table<StoredSeasonSummaryRow, [string, string]>;
+  seasonRunDetails!: Table<StoredSeasonDetailRow, [string, string]>;
+  seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
+  seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
 
   constructor(name: string) {
     super(name);
@@ -77,6 +89,13 @@ class TestDatabase extends Dexie {
     });
     this.version(5).stores({
       seasonDrafts: 'recordId',
+    });
+    this.version(6).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
     });
   }
 }

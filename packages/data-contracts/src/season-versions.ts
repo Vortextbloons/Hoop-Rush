@@ -8,14 +8,16 @@
  */
 
 /**
- * Season Run persistence snapshot schema layout. Bumped to 3 by M2.2: the
- * run now freezes the rotation-planner, Season-game, and Season-game-targets
- * material versions alongside the M2.1 draft facts, AI assignments,
- * generated rotations, and generation audit. Bumped to 2 by M2.1 (draft
+ * Season Run persistence snapshot schema layout. Bumped to 4 by M2.3: the
+ * run now freezes the block, game-summary, aggregates, recap, leaders,
+ * home-court, and checkpoint material versions; the Season game contract
+ * moved to season-game-v2 (home court) with recalibrated
+ * season-game-targets-v2. Bumped to 3 by M2.2 (rotation-planner, Season-game,
+ * and Season-game-targets material versions). Bumped to 2 by M2.1 (draft
  * facts, AI assignments, rotations, audit, new material versions). The M2.0
  * schema v1 data is development scaffolding, not a migration target.
  */
-export const SEASON_RUN_SCHEMA_VERSION = 3;
+export const SEASON_RUN_SCHEMA_VERSION = 4;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -74,21 +76,78 @@ export const SEASON_ROTATION_VERSION = 'season-rotation-v2';
 export const SEASON_ROTATION_PLANNER_VERSION = 'rotation-planner-v1';
 
 /**
- * Season Run single-game controller (spec/2.0/04, season-game-v1, M2.2):
- * resumable possession steps, ten-player rotations, foul-outs, substitutions,
- * exact seconds, unit stints, deviations, and typed forfeits.
+ * Season Run single-game controller (spec/2.0/04, season-game-v2, M2.3).
+ * v2 applies the versioned home-court profile through named mechanisms only
+ * (improved home defensive communication and additional away turnover
+ * pressure); the neutral adapter used by Classic remains byte-identical to
+ * the M2.2 fixed-five path.
  */
-export const SEASON_GAME_VERSION = 'season-game-v1';
+export const SEASON_GAME_VERSION = 'season-game-v2';
 
 /**
- * Frozen Season game calibration cohort and envelopes (season-game-targets-v1,
- * M2.2): seeds 0-1023 calibration with 1024-1279 held out, preset-minute
+ * Frozen Season game calibration cohort and envelopes
+ * (season-game-targets-v2, M2.3): recalibrated with the home-court profile
+ * applied; seeds 0-1023 calibration with 1024-1279 held out, preset-minute
  * ordering gates, and 95% held-out envelope coverage.
  */
-export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v1';
+export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v2';
 
 /** Frozen calibration cohort targets for AI roster strength and coverage. */
 export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v1';
+
+/**
+ * M2.3 pure block simulation pipeline (spec/2.0/02 ten-game blocks,
+ * season-block-v1): validate cursor and locked rotations, expand the 300
+ * drafted versions, simulate in stable game-id order, convert to compact
+ * summaries, fold standings and aggregates, audit, build the recap, and
+ * produce one candidate checkpoint.
+ */
+export const SEASON_BLOCK_VERSION = 'season-block-v1';
+
+/** Compact completed-game summary conversion (season-game-summary-v1). */
+export const SEASON_GAME_SUMMARY_VERSION = 'season-game-summary-v1';
+
+/** Team/player aggregate folding and leaders (season-aggregates-v1). */
+export const SEASON_AGGREGATES_VERSION = 'season-aggregates-v1';
+
+/** Block recap construction from saved game and aggregate facts. */
+export const SEASON_RECAP_VERSION = 'season-recap-v1';
+
+/** League leaders derivation, eligibility, and tie-breaking. */
+export const SEASON_LEADERS_VERSION = 'season-leaders-v1';
+
+/**
+ * Home-court profile (season-home-court-v1): two named bounded mechanisms
+ * (home defensive communication, away turnover pressure) calibrated against
+ * a frozen held-out home-win-rate target. The neutral adapter is the zero
+ * profile and never changes Classic results.
+ */
+export const SEASON_HOME_COURT_VERSION = 'season-home-court-v1';
+
+/**
+ * Canonical candidate-checkpoint contract and digest (season-checkpoint-v1).
+ * The digest is a pure function of the checkpoint's recorded facts, so
+ * uninterrupted, cancelled/retried, terminated/reloaded, single-worker, and
+ * CLI executions must agree byte-for-byte.
+ */
+export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v1';
+
+/**
+ * Frozen held-out home-win-rate calibration target for the season-home-court
+ * profile (M2.3). The bounded constants are tuned against this target, never
+ * against a general ratings multiplier.
+ */
+export const SEASON_HOME_WIN_RATE_TARGET = 0.575;
+
+/**
+ * League-leader eligibility: a player-version qualifies for per-game rate
+ * leader categories after playing at least this share of the team's games
+ * played at the time of derivation.
+ */
+export const SEASON_LEADER_MIN_GAME_SHARE = 0.7;
+
+/** Per-category leader table depth. */
+export const SEASON_LEADER_DEPTH = 5;
 
 /**
  * Committed authoring seed of the packaged `season/draft-catalog.json`-driven

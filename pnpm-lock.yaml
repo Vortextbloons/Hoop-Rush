@@ -186,6 +186,9 @@ importers:
       '@hoop-rush/data-contracts':
         specifier: workspace:*
         version: link:../data-contracts
+      '@hoop-rush/engine':
+        specifier: workspace:*
+        version: link:../engine
       dexie:
         specifier: ^4.4.4
         version: 4.4.4
@@ -242,6 +245,9 @@ importers:
       '@hoop-rush/importer':
         specifier: workspace:*
         version: link:../../packages/importer
+      '@hoop-rush/persistence':
+        specifier: workspace:*
+        version: link:../../packages/persistence
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -252,9 +258,15 @@ importers:
       '@types/node':
         specifier: ^26.1.2
         version: 26.1.2
+      dexie:
+        specifier: ^4.4.4
+        version: 4.4.4
       eslint:
         specifier: ^10.8.0
         version: 10.8.0(jiti@2.7.0)
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
       tsx:
         specifier: ^4.23.4
         version: 4.23.4

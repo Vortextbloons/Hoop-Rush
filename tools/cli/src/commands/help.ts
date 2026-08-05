@@ -104,6 +104,38 @@ Commands:
                          --schedule <path>    Schedule artifact (default packaged)
                          --league <path>      League artifact (default packaged)
                          --manifest <path>    Manifest for hash cross-check
+  season block simulate  Run one ten-game block through the authoritative
+                         block pipeline over a committed run fixture.
+                         --input <run.json> (default fixtures/season-run.json)
+                         --block N (default: the cursor's next block)
+                         --manifest <path> --profile <eraId>
+  season block audit     Audit a candidate checkpoint JSON: schema, cursor,
+                         reconciliation, recap, and digest verification.
+                         --input <checkpoint.json> --run <run.json>
+                         --manifest <path> --profile <eraId>
+  season full simulate   Simulate all nine blocks (1,230 games) and print
+                         per-block digests, the final digest, and total time.
+                         --input <run.json> --manifest <path> --profile <eraId>
+  season home-court calibrate
+                         Measure the tuned home-court profile against the
+                         frozen 0.575 held-out target and write the evidence
+                         artifact (home-court-targets.json).
+                         --fixture <ids> --seed-from N --seed-to N --workers N
+                         --constants a,b (dev tuning) --out <path>
+                         --validate <path> (check an existing artifact)
+  season benchmark block Measure normal-block (0) and final-block (8) times
+                         against the desktop budgets (3s / 1s).
+                         --out <path> --input <run.json>
+  season benchmark full  Measure the full-season time against the 30s budget.
+                         --out <path> --input <run.json>
+  season benchmark determinism
+                         Run the full season twice plus an interrupted-resume
+                         run; fail when any digest diverges.
+                         --out <path> --input <run.json>
+  season benchmark persistence
+                         Run the persistence package's Season Run benchmark
+                         harness (commit/reload p95, storage size).
+                         --samples N --out <path>
   import ratings         Derive ratings/tendencies/traits/contracts from fetched
                          raw-data roster + season-stats (Python stays the fetch
                          layer only). --seasons 2024-25,2023-24 (comma-separated)

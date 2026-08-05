@@ -194,6 +194,7 @@ export function makeProbability(
   action: ActionType,
   periodSecondsRemaining: number,
   prep: ShotPrep,
+  homeCourtAdjustment = 0,
 ): number {
   const threePointZone = isThreePointZone(zone);
   const observedThreePointPct = threePointZone ? shooter.anchors?.threePointPct : null;
@@ -228,6 +229,15 @@ export function makeProbability(
       ? -(0.04 + Math.min(1, Math.max(0, (4 - periodSecondsRemaining) / 4)) * 0.06)
       : 0;
   const calibration = threePointZone ? ENGINE_CONSTANTS.threePointCalibrationOffset : 0;
-  const raw = base + skill + contest + era + spacing + quality + latePenalty + calibration;
+  const raw =
+    base +
+    skill +
+    contest +
+    era +
+    spacing +
+    quality +
+    latePenalty +
+    calibration +
+    homeCourtAdjustment;
   return Math.min(0.97, Math.max(ENGINE_CONSTANTS.zoneMakeFloor[zone], Math.max(0.03, raw)));
 }

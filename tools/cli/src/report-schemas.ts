@@ -703,3 +703,118 @@ export const seasonGameCalibrateReportSchema = z.object({
   pass: z.boolean(),
 });
 export type SeasonGameCalibrateReport = z.infer<typeof seasonGameCalibrateReportSchema>;
+
+/**
+ * M2.3 `season block simulate` / `season block audit` report payloads
+ * (spec/2.0/02, spec/2.0/07).
+ */
+export const seasonBlockSimulateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season block simulate'),
+  runId: z.string().min(1).max(64),
+  blockIndex: z.number().int().min(0).max(8),
+  expectedRevision: z.number().int().nonnegative(),
+  rotationDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  completedRounds: z.number().int().min(0).max(82),
+  summaryCount: z.number().int().min(1).max(150),
+  retainedDetailCount: z.number().int().min(0).max(10),
+  digest: z.string().regex(/^[0-9a-f]{32}$/),
+  durationMs: z.number().nonnegative(),
+  auditFailures: z.array(z.string()),
+  rejection: z.string().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonBlockSimulateReport = z.infer<typeof seasonBlockSimulateReportSchema>;
+
+export const seasonBlockAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season block audit'),
+  runId: z.string().min(1).max(64),
+  blockIndex: z.number().int().min(0).max(8),
+  digest: z.string().regex(/^[0-9a-f]{32}$/),
+  recomputedDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  auditFailures: z.array(z.string()),
+  pass: z.boolean(),
+});
+export type SeasonBlockAuditReport = z.infer<typeof seasonBlockAuditReportSchema>;
+
+/** M2.3 `season full simulate` report payload. */
+export const seasonFullSimulateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season full simulate'),
+  runId: z.string().min(1).max(64),
+  blockDigests: z
+    .array(
+      z.object({
+        blockIndex: z.number().int().min(0).max(8),
+        digest: z.string().regex(/^[0-9a-f]{32}$/),
+        durationMs: z.number().nonnegative(),
+      }),
+    )
+    .length(9),
+  finalDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  totalDurationMs: z.number().nonnegative(),
+  summaries: z.number().int().positive(),
+  auditFailures: z.array(z.string()),
+  pass: z.boolean(),
+});
+export type SeasonFullSimulateReport = z.infer<typeof seasonFullSimulateReportSchema>;
+
+/** M2.3 `season benchmark` report payloads. */
+export const seasonBenchmarkReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.enum([
+    'season benchmark block',
+    'season benchmark full',
+    'season benchmark determinism',
+    'season benchmark persistence',
+  ]),
+  runId: z.string().min(1).max(64),
+  durationMs: z.number().nonnegative(),
+  budgetMs: z.number().nullable(),
+  withinBudget: z.boolean().nullable(),
+  digest: z.string().nullable(),
+  identicalDigests: z.boolean().nullable(),
+  perBlock: z
+    .array(
+      z.object({
+        blockIndex: z.number().int().min(0).max(8),
+        digest: z.string().regex(/^[0-9a-f]{32}$/),
+        durationMs: z.number().nonnegative(),
+      }),
+    )
+    .optional(),
+  persistence: z.unknown().nullable(),
+  auditFailures: z.array(z.string()),
+  outPath: z.string().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonBenchmarkReport = z.infer<typeof seasonBenchmarkReportSchema>;
+
+/** M2.3 `season home-court calibrate` report payload. */
+export const seasonHomeCourtCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season home-court calibrate'),
+  profileVersion: z.literal('season-home-court-v1'),
+  constants: z.object({
+    homeDefensiveCommunication: z.number().min(0).max(1),
+    awayTurnoverPressure: z.number().min(0).max(1),
+  }),
+  targetHomeWinRate: z.literal(0.575),
+  calibrationSeedCount: z.number().int().nonnegative(),
+  validationSeedCount: z.number().int().nonnegative(),
+  neutralHomeWinRate: z.number().min(0).max(1),
+  achievedHomeWinRate: z.number().min(0).max(1),
+  gamesSimulated: z.number().int().positive(),
+  durationMs: z.number().nonnegative(),
+  gates: z.object({
+    neutralBaseline: z.boolean(),
+    withinTolerance: z.boolean(),
+    possessionStable: z.boolean(),
+    monotonic: z.boolean(),
+  }),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonHomeCourtCalibrateReport = z.infer<typeof seasonHomeCourtCalibrateReportSchema>;

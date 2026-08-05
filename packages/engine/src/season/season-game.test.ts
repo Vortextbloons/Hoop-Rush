@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SEASON_NEUTRAL_HOME_COURT,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
   seasonGameSimulationResultSchema,
@@ -115,6 +116,7 @@ function buildSeasonGameInput(
       available: true,
     })),
     removals: [],
+    homeCourt: SEASON_NEUTRAL_HOME_COURT,
     ...overrides,
   };
 }

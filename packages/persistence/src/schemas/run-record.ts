@@ -10,7 +10,7 @@ import {
   type GameResult,
   type RunAggregates,
 } from '@hoop-rush/data-contracts';
-import type { StoredClassicDraft } from './classic-draft-record.js';
+import type { StoredClassicDraft } from './classic-draft-record.ts';
 
 /**
  * Stored-record schemas for IndexedDB (and any future adapter). Persistence

@@ -126,6 +126,61 @@ export {
   evaluateSeasonRoster,
   runSeasonRosterCalibrationSeeds,
 } from './season/ai.ts';
+// M2.3 full-league blocks: home-court profile, compact summaries, aggregate
+// folding, game reconstruction, checkpoint digests, block recaps, and the
+// authoritative block pipeline shared by the worker and the CLI.
+export {
+  SEASON_HOME_COURT_DEFENSE_MAX_ADJUSTMENT,
+  SEASON_HOME_COURT_TURNOVER_MAX_ADJUSTMENT,
+  SEASON_HOME_COURT_PROFILE,
+  seasonHomeCourtMechanisms,
+  type SeasonHomeCourtMechanisms,
+} from './season/home-court.ts';
+export {
+  seasonGameSummaryFromResult,
+  seasonRetainedDetailFromResult,
+  auditSeasonGameSummary,
+} from './season/game-summary.ts';
+export {
+  foldSeasonTeamAggregates,
+  foldSeasonPlayerAggregates,
+  auditSeasonAggregates,
+  deriveSeasonLeaders,
+  provisionalStandingOrder,
+} from './season/aggregates.ts';
+export {
+  reconstructSeasonGames,
+  seasonCheckpointCanonical,
+  seasonCheckpointDigest,
+} from './season/checkpoint.ts';
+export {
+  buildSeasonBlockRecap,
+  auditSeasonBlockRecap,
+  seasonBlockGameCount,
+  seasonBlockRecapCanonical,
+  seasonBlockRecapDigest,
+  type SeasonBlockRecapInput,
+} from './season/recap.ts';
+export {
+  seasonAcceptedBlockCount,
+  seasonNextBlockIndex,
+  expandSeasonRunRosters,
+  rosterPlayerIdsOf,
+  simulateSeasonBlock,
+  seasonBlockGamesOf,
+  simulateSeasonBlockGame,
+  assembleSeasonBlockCandidate,
+  seasonBlockRejection,
+  auditSeasonBlock,
+  handleSubmitSeasonBlockCommand,
+  SeasonBlockValidationError,
+  SeasonBlockInvariantError,
+  SeasonBlockCancelledError,
+  type SeasonBlockSimulationInput,
+  type SeasonBlockSimulationOptions,
+  type SeasonSubmitBlockCommandInput,
+} from './season/block.ts';
+export { seasonRotationSetDigest } from './season/rotation.ts';
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
 export * as classic from './modes/classic/draft.ts';

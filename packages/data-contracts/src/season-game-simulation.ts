@@ -10,6 +10,7 @@ import {
 import { playerVersionIdSchema } from './season-identity.ts';
 import { ratingProfileSchema } from './ratings-model.ts';
 import { seasonRotationSchema } from './season-rotation.ts';
+import { seasonHomeCourtProfileSchema, SEASON_NEUTRAL_HOME_COURT } from './season-home-court.ts';
 import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -18,11 +19,14 @@ import {
 } from './season-versions.ts';
 
 /**
- * M2.2 Season Run single-game simulation contracts (spec/2.0/04,
- * season-game-v1, rotation-planner-v1, season-game-targets-v1). The engine
+ * M2.2->M2.3 Season Run single-game simulation contracts (spec/2.0/04,
+ * season-game-v2, rotation-planner-v1, season-game-targets-v2). The engine
  * controller consumes `SeasonGameSimulationInput`, produces the typed
  * `SeasonGameSimulationResult` discriminated union, and records
  * substitutions, unit stints, per-player deviations, foul-outs, and removals.
+ * v2 adds the optional home-court profile; the neutral adapter keeps
+ * fixed-five Classic and neutral Season games byte-identical to the M2.2
+ * engine.
  *
  * Identity rule: `playerVersionId` is the authoritative simulation and
  * recorder identity. `playerId` is person-level metadata only, so two
@@ -161,7 +165,9 @@ export type SeasonGameTeamInput = z.infer<typeof seasonGameTeamInputSchema>;
  * Everything needed to reproduce one Season game: seed, game number,
  * versions, era profile, both ten-player rosters, both v2 rotations, and
  * pregame availability. `removals` is the M2.5 injury seam; it is empty in
- * production M2.2 inputs.
+ * production M2.2 inputs. `homeCourt` is the M2.3 home-court profile;
+ * omitting it uses the neutral (zero) adapter, which is byte-identical to
+ * the M2.2 fixed-five path.
  */
 export const seasonGameSimulationInputSchema = z
   .object({
@@ -178,6 +184,12 @@ export const seasonGameSimulationInputSchema = z
     /** Pregame availability for every rostered version on both sides. */
     availability: z.array(seasonGameAvailabilitySchema).length(20),
     removals: z.array(seasonRemovalSchema).default([]),
+    /**
+     * M2.3 home-court profile (season-home-court-v1). Additive with a
+     * neutral default so M2.2 inputs parse unchanged; the neutral adapter
+     * must not alter any result.
+     */
+    homeCourt: seasonHomeCourtProfileSchema.default(() => SEASON_NEUTRAL_HOME_COURT),
   })
   .superRefine((input, ctx) => {
     const ids = new Set<string>();

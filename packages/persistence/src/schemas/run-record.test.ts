@@ -7,7 +7,7 @@ import {
   runFromCheckpoint,
   storedRunRecordSchema,
   type StoredRunRecord,
-} from './run-record.js';
+} from './run-record.ts';
 
 describe('storedRunRecordSchema', () => {
   it('round-trips an accepted challenge run', () => {

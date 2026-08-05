@@ -3,12 +3,14 @@
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { ClassicDraftState, HoopRushManifest } from '@hoop-rush/data-contracts';
+  import type { SeasonActiveRunIndex } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { getManifest, warmPlayersIndex } from '$lib/data';
   import { challengeRepository } from '$lib/challenge-repo';
   import { variantLabel } from '$lib/draft-presentation';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
+  import { getSeasonRunRepository } from '$lib/season/season-repo';
 
   const sandboxHref = resolve('/sandbox');
   const historyHref = resolve('/sandbox/history');
@@ -32,12 +34,21 @@
       cta: 'Start sandbox',
       href: '/sandbox' as RouteId,
     },
+    {
+      code: '03',
+      name: 'Season Run',
+      line: 'Ten-round draft, a 30-team league, and nine season checkpoints. Roll your franchise, build your ten, and run the full 82-game regular season.',
+      status: 'available',
+      cta: 'Start season run',
+      href: '/season' as RouteId,
+    },
   ] as const;
 
   let manifest = $state<HoopRushManifest | null>(null);
   let active = $state.raw<ActiveRunCheckpoint | null>(null);
   let classicDraft = $state.raw<ClassicDraftState | null>(null);
   let recent = $state.raw<CompletedRunIndex[]>([]);
+  let seasonRun = $state.raw<SeasonActiveRunIndex | null>(null);
 
   function warmPlayersIndexDuringIdle(): void {
     const idle = window.requestIdleCallback;
@@ -74,6 +85,16 @@
         // History and continue are best-effort on the start page.
       },
     );
+    // Season Run resume is additive and best-effort; a missing repository
+    // (not yet wired) must never break the rest of the start page.
+    getSeasonRunRepository()
+      .then((repo) => repo.loadActiveRunIndex())
+      .then((index) => {
+        if (!cancelled) seasonRun = index;
+      })
+      .catch(() => {
+        // No active Season Run (or persistence not wired yet).
+      });
     warmPlayersIndexDuringIdle();
     return () => {
       cancelled = true;
@@ -139,6 +160,15 @@
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
         Continue draft · round {classicDraft.round} of 5
+      </a>
+    {/if}
+    {#if seasonRun}
+      <a
+        href={resolve('/season/league')}
+        class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
+      >
+        Continue season · {seasonRun.humanWins}–{seasonRun.humanLosses} · through
+        {seasonRun.completedRounds} rounds
       </a>
     {/if}
   </div>

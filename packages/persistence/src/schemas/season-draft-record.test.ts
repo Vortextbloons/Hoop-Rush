@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildSeasonDraftState } from '@hoop-rush/test-fixtures';
-import { recordFromState, storedSeasonDraftSchema } from './season-draft-record.js';
+import { recordFromState, storedSeasonDraftSchema } from './season-draft-record.ts';
 
 describe('storedSeasonDraftSchema', () => {
   it('accepts a valid record with a null generation', () => {

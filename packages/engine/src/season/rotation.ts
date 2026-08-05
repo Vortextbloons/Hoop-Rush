@@ -1,6 +1,7 @@
 import {
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
+  seasonDigestHex,
   type SeasonRotation,
   type SeasonRotationCommandResult,
   type SeasonRotationPreset,
@@ -98,6 +99,30 @@ export function buildMinimalRotation(input: {
 /** Total of the rotation's target minutes (must equal 240). */
 export function rotationTargetMinutes(rotation: SeasonRotation): number {
   return rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0);
+}
+
+/**
+ * Canonical digest of the locked 30-rotation set (spec/2.0/07 M2.3). Sort by
+ * franchiseId; include starters, bench order, target minutes sorted by
+ * playerVersionId, the closing five, and the rotation version; hash with
+ * `seasonDigestHex`. Identical sets hash identically regardless of input
+ * order, so a stale or tampered block lock is rejected before any simulation
+ * runs.
+ */
+export function seasonRotationSetDigest(rotations: readonly SeasonRotation[]): string {
+  const canonical = [...rotations]
+    .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))
+    .map((rotation) => ({
+      franchiseId: rotation.franchiseId,
+      starters: rotation.starters,
+      benchOrder: rotation.benchOrder,
+      targetMinutes: [...rotation.targetMinutes].sort((a, b) =>
+        a.playerVersionId < b.playerVersionId ? -1 : 1,
+      ),
+      closingFive: rotation.closingFive,
+      rotationVersion: rotation.rotationVersion,
+    }));
+  return seasonDigestHex(JSON.stringify(canonical));
 }
 
 /**

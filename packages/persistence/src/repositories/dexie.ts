@@ -2,7 +2,7 @@ import Dexie, { type EntityTable, type Table } from 'dexie';
 import {
   classicDraftRecordSchema,
   type StoredClassicDraft,
-} from '../schemas/classic-draft-record.js';
+} from '../schemas/classic-draft-record.ts';
 import {
   activeGameRowSchema,
   activeRunCheckpointSchema,
@@ -16,8 +16,15 @@ import {
   type ChallengeRepository,
   type CompletedRunIndex,
   type StoredRunRecord,
-} from '../schemas/run-record.js';
-import type { StoredSeasonDraft } from '../schemas/season-draft-record.js';
+} from '../schemas/run-record.ts';
+import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
+import type {
+  StoredSeasonAcceptedBlockRow,
+  StoredSeasonActiveRunIndex,
+  StoredSeasonDetailRow,
+  StoredSeasonRunRecord,
+  StoredSeasonSummaryRow,
+} from '../schemas/season-run-record.ts';
 
 /**
  * Concrete IndexedDB challenge repository (spec/04, spec/07 reduced reuse).
@@ -38,6 +45,16 @@ export class HoopRushDatabase extends Dexie {
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
   classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
   seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
+  /** Season Run (M2.3) active checkpoint row; single row at 'season-run'. */
+  seasonRuns!: EntityTable<StoredSeasonRunRecord, 'recordId'>;
+  /** One compact summary per completed league game, keyed [runId+gameId]. */
+  seasonRunSummaries!: Table<StoredSeasonSummaryRow, [string, string]>;
+  /** One retained detail per human-team game, keyed [runId+gameId]. */
+  seasonRunDetails!: Table<StoredSeasonDetailRow, [string, string]>;
+  /** One accepted block per commit, keyed [runId+blockIndex]. */
+  seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
+  /** Active-run index row; single row at 'season-run'. */
+  seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
 
   constructor() {
     super('hoop-rush-saves');
@@ -90,6 +107,18 @@ export class HoopRushDatabase extends Dexie {
     // v5 is additive (one new self-contained table for the M2.1 Season draft).
     // Older saves keep every existing table and row untouched, so no upgrade
     // hook is needed: v5 only creates the new table in the database.
+    this.version(6).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+    });
+    // v6 is additive (five new self-contained tables for the M2.3 Season Run
+    // persistence: checkpoint, compact summaries, retained details, accepted
+    // block history, and the active-run index). Older saves keep every
+    // existing table and row untouched, so no upgrade hook is needed: v6 only
+    // creates the new tables in the database.
   }
 }
 

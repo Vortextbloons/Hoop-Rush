@@ -32,6 +32,7 @@ import { pickRebounder, resolveRebound } from './rebounding.ts';
 import { prepareTeam, enginePlayerKey, type TeamPrep } from './prepare.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
+import type { SeasonHomeCourtMechanisms } from '../season/home-court.ts';
 
 /**
  * One offensive trip (spec/03 pipeline stages 1-9), executed as resumable
@@ -97,6 +98,13 @@ export interface TripContext {
   meanTripSeconds: number;
   eraPossEstimatePerTrip: number;
   passingAnchorFactor: number;
+  /**
+   * M2.3 home-court mechanisms (season-home-court-v1). Absent for Classic
+   * and neutral Season games: both adjustments are zero and every draw and
+   * probability is byte-identical to the M2.2 engine. The season controller
+   * computes the signed, bounded adjustments from the versioned profile.
+   */
+  homeCourt?: SeasonHomeCourtMechanisms;
 }
 
 /** Builds the shared per-game trip context (state mutates in place; the rest is stable). */
@@ -106,6 +114,7 @@ export function createTripContext(
   state: GameState,
   profile: EraSimulationProfile,
   teams: [SimulationTeam, SimulationTeam],
+  homeCourt?: SeasonHomeCourtMechanisms,
 ): TripContext {
   return {
     rng,
@@ -117,6 +126,7 @@ export function createTripContext(
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
     passingAnchorFactor: 0.5 + (profile.parameters.assistAnchorRating - 50) / 100,
+    ...(homeCourt !== undefined ? { homeCourt } : {}),
   };
 }
 
@@ -220,6 +230,10 @@ export class PossessionStepper {
 
     const handler = pickInitiator(team, teamPrep.initiatorWeights, rng);
     const handlerSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(handler)) ?? -1;
+    // M2.3 away-turnover-pressure mechanism: the away offense faces a small
+    // bounded turnover-probability increase (zero under the neutral profile).
+    const awayTurnoverPressure =
+      this.offenseSide === 1 ? (this.ctx.homeCourt?.awayTurnoverPressureAdjustment ?? 0) : 0;
     if (
       rng.chance(
         turnoverProbability(
@@ -227,6 +241,7 @@ export class PossessionStepper {
           defensePrep.pressure,
           this.ctx.eraPossEstimatePerTrip,
           this.ctx.profile,
+          awayTurnoverPressure,
         ),
       )
     ) {
@@ -586,9 +601,22 @@ function resolveShot(
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
   if (rng.chance(foulP)) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
+    // M2.3 home defensive-communication mechanism: away shots against the
+    // home defense convert at a small bounded lower rate (zero under the
+    // neutral profile).
+    const homeDefenseAdjustment =
+      defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
     const shotP =
-      makeProbability(shooter, defender, profile, zone, action, state.secondsRemaining, shotPrep) *
-      ENGINE_CONSTANTS.fouledShotMakeScale;
+      makeProbability(
+        shooter,
+        defender,
+        profile,
+        zone,
+        action,
+        state.secondsRemaining,
+        shotPrep,
+        homeDefenseAdjustment,
+      ) * ENGINE_CONSTANTS.fouledShotMakeScale;
     const made = rng.chance(shotP);
     recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
     if (made) {
@@ -622,6 +650,8 @@ function resolveShot(
   }
 
   // Shot resolution.
+  const homeDefenseAdjustment =
+    defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
   const shotP = makeProbability(
     shooter,
     defender,
@@ -630,6 +660,7 @@ function resolveShot(
     action,
     state.secondsRemaining,
     shotPrep,
+    homeDefenseAdjustment,
   );
   const made = rng.chance(shotP);
   recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);

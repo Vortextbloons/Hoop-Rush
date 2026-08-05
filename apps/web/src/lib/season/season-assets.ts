@@ -1,0 +1,158 @@
+import {
+  loadEraSimulationProfile,
+  loadSeasonDraftCatalog as loadPackagedSeasonDraftCatalog,
+  seasonLeagueSchema,
+  seasonScheduleSchema,
+  type EraSimulationProfile,
+  type SeasonDraftCatalog,
+  type SeasonHomeCourtProfile,
+  type SeasonLeague,
+  type SeasonSchedule,
+} from '@hoop-rush/data-contracts';
+import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
+import { getManifest } from '$lib/data';
+import { resolve } from '$app/paths';
+
+/**
+ * PROVISIONAL IMPLEMENTATION — OWNED BY THE LEAD.
+ *
+ * The lead implements this file in parallel with the M2.3 UI; these exported
+ * signatures are FROZEN and must not change. This provisional version lets the
+ * screens build and e2e run before the lead's implementation lands; replace
+ * the bodies freely (hash-verify + parse semantics should stay identical).
+ *
+ * Frozen exports:
+ *   loadSeasonLeague(): Promise<SeasonLeague>
+ *   loadSeasonSchedule(): Promise<SeasonSchedule>
+ *   loadSeasonDraftCatalog(): Promise<SeasonDraftCatalog>
+ *   loadSeasonEraProfile(): Promise<EraSimulationProfile>   (fixed 2010s)
+ *   loadSeasonHomeCourtProfile(): Promise<SeasonHomeCourtProfile>
+ *   seasonArtifactUrls(): Promise<SeasonArtifactUrls>       (worker input)
+ */
+
+export interface SeasonArtifactUrls {
+  catalogUrl: string;
+  catalogHash: string;
+  profileUrl: string;
+  profileHash: string;
+}
+
+const FIXED_SEASON_ERA = '2010s';
+
+function siteRoot(): string {
+  return resolve('/');
+}
+
+function resolveAssetUrl(url: string): string {
+  if (/^https?:\/\//.test(url) || url.startsWith('/')) return url;
+  return `${siteRoot()}data/${url}`;
+}
+
+async function fetchVerified<T>(
+  url: string,
+  contentHash: string,
+  parse: (value: unknown) => T,
+): Promise<T> {
+  const response = await fetch(url, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(
+      `season asset request failed: ${String(response.status)} ${response.statusText}`,
+    );
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const digest = await sha256Hex(bytes);
+  if (digest !== contentHash) {
+    throw new Error(`season asset content hash mismatch: expected ${contentHash}, got ${digest}`);
+  }
+  const text = new TextDecoder().decode(bytes);
+  return parse(JSON.parse(text) as unknown);
+}
+
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  if (typeof crypto !== 'undefined' && typeof crypto.subtle.digest === 'function') {
+    const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  return '0'.repeat(64);
+}
+
+const cache = new Map<string, Promise<unknown>>();
+
+function memoized<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const existing = cache.get(key) as Promise<T> | undefined;
+  if (existing) return existing;
+  const promise = load();
+  cache.set(key, promise);
+  promise.catch(() => cache.delete(key));
+  return promise;
+}
+
+export function loadSeasonLeague(): Promise<SeasonLeague> {
+  return memoized('season/league', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.season?.league;
+    if (!entry) throw new Error('The season league artifact is unavailable.');
+    return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) =>
+      seasonLeagueSchema.parse(value),
+    );
+  });
+}
+
+export function loadSeasonSchedule(): Promise<SeasonSchedule> {
+  return memoized('season/schedule', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.season?.schedule;
+    if (!entry) throw new Error('The season schedule artifact is unavailable.');
+    return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) =>
+      seasonScheduleSchema.parse(value),
+    );
+  });
+}
+
+export function loadSeasonDraftCatalog(): Promise<SeasonDraftCatalog> {
+  return memoized('season/draft-catalog', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.season?.draftCatalog;
+    if (!entry) throw new Error('The season draft catalog artifact is unavailable.');
+    return loadPackagedSeasonDraftCatalog(resolveAssetUrl(entry.url), entry.contentHash);
+  });
+}
+
+export function loadSeasonEraProfile(): Promise<EraSimulationProfile> {
+  return memoized('season/era-profile', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SEASON_ERA);
+    if (!entry) throw new Error('The 2010s era simulation profile is unavailable.');
+    return loadEraSimulationProfile(resolveAssetUrl(entry.url), entry.contentHash);
+  });
+}
+
+/**
+ * The fixed season home-court profile. The engine's tuned constant is
+ * authoritative (season-home-court-v1); the packaged
+ * `season/home-court-targets.json` artifact is the calibration evidence and
+ * is validated by the CLI `season home-court calibrate --validate` command.
+ */
+export function loadSeasonHomeCourtProfile(): Promise<SeasonHomeCourtProfile> {
+  return Promise.resolve({ ...SEASON_HOME_COURT_PROFILE });
+}
+
+export function seasonArtifactUrls(): Promise<SeasonArtifactUrls> {
+  return memoized('season/artifact-urls', async () => {
+    const manifest = await getManifest();
+    const catalog = manifest.season?.draftCatalog;
+    const profile = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SEASON_ERA);
+    if (!catalog || !profile) throw new Error('Season worker artifacts are unavailable.');
+    return {
+      catalogUrl: resolveAssetUrl(catalog.url),
+      catalogHash: catalog.contentHash,
+      profileUrl: resolveAssetUrl(profile.url),
+      profileHash: profile.contentHash,
+    };
+  });
+}
+
+/** @internal Resets memoized loaders between unit tests. */
+export function clearSeasonAssetCaches(): void {
+  cache.clear();
+}

@@ -3,8 +3,8 @@ import {
   storedSeasonDraftSchema,
   type SeasonDraftRepository,
   type StoredSeasonDraft,
-} from '../schemas/season-draft-record.js';
-import { HoopRushDatabase } from './dexie.js';
+} from '../schemas/season-draft-record.ts';
+import { HoopRushDatabase } from './dexie.ts';
 
 /**
  * Concrete IndexedDB Season draft repository (spec/2.0/03, spec/2.0/07, M2.1).
