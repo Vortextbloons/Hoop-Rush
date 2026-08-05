@@ -46,7 +46,9 @@
           title="Coming soon"
           class="flex min-w-0 flex-1 cursor-default flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-semibold leading-none text-muted-foreground/60"
         >
-          <item.icon class="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span aria-hidden="true" class="contents">
+            <item.icon class="h-5 w-5 shrink-0" />
+          </span>
           <span class="max-w-full truncate">{item.label}</span>
         </span>
       {:else}
@@ -60,7 +62,9 @@
             ? 'bg-primary text-primary-foreground'
             : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
         >
-          <item.icon class="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span aria-hidden="true" class="contents">
+            <item.icon class="h-5 w-5 shrink-0" />
+          </span>
           <span class="max-w-full truncate">{item.label}</span>
         </a>
       {/if}
