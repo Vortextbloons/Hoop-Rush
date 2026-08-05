@@ -15,6 +15,7 @@ import {
   SEASON_AI_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROTATION_VERSION,
+  seasonDraftLegacyStateSchema,
   seasonDraftStateSchema,
   type SeasonDraftCommandRecord,
   type SeasonLeagueGenerationResult,
@@ -252,8 +253,9 @@ describe('season draft repository (dexie)', () => {
     const loaded = await season.loadSeasonDraft();
     expect(loaded).not.toBeNull();
     expect(loaded?.saveSchemaVersion).toBe(1);
-    expect(loaded?.draft.draftVersion).toBe('season-draft-v1');
-    expect(loaded?.draft.rolls).toHaveLength(1);
+    const loadedDraft = seasonDraftLegacyStateSchema.parse(loaded?.draft);
+    expect(loadedDraft.draftVersion).toBe('season-draft-v1');
+    expect(loadedDraft.rolls).toHaveLength(1);
     expect(await db.seasonDrafts.count()).toBe(1);
     // The legacy record persists untouched until the user discards it.
     await season.clearSeasonDraft();
