@@ -11,8 +11,8 @@
  */
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { PUBLIC_DATA } from '../config.js';
-import { fileExists, readJson, sha256File, writeJsonRetry } from '../json.js';
+import { PUBLIC_DATA } from '../config.ts';
+import { fileExists, readJson, sha256File, writeJsonRetry } from '../json.ts';
 import {
   LINEAGE_RULE_VERSION,
   MANIFEST_SCHEMA_VERSION,
@@ -22,13 +22,13 @@ import {
   PLAYERS_INDEX_SCHEMA_VERSION,
   RATING_MODEL_VERSION,
 } from '@hoop-rush/data-contracts';
-import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.js';
+import { LINEAGE_SEGMENTS, MODERN_SLOTS } from '../lineage.ts';
 import {
   classifyUnattempted,
   loadCoverageReport,
   loadManifest,
   type Pool,
-} from '../pools/compute.js';
+} from '../pools/compute.ts';
 
 type Manifest = Record<string, unknown>;
 

@@ -6,8 +6,8 @@ import { seasonRunSchema } from '@hoop-rush/data-contracts';
 import {
   seasonScheduleAuditReportSchema,
   seasonScheduleGenerateReportSchema,
-} from './report-schemas.js';
-import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.js';
+} from './report-schemas.ts';
+import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
 /**
  * CLI integration tests for `season schedule generate` and `season schedule

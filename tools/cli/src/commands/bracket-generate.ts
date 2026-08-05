@@ -18,12 +18,12 @@ import {
   type SimulationAnchors,
   playableSlotGroups,
 } from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
-import { bracketGenerateReportSchema } from '../report-schemas.js';
-import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { bracketGenerateReportSchema } from '../report-schemas.ts';
+import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.ts';
 import { pools } from '@hoop-rush/importer';
-import { UsageError } from './sim.js';
-import { parseCount } from '../args.js';
+import { UsageError } from './sim.ts';
+import { parseCount } from '../args.ts';
 
 /**
  * `bracket generate` (dev tool, spec/01): authors the frozen 30-team bracket

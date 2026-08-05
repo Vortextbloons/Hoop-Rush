@@ -1,4 +1,4 @@
-import { hoopRushManifestSchema, type HoopRushManifest } from '../manifest.js';
+import { hoopRushManifestSchema, type HoopRushManifest } from '../manifest.ts';
 
 /** Fetch and validate the Hoop Rush manifest from a base URL. */
 export async function loadManifest(url: string, init?: RequestInit): Promise<HoopRushManifest> {

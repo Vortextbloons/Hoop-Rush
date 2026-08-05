@@ -10,7 +10,7 @@
  * canonical G/F/C value it replaced.
  */
 import { POSITION_NORMALIZATION_VERSION, type Position } from '@hoop-rush/data-contracts';
-import type { PositionOverride } from '../positions/overrides.js';
+import type { PositionOverride } from '../positions/overrides.ts';
 
 /**
  * Maps every published NBA position label to the detailed positions it

@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { REPO_ROOT } from './cli-test-helpers.js';
+import { REPO_ROOT } from './cli-test-helpers.ts';
 
 /**
  * Architectural dependency check (spec/2.0/07, M2.0 exit gate): Season Run

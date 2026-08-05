@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { eraIdSchema, franchiseIdSchema, seedSchema } from './ids.js';
-import { playerVersionIdSchema } from './season-identity.js';
-import { seasonLeagueSchema } from './season-league.js';
-import { SEASON_DRAFT_VERSION } from './season-versions.js';
+import { eraIdSchema, franchiseIdSchema, seedSchema } from './ids.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
+import { seasonLeagueSchema } from './season-league.ts';
+import { SEASON_DRAFT_VERSION } from './season-versions.ts';
 
 /**
  * Authoritative Season Run draft command envelopes and their accepted or

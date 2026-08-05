@@ -16,7 +16,7 @@ import {
   type SeasonRotation,
   type SeasonRun,
 } from '@hoop-rush/data-contracts';
-import { buildSeasonLeague } from './season.js';
+import { buildSeasonLeague } from './season.ts';
 
 /**
  * Deterministic Season Run M2.1 fixture builders (spec/2.0 M2.1): a compact

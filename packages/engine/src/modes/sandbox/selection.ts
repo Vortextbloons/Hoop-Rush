@@ -4,10 +4,10 @@ import {
   createGameInput,
   simulateChallenge,
   type ChallengeCreation,
-} from '../../challenge/commands.js';
-import { deriveAttemptSeed } from '../../challenge/seeds.js';
-import { simulateGame } from '../../sim/game.js';
-import type { EngineContext } from '../../sim/context.js';
+} from '../../challenge/commands.ts';
+import { deriveAttemptSeed } from '../../challenge/seeds.ts';
+import { simulateGame } from '../../sim/game.ts';
+import type { EngineContext } from '../../sim/context.ts';
 
 /**
  * Sandbox whole-run best-of-N selection (spec/01 sandbox loop). Sandbox

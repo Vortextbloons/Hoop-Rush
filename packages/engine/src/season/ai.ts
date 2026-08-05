@@ -17,5 +17,5 @@ export {
   generateAiLeague,
   runSeasonRosterCalibrationSeeds,
   type SeasonAiGenerationInput,
-} from './ai-generation.js';
+} from './ai-generation.ts';
 export type { SeasonLeagueGenerationResult } from '@hoop-rush/data-contracts';

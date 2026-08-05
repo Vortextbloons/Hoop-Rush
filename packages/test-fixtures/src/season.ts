@@ -24,7 +24,7 @@ import {
   buildFixtureSeasonDraftFacts,
   buildSeasonAiAssignments,
   buildSeasonRotation,
-} from './season-draft.js';
+} from './season-draft.ts';
 
 /**
  * Deterministic Season Run fixture builders (spec/2.0 M2.0, M2.1). Every

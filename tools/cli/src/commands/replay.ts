@@ -7,9 +7,9 @@ import {
   type GameResult,
   type GameSimulationInput,
 } from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
-import { replayReportSchema } from '../report-schemas.js';
-import { UsageError } from './sim.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { replayReportSchema } from '../report-schemas.ts';
+import { UsageError } from './sim.ts';
 
 /**
  * `replay` (spec/09): reproduces a saved game input and compares its result

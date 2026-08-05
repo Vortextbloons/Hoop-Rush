@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
-import { run, DATA_VERSION, ASSET_CACHE_VERSION } from './index.js';
-import { sha256File, writeJson } from '../json.js';
+import { run, DATA_VERSION, ASSET_CACHE_VERSION } from './index.ts';
+import { sha256File, writeJson } from '../json.ts';
 
 // The availability-matrix classification scans packaged season dirs; allow
 // headroom for parallel-suite CPU contention.

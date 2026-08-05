@@ -1,10 +1,10 @@
 import { classifyArchetype, createEngineContext } from '@hoop-rush/engine';
 import type { GameResult, SimulationPlayer } from '@hoop-rush/data-contracts';
-import { makeReport, type CliReport } from '../report.js';
-import { simDiagnoseReportSchema, simSeasonReportSchema } from '../report-schemas.js';
-import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from './sim.js';
-import { loadPackagedData, PackagedData } from './data-loader.js';
-import { parseCount } from '../args.js';
+import { makeReport, type CliReport } from '../report.ts';
+import { simDiagnoseReportSchema, simSeasonReportSchema } from '../report-schemas.ts';
+import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from './sim.ts';
+import { loadPackagedData, PackagedData } from './data-loader.ts';
+import { parseCount } from '../args.ts';
 
 /**
  * `sim diagnose` and `sim season` (spec/09). Opportunity-level diagnostics for

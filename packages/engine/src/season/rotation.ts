@@ -1,7 +1,7 @@
 import { SEASON_ROTATION_VERSION, type SeasonRotation } from '@hoop-rush/data-contracts';
 import type { Position } from '@hoop-rush/data-contracts';
-import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.js';
-import { canPlay } from '../domain/positions.js';
+import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
+import { canPlay } from '../domain/positions.ts';
 
 /**
  * Minimal M2.1 rotation builder (spec/2.0/04, season-rotation-v1). Five

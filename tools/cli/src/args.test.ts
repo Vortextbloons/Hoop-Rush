@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseArgs, UsageError } from './args.js';
+import { parseArgs, UsageError } from './args.ts';
 
 describe('parseArgs', () => {
   it('parses a two-word command with options', () => {

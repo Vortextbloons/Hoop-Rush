@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { franchiseIdSchema, eraIdSchema, playerIdSchema, seedSchema } from './ids.js';
-import { difficultyProfileSchema } from './difficulty.js';
-import { lineupSchema } from './lineup.js';
-import { simulationPlayerSchema } from './simulation.js';
-import { gameResultSchema, playerBoxScoreSchema, teamBoxScoreSchema } from './result.js';
-import { opponentBracketCoreSchema } from './bracket.js';
-import { RUN_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from './versions.js';
-import { classicCompletedDraftSchema, classicVariantSchema } from './classic.js';
+import { franchiseIdSchema, eraIdSchema, playerIdSchema, seedSchema } from './ids.ts';
+import { difficultyProfileSchema } from './difficulty.ts';
+import { lineupSchema } from './lineup.ts';
+import { simulationPlayerSchema } from './simulation.ts';
+import { gameResultSchema, playerBoxScoreSchema, teamBoxScoreSchema } from './result.ts';
+import { opponentBracketCoreSchema } from './bracket.ts';
+import { RUN_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from './versions.ts';
+import { classicCompletedDraftSchema, classicVariantSchema } from './classic.ts';
 
 /**
  * Accepted challenge-run state (spec/04 minimal run state). The domain shape

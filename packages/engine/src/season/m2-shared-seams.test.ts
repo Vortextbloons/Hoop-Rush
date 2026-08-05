@@ -6,9 +6,9 @@ import {
   rosterFeasible,
   validateSeasonRoster,
   type SeasonRosterMemberInput,
-} from './roster-rules.js';
-import { buildMinimalRotation, matchStartingFive, rotationTargetMinutes } from './rotation.js';
-import { seasonGenerationDigest } from './digest.js';
+} from './roster-rules.ts';
+import { buildMinimalRotation, matchStartingFive, rotationTargetMinutes } from './rotation.ts';
+import { seasonGenerationDigest } from './digest.ts';
 import { buildSeasonDraftCatalog, buildSeasonRotation } from '@hoop-rush/test-fixtures';
 
 const g = (id: string, ...positions: string[]): SeasonRosterMemberInput => ({

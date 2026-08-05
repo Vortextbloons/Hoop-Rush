@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
 import { buildLegalSimulationTeam } from '@hoop-rush/test-fixtures';
-import { foulerWeights, shootingFoulProbability } from './fouls.js';
-import { rebounderWeights, teamMean } from './rebounding.js';
-import { stealerWeights } from './security.js';
-import { blockProbability } from './shooting.js';
+import { foulerWeights, shootingFoulProbability } from './fouls.ts';
+import { rebounderWeights, teamMean } from './rebounding.ts';
+import { stealerWeights } from './security.ts';
+import { blockProbability } from './shooting.ts';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
 
 function playerAt(team: SimulationTeam, index: number): SimulationPlayer {

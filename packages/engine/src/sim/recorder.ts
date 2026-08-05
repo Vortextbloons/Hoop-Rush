@@ -5,7 +5,7 @@ import type {
   TeamBoxScore,
   ShotZoneSummary,
 } from '@hoop-rush/data-contracts';
-import { SHOT_ZONES } from '../domain/zones.js';
+import { SHOT_ZONES } from '../domain/zones.ts';
 
 /** Usage identity FGA + 0.44*FTA + TOV (spec/03 diagnostics, invariant-checked). */
 export function usageOf(fga: number, fta: number, tov: number): number {

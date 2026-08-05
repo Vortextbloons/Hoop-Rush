@@ -15,10 +15,10 @@ import {
   ratingsModelArtifactSchema,
   slotGroupOf,
 } from '@hoop-rush/data-contracts';
-import { makeReport, type CliReport } from '../report.js';
-import { loadPackagedData, PackagedData } from './data-loader.js';
-import { parseCount } from '../args.js';
-import { fixtureSeed } from './sim.js';
+import { makeReport, type CliReport } from '../report.ts';
+import { loadPackagedData, PackagedData } from './data-loader.ts';
+import { parseCount } from '../args.ts';
+import { fixtureSeed } from './sim.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from '@hoop-rush/importer';
 
 const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];

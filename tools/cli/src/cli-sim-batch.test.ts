@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { simBatchReportSchema } from './report-schemas.js';
-import { jsonPayload, runCli } from './cli-test-helpers.js';
+import { simBatchReportSchema } from './report-schemas.ts';
+import { jsonPayload, runCli } from './cli-test-helpers.ts';
 
 describe('cli: sim batch worker independence', () => {
   it('produces identical aggregates with 1 and 4 workers', async () => {

@@ -23,7 +23,7 @@ import {
   type SeasonPostseasonState,
   type SeasonRun,
   type SeasonSchedule,
-} from './index.js';
+} from './index.ts';
 
 /**
  * Season Run contract tests (M2.0): every runtime schema round-trips valid
@@ -941,7 +941,7 @@ describe('season run schema', () => {
 
 describe('player version identity', () => {
   it('is deterministic and field-sensitive', async () => {
-    const mod = await import('./index.js');
+    const mod = await import('./index.ts');
     const { playerVersionId } = mod;
     const a = playerVersionId('p-1', 'lakers', '1990s', '1996-97');
     const b = playerVersionId('p-1', 'lakers', '1990s', '1996-97');
@@ -954,7 +954,7 @@ describe('player version identity', () => {
   });
 
   it('derives distinct ids for two versions of the same person', async () => {
-    const mod = await import('./index.js');
+    const mod = await import('./index.ts');
     const { playerVersionId } = mod;
     const peak = playerVersionId('p-23', 'bulls', '1990s', '1997-98');
     const second = playerVersionId('p-23', 'bulls', '1990s', '1996-97');
@@ -964,7 +964,7 @@ describe('player version identity', () => {
 
 describe('season seed derivation', () => {
   it('is deterministic, namespaced, and order-independent', async () => {
-    const mod = await import('./index.js');
+    const mod = await import('./index.ts');
     const { seasonNamespaceSeed, SEASON_SEED_NAMESPACES } = mod;
     const seed = 'c0ffee1a2b3c4d5e6f708192a3b4c5d6e';
     const draft = seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.draft);
@@ -996,7 +996,7 @@ describe('season seed derivation', () => {
   });
 
   it('pins stable derivation vectors for the committed run seed', async () => {
-    const mod = await import('./index.js');
+    const mod = await import('./index.ts');
     const { seasonNamespaceSeed, SEASON_SEED_NAMESPACES, playerVersionId } = mod;
     const seed = 'c0ffee2026a1b2c3d4e5f60718293a4b';
     expect(seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.draft)).toBe(

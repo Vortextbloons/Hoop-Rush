@@ -7,7 +7,7 @@ import {
   type SeasonPostseasonState,
 } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
-import { createRng } from '../sim/rng.js';
+import { createRng } from '../sim/rng.ts';
 import {
   auditSeasonPostseason,
   createPlayoffBracket,
@@ -15,7 +15,7 @@ import {
   setPlayInRankings,
   submitPlayInGame,
   submitPlayoffGame,
-} from './postseason.js';
+} from './postseason.ts';
 
 /**
  * Season Run postseason tests (spec/2.0/02, postseason-v1): every Play-In

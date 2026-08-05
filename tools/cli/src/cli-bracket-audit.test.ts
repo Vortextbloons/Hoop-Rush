@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { bracketAuditReportSchema } from './report-schemas.js';
-import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.js';
+import { bracketAuditReportSchema } from './report-schemas.ts';
+import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
 describe('cli: bracket audit', () => {
   it('validates the frozen bracket and emits a stable report', async () => {

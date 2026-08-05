@@ -6,12 +6,12 @@ import {
   seasonScheduleSchema,
 } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague, seedFromString } from '@hoop-rush/test-fixtures';
-import { auditSeasonSchedule, generateSeasonSchedule } from './schedule.js';
+import { auditSeasonSchedule, generateSeasonSchedule } from './schedule.ts';
 import {
   conferenceNonDivisionOpponentsOf,
   divisionOpponentsOf,
   oppositeConferenceOpponentsOf,
-} from './league.js';
+} from './league.ts';
 
 /**
  * Season Run schedule tests (spec/2.0/02): committed artifact invariants,

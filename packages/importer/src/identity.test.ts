@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalPlayerName } from './identity.js';
+import { canonicalPlayerName } from './identity.ts';
 
 describe('canonicalPlayerName', () => {
   it('repairs the source split for Joe Barry Carroll by stable ID', () => {

@@ -7,12 +7,12 @@
  * profile in v3.ts. The compatibility helpers below are provisional
  * diagnostics and never feed packaging.
  */
-import { clamp, clampRating, safeFloat } from '../json.js';
-import { computeOverall } from './weights.js';
-import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.js';
-import { computeOffenseDefense, deriveRatingProfile, tendenciesForProfile } from './v3.js';
+import { clamp, clampRating, safeFloat } from '../json.ts';
+import { computeOverall } from './weights.ts';
+import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
+import { computeOffenseDefense, deriveRatingProfile, tendenciesForProfile } from './v3.ts';
 import type { SimulationRatings, SimulationTendencies } from '@hoop-rush/data-contracts';
-import type { StatsRow } from './stats.js';
+import type { StatsRow } from './stats.ts';
 
 const RATING_KEYS: readonly (keyof SimulationRatings)[] = [
   'insideScoring',

@@ -21,10 +21,10 @@ import {
   LINEUP_STRUCTURE,
   classicDraftCatalogSchema,
 } from '@hoop-rush/data-contracts';
-import { canPlay, slotGroupOf } from '../../domain/positions.js';
-import { slotRequirement as lineupSlotRequirement, validateLineup } from '../../domain/lineup.js';
-import type { EngineContext } from '../../sim/context.js';
-import type { ClassicChallengeCreation } from '../../challenge/commands.js';
+import { canPlay, slotGroupOf } from '../../domain/positions.ts';
+import { slotRequirement as lineupSlotRequirement, validateLineup } from '../../domain/lineup.ts';
+import type { EngineContext } from '../../sim/context.ts';
+import type { ClassicChallengeCreation } from '../../challenge/commands.ts';
 
 /**
  * Classic draft commands (spec/01 Classic game mode): the single authoritative

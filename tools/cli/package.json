@@ -10,7 +10,7 @@
     "lint": "prettier --cache --check src vitest.config.ts eslint.config.js && eslint --cache .",
     "test": "vitest",
     "test:run": "vitest run",
-    "hoop-rush": "tsx src/index.ts",
+    "hoop-rush": "node src/index.ts",
     "gen-fixtures": "tsx src/gen-fixtures.ts",
     "gen-season-assets": "tsx src/gen-season-assets.ts",
     "gen-season-draft-catalog": "tsx src/gen-season-draft-catalog.ts"

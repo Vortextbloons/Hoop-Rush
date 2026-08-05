@@ -2,12 +2,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { cpus } from 'node:os';
 import { isAbsolute, resolve } from 'node:path';
 import { createChallenge, createEngineContext, simulateChallenge } from '@hoop-rush/engine';
-import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.js';
-import { benchmarkReportSchema, type BenchmarkReport } from '../report-schemas.js';
-import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.js';
-import { lineupForTeam, resolveUserTeam } from './challenge.js';
-import { buildInput, chunkRange, fixtureSeed, loadFixture, runSingleGame } from './sim.js';
-import { parseCount } from '../args.js';
+import { EXIT_USAGE_OR_DATA_ERROR, makeReport, type CliReport } from '../report.ts';
+import { benchmarkReportSchema, type BenchmarkReport } from '../report-schemas.ts';
+import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.ts';
+import { lineupForTeam, resolveUserTeam } from './challenge.ts';
+import { buildInput, chunkRange, fixtureSeed, loadFixture, runSingleGame } from './sim.ts';
+import { parseCount } from '../args.ts';
 
 /**
  * Measures pool loading, warm single-game, and complete 82-game throughput.

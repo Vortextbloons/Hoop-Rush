@@ -1,5 +1,5 @@
-import { playersIndexSchema, type PlayersIndex } from '../player-season.js';
-import { sha256Hex } from './verify-hash.js';
+import { playersIndexSchema, type PlayersIndex } from '../player-season.ts';
+import { sha256Hex } from './verify-hash.ts';
 
 /** Validate an unknown draft-index value at a runtime boundary. */
 export function parsePlayersIndex(value: unknown): PlayersIndex {

@@ -12,12 +12,12 @@ import {
   type SeasonScheduleGame,
   type Seed,
 } from '@hoop-rush/data-contracts';
-import { createRng, shuffle } from '../sim/rng.js';
+import { createRng, shuffle } from '../sim/rng.ts';
 import {
   conferenceNonDivisionOpponentsOf,
   divisionOpponentsOf,
   oppositeConferenceOpponentsOf,
-} from './league.js';
+} from './league.ts';
 
 /**
  * Deterministic Season Run schedule generator (spec/2.0/02,

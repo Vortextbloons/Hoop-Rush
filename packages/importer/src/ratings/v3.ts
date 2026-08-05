@@ -11,8 +11,8 @@ import {
   type SimulationTendencies,
   type SummaryRatings,
 } from '@hoop-rush/data-contracts';
-import { clamp, clampRating, safeFloat } from '../json.js';
-import type { StatsRow } from './stats.js';
+import { clamp, clampRating, safeFloat } from '../json.ts';
+import type { StatsRow } from './stats.ts';
 
 export const RATING_ARCHETYPES: readonly RatingArchetype[] = [
   'primaryCreator',

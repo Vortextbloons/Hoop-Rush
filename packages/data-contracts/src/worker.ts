@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { eraSimulationProfileSchema } from './era-sim-profile.js';
-import { challengeRunSchema } from './run.js';
-import { gameResultSchema } from './result.js';
+import { eraSimulationProfileSchema } from './era-sim-profile.ts';
+import { challengeRunSchema } from './run.ts';
+import { gameResultSchema } from './result.ts';
 
 /**
  * Versioned Web Worker messages (spec/04 static deployment and workers). The

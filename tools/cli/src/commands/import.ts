@@ -13,7 +13,7 @@ import {
   ratings,
   runPythonFetch,
 } from '@hoop-rush/importer';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 
 /**
  * `hoop-rush import <step>` commands: build-time data derivation. Python

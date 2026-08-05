@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { playerIdSchema, seedSchema } from './ids.js';
-import { positionUnionSchema } from './positions.js';
-import { eraSimulationProfileSchema } from './era-sim-profile.js';
-import { ratingProfileSchema } from './ratings-model.js';
+import { playerIdSchema, seedSchema } from './ids.ts';
+import { positionUnionSchema } from './positions.ts';
+import { eraSimulationProfileSchema } from './era-sim-profile.ts';
+import { ratingProfileSchema } from './ratings-model.ts';
 
 /**
  * M2 possession-engine contracts. The engine consumes only these explicit

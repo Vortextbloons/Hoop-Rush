@@ -1,6 +1,6 @@
-import type { Rng } from './rng.js';
-import { createRng } from './rng.js';
-import { ENGINE_VERSION } from './constants.js';
+import type { Rng } from './rng.ts';
+import { createRng } from './rng.ts';
+import { ENGINE_VERSION } from './constants.ts';
 
 /**
  * Engine context (spec/10 public boundary). The RNG factory is injected so

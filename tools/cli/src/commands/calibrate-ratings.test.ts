@@ -1,7 +1,7 @@
 ﻿import { describe, expect, it } from 'vitest';
 import { RATINGS_VERSION, RATING_MODEL_VERSION } from '@hoop-rush/data-contracts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from '@hoop-rush/importer';
-import { buildRatingsModelArtifact, calibrationConfidence } from './calibrate-ratings.js';
+import { buildRatingsModelArtifact, calibrationConfidence } from './calibrate-ratings.ts';
 
 describe('calibrationConfidence', () => {
   it('is the fraction of the confidence target reached by the samples', () => {

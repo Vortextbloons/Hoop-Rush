@@ -1,5 +1,5 @@
 import type { BracketScheduleEntry, Seed } from '@hoop-rush/data-contracts';
-import { createRng, swapAt } from '../sim/rng.js';
+import { createRng, swapAt } from '../sim/rng.ts';
 
 /**
  * Fixed schedule generation (spec/01 challenge schedule). One seeded,

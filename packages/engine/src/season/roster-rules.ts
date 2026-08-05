@@ -1,5 +1,5 @@
 import type { Position } from '@hoop-rush/data-contracts';
-import { canPlay, slotGroupOf } from '../domain/positions.js';
+import { canPlay, slotGroupOf } from '../domain/positions.ts';
 import { SEASON_ROSTER_RULES_VERSION } from '@hoop-rush/data-contracts';
 
 /**

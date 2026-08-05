@@ -3,8 +3,8 @@ import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { combineDocs, rewriteLinksForRoot } from './docs-combine.js';
-import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.js';
+import { combineDocs, rewriteLinksForRoot } from './docs-combine.ts';
+import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
 
 let dir: string;
 

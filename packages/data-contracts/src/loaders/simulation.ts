@@ -1,8 +1,8 @@
-import type { EraSimulationProfile } from '../era-sim-profile.js';
-import { eraSimulationProfileSchema } from '../era-sim-profile.js';
-import type { OpponentTeam } from '../opponent.js';
-import { opponentTeamSchema } from '../opponent.js';
-import { verifySha256 } from './verify-hash.js';
+import type { EraSimulationProfile } from '../era-sim-profile.ts';
+import { eraSimulationProfileSchema } from '../era-sim-profile.ts';
+import type { OpponentTeam } from '../opponent.ts';
+import { opponentTeamSchema } from '../opponent.ts';
+import { verifySha256 } from './verify-hash.ts';
 
 /** Validates an era simulation profile at a runtime boundary. */
 export function parseEraSimulationProfile(value: unknown): EraSimulationProfile {

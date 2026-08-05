@@ -6,8 +6,8 @@ import {
   seasonDraftReproduceReportSchema,
   seasonRostersAuditReportSchema,
   seasonRostersGenerateReportSchema,
-} from './report-schemas.js';
-import { jsonPayload, REPO_ROOT, runCli } from './cli-test-helpers.js';
+} from './report-schemas.ts';
+import { jsonPayload, REPO_ROOT, runCli } from './cli-test-helpers.ts';
 
 /**
  * CLI integration tests for the M2.1 Season Run commands: `season draft

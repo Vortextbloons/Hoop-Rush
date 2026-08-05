@@ -6,7 +6,7 @@ import type {
   SlotIndex,
 } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
-import { canPlay } from './positions.js';
+import { canPlay } from './positions.ts';
 
 /**
  * Lineup legality: exactly two Guards, two Forwards, and one Center. Slots are

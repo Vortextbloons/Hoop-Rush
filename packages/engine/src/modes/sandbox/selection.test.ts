@@ -6,21 +6,21 @@ import {
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import type { ChallengeRun } from '@hoop-rush/data-contracts';
-import { createEngineContext } from '../../sim/context.js';
+import { createEngineContext } from '../../sim/context.ts';
 import {
   createChallenge,
   simulateChallenge,
   type ChallengeCreation,
   type ChallengeCreationBase,
-} from '../../challenge/commands.js';
-import { deriveAttemptSeed } from '../../challenge/seeds.js';
+} from '../../challenge/commands.ts';
+import { deriveAttemptSeed } from '../../challenge/seeds.ts';
 import {
   BEST_OF_ATTEMPTS,
   chooseBestRun,
   chooseBestRunSeed,
   scoreRun,
   simulateChallengeBestOf,
-} from './selection.js';
+} from './selection.ts';
 
 const context = createEngineContext();
 

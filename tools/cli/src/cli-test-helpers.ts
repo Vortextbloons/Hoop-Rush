@@ -7,8 +7,9 @@ import { promisify } from 'node:util';
 
 /**
  * Shared harness for CLI integration tests (spec/09, spec/06): the real
- * command surface invoked through tsx, verifying argument handling, exit
- * codes, payload schemas, worker-count independence, and replay determinism.
+ * command surface invoked through Node's native type stripping, verifying
+ * argument handling, exit codes, payload schemas, worker-count independence,
+ * and replay determinism.
  *
  * Each test file imports this helper, so every file gets its own scratch
  * directory; vitest runs files in parallel, which is what keeps the
@@ -24,11 +25,10 @@ export async function runCli(
   args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   try {
-    const { stdout, stderr } = await execFileAsync(
-      process.execPath,
-      [join(REPO_ROOT, 'tools/cli/node_modules/tsx/dist/cli.mjs'), CLI_ENTRY, ...args],
-      { cwd: REPO_ROOT, timeout: 300_000 },
-    );
+    const { stdout, stderr } = await execFileAsync(process.execPath, [CLI_ENTRY, ...args], {
+      cwd: REPO_ROOT,
+      timeout: 300_000,
+    });
     return { code: 0, stdout, stderr };
   } catch (error) {
     const e = error as { code?: number; stdout?: string; stderr?: string };

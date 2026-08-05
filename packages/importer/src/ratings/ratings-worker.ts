@@ -4,7 +4,7 @@
  * roster.json, so concurrent workers never touch the same file.
  */
 import { parentPort, workerData } from 'node:worker_threads';
-import { computeForSeason } from './compute.js';
+import { computeForSeason } from './compute.ts';
 
 const data = workerData as { seasons: string[]; force: boolean };
 if (parentPort === null) {

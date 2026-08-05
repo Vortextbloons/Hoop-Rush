@@ -12,8 +12,8 @@
 import { parseOpponentTeam } from '@hoop-rush/data-contracts';
 import { playableSlotGroups, type Position } from '@hoop-rush/data-contracts';
 import { join } from 'node:path';
-import { PUBLIC_DATA } from '../config.js';
-import { clamp, readJson, writeJsonRetry } from '../json.js';
+import { PUBLIC_DATA } from '../config.ts';
+import { clamp, readJson, writeJsonRetry } from '../json.ts';
 
 export const OPPONENT_ID = 'lakers-1990s-opening';
 export const BRACKET_VERSION = 'bracket-m3-v3';

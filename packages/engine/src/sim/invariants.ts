@@ -1,5 +1,5 @@
 import type { GameResult, PlayerBoxScore, TeamBoxScore } from '@hoop-rush/data-contracts';
-import { usageOf } from './recorder.js';
+import { usageOf } from './recorder.ts';
 
 /**
  * Pure invariant checker (spec/06 exact invariants). Used by tests, the CLI,

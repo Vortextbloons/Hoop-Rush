@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
-import { REPO_ROOT } from './data-loader.js';
-import { UsageError } from '../args.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { REPO_ROOT } from './data-loader.ts';
+import { UsageError } from '../args.ts';
 
 /**
  * `combine docs`: merges every markdown file under a docs directory into a

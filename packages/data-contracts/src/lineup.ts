@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { playerIdSchema } from './ids.js';
-import { positionSchema } from './positions.js';
+import { playerIdSchema } from './ids.ts';
+import { positionSchema } from './positions.ts';
 
 /**
  * A legal lineup contains two Guard slots, two Forward slots, and one Center

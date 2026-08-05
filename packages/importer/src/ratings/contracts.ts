@@ -3,7 +3,7 @@
  * Roster metadata only; deterministic (rng accepted for signature
  * compatibility and unused).
  */
-import { safeInt } from '../json.js';
+import { safeInt } from '../json.ts';
 
 export const SALARY_TIERS: ReadonlyArray<readonly [number, number]> = [
   [95, 65_000_000],

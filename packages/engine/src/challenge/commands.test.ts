@@ -7,8 +7,8 @@ import {
 } from '@hoop-rush/test-fixtures';
 import type { GameResult, RunPlayerSelection, SimulationPlayer } from '@hoop-rush/data-contracts';
 import { challengeRunSchema } from '@hoop-rush/data-contracts';
-import { createEngineContext } from '../sim/context.js';
-import { simulateGame } from '../sim/game.js';
+import { createEngineContext } from '../sim/context.ts';
+import { simulateGame } from '../sim/game.ts';
 import {
   abandonChallenge,
   acceptGameResult,
@@ -19,9 +19,9 @@ import {
   validateBracketContent,
   type ChallengeCreation,
   type ChallengeCreationBase,
-} from './commands.js';
-import { deriveGameSeed } from './seeds.js';
-import { addGameToAggregates, zeroRunAggregates } from './aggregates.js';
+} from './commands.ts';
+import { deriveGameSeed } from './seeds.ts';
+import { addGameToAggregates, zeroRunAggregates } from './aggregates.ts';
 
 const context = createEngineContext();
 

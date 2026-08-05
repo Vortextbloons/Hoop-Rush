@@ -10,16 +10,16 @@
 import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
-import { DEFAULT_SEASONS, ensureOutputDir } from '../config.js';
-import { fileExists, readJson, safeFloat, writeJsonRetry } from '../json.js';
-import { deriveTraits } from './traits.js';
-import { deriveContract } from './contracts.js';
-import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext } from './v2.js';
-import { getEra } from './era.js';
-import { canonicalPlayerName } from '../identity.js';
-import { positionOverrideFor } from '../positions/overrides.js';
-import type { StatsRow } from './stats.js';
-import { loadRatingsModelArtifact } from './artifact.js';
+import { DEFAULT_SEASONS, ensureOutputDir } from '../config.ts';
+import { fileExists, readJson, safeFloat, writeJsonRetry } from '../json.ts';
+import { deriveTraits } from './traits.ts';
+import { deriveContract } from './contracts.ts';
+import { derivePlayerRecord, fieldPublished, positionGroup, type SeasonContext } from './v2.ts';
+import { getEra } from './era.ts';
+import { canonicalPlayerName } from '../identity.ts';
+import { positionOverrideFor } from '../positions/overrides.ts';
+import type { StatsRow } from './stats.ts';
+import { loadRatingsModelArtifact } from './artifact.ts';
 
 export interface RosterPlayer extends Record<string, unknown> {
   externalId?: string | null;

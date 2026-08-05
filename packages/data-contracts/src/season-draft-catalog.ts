@@ -5,16 +5,16 @@ import {
   playerExternalIdSchema,
   playerIdSchema,
   seasonKeySchema,
-} from './ids.js';
+} from './ids.ts';
 import {
   positionNormalizationVersionSchema,
   positionSchema,
   positionUnionSchema,
-} from './positions.js';
-import { summaryRatingsSchema } from './player-season.js';
-import { playerVersionIdSchema } from './season-identity.js';
-import { PLAYER_VERSION_ID_VERSION, SEASON_DRAFT_VERSION } from './season-versions.js';
-import { simulationRatingsSchema, simulationTendenciesSchema } from './simulation.js';
+} from './positions.ts';
+import { summaryRatingsSchema } from './player-season.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
+import { PLAYER_VERSION_ID_VERSION, SEASON_DRAFT_VERSION } from './season-versions.ts';
+import { simulationRatingsSchema, simulationTendenciesSchema } from './simulation.ts';
 
 /**
  * The compact packaged Season Run draft catalog (spec/2.0 M2.1). Derived at

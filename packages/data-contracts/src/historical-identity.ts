@@ -1,6 +1,6 @@
-import { franchiseAbbreviation } from './franchise.js';
-import type { FranchiseLineageEntry } from './franchise.js';
-import type { HoopRushManifest } from './manifest.js';
+import { franchiseAbbreviation } from './franchise.ts';
+import type { FranchiseLineageEntry } from './franchise.ts';
+import type { HoopRushManifest } from './manifest.ts';
 
 /**
  * Era-scoped historical team identity resolution (spec/12). Given the

@@ -7,8 +7,8 @@
  * the league 3PA rate derived from the packaged stints.
  */
 import { join } from 'node:path';
-import { PUBLIC_DATA } from '../config.js';
-import { fileExists, readJson } from '../json.js';
+import { PUBLIC_DATA } from '../config.ts';
+import { fileExists, readJson } from '../json.ts';
 
 export interface ZoneMix {
   rim: number;

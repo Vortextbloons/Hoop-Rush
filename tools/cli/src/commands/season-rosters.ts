@@ -27,13 +27,13 @@ import {
   seasonGenerationDigest,
   validateSeasonRoster,
 } from '@hoop-rush/engine';
-import { makeReport, type CliReport } from '../report.js';
+import { makeReport, type CliReport } from '../report.ts';
 import {
   seasonRostersAuditReportSchema,
   seasonRostersCalibrateReportSchema,
   seasonRostersGenerateReportSchema,
-} from '../report-schemas.js';
-import { parseCount } from '../args.js';
+} from '../report-schemas.ts';
+import { parseCount } from '../args.ts';
 import {
   DEFAULT_MANIFEST,
   DEFAULT_ROSTER_TARGETS,
@@ -42,7 +42,7 @@ import {
   fixtureHumanRoster,
   readJsonFile,
   sha256Hex,
-} from './season-data.js';
+} from './season-data.ts';
 
 /**
  * `season rosters` (spec/2.0 M2.1): deterministic AI league generation,

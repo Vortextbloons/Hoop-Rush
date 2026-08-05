@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { franchiseIdSchema, seasonKeySchema } from './ids.js';
-import { lineupSchema } from './lineup.js';
-import { simulationPlayerSchema } from './simulation.js';
+import { franchiseIdSchema, seasonKeySchema } from './ids.ts';
+import { lineupSchema } from './lineup.ts';
+import { simulationPlayerSchema } from './simulation.ts';
 
 /**
  * A fixed, versioned opponent-team artifact (spec/01 bracket content). The

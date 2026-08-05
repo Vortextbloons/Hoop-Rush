@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { seedSchema } from './ids.js';
-import { difficultyProfileSchema } from './difficulty.js';
-import { opponentTeamSchema } from './opponent.js';
+import { seedSchema } from './ids.ts';
+import { difficultyProfileSchema } from './difficulty.ts';
+import { opponentTeamSchema } from './opponent.ts';
 
 /**
  * The fixed, versioned opponent bracket (spec/01, spec/02). One artifact

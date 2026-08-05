@@ -5,8 +5,8 @@ import {
   ratingsModelArtifactSchema,
   type RatingsModelArtifact,
 } from '@hoop-rush/data-contracts';
-import { fileExists, readJson } from '../json.js';
-import { PUBLIC_DATA } from '../config.js';
+import { fileExists, readJson } from '../json.ts';
+import { PUBLIC_DATA } from '../config.ts';
 
 /** The checked-in fallback is itself a frozen artifact, never an implicit sim. */
 export const DEFAULT_RATINGS_MODEL_ARTIFACT: RatingsModelArtifact = {

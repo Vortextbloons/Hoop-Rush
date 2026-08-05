@@ -8,8 +8,8 @@
  * its rows actually carry values.
  */
 import { join } from 'node:path';
-import { NBA_ROOT, fieldAvailableFrom } from '../config.js';
-import { readJson, safeFloat } from '../json.js';
+import { NBA_ROOT, fieldAvailableFrom } from '../config.ts';
+import { readJson, safeFloat } from '../json.ts';
 
 export interface LeagueAggregates {
   teamGames: number;

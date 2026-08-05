@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { eraIdSchema } from './ids.js';
-import { historicalValueProvenanceSchema } from './provenance.js';
-import { SHOT_ZONES } from './result.js';
+import { eraIdSchema } from './ids.ts';
+import { historicalValueProvenanceSchema } from './provenance.ts';
+import { SHOT_ZONES } from './result.ts';
 
 /**
  * Versioned era simulation profile (spec/03, spec/06). One artifact per decade,

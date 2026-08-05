@@ -6,9 +6,9 @@ import {
   buildRolesTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { simulateGame } from './game.js';
-import { createEngineContext } from './context.js';
-import { classifyArchetype } from '../domain/archetypes.js';
+import { simulateGame } from './game.ts';
+import { createEngineContext } from './context.ts';
+import { classifyArchetype } from '../domain/archetypes.ts';
 
 /**
  * Player-role behavior gates (spec/06). The role-differentiated lineup

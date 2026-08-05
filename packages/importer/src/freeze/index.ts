@@ -11,8 +11,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PUBLIC_DATA } from '../config.js';
-import { fileExists, readJson, writeJson } from '../json.js';
+import { PUBLIC_DATA } from '../config.ts';
+import { fileExists, readJson, writeJson } from '../json.ts';
 
 export const ERA_SIM_DIR = join(PUBLIC_DATA, 'era-sim');
 

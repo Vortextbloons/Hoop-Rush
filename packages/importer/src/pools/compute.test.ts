@@ -13,8 +13,8 @@ import {
 } from 'vitest';
 import { parsePool } from '@hoop-rush/data-contracts';
 import { COHORT_NORMALIZATION_VERSION } from '@hoop-rush/data-contracts';
-import { readJson, sha256File, writeJson } from '../json.js';
-import { normalizePositionLabels } from './positions.js';
+import { readJson, sha256File, writeJson } from '../json.ts';
+import { normalizePositionLabels } from './positions.ts';
 import {
   CONFIDENCE_POLICY_VERSION,
   DATA_VERSION,
@@ -41,7 +41,7 @@ import {
   type Manifest,
   type Pool,
   type PoolBuildFailure,
-} from './compute.js';
+} from './compute.ts';
 
 const TEAM = '1610612747';
 

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { franchiseIdSchema, seedSchema } from './ids.js';
-import { conferenceIdSchema } from './season-league.js';
-import { seasonGameStatusSchema } from './season-game.js';
-import { SEASON_POSTSEASON_VERSION } from './season-versions.js';
+import { franchiseIdSchema, seedSchema } from './ids.ts';
+import { conferenceIdSchema } from './season-league.ts';
+import { seasonGameStatusSchema } from './season-game.ts';
+import { SEASON_POSTSEASON_VERSION } from './season-versions.ts';
 
 /**
  * Postseason state: the Play-In Tournament and the 16-team best-of-seven

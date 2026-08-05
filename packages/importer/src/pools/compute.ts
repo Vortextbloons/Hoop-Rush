@@ -37,8 +37,8 @@ import {
   type UnavailabilityReason,
 } from '@hoop-rush/data-contracts';
 import { playableSlotGroups } from '@hoop-rush/data-contracts';
-import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.js';
-import { refreshPlayersIndexInManifest } from '../manifest/index.js';
+import { NBA_ROOT, PUBLIC_DATA, RAW_CACHE } from '../config.ts';
+import { refreshPlayersIndexInManifest } from '../manifest/index.ts';
 import {
   fileExists,
   safeFloat,
@@ -48,22 +48,22 @@ import {
   writeJsonRetry,
   clamp,
   clampUnitInterval,
-} from '../json.js';
-import { buildPlayerPositions } from './positions.js';
-import { positionOverrideFor } from '../positions/overrides.js';
-import { canonicalPlayerName } from '../identity.js';
-import { derivePlayerRecord } from '../ratings/v2.js';
-import { getEra } from '../ratings/era.js';
-import { loadRatingsModelArtifact } from '../ratings/artifact.js';
+} from '../json.ts';
+import { buildPlayerPositions } from './positions.ts';
+import { positionOverrideFor } from '../positions/overrides.ts';
+import { canonicalPlayerName } from '../identity.ts';
+import { derivePlayerRecord } from '../ratings/v2.ts';
+import { getEra } from '../ratings/era.ts';
+import { loadRatingsModelArtifact } from '../ratings/artifact.ts';
 
 /** Re-exported so CLI consumers (e.g. bracket generation) share the one normalization. */
-export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.js';
+export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.ts';
 import {
   LINEAGE_SEGMENTS,
   MODERN_SLOTS,
   firstSupportedSeason,
   resolveHistoricalIdentity,
-} from '../lineage.js';
+} from '../lineage.ts';
 
 /**
  * Python's json.loads accepts the bare NaN token that the fetch layer's

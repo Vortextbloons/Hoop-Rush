@@ -1,6 +1,6 @@
 import type { EraSimulationProfile } from '@hoop-rush/data-contracts';
-import type { Rng } from './rng.js';
-import { ENGINE_CONSTANTS } from './constants.js';
+import type { Rng } from './rng.ts';
+import { ENGINE_CONSTANTS } from './constants.ts';
 
 /**
  * Era pace determines possession duration (spec/03). Both teams share the game

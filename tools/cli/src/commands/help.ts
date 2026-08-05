@@ -1,5 +1,5 @@
-import { makeReport, type CliReport } from '../report.js';
-import { listFixtureIds } from './sim.js';
+import { makeReport, type CliReport } from '../report.ts';
+import { listFixtureIds } from './sim.ts';
 
 export const HELP_TEXT = `hoop-rush — developer CLI for the Hoop Rush engine and data
 

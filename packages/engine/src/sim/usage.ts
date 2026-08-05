@@ -4,10 +4,13 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import type { Rng } from './rng.js';
-import { ENGINE_CONSTANTS } from './constants.js';
-import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.js';
-import { slotGroupOf } from '../domain/positions.js';
+import type { Rng } from './rng.ts';
+import { ENGINE_CONSTANTS } from './constants.ts';
+import { creationScore, interiorScoringScore, spacingScore } from '../domain/archetypes.ts';
+import {
+  sameGroupMatchWeight,
+  type PositionResponsibilityModifiers,
+} from './position-responsibilities.ts';
 
 /**
  * Usage, creation, passing, and action tendencies select the initiator,
@@ -45,13 +48,19 @@ export interface ShotSelection {
  * them). The usage exponent is deliberately soft (1.1): a high-usage creator
  * concentrates possession starts without monopolizing every possession
  * class, so usage is not double-counted through initiation and catch-and-
- * shoot pull. All deterministic and bounded to keep matchups meaningful.
+ * shoot pull. The assigned-slot initiation modifier (position-responsibilities)
+ * nudges guards toward starting possessions and centers away from them; all
+ * deterministic and bounded to keep matchups meaningful.
  */
-export function initiatorWeight(player: SimulationPlayer, team: SimulationTeam): number {
+export function initiatorWeight(
+  player: SimulationPlayer,
+  team: SimulationTeam,
+  modifiers: PositionResponsibilityModifiers,
+): number {
   const usage = Math.max(0.5, player.tendencies.usageRate);
   const usagePower = Math.pow(usage / 10, ENGINE_CONSTANTS.usageExponent);
   const creationMod = 0.75 + 0.5 * creationScore(player);
-  return usagePower * creationMod * creationBurden(player, team);
+  return usagePower * creationMod * creationBurden(player, team) * modifiers.initiation;
 }
 
 /** Bounded (1.08..1.2) burden shift for the highest-usage creators. */
@@ -65,9 +74,24 @@ export function creationBurden(player: SimulationPlayer, team: SimulationTeam): 
 }
 
 /** Precomputed initiator weights for a team, in the team's immutable index order. */
-export function teamInitiatorWeights(team: SimulationTeam): number[] {
-  return team.players.map((p) => initiatorWeight(p, team));
+export function teamInitiatorWeights(
+  team: SimulationTeam,
+  positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
+): number[] {
+  return team.players.map((p) =>
+    initiatorWeight(p, team, positionModifiers.get(p.playerId) ?? identityModifiers),
+  );
 }
+
+/** Neutral modifiers (all 1) used when a team lacks a precomputed table. */
+export const identityModifiers: PositionResponsibilityModifiers = {
+  initiation: 1,
+  pnrHandler: 1,
+  rollMan: 1,
+  postUp: 1,
+  rebounding: 1,
+  rimProtection: 1,
+};
 
 /** Selects the possession initiator against precomputed creation-scaled usage weights. */
 export function pickInitiator(
@@ -95,24 +119,30 @@ export function usagePull(player: SimulationPlayer): number {
 }
 
 /**
- * Action tendency weights for one initiator (pure function of the player).
- * Speed raises the transition rate: faster lineups run more (physical trait
- * mechanism). High-usage initiators run ball-dominant actions (isolation,
- * pick-and-roll, post-up) at a higher rate: their shot responsibilities come
- * from creation, not spot-up volume.
+ * Action tendency weights for one initiator (pure function of the player and
+ * the assigned-slot responsibility modifiers). Speed raises the transition
+ * rate: faster lineups run more (physical trait mechanism). High-usage
+ * initiators run ball-dominant actions (isolation, pick-and-roll, post-up)
+ * at a higher rate: their shot responsibilities come from creation, not
+ * spot-up volume. The slot modifiers scale only the handler (pick-and-roll),
+ * roll-man, and post-up weights, so a zero tendency stays zero: position
+ * never manufactures an action.
  */
-export function actionWeights(initiator: SimulationPlayer): number[] {
+export function actionWeights(
+  initiator: SimulationPlayer,
+  modifiers: PositionResponsibilityModifiers,
+): number[] {
   const t = initiator.tendencies;
   const ballDominance = Math.min(1, t.usageRate / 36);
   const transitionWeight = t.transitionRate * (0.5 + initiator.ratings.speed / 100);
   const iso = t.isolationRate * (1 + 0.6 * ballDominance);
-  const pnr = t.pickAndRollBallHandlerRate * (1 + 0.5 * ballDominance);
-  const post = t.postUpRate * (1 + 0.4 * ballDominance);
+  const pnr = t.pickAndRollBallHandlerRate * (1 + 0.5 * ballDominance) * modifiers.pnrHandler;
+  const post = t.postUpRate * (1 + 0.4 * ballDominance) * modifiers.postUp;
   const passiveScale = 1 - 0.3 * ballDominance;
   return [
     iso,
     pnr,
-    t.pickAndRollRollManRate,
+    t.pickAndRollRollManRate * modifiers.rollMan,
     post,
     t.spotUpRate * passiveScale,
     t.cutRate * passiveScale,
@@ -165,17 +195,22 @@ export interface TeammateShots {
 /**
  * Teammate shot weights for one initiator and action class, in team index
  * order minus the initiator. The pass variant is shared by every non-roll
- * action because the weight formula branches only on pickAndRollRoll.
+ * action because the weight formula branches only on pickAndRollRoll. The
+ * roll variant scales each teammate by their own roll-man responsibility
+ * modifier (assigned slot), so bigs attract more roll finishes.
  */
 export function teammateShotWeights(
   team: SimulationTeam,
   initiator: SimulationPlayer,
   action: ActionType,
+  positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
 ): TeammateShotWeights {
   const teammates = team.players.filter((p) => p.playerId !== initiator.playerId);
   const weights = teammates.map((p) =>
     action === 'pickAndRollRoll'
-      ? Math.max(0.5, p.tendencies.pickAndRollRollManRate) * (0.6 + 0.8 * interiorScoringScore(p))
+      ? Math.max(0.5, p.tendencies.pickAndRollRollManRate) *
+        (0.6 + 0.8 * interiorScoringScore(p)) *
+        (positionModifiers.get(p.playerId)?.rollMan ?? 1)
       : Math.max(0.3, p.tendencies.shotRate * spacingWeight(p) * usagePull(p)),
   );
   return { teammates, weights };
@@ -223,37 +258,41 @@ export function pickAssister(
   return rng.weightedPick(candidates, weights);
 }
 
-/** Weight profile for a defender based on zone and position matchup. */
-function defenderWeight(
-  defender: SimulationPlayer,
-  shooter: SimulationPlayer,
-  zone: ShotZone,
-): number {
-  const positionMatch = defender.positions.some((p) =>
-    shooter.positions.some((q) => slotGroupOf(p) === slotGroupOf(q)),
-  )
-    ? 1.35
-    : 1;
+/** Weight profile for a defender based on zone-relevant defense only. */
+function defenderWeight(defender: SimulationPlayer, zone: ShotZone): number {
   const zoneRating =
     zone === 'rim' || zone === 'shortMid'
       ? defender.ratings.interiorDefense
       : zone === 'longMid'
         ? (defender.ratings.interiorDefense + defender.ratings.perimeterDefense) / 2
         : defender.ratings.perimeterDefense;
-  const ability = Math.max(0.25, (zoneRating - 45) / 35);
-  return positionMatch * ability;
+  return Math.max(0.25, (zoneRating - 45) / 35);
 }
 
-/** Selects the primary defender, favoring matchups and zone-relevant defense. */
+/**
+ * Selects the primary defender, favoring same-slot-group matchups (assigned
+ * slots, never native position unions) and zone-relevant defense. On interior
+ * zones the defender's assigned-slot rim-protection modifier shapes how often
+ * bigs are assigned the block-check responsibility.
+ */
 export function pickDefender(
   team: SimulationTeam,
   shooter: SimulationPlayer,
   zone: ShotZone,
   rng: Rng,
+  positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
+  shooterSlot: number,
 ): SimulationPlayer {
+  const interior = zone === 'rim' || zone === 'shortMid';
   return rng.weightedPick(
     team.players,
-    team.players.map((d) => defenderWeight(d, shooter, zone)),
+    team.players.map((defender, slot) => {
+      const modifiers = positionModifiers.get(defender.playerId);
+      const rimProtection = interior ? (modifiers?.rimProtection ?? 1) : 1;
+      return (
+        defenderWeight(defender, zone) * sameGroupMatchWeight(slot, shooterSlot) * rimProtection
+      );
+    }),
   );
 }
 

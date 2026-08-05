@@ -1,8 +1,8 @@
 import type { EraSimulationProfile, GameResult, SimulationTeam } from '@hoop-rush/data-contracts';
-import type { EngineContext } from '../sim/context.js';
-import { simulateGame } from '../sim/game.js';
-import { fnv1a32, hex32 } from '../sim/rng.js';
-import { BENCHMARK_WEIGHTS } from './benchmarks.js';
+import type { EngineContext } from '../sim/context.ts';
+import { simulateGame } from '../sim/game.ts';
+import { fnv1a32, hex32 } from '../sim/rng.ts';
+import { BENCHMARK_WEIGHTS } from './benchmarks.ts';
 
 /**
  * Lineup evaluation (spec/01 authored opponent requirements, spec/06

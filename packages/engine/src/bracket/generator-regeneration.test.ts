@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { seedFromString } from '@hoop-rush/test-fixtures';
-import { generateBracket } from './generator.js';
-import { fixtureBracket, generationOptions } from './generator-testing.js';
+import { generateBracket } from './generator.ts';
+import { fixtureBracket, generationOptions } from './generator-testing.ts';
 
 /**
  * Deterministic regeneration tests (spec/01): the same seed and inputs must

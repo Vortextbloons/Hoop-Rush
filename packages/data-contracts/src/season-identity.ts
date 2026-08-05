@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { seasonDigestHex } from './season-hash.js';
-import { PLAYER_VERSION_ID_VERSION } from './season-versions.js';
+import { seasonDigestHex } from './season-hash.ts';
+import { PLAYER_VERSION_ID_VERSION } from './season-versions.ts';
 
 /**
  * Season Run player-version identity (spec/2.0/03). One peak player-season

@@ -1,7 +1,7 @@
 import { it } from 'vitest';
 import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
 import { SEASON_COMMITTED_SCHEDULE_SEED } from '@hoop-rush/data-contracts';
-import { generateSeasonSchedule } from './schedule.js';
+import { generateSeasonSchedule } from './schedule.ts';
 
 it('probe: stage timing', () => {
   const league = buildSeasonLeague();

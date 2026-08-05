@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest';
-import * as schedule from './schedule.js';
-import * as league from './league.js';
+import * as schedule from './schedule.ts';
+import * as league from './league.ts';
 
 it('imports load', () => {
   expect(typeof schedule.generateSeasonSchedule).toBe('function');

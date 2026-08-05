@@ -8,8 +8,8 @@ import {
   type HoopRushManifest,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
-import { bracketAuditReportSchema } from '../report-schemas.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { bracketAuditReportSchema } from '../report-schemas.ts';
 
 /**
  * `bracket audit` (spec/09 target): validates the fixed 30-team bracket and

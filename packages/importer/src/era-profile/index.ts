@@ -6,21 +6,21 @@
  */
 import { parseEraSimulationProfile } from '@hoop-rush/data-contracts';
 import { join } from 'node:path';
-import { ensureDir, writeJsonRetry } from '../json.js';
-import { computeEraProfile, ERA_SIM_DIR, erasWithData, type EraDef } from './profile.js';
+import { ensureDir, writeJsonRetry } from '../json.ts';
+import { computeEraProfile, ERA_SIM_DIR, erasWithData, type EraDef } from './profile.ts';
 
-export { computeEraProfile, eraSeasons, erasWithData, packagedSeasons, target } from './profile.js';
+export { computeEraProfile, eraSeasons, erasWithData, packagedSeasons, target } from './profile.ts';
 export type {
   CalibrationTarget,
   EraDef,
   EraProfileTargets,
   EraSimParameters,
   EraSimProfile,
-} from './profile.js';
-export { deriveLeagueAggregates, deriveLeagueAggregatesFromStints } from './aggregates.js';
-export type { LeagueAggregates, StintRow } from './aggregates.js';
-export { computePoolShotMix, poolShotMixAndAnchors } from './shot-mix.js';
-export type { PoolPlayerLike, ShotMixAndAnchors, ZoneMix } from './shot-mix.js';
+} from './profile.ts';
+export { deriveLeagueAggregates, deriveLeagueAggregatesFromStints } from './aggregates.ts';
+export type { LeagueAggregates, StintRow } from './aggregates.ts';
+export { computePoolShotMix, poolShotMixAndAnchors } from './shot-mix.ts';
+export type { PoolPlayerLike, ShotMixAndAnchors, ZoneMix } from './shot-mix.ts';
 
 export function run(eras?: readonly string[]): void {
   let selected: EraDef[] = erasWithData();

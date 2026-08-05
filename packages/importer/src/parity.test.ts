@@ -10,10 +10,10 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parsePool } from '@hoop-rush/data-contracts';
-import { PUBLIC_DATA } from './config.js';
-import { readJson } from './json.js';
-import { computePool, loadBbrefIds, loadManifest } from './pools/compute.js';
-import { computeEraProfile, erasWithData } from './era-profile/profile.js';
+import { PUBLIC_DATA } from './config.ts';
+import { readJson } from './json.ts';
+import { computePool, loadBbrefIds, loadManifest } from './pools/compute.ts';
+import { computeEraProfile, erasWithData } from './era-profile/profile.ts';
 
 interface CommittedPoolPlayer {
   playerExternalId: string;

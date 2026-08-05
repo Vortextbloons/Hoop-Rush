@@ -6,7 +6,7 @@ import type {
   PlayerBoxScore,
   TeamResult,
 } from '@hoop-rush/data-contracts';
-import { gameScore, leagueMvp, mvpValue } from './mvp.js';
+import { gameScore, leagueMvp, mvpValue } from './mvp.ts';
 
 /**
  * A full box score with known values: 25 pts, 10/20 FG, 5/6 FT, 4 ORB, 6 DRB,

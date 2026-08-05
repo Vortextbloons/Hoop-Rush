@@ -17,14 +17,14 @@ import {
   evaluateSeasonRoster,
   generateAiLeague,
   runSeasonRosterCalibrationSeeds,
-} from './ai.js';
+} from './ai.ts';
 import {
   completionTargetsMet,
   validateSeasonRoster,
   type SeasonRosterMemberInput,
-} from './roster-rules.js';
-import { rotationTargetMinutes } from './rotation.js';
-import { createRng } from '../sim/rng.js';
+} from './roster-rules.ts';
+import { rotationTargetMinutes } from './rotation.ts';
+import { createRng } from '../sim/rng.ts';
 import { seasonDigestHex } from '@hoop-rush/data-contracts';
 
 /**

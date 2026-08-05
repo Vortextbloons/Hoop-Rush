@@ -2,8 +2,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { extractCalibrationPayload, freezeTargets, MINIMUM_SAMPLES } from './index.js';
-import { writeJson } from '../json.js';
+import { extractCalibrationPayload, freezeTargets, MINIMUM_SAMPLES } from './index.ts';
+import { writeJson } from '../json.ts';
 
 const tempRoots: string[] = [];
 function makeTempDir(): string {

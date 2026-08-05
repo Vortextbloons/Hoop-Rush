@@ -13,13 +13,13 @@ import type {
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
 import { opponentBracketSchema } from '@hoop-rush/data-contracts';
-import type { EngineContext } from '../sim/context.js';
-import { createRng, shuffle } from '../sim/rng.js';
-import { validateBracketContent } from '../challenge/commands.js';
-import { evaluateLineupBalance, evaluateLineupStrength } from '../challenge/lineup-eval.js';
-import { BENCHMARK_VERSION } from '../challenge/benchmarks.js';
-import { playableSlotGroups } from '../domain/positions.js';
-import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.js';
+import type { EngineContext } from '../sim/context.ts';
+import { createRng, shuffle } from '../sim/rng.ts';
+import { validateBracketContent } from '../challenge/commands.ts';
+import { evaluateLineupBalance, evaluateLineupStrength } from '../challenge/lineup-eval.ts';
+import { BENCHMARK_VERSION } from '../challenge/benchmarks.ts';
+import { playableSlotGroups } from '../domain/positions.ts';
+import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 
 /** Frozen schedule version label shared by the artifact and audits. */
 export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.replace('schedule-', '')}`;

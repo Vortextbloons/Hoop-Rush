@@ -15,7 +15,7 @@ import {
   buildStrongMediumFixture,
   buildStrongWeakFixture,
 } from '@hoop-rush/test-fixtures';
-import type { SimFixture } from './fixture-schema.js';
+import type { SimFixture } from './fixture-schema.ts';
 
 const FIXTURES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { HoopRushManifest, FranchiseLineageEntry } from './index.js';
-import { resolveEraTeamIdentity, resolveHistoricalIdentitySpans } from './historical-identity.js';
+import type { HoopRushManifest, FranchiseLineageEntry } from './index.ts';
+import { resolveEraTeamIdentity, resolveHistoricalIdentitySpans } from './historical-identity.ts';
 
 /**
  * Compact manifest builder for identity-resolution tests. The lineage set

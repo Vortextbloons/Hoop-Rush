@@ -17,16 +17,16 @@ import {
   playableSlotGroups,
   slotGroupOf,
 } from '@hoop-rush/data-contracts';
-import { makeReport, type CliReport } from '../report.js';
+import { makeReport, type CliReport } from '../report.ts';
 import {
   calibrationMetricSchema,
   calibrateRunReportSchema,
   calibrateSensitivityReportSchema,
-} from '../report-schemas.js';
-import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from './sim.js';
-import { lineupForTeam } from './challenge.js';
-import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.js';
-import { parseCount } from '../args.js';
+} from '../report-schemas.ts';
+import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from './sim.ts';
+import { lineupForTeam } from './challenge.ts';
+import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.ts';
+import { parseCount } from '../args.ts';
 
 /**
  * `calibrate run` and `calibrate sensitivity` (spec/09, spec/06). Calibration

@@ -7,23 +7,23 @@
  * sim plumbing (possession, shooting, fouls, rebounding, usage, recorder,
  * facts, timing, constants, seeds) stays internal to the package.
  */
-export { canPlay, type SlotGroup } from './domain/positions.js';
-export { slotRequirement, validateLineup } from './domain/lineup.js';
-export { classifyArchetype } from './domain/archetypes.js';
-export { createEngineContext, type EngineContext } from './sim/context.js';
-export { fnv1a32, hex32 } from './sim/rng.js';
-export { simulateGame } from './sim/game.js';
-export { checkGameResult, gameResultDigest } from './sim/invariants.js';
-export { evaluateLineupStrength } from './challenge/lineup-eval.js';
+export { canPlay, type SlotGroup } from './domain/positions.ts';
+export { slotRequirement, validateLineup } from './domain/lineup.ts';
+export { classifyArchetype } from './domain/archetypes.ts';
+export { createEngineContext, type EngineContext } from './sim/context.ts';
+export { fnv1a32, hex32 } from './sim/rng.ts';
+export { simulateGame } from './sim/game.ts';
+export { checkGameResult, gameResultDigest } from './sim/invariants.ts';
+export { evaluateLineupStrength } from './challenge/lineup-eval.ts';
 export {
   evaluateContextualPlayerValue,
   evaluateLineupFit,
   evaluateMatchup,
   evaluateLineupMatchup,
-} from './challenge/contextual-value.js';
-export { explainSeason } from './challenge/explain.js';
-export { leagueMvp } from './challenge/mvp.js';
-export { perGamePlayer } from './challenge/aggregates.js';
+} from './challenge/contextual-value.ts';
+export { explainSeason } from './challenge/explain.ts';
+export { leagueMvp } from './challenge/mvp.ts';
+export { perGamePlayer } from './challenge/aggregates.ts';
 export {
   acceptGameResult,
   createChallenge,
@@ -31,19 +31,19 @@ export {
   simulateChallenge,
   validateBracketContent,
   type ChallengeCreation,
-} from './challenge/commands.js';
-export { generateSchedule, scheduleInvariants } from './bracket/schedule.js';
+} from './challenge/commands.ts';
+export { generateSchedule, scheduleInvariants } from './bracket/schedule.ts';
 export {
   generateBracket,
   type BracketCandidatePlayer,
   type FranchiseCandidates,
-} from './bracket/generator.js';
-export { toSimulationPlayer } from './modes/sandbox/adapters.js';
+} from './bracket/generator.ts';
+export { toSimulationPlayer } from './modes/sandbox/adapters.ts';
 export {
   BEST_OF_ATTEMPTS,
   chooseBestRunSeed,
   simulateChallengeBestOf,
-} from './modes/sandbox/selection.js';
+} from './modes/sandbox/selection.ts';
 // Season Run (2.0 M2.0) league skeleton: league membership, the deterministic
 // schedule generator and auditor, pure standings reduction, and the
 // Play-In/playoff state machine.
@@ -54,13 +54,13 @@ export {
   divisionOpponentsOf,
   conferenceNonDivisionOpponentsOf,
   oppositeConferenceOpponentsOf,
-} from './season/league.js';
+} from './season/league.ts';
 export {
   generateSeasonSchedule,
   auditSeasonSchedule,
   type GenerateSeasonScheduleInput,
-} from './season/schedule.js';
-export { reduceSeasonStandings, auditSeasonStandings } from './season/standings.js';
+} from './season/schedule.ts';
+export { reduceSeasonStandings, auditSeasonStandings } from './season/standings.ts';
 export {
   setPlayInRankings,
   submitPlayInGame,
@@ -71,7 +71,7 @@ export {
   type PostseasonRankings,
   type PlayInGameResult,
   type PlayoffGameResult,
-} from './season/postseason.js';
+} from './season/postseason.ts';
 // Season Run (2.0 M2.1) ten-player draft, roster legality, AI generation,
 // rotations, and generation digests.
 export {
@@ -85,21 +85,21 @@ export {
   rosterFeasible,
   anyMemberPlays,
   type SeasonRosterMemberInput,
-} from './season/roster-rules.js';
+} from './season/roster-rules.ts';
 export {
   matchStartingFive,
   buildMinimalRotation,
   rotationTargetMinutes,
   auditSeasonRotation,
-} from './season/rotation.js';
-export { seasonGenerationDigest, type SeasonGenerationDigestInput } from './season/digest.js';
+} from './season/rotation.ts';
+export { seasonGenerationDigest, type SeasonGenerationDigestInput } from './season/digest.ts';
 export {
   seasonDraftStateDigest,
   seasonDraftStateCanonical,
   applySeasonDraftCommand,
   type SeasonAiGenerationDeps,
   type SeasonAiGenerationInput,
-} from './season/draft.js';
+} from './season/draft.ts';
 export {
   SOLO_BAND_QUOTAS,
   DUO_BAND_QUOTAS,
@@ -109,7 +109,7 @@ export {
   assignAiBandsAndIdentities,
   evaluateSeasonRoster,
   runSeasonRosterCalibrationSeeds,
-} from './season/ai.js';
+} from './season/ai.ts';
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
-export * as classic from './modes/classic/draft.js';
+export * as classic from './modes/classic/draft.ts';

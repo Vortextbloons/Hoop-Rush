@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { eraIdSchema, franchiseIdSchema, seedSchema } from './ids.js';
-import { playerVersionIdSchema } from './season-identity.js';
-import { SEASON_DRAFT_VERSION } from './season-versions.js';
-import { seasonLeagueSchema } from './season-league.js';
-import { seasonDraftCommandRecordSchema } from './season-draft-command.js';
+import { eraIdSchema, franchiseIdSchema, seedSchema } from './ids.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
+import { SEASON_DRAFT_VERSION } from './season-versions.ts';
+import { seasonLeagueSchema } from './season-league.ts';
+import { seasonDraftCommandRecordSchema } from './season-draft-command.ts';
 
 /**
  * Season Run ten-round draft state (spec/2.0/03, M2.1). One revisioned

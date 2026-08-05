@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.js';
-import { SEASON_STANDINGS_VERSION, SEASON_TEAM_COUNT } from './season-versions.js';
+import { franchiseIdSchema } from './ids.ts';
+import { SEASON_STANDINGS_VERSION, SEASON_TEAM_COUNT } from './season-versions.ts';
 
 /**
  * Standings rows reduced from finalized game facts (spec/2.0/02). Standings

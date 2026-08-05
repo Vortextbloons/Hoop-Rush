@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Lineup, LineupAssignment, PositionUnion } from '@hoop-rush/data-contracts';
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
-import { assignLineup, canFillSlot, slotRequirement, validateLineup } from './lineup.js';
+import { assignLineup, canFillSlot, slotRequirement, validateLineup } from './lineup.ts';
 
 const structure = { structure: LINEUP_STRUCTURE };
 

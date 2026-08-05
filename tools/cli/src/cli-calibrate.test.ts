@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { calibrateRunReportSchema, calibrateSensitivityReportSchema } from './report-schemas.js';
-import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.js';
+import { calibrateRunReportSchema, calibrateSensitivityReportSchema } from './report-schemas.ts';
+import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
 describe('cli: calibrate commands', () => {
   it('calibrate run passes the frozen profile and emits a validated payload', async () => {

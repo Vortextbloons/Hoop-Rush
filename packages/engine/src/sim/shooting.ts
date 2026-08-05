@@ -4,14 +4,14 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import { ENGINE_CONSTANTS } from './constants.js';
+import { ENGINE_CONSTANTS } from './constants.ts';
 import {
   blendedZoneWeights,
   isThreePointZone,
   twoPointZoneSharesFromBlend,
   zoneSkillRating,
   type ActionType,
-} from './usage.js';
+} from './usage.ts';
 
 /**
  * Zone skill, defender selection, perimeter/interior pressure, and era

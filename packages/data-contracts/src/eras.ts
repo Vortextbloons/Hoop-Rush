@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { eraIdSchema, seasonKeySchema } from './ids.js';
+import { eraIdSchema, seasonKeySchema } from './ids.ts';
 
 /**
  * A decade is a documented range of NBA seasons, per spec/01:

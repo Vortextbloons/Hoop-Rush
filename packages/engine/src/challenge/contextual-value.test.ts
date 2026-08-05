@@ -4,7 +4,7 @@ import {
   evaluateContextualPlayerValue,
   evaluateLineupFit,
   evaluateLineupMatchup,
-} from './contextual-value.js';
+} from './contextual-value.ts';
 
 describe('contextual lineup value', () => {
   it('rewards a missing creator without changing the player base overall', () => {

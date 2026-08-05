@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { benchmarkReportSchema } from './report-schemas.js';
-import { jsonPayload, runCli } from './cli-test-helpers.js';
+import { benchmarkReportSchema } from './report-schemas.ts';
+import { jsonPayload, runCli } from './cli-test-helpers.ts';
 
 describe('cli: benchmark', () => {
   it('measures warm single-game and 82-game runs with a validated payload', async () => {

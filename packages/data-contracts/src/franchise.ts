@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema, seasonKeySchema, teamExternalIdSchema } from './ids.js';
+import { franchiseIdSchema, seasonKeySchema, teamExternalIdSchema } from './ids.ts';
 
 /**
  * Modern franchise slots and historical lineage (spec/12). A modern slot is

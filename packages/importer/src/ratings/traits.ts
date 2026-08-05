@@ -3,8 +3,8 @@
  * Traits are roster metadata only and never enter the pool artifacts. They are
  * deterministic: no random jitter.
  */
-import { clamp, clampRating, safeFloat } from '../json.js';
-import type { StatsRow } from './stats.js';
+import { clamp, clampRating, safeFloat } from '../json.ts';
+import type { StatsRow } from './stats.ts';
 
 export function deriveTraits(
   ratings: Record<string, number>,

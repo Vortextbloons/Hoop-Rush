@@ -1,5 +1,5 @@
-import { franchiseEraPoolSchema, type FranchiseEraPool } from '../player-season.js';
-import { sha256Hex } from './verify-hash.js';
+import { franchiseEraPoolSchema, type FranchiseEraPool } from '../player-season.ts';
+import { sha256Hex } from './verify-hash.ts';
 
 /** Validate an unknown pool value at a runtime boundary. */
 export function parsePool(value: unknown): FranchiseEraPool {

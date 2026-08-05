@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { franchiseIdSchema, seedSchema } from './ids.js';
+import { franchiseIdSchema, seedSchema } from './ids.ts';
 import {
   SEASON_GAME_COUNT,
   SEASON_LEAGUE_VERSION,
   SEASON_ROUND_COUNT,
   SEASON_SCHEDULE_FORMULA_VERSION,
   SEASON_SCHEDULE_VERSION,
-} from './season-versions.js';
+} from './season-versions.ts';
 
 /**
  * The authored Season Run schedule artifact (spec/2.0/02). One immutable

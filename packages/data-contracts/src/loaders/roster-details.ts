@@ -1,5 +1,5 @@
-import { rosterDetailsSchema, type RosterDetails } from '../player-season.js';
-import { sha256Hex } from './verify-hash.js';
+import { rosterDetailsSchema, type RosterDetails } from '../player-season.ts';
+import { sha256Hex } from './verify-hash.ts';
 
 /** Validate an unknown roster-details value at a runtime boundary. */
 export function parseRosterDetails(value: unknown): RosterDetails {

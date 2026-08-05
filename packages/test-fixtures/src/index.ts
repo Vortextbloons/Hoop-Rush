@@ -786,6 +786,144 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
   };
 }
 
+/**
+ * Multi-position slot-permutation fixture (spec/06): the same five players
+ * with overlapping position unions so several legal G,G,F,F,C orderings
+ * exist. The engine's assigned-slot responsibility modifiers must shift
+ * responsibility by player ID across permutations while leaving team-level
+ * outcomes inside a small band. Unions are sorted/deduplicated per the
+ * position-union contract.
+ */
+export function buildSlotPermutationPlayers(): SimulationPlayer[] {
+  return [
+    buildSimulationPlayer({
+      playerId: 'p-slot-creator',
+      displayName: 'Slot Creator',
+      positions: ['PG', 'SG', 'SF', 'PF', 'C'],
+      ratings: {
+        ...DEFAULT_SIM_RATINGS,
+        ballHandling: 88,
+        passing: 86,
+        offensiveIq: 84,
+        threePoint: 70,
+      },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 32,
+        passRate: 45,
+        shotRate: 30,
+        isolationRate: 20,
+        pickAndRollBallHandlerRate: 40,
+        postUpRate: 0,
+        pickAndRollRollManRate: 0,
+        threePointRate: 20,
+        freeThrowRate: 24,
+      },
+    }),
+    buildSimulationPlayer({
+      playerId: 'p-slot-shooter',
+      displayName: 'Slot Shooter',
+      positions: ['PG', 'SG', 'SF'],
+      ratings: { ...DEFAULT_SIM_RATINGS, threePoint: 84 },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 16,
+        passRate: 28,
+        shotRate: 24,
+        spotUpRate: 38,
+        threePointRate: 42,
+        cornerThreeFrequency: 15,
+        aboveBreakThreeFrequency: 30,
+      },
+    }),
+    buildSimulationPlayer({
+      playerId: 'p-slot-wing',
+      displayName: 'Slot Wing',
+      positions: ['SG', 'SF', 'PF'],
+      ratings: { ...DEFAULT_SIM_RATINGS, threePoint: 74, offensiveIq: 72 },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 22,
+        passRate: 34,
+        shotRate: 26,
+        spotUpRate: 24,
+        threePointRate: 28,
+      },
+    }),
+    buildSimulationPlayer({
+      playerId: 'p-slot-post',
+      displayName: 'Slot Post',
+      positions: ['PF', 'C'],
+      ratings: { ...DEFAULT_SIM_RATINGS, insideScoring: 82, closeShot: 74, offensiveRebound: 78 },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 18,
+        shotRate: 24,
+        postUpRate: 24,
+        rimFrequency: 40,
+        threePointRate: 8,
+        crashOffensiveGlassRate: 22,
+      },
+    }),
+    buildSimulationPlayer({
+      playerId: 'p-slot-rim',
+      displayName: 'Slot Rim',
+      positions: ['PF', 'C'],
+      ratings: {
+        ...DEFAULT_SIM_RATINGS,
+        insideScoring: 86,
+        closeShot: 78,
+        offensiveRebound: 82,
+        defensiveRebound: 80,
+        interiorDefense: 75,
+        vertical: 78,
+      },
+      tendencies: {
+        ...DEFAULT_SIM_TENDENCIES,
+        usageRate: 15,
+        passRate: 20,
+        shotRate: 22,
+        rimFrequency: 50,
+        shortMidFrequency: 25,
+        pickAndRollRollManRate: 32,
+        cutRate: 24,
+        threePointRate: 4,
+        freeThrowRate: 18,
+        crashOffensiveGlassRate: 20,
+      },
+    }),
+  ];
+}
+
+/**
+ * Legal slot orderings of the five slot-permutation players. Every ordering
+ * satisfies the G,G,F,F,C structure (each player's union covers their slot
+ * group): creator can play any slot, shooter any guard/forward slot, wing any
+ * guard/forward slot, and the two bigs either forward or center.
+ */
+export function buildSlotPermutationTeams(): SimulationTeam[] {
+  const players = buildSlotPermutationPlayers();
+  const orders: number[][] = [
+    [0, 1, 2, 3, 4],
+    [1, 0, 2, 3, 4],
+    [0, 1, 3, 2, 4],
+    [1, 2, 0, 4, 3],
+    [1, 2, 3, 4, 0],
+    [0, 1, 2, 4, 3],
+  ];
+  return orders.map((order, index) => ({
+    teamId: 'slot-perms',
+    displayName: `Slot Permutation ${String(index + 1)}`,
+    players: order.map((playerIndex) => {
+      const player = players[playerIndex];
+      if (player === undefined) {
+        throw new Error(`slot permutation fixture missing player at ${String(playerIndex)}`);
+      }
+      return player;
+    }),
+  }));
+}
+
 /** Strength bands: strong ~85 across the board, medium ~65, weak ~48. */
 function fixtureScale(targetCenter: number) {
   return (_element: unknown, index: number): SimulationPlayer => {
@@ -1026,8 +1164,8 @@ export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): Opp
   };
 }
 
-export * from './classic.js';
+export * from './classic.ts';
 
-export * from './season.js';
+export * from './season.ts';
 
-export * from './season-draft.js';
+export * from './season-draft.ts';

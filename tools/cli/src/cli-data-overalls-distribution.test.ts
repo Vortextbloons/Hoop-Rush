@@ -2,8 +2,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
-import { overallsDistributionReportSchema } from './report-schemas.js';
-import { jsonPayload, runCli, TMP } from './cli-test-helpers.js';
+import { overallsDistributionReportSchema } from './report-schemas.ts';
+import { jsonPayload, runCli, TMP } from './cli-test-helpers.ts';
 
 /**
  * CLI integration tests for `data overalls-distribution` (spec: cohort

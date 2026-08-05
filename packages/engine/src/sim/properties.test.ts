@@ -7,9 +7,9 @@ import {
   buildSimulationPlayer,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { simulateGame } from './game.js';
-import { checkGameResult, gameResultDigest } from './invariants.js';
-import { createEngineContext } from './context.js';
+import { simulateGame } from './game.ts';
+import { checkGameResult, gameResultDigest } from './invariants.ts';
+import { createEngineContext } from './context.ts';
 
 /**
  * Property-based accounting, determinism, and distribution invariants

@@ -3,8 +3,8 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import type { Rng } from './rng.js';
-import { ENGINE_CONSTANTS } from './constants.js';
+import type { Rng } from './rng.ts';
+import { ENGINE_CONSTANTS } from './constants.ts';
 
 /**
  * Ball security versus defensive pressure resolves turnovers and optional

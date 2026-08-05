@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GameResult, PlayerBoxScore, TeamResult } from '@hoop-rush/data-contracts';
-import { buildFacts } from './facts.js';
+import { buildFacts } from './facts.ts';
 
 function player(overrides: Partial<PlayerBoxScore> = {}): PlayerBoxScore {
   return {

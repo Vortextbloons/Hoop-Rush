@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { seedSchema } from '@hoop-rush/data-contracts';
-import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.js';
+import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.ts';
 
 describe('deriveGameSeed (spec/01 per-game seeds)', () => {
   it('is deterministic for the same run seed and game number', () => {

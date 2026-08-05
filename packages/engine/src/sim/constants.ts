@@ -1,4 +1,5 @@
-import type { ShotZone } from '@hoop-rush/data-contracts';
+import type { ShotZone, SlotGroup } from '@hoop-rush/data-contracts';
+import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 
 /**
  * Frozen possession-engine constants (spec/03). Every value is a deliberate
@@ -8,7 +9,7 @@ import type { ShotZone } from '@hoop-rush/data-contracts';
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v8';
+export const ENGINE_VERSION = 'm3-engine-v9';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -241,6 +242,48 @@ export const ENGINE_CONSTANTS = {
   offensiveReboundPerimeterPenalty: 0.04,
   /** Weight of observed per-game rebound production in player attribution. */
   observedReboundWeight: 6,
+
+  /**
+   * Assigned-position responsibility modifiers (spec/03, m3-engine-v9). Slot
+   * groups come from the fixed G/G/F/F/C lineup structure via the assigned
+   * slot index, never from native position unions. Each coefficient
+   * multiplies only responsibility weights: initiation, P&R handler, roll
+   * man, post-up, rebounding, and rim protection. Shooting, passing,
+   * turnover, contest, block, defense-rating, overall-rating, anchor, and
+   * physical-attribute formulas are untouched. Every coefficient is strictly
+   * positive and bounded by positionResponsibilityBound, so position can
+   * never manufacture an action whose player tendency is zero.
+   */
+  positionResponsibility: {
+    G: {
+      initiation: 1.08,
+      pnrHandler: 1.1,
+      rollMan: 0.94,
+      postUp: 0.94,
+      rebounding: 0.92,
+      rimProtection: 0.9,
+    },
+    F: {
+      initiation: 1.02,
+      pnrHandler: 1.02,
+      rollMan: 1,
+      postUp: 1.04,
+      rebounding: 1.04,
+      rimProtection: 1.04,
+    },
+    C: {
+      initiation: 0.92,
+      pnrHandler: 0.92,
+      rollMan: 1.08,
+      postUp: 1.08,
+      rebounding: 1.1,
+      rimProtection: 1.1,
+    },
+  } as const satisfies Record<SlotGroup, PositionResponsibilityModifiers>,
+  /** Responsibility coefficients may deviate from 1 by at most this much. */
+  positionResponsibilityBound: 0.12,
+  /** Same-group matchup bonus when the defender shares the shooter's assigned slot group. */
+  positionMatchBonus: 1.35,
 
   /** Blocked shots resolve as misses; this chance a block also records the shot as made-free. */
   blockedShotMiss: true,

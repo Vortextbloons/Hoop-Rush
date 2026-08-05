@@ -5,8 +5,8 @@ import {
   type SeasonStandings,
 } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
-import { createRng } from '../sim/rng.js';
-import { auditSeasonStandings, reduceSeasonStandings } from './standings.js';
+import { createRng } from '../sim/rng.ts';
+import { auditSeasonStandings, reduceSeasonStandings } from './standings.ts';
 
 /**
  * Season Run standings tests (spec/2.0/02): pure reduction from finalized

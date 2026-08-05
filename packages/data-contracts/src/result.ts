@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { playerIdSchema } from './ids.js';
+import { playerIdSchema } from './ids.ts';
 
 /**
  * Recorded game results (spec/03 outputs). These facts are the single source

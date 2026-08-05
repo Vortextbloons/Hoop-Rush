@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { eraIdSchema, franchiseIdSchema, playerIdSchema, seedSchema } from './ids.js';
-import { slotIndexSchema } from './lineup.js';
-import { positionUnionSchema } from './positions.js';
-import { CLASSIC_DRAFT_SCHEMA_VERSION } from './versions.js';
+import { eraIdSchema, franchiseIdSchema, playerIdSchema, seedSchema } from './ids.ts';
+import { slotIndexSchema } from './lineup.ts';
+import { positionUnionSchema } from './positions.ts';
+import { CLASSIC_DRAFT_SCHEMA_VERSION } from './versions.ts';
 
 /**
  * Classic draft contracts (spec/01 Classic game mode, M4). Classic builds the

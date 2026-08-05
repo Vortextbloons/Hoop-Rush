@@ -1,5 +1,5 @@
 import type { Seed } from '@hoop-rush/data-contracts';
-import { FNV_OFFSET_32, fnv1a32, hex32 } from '../sim/rng.js';
+import { FNV_OFFSET_32, fnv1a32, hex32 } from '../sim/rng.ts';
 
 /**
  * Per-game seed derivation (spec/01 challenge seeds). Every game of a run

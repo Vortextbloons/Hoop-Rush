@@ -12,7 +12,7 @@ import {
   type SeasonLeague,
   type SeasonPostseasonState,
 } from '@hoop-rush/data-contracts';
-import { franchisesInConference } from './league.js';
+import { franchisesInConference } from './league.ts';
 
 /**
  * Season Run postseason state machine (spec/2.0/02, postseason-v1). M2.0

@@ -1,13 +1,13 @@
 import { z } from 'zod';
-import { franchiseIdSchema, seedSchema } from './ids.js';
-import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.js';
-import { seasonRotationSchema } from './season-rotation.js';
+import { franchiseIdSchema, seedSchema } from './ids.ts';
+import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
+import { seasonRotationSchema } from './season-rotation.ts';
 import {
   SEASON_AI_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
-} from './season-versions.js';
+} from './season-versions.ts';
 
 /**
  * Season Run AI league generation contracts (spec/2.0/03, M2.1). Decision

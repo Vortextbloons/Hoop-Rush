@@ -11,10 +11,10 @@ import {
   buildSimulationPlayer,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { createEngineContext } from './context.js';
-import { simulateGame } from './game.js';
-import { freeThrowProbability } from './fouls.js';
-import { makeProbability, teamSpacing } from './shooting.js';
+import { createEngineContext } from './context.ts';
+import { simulateGame } from './game.ts';
+import { freeThrowProbability } from './fouls.ts';
+import { makeProbability, teamSpacing } from './shooting.ts';
 
 const context = createEngineContext();
 

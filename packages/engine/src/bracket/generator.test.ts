@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildOpeningOpponent, seedFromString } from '@hoop-rush/test-fixtures';
-import { playableSlotGroups } from '../domain/positions.js';
-import { generateBracket } from './generator.js';
-import { fixtureBracket, generationOptions } from './generator-testing.js';
-import { validateBracketContent } from '../challenge/commands.js';
-import { evaluateLineupBalance } from '../challenge/lineup-eval.js';
-import { scheduleInvariants } from './schedule.js';
+import { playableSlotGroups } from '../domain/positions.ts';
+import { generateBracket } from './generator.ts';
+import { fixtureBracket, generationOptions } from './generator-testing.ts';
+import { validateBracketContent } from '../challenge/commands.ts';
+import { evaluateLineupBalance } from '../challenge/lineup-eval.ts';
+import { scheduleInvariants } from './schedule.ts';
 
 /**
  * Bracket generation tests (spec/01, spec/06): unchanged opening opponent,

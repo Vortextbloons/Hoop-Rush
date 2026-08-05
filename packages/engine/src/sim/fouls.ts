@@ -4,9 +4,9 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import type { Rng } from './rng.js';
-import { ENGINE_CONSTANTS } from './constants.js';
-import { isThreePointZone } from './usage.js';
+import type { Rng } from './rng.ts';
+import { ENGINE_CONSTANTS } from './constants.ts';
+import { isThreePointZone } from './usage.ts';
 
 /**
  * Shooting and non-shooting fouls, period team bonus, and free throws

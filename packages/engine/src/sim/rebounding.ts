@@ -4,8 +4,9 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import type { Rng } from './rng.js';
-import { ENGINE_CONSTANTS } from './constants.js';
+import type { Rng } from './rng.ts';
+import { ENGINE_CONSTANTS } from './constants.ts';
+import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 
 /**
  * Rebound resolution (spec/03 pipeline stage 7). Every live miss resolves to
@@ -72,8 +73,17 @@ export function resolveRebound(
   return { offensive: false, team: false };
 }
 
-/** Rebound attribution weights for a team, in team index order. */
-export function rebounderWeights(team: SimulationTeam, offensive: boolean): number[] {
+/**
+ * Rebound attribution weights for a team, in team index order. The assigned-
+ * slot rebounding modifier scales attribution only (never the team-level
+ * rebound rate, which stays anchored to the era profile), so the slot effect
+ * is a soft 8-12% nudge on who grabs the board, not on how many there are.
+ */
+export function rebounderWeights(
+  team: SimulationTeam,
+  offensive: boolean,
+  positionModifiers?: ReadonlyMap<string, PositionResponsibilityModifiers>,
+): number[] {
   const rating = offensive ? 'offensiveRebound' : 'defensiveRebound';
   return team.players.map((p) => {
     const historical = offensive
@@ -81,13 +91,16 @@ export function rebounderWeights(team: SimulationTeam, offensive: boolean): numb
       : (p.anchors?.defensiveReboundsPerGame ?? 0);
     const heightContribution = p.heightInches === null ? 0 : Math.max(0, p.heightInches - 72) * 0.8;
     const weightContribution = p.weightLbs === null ? 0 : Math.max(0, p.weightLbs - 180) * 0.03;
-    return Math.max(
-      0.5,
-      p.ratings[rating] * (offensive ? 0.75 + p.tendencies.crashOffensiveGlassRate / 40 : 1) +
-        p.ratings.vertical * 0.25 +
-        historical * ENGINE_CONSTANTS.observedReboundWeight +
-        heightContribution +
-        weightContribution,
+    const responsibility = positionModifiers?.get(p.playerId)?.rebounding ?? 1;
+    return (
+      Math.max(
+        0.5,
+        p.ratings[rating] * (offensive ? 0.75 + p.tendencies.crashOffensiveGlassRate / 40 : 1) +
+          p.ratings.vertical * 0.25 +
+          historical * ENGINE_CONSTANTS.observedReboundWeight +
+          heightContribution +
+          weightContribution,
+      ) * responsibility
     );
   });
 }

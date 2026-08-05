@@ -4,7 +4,7 @@ import type {
   ShotZone,
   ShotZoneSummary,
 } from '@hoop-rush/data-contracts';
-import { usageOf } from '../sim/recorder.js';
+import { usageOf } from '../sim/recorder.ts';
 
 /**
  * Season explanation evidence (spec/01 feedback, spec/03 outputs). Derives

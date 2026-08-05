@@ -13,8 +13,8 @@ import {
   simulationTeamSchema,
   workerMessageSchema,
   workerRequestSchema,
-} from './index.js';
-import type { Lineup, LineupAssignment, PeakPlayerSeason } from './index.js';
+} from './index.ts';
+import type { Lineup, LineupAssignment, PeakPlayerSeason } from './index.ts';
 
 const validPlayer: PeakPlayerSeason = {
   schemaVersion: 3,

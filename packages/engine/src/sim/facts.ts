@@ -1,5 +1,5 @@
 import type { ExplanationFact, GameResult, TeamResult } from '@hoop-rush/data-contracts';
-import { usageOf } from './recorder.js';
+import { usageOf } from './recorder.ts';
 
 /**
  * Structured evidence for decisive margins (spec/01 feedback, spec/03 outputs).

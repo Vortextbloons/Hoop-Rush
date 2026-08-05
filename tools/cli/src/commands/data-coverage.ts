@@ -5,8 +5,8 @@ import {
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import { FIELD_AVAILABILITY } from '@hoop-rush/importer';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
-import { DEFAULT_MANIFEST } from './data-loader.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { DEFAULT_MANIFEST } from './data-loader.ts';
 
 /**
  * `hoop-rush data coverage`: field availability, provenance, confidence,

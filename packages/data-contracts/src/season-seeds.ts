@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { seedSchema } from './ids.js';
-import { seasonDigestHex } from './season-hash.js';
-import { SEASON_SEED_DERIVATION_VERSION } from './season-versions.js';
+import { seedSchema } from './ids.ts';
+import { seasonDigestHex } from './season-hash.ts';
+import { SEASON_SEED_DERIVATION_VERSION } from './season-versions.ts';
 
 /**
  * Named Season Run seed tree (spec/2.0/07 deterministic seed tree). Each

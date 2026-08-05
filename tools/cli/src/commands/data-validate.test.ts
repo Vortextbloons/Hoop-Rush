@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PeakPlayerSeason } from '@hoop-rush/data-contracts';
 import { POSITION_NORMALIZATION_VERSION } from '@hoop-rush/data-contracts';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
-import { dataValidate } from './data-validate.js';
-import { EXIT_CHECKS_FAILED, EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.js';
+import { dataValidate } from './data-validate.ts';
+import { EXIT_CHECKS_FAILED, EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
 
 let dir: string;
 

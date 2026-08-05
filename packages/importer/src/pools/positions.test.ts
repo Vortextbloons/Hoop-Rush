@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Position } from '@hoop-rush/data-contracts';
-import type { PositionOverride } from '../positions/overrides.js';
-import { buildPlayerPositions, normalizePositionLabels, POSITION_LABEL_MAP } from './positions.js';
+import type { PositionOverride } from '../positions/overrides.ts';
+import { buildPlayerPositions, normalizePositionLabels, POSITION_LABEL_MAP } from './positions.ts';
 
 describe('position label normalization', () => {
   it('maps simple detailed labels to themselves', () => {

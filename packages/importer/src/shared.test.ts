@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, clampRating, safeFloat, safeInt, sha256Hex } from './json.js';
+import { clamp, clampRating, safeFloat, safeInt, sha256Hex } from './json.ts';
 
 describe('json helpers', () => {
   it('safeFloat mirrors Python _safe_float', () => {

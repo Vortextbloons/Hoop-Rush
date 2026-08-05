@@ -17,9 +17,9 @@ import {
   type SeasonStrengthBand,
   type Seed,
 } from '@hoop-rush/data-contracts';
-import { createRng, shuffle } from '../sim/rng.js';
-import { buildMinimalRotation } from './rotation.js';
-import { seasonGenerationDigest } from './digest.js';
+import { createRng, shuffle } from '../sim/rng.ts';
+import { buildMinimalRotation } from './rotation.ts';
+import { seasonGenerationDigest } from './digest.ts';
 import {
   completionTargetsMet,
   groupMaskOf,
@@ -28,7 +28,7 @@ import {
   rosterGroupCounts,
   validateSeasonRoster,
   type SeasonRosterMemberInput,
-} from './roster-rules.js';
+} from './roster-rules.ts';
 import {
   BAND_CEILING_PENALTY,
   BAND_SCORE_CEILINGS,
@@ -39,7 +39,7 @@ import {
   overallReportOf,
   roleScoresOf,
   type SeasonScoreMember,
-} from './ai-scoring.js';
+} from './ai-scoring.ts';
 
 /**
  * Deterministic AI league generation (spec/2.0/03, season-ai-v1,
@@ -197,13 +197,15 @@ export function evaluateSeasonRoster(input: {
 
 export class SeasonAiGenerationError extends Error {
   readonly code = 'GENERATION_EXHAUSTED' as const;
+  readonly diagnostics: SeasonLeagueGenerationResult['diagnostics'];
 
   constructor(
-    readonly diagnostics: SeasonLeagueGenerationResult['diagnostics'],
+    diagnostics: SeasonLeagueGenerationResult['diagnostics'],
     message = 'AI roster generation exhausted its node budget',
   ) {
     super(message);
     this.name = 'SeasonAiGenerationError';
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -483,12 +485,14 @@ function pickForTeam(
 }
 
 class BacktrackSignal extends Error {
-  constructor(
-    readonly teamId: string,
-    readonly reason: string,
-  ) {
+  readonly teamId: string;
+  readonly reason: string;
+
+  constructor(teamId: string, reason: string) {
     super(`backtrack ${teamId}: ${reason}`);
     this.name = 'BacktrackSignal';
+    this.teamId = teamId;
+    this.reason = reason;
   }
 }
 

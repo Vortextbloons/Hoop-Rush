@@ -4,9 +4,9 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import type { Rng } from './rng.js';
-import { GameRecorder, type SideIndex } from './recorder.js';
-import { meanTripSeconds, sampleTripSeconds } from './timing.js';
+import type { Rng } from './rng.ts';
+import { GameRecorder, type SideIndex } from './recorder.ts';
+import { meanTripSeconds, sampleTripSeconds } from './timing.ts';
 import {
   pickAction,
   pickDefender,
@@ -17,9 +17,9 @@ import {
   isThreePointZone,
   zoneSkillRating,
   type ActionType,
-} from './usage.js';
-import { eraPossEstimatePerTrip, isSteal, pickStealer, turnoverProbability } from './security.js';
-import { blockProbability, makeProbability, type ShotPrep } from './shooting.js';
+} from './usage.ts';
+import { eraPossEstimatePerTrip, isSteal, pickStealer, turnoverProbability } from './security.ts';
+import { blockProbability, makeProbability, type ShotPrep } from './shooting.ts';
 import {
   freeThrowsForZone,
   freeThrowProbability,
@@ -27,11 +27,11 @@ import {
   pickFouler,
   pickFreeThrowShooter,
   shootingFoulProbability,
-} from './fouls.js';
-import { pickRebounder, resolveRebound } from './rebounding.js';
-import { prepareTeam, type TeamPrep } from './prepare.js';
-import { ENGINE_CONSTANTS } from './constants.js';
-import { creationScore } from '../domain/archetypes.js';
+} from './fouls.ts';
+import { pickRebounder, resolveRebound } from './rebounding.ts';
+import { prepareTeam, type TeamPrep } from './prepare.ts';
+import { ENGINE_CONSTANTS } from './constants.ts';
+import { creationScore } from '../domain/archetypes.ts';
 
 /**
  * One offensive trip (spec/03 pipeline stages 1-9). All clock consumption
@@ -314,9 +314,16 @@ function resolveShot(
     throw new Error(`possession: no zone preparation for ${shooter.playerId}`);
   }
   const zone = pickZone(action, zonePrep, rng);
-  const defender = pickDefender(defense, shooter, zone, rng);
-
   const shooterSlot = teamPrep.slotByPlayerId.get(shooter.playerId) ?? -1;
+  const defender = pickDefender(
+    defense,
+    shooter,
+    zone,
+    rng,
+    defensePrep.positionModifiers,
+    shooterSlot,
+  );
+
   const three = isThreePointZone(zone);
   const defenderSlot = defensePrep.slotByPlayerId.get(defender.playerId) ?? -1;
   if (defenderSlot >= 0) recorder.contest(defenseSide, defenderSlot);

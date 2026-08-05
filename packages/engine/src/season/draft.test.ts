@@ -29,10 +29,10 @@ import {
   seasonDraftStateCanonical,
   type SeasonAiGenerationDeps,
   type SeasonAiGenerationInput,
-} from './draft.js';
-import { seasonGenerationDigest } from './digest.js';
-import { SeasonAiGenerationError } from './ai.js';
-import { createRng } from '../sim/rng.js';
+} from './draft.ts';
+import { seasonGenerationDigest } from './digest.ts';
+import { SeasonAiGenerationError } from './ai.ts';
+import { createRng } from '../sim/rng.ts';
 
 /**
  * Season Run M2.1 human draft domain tests: one- and two-human creation,

@@ -5,8 +5,8 @@ import {
   hoopRushManifestSchema,
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
-import { DEFAULT_MANIFEST } from './data-loader.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { DEFAULT_MANIFEST } from './data-loader.ts';
 
 /**
  * `hoop-rush data lineage-audit`: proves historical team ranges map to

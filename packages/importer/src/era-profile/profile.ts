@@ -15,11 +15,11 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { NBA_ROOT, PUBLIC_DATA } from '../config.js';
-import { readJson } from '../json.js';
-import { deriveLeagueAggregates, type LeagueAggregates } from './aggregates.js';
-import { poolShotMixAndAnchors, type ZoneMix } from './shot-mix.js';
-import { getEra } from '../ratings/era.js';
+import { NBA_ROOT, PUBLIC_DATA } from '../config.ts';
+import { readJson } from '../json.ts';
+import { deriveLeagueAggregates, type LeagueAggregates } from './aggregates.ts';
+import { poolShotMixAndAnchors, type ZoneMix } from './shot-mix.ts';
+import { getEra } from '../ratings/era.ts';
 import {
   DERIVATION_METHOD_VERSION,
   SOURCE_VERSION,

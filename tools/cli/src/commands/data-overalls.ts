@@ -5,7 +5,7 @@ import {
   hoopRushManifestSchema,
   type PeakPlayerSeason,
 } from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 
 export const DATA_OVERALLS_OPTIONS: Record<string, boolean> = {
   input: true,

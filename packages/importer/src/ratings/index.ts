@@ -1,13 +1,13 @@
 /**
  * Ratings derivation for the import pipeline.
  */
-export * from './era.js';
-export * from './weights.js';
-export * from './summary.js';
-export * from './v2.js';
-export * from './traits.js';
-export * from './contracts.js';
-export * from './compute.js';
-export * from './v3.js';
-export * from './artifact.js';
-export type { StatsRow } from './stats.js';
+export * from './era.ts';
+export * from './weights.ts';
+export * from './summary.ts';
+export * from './v2.ts';
+export * from './traits.ts';
+export * from './contracts.ts';
+export * from './compute.ts';
+export * from './v3.ts';
+export * from './artifact.ts';
+export type { StatsRow } from './stats.ts';

@@ -13,9 +13,9 @@ import type {
   ClassicVariant,
 } from '@hoop-rush/data-contracts';
 import { challengeRunSchema } from '@hoop-rush/data-contracts';
-import { createEngineContext } from '../../sim/context.js';
-import { canPlay } from '../../domain/positions.js';
-import { createChallenge } from '../../challenge/commands.js';
+import { createEngineContext } from '../../sim/context.ts';
+import { canPlay } from '../../domain/positions.ts';
+import { createChallenge } from '../../challenge/commands.ts';
 import {
   classicRerollAvailable,
   classicRollCandidates,
@@ -29,7 +29,7 @@ import {
   slotRequirement,
   sortClassicCatalog,
   type ClassicChallengeEnvironment,
-} from './draft.js';
+} from './draft.ts';
 
 const context = createEngineContext();
 

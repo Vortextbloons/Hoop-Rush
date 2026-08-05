@@ -6,24 +6,24 @@ import {
   playerExternalIdSchema,
   playerIdSchema,
   seasonKeySchema,
-} from './ids.js';
+} from './ids.ts';
 import {
   positionNormalizationVersionSchema,
   positionSchema,
   positionUnionSchema,
   sourcePositionSchema,
-} from './positions.js';
+} from './positions.ts';
 import {
   simulationRatingsSchema,
   simulationTendenciesSchema,
   simulationAnchorsSchema,
-} from './simulation.js';
+} from './simulation.ts';
 import {
   historicalTeamIdentitySchema,
   provenanceMapSchema,
   coverageSummarySchema,
-} from './provenance.js';
-import { ratingProfileSchema } from './ratings-model.js';
+} from './provenance.ts';
+import { ratingProfileSchema } from './ratings-model.ts';
 
 /**
  * Player-season records and the packaged peak-season pools they feed

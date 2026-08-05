@@ -1,6 +1,6 @@
 import { parseOpponentTeam } from '@hoop-rush/data-contracts';
 import { describe, expect, it } from 'vitest';
-import { anchorsForPlayer, buildOpponentArtifact, LINEUP, type PoolPlayer } from './index.js';
+import { anchorsForPlayer, buildOpponentArtifact, LINEUP, type PoolPlayer } from './index.ts';
 
 function poolPlayer(partial: Partial<PoolPlayer>): PoolPlayer {
   return {

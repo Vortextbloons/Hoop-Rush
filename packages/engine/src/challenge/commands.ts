@@ -19,12 +19,12 @@ import {
   seedSchema,
   type RunPlayerSelection,
 } from '@hoop-rush/data-contracts';
-import { validateLineup } from '../domain/lineup.js';
-import type { EngineContext } from '../sim/context.js';
-import { simulateGame } from '../sim/game.js';
-import { checkGameResult } from '../sim/invariants.js';
-import { addGameToAggregates, zeroRunAggregates } from './aggregates.js';
-import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.js';
+import { validateLineup } from '../domain/lineup.ts';
+import type { EngineContext } from '../sim/context.ts';
+import { simulateGame } from '../sim/game.ts';
+import { checkGameResult } from '../sim/invariants.ts';
+import { addGameToAggregates, zeroRunAggregates } from './aggregates.ts';
+import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.ts';
 
 /**
  * Challenge commands (spec/10 authoritative commands): the single path from a

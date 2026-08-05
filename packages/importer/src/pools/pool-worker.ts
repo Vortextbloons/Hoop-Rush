@@ -8,7 +8,7 @@
  * which alone updates the manifest, coverage report, and players index.
  */
 import { parentPort, workerData } from 'node:worker_threads';
-import { buildPoolForTarget, type PoolWorkerData, type PoolWorkerResult } from './compute.js';
+import { buildPoolForTarget, type PoolWorkerData, type PoolWorkerResult } from './compute.ts';
 
 const data = workerData as PoolWorkerData;
 if (parentPort === null) {

@@ -6,11 +6,15 @@ import {
   zonePrep,
   type TeammateShots,
   type ZonePrep,
-} from './usage.js';
-import { teamSpacing, twoPointAnchorFactor } from './shooting.js';
-import { defenderPressure, stealerWeights } from './security.js';
-import { rebounderWeights, teamMean } from './rebounding.js';
-import { foulerWeights, freeThrowShooterWeights } from './fouls.js';
+} from './usage.ts';
+import { teamSpacing, twoPointAnchorFactor } from './shooting.ts';
+import { defenderPressure, stealerWeights } from './security.ts';
+import { rebounderWeights, teamMean } from './rebounding.ts';
+import { foulerWeights, freeThrowShooterWeights } from './fouls.ts';
+import {
+  responsibilityModifiersForSlot,
+  type PositionResponsibilityModifiers,
+} from './position-responsibilities.ts';
 
 /**
  * One-time per-game weight and lookup tables for one team. Every value is a
@@ -49,6 +53,12 @@ export interface TeamPrep {
   zonePrep: Map<string, ZonePrep>;
   /** Per-player two-point anchor factors, keyed by playerId. */
   twoPointAnchor: Map<string, number | null>;
+  /**
+   * Assigned-position responsibility modifiers, keyed by playerId (pure
+   * functions of the slot index and versioned constants; consumed by the
+   * initiator, action, roll-man, defender, and rebounder weights).
+   */
+  positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>;
 }
 
 /** Builds the per-game preparation tables for one team. */
@@ -59,14 +69,17 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
   const teammateShotsByPlayer = new Map<string, TeammateShots>();
   const zonePrepByPlayer = new Map<string, ZonePrep>();
   const twoPointAnchorByPlayer = new Map<string, number | null>();
+  const positionModifiersByPlayer = new Map<string, PositionResponsibilityModifiers>();
   let pressureTotal = 0;
   let stealTotal = 0;
   players.forEach((player, slot) => {
     slotByPlayerId.set(player.playerId, slot);
-    actionWeightsByPlayer.set(player.playerId, actionWeights(player));
+    const positionModifiers = responsibilityModifiersForSlot(slot);
+    positionModifiersByPlayer.set(player.playerId, positionModifiers);
+    actionWeightsByPlayer.set(player.playerId, actionWeights(player, positionModifiers));
     teammateShotsByPlayer.set(player.playerId, {
-      roll: teammateShotWeights(team, player, 'pickAndRollRoll'),
-      pass: teammateShotWeights(team, player, 'spotUp'),
+      roll: teammateShotWeights(team, player, 'pickAndRollRoll', positionModifiersByPlayer),
+      pass: teammateShotWeights(team, player, 'spotUp', positionModifiersByPlayer),
     });
     const prep = zonePrep(player, profile);
     zonePrepByPlayer.set(player.playerId, prep);
@@ -77,10 +90,13 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
 
   return {
     slotByPlayerId,
-    initiatorWeights: teamInitiatorWeights(team),
+    initiatorWeights: teamInitiatorWeights(team, positionModifiersByPlayer),
     actionWeights: actionWeightsByPlayer,
     teammateShots: teammateShotsByPlayer,
-    rebounderWeights: [rebounderWeights(team, true), rebounderWeights(team, false)],
+    rebounderWeights: [
+      rebounderWeights(team, true, positionModifiersByPlayer),
+      rebounderWeights(team, false, positionModifiersByPlayer),
+    ],
     foulerWeights: foulerWeights(team),
     freeThrowShooterWeights: freeThrowShooterWeights(team),
     stealerWeights: stealerWeights(team),
@@ -91,5 +107,6 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
     spacing: teamSpacing(team),
     zonePrep: zonePrepByPlayer,
     twoPointAnchor: twoPointAnchorByPlayer,
+    positionModifiers: positionModifiersByPlayer,
   };
 }

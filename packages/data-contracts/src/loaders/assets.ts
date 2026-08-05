@@ -1,7 +1,7 @@
-import type { HoopRushManifest } from '../manifest.js';
-import type { PlayerExternalId, TeamExternalId } from '../ids.js';
-import type { PeakPlayerSeason } from '../player-season.js';
-import { franchiseLogoSlug } from '../franchise.js';
+import type { HoopRushManifest } from '../manifest.ts';
+import type { PlayerExternalId, TeamExternalId } from '../ids.ts';
+import type { PeakPlayerSeason } from '../player-season.ts';
+import { franchiseLogoSlug } from '../franchise.ts';
 
 /**
  * Asset URL resolution from the manifest's versioned templates (spec/02).

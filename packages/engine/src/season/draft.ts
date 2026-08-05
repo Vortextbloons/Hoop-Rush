@@ -15,18 +15,18 @@ import {
   type SeasonDraftRollAttempt,
   type SeasonDraftState,
 } from '@hoop-rush/data-contracts';
-import { createRng } from '../sim/rng.js';
+import { createRng } from '../sim/rng.ts';
 import {
   completionTargetsMet,
   legalFiveAfterAnyRemoval,
   rosterFeasible,
   type SeasonRosterMemberInput,
-} from './roster-rules.js';
+} from './roster-rules.ts';
 import {
   SeasonAiGenerationError,
   type SeasonAiGenerationInput,
   type SeasonLeagueGenerationResult,
-} from './ai.js';
+} from './ai.ts';
 
 export type { SeasonAiGenerationInput, SeasonLeagueGenerationResult };
 

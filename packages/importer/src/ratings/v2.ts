@@ -31,11 +31,11 @@ import {
   type RatingProfile,
   type RatingsModelArtifact,
 } from '@hoop-rush/data-contracts';
-import { clamp, clampRating, clampUnitInterval, safeFloat } from '../json.js';
-import { FIELD_AVAILABILITY } from '../config.js';
-import { deriveRatingProfile } from './v3.js';
-import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.js';
-import type { StatsRow } from './stats.js';
+import { clamp, clampRating, clampUnitInterval, safeFloat } from '../json.ts';
+import { FIELD_AVAILABILITY } from '../config.ts';
+import { deriveRatingProfile } from './v3.ts';
+import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
+import type { StatsRow } from './stats.ts';
 
 /** League context used for era-relative translation (spec/12 environment). */
 export interface SeasonContext {

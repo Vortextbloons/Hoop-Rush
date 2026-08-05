@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { HoopRushManifest, PeakPlayerSeason } from '../index.js';
+import type { HoopRushManifest, PeakPlayerSeason } from '../index.ts';
 import {
   isNbaCdnHeadshotUrl,
   resolveHeadshotUrl,
@@ -10,7 +10,7 @@ import {
   resolveSecondaryHeadshotUrl,
   resolveSecondaryLogoUrl,
   shouldStallTimeoutHeadshot,
-} from './assets.js';
+} from './assets.ts';
 
 const assets: HoopRushManifest['assets'] = {
   headshotUrlTemplate: 'https://cdn.nba.com/headshots/nba/latest/1040x760/{playerExternalId}.png',

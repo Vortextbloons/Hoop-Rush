@@ -10,9 +10,9 @@ import type {
   BracketCandidatePlayer,
   BracketGenerationOptions,
   FranchiseCandidates,
-} from './generator.js';
-import { generateBracket } from './generator.js';
-import { createEngineContext } from '../sim/context.js';
+} from './generator.ts';
+import { generateBracket } from './generator.ts';
+import { createEngineContext } from '../sim/context.ts';
 
 /**
  * Shared fixtures for bracket generation tests (spec/01, spec/06). A small

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.js';
-import { playerVersionIdSchema } from './season-identity.js';
-import { SEASON_ROTATION_VERSION } from './season-versions.js';
+import { franchiseIdSchema } from './ids.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
+import { SEASON_ROTATION_VERSION } from './season-versions.ts';
 
 /**
  * Season Run rotation contracts (spec/2.0/04, M2.1). M2.1 persists a minimal

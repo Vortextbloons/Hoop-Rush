@@ -11,8 +11,8 @@ import {
   buildLegalSimulationTeam,
   seedFromString,
 } from '@hoop-rush/test-fixtures';
-import { simulateGame } from './game.js';
-import { createEngineContext } from './context.js';
+import { simulateGame } from './game.ts';
+import { createEngineContext } from './context.ts';
 
 /**
  * Directional and magnitude sensitivity for every modeled rating family

@@ -1,8 +1,8 @@
 import type { GameResult, GameSimulationInput, SimulationTeam } from '@hoop-rush/data-contracts';
-import type { EngineContext } from './context.js';
-import { GameRecorder, type SideIndex } from './recorder.js';
-import { createGameState, createTripContext, resolveTrip } from './possession.js';
-import { buildFacts } from './facts.js';
+import type { EngineContext } from './context.ts';
+import { GameRecorder, type SideIndex } from './recorder.ts';
+import { createGameState, createTripContext, resolveTrip } from './possession.ts';
+import { buildFacts } from './facts.ts';
 
 /**
  * Game orchestration (spec/03): four 12-minute regulation periods plus

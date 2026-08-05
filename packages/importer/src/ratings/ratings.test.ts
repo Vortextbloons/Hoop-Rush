@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DERIVATION_METHOD_VERSION } from '@hoop-rush/data-contracts';
-import { derivePlayerRecord, fieldPublished, type DerivationInput } from './v2.js';
-import { computeProductionImpact, computeRealOverall, computeSummaryRatings } from './summary.js';
+import { derivePlayerRecord, fieldPublished, type DerivationInput } from './v2.ts';
+import { computeProductionImpact, computeRealOverall, computeSummaryRatings } from './summary.ts';
 
 const MODERN = { leaguePpg: 110, league3PARate: 0.36, pace: 99 };
 

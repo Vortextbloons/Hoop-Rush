@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { deriveLeagueAggregatesFromStints, type StintRow } from './aggregates.js';
-import { computePoolShotMix, type PoolPlayerLike } from './shot-mix.js';
-import { target } from './profile.js';
+import { deriveLeagueAggregatesFromStints, type StintRow } from './aggregates.ts';
+import { computePoolShotMix, type PoolPlayerLike } from './shot-mix.ts';
+import { target } from './profile.ts';
 
 function stint(partial: Partial<StintRow>): StintRow {
   return partial;

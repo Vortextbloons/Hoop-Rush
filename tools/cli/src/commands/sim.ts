@@ -13,11 +13,11 @@ import {
   type GameResult,
   type GameSimulationInput,
 } from '@hoop-rush/data-contracts';
-import { makeReport, type CliReport } from '../report.js';
-import { simBatchReportSchema, simGameReportSchema } from '../report-schemas.js';
-import { simFixtureSchema, type SimFixture } from '../fixture-schema.js';
-import { parseCount, UsageError } from '../args.js';
-import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.js';
+import { makeReport, type CliReport } from '../report.ts';
+import { simBatchReportSchema, simGameReportSchema } from '../report-schemas.ts';
+import { simFixtureSchema, type SimFixture } from '../fixture-schema.ts';
+import { parseCount, UsageError } from '../args.ts';
+import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.ts';
 
 export { UsageError };
 

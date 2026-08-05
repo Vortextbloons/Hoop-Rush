@@ -4,7 +4,7 @@ import {
   SEASON_BLOCK_TEAM_GAMES,
   SEASON_FINAL_BLOCK_TEAM_GAMES,
   SEASON_ROUND_COUNT,
-} from './season-versions.js';
+} from './season-versions.ts';
 
 /**
  * Regular-season block cursor (spec/2.0/02 ten-game blocks). The season

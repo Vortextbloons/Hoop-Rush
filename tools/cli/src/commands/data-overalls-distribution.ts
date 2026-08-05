@@ -6,8 +6,8 @@ import {
   hoopRushManifestSchema,
   type PeakPlayerSeason,
 } from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
-import { overallsDistributionReportSchema } from '../report-schemas.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { overallsDistributionReportSchema } from '../report-schemas.ts';
 
 /**
  * `data overalls-distribution`: reports the cohort percentile Overall

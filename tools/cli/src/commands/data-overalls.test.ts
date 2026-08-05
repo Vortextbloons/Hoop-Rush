@@ -3,8 +3,8 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
-import { dataOveralls } from './data-overalls.js';
-import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.js';
+import { dataOveralls } from './data-overalls.ts';
+import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
 
 describe('dataOveralls', () => {
   it('reports detailed, summary, and selection values in sorted order', async () => {

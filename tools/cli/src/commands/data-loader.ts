@@ -12,7 +12,7 @@ import {
   type HoopRushManifest,
   type OpponentBracket,
 } from '@hoop-rush/data-contracts';
-import { UsageError } from '../args.js';
+import { UsageError } from '../args.ts';
 
 /**
  * Loads packaged static artifacts from the repo (spec/09: commands read
@@ -66,15 +66,16 @@ export function loadPackagedData(manifestPath: string = DEFAULT_MANIFEST): {
 }
 
 export class PackagedData {
+  readonly manifest: HoopRushManifest;
+  readonly dir: string;
   private readonly poolCache = new Map<string, FranchiseEraPool>();
   private readonly profileCache = new Map<string, EraSimulationProfile>();
   private bracketCache: OpponentBracket | null = null;
   private readonly poolEntries: Map<string, HoopRushManifest['pools'][number]>;
 
-  constructor(
-    readonly manifest: HoopRushManifest,
-    readonly dir: string,
-  ) {
+  constructor(manifest: HoopRushManifest, dir: string) {
+    this.manifest = manifest;
+    this.dir = dir;
     this.poolEntries = new Map(
       manifest.pools.map((entry) => [`${entry.franchiseId}/${entry.eraId}`, entry]),
     );

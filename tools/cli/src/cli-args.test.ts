@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { runCli, TMP } from './cli-test-helpers.js';
+import { runCli, TMP } from './cli-test-helpers.ts';
 
 describe('cli: argument validation and exit codes', () => {
   it('prints help and exits 0 with no arguments', async () => {

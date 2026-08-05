@@ -9,7 +9,7 @@ import {
   SOURCE_VERSION,
 } from '@hoop-rush/data-contracts';
 import { NBA_ROOT, ratings, resolveHistoricalIdentity } from '@hoop-rush/importer';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 
 /**
  * `hoop-rush data derive`: reproduces one player-season's complete derivation

@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { contentHashSchema, eraIdSchema, franchiseIdSchema, seedSchema } from './ids.js';
-import { seasonLeagueSchema } from './season-league.js';
-import { seasonGameSchema } from './season-game.js';
-import { seasonStandingsSchema } from './season-standings.js';
-import { seasonCursorSchema } from './season-cursor.js';
-import { seasonPostseasonStateSchema } from './season-postseason.js';
-import { playerVersionIdSchema } from './season-identity.js';
+import { contentHashSchema, eraIdSchema, franchiseIdSchema, seedSchema } from './ids.ts';
+import { seasonLeagueSchema } from './season-league.ts';
+import { seasonGameSchema } from './season-game.ts';
+import { seasonStandingsSchema } from './season-standings.ts';
+import { seasonCursorSchema } from './season-cursor.ts';
+import { seasonPostseasonStateSchema } from './season-postseason.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
 import {
   PLAYER_VERSION_ID_VERSION,
   SEASON_AI_VERSION,
@@ -24,14 +24,14 @@ import {
   SEASON_SEED_DERIVATION_VERSION,
   SEASON_STANDINGS_VERSION,
   SEASON_TEAM_COUNT,
-} from './season-versions.js';
-import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.js';
+} from './season-versions.ts';
+import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
 import {
   seasonAiAssignmentSchema,
   seasonGenerationDiagnosticsSchema,
   seasonRosterEvaluationSchema,
-} from './season-ai.js';
-import { seasonRotationSchema } from './season-rotation.js';
+} from './season-ai.ts';
+import { seasonRotationSchema } from './season-rotation.ts';
 
 /**
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
@@ -47,8 +47,8 @@ export {
   seasonRosterEntrySchema,
   seasonRosterSchema,
   seasonOwnershipSchema,
-} from './season-roster.js';
-export type { SeasonRosterEntry, SeasonRoster, SeasonOwnership } from './season-roster.js';
+} from './season-roster.ts';
+export type { SeasonRosterEntry, SeasonRoster, SeasonOwnership } from './season-roster.ts';
 
 /** Completed draft facts for the human participants (M2.1). */
 export const seasonDraftFactsSchema = z.object({

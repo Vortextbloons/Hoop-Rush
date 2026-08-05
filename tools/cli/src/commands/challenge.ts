@@ -13,10 +13,10 @@ import {
   type SimulationPlayer,
   type SimulationTeam,
 } from '@hoop-rush/data-contracts';
-import { makeReport, type CliReport } from '../report.js';
-import { simChallengeReportSchema } from '../report-schemas.js';
-import { loadPackagedData, PackagedData, loadBracketFile, loadProfileFile } from './data-loader.js';
-import { loadFixture, UsageError } from './sim.js';
+import { makeReport, type CliReport } from '../report.ts';
+import { simChallengeReportSchema } from '../report-schemas.ts';
+import { loadPackagedData, PackagedData, loadBracketFile, loadProfileFile } from './data-loader.ts';
+import { loadFixture, UsageError } from './sim.ts';
 
 /**
  * `sim challenge` (spec/09): runs one complete Sandbox challenge through the

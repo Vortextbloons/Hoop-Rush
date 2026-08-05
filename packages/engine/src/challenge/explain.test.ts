@@ -6,7 +6,7 @@ import type {
   TeamResult,
 } from '@hoop-rush/data-contracts';
 import { buildChallengeRun } from '@hoop-rush/test-fixtures';
-import { EXPLAIN_THRESHOLDS, explainSeason, opponentSeasonTotals } from './explain.js';
+import { EXPLAIN_THRESHOLDS, explainSeason, opponentSeasonTotals } from './explain.ts';
 
 function player(overrides: Partial<PlayerBoxScore> = {}): PlayerBoxScore {
   return {

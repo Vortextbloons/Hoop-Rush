@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { replayReportSchema, simGameReportSchema } from './report-schemas.js';
-import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.js';
+import { replayReportSchema, simGameReportSchema } from './report-schemas.ts';
+import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
 describe('cli: replay', () => {
   it('reproduces a saved input/expected pair byte-for-byte', async () => {

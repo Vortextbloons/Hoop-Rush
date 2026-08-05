@@ -18,7 +18,7 @@ import {
   buildPlayerSeason,
   buildPool,
   seedFromString,
-} from './index.js';
+} from './index.ts';
 
 describe('fixture builders', () => {
   it('build a schema-valid peak player season', () => {

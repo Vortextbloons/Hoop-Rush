@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HoopRushManifest } from '@hoop-rush/data-contracts';
 import { buildManifest } from '@hoop-rush/test-fixtures';
-import { dataLineageAudit } from './data-lineage-audit.js';
-import { EXIT_CHECKS_FAILED, EXIT_OK } from '../report.js';
+import { dataLineageAudit } from './data-lineage-audit.ts';
+import { EXIT_CHECKS_FAILED, EXIT_OK } from '../report.ts';
 
 let dir: string;
 

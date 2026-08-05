@@ -11,9 +11,9 @@ import {
   generateAiLeague,
   seasonDraftStateDigest,
 } from '@hoop-rush/engine';
-import { makeReport, type CliReport } from '../report.js';
-import { seasonDraftReproduceReportSchema } from '../report-schemas.js';
-import { loadSeasonDraftCatalog, readJsonFile } from './season-data.js';
+import { makeReport, type CliReport } from '../report.ts';
+import { seasonDraftReproduceReportSchema } from '../report-schemas.ts';
+import { loadSeasonDraftCatalog, readJsonFile } from './season-data.ts';
 
 /**
  * `season draft reproduce` (spec/2.0 M2.1): replays a committed command

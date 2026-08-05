@@ -3,8 +3,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { franchiseEraPoolSchema, type FranchiseEraPool } from '@hoop-rush/data-contracts';
-import { dataValidate, DEFAULT_MANIFEST } from './data-validate.js';
-import { EXIT_OK } from '../report.js';
+import { dataValidate, DEFAULT_MANIFEST } from './data-validate.ts';
+import { EXIT_OK } from '../report.ts';
 
 /**
  * Curated identity fixtures (spec/02): known Lakers 1990s stars and role

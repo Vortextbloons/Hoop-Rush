@@ -5,8 +5,8 @@ import {
   hoopRushManifestSchema,
   type PeakPlayerSeason,
 } from '@hoop-rush/data-contracts';
-import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.js';
-import { defenseBpmCorrelationReportSchema } from '../report-schemas.js';
+import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { defenseBpmCorrelationReportSchema } from '../report-schemas.ts';
 
 /**
  * `data defense-bpm-correlation`: Pearson correlation between packaged

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.js';
-import { SEASON_ROUND_COUNT } from './season-versions.js';
+import { franchiseIdSchema } from './ids.ts';
+import { SEASON_ROUND_COUNT } from './season-versions.ts';
 
 /**
  * One league game as it exists inside a Season Run: scheduled, finalized,

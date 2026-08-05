@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { eraIdSchema, franchiseIdSchema, playerIdSchema, seasonKeySchema } from './ids.js';
-import { playerVersionIdSchema } from './season-identity.js';
-import { SEASON_ROSTER_SIZE } from './season-versions.js';
+import { eraIdSchema, franchiseIdSchema, playerIdSchema, seasonKeySchema } from './ids.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
+import { SEASON_ROSTER_SIZE } from './season-versions.ts';
 
 /**
  * Season Run roster and ownership contracts (spec/2.0/03, spec/2.0/07).

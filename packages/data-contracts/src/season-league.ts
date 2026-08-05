@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.js';
-import { SEASON_LEAGUE_VERSION, SEASON_TEAM_COUNT } from './season-versions.js';
+import { franchiseIdSchema } from './ids.ts';
+import { SEASON_LEAGUE_VERSION, SEASON_TEAM_COUNT } from './season-versions.ts';
 
 /**
  * Season Run league and franchise control (spec/2.0/02). A Season Run

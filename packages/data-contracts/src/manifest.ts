@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { contentHashSchema, eraIdSchema, franchiseIdSchema } from './ids.js';
-import { franchiseLineageSchema, modernFranchiseSlotSchema } from './franchise.js';
-import { eraDefSchema } from './eras.js';
-import { poolAvailabilitySchema } from './provenance.js';
-import { MANIFEST_SCHEMA_VERSION } from './versions.js';
+import { contentHashSchema, eraIdSchema, franchiseIdSchema } from './ids.ts';
+import { franchiseLineageSchema, modernFranchiseSlotSchema } from './franchise.ts';
+import { eraDefSchema } from './eras.ts';
+import { poolAvailabilitySchema } from './provenance.ts';
+import { MANIFEST_SCHEMA_VERSION } from './versions.ts';
 
 /**
  * The single build-time manifest the browser loads first (spec/02, spec/12).

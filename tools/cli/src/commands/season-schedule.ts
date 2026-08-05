@@ -15,12 +15,12 @@ import {
   EXIT_USAGE_OR_DATA_ERROR,
   makeReport,
   type CliReport,
-} from '../report.js';
+} from '../report.ts';
 import {
   seasonScheduleAuditReportSchema,
   seasonScheduleGenerateReportSchema,
-} from '../report-schemas.js';
-import { DEFAULT_MANIFEST, REPO_ROOT } from './data-loader.js';
+} from '../report-schemas.ts';
+import { DEFAULT_MANIFEST, REPO_ROOT } from './data-loader.ts';
 
 /**
  * `season schedule` (spec/2.0 M2.0): generate the deterministic Season Run

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.js';
-import { derivePlayerRecord } from './v2.js';
-import { computeSummaryRatings } from './summary.js';
+import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
+import { derivePlayerRecord } from './v2.ts';
+import { computeSummaryRatings } from './summary.ts';
 
 const stats = {
   playerExternalId: 'v3-fixture',

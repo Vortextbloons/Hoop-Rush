@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { contentHashSchema, franchiseIdSchema, eraIdSchema, seasonKeySchema } from './ids.js';
+import { contentHashSchema, franchiseIdSchema, eraIdSchema, seasonKeySchema } from './ids.ts';
 
 /**
  * Field-level provenance, coverage summaries, and the franchise-era

@@ -1,5 +1,5 @@
-import { seasonDraftCatalogSchema, type SeasonDraftCatalog } from '../season-draft-catalog.js';
-import { sha256Hex } from './verify-hash.js';
+import { seasonDraftCatalogSchema, type SeasonDraftCatalog } from '../season-draft-catalog.ts';
+import { sha256Hex } from './verify-hash.ts';
 
 /** Validate an unknown draft catalog value at a runtime boundary. */
 export function parseSeasonDraftCatalog(value: unknown): SeasonDraftCatalog {

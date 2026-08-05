@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildFixtureBracket, seedFromString } from '@hoop-rush/test-fixtures';
-import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.js';
+import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 
 const ALL_FRANCHISES = [
   'hawks',

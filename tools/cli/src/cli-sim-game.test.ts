@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { simGameReportSchema } from './report-schemas.js';
-import { jsonPayload, runCli } from './cli-test-helpers.js';
+import { simGameReportSchema } from './report-schemas.ts';
+import { jsonPayload, runCli } from './cli-test-helpers.ts';
 
 describe('cli: sim game', () => {
   it('runs a game and emits a validated payload with versions and invariants', async () => {

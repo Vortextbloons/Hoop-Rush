@@ -7,7 +7,7 @@
  */
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { REPO_ROOT } from './config.js';
+import { REPO_ROOT } from './config.ts';
 
 export interface RunPythonOptions {
   /** Python interpreter; defaults to HOOP_RUSH_PYTHON env or "python". */
