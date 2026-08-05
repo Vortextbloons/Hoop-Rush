@@ -370,6 +370,34 @@ const COMMANDS: Record<string, CommandEntry> = {
         }),
     };
   }),
+  'season game simulate': command(async () => {
+    const { seasonGameSimulate, SEASON_GAME_SIMULATE_OPTIONS } =
+      await import('./commands/season-game.ts');
+    return {
+      options: SEASON_GAME_SIMULATE_OPTIONS,
+      run: (args) =>
+        seasonGameSimulate({
+          input: getOptionString(args, 'input') ?? null,
+          seed: getOptionString(args, 'seed') ?? null,
+        }),
+    };
+  }),
+  'season game calibrate': command(async () => {
+    const { seasonGameCalibrate, SEASON_GAME_CALIBRATE_OPTIONS } =
+      await import('./commands/season-game.ts');
+    return {
+      options: SEASON_GAME_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonGameCalibrate({
+          fixture: getOptionString(args, 'fixture') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+        }),
+    };
+  }),
   'import ratings': command(async () => {
     const { importRatings, IMPORT_RATINGS_OPTIONS } = await import('./commands/import.ts');
     return {

@@ -441,14 +441,20 @@ export const seasonGameSimulationResultSchema = z.discriminatedUnion('outcome', 
     foulOuts: z.array(seasonFoulOutSchema),
     removals: z.array(seasonRemovalEventSchema),
   }),
-  seasonGameResultBaseSchema.extend({
-    outcome: z.literal('forfeit'),
-    losingFranchiseId: franchiseIdSchema,
-    trigger: seasonForfeitTriggerSchema,
-    /** Official result: the winner scores 2, the loser 0. */
-    homeScore: z.literal(2),
-    awayScore: z.literal(0),
-  }),
+  seasonGameResultBaseSchema
+    .extend({
+      outcome: z.literal('forfeit'),
+      losingFranchiseId: franchiseIdSchema,
+      trigger: seasonForfeitTriggerSchema,
+      /** Official 2-0 result: exactly one side scores 2, the other 0. */
+      homeScore: z.union([z.literal(0), z.literal(2)]),
+      awayScore: z.union([z.literal(0), z.literal(2)]),
+    })
+    .superRefine((result, ctx) => {
+      if (result.homeScore + result.awayScore !== 2) {
+        ctx.addIssue({ code: 'custom', message: 'forfeit must be an official 2-0 result' });
+      }
+    }),
   z.object({
     schemaVersion: z.literal(1),
     outcome: z.literal('no-legal-five-both'),

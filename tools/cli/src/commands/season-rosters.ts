@@ -23,9 +23,9 @@ import {
   SeasonAiGenerationError,
   completionTargetsMet,
   generateAiLeague,
-  rotationTargetMinutes,
   seasonGenerationDigest,
   validateSeasonRoster,
+  validateSeasonRotation,
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import {
@@ -371,17 +371,25 @@ export function seasonRostersAudit(args: {
     }
   }
 
-  // Rotations: 240 minutes, closing five, partition.
+  // Rotations: v2 validation (partition, 240 minutes, independent legal
+  // starter and closing fives) against the catalog's position data.
   for (const rotation of league.rotations) {
-    if (rotationTargetMinutes(rotation) !== 240) {
-      failures.push(`${rotation.franchiseId}: rotation minutes must total 240`);
-    }
-    if (rotation.closingFive.join() !== rotation.starters.join()) {
-      failures.push(`${rotation.franchiseId}: M2.1 closing five must equal the starters`);
-    }
-    const all = [...rotation.starters, ...rotation.benchOrder];
-    if (new Set(all).size !== 10) {
-      failures.push(`${rotation.franchiseId}: rotation references duplicate players`);
+    const memberPlayable = new Map(
+      league.rosters
+        .find((roster) => roster.franchiseId === rotation.franchiseId)
+        ?.players.map((player) => {
+          const candidate = catalog.candidates.find(
+            (c) => c.playerVersionId === player.playerVersionId,
+          );
+          if (!candidate) {
+            throw new Error(`roster references an unknown version ${player.playerVersionId}`);
+          }
+          return [player.playerVersionId, candidate.positions.playable] as const;
+        }) ?? [],
+    );
+    const rotationFailures = validateSeasonRotation(rotation, memberPlayable);
+    if (rotationFailures.length > 0) {
+      failures.push(`${rotation.franchiseId}: ${rotationFailures.join('; ')}`);
     }
   }
 

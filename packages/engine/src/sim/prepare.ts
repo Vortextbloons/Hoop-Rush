@@ -1,4 +1,8 @@
-import type { EraSimulationProfile, SimulationTeam } from '@hoop-rush/data-contracts';
+import type {
+  EraSimulationProfile,
+  SimulationPlayer,
+  SimulationTeam,
+} from '@hoop-rush/data-contracts';
 import {
   actionWeights,
   teamInitiatorWeights,
@@ -17,13 +21,26 @@ import {
 } from './position-responsibilities.ts';
 
 /**
+ * Authoritative identity key for possession lookups and accounting
+ * (spec/2.0/04 M2.2): `playerVersionId` when present, otherwise `playerId`.
+ * Season Run players carry a playerVersionId so two historical versions of
+ * one person (same playerId) never collide in a shared side; Classic/sandbox
+ * players have no playerVersionId and key by playerId, keeping the Classic
+ * path byte-identical. Lookups consume no RNG, so the key change never
+ * alters a draw sequence.
+ */
+export function enginePlayerKey(player: SimulationPlayer): string {
+  return player.playerVersionId ?? player.playerId;
+}
+
+/**
  * One-time per-game weight and lookup tables for one team. Every value is a
  * pure function of the immutable player snapshots and the era profile, so
  * precomputing once per game leaves the RNG draw sequence untouched (all
  * `weightedPick` calls consume the same weight values in the same order).
  */
 export interface TeamPrep {
-  /** Slot lookup for every player id in the team's immutable index order. */
+  /** Slot lookup keyed by enginePlayerKey (playerVersionId ?? playerId). */
   slotByPlayerId: Map<string, number>;
   /** Precomputed initiator weights, in team index order. */
   initiatorWeights: number[];
@@ -73,17 +90,25 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
   let pressureTotal = 0;
   let stealTotal = 0;
   players.forEach((player, slot) => {
-    slotByPlayerId.set(player.playerId, slot);
+    const key = enginePlayerKey(player);
+    slotByPlayerId.set(key, slot);
     const positionModifiers = responsibilityModifiersForSlot(slot);
+    // Keyed by engine identity for possession lookups. The playerId alias
+    // keeps the weight functions that look up by playerId (teamInitiatorWeights,
+    // teammateShotWeights, pickDefender, rebounderWeights) working for Season
+    // players; for Classic players both keys coincide. Two versions of one
+    // person sharing the same active five would alias to the last version's
+    // modifiers via the playerId key only.
+    positionModifiersByPlayer.set(key, positionModifiers);
     positionModifiersByPlayer.set(player.playerId, positionModifiers);
-    actionWeightsByPlayer.set(player.playerId, actionWeights(player, positionModifiers));
-    teammateShotsByPlayer.set(player.playerId, {
+    actionWeightsByPlayer.set(key, actionWeights(player, positionModifiers));
+    teammateShotsByPlayer.set(key, {
       roll: teammateShotWeights(team, player, 'pickAndRollRoll', positionModifiersByPlayer),
       pass: teammateShotWeights(team, player, 'spotUp', positionModifiersByPlayer),
     });
     const prep = zonePrep(player, profile);
-    zonePrepByPlayer.set(player.playerId, prep);
-    twoPointAnchorByPlayer.set(player.playerId, twoPointAnchorFactor(player, profile, prep.blend));
+    zonePrepByPlayer.set(key, prep);
+    twoPointAnchorByPlayer.set(key, twoPointAnchorFactor(player, profile, prep.blend));
     pressureTotal += defenderPressure(player);
     stealTotal += player.ratings.steal;
   });

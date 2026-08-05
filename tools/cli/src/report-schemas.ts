@@ -1,4 +1,15 @@
 import { z } from 'zod';
+import {
+  franchiseIdSchema,
+  playerVersionIdSchema,
+  seasonFoulOutSchema,
+  seasonForfeitTriggerSchema,
+  seasonRotationDeviationReasonSchema,
+  seasonRotationDeviationSchema,
+  seasonRotationPresetSchema,
+  seasonSubstitutionSchema,
+  seasonUnitStintSchema,
+} from '@hoop-rush/data-contracts';
 
 /**
  * Versioned CLI report payloads (spec/09). Every command emits a
@@ -592,3 +603,103 @@ export const defenseBpmCorrelationReportSchema = z.object({
   perEra: z.array(defenseBpmEraSchema),
 });
 export type DefenseBpmCorrelationReport = z.infer<typeof defenseBpmCorrelationReportSchema>;
+
+/** One per-player actual-vs-target minute row in a Season game report. */
+const seasonGamePlayerMinutesSchema = z.object({
+  side: z.enum(['home', 'away']),
+  playerVersionId: playerVersionIdSchema,
+  actualSeconds: z.number().int().nonnegative(),
+  targetSeconds: z.number().int().nonnegative(),
+  deviationSeconds: z.number().int(),
+  reasons: z.array(seasonRotationDeviationReasonSchema),
+});
+
+/** M2.2 `season game simulate` report payload (spec/2.0/04). */
+export const seasonGameSimulateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season game simulate'),
+  fixtureId: z.string().min(1).max(64),
+  seed: z.string().regex(/^[0-9a-f]{16,64}$/),
+  outcome: z.enum(['completed', 'forfeit', 'no-legal-five-both']),
+  winner: z.enum(['home', 'away']).nullable(),
+  home: z.object({
+    teamId: z.string().min(1).max(64),
+    displayName: z.string().min(1).max(96),
+    score: z.number().int().nonnegative().nullable(),
+  }),
+  away: z.object({
+    teamId: z.string().min(1).max(64),
+    displayName: z.string().min(1).max(96),
+    score: z.number().int().nonnegative().nullable(),
+  }),
+  overtimePeriods: z.number().int().nonnegative(),
+  forfeit: z
+    .object({
+      losingFranchiseId: franchiseIdSchema,
+      trigger: seasonForfeitTriggerSchema,
+    })
+    .nullable(),
+  engineVersion: z.string().min(1).max(64),
+  dataVersion: z.string().min(1).max(64),
+  profileVersion: z.string().min(1).max(64),
+  gameVersion: z.string().min(1).max(64),
+  rotationVersion: z.string().min(1).max(64),
+  playerMinutes: z.array(seasonGamePlayerMinutesSchema),
+  substitutions: z.array(seasonSubstitutionSchema),
+  unitStints: z.array(seasonUnitStintSchema),
+  foulOuts: z.array(seasonFoulOutSchema),
+  deviations: z.array(seasonRotationDeviationSchema),
+  invariantFailures: z.array(z.string().min(1)),
+  pass: z.boolean(),
+});
+export type SeasonGameSimulateReport = z.infer<typeof seasonGameSimulateReportSchema>;
+
+/** Per-fixture calibration stats plus failure counts (calibration cohort). */
+const seasonGameFixtureStatsSchema = z.object({
+  fixtureId: z.string().min(1).max(64),
+  preset: seasonRotationPresetSchema.nullable(),
+  /** Completed calibration-cohort games contributing to the medians. */
+  sample: z.number().int().nonnegative(),
+  starterSecondsMedian: z.number().nonnegative(),
+  benchSecondsMedian: z.number().nonnegative(),
+  benchRoleMedianSeconds: z.array(z.number().nonnegative()).length(5),
+  failures: z.object({
+    /** Calibration games with any check failure or determinism divergence. */
+    games: z.number().int().nonnegative(),
+    /** Total checkSeasonGameResult failure strings over the calibration cohort. */
+    checks: z.number().int().nonnegative(),
+    /** Calibration games whose double-run results diverged. */
+    determinism: z.number().int().nonnegative(),
+  }),
+});
+
+/** M2.2 `season game calibrate` report payload (spec/2.0/04). */
+export const seasonGameCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season game calibrate'),
+  fixtures: z.array(
+    z.object({
+      fixtureId: z.string().min(1).max(64),
+      preset: seasonRotationPresetSchema.nullable(),
+    }),
+  ),
+  calibrationSeedCount: z.number().int().nonnegative(),
+  validationSeedCount: z.number().int().nonnegative(),
+  workers: z.number().int().min(1),
+  durationMs: z.number().nonnegative(),
+  fixtureStats: z.array(seasonGameFixtureStatsSchema),
+  gates: z.object({
+    zeroFailures: z.boolean(),
+    starterOrdering: z.boolean(),
+    benchOrdering: z.boolean(),
+    benchRoleNonIncreasing: z.boolean(),
+    heldOutPassShare: z.number().min(0).max(1),
+    heldOutPass: z.boolean(),
+  }),
+  /** Gate 6: the chunking probe re-ran a subset with one chunk and matched. */
+  chunkingIndependent: z.boolean(),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonGameCalibrateReport = z.infer<typeof seasonGameCalibrateReportSchema>;

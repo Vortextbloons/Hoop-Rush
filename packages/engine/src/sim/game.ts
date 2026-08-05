@@ -8,20 +8,32 @@ import { buildFacts } from './facts.ts';
  * Game orchestration (spec/03): four 12-minute regulation periods plus
  * repeating five-minute overtime periods until exactly one winner exists.
  * Each period resets the team-foul count used for the bonus.
+ *
+ * Classic routes through the neutral fixed-five adapter: the five-player
+ * lineups are immutable, foul-out tracking and substitution planning are
+ * disabled, and every player receives 48 + 5*OT minutes. The adapter drives
+ * the resumable possession pipeline to completion per trip (it never
+ * observes the pause boundaries the Season controller uses), so the
+ * possession order, RNG call sequence, result schema, and digest are
+ * byte-identical to the pre-M2.2 engine.
  */
 
 const REGULATION_PERIOD_SECONDS = 720;
 const OVERTIME_PERIOD_SECONDS = 300;
 const MAX_PERIODS = 12;
 
-export function simulateGame(input: GameSimulationInput, context: EngineContext): GameResult {
-  const rng = context.rngFactory(input.seed);
-  const profile = input.profile;
-  const teams: [SimulationTeam, SimulationTeam] = [input.home, input.away];
-  const recorder = new GameRecorder();
-  const state = createGameState();
-  const tripContext = createTripContext(rng, recorder, state, profile, teams);
-
+/**
+ * Neutral fixed-five adapter (spec/03): immutable lineups, no foul-outs, no
+ * substitution planning, no pause observation. Plays the full period loop
+ * against `resolveTrip`, which runs each trip through the same resumable
+ * steps the Season controller pauses at, in the exact original RNG order.
+ */
+export function playFixedFivePeriods(
+  rng: ReturnType<EngineContext['rngFactory']>,
+  recorder: GameRecorder,
+  state: ReturnType<typeof createGameState>,
+  tripContext: ReturnType<typeof createTripContext>,
+): { overtimePeriods: number; winner: 'home' | 'away' } {
   // Neutral-site tip: the opening possession is a fair coin.
   let offense: SideIndex = rng.chance(0.5) ? 0 : 1;
   let secondsRemaining = REGULATION_PERIOD_SECONDS;
@@ -66,6 +78,19 @@ export function simulateGame(input: GameSimulationInput, context: EngineContext)
         : rng.chance(0.5)
           ? 'home'
           : 'away';
+
+  return { overtimePeriods, winner };
+}
+
+export function simulateGame(input: GameSimulationInput, context: EngineContext): GameResult {
+  const rng = context.rngFactory(input.seed);
+  const profile = input.profile;
+  const teams: [SimulationTeam, SimulationTeam] = [input.home, input.away];
+  const recorder = new GameRecorder();
+  const state = createGameState();
+  const tripContext = createTripContext(rng, recorder, state, profile, teams);
+
+  const { overtimePeriods, winner } = playFixedFivePeriods(rng, recorder, state, tripContext);
 
   const side = (index: SideIndex): GameResult['home'] => ({
     teamId: index === 0 ? input.home.teamId : input.away.teamId,

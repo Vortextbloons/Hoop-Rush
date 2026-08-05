@@ -1,8 +1,10 @@
 import type {
   GameResult,
   PlayerBoxScore,
+  PlayerDiagnostics,
   ShotZone,
   TeamBoxScore,
+  TeamDiagnostics,
   ShotZoneSummary,
 } from '@hoop-rush/data-contracts';
 import { SHOT_ZONES } from '../domain/zones.ts';
@@ -33,6 +35,8 @@ export function createZoneCounters(): Record<ShotZone, number> {
 
 export interface RecorderPlayer {
   minutes: number;
+  /** Exact on-court seconds (Season Run; integer accumulation per stint). */
+  seconds: number;
   points: number;
   fieldGoalMakes: number;
   fieldGoalAttempts: number;
@@ -115,13 +119,23 @@ export function createRecorderSide(): RecorderSide {
 }
 
 export class GameRecorder {
+  /** Per-side roster records: five slots for Classic, ten for Season Run. */
   readonly players: [RecorderPlayer[], RecorderPlayer[]];
   readonly sides: [RecorderSide, RecorderSide];
+  /**
+   * Active-five translation (Season Run): `activeSlots[side][i]` is the
+   * roster index on the floor for active slot `i`. Classic keeps the identity
+   * mapping 0..4, so every event method behaves byte-identically.
+   */
+  private readonly activeSlots: [number[], number[]];
 
-  constructor() {
-    const makePlayers = (): RecorderPlayer[] =>
-      Array.from({ length: 5 }, () => ({
+  constructor(rosterSize: number | [number, number] = 5) {
+    const sizes: [number, number] =
+      typeof rosterSize === 'number' ? [rosterSize, rosterSize] : rosterSize;
+    const makePlayers = (count: number): RecorderPlayer[] =>
+      Array.from({ length: count }, () => ({
         minutes: 0,
+        seconds: 0,
         points: 0,
         fieldGoalMakes: 0,
         fieldGoalAttempts: 0,
@@ -143,15 +157,56 @@ export class GameRecorder {
         defensiveReboundChances: 0,
         contestedShots: 0,
       }));
-    this.players = [makePlayers(), makePlayers()];
+    const identitySlots = (size: number): number[] => Array.from({ length: size }, (_, i) => i);
+    this.players = [makePlayers(sizes[0]), makePlayers(sizes[1])];
     this.sides = [createRecorderSide(), createRecorderSide()];
+    // The active five is always five slots; Season Run re-points them per
+    // substitution, Classic keeps the identity mapping.
+    this.activeSlots = [identitySlots(5), identitySlots(5)];
+  }
+
+  /**
+   * Active-five translation (Season Run): rewires a side's five on-court
+   * slots to the given ten-roster indices. Classic never calls this, so the
+   * identity mapping stays and all accounting is byte-identical.
+   */
+  setActiveFive(side: SideIndex, rosterIndices: readonly number[]): void {
+    if (rosterIndices.length !== 5) {
+      throw new Error(`recorder: active five must have exactly five slots`);
+    }
+    const seen = new Set<number>();
+    for (const index of rosterIndices) {
+      if (index < 0 || index >= this.players[side].length) {
+        throw new Error(`recorder: roster index ${String(index)} out of range`);
+      }
+      if (seen.has(index)) {
+        throw new Error(`recorder: duplicate roster index ${String(index)} in active five`);
+      }
+      seen.add(index);
+    }
+    this.activeSlots[side] = [...rosterIndices];
+  }
+
+  /** Exact integer on-court seconds for one ten-roster record (Season Run). */
+  playSeconds(side: SideIndex, rosterIndex: number, seconds: number): void {
+    this.playerAtRosterIndex(side, rosterIndex).seconds += seconds;
   }
 
   /** Slot access with an explicit invariant: five players per side at all times. */
   private playerAt(side: SideIndex, slot: number): RecorderPlayer {
-    const player = this.players[side][slot];
+    const active = this.activeSlots[side][slot];
+    if (active === undefined) {
+      throw new Error(`recorder: no active player at side ${String(side)} slot ${String(slot)}`);
+    }
+    return this.playerAtRosterIndex(side, active);
+  }
+
+  private playerAtRosterIndex(side: SideIndex, rosterIndex: number): RecorderPlayer {
+    const player = this.players[side][rosterIndex];
     if (player === undefined) {
-      throw new Error(`recorder: no player at side ${String(side)} slot ${String(slot)}`);
+      throw new Error(
+        `recorder: no roster player at side ${String(side)} index ${String(rosterIndex)}`,
+      );
     }
     return player;
   }
@@ -233,12 +288,18 @@ export class GameRecorder {
 
   /** Every missed shot gives each player on the offensive side an OReb chance. */
   offensiveReboundChance(side: SideIndex): void {
-    for (const player of this.players[side]) player.offensiveReboundChances += 1;
+    for (const active of this.activeSlots[side]) {
+      const player = this.playerAtRosterIndex(side, active);
+      player.offensiveReboundChances += 1;
+    }
   }
 
   /** Every missed shot gives each player on the defensive side a DREb chance. */
   defensiveReboundChance(side: SideIndex): void {
-    for (const player of this.players[side]) player.defensiveReboundChances += 1;
+    for (const active of this.activeSlots[side]) {
+      const player = this.playerAtRosterIndex(side, active);
+      player.defensiveReboundChances += 1;
+    }
   }
 
   /** One field-goal attempt defended by this player (diagnostics). */
@@ -310,13 +371,94 @@ export class GameRecorder {
       blocks: p.blocks,
       turnovers: p.turnovers,
       fouls: p.fouls,
+      diagnostics: playerDiagnostics(p),
+    };
+  }
+
+  /**
+   * One ten-roster record line for Season Run (identity is added by the
+   * controller): counters and diagnostics for roster index `rosterIndex` on
+   * one side, including exact integer `seconds` and display `minutes`.
+   */
+  seasonPlayerBox(
+    side: SideIndex,
+    rosterIndex: number,
+  ): {
+    seconds: number;
+    minutes: number;
+    points: number;
+    fieldGoals: { made: number; attempted: number };
+    threes: { made: number; attempted: number };
+    freeThrows: { made: number; attempted: number };
+    rebounds: {
+      total: number;
+      offensive: number;
+      defensive: number;
+    };
+    assists: number;
+    steals: number;
+    blocks: number;
+    turnovers: number;
+    fouls: number;
+    diagnostics: PlayerDiagnostics;
+  } {
+    const p = this.playerAtRosterIndex(side, rosterIndex);
+    return {
+      seconds: p.seconds,
+      minutes: p.seconds / 60,
+      points: p.points,
+      fieldGoals: { made: p.fieldGoalMakes, attempted: p.fieldGoalAttempts },
+      threes: { made: p.threeMakes, attempted: p.threeAttempts },
+      freeThrows: { made: p.freeThrowMakes, attempted: p.freeThrowAttempts },
+      rebounds: {
+        total: p.offensiveRebounds + p.defensiveRebounds,
+        offensive: p.offensiveRebounds,
+        defensive: p.defensiveRebounds,
+      },
+      assists: p.assists,
+      steals: p.steals,
+      blocks: p.blocks,
+      turnovers: p.turnovers,
+      fouls: p.fouls,
+      diagnostics: playerDiagnostics(p),
+    };
+  }
+
+  /**
+   * Team box line for Season Run: identical accounting to `teamBox`, with
+   * the diagnostics block typed as present (the Season contract requires it).
+   */
+  seasonTeamBox(
+    side: SideIndex,
+    teamId: string,
+  ): Omit<TeamBoxScore, 'diagnostics'> & {
+    diagnostics: TeamDiagnostics;
+  } {
+    const t = this.sides[side];
+    return {
+      teamId,
+      points: t.points,
+      fieldGoals: { made: t.fieldGoalMakes, attempted: t.fieldGoalAttempts },
+      threes: { made: t.threeMakes, attempted: t.threeAttempts },
+      freeThrows: { made: t.freeThrowMakes, attempted: t.freeThrowAttempts },
+      rebounds: {
+        total: t.offensiveRebounds + t.defensiveRebounds + t.teamRebounds,
+        offensive: t.offensiveRebounds,
+        defensive: t.defensiveRebounds,
+        team: t.teamRebounds,
+      },
+      assists: t.assists,
+      steals: t.steals,
+      blocks: t.blocks,
+      turnovers: t.turnovers,
+      fouls: t.fouls,
+      possessions: t.possessions,
       diagnostics: {
-        usage: usageOf(p.fieldGoalAttempts, p.freeThrowAttempts, p.turnovers),
-        shotZones: zoneSummaryArray(p.zoneAttempts, p.zoneMakes),
-        assistOpportunities: p.assistOpportunities,
-        offensiveReboundChances: p.offensiveReboundChances,
-        defensiveReboundChances: p.defensiveReboundChances,
-        contestedShots: p.contestedShots,
+        assistedFieldGoals: t.assistedFieldGoals,
+        unassistedFieldGoals: t.unassistedFieldGoals,
+        reboundOpportunities:
+          t.fieldGoalAttempts - t.fieldGoalMakes + (t.freeThrowAttempts - t.freeThrowMakes),
+        contestedShots: this.players[side].reduce((sum, p) => sum + p.contestedShots, 0),
       },
     };
   }
@@ -366,4 +508,16 @@ function zoneSummaryArray(
     attempts: attempts[zone],
     makes: makes[zone],
   }));
+}
+
+/** Diagnostics block shared by the Classic and Season player box lines. */
+function playerDiagnostics(p: RecorderPlayer): PlayerDiagnostics {
+  return {
+    usage: usageOf(p.fieldGoalAttempts, p.freeThrowAttempts, p.turnovers),
+    shotZones: zoneSummaryArray(p.zoneAttempts, p.zoneMakes),
+    assistOpportunities: p.assistOpportunities,
+    offensiveReboundChances: p.offensiveReboundChances,
+    defensiveReboundChances: p.defensiveReboundChances,
+    contestedShots: p.contestedShots,
+  };
 }

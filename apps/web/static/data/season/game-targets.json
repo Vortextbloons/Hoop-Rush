@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "season-game-targets-v1",
+  "gameVersion": "season-game-v1",
+  "plannerVersion": "rotation-planner-v1",
+  "rotationVersion": "season-rotation-v2",
+  "calibration": {
+    "calibrationSeedCount": 1024,
+    "validationSeedCount": 256,
+    "generatedAtIso": "2026-08-05T03:48:04.577Z"
+  },
+  "fixtures": [
+    {
+      "fixtureId": "season-game-balanced",
+      "preset": "balanced",
+      "sample": 1024,
+      "starterSecondsMedian": 2227,
+      "benchSecondsMedian": 655,
+      "benchRoleMedianSeconds": [
+        724,
+        690,
+        663,
+        649,
+        616
+      ],
+      "aggregateEnvelopes": {
+        "points": [
+          80,
+          130
+        ],
+        "possessions": [
+          85,
+          97
+        ]
+      }
+    },
+    {
+      "fixtureId": "season-game-tight",
+      "preset": "tight",
+      "sample": 1024,
+      "starterSecondsMedian": 2455,
+      "benchSecondsMedian": 431,
+      "benchRoleMedianSeconds": [
+        528,
+        502,
+        457,
+        411,
+        379
+      ],
+      "aggregateEnvelopes": {
+        "points": [
+          79,
+          130
+        ],
+        "possessions": [
+          85,
+          98
+        ]
+      }
+    },
+    {
+      "fixtureId": "season-game-bench-heavy",
+      "preset": "bench-heavy",
+      "sample": 1024,
+      "starterSecondsMedian": 1980,
+      "benchSecondsMedian": 900,
+      "benchRoleMedianSeconds": [
+        934,
+        915,
+        900,
+        891,
+        889
+      ],
+      "aggregateEnvelopes": {
+        "points": [
+          80,
+          130
+        ],
+        "possessions": [
+          85,
+          98
+        ]
+      }
+    }
+  ],
+  "gates": {
+    "zeroFailures": true,
+    "starterOrdering": true,
+    "benchOrdering": true,
+    "benchRoleNonIncreasing": true,
+    "heldOutPassShare": 0.9752604166666666,
+    "heldOutPass": true
+  }
+}

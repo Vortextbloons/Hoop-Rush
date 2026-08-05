@@ -1,0 +1,1589 @@
+{
+  "schemaVersion": 1,
+  "fixtureId": "season-game-pregame-unavailable",
+  "description": "One starter per side unavailable pregame; rotations must absorb them with deviations.",
+  "input": {
+    "schemaVersion": 1,
+    "seed": "00000000000000000000000000000000",
+    "gameNumber": 1,
+    "dataVersion": "data-v1",
+    "profile": {
+      "schemaVersion": 1,
+      "eraId": "1990s",
+      "profileVersion": "m2-1990s-fixture-v1",
+      "dataVersion": "data-v1",
+      "seasons": [
+        "1990-91",
+        "1991-92",
+        "1992-93",
+        "1993-94",
+        "1994-95",
+        "1995-96",
+        "1996-97",
+        "1997-98",
+        "1998-99",
+        "1999-00"
+      ],
+      "baselineReport": "fixture",
+      "parameters": {
+        "pace": 95,
+        "league3PARate": 0.14,
+        "leagueTsPct": 0.51,
+        "leagueFtaPerFga": 0.28,
+        "leagueFtPct": 0.74,
+        "turnoverPerPossession": 0.15,
+        "stealShareOfTurnovers": 0.3,
+        "offensiveReboundRate": 0.315,
+        "assistRate": 0.62,
+        "foulsPerPossession": 0.21,
+        "shootingFoulShare": 0.42,
+        "freeThrowAnchorRating": 74,
+        "assistAnchorRating": 70,
+        "zoneMix": {
+          "rim": 0.3,
+          "shortMid": 0.25,
+          "longMid": 0.19,
+          "cornerThree": 0.06,
+          "aboveBreakThree": 0.2
+        },
+        "source": "fixture"
+      },
+      "targets": {
+        "possessionsPerGame": {
+          "value": 95,
+          "tolerance": 4,
+          "minimumSample": 1000
+        },
+        "pointsPerGame": {
+          "value": 101,
+          "tolerance": 6,
+          "minimumSample": 1000
+        },
+        "offensiveRating": {
+          "value": 106,
+          "tolerance": 6,
+          "minimumSample": 1000
+        },
+        "fieldGoalPct": {
+          "value": 0.47,
+          "tolerance": 0.02,
+          "minimumSample": 1000
+        },
+        "efgPct": {
+          "value": 0.5,
+          "tolerance": 0.02,
+          "minimumSample": 1000
+        },
+        "tsPct": {
+          "value": 0.53,
+          "tolerance": 0.02,
+          "minimumSample": 1000
+        },
+        "threePointRate": {
+          "value": 0.14,
+          "tolerance": 0.02,
+          "minimumSample": 1000
+        },
+        "threePointPct": {
+          "value": 0.34,
+          "tolerance": 0.02,
+          "minimumSample": 1000
+        },
+        "freeThrowsAttemptedPerGame": {
+          "value": 27,
+          "tolerance": 3,
+          "minimumSample": 1000
+        },
+        "freeThrowPct": {
+          "value": 0.74,
+          "tolerance": 0.02,
+          "minimumSample": 1000
+        },
+        "turnoversPerGame": {
+          "value": 14.5,
+          "tolerance": 1.5,
+          "minimumSample": 1000
+        },
+        "turnoversPerPossession": {
+          "value": 0.15,
+          "tolerance": 0.01,
+          "minimumSample": 1000
+        },
+        "offensiveReboundsPerGame": {
+          "value": 12,
+          "tolerance": 1.5,
+          "minimumSample": 1000
+        },
+        "offensiveReboundRate": {
+          "value": 0.315,
+          "tolerance": 0.02,
+          "minimumSample": 1000
+        },
+        "assistsPerGame": {
+          "value": 24,
+          "tolerance": 2.5,
+          "minimumSample": 1000
+        },
+        "assistRate": {
+          "value": 0.62,
+          "tolerance": 0.03,
+          "minimumSample": 1000
+        },
+        "personalFoulsPerGame": {
+          "value": 21,
+          "tolerance": 2.5,
+          "minimumSample": 1000
+        },
+        "zoneMix": {
+          "rim": {
+            "value": 0.3,
+            "tolerance": 0.02,
+            "minimumSample": 1000
+          },
+          "shortMid": {
+            "value": 0.25,
+            "tolerance": 0.02,
+            "minimumSample": 1000
+          },
+          "longMid": {
+            "value": 0.19,
+            "tolerance": 0.02,
+            "minimumSample": 1000
+          },
+          "cornerThree": {
+            "value": 0.06,
+            "tolerance": 0.015,
+            "minimumSample": 1000
+          },
+          "aboveBreakThree": {
+            "value": 0.2,
+            "tolerance": 0.02,
+            "minimumSample": 1000
+          }
+        },
+        "closeGameRate": {
+          "value": 0.18,
+          "tolerance": 0.04,
+          "minimumSample": 1000
+        },
+        "blowoutRate": {
+          "value": 0.12,
+          "tolerance": 0.04,
+          "minimumSample": 1000
+        },
+        "overtimeRate": {
+          "value": 0.06,
+          "tolerance": 0.02,
+          "minimumSample": 1000
+        },
+        "strongVsWeakWinRate": {
+          "value": 0.85,
+          "tolerance": 0.08,
+          "minimumSample": 1000
+        },
+        "equalLineupHomeWinRate": {
+          "value": 0.5,
+          "tolerance": 0.05,
+          "minimumSample": 1000
+        },
+        "playerRoles": [
+          {
+            "key": "usageShare.0",
+            "target": {
+              "value": 0.27,
+              "tolerance": 0.035,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "usageShare.1",
+            "target": {
+              "value": 0.173,
+              "tolerance": 0.035,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "usageShare.2",
+            "target": {
+              "value": 0.225,
+              "tolerance": 0.035,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "usageShare.3",
+            "target": {
+              "value": 0.176,
+              "tolerance": 0.035,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "usageShare.4",
+            "target": {
+              "value": 0.156,
+              "tolerance": 0.035,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "threePointRate.0",
+            "target": {
+              "value": 0.16,
+              "tolerance": 0.05,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "threePointRate.1",
+            "target": {
+              "value": 0.233,
+              "tolerance": 0.05,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "threePointRate.4",
+            "target": {
+              "value": 0.105,
+              "tolerance": 0.05,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "assistConversion.0",
+            "target": {
+              "value": 0.953,
+              "tolerance": 0.08,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "assistConversion.4",
+            "target": {
+              "value": 0.817,
+              "tolerance": 0.1,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "offensiveReboundPct.3",
+            "target": {
+              "value": 0.061,
+              "tolerance": 0.02,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "offensiveReboundPct.4",
+            "target": {
+              "value": 0.067,
+              "tolerance": 0.02,
+              "minimumSample": 200
+            }
+          },
+          {
+            "key": "defensiveReboundPct.4",
+            "target": {
+              "value": 0.137,
+              "tolerance": 0.03,
+              "minimumSample": 200
+            }
+          }
+        ]
+      }
+    },
+    "home": {
+      "teamId": "home-team",
+      "displayName": "Home Team",
+      "franchiseId": "lakers",
+      "players": [
+        {
+          "playerVersionId": "pv-75cf2730396cdb64d1982daea7e127c0",
+          "playerId": "p-sg-home-1",
+          "displayName": "home player 1",
+          "positions": ["PG"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 3,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-1b76279766ff573b832f62e986c2ffe7",
+          "playerId": "p-sg-home-2",
+          "displayName": "home player 2",
+          "positions": ["SG"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 3,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-dbb271166da8efaa2ef91848ada4fbe6",
+          "playerId": "p-sg-home-3",
+          "displayName": "home player 3",
+          "positions": ["SF"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-3e13088d4167dcd9081f318bf30cea9d",
+          "playerId": "p-sg-home-4",
+          "displayName": "home player 4",
+          "positions": ["PF"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-14f4755c1b8f8e7865999cfa3589e8ac",
+          "playerId": "p-sg-home-5",
+          "displayName": "home player 5",
+          "positions": ["C"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-fa3ec4b38db5ef1fd2655b05a7da8f43",
+          "playerId": "p-sg-home-6",
+          "displayName": "home player 6",
+          "positions": ["PG", "SG"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-48322ec28d1280de1fd6eab4f6271312",
+          "playerId": "p-sg-home-7",
+          "displayName": "home player 7",
+          "positions": ["SF"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-5eff38c95ded92dd23e4b237151af199",
+          "playerId": "p-sg-home-8",
+          "displayName": "home player 8",
+          "positions": ["PF", "C"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-1b3bdda8d3c2ccec9903313637deae38",
+          "playerId": "p-sg-home-9",
+          "displayName": "home player 9",
+          "positions": ["SG", "PG"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-e9c194d01394c9bcd0d7f7aa5bbd27a0",
+          "playerId": "p-sg-home-10",
+          "displayName": "home player 10",
+          "positions": ["C"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        }
+      ]
+    },
+    "away": {
+      "teamId": "away-team",
+      "displayName": "Away Team",
+      "franchiseId": "celtics",
+      "players": [
+        {
+          "playerVersionId": "pv-71b57320bd4b95d481d176d2a66bb310",
+          "playerId": "p-sg-away-1",
+          "displayName": "away player 1",
+          "positions": ["PG"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 3,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-ba74244563a061b947cde8cb8da0e435",
+          "playerId": "p-sg-away-2",
+          "displayName": "away player 2",
+          "positions": ["SG"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 3,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-96b02d5e7d1d97b295d4b674204e478e",
+          "playerId": "p-sg-away-3",
+          "displayName": "away player 3",
+          "positions": ["SF"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-2facefc34d83773f9d8de00d962e50b3",
+          "playerId": "p-sg-away-4",
+          "displayName": "away player 4",
+          "positions": ["PF"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-f1795ccceb0a3288e7670866012f4b7c",
+          "playerId": "p-sg-away-5",
+          "displayName": "away player 5",
+          "positions": ["C"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 86,
+            "closeShot": 78,
+            "midrange": 76,
+            "threePoint": 73,
+            "freeThrow": 82,
+            "ballHandling": 78,
+            "passing": 78,
+            "offensiveIq": 78,
+            "offensiveRebound": 68,
+            "defensiveRebound": 73,
+            "perimeterDefense": 70,
+            "interiorDefense": 70,
+            "steal": 68,
+            "block": 68,
+            "defensiveIq": 70,
+            "speed": 78,
+            "strength": 73,
+            "vertical": 74
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-9ea381b144488c6d4ef5ee5f382919a1",
+          "playerId": "p-sg-away-6",
+          "displayName": "away player 6",
+          "positions": ["PG", "SG"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-4d177dca2e2092464f401ca82480193a",
+          "playerId": "p-sg-away-7",
+          "displayName": "away player 7",
+          "positions": ["SF"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-85ade1cf817ce43390d952416234e3bf",
+          "playerId": "p-sg-away-8",
+          "displayName": "away player 8",
+          "positions": ["PF", "C"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-bb5ca918ec7ddefc9e46addaffbb9f08",
+          "playerId": "p-sg-away-9",
+          "displayName": "away player 9",
+          "positions": ["SG", "PG"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        },
+        {
+          "playerVersionId": "pv-d4d12dd6e4ac9cd2f4eefedcd9d773c6",
+          "playerId": "p-sg-away-10",
+          "displayName": "away player 10",
+          "positions": ["C"],
+          "heightInches": 76,
+          "weightLbs": 200,
+          "ratings": {
+            "insideScoring": 78,
+            "closeShot": 70,
+            "midrange": 68,
+            "threePoint": 65,
+            "freeThrow": 74,
+            "ballHandling": 70,
+            "passing": 70,
+            "offensiveIq": 70,
+            "offensiveRebound": 60,
+            "defensiveRebound": 65,
+            "perimeterDefense": 62,
+            "interiorDefense": 62,
+            "steal": 60,
+            "block": 60,
+            "defensiveIq": 62,
+            "speed": 70,
+            "strength": 65,
+            "vertical": 66
+          },
+          "tendencies": {
+            "usageRate": 20,
+            "passRate": 30,
+            "shotRate": 25,
+            "driveRate": 18,
+            "postUpRate": 5,
+            "rimFrequency": 30,
+            "shortMidFrequency": 20,
+            "longMidFrequency": 14,
+            "cornerThreeFrequency": 8,
+            "aboveBreakThreeFrequency": 12,
+            "threePointRate": 20,
+            "freeThrowRate": 22,
+            "turnoverRate": 12,
+            "isolationRate": 10,
+            "pickAndRollBallHandlerRate": 25,
+            "pickAndRollRollManRate": 10,
+            "spotUpRate": 20,
+            "transitionRate": 15,
+            "cutRate": 10,
+            "foulRate": 2,
+            "stealAttemptRate": 8,
+            "blockAttemptRate": 10,
+            "crashOffensiveGlassRate": 12
+          }
+        }
+      ]
+    },
+    "homeRotation": {
+      "franchiseId": "lakers",
+      "starters": [
+        "pv-75cf2730396cdb64d1982daea7e127c0",
+        "pv-1b76279766ff573b832f62e986c2ffe7",
+        "pv-dbb271166da8efaa2ef91848ada4fbe6",
+        "pv-3e13088d4167dcd9081f318bf30cea9d",
+        "pv-14f4755c1b8f8e7865999cfa3589e8ac"
+      ],
+      "benchOrder": [
+        "pv-fa3ec4b38db5ef1fd2655b05a7da8f43",
+        "pv-48322ec28d1280de1fd6eab4f6271312",
+        "pv-5eff38c95ded92dd23e4b237151af199",
+        "pv-1b3bdda8d3c2ccec9903313637deae38",
+        "pv-e9c194d01394c9bcd0d7f7aa5bbd27a0"
+      ],
+      "targetMinutes": [
+        {
+          "playerVersionId": "pv-75cf2730396cdb64d1982daea7e127c0",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-1b76279766ff573b832f62e986c2ffe7",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-dbb271166da8efaa2ef91848ada4fbe6",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-3e13088d4167dcd9081f318bf30cea9d",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-14f4755c1b8f8e7865999cfa3589e8ac",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-fa3ec4b38db5ef1fd2655b05a7da8f43",
+          "minutes": 21
+        },
+        {
+          "playerVersionId": "pv-48322ec28d1280de1fd6eab4f6271312",
+          "minutes": 18
+        },
+        {
+          "playerVersionId": "pv-5eff38c95ded92dd23e4b237151af199",
+          "minutes": 15
+        },
+        {
+          "playerVersionId": "pv-1b3bdda8d3c2ccec9903313637deae38",
+          "minutes": 12
+        },
+        {
+          "playerVersionId": "pv-e9c194d01394c9bcd0d7f7aa5bbd27a0",
+          "minutes": 9
+        }
+      ],
+      "closingFive": [
+        "pv-75cf2730396cdb64d1982daea7e127c0",
+        "pv-1b76279766ff573b832f62e986c2ffe7",
+        "pv-dbb271166da8efaa2ef91848ada4fbe6",
+        "pv-3e13088d4167dcd9081f318bf30cea9d",
+        "pv-14f4755c1b8f8e7865999cfa3589e8ac"
+      ],
+      "rotationVersion": "season-rotation-v2"
+    },
+    "awayRotation": {
+      "franchiseId": "celtics",
+      "starters": [
+        "pv-71b57320bd4b95d481d176d2a66bb310",
+        "pv-ba74244563a061b947cde8cb8da0e435",
+        "pv-96b02d5e7d1d97b295d4b674204e478e",
+        "pv-2facefc34d83773f9d8de00d962e50b3",
+        "pv-f1795ccceb0a3288e7670866012f4b7c"
+      ],
+      "benchOrder": [
+        "pv-9ea381b144488c6d4ef5ee5f382919a1",
+        "pv-4d177dca2e2092464f401ca82480193a",
+        "pv-85ade1cf817ce43390d952416234e3bf",
+        "pv-bb5ca918ec7ddefc9e46addaffbb9f08",
+        "pv-d4d12dd6e4ac9cd2f4eefedcd9d773c6"
+      ],
+      "targetMinutes": [
+        {
+          "playerVersionId": "pv-71b57320bd4b95d481d176d2a66bb310",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-ba74244563a061b947cde8cb8da0e435",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-96b02d5e7d1d97b295d4b674204e478e",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-2facefc34d83773f9d8de00d962e50b3",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-f1795ccceb0a3288e7670866012f4b7c",
+          "minutes": 33
+        },
+        {
+          "playerVersionId": "pv-9ea381b144488c6d4ef5ee5f382919a1",
+          "minutes": 21
+        },
+        {
+          "playerVersionId": "pv-4d177dca2e2092464f401ca82480193a",
+          "minutes": 18
+        },
+        {
+          "playerVersionId": "pv-85ade1cf817ce43390d952416234e3bf",
+          "minutes": 15
+        },
+        {
+          "playerVersionId": "pv-bb5ca918ec7ddefc9e46addaffbb9f08",
+          "minutes": 12
+        },
+        {
+          "playerVersionId": "pv-d4d12dd6e4ac9cd2f4eefedcd9d773c6",
+          "minutes": 9
+        }
+      ],
+      "closingFive": [
+        "pv-71b57320bd4b95d481d176d2a66bb310",
+        "pv-ba74244563a061b947cde8cb8da0e435",
+        "pv-96b02d5e7d1d97b295d4b674204e478e",
+        "pv-2facefc34d83773f9d8de00d962e50b3",
+        "pv-f1795ccceb0a3288e7670866012f4b7c"
+      ],
+      "rotationVersion": "season-rotation-v2"
+    },
+    "availability": [
+      {
+        "playerVersionId": "pv-75cf2730396cdb64d1982daea7e127c0",
+        "available": false
+      },
+      {
+        "playerVersionId": "pv-1b76279766ff573b832f62e986c2ffe7",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-dbb271166da8efaa2ef91848ada4fbe6",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-3e13088d4167dcd9081f318bf30cea9d",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-14f4755c1b8f8e7865999cfa3589e8ac",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-fa3ec4b38db5ef1fd2655b05a7da8f43",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-48322ec28d1280de1fd6eab4f6271312",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-5eff38c95ded92dd23e4b237151af199",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-1b3bdda8d3c2ccec9903313637deae38",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-e9c194d01394c9bcd0d7f7aa5bbd27a0",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-71b57320bd4b95d481d176d2a66bb310",
+        "available": false
+      },
+      {
+        "playerVersionId": "pv-ba74244563a061b947cde8cb8da0e435",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-96b02d5e7d1d97b295d4b674204e478e",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-2facefc34d83773f9d8de00d962e50b3",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-f1795ccceb0a3288e7670866012f4b7c",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-9ea381b144488c6d4ef5ee5f382919a1",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-4d177dca2e2092464f401ca82480193a",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-85ade1cf817ce43390d952416234e3bf",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-bb5ca918ec7ddefc9e46addaffbb9f08",
+        "available": true
+      },
+      {
+        "playerVersionId": "pv-d4d12dd6e4ac9cd2f4eefedcd9d773c6",
+        "available": true
+      }
+    ],
+    "removals": []
+  }
+}

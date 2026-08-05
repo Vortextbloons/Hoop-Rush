@@ -29,15 +29,25 @@ import {
   shootingFoulProbability,
 } from './fouls.ts';
 import { pickRebounder, resolveRebound } from './rebounding.ts';
-import { prepareTeam, type TeamPrep } from './prepare.ts';
+import { prepareTeam, enginePlayerKey, type TeamPrep } from './prepare.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
 
 /**
- * One offensive trip (spec/03 pipeline stages 1-9). All clock consumption
- * flows through `state.secondsRemaining`, which the caller owns and seals
- * per period; the trip returns the consumed seconds and whether the ball
- * changed possession.
+ * One offensive trip (spec/03 pipeline stages 1-9), executed as resumable
+ * steps so a controller can pause at legal dead-ball boundaries (spec/2.0/04
+ * M2.2): made baskets, completed foul/free-throw sequences, inbound-producing
+ * fouls, dead-ball team rebounds, and period endings. Live turnovers, live
+ * rebounds, and unresolved shot/free-throw sequences never pause. An and-one
+ * made basket is followed immediately by its free throw; no step splits that
+ * sequence. All clock consumption flows through `state.secondsRemaining`,
+ * which the caller owns and seals per period.
+ *
+ * The step decomposition preserves the monolithic trip's RNG call order
+ * exactly: each step performs one atomic unit of work in the original
+ * sequence, so `resolveTrip` (the run-to-completion driver) is behavior- and
+ * digest-identical to the pre-M2.2 engine, and the Season controller that
+ * pauses between steps consumes RNG only through this same pipeline.
  */
 
 export interface TripResolution {
@@ -71,7 +81,9 @@ export function createGameState(): GameState {
 /**
  * Shared per-game trip context. Constructed once per game and passed by
  * reference: the RNG, recorder, state, teams, and all per-team preparation
- * tables are game-stable, so no trip rebuilds them.
+ * tables are game-stable, so no trip rebuilds them. Season Run substitutes by
+ * replacing `teams[side]` and `preps[side]` at a legal boundary; rebuilding
+ * consumes no RNG (prepareTeam is pure).
  */
 export interface TripContext {
   rng: Rng;
@@ -105,6 +117,233 @@ export function createTripContext(
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
     passingAnchorFactor: 0.5 + (profile.parameters.assistAnchorRating - 50) / 100,
+  };
+}
+
+/**
+ * Outcome of one atomic step of the trip machine.
+ *
+ * - `ended`: the trip is over and possession changed.
+ * - `pause`: a legal dead-ball substitution boundary was reached. True for
+ *   made baskets, completed foul/free-throw sequences, inbound-producing
+ *   fouls (trip continues), dead-ball team rebounds, and period endings;
+ *   false for live turnovers, live rebounds, and unresolved sequences.
+ * - `periodEnded`: the game clock is exhausted or the trip was sealed with an
+ *   offensive rebound below the minimum start time; the caller must end the
+ *   period.
+ * - `finished`: no further steps exist for this trip.
+ */
+export interface PossessionStep {
+  ended: boolean;
+  pause: boolean;
+  periodEnded: boolean;
+  finished: boolean;
+}
+
+/**
+ * Resumable trip executor. Construct once per trip, call `step()` until a
+ * finished or periodEnded step; a pause step returns control to the caller
+ * (the Season controller may substitute), and the next `step()` resumes the
+ * same trip. The RNG draw sequence matches the pre-M2.2 monolithic trip
+ * exactly, regardless of how many steps the caller lets run.
+ */
+export class PossessionStepper {
+  private phase: 'sample' | 'security' | 'foul' | 'inbound' | 'shot' | 'continuation' | 'done' =
+    'sample';
+  private foulIndex = 0;
+  private continuations = 0;
+  private deadBall = false;
+  private readonly ctx: TripContext;
+  private readonly offenseSide: SideIndex;
+  private readonly startedRemaining: number;
+  private finalStep: PossessionStep | null = null;
+
+  constructor(ctx: TripContext, offenseSide: SideIndex) {
+    this.ctx = ctx;
+    this.offenseSide = offenseSide;
+    this.startedRemaining = ctx.state.secondsRemaining;
+  }
+
+  /** Advances exactly one atomic unit of work and reports its boundary. */
+  step(): PossessionStep {
+    if (this.phase === 'done') {
+      if (this.finalStep === null) {
+        throw new Error('possession: stepper finished without a terminal step');
+      }
+      return this.finalStep;
+    }
+    switch (this.phase) {
+      case 'sample':
+        return this.stepSample();
+      case 'security':
+        return this.stepSecurity();
+      case 'foul':
+        return this.stepFoulCheck();
+      case 'inbound': {
+        consumeTime(this.ctx.state, 2);
+        this.phase = 'foul';
+        return { ended: false, pause: false, periodEnded: false, finished: false };
+      }
+      case 'shot':
+        return this.stepShot();
+      case 'continuation':
+        return this.stepContinuation();
+    }
+    throw new Error(`possession: unknown stepper phase ${String(this.phase)}`);
+  }
+
+  private stepSample(): PossessionStep {
+    const { rng, state, profile } = this.ctx;
+    const sampled = sampleTripSeconds(
+      rng,
+      profile,
+      state.secondsRemaining,
+      this.ctx.meanTripSeconds,
+    );
+    if (sampled === null) {
+      // Period has less than the minimum start time left: it ends without a trip.
+      return this.finish({ ended: false, pause: true, periodEnded: true });
+    }
+    const consumedBase = consumeTime(state, sampled);
+    this.deadBall = consumedBase >= this.startedRemaining - ENGINE_CONSTANTS.minimumStartSeconds;
+    this.phase = 'security';
+    return { ended: false, pause: false, periodEnded: false, finished: false };
+  }
+
+  private stepSecurity(): PossessionStep {
+    const { rng, recorder, teams, preps } = this.ctx;
+    const offense = this.offenseSide;
+    const defense = (1 - offense) as SideIndex;
+    const team = teams[offense];
+    const teamPrep = preps[offense];
+    const defensePrep = preps[defense];
+
+    const handler = pickInitiator(team, teamPrep.initiatorWeights, rng);
+    const handlerSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(handler)) ?? -1;
+    if (
+      rng.chance(
+        turnoverProbability(
+          handler,
+          defensePrep.pressure,
+          this.ctx.eraPossEstimatePerTrip,
+          this.ctx.profile,
+        ),
+      )
+    ) {
+      recorder.turnover(offense, handlerSlot >= 0 ? handlerSlot : 0);
+      if (isSteal(rng, defensePrep.stealAbility, this.ctx.profile)) {
+        const stealer = pickStealer(teams[defense].players, defensePrep.stealerWeights, rng);
+        const stealerSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(stealer)) ?? -1;
+        recorder.steal(defense, stealerSlot >= 0 ? stealerSlot : 0);
+      }
+      recorder.possession(offense);
+      // A live turnover changes possession without a stoppage: no pause.
+      return this.endedStep(false);
+    }
+    this.phase = 'foul';
+    return { ended: false, pause: false, periodEnded: false, finished: false };
+  }
+
+  private stepFoulCheck(): PossessionStep {
+    const { rng, recorder, state, teams, preps, profile } = this.ctx;
+    const offense = this.offenseSide;
+    const defense = (1 - offense) as SideIndex;
+    if (this.foulIndex >= 4) {
+      this.phase = 'shot';
+      return { ended: false, pause: false, periodEnded: false, finished: false };
+    }
+    this.foulIndex += 1;
+    if (!rng.chance(nonShootingFoulProbability(profile))) {
+      this.phase = 'shot';
+      return { ended: false, pause: false, periodEnded: false, finished: false };
+    }
+    const defenseTeam = teams[defense];
+    const defensePrep = preps[defense];
+    const fouler = pickFouler(defenseTeam.players, defensePrep.foulerWeights, rng);
+    const foulerSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(fouler)) ?? -1;
+    recorder.foul(defense, foulerSlot >= 0 ? foulerSlot : 0);
+    state.periodFouls[defense] += 1;
+    if (teamInBonus(state.periodFouls[defense], state.periodIndex >= 4)) {
+      const team = teams[offense];
+      const teamPrep = preps[offense];
+      const shooter = pickFreeThrowShooter(team.players, teamPrep.freeThrowShooterWeights, rng);
+      const shooterSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(shooter)) ?? -1;
+      resolveFreeThrows(this.ctx, offense, defense, shooterSlot, 2, this.deadBall);
+      recorder.possession(offense);
+      // Completed free-throw sequence: legal dead-ball pause.
+      return this.endedStep(true);
+    }
+    // Inbound-producing non-bonus foul: legal pause; the trip continues.
+    this.phase = 'inbound';
+    return { ended: false, pause: true, periodEnded: false, finished: false };
+  }
+
+  private stepShot(): PossessionStep {
+    const { recorder } = this.ctx;
+    const offense = this.offenseSide;
+    const defense = (1 - offense) as SideIndex;
+    const outcome = resolveShot(this.ctx, offense, defense, this.deadBall);
+    if (!outcome.continues) {
+      recorder.possession(offense);
+      // Made baskets, completed shooting-foul free throws, and dead-ball
+      // team rebounds pause; a live defensive rebound does not.
+      return this.endedStep(!outcome.liveReboundEnd);
+    }
+    if (this.continuations >= 4) {
+      // Continuation guard reached: seal the trip to avoid unbounded loops.
+      recorder.possession(offense);
+      return this.endedStep(false);
+    }
+    this.phase = 'continuation';
+    return { ended: false, pause: false, periodEnded: false, finished: false };
+  }
+
+  private stepContinuation(): PossessionStep {
+    const { recorder, state } = this.ctx;
+    const offense = this.offenseSide;
+    this.continuations += 1;
+    consumeTime(state, 3);
+    if (state.secondsRemaining < ENGINE_CONSTANTS.minimumStartSeconds) {
+      // The period ends with the offensive rebound: the trip is sealed.
+      recorder.possession(offense);
+      return this.finish({ ended: true, pause: true, periodEnded: true });
+    }
+    this.phase = 'shot';
+    return { ended: false, pause: false, periodEnded: false, finished: false };
+  }
+
+  private endedStep(pause: boolean): PossessionStep {
+    return this.finish({
+      ended: true,
+      pause,
+      periodEnded: this.ctx.state.secondsRemaining <= 0,
+    });
+  }
+
+  private finish(step: Omit<PossessionStep, 'finished'>): PossessionStep {
+    const result: PossessionStep = { ...step, finished: true };
+    this.phase = 'done';
+    this.finalStep = result;
+    return result;
+  }
+}
+
+/**
+ * Runs one offensive trip to completion (the Classic fixed-five driver).
+ * Pauses are legal boundaries, but this driver never observes them: lineups
+ * are immutable in Classic, so the trip always finishes in the same RNG
+ * sequence as the pre-M2.2 monolithic resolver.
+ */
+export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResolution {
+  const startedRemaining = ctx.state.secondsRemaining;
+  const stepper = new PossessionStepper(ctx, offenseSide);
+  let step: PossessionStep = { ended: false, pause: false, periodEnded: false, finished: false };
+  while (!step.periodEnded && !step.finished) {
+    step = stepper.step();
+  }
+  return {
+    secondsElapsed: startedRemaining - ctx.state.secondsRemaining,
+    ended: step.ended,
   };
 }
 
@@ -199,7 +438,7 @@ function creditAssist(
   if (!passed) return;
   const passer = pickAssister(team, shooter, initiator, ctx.rng);
   if (!passer) return;
-  const slot = ctx.preps[offenseSide].slotByPlayerId.get(passer.playerId) ?? -1;
+  const slot = ctx.preps[offenseSide].slotByPlayerId.get(enginePlayerKey(passer)) ?? -1;
   if (slot < 0) return;
   ctx.recorder.assistOpportunity(offenseSide, slot);
   if (!ctx.rng.chance(assistProbability(ctx, passer, action, zone, shooter))) return;
@@ -237,7 +476,7 @@ function reboundFromMissedFreeThrow(
   const team = ctx.teams[side];
   const prep = ctx.preps[side];
   const rebounder = pickRebounder(team.players, prep.rebounderWeights[offensive ? 0 : 1], ctx.rng);
-  const slot = prep.slotByPlayerId.get(rebounder.playerId) ?? -1;
+  const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
   if (offensive) {
     ctx.recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
   } else {
@@ -281,16 +520,26 @@ function resolveFreeThrows(
   recorder.freeThrowTrip(offenseSide);
 }
 
+/** How one shot sequence ended, for the caller's boundary decision. */
+interface ShotOutcome {
+  /** True when an offensive rebound keeps the trip alive. */
+  continues: boolean;
+  /** True when the trip ended on a live defensive player rebound (no pause). */
+  liveReboundEnd: boolean;
+}
+
 /**
- * Resolves one shot attempt. Returns true when an offensive rebound keeps the
- * trip alive; every shot outcome consumes the relevant clock.
+ * Resolves one shot attempt as one atomic step. Returns the continuation and
+ * boundary facts; every shot outcome consumes the relevant clock. An and-one
+ * made basket is followed immediately by its free throw inside this step —
+ * no pause splits the sequence.
  */
 function resolveShot(
   ctx: TripContext,
   offenseSide: SideIndex,
   defenseSide: SideIndex,
   deadBall: boolean,
-): boolean {
+): ShotOutcome {
   const { rng, recorder, state, profile } = ctx;
   const team = ctx.teams[offenseSide];
   const teamPrep = ctx.preps[offenseSide];
@@ -298,23 +547,23 @@ function resolveShot(
   const defensePrep = ctx.preps[defenseSide];
 
   const initiator = pickInitiator(team, teamPrep.initiatorWeights, rng);
-  const actionWeights = teamPrep.actionWeights.get(initiator.playerId);
+  const actionWeights = teamPrep.actionWeights.get(enginePlayerKey(initiator));
   if (actionWeights === undefined) {
     throw new Error(`possession: no action weights for ${initiator.playerId}`);
   }
   const action = pickAction(initiator, actionWeights, rng);
-  const teammateShots = teamPrep.teammateShots.get(initiator.playerId);
+  const teammateShots = teamPrep.teammateShots.get(enginePlayerKey(initiator));
   if (teammateShots === undefined) {
     throw new Error(`possession: no teammate shot table for ${initiator.playerId}`);
   }
   const shot = pickShot(teammateShots, initiator, action, rng);
   const shooter = shot.shooter;
-  const zonePrep = teamPrep.zonePrep.get(shooter.playerId);
+  const zonePrep = teamPrep.zonePrep.get(enginePlayerKey(shooter));
   if (zonePrep === undefined) {
     throw new Error(`possession: no zone preparation for ${shooter.playerId}`);
   }
   const zone = pickZone(action, zonePrep, rng);
-  const shooterSlot = teamPrep.slotByPlayerId.get(shooter.playerId) ?? -1;
+  const shooterSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(shooter)) ?? -1;
   const defender = pickDefender(
     defense,
     shooter,
@@ -325,12 +574,12 @@ function resolveShot(
   );
 
   const three = isThreePointZone(zone);
-  const defenderSlot = defensePrep.slotByPlayerId.get(defender.playerId) ?? -1;
+  const defenderSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(defender)) ?? -1;
   if (defenderSlot >= 0) recorder.contest(defenseSide, defenderSlot);
 
   const shotPrep: ShotPrep = {
     spacing: teamPrep.spacing,
-    twoPointAnchor: teamPrep.twoPointAnchor.get(shooter.playerId) ?? null,
+    twoPointAnchor: teamPrep.twoPointAnchor.get(enginePlayerKey(shooter)) ?? null,
   };
 
   // Shooting foul check (zone-aware, ability-aware).
@@ -344,7 +593,7 @@ function resolveShot(
     recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
     if (made) {
       creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
-      // And-one free throw.
+      // And-one free throw, resolved immediately (no pause between basket and FT).
       resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, false);
     } else {
       // The missed shot on a shooting foul is a declared dead-ball miss:
@@ -360,7 +609,8 @@ function resolveShot(
         deadBall,
       );
     }
-    return false; // free-throw trips always change possession
+    // Free-throw trips always change possession at a dead-ball pause.
+    return { continues: false, liveReboundEnd: false };
   }
 
   // Block check (a block forces a miss, then a normal rebound).
@@ -385,7 +635,8 @@ function resolveShot(
   recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
   if (made) {
     creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
-    return false; // made basket changes possession
+    // A made basket is a dead-ball pause.
+    return { continues: false, liveReboundEnd: false };
   }
   return reboundAfterMiss(ctx, offenseSide, defenseSide, zone, deadBall);
 }
@@ -397,7 +648,7 @@ function reboundAfterMiss(
   defenseSide: SideIndex,
   zone: ShotZone,
   deadBall: boolean,
-): boolean {
+): ShotOutcome {
   const { rng, recorder } = ctx;
   reboundChances(ctx, offenseSide, defenseSide);
   const result = resolveRebound(
@@ -409,21 +660,23 @@ function reboundAfterMiss(
     deadBall,
   );
   if (result.team) {
+    // Dead-ball team rebound: legal pause, possession changes.
     recorder.teamRebound(defenseSide);
-    return false;
+    return { continues: false, liveReboundEnd: false };
   }
   if (result.offensive) {
     const prep = ctx.preps[offenseSide];
     const rebounder = pickRebounder(ctx.teams[offenseSide].players, prep.rebounderWeights[0], rng);
-    const slot = prep.slotByPlayerId.get(rebounder.playerId) ?? -1;
+    const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
     recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
-    return true;
+    return { continues: true, liveReboundEnd: false };
   }
   const prep = ctx.preps[defenseSide];
   const rebounder = pickRebounder(ctx.teams[defenseSide].players, prep.rebounderWeights[1], rng);
-  const slot = prep.slotByPlayerId.get(rebounder.playerId) ?? -1;
+  const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
   recorder.defensiveRebound(defenseSide, slot >= 0 ? slot : 0);
-  return false;
+  // A live defensive player rebound changes possession without a stoppage.
+  return { continues: false, liveReboundEnd: true };
 }
 
 /** Team foul count in the current period for the defending side. */
@@ -432,87 +685,4 @@ function teamInBonus(foulsInPeriod: number, overtime: boolean): boolean {
     ? ENGINE_CONSTANTS.bonusFoulsOvertime
     : ENGINE_CONSTANTS.bonusFoulsRegulation;
   return foulsInPeriod >= limit;
-}
-
-/**
- * Resolves one offensive trip for `offenseSide`. Consumes clock through the
- * shared game state and reports consumed seconds and possession change.
- */
-export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResolution {
-  const { rng, recorder, state, profile, teams, preps } = ctx;
-  const defenseSide = (1 - offenseSide) as SideIndex;
-  const defense = teams[defenseSide];
-  const defensePrep = preps[defenseSide];
-  const team = teams[offenseSide];
-  const teamPrep = preps[offenseSide];
-  const overtime = state.periodIndex >= 4;
-  const startedRemaining = state.secondsRemaining;
-
-  const sampled = sampleTripSeconds(rng, profile, state.secondsRemaining, ctx.meanTripSeconds);
-  if (sampled === null) return { secondsElapsed: 0, ended: false };
-  const consumedBase = consumeTime(state, sampled);
-  const deadBall = consumedBase >= startedRemaining - ENGINE_CONSTANTS.minimumStartSeconds;
-
-  // Ball security check.
-  const handler = pickInitiator(team, teamPrep.initiatorWeights, rng);
-  const handlerSlot = teamPrep.slotByPlayerId.get(handler.playerId) ?? -1;
-  if (
-    rng.chance(
-      turnoverProbability(handler, defensePrep.pressure, ctx.eraPossEstimatePerTrip, profile),
-    )
-  ) {
-    recorder.turnover(offenseSide, handlerSlot >= 0 ? handlerSlot : 0);
-    if (isSteal(rng, defensePrep.stealAbility, profile)) {
-      const stealer = pickStealer(defense.players, defensePrep.stealerWeights, rng);
-      const stealerSlot = defensePrep.slotByPlayerId.get(stealer.playerId) ?? -1;
-      recorder.steal(defenseSide, stealerSlot >= 0 ? stealerSlot : 0);
-    }
-    recorder.possession(offenseSide);
-    return { secondsElapsed: startedRemaining - state.secondsRemaining, ended: true };
-  }
-
-  // Non-shooting foul checks stay inside the same trip: a non-bonus foul
-  // consumes inbound seconds and the possession continues without a new
-  // duration sample or an extra possession count.
-  for (let guard = 0; guard < 4; guard += 1) {
-    if (!rng.chance(nonShootingFoulProbability(profile))) break;
-    const fouler = pickFouler(defense.players, defensePrep.foulerWeights, rng);
-    const foulerSlot = defensePrep.slotByPlayerId.get(fouler.playerId) ?? -1;
-    recorder.foul(defenseSide, foulerSlot >= 0 ? foulerSlot : 0);
-    state.periodFouls[defenseSide] += 1;
-    if (teamInBonus(state.periodFouls[defenseSide], overtime)) {
-      const shooter = pickFreeThrowShooter(team.players, teamPrep.freeThrowShooterWeights, rng);
-      const shooterSlot = teamPrep.slotByPlayerId.get(shooter.playerId) ?? -1;
-      resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 2, deadBall);
-      recorder.possession(offenseSide);
-      return { secondsElapsed: startedRemaining - state.secondsRemaining, ended: true };
-    }
-    consumeTime(state, 2);
-  }
-
-  // Shot resolution with possible offensive-rebound continuations.
-  let continues = resolveShot(ctx, offenseSide, defenseSide, deadBall);
-  let continuations = 0;
-  let sealed = false;
-  while (continues && continuations < 4) {
-    continuations += 1;
-    consumeTime(state, 3);
-    if (state.secondsRemaining < ENGINE_CONSTANTS.minimumStartSeconds) {
-      // The period ends with the offensive rebound: the trip is sealed.
-      recorder.possession(offenseSide);
-      sealed = true;
-      continues = false;
-      break;
-    }
-    continues = resolveShot(ctx, offenseSide, defenseSide, false);
-  }
-  if (!sealed && !continues) {
-    // Trip ended by a made basket, defensive/team rebound, block rebound, or free throws.
-    recorder.possession(offenseSide);
-  }
-  if (continues) {
-    // Continuation guard reached; seal the trip to avoid unbounded loops.
-    recorder.possession(offenseSide);
-  }
-  return { secondsElapsed: startedRemaining - state.secondsRemaining, ended: true };
 }
