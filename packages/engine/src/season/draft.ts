@@ -1,6 +1,5 @@
 import {
   SEASON_DRAFT_VERSION,
-  seasonDraftCatalogSchema,
   seasonDraftStateSchema,
   seasonLeagueSchema,
   seasonNamespaceSeed,
@@ -16,6 +15,7 @@ import {
   type SeasonDraftState,
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
+import { validateDraftCatalog } from './catalog-validation.ts';
 import {
   completionTargetsMet,
   legalFiveAfterAnyRemoval,
@@ -835,15 +835,16 @@ export function applySeasonDraftCommand(
   record: SeasonDraftCommandRecord;
   generation: SeasonLeagueGenerationResult | null;
 } {
-  const catalogParse = seasonDraftCatalogSchema.safeParse(catalog);
-  if (!catalogParse.success) {
+  let validatedCatalog: SeasonDraftCatalog;
+  try {
+    validatedCatalog = validateDraftCatalog(catalog);
+  } catch {
     return {
       state,
       record: rejectedRecord(state, command, 'INVALID_CATALOG', 'draft catalog is invalid'),
       generation: null,
     };
   }
-  const validatedCatalog = catalogParse.data;
 
   if (state === null) {
     if (command.payload.kind !== 'create-season-draft') {

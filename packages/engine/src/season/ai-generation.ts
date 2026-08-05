@@ -2,7 +2,6 @@ import {
   SEASON_AI_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROTATION_VERSION,
-  seasonDraftCatalogSchema,
   seasonLeagueGenerationResultSchema,
   seasonLeagueSchema,
   seasonNamespaceSeed,
@@ -18,6 +17,7 @@ import {
   type Seed,
 } from '@hoop-rush/data-contracts';
 import { createRng, shuffle } from '../sim/rng.ts';
+import { validateDraftCatalog } from './catalog-validation.ts';
 import { buildMinimalRotation } from './rotation.ts';
 import { seasonGenerationDigest } from './digest.ts';
 import {
@@ -227,6 +227,12 @@ interface GenerationContext {
   roleScoresByVersion: Map<string, Record<SeasonRosterRole, number>>;
   /** Precomputed coarse group mask per candidate. */
   maskByVersion: Map<string, number>;
+  /** Candidates bucketed by coarse group mask, each bucket in catalog order. */
+  byMask: string[][];
+  /** Per-team seeded candidate ranks, computed once (seed and team are fixed). */
+  ranksByTeam: Map<string, Map<string, number>>;
+  /** Precomputed identity scores (one per identity) per candidate. */
+  identityScoresByVersion: Map<string, Record<SeasonAiIdentity, number>>;
   seed: Seed;
   assignments: Map<string, SeasonAiAssignment>;
   rosters: Map<string, string[]>;
@@ -249,7 +255,9 @@ function candidateScore(
   rngRanks: Map<string, number>,
 ): number {
   if (scores === undefined) return -Infinity;
-  const identity = identityScore(scores, team.identity);
+  const identity =
+    ctx.identityScoresByVersion.get(candidateId)?.[team.identity] ??
+    identityScore(scores, team.identity);
   let score = identity + BAND_SELECTION_BIAS[team.band];
   const ceiling = BAND_SCORE_CEILINGS[team.band];
   if (identity > ceiling) {
@@ -353,6 +361,8 @@ function uncoveredRoles(roleScores: Record<SeasonRosterRole, number>): SeasonRos
 
 /** Deterministic seeded ranks for candidate tie-breaking (canonical draws). */
 function candidateRanks(ctx: GenerationContext, teamId: string): Map<string, number> {
+  const cached = ctx.ranksByTeam.get(teamId);
+  if (cached !== undefined) return cached;
   const rng = createRng(seasonNamespaceSeed(ctx.seed, 'ai-rosters', 'candidate-order', teamId));
   const canonical = [...ctx.catalog.candidates].sort((a, b) =>
     a.playerVersionId < b.playerVersionId ? -1 : 1,
@@ -361,6 +371,7 @@ function candidateRanks(ctx: GenerationContext, teamId: string): Map<string, num
   canonical.forEach((candidate) => {
     ranks.set(candidate.playerVersionId, rng.next());
   });
+  ctx.ranksByTeam.set(teamId, ranks);
   return ranks;
 }
 
@@ -390,17 +401,19 @@ function pickForTeam(
   const ownedCounts = rosterGroupCounts(ownedMembers);
 
   // One pass over the unowned candidates: bucket probes by mask and build the
-  // per-mask counts used by every feasibility probe.
+  // per-mask counts used by every feasibility probe. Buckets are prebuilt in
+  // catalog order, so the first unowned entry per mask is the same probe the
+  // full-catalog scan would find.
   const availableMaskCounts = new Array<number>(8).fill(0);
   const probeByMask = new Array<string | undefined>(8).fill(undefined);
-  for (const candidate of ctx.catalog.candidates) {
-    if (!ctx.unowned.has(candidate.playerVersionId) || excluded.has(candidate.playerVersionId)) {
-      continue;
+  for (let mask = 1; mask <= 7; mask += 1) {
+    const bucket = ctx.byMask[mask];
+    if (bucket === undefined) continue;
+    for (const candidateId of bucket) {
+      if (!ctx.unowned.has(candidateId) || excluded.has(candidateId)) continue;
+      availableMaskCounts[mask] = (availableMaskCounts[mask] ?? 0) + 1;
+      if (probeByMask[mask] === undefined) probeByMask[mask] = candidateId;
     }
-    const mask = ctx.maskByVersion.get(candidate.playerVersionId) ?? 0;
-    if (mask === 0) continue;
-    availableMaskCounts[mask] = (availableMaskCounts[mask] ?? 0) + 1;
-    if (probeByMask[mask] === undefined) probeByMask[mask] = candidate.playerVersionId;
   }
   ctx.availableMaskCounts = availableMaskCounts;
 
@@ -431,48 +444,49 @@ function pickForTeam(
   if (guardDeficit === maxDeficit && guardDeficit > 0) mostDeficient.add(1);
   if (forwardDeficit === maxDeficit && forwardDeficit > 0) mostDeficient.add(2);
   if (centerDeficit === maxDeficit && centerDeficit > 0) mostDeficient.add(4);
-  const candidates = ctx.catalog.candidates.filter((candidate) => {
-    if (!ctx.unowned.has(candidate.playerVersionId) || excluded.has(candidate.playerVersionId)) {
-      return false;
-    }
-    const mask = ctx.maskByVersion.get(candidate.playerVersionId) ?? 0;
-    if (!feasibleMasks.has(mask)) return false;
-    const scores = ctx.roleScoresByVersion.get(candidate.playerVersionId);
-    if (scores === undefined) return false;
-    const coversNew = uncovered.some((role) => scores[role] >= ROLE_COVERAGE_THRESHOLD);
-    if (uncovered.length > 0 && !coversNew) return false;
-    // Every pick must help the most-deficient completion group so guards
-    // and centers can never fall behind the remaining slot budget and teams
-    // cannot hoard scarce coverage.
-    if (mostDeficient.size > 0) {
-      const helpsMost = [...mostDeficient].some((group) => (mask & group) !== 0);
-      if (!helpsMost) return false;
-    }
-    return true;
-  });
+  const mostDeficientList = [...mostDeficient];
+  const uncoveredExists = uncovered.length > 0;
   // Role-coverage feasibility with the remaining slots (including this one).
-  if (uncovered.length > 0) {
+  if (uncoveredExists) {
     if (!coverageFeasible(ctx, uncovered, remaining)) {
       throw new BacktrackSignal(team.franchiseId, 'coverage infeasible');
     }
   }
-  const scored = candidates
-    .map((candidate) => ({
-      candidate,
-      score: candidateScore(
-        ctx,
-        candidate.playerVersionId,
-        team,
-        ctx.roleScoresByVersion.get(candidate.playerVersionId),
-        uncovered,
-        rngRanks,
-      ),
-    }))
-    .sort(
-      (a, b) =>
-        b.score - a.score || a.candidate.playerVersionId.localeCompare(b.candidate.playerVersionId),
-    );
-  const best = scored[0];
+  // One pass over the feasible-mask buckets: filter, score, and track the
+  // best candidate. The winner is the same the map+sort produces (score
+  // descending, version id ascending on exact ties), without materializing
+  // or sorting the candidate list.
+  let best: { candidate: SeasonDraftCatalog['candidates'][number]; score: number } | undefined;
+  for (const mask of feasibleMasks) {
+    const bucket = ctx.byMask[mask];
+    if (bucket === undefined) continue;
+    for (const candidateId of bucket) {
+      if (!ctx.unowned.has(candidateId) || excluded.has(candidateId)) continue;
+      const scores = ctx.roleScoresByVersion.get(candidateId);
+      if (scores === undefined) continue;
+      if (uncoveredExists) {
+        const coversNew = uncovered.some((role) => scores[role] >= ROLE_COVERAGE_THRESHOLD);
+        if (!coversNew) continue;
+      }
+      // Every pick must help the most-deficient completion group so guards
+      // and centers can never fall behind the remaining slot budget and teams
+      // cannot hoard scarce coverage.
+      if (mostDeficientList.length > 0) {
+        const helpsMost = mostDeficientList.some((group) => (mask & group) !== 0);
+        if (!helpsMost) continue;
+      }
+      const candidate = ctx.byId.get(candidateId);
+      if (candidate === undefined) continue;
+      const score = candidateScore(ctx, candidateId, team, scores, uncovered, rngRanks);
+      if (
+        best === undefined ||
+        score > best.score ||
+        (score === best.score && candidateId.localeCompare(best.candidate.playerVersionId) < 0)
+      ) {
+        best = { candidate, score };
+      }
+    }
+  }
   if (best === undefined) {
     throw new BacktrackSignal(team.franchiseId, 'no legal candidate at slot');
   }
@@ -648,13 +662,7 @@ function crossTeamRepairPass(
  * `SeasonAiGenerationError` on node-budget exhaustion with full diagnostics.
  */
 export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGenerationResult {
-  const catalogParse = seasonDraftCatalogSchema.safeParse(input.catalog);
-  if (!catalogParse.success) {
-    throw new Error(
-      `draft catalog is invalid: ${catalogParse.error.issues[0]?.message ?? 'unknown'}`,
-    );
-  }
-  const catalog = catalogParse.data;
+  const catalog = validateDraftCatalog(input.catalog);
   const leagueParse = seasonLeagueSchema.safeParse(input.league);
   if (!leagueParse.success) {
     throw new Error('league fails the league schema');
@@ -682,15 +690,29 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
   const humanOwned = new Set(input.humanRosters.flatMap((r) => r.playerVersionIds));
   const roleScoresByVersion = new Map<string, Record<SeasonRosterRole, number>>();
   const maskByVersion = new Map<string, number>();
+  const byMask: string[][] = Array.from({ length: 8 }, () => []);
+  const identityScoresByVersion = new Map<string, Record<SeasonAiIdentity, number>>();
   for (const candidate of catalog.candidates) {
-    roleScoresByVersion.set(candidate.playerVersionId, roleScoresOf(candidate));
-    maskByVersion.set(candidate.playerVersionId, groupMask(candidate.positions.playable));
+    const scores = roleScoresOf(candidate);
+    roleScoresByVersion.set(candidate.playerVersionId, scores);
+    const mask = groupMask(candidate.positions.playable);
+    maskByVersion.set(candidate.playerVersionId, mask);
+    const bucket = byMask[mask];
+    if (bucket !== undefined) bucket.push(candidate.playerVersionId);
+    const identityScores = {} as Record<SeasonAiIdentity, number>;
+    for (const identity of IDENTITIES) {
+      identityScores[identity] = identityScore(scores, identity);
+    }
+    identityScoresByVersion.set(candidate.playerVersionId, identityScores);
   }
   const ctx: GenerationContext = {
     catalog,
     byId,
     roleScoresByVersion,
     maskByVersion,
+    byMask,
+    ranksByTeam: new Map(),
+    identityScoresByVersion,
     seed: input.seed,
     assignments: new Map(
       assignAiBandsAndIdentities({

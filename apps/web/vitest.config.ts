@@ -16,12 +16,22 @@ import { defaultExclude, defineConfig } from 'vitest/config';
 const sveltePackageJson = fileURLToPath(import.meta.resolve('svelte/package.json'));
 const svelteClientEntry = path.join(path.dirname(sveltePackageJson), 'src', 'index-client.js');
 
+// The SvelteKit vite plugin resolves svelte.config.js, generated aliases,
+// and the .svelte-kit output directory from process.cwd(). Under the
+// workspace projects runner every project shares the workspace cwd, so the
+// web project must run with cwd pinned to the app directory.
+process.chdir(path.dirname(fileURLToPath(import.meta.url)));
+
 export default defineConfig({
   plugins: [sveltekit()],
   resolve: {
     alias: [{ find: /^svelte$/, replacement: svelteClientEntry }],
   },
   test: {
+    name: '@hoop-rush/web',
+    // Pin the project root so includes/excludes resolve from the package
+    // directory under the workspace projects runner.
+    root: path.dirname(fileURLToPath(import.meta.url)),
     // Pure-TS unit tests (src/lib/*.test.ts) run in the node environment by
     // default. Component tests opt into jsdom per file with a
     // `// @vitest-environment jsdom` docblock comment (see
@@ -41,11 +51,6 @@ export default defineConfig({
     // (setups, mocks, jsdom envs), so no leakage is expected; the component
     // tests still clean up the DOM via afterEach.
     isolate: false,
-    // Fewer workers means fewer duplicated transform passes over the same
-    // module graph; with the shared module registry the 8 small files still
-    // parallelize fine on 2 workers, and the wall time is set by how many
-    // times the SvelteKit graph is built, not by test execution.
-    maxWorkers: 2,
     // The suite is dominated by the SvelteKit module graph (35s+ of
     // transform/import per worker for ~0.6s of actual test execution).
     // Persisting transformed modules to disk makes cold-start reruns reuse

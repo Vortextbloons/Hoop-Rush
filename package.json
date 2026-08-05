@@ -11,9 +11,9 @@
     "lint": "pnpm --parallel -r lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "pnpm --parallel -r test",
-    "test:run": "pnpm --parallel -r test:run",
-    "test:quick": "pnpm --parallel -r exec vitest run --exclude **/generator*.test.ts",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:quick": "vitest run --exclude **/generator*.test.ts",
     "static": "pnpm --parallel -r run \"/^(check|lint)$/\"",
     "e2e": "pnpm --filter @hoop-rush/web e2e",
     "e2e:smoke": "pnpm --filter @hoop-rush/web e2e:smoke",
@@ -21,8 +21,8 @@
     "verify": "pnpm static && pnpm test:run && pnpm build",
     "verify:changed": "pnpm --filter \"...[HEAD]\" --filter \"!hoop-rush\" --parallel --if-present run \"/^(check|lint)$/\" && pnpm --filter \"...[HEAD]\" --filter \"!hoop-rush\" --parallel --if-present test:run",
     "check:watch:web": "pnpm --filter @hoop-rush/web check:watch",
-    "test:watch:web": "pnpm --filter @hoop-rush/web test",
-    "test:watch:engine": "pnpm --filter @hoop-rush/engine test",
+    "test:watch:web": "vitest watch --project @hoop-rush/web",
+    "test:watch:engine": "vitest watch --project @hoop-rush/engine",
     "prepare": "husky"
   },
   "engines": {
@@ -39,6 +39,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",
-    "prettier-plugin-svelte": "^4.1.1"
+    "prettier-plugin-svelte": "^4.1.1",
+    "vitest": "^4.1.10"
   }
 }

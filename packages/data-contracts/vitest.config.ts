@@ -1,5 +1,12 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  test: {},
+  test: {
+    name: '@hoop-rush/data-contracts',
+    // Pin the project root so includes/excludes resolve from the package
+    // directory under the workspace projects runner.
+    root: path.dirname(fileURLToPath(import.meta.url)),
+  },
 });

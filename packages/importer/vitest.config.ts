@@ -1,10 +1,12 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // The importer is transform-heavy (zod schemas over full data files).
-    // Under full parallel package execution, more workers only duplicate the
-    // transform work; four keep the suite fast without oversubscribing.
-    maxWorkers: 4,
+    name: '@hoop-rush/importer',
+    // Pin the project root so includes/excludes resolve from the package
+    // directory under the workspace projects runner.
+    root: path.dirname(fileURLToPath(import.meta.url)),
   },
 });
