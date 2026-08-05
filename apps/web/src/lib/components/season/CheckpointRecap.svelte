@@ -76,7 +76,10 @@
 
 <div class="flex flex-col gap-6">
   {#if humanRecord}
-    <section aria-labelledby="recap-record-heading" class="rounded-xl bg-surface-1 p-4">
+    <section
+      aria-labelledby="recap-record-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    >
       <h2
         id="recap-record-heading"
         class="font-display text-base font-extrabold uppercase tracking-tight"
@@ -108,7 +111,10 @@
   {/if}
 
   {#if recap.standingsMovement.length > 0}
-    <section aria-labelledby="recap-movement-heading" class="rounded-xl bg-surface-1 p-4">
+    <section
+      aria-labelledby="recap-movement-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    >
       <h2
         id="recap-movement-heading"
         class="font-display text-base font-extrabold uppercase tracking-tight"
@@ -140,7 +146,10 @@
   {/if}
 
   {#if recap.notablePerformances.length > 0}
-    <section aria-labelledby="recap-performances-heading" class="rounded-xl bg-surface-1 p-4">
+    <section
+      aria-labelledby="recap-performances-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    >
       <h2
         id="recap-performances-heading"
         class="font-display text-base font-extrabold uppercase tracking-tight"
@@ -194,7 +203,10 @@
   {/if}
 
   {#if recap.streaks.length > 0}
-    <section aria-labelledby="recap-streaks-heading" class="rounded-xl bg-surface-1 p-4">
+    <section
+      aria-labelledby="recap-streaks-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    >
       <h2
         id="recap-streaks-heading"
         class="font-display text-base font-extrabold uppercase tracking-tight"
@@ -226,7 +238,10 @@
   {/if}
 
   {#if recap.versionSpotlights.length > 0}
-    <section aria-labelledby="recap-spotlights-heading" class="rounded-xl bg-surface-1 p-4">
+    <section
+      aria-labelledby="recap-spotlights-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    >
       <h2
         id="recap-spotlights-heading"
         class="font-display text-base font-extrabold uppercase tracking-tight"
@@ -267,7 +282,10 @@
     </section>
   {/if}
 
-  <section aria-labelledby="recap-upcoming-heading" class="rounded-xl bg-surface-1 p-4">
+  <section
+    aria-labelledby="recap-upcoming-heading"
+    class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+  >
     <h2
       id="recap-upcoming-heading"
       class="font-display text-base font-extrabold uppercase tracking-tight"

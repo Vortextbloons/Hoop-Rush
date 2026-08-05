@@ -33,10 +33,10 @@
 
 <nav
   aria-label={label}
-  class="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+  class="fixed inset-x-0 bottom-0 z-40 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden"
 >
   <div
-    class="flex items-center gap-1 rounded-2xl border border-border bg-background/90 p-1.5 shadow-2xl shadow-black/30 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+    class="flex w-full items-stretch gap-0.5 border-t border-border bg-background/90 p-1 shadow-2xl shadow-black/30 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:rounded-none"
   >
     {#each items as item (item.id)}
       {@const active = isNavItemActive(item, routeId)}
@@ -44,10 +44,10 @@
         <span
           aria-disabled="true"
           title="Coming soon"
-          class="inline-flex cursor-default items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-muted-foreground/60"
+          class="flex min-w-0 flex-1 cursor-default flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-semibold leading-none text-muted-foreground/60"
         >
-          <item.icon class="h-4 w-4 shrink-0" />
-          {item.label}
+          <item.icon class="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span class="max-w-full truncate">{item.label}</span>
         </span>
       {:else}
         <a
@@ -56,12 +56,12 @@
           onpointerenter={() => intent(item.id)}
           onfocus={() => intent(item.id)}
           ontouchstart={() => intent(item.id)}
-          class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
+          class="flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[10px] font-semibold leading-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring {active
             ? 'bg-primary text-primary-foreground'
             : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'}"
         >
-          <item.icon class="h-4 w-4 shrink-0" />
-          {item.label}
+          <item.icon class="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span class="max-w-full truncate">{item.label}</span>
         </a>
       {/if}
     {/each}

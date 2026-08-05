@@ -244,37 +244,41 @@
   <title>Season Run — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-  <div class="flex items-end justify-between gap-4">
-    <div>
+<section class="mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden py-6 sm:px-6 sm:py-10">
+  <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
+    <div class="min-w-0">
       <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run · 2.0</p>
       <h1
-        class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
+        class="font-display mt-2 text-2xl font-extrabold tracking-tight break-words uppercase sm:text-3xl md:text-4xl lg:text-5xl"
       >
         Ten rounds. One league.
       </h1>
-      <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-        Your franchise is rolled from the run seed. Each round draws eight global player-season
-        cards; safe picks keep the 4G/4F/3C completion targets reachable, and disabled cards say
-        why.
-      </p>
+      {#if !(started && board?.draft)}
+        <p class="mt-3 max-w-xl text-sm text-muted-foreground">
+          Your franchise is rolled from the run seed. Each round draws eight global player-season
+          cards; safe picks keep the 4G/4F/3C completion targets reachable, and disabled cards say
+          why.
+        </p>
+      {/if}
     </div>
     <a
       href={resolve('/')}
-      class="font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
+      class="shrink-0 self-start font-mono text-xs text-muted-foreground underline-offset-4 hover:underline sm:self-auto"
     >
       Back
     </a>
   </div>
 
   {#if assetsError}
-    <p class="mt-8 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm">
+    <p
+      class="mt-8 mx-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm sm:mx-0"
+    >
       Failed to load season data: {assetsError}
     </p>
   {:else if !loaded}
-    <p class="mt-8 font-mono text-sm text-muted-foreground">Loading season data…</p>
+    <p class="mt-8 px-3 font-mono text-sm text-muted-foreground sm:px-0">Loading season data…</p>
   {:else if resumeHref}
-    <div class="mt-10 rounded-xl bg-surface-1 p-6">
+    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
         An active season run exists
       </h2>
@@ -321,7 +325,7 @@
       {/if}
     </div>
   {:else if hasDraft && !started && board?.draft}
-    <div class="mt-10 rounded-xl bg-surface-1 p-6">
+    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
         Draft in progress
       </h2>
@@ -347,7 +351,7 @@
     </div>
   {:else if !started || !board?.draft}
     <div class="mt-10 flex flex-col gap-6">
-      <div class="rounded-xl bg-surface-1 p-6">
+      <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
         <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
           Start a Season Run
         </h2>
@@ -374,7 +378,10 @@
       </div>
 
       {#if league && manifest}
-        <section aria-labelledby="season-league-heading" class="rounded-xl bg-surface-1 p-6">
+        <section
+          aria-labelledby="season-league-heading"
+          class="rounded-none bg-surface-1 sm:rounded-xl p-6"
+        >
           <h2
             id="season-league-heading"
             class="font-display text-base font-extrabold uppercase tracking-tight"
@@ -393,10 +400,10 @@
       {/if}
     </div>
   {:else if board.draft?.status === 'drafting' || board.draft?.status === 'finalized'}
-    <div class="mt-10 flex flex-col gap-6 pb-32">
+    <div class="mt-8 flex flex-col gap-6 pb-[max(6rem,env(safe-area-inset-bottom))] sm:mt-10">
       {#if flow && manifest && board.draft}
-        <div class="rounded-xl bg-surface-1 px-4 py-3">
-          <p class="font-mono text-[10px] text-muted-foreground">
+        <div class="rounded-none bg-surface-1 sm:rounded-xl px-4 py-3">
+          <p class="font-mono text-[10px] break-words text-muted-foreground">
             Your franchise:
             <span class="font-bold text-foreground">
               {franchiseName(board.draft.participants[0]?.franchiseId ?? '—')}
@@ -417,7 +424,7 @@
         />
       {/if}
       {#if board.draft?.status === 'finalized'}
-        <div class="rounded-xl bg-surface-1 p-6">
+        <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
           <h2 class="font-display text-base font-extrabold uppercase tracking-tight">
             Generate the AI league
           </h2>
@@ -455,7 +462,7 @@
     </div>
   {:else if board.draft?.status === 'complete' && board.generation}
     <div class="mt-10 flex max-w-2xl flex-col gap-6 pb-32">
-      <div class="rounded-xl bg-surface-1 p-6">
+      <div class="rounded-none bg-surface-1 sm:rounded-xl p-6">
         <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
           League generated
         </h2>

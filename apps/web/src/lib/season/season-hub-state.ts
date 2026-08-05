@@ -170,6 +170,42 @@ export class SeasonHubState {
     this.runner.cancel(requestId);
   }
 
+  /**
+   * Quits the current run: stops an in-flight block (cancel, then terminate
+   * if the worker does not acknowledge), clears the run atomically
+   * (checkpoint, index, summaries, details, blocks), and reloads so the
+   * shell falls back to its empty state. Terminating a stuck worker also
+   * invalidates its pending candidate, so nothing can be committed behind
+   * the clear.
+   */
+  async quitRun(): Promise<{ ok: boolean; error: string | null }> {
+    if (this.snapshot === null) {
+      return { ok: false, error: 'no active season run to quit' };
+    }
+    const runId = this.snapshot.run.runId;
+    if (this.block.phase === 'running') {
+      this.cancel();
+      const deadline = Date.now() + 5000;
+      const phaseOf = (): BlockPhase => this.block.phase;
+      while (phaseOf() === 'running' && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      if (phaseOf() === 'running') {
+        this.runner.terminate();
+        this.block = { ...IDLE_BLOCK };
+        this.emit();
+      }
+    }
+    try {
+      await this.repo.clearSeasonRun(runId);
+      await this.refresh();
+      return { ok: true, error: null };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: `could not quit the run: ${message}` };
+    }
+  }
+
   /** Re-issues the same idempotent command after cancel/failure. */
   retry(): void {
     if (this.block.command === null || this.block.startInput === null) return;

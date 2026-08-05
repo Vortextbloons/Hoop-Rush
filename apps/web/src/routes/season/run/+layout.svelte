@@ -1,9 +1,11 @@
 <script lang="ts">
   import { setContext } from 'svelte';
   import { page } from '$app/state';
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
-  import { BarChart3, CalendarDays, LayoutGrid, Trophy, Users } from '@lucide/svelte';
+  import { BarChart3, CalendarDays, LayoutGrid, LogOut, Trophy, Users, X } from '@lucide/svelte';
+  import { Dialog } from 'bits-ui';
   import { franchiseAbbreviation, type PlayersIndexEntry } from '@hoop-rush/data-contracts';
   import { ordinal, provisionalRanking, recordLabel } from '$lib/season/season-presentation';
   import {
@@ -124,6 +126,27 @@
 
   let unsubscribeHub: (() => void) | null = null;
 
+  let quitOpen = $state(false);
+  let quitting = $state(false);
+  let quitError: string | null = $state(null);
+
+  async function confirmQuit(): Promise<void> {
+    if (quitting) return;
+    quitting = true;
+    quitError = null;
+    try {
+      const result = await shell.quitRun();
+      if (!result.ok) {
+        quitError = result.error;
+        return;
+      }
+      quitOpen = false;
+      await goto(resolve('/season'));
+    } finally {
+      quitting = false;
+    }
+  }
+
   $effect(() => {
     if (!import.meta.env.SSR) {
       void initShell();
@@ -177,6 +200,12 @@
   shell.refresh = async () => {
     await shell.hub?.refresh();
     mirrorHub();
+  };
+  shell.quitRun = async () => {
+    if (shell.hub === null) {
+      return { ok: false, error: 'season hub is not ready' };
+    }
+    return shell.hub.quitRun();
   };
   shell.playerName = (playerVersionId: string): string => {
     for (const roster of shell.run?.rosters ?? []) {
@@ -260,16 +289,29 @@
     </div>
   </div>
 {:else}
-  <div class="mx-auto w-full max-w-6xl px-4 sm:px-6">
-    <div class="pt-6">
-      {#if mastheadFacts}
-        <SeasonMasthead
-          manifest={shell.manifest}
-          franchiseId={mastheadFacts.franchiseId}
-          recordLabel={mastheadFacts.record}
-          positionLabel={mastheadFacts.position}
-        />
-      {/if}
+  <div class="mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden sm:px-6">
+    <div class="px-3 pt-6 sm:px-0">
+      <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+        <div class="min-w-0 flex-1">
+          {#if mastheadFacts}
+            <SeasonMasthead
+              manifest={shell.manifest}
+              franchiseId={mastheadFacts.franchiseId}
+              recordLabel={mastheadFacts.record}
+              positionLabel={mastheadFacts.position}
+            />
+          {/if}
+        </div>
+        <button
+          type="button"
+          onclick={() => (quitOpen = true)}
+          disabled={quitting}
+          class="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-muted-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-destructive/50 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <LogOut class="h-4 w-4 shrink-0" />
+          Quit run
+        </button>
+      </div>
     </div>
 
     <nav
@@ -293,10 +335,68 @@
       </div>
     </nav>
 
-    <main class="pb-36 md:pb-14">
+    <main class="min-w-0 overflow-x-hidden pb-[max(6.5rem,env(safe-area-inset-bottom))] md:pb-14">
       {@render children()}
     </main>
   </div>
 
   <BottomNav items={seasonNavItems} label="Season navigation" />
+
+  <Dialog.Root
+    open={quitOpen}
+    onOpenChange={(open) => {
+      if (!open && !quitting) quitOpen = false;
+    }}
+  >
+    <Dialog.Portal>
+      <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
+      <Dialog.Content
+        class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border-t border-border bg-card p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl shadow-black/40 outline-none sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:pb-4"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <Dialog.Title
+            class="font-display truncate text-lg font-extrabold tracking-tight uppercase"
+          >
+            Quit this run?
+          </Dialog.Title>
+          <Dialog.Close
+            aria-label="Cancel"
+            class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X class="h-4 w-4" />
+          </Dialog.Close>
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Quitting ends this Season Run and deletes its progress from this browser. You can start a
+          new Season Run from the Season setup screen.
+        </p>
+        {#if quitError}
+          <p
+            role="alert"
+            class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+          >
+            {quitError}
+          </p>
+        {/if}
+        <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onclick={() => (quitOpen = false)}
+            disabled={quitting}
+            class="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Stay
+          </button>
+          <button
+            type="button"
+            onclick={() => void confirmQuit()}
+            disabled={quitting}
+            class="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {quitting ? 'Quitting…' : 'Quit and delete'}
+          </button>
+        </div>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
 {/if}

@@ -88,19 +88,21 @@
   }
 </script>
 
-<div class="flex flex-col gap-6">
+<div class="flex min-w-0 flex-col gap-6">
   {#if draft}
-    <div class="rounded-xl bg-surface-1">
-      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <div class="rounded-none bg-surface-1 sm:rounded-xl">
+      <div
+        class="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+      >
         <span
           data-season-round-heading
-          class="font-display text-lg font-extrabold tracking-tight uppercase"
+          class="font-display text-base font-extrabold tracking-tight uppercase sm:text-lg"
         >
           Round {draft.round} of 10
         </span>
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <span
-            class="rounded-full bg-surface-2 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]"
+            class="rounded-full bg-surface-2 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
           >
             {#if participant}
               {franchiseAbbreviation(participant.franchiseId)} · your franchise
@@ -109,14 +111,14 @@
             {/if}
           </span>
           <span
-            class="rounded-full bg-surface-2 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]"
+            class="rounded-full bg-surface-2 px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] sm:px-2.5 sm:text-[10px] sm:tracking-[0.14em]"
           >
             {picks.length} of 10 picked
           </span>
         </div>
       </div>
 
-      <div class="grid gap-4 p-4 sm:grid-cols-2">
+      <div class="grid gap-3 p-3 sm:gap-4 sm:p-4 sm:grid-cols-2">
         <section aria-labelledby="season-turn-heading" class="rounded-lg bg-surface-2 p-3">
           <h3
             id="season-turn-heading"
@@ -140,9 +142,11 @@
           >
             Coverage needs
           </h3>
-          <dl class="mt-2 grid grid-cols-3 gap-2 text-center">
-            <div class="rounded-lg bg-surface-3 p-2">
-              <dt class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <dl class="mt-2 grid grid-cols-3 gap-1.5 text-center sm:gap-2">
+            <div class="rounded-lg bg-surface-3 p-1.5 sm:p-2">
+              <dt
+                class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
+              >
                 Guards
               </dt>
               <dd
@@ -152,8 +156,10 @@
                 {needs.guards}<span class="text-muted-foreground">/{COVERAGE_TARGETS.guards}</span>
               </dd>
             </div>
-            <div class="rounded-lg bg-surface-3 p-2">
-              <dt class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            <div class="rounded-lg bg-surface-3 p-1.5 sm:p-2">
+              <dt
+                class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
+              >
                 Forwards
               </dt>
               <dd
@@ -165,8 +171,10 @@
                 >
               </dd>
             </div>
-            <div class="rounded-lg bg-surface-3 p-2">
-              <dt class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+            <div class="rounded-lg bg-surface-3 p-1.5 sm:p-2">
+              <dt
+                class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
+              >
                 Centers
               </dt>
               <dd
@@ -187,7 +195,10 @@
     </div>
 
     {#if offer}
-      <section aria-labelledby="season-offer-heading" class="rounded-xl bg-surface-1 p-4">
+      <section
+        aria-labelledby="season-offer-heading"
+        class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      >
         <div class="flex flex-wrap items-center justify-between gap-3">
           <h2
             id="season-offer-heading"
@@ -206,10 +217,10 @@
               ? eraIdentityOf(manifest, candidate.franchiseId, candidate.eraId)
               : { displayLabel: null, logoCandidates: [] }}
             <li
-              class="flex flex-col gap-2 rounded-lg bg-surface-2 p-3"
+              class="flex min-w-0 flex-col gap-2 rounded-lg bg-surface-2 p-3"
               class:opacity-70={!card.selectable}
             >
-              <div class="flex items-start justify-between gap-2">
+              <div class="flex min-w-0 items-start justify-between gap-2">
                 {#if faceOf(card.playerVersionId)}
                   <SeasonPlayerFace
                     face={faceOf(card.playerVersionId)!}
@@ -232,10 +243,20 @@
                 {/if}
               </div>
               <div class="min-w-0">
-                <p class="truncate text-sm font-bold">
-                  {candidate?.displayName ?? card.playerVersionId}
-                </p>
-                <p class="font-mono text-[10px] text-muted-foreground">
+                <div class="flex min-w-0 items-center gap-2">
+                  <p class="min-w-0 flex-1 truncate text-sm font-bold">
+                    {candidate?.displayName ?? card.playerVersionId}
+                  </p>
+                  {#if candidate}
+                    <span
+                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
+                      title="Overall rating"
+                    >
+                      OVR {candidate.summaryRatings.overallRating}
+                    </span>
+                  {/if}
+                </div>
+                <p class="truncate font-mono text-[10px] text-muted-foreground">
                   {candidate?.seasonKey ?? ''} · {candidate?.positions.playable.join('/') ?? ''}
                 </p>
                 <p class="truncate font-mono text-[10px] text-muted-foreground">
@@ -265,13 +286,13 @@
         </ul>
       </section>
     {:else if draft.status === 'drafting'}
-      <div>
+      <div class="sticky bottom-3 z-20 sm:static">
         {#if canDraw}
           <button
             type="button"
             onclick={onDraw}
             disabled={busy}
-            class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-black/30 transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:shadow-none"
           >
             Draw round {draft.round} offer
           </button>
@@ -295,7 +316,10 @@
     {/if}
 
     {#if picks.length > 0}
-      <section aria-labelledby="season-picks-heading" class="rounded-xl bg-surface-1">
+      <section
+        aria-labelledby="season-picks-heading"
+        class="rounded-none bg-surface-1 sm:rounded-xl"
+      >
         <div class="px-4 py-3">
           <h2
             id="season-picks-heading"
@@ -310,27 +334,35 @@
             {@const identity = candidate
               ? eraIdentityOf(manifest, pick.franchiseId, pick.eraId)
               : { displayLabel: null, logoCandidates: [] }}
-            <li class="flex items-center gap-3 px-4 py-3">
+            <li class="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+              <div class="flex min-w-0 items-center gap-3">
+                <span
+                  class="w-10 shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:w-20"
+                >
+                  {pickRoundLabel(pick.pickOrdinal)}
+                </span>
+                {#if candidate}
+                  <SeasonTeamLogo
+                    {manifest}
+                    franchiseId={pick.franchiseId}
+                    teamExternalId={manifest.modernFranchiseSlots.find(
+                      (s) => s.franchiseId === pick.franchiseId,
+                    )?.teamExternalId ?? ''}
+                    logoCandidates={identity.logoCandidates}
+                    size="sm"
+                  />
+                {/if}
+                <span class="min-w-0 flex-1 truncate text-sm font-bold">
+                  {candidate?.displayName ?? pick.playerVersionId}
+                </span>
+              </div>
               <span
-                class="w-20 shrink-0 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+                class="truncate pl-[calc(2.5rem+0.75rem)] font-mono text-[10px] text-muted-foreground sm:shrink-0 sm:pl-0"
               >
-                {pickRoundLabel(pick.pickOrdinal)}
-              </span>
-              {#if candidate}
-                <SeasonTeamLogo
-                  {manifest}
-                  franchiseId={pick.franchiseId}
-                  teamExternalId={manifest.modernFranchiseSlots.find(
-                    (s) => s.franchiseId === pick.franchiseId,
-                  )?.teamExternalId ?? ''}
-                  logoCandidates={identity.logoCandidates}
-                  size="sm"
-                />
-              {/if}
-              <span class="min-w-0 flex-1 truncate text-sm font-bold">
-                {candidate?.displayName ?? pick.playerVersionId}
-              </span>
-              <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                {#if candidate}<span class="font-bold text-foreground"
+                    >OVR {candidate.summaryRatings.overallRating}</span
+                  > ·
+                {/if}
                 {candidate?.positions.playable.join('/') ?? ''} ·
                 {identity.displayLabel ?? franchiseAbbreviation(pick.franchiseId)} ·
                 {eraLabel(pick.eraId)}

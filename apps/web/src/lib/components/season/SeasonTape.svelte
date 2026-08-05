@@ -93,10 +93,12 @@
 </script>
 
 <nav aria-label="Season progress" class="w-full">
-  <ol class="flex flex-wrap gap-1.5 sm:gap-2">
+  <ol
+    class="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:pb-0"
+  >
     {#each segments as segment (segment.blockIndex)}
       {#if segment.state === 'completed'}
-        <li class="min-w-[4.25rem] flex-1">
+        <li class="w-[4.25rem] shrink-0 sm:min-w-[4.25rem] sm:flex-1">
           <a
             href={resolve(`/season/run/checkpoint/?block=${String(segment.blockIndex)}` as RouteId)}
             data-season-tape-segment={segment.blockIndex}
@@ -117,7 +119,7 @@
           </a>
         </li>
       {:else}
-        <li class="min-w-[4.25rem] flex-1">
+        <li class="w-[4.25rem] shrink-0 sm:min-w-[4.25rem] sm:flex-1">
           <span
             data-season-tape-segment={segment.blockIndex}
             aria-label={labelOf(segment)}

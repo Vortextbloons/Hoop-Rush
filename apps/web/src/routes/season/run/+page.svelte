@@ -161,9 +161,9 @@
   <title>Season Run — Hub — Hoop Rush</title>
 </svelte:head>
 
-<div class="flex flex-col gap-6 pt-6">
+<div class="flex min-w-0 flex-col gap-6 pt-6">
   <!-- 1. Season tape -->
-  <section aria-labelledby="season-tape-heading">
+  <section aria-labelledby="season-tape-heading" class="px-3 sm:px-0">
     <h2 id="season-tape-heading" class="sr-only">Season progress</h2>
     {#if snapshot !== null}
       <SeasonTape
@@ -179,7 +179,7 @@
     <!-- Regular season complete -->
     <section
       aria-labelledby="season-complete-heading"
-      class="flex flex-col gap-3 rounded-xl bg-surface-1 p-6"
+      class="flex flex-col gap-3 rounded-none bg-surface-1 p-4 sm:rounded-xl sm:p-5"
     >
       <h2
         id="season-complete-heading"
@@ -202,7 +202,7 @@
     <!-- 2. Next decision panel -->
     <section
       aria-labelledby="next-decision-heading"
-      class="flex flex-col gap-4 rounded-xl border border-border bg-surface-1 p-4 sm:p-5"
+      class="flex flex-col gap-4 rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
     >
       <div class="flex flex-wrap items-baseline justify-between gap-2">
         <h2
@@ -371,7 +371,7 @@
           type="button"
           onclick={() => void submitBlock()}
           disabled={!canSubmit || submitting}
-          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
         >
           {block.phase === 'running'
             ? 'Simulating block…'
@@ -379,7 +379,7 @@
               ? 'Preparing block…'
               : 'Lock rotation and simulate block'}
         </button>
-        <p class="font-mono text-[10px] text-muted-foreground">
+        <p class="hidden font-mono text-[10px] text-muted-foreground sm:block">
           Rejections are typed: stale cursor, duplicate command, invalid rotations, non-boundary
           block, or run mismatch. Nothing is persisted until the checkpoint passes validation.
         </p>
@@ -395,21 +395,21 @@
 
     <!-- 3. Recent recap affordance -->
     {#if recentBlocks.length > 0}
-      <section aria-labelledby="recent-recaps-heading">
+      <section aria-labelledby="recent-recaps-heading" class="px-3 sm:px-0">
         <h2
           id="recent-recaps-heading"
           class="font-display text-base font-extrabold uppercase tracking-tight"
         >
           Recent checkpoints
         </h2>
-        <ul class="mt-2 flex flex-col gap-2">
+        <ul class="mt-2 flex flex-col gap-0 sm:gap-2">
           {#each recentBlocks as entry (entry.accepted.blockIndex)}
             <li>
               <a
                 href={resolve(
                   `/season/run/checkpoint/?block=${String(entry.accepted.blockIndex)}` as RouteId,
                 )}
-                class="flex items-center justify-between gap-3 rounded-xl bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2"
+                class="flex items-center justify-between gap-3 bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:rounded-xl"
               >
                 <span class="font-mono text-[10px] font-bold uppercase text-primary">
                   Block {entry.accepted.blockIndex + 1} of 9

@@ -48,15 +48,15 @@
 {#if !shell.ready || !shell.snapshot || !shell.run || !manifest}
   <p class="py-10 font-mono text-sm text-muted-foreground">Preparing the leaders…</p>
 {:else}
-  <section aria-labelledby="leaders-heading" class="pt-6">
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div>
+  <section aria-labelledby="leaders-heading" class="min-w-0 pt-6">
+    <div class="flex flex-col gap-3 px-3 sm:px-0">
+      <div class="min-w-0">
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
           Season Run · leaders
         </p>
         <h1
           id="leaders-heading"
-          class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase"
+          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
         >
           Leaders
         </h1>

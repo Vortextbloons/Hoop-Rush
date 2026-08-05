@@ -153,16 +153,16 @@
   }
 </script>
 
-<div class="flex flex-col gap-4">
-  <div class="flex flex-wrap items-center justify-between gap-3">
+<div class="flex min-w-0 flex-col gap-4">
+  <div class="flex flex-col gap-3">
     <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Rotation</h2>
-    <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Minute presets">
+    <div class="grid grid-cols-3 gap-2" role="group" aria-label="Minute presets">
       {#each ROTATION_PRESETS as preset (preset)}
         <button
           type="button"
           onclick={() => applyPreset(preset)}
           {disabled}
-          class="min-h-11 rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 md:min-h-0"
+          class="min-h-11 rounded-lg bg-surface-2 px-2 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm md:min-h-0"
         >
           {presetLabel(preset)}
         </button>
@@ -170,7 +170,7 @@
     </div>
   </div>
 
-  <p class="text-sm text-muted-foreground">
+  <p class="text-sm break-words text-muted-foreground">
     Target minutes total <strong class="text-foreground">{minutesTotal}</strong> of 240. Starters are
     ordered G, G, F, F, C; the closing five is an independent legal five.
   </p>
@@ -193,7 +193,10 @@
   {/if}
 
   <!-- Mobile: compact player rows -->
-  <section aria-labelledby="compact-rows-heading" class="rounded-xl bg-surface-1 p-3 md:hidden">
+  <section
+    aria-labelledby="compact-rows-heading"
+    class="min-w-0 overflow-hidden rounded-none bg-surface-1 p-3 md:hidden md:rounded-xl"
+  >
     <h3
       id="compact-rows-heading"
       class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
@@ -205,8 +208,8 @@
         {@const rowFailures = failureIndex.byPlayer.get(row.member.playerVersionId) ?? null}
         {@const closingSlot = editor.rotation.closingFive.indexOf(row.member.playerVersionId)}
         {@const inClosing = closingSlot !== -1}
-        <li class="py-2">
-          <div class="flex items-center gap-3">
+        <li class="py-3">
+          <div class="flex min-w-0 items-center gap-3">
             {#if manifest !== null}
               {#if faceOf(row.member.playerVersionId) !== null}
                 <SeasonPlayerFace face={faceOf(row.member.playerVersionId)!} {manifest} size="sm" />
@@ -221,11 +224,13 @@
             {/if}
             <div class="min-w-0 flex-1">
               <p class="truncate text-sm font-semibold">{row.member.displayName}</p>
-              <p class="font-mono text-[10px] text-muted-foreground">
+              <p class="truncate font-mono text-[10px] text-muted-foreground">
                 {row.role}
                 {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
               </p>
             </div>
+          </div>
+          <div class="mt-2 flex items-center justify-between gap-2 pl-12">
             <button
               type="button"
               aria-pressed={inClosing}
@@ -234,11 +239,11 @@
                 : `Add ${row.member.displayName} to the closing five`}
               onclick={() => toggleClosing(row.member.playerVersionId)}
               {disabled}
-              class="min-h-11 min-w-11 shrink-0 rounded-lg px-2.5 font-mono text-[10px] font-bold uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 {inClosing
+              class="min-h-11 shrink-0 rounded-lg px-3 font-mono text-[10px] font-bold uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 {inClosing
                 ? 'bg-accent/15 text-accent'
                 : 'bg-surface-2 text-muted-foreground hover:bg-surface-3'}"
             >
-              {inClosing ? `Close ${slotLabel(closingSlot)}` : 'Close'}
+              {inClosing ? `Closing ${slotLabel(closingSlot)}` : '+ Closing'}
             </button>
             <div
               class="flex shrink-0 items-center gap-1"
@@ -254,7 +259,10 @@
               >
                 −
               </button>
-              <output class="w-10 text-center font-mono text-sm font-bold" aria-live="polite">
+              <output
+                class="w-10 text-center font-mono text-sm font-bold tabular-nums"
+                aria-live="polite"
+              >
                 {row.minutes}
               </output>
               <button

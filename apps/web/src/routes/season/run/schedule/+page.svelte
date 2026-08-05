@@ -108,15 +108,15 @@
 {#if !shell.ready || !shell.snapshot || !shell.run || !humanFranchiseId || !manifest}
   <p class="py-10 font-mono text-sm text-muted-foreground">Preparing the schedule…</p>
 {:else}
-  <section aria-labelledby="schedule-heading" class="pt-6">
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div>
+  <section aria-labelledby="schedule-heading" class="min-w-0 pt-6">
+    <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
+      <div class="min-w-0">
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
           Season Run · schedule
         </p>
         <h1
           id="schedule-heading"
-          class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase"
+          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
         >
           Schedule
         </h1>
@@ -124,7 +124,11 @@
           {playedCount} of 82 played · nine checkpoints
         </p>
       </div>
-      <div role="group" aria-label="Schedule filter" class="flex rounded-lg bg-surface-2 p-1">
+      <div
+        role="group"
+        aria-label="Schedule filter"
+        class="flex shrink-0 self-start rounded-lg bg-surface-2 p-1"
+      >
         {#each FILTERS as item (item.value)}
           <button
             type="button"
@@ -151,7 +155,7 @@
       <div class="mt-6 flex flex-col gap-8">
         {#each filteredGroups as group (group.blockIndex)}
           <section aria-labelledby={`schedule-block-${group.blockIndex}-heading`}>
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 sm:px-0">
               <h2
                 id={`schedule-block-${group.blockIndex}-heading`}
                 class="font-display text-lg font-extrabold tracking-tight uppercase"
@@ -174,12 +178,14 @@
             </div>
 
             <!-- Mobile: one card per game; completed games expand to a box score -->
-            <ul class="mt-2 flex flex-col gap-2 md:hidden">
+            <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
               {#each group.rows as row (row.gameId)}
                 {@const box = boxFor(row)}
-                <li data-season-schedule-row class="rounded-xl bg-surface-1">
-                  <div class="flex items-center gap-3 px-4 py-3">
-                    <span class="w-9 shrink-0 font-mono text-[10px] text-muted-foreground">
+                <li data-season-schedule-row class="overflow-hidden bg-surface-1 md:rounded-xl">
+                  <div
+                    class="grid grid-cols-[2rem_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 sm:gap-x-3 sm:px-4"
+                  >
+                    <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
                       R{row.round}
                     </span>
                     {#if identityOf(row.opponentFranchiseId)}
@@ -190,39 +196,40 @@
                         alt={`${shell.franchiseName(row.opponentFranchiseId)} logo`}
                         size="sm"
                       />
+                    {:else}
+                      <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
                     {/if}
-                    <span class="min-w-0 flex-1">
+                    <p class="min-w-0 text-sm font-semibold leading-tight">
                       <span
-                        class="mr-1.5 inline-flex rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+                        class="mr-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                       >
                         {row.humanIsHome ? 'vs' : 'at'}
                       </span>
-                      <span class="truncate font-semibold">
-                        {shell.franchiseName(row.opponentFranchiseId)}
-                      </span>
-                    </span>
-                    <span class="shrink-0 text-right">
+                      <span class="break-words">{shell.franchiseName(row.opponentFranchiseId)}</span
+                      >
+                    </p>
+                    <div class="shrink-0 pl-1 text-right tabular-nums">
                       {#if row.won === null}
                         <span class="font-mono text-[10px] text-muted-foreground">scheduled</span>
                       {:else}
                         <span
-                          class="block font-mono text-sm font-bold {row.won
+                          class="block font-mono text-sm font-bold leading-none {row.won
                             ? 'text-primary'
                             : 'text-muted-foreground'}"
                         >
                           {row.won ? 'W' : 'L'}
                         </span>
-                        <span class="block font-mono text-[10px]">
+                        <span class="mt-0.5 block font-mono text-[10px] leading-none">
                           {row.humanScore}–{row.opponentScore}
                           {#if row.forfeit}· forfeit{/if}
                         </span>
                       {/if}
-                    </span>
+                    </div>
                   </div>
                   {#if box}
                     <details class="group border-t border-border/50">
                       <summary
-                        class="cursor-pointer px-4 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
+                        class="cursor-pointer px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring md:px-4 [&::-webkit-details-marker]:hidden"
                       >
                         Box score
                       </summary>
@@ -308,7 +315,7 @@
       </div>
     {/if}
 
-    <p class="mt-6 font-mono text-[10px] text-muted-foreground">
+    <p class="mt-6 px-3 font-mono text-[10px] text-muted-foreground sm:px-0">
       Results come from accepted checkpoints; scheduled games carry no prediction.
     </p>
   </section>

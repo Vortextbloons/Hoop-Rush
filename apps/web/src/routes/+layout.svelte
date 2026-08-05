@@ -41,7 +41,7 @@
 <ModeWatcher />
 
 <header class="border-b border-border/70">
-  <div class="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+  <div class="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-3 sm:px-6">
     <a
       href={homeHref}
       class="flex items-center gap-2.5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -79,7 +79,7 @@
   </div>
 </header>
 
-<main>
+<main class="min-w-0 overflow-x-hidden">
   {@render children()}
 </main>
 

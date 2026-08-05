@@ -74,13 +74,13 @@
   <section aria-labelledby={`standings-${section.title.toLowerCase()}-heading`}>
     <h3
       id={`standings-${section.title.toLowerCase()}-heading`}
-      class="font-display text-sm font-extrabold uppercase tracking-tight"
+      class="font-display px-3 text-sm font-extrabold uppercase tracking-tight sm:px-0"
     >
       {section.title} · provisional
     </h3>
 
     <!-- Mobile: ranked team cards with expandable splits -->
-    <ul class="mt-2 flex flex-col gap-2 md:hidden">
+    <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
       {#each section.entries as entry (entry.row.franchiseId)}
         {@const row = entry.row}
         {@const isHuman = row.franchiseId === humanFranchiseId}
@@ -89,9 +89,13 @@
         <li
           data-season-standings-row
           aria-label={isHuman ? `${franchiseName(row.franchiseId)} (your team)` : undefined}
-          class="rounded-xl bg-surface-1 {isHuman ? 'ring-1 ring-primary/40' : ''}"
+          class="overflow-hidden bg-surface-1 sm:rounded-xl {isHuman
+            ? 'ring-1 ring-primary/40'
+            : ''}"
         >
-          <div class="flex items-center gap-3 px-4 py-3">
+          <div
+            class="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 sm:gap-x-3 sm:px-4"
+          >
             <span class="w-7 shrink-0 font-mono text-[10px] font-bold text-muted-foreground">
               {ordinal(entry.rank)}
             </span>
@@ -103,12 +107,14 @@
                 alt=""
                 size="sm"
               />
+            {:else}
+              <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
             {/if}
-            <span class="min-w-0 flex-1 truncate font-semibold">
+            <span class="min-w-0 truncate font-semibold">
               {franchiseName(row.franchiseId)}
               {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
             </span>
-            <span class="shrink-0 text-right">
+            <span class="shrink-0 text-right tabular-nums">
               <span class="block font-mono text-xs font-bold">
                 {recordLabel(row.wins, row.losses)}
               </span>

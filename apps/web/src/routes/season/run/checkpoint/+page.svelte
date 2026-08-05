@@ -230,7 +230,7 @@
     aria-labelledby="checkpoint-heading"
     class="pt-6"
   >
-    <div class="flex items-end justify-between gap-4">
+    <div class="flex items-end justify-between gap-4 px-3 sm:px-0">
       <div>
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
           Season Run · checkpoint
@@ -269,15 +269,15 @@
         <section aria-labelledby="checkpoint-boxes-heading">
           <h2
             id="checkpoint-boxes-heading"
-            class="font-display text-xl font-extrabold tracking-tight uppercase"
+            class="font-display px-3 text-xl font-extrabold tracking-tight uppercase sm:px-0"
           >
             Box scores · your games
           </h2>
-          <div class="mt-3 flex flex-col gap-3">
+          <div class="mt-3 flex flex-col gap-0 sm:gap-3">
             {#each humanGames as summary (summary.gameId)}
               {@const box = boxFor(summary)}
               {@const opponentId = opponentOf(summary)}
-              <details class="group rounded-xl bg-surface-1 open:ring-1 open:ring-ring/30">
+              <details class="group bg-surface-1 open:ring-1 open:ring-ring/30 sm:rounded-xl">
                 <summary
                   class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
                 >
@@ -336,7 +336,7 @@
       {/if}
 
       {#if acceptedBlock}
-        <p class="font-mono text-[10px] text-muted-foreground">
+        <p class="px-3 font-mono text-[10px] text-muted-foreground sm:px-0">
           run {run.runId} · block {acceptedBlock.blockIndex} · revision {acceptedBlock.revision} · checkpoint
           {acceptedBlock.checkpointDigest.slice(0, 10)}…
         </p>

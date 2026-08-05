@@ -80,7 +80,7 @@
 <section
   data-season-leaders-category={category}
   aria-labelledby={`leaders-${category}-heading`}
-  class="flex flex-col rounded-xl bg-surface-1"
+  class="flex flex-col rounded-none bg-surface-1 md:rounded-xl"
 >
   <h3
     id={`leaders-${category}-heading`}

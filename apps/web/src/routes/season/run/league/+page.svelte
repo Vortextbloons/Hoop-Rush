@@ -105,15 +105,15 @@
 {#if !shell.ready || !shell.snapshot || !run || !humanFranchiseId || !manifest}
   <p class="py-10 font-mono text-sm text-muted-foreground">Preparing the league…</p>
 {:else}
-  <section aria-labelledby="league-heading" class="pt-6">
-    <div class="flex flex-wrap items-end justify-between gap-3">
-      <div>
+  <section aria-labelledby="league-heading" class="min-w-0 pt-6">
+    <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
+      <div class="min-w-0">
         <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">
           Season Run · league
         </p>
         <h1
           id="league-heading"
-          class="font-display mt-1 text-3xl font-extrabold tracking-tight uppercase"
+          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
         >
           League
         </h1>
@@ -124,7 +124,7 @@
           team games accepted{shell.seasonComplete ? ' (final)' : ''}
         </p>
       </div>
-      <div class="flex flex-col items-end gap-2">
+      <div class="flex shrink-0 flex-col items-start gap-2 sm:items-end">
         <div role="group" aria-label="League view" class="flex rounded-lg bg-surface-2 p-1">
           <button
             type="button"
@@ -205,7 +205,7 @@
         </p>
       {:else}
         <!-- Mobile: per-team stat cards -->
-        <ul class="mt-6 flex flex-col gap-2 md:hidden">
+        <ul class="mt-6 flex flex-col gap-0 md:hidden md:gap-2">
           {#each teamStats as team (team.franchiseId)}
             {@const isHuman = team.franchiseId === humanFranchiseId}
             {@const identity = identityOf(team.franchiseId)}
@@ -214,9 +214,11 @@
               aria-label={isHuman
                 ? `${shell.franchiseName(team.franchiseId)} (your team)`
                 : undefined}
-              class="rounded-xl bg-surface-1 px-4 py-3 {isHuman ? 'ring-1 ring-primary/40' : ''}"
+              class="overflow-hidden bg-surface-1 px-3 py-3 sm:rounded-xl sm:px-4 {isHuman
+                ? 'ring-1 ring-primary/40'
+                : ''}"
             >
-              <div class="flex items-center gap-3">
+              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2">
                 {#if identity}
                   <SeasonTeamLogo
                     {manifest}
@@ -225,8 +227,10 @@
                     alt=""
                     size="sm"
                   />
+                {:else}
+                  <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
                 {/if}
-                <span class="min-w-0 flex-1 truncate font-semibold">
+                <span class="min-w-0 truncate font-semibold">
                   {shell.franchiseName(team.franchiseId)}
                   {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
                 </span>

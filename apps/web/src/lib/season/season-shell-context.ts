@@ -62,6 +62,8 @@ export interface SeasonRunShellData {
   cancelBlock: () => void;
   retryBlock: () => void;
   refresh: () => Promise<void>;
+  /** Ends the current run and clears it from this browser. */
+  quitRun: () => Promise<{ ok: boolean; error: string | null }>;
 }
 
 /** Initial (empty) shell object; the layout turns it into `$state`. */
@@ -103,5 +105,6 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     cancelBlock: () => undefined,
     retryBlock: () => undefined,
     refresh: () => Promise.resolve(),
+    quitRun: () => Promise.resolve({ ok: false, error: 'season shell not ready' }),
   };
 }

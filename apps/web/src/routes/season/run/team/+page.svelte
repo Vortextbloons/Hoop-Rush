@@ -43,20 +43,20 @@
   <title>Season Run — Team — Hoop Rush</title>
 </svelte:head>
 
-<div class="flex flex-col gap-6 pt-6">
+<div class="flex min-w-0 flex-col gap-6 pt-6">
   {#if roster === null || run === null || humanFranchiseId === null}
-    <p class="font-mono text-sm text-muted-foreground">Loading the roster…</p>
+    <p class="px-3 font-mono text-sm text-muted-foreground sm:px-0">Loading the roster…</p>
   {:else}
-    <div class="grid gap-6 lg:grid-cols-5">
+    <div class="grid min-w-0 gap-6 lg:grid-cols-5">
       <!-- 1. Roster section -->
-      <section aria-labelledby="roster-heading" class="lg:col-span-2">
+      <section aria-labelledby="roster-heading" class="min-w-0 lg:col-span-2">
         <h2
           id="roster-heading"
-          class="font-display text-base font-extrabold uppercase tracking-tight"
+          class="font-display px-3 text-base font-extrabold uppercase tracking-tight sm:px-0"
         >
           Roster
         </h2>
-        <ul class="mt-3 flex flex-col gap-2">
+        <ul class="mt-3 flex flex-col gap-0 sm:gap-2">
           {#each roster.players as entry (entry.playerVersionId)}
             {@const face = shell.facesByVersion.get(entry.playerVersionId) ?? null}
             {@const eraIdentity =
@@ -64,8 +64,8 @@
             {@const modernIdentity =
               manifest !== null ? franchiseIdentityOf(manifest, entry.franchiseId) : null}
             {@const row = rowOf(entry.playerVersionId)}
-            <li class="rounded-xl bg-surface-1 p-3">
-              <div class="flex items-center gap-3">
+            <li class="overflow-hidden bg-surface-1 p-3 sm:rounded-xl">
+              <div class="flex min-w-0 items-start gap-3">
                 {#if manifest !== null && face !== null}
                   <SeasonPlayerFace {face} {manifest} size="sm" />
                 {:else}
@@ -84,6 +84,13 @@
                       · {shell.playablePositions(entry.playerVersionId).join('/')}
                     {/if}
                   </p>
+                  {#if eraIdentity?.displayLabel}
+                    <p
+                      class="mt-1 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
+                    >
+                      {eraIdentity.displayLabel}
+                    </p>
+                  {/if}
                 </div>
                 <div class="flex shrink-0 flex-col items-end gap-1">
                   {#if manifest !== null}
@@ -96,26 +103,21 @@
                       alt={eraIdentity?.displayLabel ?? modernIdentity?.displayName ?? ''}
                     />
                   {/if}
-                  <span class="font-mono text-[10px] text-muted-foreground">
+                  <span class="whitespace-nowrap font-mono text-[10px] text-muted-foreground">
                     {row?.role ?? '—'} · {row?.minutes ?? '—'} min
                   </span>
                 </div>
               </div>
-              {#if eraIdentity?.displayLabel}
-                <p class="mt-1 truncate font-mono text-[9px] text-muted-foreground/70">
-                  {eraIdentity.displayLabel}
-                </p>
-              {/if}
             </li>
           {/each}
         </ul>
       </section>
 
       <!-- 2. Rotation workspace -->
-      <section aria-labelledby="workspace-heading" class="lg:col-span-3">
+      <section aria-labelledby="workspace-heading" class="min-w-0 lg:col-span-3">
         <h2
           id="workspace-heading"
-          class="font-display text-base font-extrabold uppercase tracking-tight"
+          class="font-display px-3 text-base font-extrabold uppercase tracking-tight sm:px-0"
         >
           Rotation workspace
         </h2>
@@ -137,11 +139,13 @@
         </div>
 
         <!-- Sticky action bar: validation state + simulate shortcut -->
-        <div class="sticky bottom-20 z-20 mt-6 md:bottom-4">
+        <div
+          class="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 px-3 sm:bottom-4 sm:px-0"
+        >
           <div
-            class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-1/95 p-3 shadow-2xl shadow-black/30 backdrop-blur supports-[backdrop-filter]:bg-surface-1/85"
+            class="flex flex-col gap-3 rounded-none border border-border bg-surface-1 p-3 shadow-2xl shadow-black/40 backdrop-blur supports-[backdrop-filter]:bg-surface-1/95 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:rounded-xl"
           >
-            <p class="text-sm" aria-live="polite">
+            <p class="min-w-0 text-sm" aria-live="polite">
               {#if failures.length === 0}
                 <span class="font-semibold text-positive">Rotation valid</span>
                 <span class="ml-2 hidden text-muted-foreground sm:inline">
@@ -156,7 +160,7 @@
             <a
               href={resolve('/season/run')}
               aria-disabled={failures.length > 0 ? 'true' : undefined}
-              class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 {failures.length >
+              class="inline-flex w-full min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-primary/60 bg-surface-2 px-4 py-2.5 text-sm font-semibold text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-primary hover:bg-surface-3 sm:w-auto sm:border-transparent sm:bg-primary sm:px-5 sm:text-primary-foreground sm:hover:opacity-90 {failures.length >
               0
                 ? 'pointer-events-none opacity-40'
                 : ''}"
