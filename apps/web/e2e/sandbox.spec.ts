@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openPlayerPicker as pickPlayer } from './player-helpers';
+import { placeAtSlot } from './player-helpers';
 
 /**
  * Sandbox draft journey (spec/01): the draft browses the global players index
@@ -18,31 +18,11 @@ test.describe('sandbox draft journey', () => {
       await expect(page.getByText(/players . sorted by OVER/)).toBeVisible();
 
       // Each pool pick opens a position popup; the player lands in the chosen slot.
-      await pickPlayer(page, 'Nick Van Exel');
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await page
-        .getByRole('button', { name: 'Place Nick Van Exel at Point Guard slot 1', exact: true })
-        .click();
-
-      await pickPlayer(page, 'Magic Johnson');
-      await page
-        .getByRole('button', { name: 'Place Magic Johnson at Shooting Guard slot 2', exact: true })
-        .click();
-
-      await pickPlayer(page, 'Kobe Bryant');
-      await page
-        .getByRole('button', { name: 'Place Kobe Bryant at Small Forward slot 3', exact: true })
-        .click();
-
-      await pickPlayer(page, 'James Worthy');
-      await page
-        .getByRole('button', { name: 'Place James Worthy at Power Forward slot 4', exact: true })
-        .click();
-
-      await pickPlayer(page, "Shaquille O'Neal");
-      await page
-        .getByRole('button', { name: "Place Shaquille O'Neal at Center slot 5", exact: true })
-        .click();
+      await placeAtSlot(page, 'Nick Van Exel', 'Point Guard slot 1');
+      await placeAtSlot(page, 'Magic Johnson', 'Shooting Guard slot 2');
+      await placeAtSlot(page, 'Kobe Bryant', 'Small Forward slot 3');
+      await placeAtSlot(page, 'James Worthy', 'Power Forward slot 4');
+      await placeAtSlot(page, "Shaquille O'Neal", 'Center slot 5');
 
       await expect(page.getByText('5/5', { exact: true })).toBeVisible();
       await expect(page.getByText('Lineup ready.')).toBeVisible();
@@ -56,22 +36,10 @@ test.describe('sandbox draft journey', () => {
   test('displaces a movable incumbent to fit a better player', async ({ page }) => {
     await page.goto('/sandbox');
 
-    await pickPlayer(page, 'Nick Van Exel');
-    await page
-      .getByRole('button', { name: 'Place Nick Van Exel at Point Guard slot 1', exact: true })
-      .click();
-    await pickPlayer(page, 'Magic Johnson');
-    await page
-      .getByRole('button', { name: 'Place Magic Johnson at Shooting Guard slot 2', exact: true })
-      .click();
-    await pickPlayer(page, 'James Worthy');
-    await page
-      .getByRole('button', { name: 'Place James Worthy at Small Forward slot 3', exact: true })
-      .click();
-    await pickPlayer(page, 'Travis Knight');
-    await page
-      .getByRole('button', { name: 'Place Travis Knight at Center slot 5', exact: true })
-      .click();
+    await placeAtSlot(page, 'Nick Van Exel', 'Point Guard slot 1');
+    await placeAtSlot(page, 'Magic Johnson', 'Shooting Guard slot 2');
+    await placeAtSlot(page, 'James Worthy', 'Small Forward slot 3');
+    await placeAtSlot(page, 'Travis Knight', 'Center slot 5');
 
     // Shaq's card is highlighted: he can take over center by moving Knight (C/F).
     const search = page.getByRole('searchbox', { name: 'Search players by name' });
@@ -93,10 +61,7 @@ test.describe('sandbox draft journey', () => {
   test('moves a drafted player between positions they can play', async ({ page }) => {
     await page.goto('/sandbox');
 
-    await pickPlayer(page, 'Kobe Bryant');
-    await page
-      .getByRole('button', { name: 'Place Kobe Bryant at Point Guard slot 1', exact: true })
-      .click();
+    await placeAtSlot(page, 'Kobe Bryant', 'Point Guard slot 1');
 
     // Kobe (G/F) can slide to a forward slot from the lineup panel.
     await page.getByRole('button', { name: /Move Kobe Bryant to another position/ }).click();
@@ -117,26 +82,11 @@ test.describe('sandbox draft journey', () => {
   test('mixes players from different franchises and decades in one lineup', async ({ page }) => {
     await page.goto('/sandbox');
 
-    await pickPlayer(page, 'Michael Jordan');
-    await page
-      .getByRole('button', { name: 'Place Michael Jordan at Point Guard slot 1', exact: true })
-      .click();
-    await pickPlayer(page, 'LeBron James');
-    await page
-      .getByRole('button', { name: 'Place LeBron James at Small Forward slot 3', exact: true })
-      .click();
-    await pickPlayer(page, 'B.J. Armstrong');
-    await page
-      .getByRole('button', { name: 'Place B.J. Armstrong at Shooting Guard slot 2', exact: true })
-      .click();
-    await pickPlayer(page, 'Dennis Rodman');
-    await page
-      .getByRole('button', { name: 'Place Dennis Rodman at Power Forward slot 4', exact: true })
-      .click();
-    await pickPlayer(page, 'Timofey Mozgov');
-    await page
-      .getByRole('button', { name: 'Place Timofey Mozgov at Center slot 5', exact: true })
-      .click();
+    await placeAtSlot(page, 'Michael Jordan', 'Point Guard slot 1');
+    await placeAtSlot(page, 'LeBron James', 'Small Forward slot 3');
+    await placeAtSlot(page, 'B.J. Armstrong', 'Shooting Guard slot 2');
+    await placeAtSlot(page, 'Dennis Rodman', 'Power Forward slot 4');
+    await placeAtSlot(page, 'Timofey Mozgov', 'Center slot 5');
 
     await expect(page.getByText('5/5', { exact: true })).toBeVisible();
     await expect(page.getByText('Lineup ready.')).toBeVisible();
@@ -179,11 +129,7 @@ test.describe('sandbox draft journey', () => {
     await expect(bar).toBeVisible();
     await expect(page.getByText('Picked 0 of 5')).toBeVisible();
 
-    await pickPlayer(page, "Shaquille O'Neal");
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await page
-      .getByRole('button', { name: "Place Shaquille O'Neal at Center slot 5", exact: true })
-      .click();
+    await placeAtSlot(page, "Shaquille O'Neal", 'Center slot 5');
     await expect(page.getByText('Picked 1 of 5')).toBeVisible();
 
     await bar.click();

@@ -117,6 +117,14 @@ export {
   type SeasonAiGenerationInput,
 } from './season/draft.ts';
 export {
+  drawGlobalOffer,
+  selectionKeepsFeasibility,
+  remainingCandidates,
+  offerSeedPath,
+  SEASON_DRAFT_COVERAGE_REASON,
+  type SeasonOfferDrawResult,
+} from './season/draft-offers.ts';
+export {
   SOLO_BAND_QUOTAS,
   DUO_BAND_QUOTAS,
   AI_GENERATION_NODE_BUDGET,

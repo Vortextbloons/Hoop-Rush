@@ -14,7 +14,6 @@ import {
   foldSeasonAggregates,
   franchiseStreak,
   humanScheduleRows,
-  leaderTables,
   ordinal,
   provisionalRanking,
   rebaseStandingsBefore,
@@ -265,32 +264,6 @@ describe('foldSeasonAggregates', () => {
     expect(celtics.wins).toBe(1);
     expect(lakers.points).toBe(0);
     expect(players).toHaveLength(0);
-  });
-});
-
-describe('leaderTables', () => {
-  it('applies the game-share eligibility and depth-5 limit', () => {
-    const { players } = foldSeasonAggregates([
-      summary({ gameId: 's000001', round: 1 }),
-      summary({ gameId: 's000002', round: 2 }),
-    ]);
-    // Two games played; the 0.7 share of 2 games floor means 2 games required,
-    // so nobody qualifies with 1-2 games in this fold — assert shape instead.
-    const teams = foldSeasonAggregates([
-      summary({ gameId: 's000001', round: 1 }),
-      summary({ gameId: 's000002', round: 2 }),
-    ]).teams;
-    const tables = leaderTables(players, teams);
-    for (const category of [
-      'points',
-      'rebounds',
-      'assists',
-      'steals',
-      'blocks',
-      'threePointersMade',
-    ] as const) {
-      expect(tables[category].length).toBeLessThanOrEqual(5);
-    }
   });
 });
 

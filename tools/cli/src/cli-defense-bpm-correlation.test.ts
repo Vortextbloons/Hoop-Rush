@@ -4,7 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { buildManifest, buildPlayerSeason, buildPool } from '@hoop-rush/test-fixtures';
 import { pearsonCorrelation } from './commands/data-defense-bpm-correlation.ts';
 import { defenseBpmCorrelationReportSchema } from './report-schemas.ts';
-import { jsonPayload, runCli, TMP } from './cli-test-helpers.ts';
+import {
+  expectExit2CleanManifestReport,
+  jsonPayload,
+  runCli,
+  withTmpDir,
+} from './cli-test-helpers.ts';
 
 /**
  * CLI integration tests for `data defense-bpm-correlation` (spec: defensive
@@ -31,7 +36,7 @@ interface FixtureRow {
  * Provenance maps are stripped so the 1000+ row fixture stays small; the
  * schema accepts empty maps.
  */
-function writeDefenseFixture(subdir: string, count: number): string {
+function writeDefenseFixture(dataRoot: string, count: number): string {
   const rows: FixtureRow[] = Array.from({ length: count }, (_, i) => {
     const defense = 40 + (i % 51);
     const noise = (((i * 2654435761) % 2001) - 1000) / 1000;
@@ -41,7 +46,7 @@ function writeDefenseFixture(subdir: string, count: number): string {
       bpm: 0.5 * defense - 20 + 15 * noise,
     };
   });
-  const dataDir = join(TMP, subdir, 'apps/web/static/data');
+  const dataDir = join(dataRoot, 'apps/web/static/data');
   mkdirSync(join(dataDir, 'pools'), { recursive: true });
   writeFileSync(
     join(dataDir, 'pools', 'lakers-1990s.json'),
@@ -78,7 +83,7 @@ function writeDefenseFixture(subdir: string, count: number): string {
       }),
     ),
   );
-  const rawDir = join(TMP, subdir, 'raw-data', 'nba', SEASON_KEY);
+  const rawDir = join(dataRoot, 'raw-data', 'nba', SEASON_KEY);
   mkdirSync(rawDir, { recursive: true });
   writeFileSync(
     join(rawDir, 'season-stats.json'),
@@ -116,68 +121,58 @@ describe('pearsonCorrelation', () => {
 
 describe('cli: data defense-bpm-correlation', () => {
   it('passes when the sample clears the gate and r stays at or below 0.92', async () => {
-    const manifestPath = writeDefenseFixture('defense-pass', 1050);
-    const { code, stdout } = await runCli([
-      'data',
-      'defense-bpm-correlation',
-      '--input',
-      manifestPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = defenseBpmCorrelationReportSchema.parse(jsonPayload(stdout));
-    expect(payload.pass).toBe(true);
-    expect(payload.totalRows).toBe(1050);
-    expect(payload.sample).toBeGreaterThanOrEqual(1000);
-    expect(payload.excluded).toBe(0);
-    expect(payload.correlation).not.toBeNull();
-    expect(payload.correlation).toBeGreaterThan(0);
-    expect(payload.correlation).toBeLessThanOrEqual(0.92);
-    expect(payload.perEra).toEqual([
-      { eraId: '1990s', sample: 1050, correlation: payload.correlation },
-    ]);
+    await withTmpDir(async (tmp) => {
+      const manifestPath = writeDefenseFixture(tmp, 1050);
+      const { code, stdout } = await runCli([
+        'data',
+        'defense-bpm-correlation',
+        '--input',
+        manifestPath,
+        '--format',
+        'json',
+      ]);
+      expect(code).toBe(0);
+      const payload = defenseBpmCorrelationReportSchema.parse(jsonPayload(stdout));
+      expect(payload.pass).toBe(true);
+      expect(payload.totalRows).toBe(1050);
+      expect(payload.sample).toBeGreaterThanOrEqual(1000);
+      expect(payload.excluded).toBe(0);
+      expect(payload.correlation).not.toBeNull();
+      expect(payload.correlation).toBeGreaterThan(0);
+      expect(payload.correlation).toBeLessThanOrEqual(0.92);
+      expect(payload.perEra).toEqual([
+        { eraId: '1990s', sample: 1050, correlation: payload.correlation },
+      ]);
+    });
   });
 
   it('fails with a sample-gate failure when fewer than 1000 rows match', async () => {
-    const manifestPath = writeDefenseFixture('defense-gate', 8);
-    const { code, stderr } = await runCli([
-      'data',
-      'defense-bpm-correlation',
-      '--input',
-      manifestPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(1);
-    expect(stderr).not.toMatch(/^\s+at /m);
-    expect(stderr).toContain('1000-row gate');
-    const payload = defenseBpmCorrelationReportSchema.parse(jsonPayload('', stderr));
-    expect(payload.pass).toBe(false);
-    expect(payload.totalRows).toBe(8);
-    expect(payload.sample).toBe(8);
+    await withTmpDir(async (tmp) => {
+      const manifestPath = writeDefenseFixture(tmp, 8);
+      const { code, stderr } = await runCli([
+        'data',
+        'defense-bpm-correlation',
+        '--input',
+        manifestPath,
+        '--format',
+        'json',
+      ]);
+      expect(code).toBe(1);
+      expect(stderr).not.toMatch(/^\s+at /m);
+      expect(stderr).toContain('1000-row gate');
+      const payload = defenseBpmCorrelationReportSchema.parse(jsonPayload('', stderr));
+      expect(payload.pass).toBe(false);
+      expect(payload.totalRows).toBe(8);
+      expect(payload.sample).toBe(8);
+    });
   });
 
   it('exits 2 with a clean report on an invalid manifest', async () => {
-    const dataDir = join(TMP, 'defense-invalid', 'apps/web/static/data');
-    mkdirSync(dataDir, { recursive: true });
-    const manifestPath = join(dataDir, 'manifest.json');
-    writeFileSync(manifestPath, JSON.stringify({ schemaVersion: 3, dataVersion: '' }));
-    const { code, stderr } = await runCli([
-      'data',
-      'defense-bpm-correlation',
-      '--input',
-      manifestPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(2);
-    expect(stderr).not.toMatch(/^\s+at /m);
-    const report = JSON.parse(stderr.slice(stderr.indexOf('{'))) as {
-      exitCode: number;
-      failures: string[];
-    };
-    expect(report.exitCode).toBe(2);
-    expect(report.failures[0]).toContain('manifest');
+    await withTmpDir((tmp) =>
+      expectExit2CleanManifestReport(
+        ['data', 'defense-bpm-correlation'],
+        join(tmp, 'apps/web/static/data'),
+      ),
+    );
   });
 });

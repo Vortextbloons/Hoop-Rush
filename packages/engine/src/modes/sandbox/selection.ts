@@ -67,25 +67,26 @@ export function chooseBestRun(runs: readonly ChallengeRun[]): ChallengeRun {
 }
 
 /**
- * Creates the run, simulates BEST_OF_ATTEMPTS complete seasons from derived
- * attempt seeds, and returns the chosen attempt's finished run. All attempts
- * always finish; the returned run is a normal accepted ChallengeRun whose
- * runSeed is the chosen attempt seed.
+ * Creates the run, simulates `attempts` complete seasons from derived attempt
+ * seeds (BEST_OF_ATTEMPTS by default), and returns the chosen attempt's
+ * finished run. All attempts always finish; the returned run is a normal
+ * accepted ChallengeRun whose runSeed is the chosen attempt seed.
  */
 export function simulateChallengeBestOf(
   creation: ChallengeCreation,
   profile: EraSimulationProfile,
   context: EngineContext,
+  attempts: number = BEST_OF_ATTEMPTS,
 ): ChallengeRun {
-  const attempts: ChallengeRun[] = [];
-  for (let attempt = 0; attempt < BEST_OF_ATTEMPTS; attempt += 1) {
+  const runs: ChallengeRun[] = [];
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     const attemptRun = createChallenge({
       ...creation,
       runSeed: deriveAttemptSeed(creation.runSeed, attempt),
     });
-    attempts.push(simulateChallenge(attemptRun, profile, context));
+    runs.push(simulateChallenge(attemptRun, profile, context));
   }
-  return chooseBestRun(attempts);
+  return chooseBestRun(runs);
 }
 
 export interface BestOfChoice {

@@ -1,26 +1,25 @@
 import { describe, expect, it } from 'vitest';
+import { simBatch } from './commands/sim.ts';
 import { simBatchReportSchema } from './report-schemas.ts';
 import { jsonPayload, runCli } from './cli-test-helpers.ts';
 
+/**
+ * Worker independence and seed-range additivity are pure functions of the
+ * (fixture, seed, profile) triple, so both behaviors are exercised in
+ * process through the authoritative `simBatch` command (the subprocess
+ * suite's slow path). One real CLI boot stays for the --workers plumbing.
+ */
 describe('cli: sim batch worker independence', () => {
   it('produces identical aggregates with 1 and 4 workers', async () => {
     const runWith = async (workers: string) => {
-      const { code, stdout } = await runCli([
-        'sim',
-        'batch',
-        '--fixture',
-        'equal',
-        '--seed-from',
-        '0',
-        '--seed-to',
-        '99',
-        '--workers',
+      const report = await simBatch({
+        fixture: 'equal',
+        'seed-from': '0',
+        'seed-to': '99',
         workers,
-        '--format',
-        'json',
-      ]);
-      expect(code).toBe(0);
-      return simBatchReportSchema.parse(jsonPayload(stdout));
+      });
+      expect(report.exitCode).toBe(0);
+      return simBatchReportSchema.parse(report.payload);
     };
     const single = await runWith('1');
     const many = await runWith('4');
@@ -33,46 +32,37 @@ describe('cli: sim batch worker independence', () => {
   });
 
   it('seed assignment depends only on the requested range', async () => {
-    const full = await (async () => {
-      const { code, stdout } = await runCli([
-        'sim',
-        'batch',
-        '--fixture',
-        'equal',
-        '--seed-from',
-        '0',
-        '--seed-to',
-        '49',
-        '--format',
-        'json',
-      ]);
-      expect(code).toBe(0);
-      return simBatchReportSchema.parse(jsonPayload(stdout));
-    })();
-    const halves = [];
-    for (const [from, to] of [
-      [0, 24],
-      [25, 49],
-    ] as const) {
-      const { code, stdout } = await runCli([
-        'sim',
-        'batch',
-        '--fixture',
-        'equal',
-        '--seed-from',
-        String(from),
-        '--seed-to',
-        String(to),
-        '--format',
-        'json',
-      ]);
-      expect(code).toBe(0);
-      halves.push(simBatchReportSchema.parse(jsonPayload(stdout)));
-    }
-    const firstHalf = halves[0];
-    const secondHalf = halves[1];
-    if (!firstHalf || !secondHalf) throw new Error('batch halves missing');
+    const run = async (from: string, to: string) => {
+      const report = await simBatch({ fixture: 'equal', 'seed-from': from, 'seed-to': to });
+      expect(report.exitCode).toBe(0);
+      return simBatchReportSchema.parse(report.payload);
+    };
+    const full = await run('0', '49');
+    const firstHalf = await run('0', '24');
+    const secondHalf = await run('25', '49');
     expect(firstHalf.homeWins + secondHalf.homeWins).toBe(full.homeWins);
     expect(firstHalf.awayWins + secondHalf.awayWins).toBe(full.awayWins);
+  });
+
+  it('forwards --workers through the real CLI plumbing', async () => {
+    const { code, stdout } = await runCli([
+      'sim',
+      'batch',
+      '--fixture',
+      'equal',
+      '--seed-from',
+      '0',
+      '--seed-to',
+      '24',
+      '--workers',
+      '4',
+      '--format',
+      'json',
+    ]);
+    expect(code).toBe(0);
+    const payload = simBatchReportSchema.parse(jsonPayload(stdout));
+    expect(payload.workers).toBe(4);
+    expect(payload.games).toBe(25);
+    expect(payload.homeWins + payload.awayWins).toBe(25);
   });
 });

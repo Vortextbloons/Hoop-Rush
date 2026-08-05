@@ -9,23 +9,29 @@
     SeasonDraftFlow,
     type SeasonDraftFlowState,
   } from '$lib/season/season-draft-flow';
+  import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
   import {
     loadSeasonDraftCatalog,
     loadSeasonLeague,
     loadSeasonSchedule,
   } from '$lib/season/season-assets';
-  import { getManifest } from '$lib/data';
+  import { getManifest, getPlayersIndex } from '$lib/data';
   import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
   import { getSeasonRunRepository } from '$lib/season/season-repo';
   import { seasonRootSeed } from '$lib/season/season-ids';
   import { buildSeasonRunFromGeneration, sha256Hex } from '$lib/season/season-run-builder';
 
   /**
-   * Season Run setup (spec/2.0/03, spec/2.0/07, M2.3): franchise roll facts,
-   * the ten-round turn-based draft board, deterministic invalid-roll recovery,
+   * Season Run setup (spec/2.0/03, spec/2.0/07, M2.3.5, season-draft-v2):
+   * seeded franchise assignment, the ten-round snake draft with one
+   * deterministic global eight-card offer per turn, coverage-safe selections,
    * draft resume, AI league generation progress, and promotion of the
    * completed draft to an active run. The board renders engine facts only;
    * every command flows through `SeasonDraftFlow` -> `applySeasonDraftCommand`.
+   *
+   * A stored legacy season-draft-v1 record (saveSchemaVersion 1) shows the
+   * explicit "Draft rules changed" recovery screen with a single
+   * discard-and-restart action — it is never auto-deleted.
    */
 
   let manifest = $state<HoopRushManifest | null>(null);
@@ -43,16 +49,36 @@
   let promoteError: string | null = $state(null);
   let resumeHref: string | null = $state(null);
   let hasDraft = $state(false);
+  /** True when the stored record is a legacy season-draft-v1 draft. */
+  let legacyStored = $state(false);
+  let faces = $state<Map<string, SeasonFaceRef>>(new Map());
 
   $effect(() => {
     if (!browser) return;
     let cancelled = false;
-    Promise.all([getManifest(), loadSeasonLeague(), loadSeasonDraftCatalog(), loadSeasonSchedule()])
-      .then(async ([m, seasonLeague, catalog, seasonSchedule]) => {
+    Promise.all([
+      getManifest(),
+      loadSeasonLeague(),
+      loadSeasonDraftCatalog(),
+      loadSeasonSchedule(),
+      getPlayersIndex(),
+    ])
+      .then(async ([m, seasonLeague, catalog, seasonSchedule, playersIndex]) => {
         if (cancelled) return;
         manifest = m;
         league = seasonLeague;
         schedule = seasonSchedule;
+        faces = buildVersionFaceIndex(
+          playersIndex.players,
+          catalog.candidates.map((candidate) => ({
+            playerVersionId: candidate.playerVersionId,
+            playerId: candidate.playerId,
+            franchiseId: candidate.franchiseId,
+            eraId: candidate.eraId,
+            seasonKey: candidate.seasonKey,
+            displayName: candidate.displayName,
+          })),
+        );
         flow = new SeasonDraftFlow(
           new DexieSeasonDraftRepository(),
           catalog,
@@ -60,13 +86,14 @@
         );
         board = flow.state();
         hasDraft = await flow.load();
+        legacyStored = flow.legacyStored;
         board = flow.state();
         // An active run takes precedence over the draft board.
         try {
           const repo = await getSeasonRunRepository();
           const index = await repo.loadActiveRunIndex();
           if (!cancelled && index) {
-            resumeHref = resolve('/season/league');
+            resumeHref = resolve('/season/run');
           }
         } catch {
           // Persistence is best-effort on setup; the board still works.
@@ -125,15 +152,8 @@
     }
   }
 
-  function onReveal() {
-    void runCommand(() => flow!.reveal());
-  }
-
-  function onClaim() {
-    const reveal = flow?.draft?.currentReveal;
-    const attempt = reveal?.attempts[reveal.attempts.length - 1];
-    if (!attempt) return;
-    void runCommand(() => flow!.claim('human', attempt.franchiseId, attempt.eraId));
+  function onDraw() {
+    void runCommand(() => flow!.draw());
   }
 
   function onPick(playerVersionId: string) {
@@ -159,6 +179,26 @@
     }
   }
 
+  /**
+   * Explicit legacy-draft discard: clears the stored season-draft-v1 record
+   * through the repository and returns to a fresh setup state. The user
+   * controls this action; the app never deletes the legacy record silently.
+   */
+  async function discardLegacy() {
+    if (!flow) return;
+    busy = true;
+    try {
+      await flow.discardLegacy();
+      legacyStored = false;
+      hasDraft = false;
+      started = false;
+      board = flow.state();
+      actionError = null;
+    } finally {
+      busy = false;
+    }
+  }
+
   /** Promotes the completed draft to an active run (atomic in the repo). */
   async function promote() {
     if (!flow || !flow.draft || !flow.generation || !schedule) return;
@@ -179,7 +219,7 @@
         generation: flow.generation,
       });
       await repo.promoteSeasonDraftToRun(stored, run);
-      void goto(resolve('/season/league'));
+      void goto(resolve('/season/run'));
     } catch (error) {
       promoteError = error instanceof Error ? error.message : String(error);
       promoting = false;
@@ -214,9 +254,9 @@
         Ten rounds. One league.
       </h1>
       <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-        Your franchise is rolled from the run seed. Each pick rolls a franchise and an era; a rolled
-        pool with no usable version is re-rolled deterministically. Claimed pools are exclusive
-        exact pairs.
+        Your franchise is rolled from the run seed. Each round draws eight global player-season
+        cards; safe picks keep the 4G/4F/3C completion targets reachable, and disabled cards say
+        why.
       </p>
     </div>
     <a
@@ -239,14 +279,46 @@
         An active season run exists
       </h2>
       <p class="mt-2 text-sm text-muted-foreground">
-        Resuming returns to the league hub at the last accepted checkpoint.
+        Resuming returns to the season hub at the last accepted checkpoint.
       </p>
       <a
-        href={resolve('/season/league')}
+        href={resolve('/season/run')}
         class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
       >
         Resume season
       </a>
+    </div>
+  {:else if legacyStored}
+    <div class="mt-10 max-w-2xl rounded-xl border border-destructive/30 bg-surface-1 p-6">
+      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Draft rules changed</p>
+      <h2 class="font-display mt-2 text-2xl font-extrabold uppercase tracking-tight">
+        This saved draft was made with the old rules
+      </h2>
+      <p class="mt-3 text-sm text-muted-foreground">
+        Season Run drafts now use ten global eight-card offers instead of the old franchise-era
+        rolls. Unfinished drafts from the previous rules cannot be converted, so they are kept
+        untouched until you decide what to do with them.
+      </p>
+      <p class="mt-3 text-sm text-muted-foreground">
+        Discarding removes the old draft from this browser and starts a fresh Season Run under the
+        current rules.
+      </p>
+      <button
+        type="button"
+        onclick={discardLegacy}
+        disabled={busy}
+        class="mt-5 inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-5 py-3 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Discard and restart
+      </button>
+      {#if actionError}
+        <p
+          role="alert"
+          class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        >
+          {actionError}
+        </p>
+      {/if}
     </div>
   {:else if hasDraft && !started && board?.draft}
     <div class="mt-10 rounded-xl bg-surface-1 p-6">
@@ -280,8 +352,8 @@
           Start a Season Run
         </h2>
         <p class="mt-2 max-w-xl text-sm text-muted-foreground">
-          A fresh run seed rolls your franchise and the first pick. The draft, rolls, claims, and
-          picks persist to this browser, so reload resumes the exact board.
+          A fresh run seed rolls your franchise and the first pick. The draft, offers, and picks
+          persist to this browser, so reload resumes the exact board.
         </p>
         <button
           type="button"
@@ -335,11 +407,11 @@
         <SeasonDraftBoard
           flow={board}
           {manifest}
+          {faces}
           catalog={flow.catalog}
           {busy}
           error={actionError}
-          {onReveal}
-          {onClaim}
+          {onDraw}
           {onPick}
           {onFinalize}
         />
@@ -389,7 +461,7 @@
         </h2>
         <p class="mt-2 text-sm text-muted-foreground">
           30 rosters, 300 unique player versions, and 30 legal rotations are ready. Promoting moves
-          the draft into an active run and opens the league hub.
+          the draft into an active run and opens the season hub.
         </p>
         <dl class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
           <div class="rounded-lg bg-surface-2 p-3">

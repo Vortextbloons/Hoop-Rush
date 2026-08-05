@@ -90,10 +90,6 @@
     }
     return `${range} upcoming`;
   }
-
-  function checkpointHref(blockIndex: number): string {
-    return `${resolve('/season/run/checkpoint/' as RouteId)}?block=${String(blockIndex)}`;
-  }
 </script>
 
 <nav aria-label="Season progress" class="w-full">
@@ -102,7 +98,7 @@
       {#if segment.state === 'completed'}
         <li class="min-w-[4.25rem] flex-1">
           <a
-            href={checkpointHref(segment.blockIndex)}
+            href={resolve(`/season/run/checkpoint/?block=${String(segment.blockIndex)}` as RouteId)}
             data-season-tape-segment={segment.blockIndex}
             aria-label={labelOf(segment)}
             class="flex h-full flex-col items-center gap-0.5 rounded-lg border border-border bg-surface-1 px-1.5 py-2 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong hover:bg-surface-2"

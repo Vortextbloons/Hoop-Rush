@@ -56,9 +56,18 @@ Commands:
                          variance against independent per-shot binomial draws.
                           --fixture <id> (default equal) --samples N (default 1, max 10)
   sim challenge          Run one complete 82-game challenge against the frozen bracket.
-                         --lineup <fixture-id|team.json>  User five (default challenge-user)
+                         --lineup <ref[,...]>  Five players in G,G,F,F,C slot order
+                                              (required). Refs are ids or names:
+                                              playerId | playerId@franchise/era |
+                                              Name | Name@Franchise | Name@Franchise/era.
+                                              Ambiguous ids/names are rejected with
+                                              qualifying forms; a franchise-qualified
+                                              name picks the best peak (highest overall)
                          --seed <hex>          Run seed (required)
-                         --profile <path>      Override the packaged 1990s era profile
+                         --reruns N            Best-of whole-season attempts (default 2)
+                         --era <eraId>         Simulation era (default 2010s; selects the
+                                               packaged era profile)
+                         --profile <path>      Override the packaged era profile
                          --bracket <path>      Override the packaged bracket artifact
   bracket audit          Validate the frozen 30-team bracket and 82-game schedule:
                          schema/hash/versions, legal balanced lineups, duplicates,

@@ -233,7 +233,9 @@ describe('auditSeasonSchedule', () => {
   it('flags a league mismatch', () => {
     const league = buildSeasonLeague();
     const schedule = generateSeasonSchedule({ league, seed: seedFromString('audit-league') });
-    const other = buildSeasonLeague({}, { humanFranchiseId: 'celtics' });
-    expect(auditSeasonSchedule(schedule, other).length).toBeGreaterThanOrEqual(0);
+    const other = buildSeasonLeague({
+      teams: league.teams.filter((team) => team.franchiseId !== 'celtics'),
+    });
+    expect(auditSeasonSchedule(schedule, other).length).toBeGreaterThan(0);
   });
 });

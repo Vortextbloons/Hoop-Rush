@@ -30,6 +30,7 @@
     aggregates ? engineOrderLeaderTables(aggregates.players, aggregates.teams) : null,
   );
   const rosterByVersion = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, SeasonRosterEntry>();
     for (const roster of shell.run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry);

@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "draftVersion": "season-draft-v1",
+  "schemaVersion": 2,
+  "draftVersion": "season-draft-v2",
   "runId": "fixture-season-run-1",
   "rootSeed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
   "league": {
@@ -189,7 +189,7 @@
       }
     ]
   },
-  "catalogVersion": "season-draft-v1",
+  "catalogVersion": "season-draft-v2",
   "participants": [
     {
       "participantId": "fixture-human",
@@ -200,198 +200,488 @@
   "round": 10,
   "currentTurnParticipantId": null,
   "status": "complete",
-  "revision": 33,
-  "currentReveal": null,
-  "rolls": [
-    {
-      "franchiseId": "blazers",
-      "eraId": "1980s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "suns",
-      "eraId": "2000s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "kings",
-      "eraId": "1970s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "timberwolves",
-      "eraId": "2000s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "sixers",
-      "eraId": "1970s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "heat",
-      "eraId": "1990s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "bucks",
-      "eraId": "2010s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "blazers",
-      "eraId": "2010s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "wizards",
-      "eraId": "1990s",
-      "attemptIndex": 0,
-      "usable": true
-    },
-    {
-      "franchiseId": "spurs",
-      "eraId": "1990s",
-      "attemptIndex": 0,
-      "usable": false
-    },
-    {
-      "franchiseId": "sixers",
-      "eraId": "2010s",
-      "attemptIndex": 1,
-      "usable": false
-    },
-    {
-      "franchiseId": "kings",
-      "eraId": "1980s",
-      "attemptIndex": 2,
-      "usable": false
-    },
-    {
-      "franchiseId": "spurs",
-      "eraId": "1970s",
-      "attemptIndex": 3,
-      "usable": false
-    },
-    {
-      "franchiseId": "pistons",
-      "eraId": "2010s",
-      "attemptIndex": 4,
-      "usable": false
-    },
-    {
-      "franchiseId": "hornets",
-      "eraId": "1990s",
-      "attemptIndex": 5,
-      "usable": false
-    },
-    {
-      "franchiseId": "warriors",
-      "eraId": "2000s",
-      "attemptIndex": 6,
-      "usable": false
-    },
-    {
-      "franchiseId": "pacers",
-      "eraId": "1990s",
-      "attemptIndex": 7,
-      "usable": false
-    },
-    {
-      "franchiseId": "grizzlies",
-      "eraId": "2000s",
-      "attemptIndex": 8,
-      "usable": false
-    },
-    {
-      "franchiseId": "spurs",
-      "eraId": "2020s",
-      "attemptIndex": 9,
-      "usable": false
-    },
-    {
-      "franchiseId": "cavaliers",
-      "eraId": "1990s",
-      "attemptIndex": 10,
-      "usable": false
-    },
-    {
-      "franchiseId": "celtics",
-      "eraId": "1960s",
-      "attemptIndex": 11,
-      "usable": false
-    },
-    {
-      "franchiseId": "bucks",
-      "eraId": "1980s",
-      "attemptIndex": 12,
-      "usable": false
-    },
-    {
-      "franchiseId": "hornets",
-      "eraId": "2000s",
-      "attemptIndex": 13,
-      "usable": true
-    }
-  ],
-  "claims": [
+  "revision": 23,
+  "currentOffer": null,
+  "offers": [
     {
       "participantId": "fixture-human",
-      "franchiseId": "blazers",
-      "eraId": "1980s"
+      "round": 1,
+      "pickOrdinal": 1,
+      "seedPath": ["draft", "offer", "fixture-human", "1", "1", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-e9bf2fa8a536fb34011c22ce417bdbf8",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-ce8bcc11594db55d21a967d781d44ae1",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-aeaba80c2299b778be2326a215f3b3fc",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-974db94f4a008b237672fea1c67342ff",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-a3c6a33bdf67817f4625dca15061f02b",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-f215c9b2bf1b8b362b7af1d87880c7c2",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-0e3d396229cf50fe2667c0d841228552",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-ad9f0cb4af2035a086cf6532840c45e4",
+          "selectable": true,
+          "coverageReason": null
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "suns",
-      "eraId": "2000s"
+      "round": 2,
+      "pickOrdinal": 2,
+      "seedPath": ["draft", "offer", "fixture-human", "2", "2", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-271852d524b888497b2f7707ef5ffe05",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-155e58f0085026bcb5a7856a9c71ed00",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-61141464c2f8195899fad93eca169d14",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-ba8783d4d5fffd30578ea7c274d58824",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-54dfa71b93c6348f835bd601ba089ecb",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-d6eb44a8a3f94384a341c92a8dadc3f8",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-73e3d61b6e35b13f92d0568111f1792b",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-7c841ea8f58ceffceccd738a5b7ac978",
+          "selectable": true,
+          "coverageReason": null
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "kings",
-      "eraId": "1970s"
+      "round": 3,
+      "pickOrdinal": 3,
+      "seedPath": ["draft", "offer", "fixture-human", "3", "3", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-915828cd3c479f1104fbfb07357af51d",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-a97409175a1e9403c59f8209766fd327",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-e3b1a4342aa06800b9d01376a616a244",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-3b7ca2f90bd0f27586ec7c1f5ab7f489",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-b1c44fbd94057339c9f9b6af84bc0f4d",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-0209c8b46249c74858adb7c60be3aa44",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-a64c45f37d602db7e87afcf5f2d3e643",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-ff55cb43ae48ca8f89bd6a4db8010813",
+          "selectable": true,
+          "coverageReason": null
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "timberwolves",
-      "eraId": "2000s"
+      "round": 4,
+      "pickOrdinal": 4,
+      "seedPath": ["draft", "offer", "fixture-human", "4", "4", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-e68c6cb63915dbe26c5379f4e3057366",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-7a466789d3cfed6d332d5ce34176ce99",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-ec06ea1b7cbb500f9952b0fd2532edcb",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-dd3422c26704c276b91039e4ed52fe92",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-4e83e38d75355c01d3728e8bccf59c9d",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-8e8ee247411731a37fef001989fdcb57",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-782c9ae4f3950120f904202ac6d6bb54",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-2320e1cd315dbb9164cce27f4263bbfd",
+          "selectable": true,
+          "coverageReason": null
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "sixers",
-      "eraId": "1970s"
+      "round": 5,
+      "pickOrdinal": 5,
+      "seedPath": ["draft", "offer", "fixture-human", "5", "5", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-692d2653edb749b721cdab956e6b5163",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-d767477cca8545809b69c9224f00f6ac",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-ffe1a5f6b17516b2e1e1ae509620e466",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-fb52df1283a9480e6370b784cd4d01c2",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-93fbc1656426c299de9a21177a4eb8d5",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-60ce63faa2db17e6791acc647642a8ca",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-f3822639c7034bcd313d32efdee30e09",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-d85ae06736a796032b56f52d1708baf7",
+          "selectable": true,
+          "coverageReason": null
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "heat",
-      "eraId": "1990s"
+      "round": 6,
+      "pickOrdinal": 6,
+      "seedPath": ["draft", "offer", "fixture-human", "6", "6", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-3002eca31f0af64748e063454abbd413",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-44d9483face39333c6c4571db76b37cf",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-6c04bbc6f2e55f6acac324a424d966f6",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-4f0f3e2001764b44a0c656be67854d30",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-f68027e7e0d72bcb84897435cb36ec77",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-5fa075972804db633d4b9c05f820dca7",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-3aa1d17ba35c4f87cba27b61cd4ea9ab",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-7f01ce4765f9bcab2bf845ed21f591d7",
+          "selectable": true,
+          "coverageReason": null
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "bucks",
-      "eraId": "2010s"
+      "round": 7,
+      "pickOrdinal": 7,
+      "seedPath": ["draft", "offer", "fixture-human", "7", "7", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-7826586fd5b0d0e3e2ded3c12977045f",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-a9e119adaa68e6295f65034ba29faedd",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-f23d503a9aed102600b7bef80ff0402a",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-de611f230f42f20713b92775762cea93",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-4f565ee6ca2a68427b156bec39672f56",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-278c8e5f6883977b4c036f5df52277af",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-c952dfd441760fa88e60f10a650f5584",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-c33e166fa8c1baa393f5b5913948cf1f",
+          "selectable": true,
+          "coverageReason": null
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "blazers",
-      "eraId": "2010s"
+      "round": 8,
+      "pickOrdinal": 8,
+      "seedPath": ["draft", "offer", "fixture-human", "8", "8", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-9798acc1665b878d6e1a6ff320a958f1",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-2e45f10df1457239d0d65bdf8e928c1d",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-263ec3dc82955920ee421316c9e87f0c",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-0182861a2ddd58f64f85dde083279aaa",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-c2fb886d0947d0b96a01e6affd90bf7d",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-fa9f33c8f2d90f04e94b9a82df1a5a78",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-4b5a855c7ee7c5b8b2ad105e546c77ac",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-cf380085b8750961dff7fe4f4ee40f15",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "wizards",
-      "eraId": "1990s"
+      "round": 9,
+      "pickOrdinal": 9,
+      "seedPath": ["draft", "offer", "fixture-human", "9", "9", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-4262e9b746667613584f4839963a24a7",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-16b651d11b2a7d3d95ddd79369459541",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-b6386d1becec31ff131d92a58ef9d7cb",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-b3c9af9b4a0583ef6c959ed1f766c02b",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-ee18a8269026037a48b4fb104cb7f036",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-67ac79e4ea26b430e921d7f6312b23d4",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-c830ff4ee6baf3a2c5333804815c8ede",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-517e6c48595aeebc65a88b6682843538",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        }
+      ]
     },
     {
       "participantId": "fixture-human",
-      "franchiseId": "hornets",
-      "eraId": "2000s"
+      "round": 10,
+      "pickOrdinal": 10,
+      "seedPath": ["draft", "offer", "fixture-human", "10", "10", "safe-order", "sample-order"],
+      "cards": [
+        {
+          "playerVersionId": "pv-89d2f18f6c95f92be023ff396f152dff",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-4bfc69c70ca62633b4350489d9be52f7",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-934082db0bbedb8f2e93e2f94d28cf8b",
+          "selectable": true,
+          "coverageReason": null
+        },
+        {
+          "playerVersionId": "pv-bd2917e58ade8b318fdaf2dfd9236455",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-0736968b1bb2c6376324322914373a7b",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-e23f35b82ac0b88c15c6d146278737e8",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-2fb15fceb1096bba1acb36800ea98e1e",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        },
+        {
+          "playerVersionId": "pv-90307ee6314e13729c056c9c2a068396",
+          "selectable": false,
+          "coverageReason": "Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks"
+        }
+      ]
     }
   ],
   "picks": [
@@ -399,91 +689,91 @@
       "participantId": "fixture-human",
       "round": 1,
       "pickOrdinal": 1,
-      "playerVersionId": "pv-342ce81658b7ea22c7b932ac06191106",
-      "franchiseId": "blazers",
-      "eraId": "1980s",
-      "rollAttempts": 1
+      "playerVersionId": "pv-ad9f0cb4af2035a086cf6532840c45e4",
+      "franchiseId": "clippers",
+      "eraId": "2010s",
+      "seedPath": ["draft", "offer", "fixture-human", "1", "1", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 2,
       "pickOrdinal": 2,
-      "playerVersionId": "pv-4a3f0cc28e40497e01aab31808b16092",
-      "franchiseId": "suns",
-      "eraId": "2000s",
-      "rollAttempts": 1
+      "playerVersionId": "pv-155e58f0085026bcb5a7856a9c71ed00",
+      "franchiseId": "wizards",
+      "eraId": "2010s",
+      "seedPath": ["draft", "offer", "fixture-human", "2", "2", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 3,
       "pickOrdinal": 3,
-      "playerVersionId": "pv-1cf4be981c538ffc7ecf922a4ad47bc8",
-      "franchiseId": "kings",
-      "eraId": "1970s",
-      "rollAttempts": 1
+      "playerVersionId": "pv-3b7ca2f90bd0f27586ec7c1f5ab7f489",
+      "franchiseId": "bucks",
+      "eraId": "1980s",
+      "seedPath": ["draft", "offer", "fixture-human", "3", "3", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 4,
       "pickOrdinal": 4,
-      "playerVersionId": "pv-a0ae590569a19379a21189bf082ea9d5",
-      "franchiseId": "timberwolves",
-      "eraId": "2000s",
-      "rollAttempts": 1
+      "playerVersionId": "pv-7a466789d3cfed6d332d5ce34176ce99",
+      "franchiseId": "knicks",
+      "eraId": "2020s",
+      "seedPath": ["draft", "offer", "fixture-human", "4", "4", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 5,
       "pickOrdinal": 5,
-      "playerVersionId": "pv-3afdf6b5e5396b797c2b873740b1e225",
-      "franchiseId": "sixers",
+      "playerVersionId": "pv-93fbc1656426c299de9a21177a4eb8d5",
+      "franchiseId": "clippers",
       "eraId": "1970s",
-      "rollAttempts": 1
+      "seedPath": ["draft", "offer", "fixture-human", "5", "5", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 6,
       "pickOrdinal": 6,
-      "playerVersionId": "pv-369d34bf09fcee2b503a0f9deccf44cf",
-      "franchiseId": "heat",
-      "eraId": "1990s",
-      "rollAttempts": 1
+      "playerVersionId": "pv-3002eca31f0af64748e063454abbd413",
+      "franchiseId": "kings",
+      "eraId": "2010s",
+      "seedPath": ["draft", "offer", "fixture-human", "6", "6", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 7,
       "pickOrdinal": 7,
-      "playerVersionId": "pv-f089b89f0c80b6bb44d03a8d5b49b5af",
-      "franchiseId": "bucks",
+      "playerVersionId": "pv-a9e119adaa68e6295f65034ba29faedd",
+      "franchiseId": "cavaliers",
       "eraId": "2010s",
-      "rollAttempts": 1
+      "seedPath": ["draft", "offer", "fixture-human", "7", "7", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 8,
       "pickOrdinal": 8,
-      "playerVersionId": "pv-488c51b152bd94b520b4794b9a583da1",
+      "playerVersionId": "pv-263ec3dc82955920ee421316c9e87f0c",
       "franchiseId": "blazers",
-      "eraId": "2010s",
-      "rollAttempts": 1
+      "eraId": "1970s",
+      "seedPath": ["draft", "offer", "fixture-human", "8", "8", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 9,
       "pickOrdinal": 9,
-      "playerVersionId": "pv-1f053a1c79ab7110f7f3adfaef1e482c",
-      "franchiseId": "wizards",
-      "eraId": "1990s",
-      "rollAttempts": 1
+      "playerVersionId": "pv-c830ff4ee6baf3a2c5333804815c8ede",
+      "franchiseId": "heat",
+      "eraId": "2010s",
+      "seedPath": ["draft", "offer", "fixture-human", "9", "9", "safe-order", "sample-order"]
     },
     {
       "participantId": "fixture-human",
       "round": 10,
       "pickOrdinal": 10,
-      "playerVersionId": "pv-480dc092ec6c654647c936288e143502",
-      "franchiseId": "hornets",
+      "playerVersionId": "pv-934082db0bbedb8f2e93e2f94d28cf8b",
+      "franchiseId": "pelicans",
       "eraId": "2000s",
-      "rollAttempts": 14
+      "seedPath": ["draft", "offer", "fixture-human", "10", "10", "safe-order", "sample-order"]
     }
   ],
   "commandLog": [
@@ -492,7 +782,7 @@
       "commandId": "fixture-create",
       "revisionBefore": 0,
       "revisionAfter": 1,
-      "stateDigest": "2f867faf1d0abfab2b5d62f1c25aa73f",
+      "stateDigest": "59c540f9c95b722da431311f95101ae9",
       "command": {
         "commandId": "fixture-create",
         "expectedRevision": 0,
@@ -687,499 +977,329 @@
             ]
           },
           "humanParticipantIds": ["fixture-human"],
-          "catalogVersion": "season-draft-v1"
+          "catalogVersion": "season-draft-v2"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-0",
+      "commandId": "fixture-draw-0",
       "revisionBefore": 1,
       "revisionAfter": 2,
-      "stateDigest": "1b87360bf14543b7c3eb256db666927b",
+      "stateDigest": "912229260a6e70fa43f7758cb36b27f6",
       "command": {
-        "commandId": "fixture-reveal-0",
+        "commandId": "fixture-draw-0",
         "expectedRevision": 1,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-0",
-      "revisionBefore": 2,
-      "revisionAfter": 3,
-      "stateDigest": "4963a65a904b8f9eee597f187a9283aa",
-      "command": {
-        "commandId": "fixture-claim-0",
-        "expectedRevision": 2,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "blazers",
-          "eraId": "1980s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-0",
-      "revisionBefore": 3,
-      "revisionAfter": 4,
-      "stateDigest": "debcb1ac88477dc809186aa66a50a9fc",
+      "revisionBefore": 2,
+      "revisionAfter": 3,
+      "stateDigest": "26056f072eefacfb80528739d3752f77",
       "command": {
         "commandId": "fixture-pick-0",
-        "expectedRevision": 3,
+        "expectedRevision": 2,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-342ce81658b7ea22c7b932ac06191106"
+          "playerVersionId": "pv-ad9f0cb4af2035a086cf6532840c45e4"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-1",
-      "revisionBefore": 4,
-      "revisionAfter": 5,
-      "stateDigest": "d9e954212f454d4502b5b7e3a6b2e251",
+      "commandId": "fixture-draw-1",
+      "revisionBefore": 3,
+      "revisionAfter": 4,
+      "stateDigest": "89b38cb3af67cfcf1ffc0d1dc4ebc783",
       "command": {
-        "commandId": "fixture-reveal-1",
-        "expectedRevision": 4,
+        "commandId": "fixture-draw-1",
+        "expectedRevision": 3,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-1",
-      "revisionBefore": 5,
-      "revisionAfter": 6,
-      "stateDigest": "a302691d8bc8b9e95808bd47d05150ad",
-      "command": {
-        "commandId": "fixture-claim-1",
-        "expectedRevision": 5,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "suns",
-          "eraId": "2000s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-1",
-      "revisionBefore": 6,
-      "revisionAfter": 7,
-      "stateDigest": "2e64bbbd076427b15b576daf7ddae5ed",
+      "revisionBefore": 4,
+      "revisionAfter": 5,
+      "stateDigest": "4c313ef551e622c11594d21380de25e5",
       "command": {
         "commandId": "fixture-pick-1",
-        "expectedRevision": 6,
+        "expectedRevision": 4,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-4a3f0cc28e40497e01aab31808b16092"
+          "playerVersionId": "pv-155e58f0085026bcb5a7856a9c71ed00"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-2",
-      "revisionBefore": 7,
-      "revisionAfter": 8,
-      "stateDigest": "79bb8fb8525997a4c0a60bca4dd2ddc8",
+      "commandId": "fixture-draw-2",
+      "revisionBefore": 5,
+      "revisionAfter": 6,
+      "stateDigest": "de390ec235e51496ef0630f8e40562b2",
       "command": {
-        "commandId": "fixture-reveal-2",
-        "expectedRevision": 7,
+        "commandId": "fixture-draw-2",
+        "expectedRevision": 5,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-2",
-      "revisionBefore": 8,
-      "revisionAfter": 9,
-      "stateDigest": "00dae1bf544629d328207071cbb592ef",
-      "command": {
-        "commandId": "fixture-claim-2",
-        "expectedRevision": 8,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "kings",
-          "eraId": "1970s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-2",
-      "revisionBefore": 9,
-      "revisionAfter": 10,
-      "stateDigest": "0dbc9c9c4d51b6f81520f8c660e7844c",
+      "revisionBefore": 6,
+      "revisionAfter": 7,
+      "stateDigest": "fd5838ce1d30f93a84c0f9cc2abbcb3e",
       "command": {
         "commandId": "fixture-pick-2",
-        "expectedRevision": 9,
+        "expectedRevision": 6,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-1cf4be981c538ffc7ecf922a4ad47bc8"
+          "playerVersionId": "pv-3b7ca2f90bd0f27586ec7c1f5ab7f489"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-3",
-      "revisionBefore": 10,
-      "revisionAfter": 11,
-      "stateDigest": "ecf80f63d141f1ef830d2cb1c1b4f5b3",
+      "commandId": "fixture-draw-3",
+      "revisionBefore": 7,
+      "revisionAfter": 8,
+      "stateDigest": "abf89c5313e6bdff753bce61b01ced03",
       "command": {
-        "commandId": "fixture-reveal-3",
-        "expectedRevision": 10,
+        "commandId": "fixture-draw-3",
+        "expectedRevision": 7,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-3",
-      "revisionBefore": 11,
-      "revisionAfter": 12,
-      "stateDigest": "5b936f1ff4f0fe33d2240be5e64296af",
-      "command": {
-        "commandId": "fixture-claim-3",
-        "expectedRevision": 11,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "timberwolves",
-          "eraId": "2000s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-3",
-      "revisionBefore": 12,
-      "revisionAfter": 13,
-      "stateDigest": "c197265e02a5344a5ae47d98b337114e",
+      "revisionBefore": 8,
+      "revisionAfter": 9,
+      "stateDigest": "329cb81f976f073bce0497a9cd9c1faf",
       "command": {
         "commandId": "fixture-pick-3",
-        "expectedRevision": 12,
+        "expectedRevision": 8,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-a0ae590569a19379a21189bf082ea9d5"
+          "playerVersionId": "pv-7a466789d3cfed6d332d5ce34176ce99"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-4",
-      "revisionBefore": 13,
-      "revisionAfter": 14,
-      "stateDigest": "590ba848013940648171f67679347ab8",
+      "commandId": "fixture-draw-4",
+      "revisionBefore": 9,
+      "revisionAfter": 10,
+      "stateDigest": "d6993b5c30e3c5509a661376b2f7274c",
       "command": {
-        "commandId": "fixture-reveal-4",
-        "expectedRevision": 13,
+        "commandId": "fixture-draw-4",
+        "expectedRevision": 9,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-4",
-      "revisionBefore": 14,
-      "revisionAfter": 15,
-      "stateDigest": "d4dad3807393755c12be8166789a7e50",
-      "command": {
-        "commandId": "fixture-claim-4",
-        "expectedRevision": 14,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "sixers",
-          "eraId": "1970s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-4",
-      "revisionBefore": 15,
-      "revisionAfter": 16,
-      "stateDigest": "029a2e0ffdb0e083fcbb897d093b6bff",
+      "revisionBefore": 10,
+      "revisionAfter": 11,
+      "stateDigest": "7c7832f3b1d89cb77ccf83f1c1c736a3",
       "command": {
         "commandId": "fixture-pick-4",
-        "expectedRevision": 15,
+        "expectedRevision": 10,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-3afdf6b5e5396b797c2b873740b1e225"
+          "playerVersionId": "pv-93fbc1656426c299de9a21177a4eb8d5"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-5",
-      "revisionBefore": 16,
-      "revisionAfter": 17,
-      "stateDigest": "2042d1efba5cea2384f80b6d021e59df",
+      "commandId": "fixture-draw-5",
+      "revisionBefore": 11,
+      "revisionAfter": 12,
+      "stateDigest": "eb61c9ed3967aa41c1bc499fc6bdbd3d",
       "command": {
-        "commandId": "fixture-reveal-5",
-        "expectedRevision": 16,
+        "commandId": "fixture-draw-5",
+        "expectedRevision": 11,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-5",
-      "revisionBefore": 17,
-      "revisionAfter": 18,
-      "stateDigest": "55add33f9d931af347b2508d47ac304f",
-      "command": {
-        "commandId": "fixture-claim-5",
-        "expectedRevision": 17,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "heat",
-          "eraId": "1990s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-5",
-      "revisionBefore": 18,
-      "revisionAfter": 19,
-      "stateDigest": "b5bedefdbe331071aa2459ab81fc00ed",
+      "revisionBefore": 12,
+      "revisionAfter": 13,
+      "stateDigest": "35ef425be6619587d45165dd7eed186b",
       "command": {
         "commandId": "fixture-pick-5",
-        "expectedRevision": 18,
+        "expectedRevision": 12,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-369d34bf09fcee2b503a0f9deccf44cf"
+          "playerVersionId": "pv-3002eca31f0af64748e063454abbd413"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-6",
-      "revisionBefore": 19,
-      "revisionAfter": 20,
-      "stateDigest": "74b135ac3bc364f8158aea8e78ac46bc",
+      "commandId": "fixture-draw-6",
+      "revisionBefore": 13,
+      "revisionAfter": 14,
+      "stateDigest": "4f5e3cdc5504a45066d3fa226899260c",
       "command": {
-        "commandId": "fixture-reveal-6",
-        "expectedRevision": 19,
+        "commandId": "fixture-draw-6",
+        "expectedRevision": 13,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-6",
-      "revisionBefore": 20,
-      "revisionAfter": 21,
-      "stateDigest": "82f7e74b183cfc57986bbfb584edd37b",
-      "command": {
-        "commandId": "fixture-claim-6",
-        "expectedRevision": 20,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "bucks",
-          "eraId": "2010s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-6",
-      "revisionBefore": 21,
-      "revisionAfter": 22,
-      "stateDigest": "77604f265e78c1c2805244e048942e56",
+      "revisionBefore": 14,
+      "revisionAfter": 15,
+      "stateDigest": "82772b00e487ed7cefcb9ab280a015b0",
       "command": {
         "commandId": "fixture-pick-6",
-        "expectedRevision": 21,
+        "expectedRevision": 14,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-f089b89f0c80b6bb44d03a8d5b49b5af"
+          "playerVersionId": "pv-a9e119adaa68e6295f65034ba29faedd"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-7",
-      "revisionBefore": 22,
-      "revisionAfter": 23,
-      "stateDigest": "cda71caa47ac310689cbc53c948e113a",
+      "commandId": "fixture-draw-7",
+      "revisionBefore": 15,
+      "revisionAfter": 16,
+      "stateDigest": "15bd942f1e89ffbbc1b195758d1cea7f",
       "command": {
-        "commandId": "fixture-reveal-7",
-        "expectedRevision": 22,
+        "commandId": "fixture-draw-7",
+        "expectedRevision": 15,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-7",
-      "revisionBefore": 23,
-      "revisionAfter": 24,
-      "stateDigest": "ecbdb492677a2beea059651cf4bb29e2",
-      "command": {
-        "commandId": "fixture-claim-7",
-        "expectedRevision": 23,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "blazers",
-          "eraId": "2010s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-7",
-      "revisionBefore": 24,
-      "revisionAfter": 25,
-      "stateDigest": "8ecfc997aeb5194bb09856f9b80fb367",
+      "revisionBefore": 16,
+      "revisionAfter": 17,
+      "stateDigest": "016e040e5b043b1a61964874d74a80be",
       "command": {
         "commandId": "fixture-pick-7",
-        "expectedRevision": 24,
+        "expectedRevision": 16,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-488c51b152bd94b520b4794b9a583da1"
+          "playerVersionId": "pv-263ec3dc82955920ee421316c9e87f0c"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-8",
-      "revisionBefore": 25,
-      "revisionAfter": 26,
-      "stateDigest": "4e9e1ff9610109259de7881b1eebe389",
+      "commandId": "fixture-draw-8",
+      "revisionBefore": 17,
+      "revisionAfter": 18,
+      "stateDigest": "7cbcc3777079769b1f054011b407b867",
       "command": {
-        "commandId": "fixture-reveal-8",
-        "expectedRevision": 25,
+        "commandId": "fixture-draw-8",
+        "expectedRevision": 17,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
-        }
-      }
-    },
-    {
-      "status": "accepted",
-      "commandId": "fixture-claim-8",
-      "revisionBefore": 26,
-      "revisionAfter": 27,
-      "stateDigest": "15755a420e88fda6ab7cfd502bed8e12",
-      "command": {
-        "commandId": "fixture-claim-8",
-        "expectedRevision": 26,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "wizards",
-          "eraId": "1990s"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-pick-8",
-      "revisionBefore": 27,
-      "revisionAfter": 28,
-      "stateDigest": "e517c894eb82b140956104be4d9a1184",
+      "revisionBefore": 18,
+      "revisionAfter": 19,
+      "stateDigest": "38cb7130ea9551843579c0b699760220",
       "command": {
         "commandId": "fixture-pick-8",
-        "expectedRevision": 27,
+        "expectedRevision": 18,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-1f053a1c79ab7110f7f3adfaef1e482c"
+          "playerVersionId": "pv-c830ff4ee6baf3a2c5333804815c8ede"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-reveal-9",
-      "revisionBefore": 28,
-      "revisionAfter": 29,
-      "stateDigest": "18c566ea6c139bae8d16935862d8c07a",
+      "commandId": "fixture-draw-9",
+      "revisionBefore": 19,
+      "revisionAfter": 20,
+      "stateDigest": "035ada8ecef3015a6069fbb499b61e9e",
       "command": {
-        "commandId": "fixture-reveal-9",
-        "expectedRevision": 28,
+        "commandId": "fixture-draw-9",
+        "expectedRevision": 19,
         "payload": {
-          "kind": "reveal-draft-roll",
+          "kind": "draw-season-offer",
           "participantId": "fixture-human"
         }
       }
     },
     {
       "status": "accepted",
-      "commandId": "fixture-claim-9",
-      "revisionBefore": 29,
-      "revisionAfter": 30,
-      "stateDigest": "ebfe97f86facdc14487ea19e316b1368",
-      "command": {
-        "commandId": "fixture-claim-9",
-        "expectedRevision": 29,
-        "payload": {
-          "kind": "claim-draft-pool",
-          "participantId": "fixture-human",
-          "franchiseId": "hornets",
-          "eraId": "2000s"
-        }
-      }
-    },
-    {
-      "status": "accepted",
       "commandId": "fixture-pick-9",
-      "revisionBefore": 30,
-      "revisionAfter": 31,
-      "stateDigest": "415f3ed21c2c00e6af5577d42b2123a2",
+      "revisionBefore": 20,
+      "revisionAfter": 21,
+      "stateDigest": "ccb6e23902fb04a55125ffcf05974c89",
       "command": {
         "commandId": "fixture-pick-9",
-        "expectedRevision": 30,
+        "expectedRevision": 20,
         "payload": {
           "kind": "select-draft-player",
           "participantId": "fixture-human",
-          "playerVersionId": "pv-480dc092ec6c654647c936288e143502"
+          "playerVersionId": "pv-934082db0bbedb8f2e93e2f94d28cf8b"
         }
       }
     },
     {
       "status": "accepted",
       "commandId": "fixture-finalize",
-      "revisionBefore": 31,
-      "revisionAfter": 32,
-      "stateDigest": "544e1d572a2d3a33c9a00d4d095b7a87",
+      "revisionBefore": 21,
+      "revisionAfter": 22,
+      "stateDigest": "6d5501b42dc59dc8dcf2b6da5f554b04",
       "command": {
         "commandId": "fixture-finalize",
-        "expectedRevision": 31,
+        "expectedRevision": 21,
         "payload": {
           "kind": "finalize-human-rosters"
         }
@@ -1188,12 +1308,12 @@
     {
       "status": "accepted",
       "commandId": "fixture-generate",
-      "revisionBefore": 32,
-      "revisionAfter": 33,
-      "stateDigest": "a4d4e6047eb7bbf8bdc3b736345905d4",
+      "revisionBefore": 22,
+      "revisionAfter": 23,
+      "stateDigest": "23cbcb38400ed114d26d2a6205397888",
       "command": {
         "commandId": "fixture-generate",
-        "expectedRevision": 32,
+        "expectedRevision": 22,
         "payload": {
           "kind": "generate-ai-league"
         }

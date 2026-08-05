@@ -60,6 +60,7 @@
   );
 
   const playerNames = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, string>();
     for (const roster of shell.run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
@@ -67,6 +68,7 @@
     return map;
   });
   const playable = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, readonly string[]>();
     for (const roster of shell.run?.rosters ?? []) {
       for (const entry of roster.players) {
@@ -97,8 +99,6 @@
     if (row.forfeit) return row.won ? 'W · forfeit' : 'L · forfeit';
     return row.won ? 'W' : 'L';
   }
-
-  const checkpointHref = resolve('/season/run/checkpoint' as RouteId);
 </script>
 
 <svelte:head>
@@ -163,7 +163,9 @@
               </span>
               {#if acceptedBlockIndexes.has(group.blockIndex)}
                 <a
-                  href={`${checkpointHref}?block=${String(group.blockIndex)}`}
+                  href={resolve(
+                    `/season/run/checkpoint/?block=${String(group.blockIndex)}` as RouteId,
+                  )}
                   class="font-mono text-[10px] text-primary underline-offset-4 hover:underline"
                 >
                   Checkpoint recap

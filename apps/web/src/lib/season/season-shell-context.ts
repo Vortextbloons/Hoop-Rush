@@ -102,6 +102,6 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     franchiseAbbrev: () => '—',
     cancelBlock: () => undefined,
     retryBlock: () => undefined,
-    refresh: async () => undefined,
+    refresh: () => Promise.resolve(),
   };
 }

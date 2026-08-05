@@ -84,7 +84,7 @@
         Your block
       </h2>
       <div class="mt-2 flex items-center gap-3">
-        {#if franchiseIdentity(humanRecord.franchiseId)}
+        {#if manifest && franchiseIdentity(humanRecord.franchiseId)}
           <SeasonTeamLogo
             {manifest}
             franchiseId={humanRecord.franchiseId}
@@ -118,7 +118,7 @@
       <ul class="mt-2 flex flex-col divide-y divide-border/50">
         {#each recap.standingsMovement as movement (movement.franchiseId)}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-            {#if franchiseIdentity(movement.franchiseId)}
+            {#if manifest && franchiseIdentity(movement.franchiseId)}
               <SeasonTeamLogo
                 {manifest}
                 franchiseId={movement.franchiseId}
@@ -151,7 +151,7 @@
         {#each recap.notablePerformances as performance (performance.playerVersionId + performance.gameId)}
           {@const source = versionSource(performance.playerVersionId)}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-            {#if faces.get(performance.playerVersionId)}
+            {#if manifest && faces.get(performance.playerVersionId)}
               <SeasonPlayerFace
                 face={faces.get(performance.playerVersionId)!}
                 {manifest}
@@ -204,7 +204,7 @@
       <ul class="mt-2 flex flex-col gap-1.5">
         {#each recap.streaks as streak (streak.franchiseId)}
           <li class="flex items-center gap-2 text-sm">
-            {#if franchiseIdentity(streak.franchiseId)}
+            {#if manifest && franchiseIdentity(streak.franchiseId)}
               <SeasonTeamLogo
                 {manifest}
                 franchiseId={streak.franchiseId}
@@ -236,7 +236,7 @@
       <ul class="mt-2 flex flex-col divide-y divide-border/50">
         {#each recap.versionSpotlights as spotlight (spotlight.versionA + spotlight.versionB)}
           <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-            {#if faces.get(spotlight.versionA)}
+            {#if manifest && faces.get(spotlight.versionA)}
               <SeasonPlayerFace face={faces.get(spotlight.versionA)!} {manifest} size="sm" />
             {/if}
             <span class="min-w-0 flex-1">
@@ -258,7 +258,7 @@
                 {/if}
               </span>
             </span>
-            {#if faces.get(spotlight.versionB)}
+            {#if manifest && faces.get(spotlight.versionB)}
               <SeasonPlayerFace face={faces.get(spotlight.versionB)!} {manifest} size="sm" />
             {/if}
           </li>
@@ -287,7 +287,7 @@
             <span class="w-14 shrink-0 font-mono text-[10px] text-muted-foreground">
               R{game.round}
             </span>
-            {#if franchiseIdentity(game.opponentFranchiseId)}
+            {#if manifest && franchiseIdentity(game.opponentFranchiseId)}
               <SeasonTeamLogo
                 {manifest}
                 franchiseId={game.opponentFranchiseId}

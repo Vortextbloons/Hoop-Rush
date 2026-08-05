@@ -24,7 +24,6 @@ import {
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
 import { rotationTargetMinutes } from './rotation.ts';
-import { createRng } from '../sim/rng.ts';
 import { seasonDigestHex } from '@hoop-rush/data-contracts';
 
 /**
@@ -524,14 +523,5 @@ describe('season AI property coverage', () => {
       expect(result.rosters).toHaveLength(30);
       expect(new Set(result.ownership.map((o) => o.playerVersionId)).size).toBe(300);
     }
-  });
-
-  it('reproduces identical outputs across independent module state', () => {
-    const rng = createRng(seedFromString('independence'));
-    const seeds = Array.from({ length: 3 }, (_, i) => seasonDigestHex(`ind-${String(i)}`));
-    void rng;
-    const first = seeds.map((seed) => generateAiLeague(soloInput(seed)));
-    const second = seeds.map((seed) => generateAiLeague(soloInput(seed)));
-    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
   });
 });

@@ -66,7 +66,7 @@ function renderTape(overrides: {
 }
 
 function segments(container: HTMLElement): HTMLElement[] {
-  return Array.from(container.querySelectorAll('[data-season-tape-segment]')) as HTMLElement[];
+  return Array.from(container.querySelectorAll('[data-season-tape-segment]'));
 }
 
 describe('SeasonTape', () => {

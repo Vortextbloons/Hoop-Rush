@@ -5,7 +5,8 @@ import { redirect } from '@sveltejs/kit';
  * the run shell; the checkpoint detail defaults to the last accepted block.
  */
 export const prerender = true;
-export const entries = () => [{}];
+/** Route entries generator (this route has no dynamic params). */
+export const entries: () => Array<Record<string, never>> = () => [{}];
 
 export function load() {
   redirect(308, '/season/run/checkpoint/');

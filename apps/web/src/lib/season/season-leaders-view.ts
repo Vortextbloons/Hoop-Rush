@@ -71,11 +71,10 @@ export function engineOrderLeaderTables(
           gamesPlayed: player.gamesPlayed,
           value,
           perGame: player.gamesPlayed > 0 ? value / player.gamesPlayed : 0,
-          eligible:
-            teamPlayed > 0 && player.gamesPlayed >= SEASON_LEADER_MIN_GAME_SHARE * teamPlayed,
+          eligible: player.gamesPlayed >= SEASON_LEADER_MIN_GAME_SHARE * teamPlayed,
         };
       })
-      .filter((entry) => entry.eligible && entry.gamesPlayed > 0)
+      .filter((entry) => entry.eligible)
       .sort(
         (a, b) =>
           b.perGame - a.perGame ||

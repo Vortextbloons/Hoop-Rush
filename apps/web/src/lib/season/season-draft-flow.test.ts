@@ -1,8 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   SEASON_AI_VERSION,
+  SEASON_DRAFT_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROTATION_VERSION,
+  type SeasonDraftLegacyState,
   type SeasonDraftState,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
@@ -15,16 +17,12 @@ import {
   buildSeasonRosters,
   buildFixtureEvaluations,
 } from '@hoop-rush/test-fixtures';
-import {
-  SOLO_PARTICIPANT_ID,
-  SeasonDraftFlow,
-  coverageNeeds,
-  revealPoolRows,
-} from './season-draft-flow';
+import { SOLO_PARTICIPANT_ID, SeasonDraftFlow, coverageNeeds } from './season-draft-flow';
 
 /**
- * M2.3 draft flow unit tests: the UI state machine over the authoritative
- * engine commands and the persisted Season draft record (spec/2.0/03).
+ * M2.3.5 draft flow unit tests (season-draft-v2): the UI state machine over
+ * the authoritative engine commands and the persisted Season draft record
+ * (spec/2.0/03), plus legacy season-draft-v1 detection and explicit discard.
  */
 
 class InMemorySeasonDraftRepository implements SeasonDraftRepository {
@@ -92,36 +90,40 @@ function makeFlow(repo: SeasonDraftRepository) {
   return new SeasonDraftFlow(repo, CATALOG, { generate: () => fakeGeneration() });
 }
 
+/** Picks the highest-selectable card of the drawn offer until accepted. */
+async function pickBestFromOffer(flow: SeasonDraftFlow): Promise<void> {
+  const state = flow.draft;
+  if (state === null) throw new Error('expected a draft state');
+  const offer = state.currentOffer;
+  if (offer === null) throw new Error('expected a drawn offer');
+  const selectable = offer.cards.filter((card) => card.selectable);
+  expect(selectable.length).toBeGreaterThanOrEqual(3);
+  const byId = new Map(CATALOG.candidates.map((c) => [c.playerVersionId, c]));
+  const best = [...selectable].sort(
+    (a, b) =>
+      (byId.get(b.playerVersionId)?.summaryRatings.overallRating ?? 0) -
+        (byId.get(a.playerVersionId)?.summaryRatings.overallRating ?? 0) ||
+      a.playerVersionId.localeCompare(b.playerVersionId),
+  )[0];
+  if (!best) throw new Error('no selectable card');
+  const pick = await flow.pick(SOLO_PARTICIPANT_ID, best.playerVersionId);
+  expect(pick.status).toBe('accepted');
+}
+
 async function draftFullSeason(flow: SeasonDraftFlow) {
   await flow.create({ rootSeed: ROOT_SEED, league: LEAGUE });
   for (let round = 1; round <= 10; round += 1) {
-    const reveal = await flow.reveal();
-    expect(reveal.status).toBe('accepted');
+    const draw = await flow.draw();
+    expect(draw.status).toBe('accepted');
     const state = flow.draft as SeasonDraftState;
-    const revealState = state.currentReveal;
-    if (revealState === null) {
-      throw new Error('expected a revealed draft state');
+    const offer = state.currentOffer;
+    if (offer === null) {
+      throw new Error('expected a drawn offer');
     }
-    const lastAttempt = revealState.attempts[revealState.attempts.length - 1];
-    if (lastAttempt === undefined) {
-      throw new Error('expected at least one reveal attempt');
-    }
-    expect(lastAttempt.usable).toBe(true);
-    const claim = await flow.claim(SOLO_PARTICIPANT_ID, lastAttempt.franchiseId, lastAttempt.eraId);
-    expect(claim.status).toBe('accepted');
-    const rows = revealPoolRows(state, CATALOG);
-    expect(rows.length).toBeGreaterThan(0);
-    // The engine rejects picks that would make the final roster constraints
-    // impossible; try the pool's candidates until one is accepted (the UI
-    // surfaces the typed rejection and lets the player choose again).
-    let pick: Awaited<ReturnType<SeasonDraftFlow['pick']>> | null = null;
-    for (const candidate of rows) {
-      pick = await flow.pick(SOLO_PARTICIPANT_ID, candidate.playerVersionId);
-      if (pick.status === 'accepted') break;
-    }
-    expect(pick?.status, `round ${String(round)} pick failed: ${flow.error ?? 'no error'}`).toBe(
-      'accepted',
-    );
+    expect(offer.cards).toHaveLength(8);
+    expect(new Set(offer.cards.map((card) => card.playerVersionId)).size).toBe(8);
+    expect(offer.cards.filter((card) => card.selectable).length).toBeGreaterThanOrEqual(3);
+    await pickBestFromOffer(flow);
   }
   const finalize = await flow.finalize();
   expect(finalize.status).toBe('accepted');
@@ -144,30 +146,45 @@ describe('SeasonDraftFlow', () => {
     }
     expect(participant.participantId).toBe(SOLO_PARTICIPANT_ID);
     expect(draft.rootSeed).toBe(ROOT_SEED);
+    expect(draft.draftVersion).toBe(SEASON_DRAFT_VERSION);
   });
 
-  it('reveals a deterministic roll with recovery attempts recorded', async () => {
+  it('draws a deterministic eight-card offer with at least three selectable cards', async () => {
     const flow = makeFlow(new InMemorySeasonDraftRepository());
     await flow.create({ rootSeed: ROOT_SEED, league: LEAGUE });
-    const reveal = await flow.reveal();
-    expect(reveal.status).toBe('accepted');
+    const draw = await flow.draw();
+    expect(draw.status).toBe('accepted');
     const draft = flow.draft;
     if (draft === null) {
       throw new Error('expected the draft to be created');
     }
-    const revealState = draft.currentReveal;
-    if (revealState === null) {
-      throw new Error('expected a revealed draft state');
+    const offer = draft.currentOffer;
+    if (offer === null) {
+      throw new Error('expected a drawn offer');
     }
-    expect(revealState.attempts.length).toBeGreaterThanOrEqual(1);
-    const lastAttempt = revealState.attempts[revealState.attempts.length - 1];
-    if (lastAttempt === undefined) {
-      throw new Error('expected at least one reveal attempt');
+    expect(offer.cards).toHaveLength(8);
+    expect(new Set(offer.cards.map((card) => card.playerVersionId)).size).toBe(8);
+    const selectable = offer.cards.filter((card) => card.selectable);
+    expect(selectable.length).toBeGreaterThanOrEqual(3);
+    for (const card of offer.cards) {
+      if (card.selectable) {
+        expect(card.coverageReason).toBeNull();
+      } else {
+        expect(card.coverageReason).not.toBeNull();
+      }
     }
-    expect(lastAttempt.usable).toBe(true);
+    expect(offer.seedPath).toEqual([
+      'draft',
+      'offer',
+      SOLO_PARTICIPANT_ID,
+      '1',
+      '1',
+      'safe-order',
+      'sample-order',
+    ]);
   });
 
-  it('rejects a pick when no pool is revealed (typed rejection, no state change)', async () => {
+  it('rejects a pick when no offer is drawn (typed rejection, no state change)', async () => {
     const flow = makeFlow(new InMemorySeasonDraftRepository());
     await flow.create({ rootSeed: ROOT_SEED, league: LEAGUE });
     const draft = flow.draft;
@@ -178,10 +195,26 @@ describe('SeasonDraftFlow', () => {
     const pick = await flow.pick(SOLO_PARTICIPANT_ID, 'pv-' + 'a'.repeat(32));
     expect(pick.status).toBe('rejected');
     if (pick.status === 'rejected') {
-      expect(pick.errorCode).toBe('UNAVAILABLE_POOL');
+      expect(pick.errorCode).toBe('NO_OFFER_DRAWN');
     }
     expect(draft.revision).toBe(revisionBefore);
     expect(flow.error).not.toBeNull();
+  });
+
+  it('rejects a disabled card with the coverage reason surfaced', async () => {
+    const flow = makeFlow(new InMemorySeasonDraftRepository());
+    await flow.create({ rootSeed: ROOT_SEED, league: LEAGUE });
+    await flow.draw();
+    const draft = flow.draft;
+    if (draft === null) throw new Error('expected the draft to be created');
+    const disabled = draft.currentOffer?.cards.find((card) => !card.selectable);
+    if (disabled === undefined) return;
+    const pick = await flow.pick(SOLO_PARTICIPANT_ID, disabled.playerVersionId);
+    expect(pick.status).toBe('rejected');
+    if (pick.status === 'rejected') {
+      expect(pick.errorCode).toBe('UNCOMPLETABLE_ROSTER');
+      expect(pick.message).toContain('completion targets unreachable');
+    }
   });
 
   it('plays all ten rounds, finalizes, and generates the league deterministically', async () => {
@@ -193,6 +226,7 @@ describe('SeasonDraftFlow', () => {
       throw new Error('expected the draft to be created');
     }
     expect(draft.picks.filter((p) => p.participantId === SOLO_PARTICIPANT_ID)).toHaveLength(10);
+    expect(draft.offers).toHaveLength(10);
     expect(draft.status).toBe('finalized');
 
     const generation = await flow.generate();
@@ -210,7 +244,7 @@ describe('SeasonDraftFlow', () => {
     // The persisted record carries the completed generation.
     const stored = await repo.loadSeasonDraft();
     expect(stored).not.toBeNull();
-    expect((stored as { generation: unknown }).generation).not.toBeNull();
+    expect(stored?.generation).not.toBeNull();
   });
 
   it('resumes a persisted draft through a new flow instance', async () => {
@@ -229,6 +263,62 @@ describe('SeasonDraftFlow', () => {
     expect(draft.status).toBe('complete');
     expect(second.generation).not.toBeNull();
     expect(second.phase).toBe('complete');
+    expect(second.legacyStored).toBe(false);
+  });
+
+  it('detects a stored legacy season-draft-v1 record and never loads it as playable', async () => {
+    const repo = new InMemorySeasonDraftRepository();
+    const legacyState: SeasonDraftLegacyState = {
+      schemaVersion: 1,
+      draftVersion: 'season-draft-v1',
+      runId: 'legacy-run-1',
+      rootSeed: ROOT_SEED,
+      league: LEAGUE,
+      catalogVersion: 'season-draft-v1',
+      participants: [{ participantId: SOLO_PARTICIPANT_ID, franchiseId: 'lakers' }],
+      firstPickParticipantId: SOLO_PARTICIPANT_ID,
+      round: 3,
+      currentTurnParticipantId: SOLO_PARTICIPANT_ID,
+      status: 'drafting',
+      revision: 5,
+      currentReveal: {
+        participantId: SOLO_PARTICIPANT_ID,
+        round: 3,
+        pickOrdinal: 3,
+        attempts: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
+      },
+      rolls: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
+      claims: [],
+      picks: [
+        {
+          participantId: SOLO_PARTICIPANT_ID,
+          round: 1,
+          pickOrdinal: 1,
+          playerVersionId: `pv-${'0'.repeat(32)}`,
+          franchiseId: 'lakers',
+          eraId: '1990s',
+          rollAttempts: 1,
+        },
+      ],
+      commandLog: [],
+    };
+    await repo.saveSeasonDraft({
+      recordId: 'season-draft',
+      saveSchemaVersion: 1,
+      draft: legacyState,
+      generation: null,
+    });
+    const flow = makeFlow(repo);
+    const found = await flow.load();
+    expect(found).toBe(true);
+    expect(flow.legacyStored).toBe(true);
+    expect(flow.draft).toBeNull();
+    expect(flow.phase).toBe('idle');
+    // The legacy record survives until the explicit discard.
+    expect(await repo.loadSeasonDraft()).not.toBeNull();
+    await flow.discardLegacy();
+    expect(flow.legacyStored).toBe(false);
+    expect(await repo.loadSeasonDraft()).toBeNull();
   });
 
   it('clears the persisted draft on discard', async () => {
@@ -252,39 +342,27 @@ describe('SeasonDraftFlow', () => {
     expect(needs).toEqual({ guards: 0, forwards: 0, centers: 0 });
   });
 
-  it('records duplicate command ids idempotently through the engine', async () => {
+  it('records duplicate draw commands idempotently through the engine', async () => {
     const flow = makeFlow(new InMemorySeasonDraftRepository());
     await flow.create({ rootSeed: ROOT_SEED, league: LEAGUE });
-    const reveal = await flow.reveal();
-    expect(reveal.status).toBe('accepted');
-    const state = flow.draft;
-    if (state === null) {
-      throw new Error('expected the draft to be created');
-    }
-    const currentReveal = state.currentReveal;
-    if (currentReveal === null) {
-      throw new Error('expected a revealed draft state');
-    }
-    const lastAttempt = currentReveal.attempts[currentReveal.attempts.length - 1];
-    if (lastAttempt === undefined) {
-      throw new Error('expected at least one reveal attempt');
-    }
-    await flow.claim(SOLO_PARTICIPANT_ID, lastAttempt.franchiseId, lastAttempt.eraId);
-    // A second claim of the same pair is an accepted no-op (engine idempotency).
-    const secondClaim = await flow.claim(
-      SOLO_PARTICIPANT_ID,
-      lastAttempt.franchiseId,
-      lastAttempt.eraId,
-    );
-    expect(secondClaim.status).toBe('accepted');
+    const draw = await flow.draw();
+    expect(draw.status).toBe('accepted');
+    const offerBefore = flow.draft?.currentOffer;
+    // A second draw of the same turn is an accepted no-op (the flow issues a
+    // fresh command id, so the engine's own accepted-no-op path keeps the
+    // same offer and never appends a second one).
+    const secondDraw = await flow.draw();
+    expect(secondDraw.status).toBe('accepted');
+    expect(flow.draft?.currentOffer).toEqual(offerBefore);
+    expect(flow.draft?.offers).toHaveLength(1);
   });
 });
 
 describe('SeasonDraftFlow construction', () => {
-  it('throws on a malformed catalog? no — create rejects with INVALID_CATALOG', async () => {
+  it('rejects creation against a malformed catalog with INVALID_CATALOG', async () => {
     const badCatalog = { ...CATALOG, pools: [] };
     const broken = new SeasonDraftFlow(new InMemorySeasonDraftRepository(), badCatalog, {
-      generate: vi.fn(),
+      generate: () => fakeGeneration(),
     });
     const record = await broken.create({ rootSeed: ROOT_SEED, league: LEAGUE });
     expect(record.status).toBe('rejected');

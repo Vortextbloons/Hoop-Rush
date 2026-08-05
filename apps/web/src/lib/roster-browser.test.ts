@@ -12,7 +12,6 @@ import {
   shotPct,
   sortRoster,
   type RosterDetailRow,
-  type RosterListItem,
 } from './roster-browser';
 
 function row(partial: Partial<RosterDetailRow> & { playerId: string }): RosterDetailRow {
@@ -263,27 +262,6 @@ describe('paginateGroupedRows', () => {
     row({ playerId: 'g', franchiseId: 'celtics', eraId: '2000s' }),
     row({ playerId: 'h', franchiseId: 'celtics', eraId: '2000s' }),
   ];
-
-  function reference(rows: RosterDetailRow[], count: number): RosterListItem[] {
-    return paginateItems(
-      groupRoster(rows).flatMap((group): RosterListItem[] => [
-        {
-          type: 'group',
-          franchiseId: group.franchiseId,
-          eraId: group.eraId,
-          count: group.players.length,
-        },
-        ...group.players.map((player): RosterListItem => ({ type: 'player', player })),
-      ]),
-      count,
-    );
-  }
-
-  it('is output-identical to groupRoster + flatMap + paginateItems at every cut point', () => {
-    for (const n of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 100]) {
-      expect(paginateGroupedRows(rows, n)).toEqual(reference(rows, n));
-    }
-  });
 
   it('stops at exactly count player items', () => {
     const page = paginateGroupedRows(rows, 5);

@@ -10,7 +10,7 @@ import {
   simulateSeasonHomeCourtFacts,
   validateSeasonHomeCourtTargets,
 } from './commands/season-home-court.ts';
-import { REPO_ROOT, TMP } from './cli-test-helpers.ts';
+import { REPO_ROOT, withTmpDir } from './cli-test-helpers.ts';
 import { seasonGameSimulationInputSchema } from '@hoop-rush/data-contracts';
 import { seasonGameFixtureSchema } from './fixture-schema.ts';
 import { seasonGameCalibrationSeed } from './commands/season-game.ts';
@@ -145,58 +145,64 @@ describe('season home-court calibration helpers', () => {
 
 describe('cli: season home-court calibrate (injected doubles)', () => {
   it('writes the evidence artifact when the gates pass', async () => {
-    const out = join(TMP, 'home-court-targets.json');
-    const report = await seasonHomeCourtCalibrate(
-      {
-        fixture: 'season-game-balanced',
-        'seed-from': '1024',
-        'seed-to': '1087',
-        workers: '2',
-        constants: '0.55,0.5',
-        out,
-      },
-      fakeDeps,
-    );
-    const payload = seasonHomeCourtCalibrateReportSchema.parse(report.payload);
-    expect(payload.pass).toBe(true);
-    expect(payload.gates.withinTolerance).toBe(true);
-    expect(payload.targetsWritten).toBe(true);
-    const artifact = seasonHomeCourtTargetsSchema.parse(JSON.parse(readFileSync(out, 'utf8')));
-    expect(artifact.constants).toEqual({
-      homeDefensiveCommunication: 0.55,
-      awayTurnoverPressure: 0.5,
+    await withTmpDir(async (tmp) => {
+      const out = join(tmp, 'home-court-targets.json');
+      const report = await seasonHomeCourtCalibrate(
+        {
+          fixture: 'season-game-balanced',
+          'seed-from': '1024',
+          'seed-to': '1087',
+          workers: '2',
+          constants: '0.55,0.5',
+          out,
+        },
+        fakeDeps,
+      );
+      const payload = seasonHomeCourtCalibrateReportSchema.parse(report.payload);
+      expect(payload.pass).toBe(true);
+      expect(payload.gates.withinTolerance).toBe(true);
+      expect(payload.targetsWritten).toBe(true);
+      const artifact = seasonHomeCourtTargetsSchema.parse(JSON.parse(readFileSync(out, 'utf8')));
+      expect(artifact.constants).toEqual({
+        homeDefensiveCommunication: 0.55,
+        awayTurnoverPressure: 0.5,
+      });
+      expect(artifact.gameVersion).toBe('season-game-v2');
+      expect(artifact.engineVersion.length).toBeGreaterThan(0);
     });
-    expect(artifact.gameVersion).toBe('season-game-v2');
-    expect(artifact.engineVersion.length).toBeGreaterThan(0);
   }, 60_000);
 
   it('fails the gates without writing when the target is missed', async () => {
-    const out = join(TMP, 'home-court-targets-miss.json');
-    const report = await seasonHomeCourtCalibrate(
-      {
-        fixture: 'season-game-balanced',
-        'seed-from': '1024',
-        'seed-to': '2047',
-        workers: '1',
-        constants: '0.9,0.9',
-        out,
-      },
-      fakeDeps,
-    );
-    expect(report.failures.length).toBeGreaterThan(0);
-    // The artifact must not be written on a failed calibration.
-    expect(report.payload).toMatchObject({ targetsWritten: false });
+    await withTmpDir(async (tmp) => {
+      const out = join(tmp, 'home-court-targets-miss.json');
+      const report = await seasonHomeCourtCalibrate(
+        {
+          fixture: 'season-game-balanced',
+          'seed-from': '1024',
+          'seed-to': '2047',
+          workers: '1',
+          constants: '0.9,0.9',
+          out,
+        },
+        fakeDeps,
+      );
+      expect(report.failures.length).toBeGreaterThan(0);
+      // The artifact must not be written on a failed calibration.
+      expect(report.payload).toMatchObject({ targetsWritten: false });
+    });
   }, 60_000);
 
-  it('rejects a tampered artifact through --validate', () => {
-    const tampered = join(TMP, 'home-court-targets-tampered.json');
-    const committed = join(REPO_ROOT, 'apps/web/static/data/season/home-court-targets.json');
-    const content = JSON.parse(readFileSync(committed, 'utf8')) as {
-      constants: { homeDefensiveCommunication: number };
-    };
-    content.constants.homeDefensiveCommunication = 0.99;
-    writeFileSync(tampered, `${JSON.stringify(content, null, 2)}\n`);
-    const failures = validateSeasonHomeCourtTargets(tampered);
-    expect(failures.some((failure) => failure.includes('homeDefensiveCommunication'))).toBe(true);
+  it('rejects a tampered artifact through --validate', async () => {
+    await withTmpDir((tmp) => {
+      const tampered = join(tmp, 'home-court-targets-tampered.json');
+      const committed = join(REPO_ROOT, 'apps/web/static/data/season/home-court-targets.json');
+      const content = JSON.parse(readFileSync(committed, 'utf8')) as {
+        constants: { homeDefensiveCommunication: number };
+      };
+      content.constants.homeDefensiveCommunication = 0.99;
+      writeFileSync(tampered, `${JSON.stringify(content, null, 2)}\n`);
+      const failures = validateSeasonHomeCourtTargets(tampered);
+      expect(failures.some((failure) => failure.includes('homeDefensiveCommunication'))).toBe(true);
+    });
   });
 });

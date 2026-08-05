@@ -311,7 +311,7 @@ export function fixtureGenerationDigest(material: string): string {
   return seasonDigestHex(material).slice(0, 32);
 }
 
-/** Synthetic v2 M2.1 draft facts for fixture runs. */
+/** Synthetic M2.3.5 global-eight draft facts for fixture runs. */
 export function buildFixtureSeasonDraftFacts(): SeasonRun['draft'] {
   return {
     draftVersion: SEASON_DRAFT_VERSION,
@@ -319,9 +319,65 @@ export function buildFixtureSeasonDraftFacts(): SeasonRun['draft'] {
       {
         participantId: 'fixture-human',
         franchiseId: 'lakers',
-        rolls: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
-        claims: [{ franchiseId: 'lakers', eraId: '1990s' }],
-        picks: [],
+        offers: [
+          {
+            round: 1,
+            pickOrdinal: 1,
+            seedPath: ['draft', 'offer', 'fixture-human', '1', '1', 'safe-order', 'sample-order'],
+            cards: [
+              {
+                playerVersionId: `pv-${'1'.repeat(32)}`,
+                selectable: true,
+                coverageReason: null,
+              },
+              {
+                playerVersionId: `pv-${'2'.repeat(32)}`,
+                selectable: true,
+                coverageReason: null,
+              },
+              {
+                playerVersionId: `pv-${'3'.repeat(32)}`,
+                selectable: true,
+                coverageReason: null,
+              },
+              {
+                playerVersionId: `pv-${'4'.repeat(32)}`,
+                selectable: true,
+                coverageReason: null,
+              },
+              {
+                playerVersionId: `pv-${'5'.repeat(32)}`,
+                selectable: false,
+                coverageReason:
+                  'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+              },
+              {
+                playerVersionId: `pv-${'6'.repeat(32)}`,
+                selectable: true,
+                coverageReason: null,
+              },
+              {
+                playerVersionId: `pv-${'7'.repeat(32)}`,
+                selectable: true,
+                coverageReason: null,
+              },
+              {
+                playerVersionId: `pv-${'8'.repeat(32)}`,
+                selectable: true,
+                coverageReason: null,
+              },
+            ],
+          },
+        ],
+        picks: [
+          {
+            round: 1,
+            playerVersionId: `pv-${'1'.repeat(32)}`,
+            franchiseId: 'lakers',
+            eraId: '1990s',
+            seedPath: ['draft', 'offer', 'fixture-human', '1', '1', 'safe-order', 'sample-order'],
+          },
+        ],
       },
     ],
   };
@@ -389,19 +445,36 @@ export function buildFixtureEvaluations(
 }
 
 /**
- * Valid draft-state fixture for persistence and CLI tests. The state is
- * schema-valid (mid-drafting with one claim and one pick); tests that need
- * specific shapes pass shallow overrides.
+ * Valid draft-state fixture for persistence and CLI tests (season-draft-v2).
+ * The state is schema-valid (mid-drafting with one drawn eight-card offer and
+ * one pick); tests that need specific shapes pass shallow overrides.
  */
 export function buildSeasonDraftState(
-  overrides: Partial<SeasonRun['draft']> & { rootSeed?: string; revision?: number } = {},
+  overrides: Partial<SeasonDraftState> & { rootSeed?: string; revision?: number } = {},
 ): SeasonDraftState {
+  const seedPath = ['draft', 'offer', 'human-1', '1', '1', 'safe-order', 'sample-order'];
+  const cards = [
+    { playerVersionId: `pv-${'1'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'2'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'3'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'4'.repeat(32)}`, selectable: true, coverageReason: null },
+    {
+      playerVersionId: `pv-${'5'.repeat(32)}`,
+      selectable: false,
+      coverageReason: 'fixture disabled card',
+    },
+    { playerVersionId: `pv-${'6'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'7'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'8'.repeat(32)}`, selectable: true, coverageReason: null },
+  ];
+  const rootSeed = overrides.rootSeed ?? 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+  const league = buildSeasonLeague();
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     draftVersion: SEASON_DRAFT_VERSION,
     runId: 'fixture-draft-1',
-    rootSeed: overrides.rootSeed ?? 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
-    league: buildSeasonLeague(),
+    rootSeed,
+    league,
     catalogVersion: SEASON_DRAFT_VERSION,
     participants: [
       { participantId: 'human-1', franchiseId: 'lakers' },
@@ -412,23 +485,31 @@ export function buildSeasonDraftState(
     currentTurnParticipantId: 'human-2',
     status: 'drafting',
     revision: overrides.revision ?? 3,
-    currentReveal: {
+    currentOffer: {
       participantId: 'human-2',
       round: 2,
       pickOrdinal: 2,
-      attempts: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
+      seedPath: ['draft', 'offer', 'human-2', '2', '2', 'safe-order', 'sample-order'],
+      cards,
     },
-    rolls: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
-    claims: [{ participantId: 'human-1', franchiseId: 'lakers', eraId: '1990s' }],
+    offers: [
+      {
+        participantId: 'human-1',
+        round: 1,
+        pickOrdinal: 1,
+        seedPath,
+        cards,
+      },
+    ],
     picks: [
       {
         participantId: 'human-1',
         round: 1,
         pickOrdinal: 1,
-        playerVersionId: `pv-${'0'.repeat(32)}`,
+        playerVersionId: `pv-${'1'.repeat(32)}`,
         franchiseId: 'lakers',
         eraId: '1990s',
-        rollAttempts: 1,
+        seedPath,
       },
     ],
     commandLog: [
@@ -444,8 +525,8 @@ export function buildSeasonDraftState(
           payload: {
             kind: 'create-season-draft',
             runId: 'fixture-draft-1',
-            rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
-            league: buildSeasonLeague(),
+            rootSeed,
+            league,
             humanParticipantIds: ['human-1', 'human-2'],
             catalogVersion: SEASON_DRAFT_VERSION,
           },
@@ -453,33 +534,33 @@ export function buildSeasonDraftState(
       },
       {
         status: 'accepted',
-        commandId: 'c-reveal-1',
+        commandId: 'c-draw-1',
         revisionBefore: 1,
         revisionAfter: 2,
         stateDigest: '0'.repeat(32),
         command: {
-          commandId: 'c-reveal-1',
+          commandId: 'c-draw-1',
           expectedRevision: 1,
-          payload: { kind: 'reveal-draft-roll', participantId: 'human-1' },
+          payload: { kind: 'draw-season-offer', participantId: 'human-1' },
         },
       },
       {
         status: 'accepted',
-        commandId: 'c-claim-1',
+        commandId: 'c-pick-1',
         revisionBefore: 2,
         revisionAfter: 3,
         stateDigest: '0'.repeat(32),
         command: {
-          commandId: 'c-claim-1',
+          commandId: 'c-pick-1',
           expectedRevision: 2,
           payload: {
-            kind: 'claim-draft-pool',
+            kind: 'select-draft-player',
             participantId: 'human-1',
-            franchiseId: 'lakers',
-            eraId: '1990s',
+            playerVersionId: `pv-${'1'.repeat(32)}`,
           },
         },
       },
     ],
+    ...overrides,
   };
 }

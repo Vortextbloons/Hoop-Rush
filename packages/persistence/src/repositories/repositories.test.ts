@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import Dexie, { type EntityTable, type Table } from 'dexie';
-import { IDBFactory } from 'fake-indexeddb';
+import { afterEach, describe, expect, it } from 'vitest';
+import Dexie from 'dexie';
 import {
   buildChallengeRun,
   buildClassicCompletedDraft,
@@ -11,22 +10,18 @@ import {
 import type { GameResult, RunAggregates } from '@hoop-rush/data-contracts';
 import { DexieChallengeRepository } from './dexie.ts';
 import type { StoredClassicDraft } from '../schemas/classic-draft-record.ts';
-import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
-import type {
-  StoredSeasonAcceptedBlockRow,
-  StoredSeasonActiveRunIndex,
-  StoredSeasonDetailRow,
-  StoredSeasonRunRecord,
-  StoredSeasonSummaryRow,
-} from '../schemas/season-run-record.ts';
 import type {
   ActiveGameAppend,
-  ActiveGameRow,
-  ActiveRunCheckpoint,
   ChallengeRepository,
   CompletedRunIndex,
   StoredRunRecord,
 } from '../schemas/run-record.ts';
+import {
+  TestDatabase,
+  resetIndexedDb,
+  restoreIndexedDb,
+  testDatabaseName,
+} from '../testing/repo-test-support.ts';
 
 /**
  * Repository contract tests: both adapters must validate every read, promote
@@ -36,13 +31,6 @@ import type {
  * game row per accepted game, reconstructed in order on load. Classic mode
  * adds a single active draft row that promotion clears atomically.
  */
-
-/** Replaces the shared fake-indexeddb factory, isolating Dexie versioning. */
-function resetIndexedDb(): void {
-  const factory = new IDBFactory();
-  globalThis.indexedDB = factory;
-  Dexie.dependencies.indexedDB = factory;
-}
 
 function draftRecord(
   draft: StoredClassicDraft['draft'] = buildClassicDraftState(),
@@ -179,50 +167,9 @@ function aggregatesFor(gamesPlayed: number, wins: number, losses: number): RunAg
   };
 }
 
-class TestDatabase extends Dexie {
-  active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
-  activeGames!: Table<ActiveGameRow, [string, number]>;
-  completed!: EntityTable<StoredRunRecord, 'recordId'>;
-  history!: EntityTable<CompletedRunIndex, 'recordId'>;
-  classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
-  seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
-  seasonRuns!: EntityTable<StoredSeasonRunRecord, 'recordId'>;
-  seasonRunSummaries!: Table<StoredSeasonSummaryRow, [string, string]>;
-  seasonRunDetails!: Table<StoredSeasonDetailRow, [string, string]>;
-  seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
-  seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
-
-  constructor(name: string) {
-    super(name);
-    this.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
-    this.version(2).stores({
-      active: 'recordId',
-      activeGames: '[runId+gameNumber], runId',
-      completed: 'recordId',
-      history: 'recordId',
-    });
-    this.version(3).stores({
-      history: 'recordId, completedAtIso',
-    });
-    this.version(4).stores({
-      classicDrafts: 'recordId',
-    });
-    this.version(5).stores({
-      seasonDrafts: 'recordId',
-    });
-    this.version(6).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-    });
-  }
-}
-
 /** Fresh Dexie-backed repository with one isolated database per test. */
 function makeAdapter(): { repo: ChallengeRepository; db: TestDatabase } {
-  const db = new TestDatabase(`test-${String(Math.random())}`);
+  const db = new TestDatabase(testDatabaseName('repositories'));
   return { repo: new DexieChallengeRepository(db), db };
 }
 
@@ -545,6 +492,8 @@ describe('challenge repository (dexie)', () => {
 });
 
 describe('dexie active-run migration', () => {
+  afterEach(restoreIndexedDb);
+
   it('splits a legacy v1 full-run row into a checkpoint plus game rows', async () => {
     resetIndexedDb();
     const legacyRecord: StoredRunRecord = {

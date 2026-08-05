@@ -10,6 +10,8 @@ import {
   seasonStandingsSchema,
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
+  seasonDraftLegacyStateSchema,
+  storedSeasonDraftStateSchema,
   seasonDraftCommandSchema,
   seasonDraftCommandRecordSchema,
   seasonRotationSchema,
@@ -236,7 +238,7 @@ function buildRun(): SeasonRun {
       postseasonVersion: 'postseason-v1',
       seedDerivationVersion: 'season-seeds-v1',
       playerVersionIdVersion: 'player-version-id-v1',
-      draftVersion: 'season-draft-v1',
+      draftVersion: 'season-draft-v2',
       rosterRulesVersion: 'season-roster-v1',
       rosterGenerationVersion: 'roster-generation-v1',
       aiVersion: 'season-ai-v1',
@@ -295,19 +297,40 @@ function buildRun(): SeasonRun {
     cursor: { schemaVersion: 1, completedRounds: 0 },
     postseason: buildPostseason(SEED),
     draft: {
-      draftVersion: 'season-draft-v1',
+      draftVersion: 'season-draft-v2',
       participants: [
         {
           participantId: 'p1',
           franchiseId: 'hawks',
-          rolls: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
-          claims: [{ franchiseId: 'lakers', eraId: '1990s' }],
+          offers: [
+            {
+              round: 1,
+              pickOrdinal: 1,
+              seedPath: ['draft', 'offer', 'p1', '1', '1', 'safe-order', 'sample-order'],
+              cards: [
+                { playerVersionId: `pv-${'1'.repeat(32)}`, selectable: true, coverageReason: null },
+                { playerVersionId: `pv-${'2'.repeat(32)}`, selectable: true, coverageReason: null },
+                { playerVersionId: `pv-${'3'.repeat(32)}`, selectable: true, coverageReason: null },
+                { playerVersionId: `pv-${'4'.repeat(32)}`, selectable: true, coverageReason: null },
+                { playerVersionId: `pv-${'5'.repeat(32)}`, selectable: true, coverageReason: null },
+                {
+                  playerVersionId: `pv-${'6'.repeat(32)}`,
+                  selectable: false,
+                  coverageReason:
+                    'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+                },
+                { playerVersionId: `pv-${'7'.repeat(32)}`, selectable: true, coverageReason: null },
+                { playerVersionId: `pv-${'8'.repeat(32)}`, selectable: true, coverageReason: null },
+              ],
+            },
+          ],
           picks: [
             {
               round: 1,
-              playerVersionId: `pv-${'0'.repeat(32)}`,
+              playerVersionId: `pv-${'1'.repeat(32)}`,
               franchiseId: 'lakers',
               eraId: '1990s',
+              seedPath: ['draft', 'offer', 'p1', '1', '1', 'safe-order', 'sample-order'],
             },
           ],
         },
@@ -1104,7 +1127,7 @@ describe('season draft catalog schema (M2.1)', () => {
     const candidates = [candidate(1, ['PG']), candidate(2, ['SG']), candidate(3, ['SF'])];
     return {
       schemaVersion: 1,
-      catalogVersion: 'season-draft-v1',
+      catalogVersion: 'season-draft-v2',
       dataVersion: 'm10-ratings-v3.4',
       ratingsVersion: 'ratings-v3.4',
       positionNormalizationVersion: 'position-v3',
@@ -1128,7 +1151,7 @@ describe('season draft catalog schema (M2.1)', () => {
 
   it('rejects wrong catalog and identity versions', () => {
     expect(() =>
-      seasonDraftCatalogSchema.parse({ ...buildCatalog(), catalogVersion: 'season-draft-v2' }),
+      seasonDraftCatalogSchema.parse({ ...buildCatalog(), catalogVersion: 'season-draft-v1' }),
     ).toThrow();
     expect(() =>
       seasonDraftCatalogSchema.parse({ ...buildCatalog(), playerVersionIdVersion: 'pv-v2' }),
@@ -1142,14 +1165,29 @@ describe('season draft catalog schema (M2.1)', () => {
   });
 });
 
-describe('season draft state schema (M2.1)', () => {
+describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
+  const seedPath = ['draft', 'offer', 'p1', '1', '1', 'safe-order', 'sample-order'];
+  const cards = [
+    { playerVersionId: `pv-${'1'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'2'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'3'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'4'.repeat(32)}`, selectable: true, coverageReason: null },
+    {
+      playerVersionId: `pv-${'5'.repeat(32)}`,
+      selectable: false,
+      coverageReason: 'disabled fixture card',
+    },
+    { playerVersionId: `pv-${'6'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'7'.repeat(32)}`, selectable: true, coverageReason: null },
+    { playerVersionId: `pv-${'8'.repeat(32)}`, selectable: true, coverageReason: null },
+  ];
   const baseState = {
-    schemaVersion: 1,
-    draftVersion: 'season-draft-v1',
+    schemaVersion: 2,
+    draftVersion: 'season-draft-v2',
     runId: 'run-1',
     rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
     league: buildLeague(),
-    catalogVersion: 'season-draft-v1',
+    catalogVersion: 'season-draft-v2',
     participants: [
       { participantId: 'p1', franchiseId: 'lakers' },
       { participantId: 'p2', franchiseId: 'celtics' },
@@ -1159,29 +1197,31 @@ describe('season draft state schema (M2.1)', () => {
     currentTurnParticipantId: 'p2',
     status: 'drafting',
     revision: 4,
-    currentReveal: {
+    currentOffer: {
       participantId: 'p2',
       round: 2,
       pickOrdinal: 2,
-      attempts: [
-        { franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: false },
-        { franchiseId: 'celtics', eraId: '1980s', attemptIndex: 1, usable: true },
-      ],
+      seedPath: ['draft', 'offer', 'p2', '2', '2', 'safe-order', 'sample-order'],
+      cards,
     },
-    rolls: [
-      { franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: false },
-      { franchiseId: 'celtics', eraId: '1980s', attemptIndex: 1, usable: true },
+    offers: [
+      {
+        participantId: 'p1',
+        round: 1,
+        pickOrdinal: 1,
+        seedPath,
+        cards,
+      },
     ],
-    claims: [{ participantId: 'p1', franchiseId: 'lakers', eraId: '1990s' }],
     picks: [
       {
         participantId: 'p1',
         round: 1,
         pickOrdinal: 1,
-        playerVersionId: `pv-${'0'.repeat(32)}`,
+        playerVersionId: `pv-${'1'.repeat(32)}`,
         franchiseId: 'lakers',
         eraId: '1990s',
-        rollAttempts: 1,
+        seedPath,
       },
     ],
     commandLog: [
@@ -1200,7 +1240,7 @@ describe('season draft state schema (M2.1)', () => {
             rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
             league: buildLeague(),
             humanParticipantIds: ['p1', 'p2'],
-            catalogVersion: 'season-draft-v1',
+            catalogVersion: 'season-draft-v2',
           },
         },
       },
@@ -1211,18 +1251,111 @@ describe('season draft state schema (M2.1)', () => {
     const state = roundTrip(seasonDraftStateSchema, baseState);
     expect(state.participants).toHaveLength(2);
     expect(state.picks).toHaveLength(1);
+    expect(state.currentOffer).not.toBeNull();
+    expect(state.offers).toHaveLength(1);
+    expect(state.schemaVersion).toBe(2);
+    expect(state.catalogVersion).toBe('season-draft-v2');
   });
 
-  it('rejects wrong draft version and malformed rolls', () => {
+  it('rejects wrong draft versions and malformed offers', () => {
     expect(() =>
-      seasonDraftStateSchema.parse({ ...baseState, draftVersion: 'season-draft-v2' }),
+      seasonDraftStateSchema.parse({ ...baseState, draftVersion: 'season-draft-v1' }),
     ).toThrow();
+    expect(() =>
+      seasonDraftStateSchema.parse({ ...baseState, catalogVersion: 'season-draft-v1' }),
+    ).toThrow();
+    // Fewer than eight cards fails the offer contract.
     expect(() =>
       seasonDraftStateSchema.parse({
         ...baseState,
-        currentReveal: { ...baseState.currentReveal, attempts: [] },
+        currentOffer: { ...baseState.currentOffer, cards: cards.slice(0, 7) },
       }),
     ).toThrow();
+    // Duplicate cards fail the distinctness refinement.
+    expect(() =>
+      seasonDraftStateSchema.parse({
+        ...baseState,
+        currentOffer: {
+          ...baseState.currentOffer,
+          cards: [...cards.slice(0, 7), { ...cards[0] }],
+        },
+      }),
+    ).toThrow();
+    // A selectable card with a coverage reason is corrupt.
+    expect(() =>
+      seasonDraftStateSchema.parse({
+        ...baseState,
+        currentOffer: {
+          ...baseState.currentOffer,
+          cards: cards.map((card, index) =>
+            index === 0 ? { ...card, coverageReason: 'must be null' } : card,
+          ),
+        },
+      }),
+    ).toThrow();
+    // A disabled card without a coverage reason is corrupt.
+    expect(() =>
+      seasonDraftStateSchema.parse({
+        ...baseState,
+        currentOffer: {
+          ...baseState.currentOffer,
+          cards: cards.map((card, index) =>
+            index === 4 ? { ...card, coverageReason: null } : card,
+          ),
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('reads legacy season-draft-v1 states through the legacy schema and the stored union', () => {
+    const legacy = {
+      schemaVersion: 1,
+      draftVersion: 'season-draft-v1',
+      runId: 'run-1',
+      rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+      league: buildLeague(),
+      catalogVersion: 'season-draft-v1',
+      participants: [
+        { participantId: 'p1', franchiseId: 'lakers' },
+        { participantId: 'p2', franchiseId: 'celtics' },
+      ],
+      firstPickParticipantId: 'p1',
+      round: 2,
+      currentTurnParticipantId: 'p2',
+      status: 'drafting',
+      revision: 4,
+      currentReveal: {
+        participantId: 'p2',
+        round: 2,
+        pickOrdinal: 2,
+        attempts: [
+          { franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: false },
+          { franchiseId: 'celtics', eraId: '1980s', attemptIndex: 1, usable: true },
+        ],
+      },
+      rolls: [
+        { franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: false },
+        { franchiseId: 'celtics', eraId: '1980s', attemptIndex: 1, usable: true },
+      ],
+      claims: [{ participantId: 'p1', franchiseId: 'lakers', eraId: '1990s' }],
+      picks: [
+        {
+          participantId: 'p1',
+          round: 1,
+          pickOrdinal: 1,
+          playerVersionId: `pv-${'0'.repeat(32)}`,
+          franchiseId: 'lakers',
+          eraId: '1990s',
+          rollAttempts: 1,
+        },
+      ],
+      commandLog: [],
+    };
+    expect(roundTrip(seasonDraftLegacyStateSchema, legacy).draftVersion).toBe('season-draft-v1');
+    // The v2 schema rejects legacy states; the stored union accepts both.
+    expect(() => seasonDraftStateSchema.parse(legacy)).toThrow();
+    expect(roundTrip(storedSeasonDraftStateSchema, legacy).schemaVersion).toBe(1);
+    expect(roundTrip(storedSeasonDraftStateSchema, baseState).schemaVersion).toBe(2);
   });
 });
 
@@ -1295,10 +1428,67 @@ describe('season draft command records (M2.1)', () => {
           rootSeed: 'a1b2c3d4e5f60718',
           league: buildLeague(),
           humanParticipantIds: ['p1'],
-          catalogVersion: 'season-draft-v1',
+          catalogVersion: 'season-draft-v2',
         },
       }),
     ).not.toThrow();
+    // Legacy v1 command envelopes still parse (stored-record reads).
+    expect(() =>
+      seasonDraftCommandSchema.parse({
+        ...command,
+        payload: { kind: 'reveal-draft-roll', participantId: 'p1' },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      seasonDraftCommandSchema.parse({
+        ...command,
+        payload: {
+          kind: 'draw-season-offer',
+          participantId: 'p1',
+        },
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe('season run draft facts union (M2.3.5)', () => {
+  it('accepts legacy season-draft-v1 run facts alongside v2 versions', () => {
+    const run = buildRun();
+    const legacyFacts = {
+      draftVersion: 'season-draft-v1',
+      participants: [
+        {
+          participantId: 'p1',
+          franchiseId: 'hawks',
+          rolls: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
+          claims: [{ franchiseId: 'lakers', eraId: '1990s' }],
+          picks: [
+            {
+              round: 1,
+              playerVersionId: `pv-${'0'.repeat(32)}`,
+              franchiseId: 'lakers',
+              eraId: '1990s',
+            },
+          ],
+        },
+      ],
+    };
+    const parsed = roundTrip(seasonRunSchema, {
+      ...run,
+      versions: { ...run.versions, draftVersion: 'season-draft-v1' },
+      draft: legacyFacts,
+    });
+    expect(parsed.draft.draftVersion).toBe('season-draft-v1');
+  });
+
+  it('rejects draft facts that do not match either variant', () => {
+    const run = buildRun();
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        draft: { draftVersion: 'season-draft-v3', participants: [] },
+      }),
+    ).toThrow();
   });
 });
 

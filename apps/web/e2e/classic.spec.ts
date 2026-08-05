@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectCommittedGame, expectSeasonReport, recordText } from './challenge-helpers';
 
 /**
  * Classic M4 journeys (spec/01 Classic game mode, spec/08): five deterministic
@@ -71,24 +72,6 @@ async function reachClassicPlaying(page: Page) {
   await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible();
 }
 
-/** Waits for the completed classic season report after the animated overlay. */
-async function expectClassicSeasonReport(page: Page) {
-  await expect(page).toHaveURL(/\/classic\/result\/?\?runId=/, { timeout: 30000 });
-  await expect(page.getByRole('heading', { name: 'Season report' })).toBeVisible({
-    timeout: 30000,
-  });
-  await expect(
-    page.getByText(/82(-0 · perfect| games · (contender|playoff|lottery|tanking))/),
-  ).toBeVisible({
-    timeout: 15000,
-  });
-}
-
-/** Reads the current record text (e.g. "82–0") from the season report. */
-async function recordText(page: Page): Promise<string> {
-  return page.getByText(/^\d+–\d+$/).innerText();
-}
-
 /**
  * The round-card header. The roll modal also renders the round, so plain
  * getByText would match two elements while a spin is open; the header is
@@ -96,6 +79,40 @@ async function recordText(page: Page): Promise<string> {
  */
 function roundHeading(page: Page, round: number) {
   return page.locator('[data-round-heading]', { hasText: `Round ${String(round)} of 5` });
+}
+
+/**
+ * The first reroll axis that is currently enabled, or null when both are
+ * disabled (reroll availability is seed-dependent: a rolled pool without an
+ * alternative for an axis disables that reroll permanently).
+ */
+async function availableRerolls(
+  franchiseReroll: Locator,
+  eraReroll: Locator,
+): Promise<'franchise' | 'era' | null> {
+  if (await franchiseReroll.isEnabled()) return 'franchise';
+  if (await eraReroll.isEnabled()) return 'era';
+  return null;
+}
+
+/**
+ * Clicks a reroll button when the rolled pool offers an alternative for its
+ * axis; otherwise asserts the disabled button explains itself (title).
+ * Returns whether the reroll was spent.
+ */
+async function useRerollIfAvailable(
+  page: Page,
+  button: Locator,
+  overlay: Locator,
+): Promise<boolean> {
+  if (!(await button.isEnabled())) {
+    await expect(button).toHaveAttribute('title', /\S/);
+    return false;
+  }
+  await button.click();
+  await expect(overlay).toBeVisible();
+  await expect(overlay).not.toBeVisible({ timeout: 5000 });
+  return true;
 }
 
 test.describe('classic: reel draft, auto-launch, guard, and result journeys', () => {
@@ -148,7 +165,7 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
       await expect(page.getByLabel('82-game strip')).toBeVisible();
       await expect(page.getByText(/Classic · Ratings/)).toBeVisible();
 
-      await expectClassicSeasonReport(page);
+      await expectSeasonReport(page, 'classic');
 
       // The result report shows the classic mode identity and all sections.
       await expect(page.getByText('Classic · Ratings')).toBeVisible();
@@ -193,12 +210,12 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await draftRounds(page);
     await expect(page).toHaveURL(/\/classic\/challenge\/?$/, { timeout: 15000 });
     await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible();
-    await expectClassicSeasonReport(page);
+    await expectSeasonReport(page, 'classic');
     await expect(page.getByText('Classic · Ball Knowledge')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
   });
 
-  test('rerolls spin only their axis and resume never replays the animation', async ({ page }) => {
+  test('a reroll spins only its axis whenever one is available', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/classic');
     await page.getByRole('button', { name: 'Start Ratings draft' }).click();
@@ -214,14 +231,26 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     const overlay = page.locator('.roll-overlay');
     const franchiseReel = page.locator('[data-axis="franchise"]');
     const eraReel = page.locator('[data-axis="era"]');
+    const franchiseReroll = page.getByRole('button', { name: /Reroll franchise/ });
+    const eraReroll = page.getByRole('button', { name: /Reroll era/ });
+    await expect(franchiseReroll).toBeVisible();
+    await expect(eraReroll).toBeVisible();
 
-    const eraBefore = (await eraIndicator.innerText()).trim();
-    const franchiseBefore = (await franchiseIndicator.innerText()).trim();
+    // Reroll availability is seed-dependent, so poll for any enabled reroll
+    // instead of sampling once: the isolation assertions then run on every
+    // seed that offers a reroll at all. When neither axis can be rerolled
+    // (the rolled pool has no alternative), the buttons must explain
+    // themselves on their titles instead.
+    await expect
+      .poll(() => availableRerolls(franchiseReroll, eraReroll), { timeout: 10_000 })
+      .not.toBeNull()
+      .catch(() => undefined);
+    const available = await availableRerolls(franchiseReroll, eraReroll);
 
-    const reroll = page.getByRole('button', { name: /Reroll franchise/ });
-    await expect(reroll).toBeVisible();
-    if (await reroll.isEnabled()) {
-      await reroll.click();
+    if (available === 'franchise') {
+      const eraBefore = (await eraIndicator.innerText()).trim();
+      const franchiseBefore = (await franchiseIndicator.innerText()).trim();
+      await franchiseReroll.click();
       // The modal opens; only the franchise reel animates; the era stays fixed.
       await expect(overlay).toBeVisible();
       await expect(franchiseReel.locator('.reel-strip')).toHaveClass(/reel-spinning/, {
@@ -233,28 +262,8 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
       await expect(overlay).not.toBeVisible({ timeout: 5000 });
       await expect(eraIndicator).toContainText(eraBefore);
       await expect(franchiseIndicator).not.toContainText(franchiseBefore);
-    } else {
-      // A roll with no alternative franchise explains itself on the button.
-      await expect(reroll).toHaveAttribute('title', /\S/);
-    }
-
-    // Pick round 1, then reload: the draft resumes in round 2 with the spent
-    // reroll state still recorded, and the roll modal never replays.
-    // Wait for the round header to advance first: it only renders after the
-    // pick's persist commits, so the reload can never race the save.
-    await pickOne(page);
-    await expect(roundHeading(page, 2)).toBeVisible({ timeout: 5000 });
-    await page.reload();
-    await expect(roundHeading(page, 2)).toBeVisible();
-    await expect(overlay).toHaveCount(0);
-    const spent = await reroll.isDisabled();
-    const showsUsed = /used/i.test(await reroll.innerText());
-    expect(spent || showsUsed).toBe(true);
-
-    // The era reroll is independent: it can be spent in a later round.
-    const eraReroll = page.getByRole('button', { name: /Reroll era/ });
-    if (await eraReroll.isEnabled()) {
-      const eraBefore2 = (await eraIndicator.innerText()).trim();
+    } else if (available === 'era') {
+      const eraBefore = (await eraIndicator.innerText()).trim();
       await eraReroll.click();
       await expect(overlay).toBeVisible();
       await expect(eraReel.locator('.reel-strip')).toHaveClass(/reel-spinning/, {
@@ -265,10 +274,51 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
       // The franchise id stays fixed, but its historical display identity can
       // legitimately change with the era (for example NJN -> BKN). The reel
       // class assertion above is the stable proof that this axis did not spin.
-      await expect(eraIndicator).not.toContainText(eraBefore2);
+      await expect(eraIndicator).not.toContainText(eraBefore);
     } else {
+      // A roll with no alternative franchise or era explains itself on the
+      // disabled buttons.
+      await expect(franchiseReroll).toHaveAttribute('title', /\S/);
       await expect(eraReroll).toHaveAttribute('title', /\S/);
     }
+  });
+
+  test('reroll state survives a reload and resume never replays the animation', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/classic');
+    await page.getByRole('button', { name: 'Start Ratings draft' }).click();
+    await expect(roundHeading(page, 1)).toBeVisible();
+
+    // The initial roll spins on fresh creation; wait for it to settle so the
+    // reroll buttons are usable.
+    await expect(page.locator('.roll-overlay')).toBeVisible();
+    await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+
+    const overlay = page.locator('.roll-overlay');
+    const franchiseReroll = page.getByRole('button', { name: /Reroll franchise/ });
+    const eraReroll = page.getByRole('button', { name: /Reroll era/ });
+
+    // Spend the franchise reroll when this seed's pools offer one; otherwise
+    // the disabled button must explain itself.
+    await useRerollIfAvailable(page, franchiseReroll, overlay);
+
+    // Pick round 1, then reload: the draft resumes in round 2 with the spent
+    // reroll state still recorded, and the roll modal never replays.
+    // Wait for the round header to advance first: it only renders after the
+    // pick's persist commits, so the reload can never race the save.
+    await pickOne(page);
+    await expect(roundHeading(page, 2)).toBeVisible({ timeout: 5000 });
+    await page.reload();
+    await expect(roundHeading(page, 2)).toBeVisible();
+    await expect(overlay).toHaveCount(0);
+    const spent = await franchiseReroll.isDisabled();
+    const showsUsed = /used/i.test(await franchiseReroll.innerText());
+    expect(spent || showsUsed).toBe(true);
+
+    // The era reroll is independent: it can be spent in a later round.
+    await useRerollIfAvailable(page, eraReroll, overlay);
 
     // Draft to completion across the reload; the fifth pick auto-launches.
     await draftRounds(page, 2);
@@ -294,12 +344,15 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
   test('a mid-challenge reload resumes and completes the classic run', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await reachClassicPlaying(page);
-    await page.waitForTimeout(1200);
+    // Wait until at least one game is committed (persisted) before
+    // interrupting the overlay, so the reload resumes from a non-empty
+    // persisted prefix rather than racing the first commit.
+    await expectCommittedGame(page);
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible({
       timeout: 15000,
     });
-    await expectClassicSeasonReport(page);
+    await expectSeasonReport(page, 'classic');
     expect(await recordText(page)).toMatch(/^\d+–\d+$/);
   });
 
@@ -367,7 +420,7 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
   test('classic result: Run again restarts with a fresh draft', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await reachClassicPlaying(page);
-    await expectClassicSeasonReport(page);
+    await expectSeasonReport(page, 'classic');
 
     // The result shows exactly one action button: Run again.
     await expect(page.getByRole('button', { name: 'Run again' })).toBeVisible();
@@ -397,7 +450,7 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
   test('history identifies the classic mode and variant', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await reachClassicPlaying(page);
-    await expectClassicSeasonReport(page);
+    await expectSeasonReport(page, 'classic');
 
     await page.goto('/classic/history');
     await expect(page.getByRole('link', { name: /Classic · Ratings/ })).toBeVisible();

@@ -3,7 +3,6 @@ import {
   seasonDraftCommandSchema,
   seasonDraftStateSchema,
   seedSchema,
-  type SeasonDraftCommand,
   type SeasonDraftState,
 } from '@hoop-rush/data-contracts';
 import {
@@ -16,9 +15,9 @@ import { seasonDraftReproduceReportSchema } from '../report-schemas.ts';
 import { loadSeasonDraftCatalog, readJsonFile } from './season-data.ts';
 
 /**
- * `season draft reproduce` (spec/2.0 M2.1): replays a committed command
+ * `season draft reproduce` (spec/2.0 M2.3.5): replays a committed command
  * sequence against the initial draft state through the authoritative engine
- * and reports every roll, claim, pick, rejection, the final digest, and any
+ * and reports every drawn offer, pick, rejection, the final digest, and any
  * divergence from the expected digest.
  */
 
@@ -32,7 +31,7 @@ export const seasonDraftReproduceInputSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season draft reproduce'),
   seed: seedSchema,
-  catalogVersion: z.literal('season-draft-v1'),
+  catalogVersion: z.literal('season-draft-v2'),
   initialState: seasonDraftStateSchema.nullable(),
   commands: z.array(seasonDraftCommandSchema),
   expected: z
@@ -43,66 +42,6 @@ export const seasonDraftReproduceInputSchema = z.object({
     .optional(),
 });
 export type SeasonDraftReproduceInput = z.infer<typeof seasonDraftReproduceInputSchema>;
-
-/**
- * Associates every recorded roll attempt with its participant by walking the
- * accepted reveal commands in order: each reveal's attempts form the next
- * contiguous group of the state's rolls array.
- */
-function rollsWithParticipants(state: SeasonDraftState): Array<{
-  participantId: string;
-  franchiseId: string;
-  eraId: string;
-  attemptIndex: number;
-  usable: boolean;
-}> {
-  const reveals = state.commandLog
-    .filter((record) => record.status === 'accepted')
-    .map((record) => record.command)
-    .filter(
-      (command): command is SeasonDraftCommand & { payload: { kind: 'reveal-draft-roll' } } =>
-        command.payload.kind === 'reveal-draft-roll',
-    );
-  const rows: Array<{
-    participantId: string;
-    franchiseId: string;
-    eraId: string;
-    attemptIndex: number;
-    usable: boolean;
-  }> = [];
-  let rollIndex = 0;
-  for (const reveal of reveals) {
-    // Group the contiguous attempts belonging to this reveal by walking until
-    // the group's usable attempt (the reveal's final attempt).
-    const participantId = reveal.payload.participantId;
-    for (;;) {
-      const attempt = state.rolls[rollIndex];
-      if (attempt === undefined) break;
-      rows.push({
-        participantId,
-        franchiseId: attempt.franchiseId,
-        eraId: attempt.eraId,
-        attemptIndex: attempt.attemptIndex,
-        usable: attempt.usable,
-      });
-      rollIndex += 1;
-      if (attempt.usable) break;
-    }
-  }
-  for (; rollIndex < state.rolls.length; rollIndex += 1) {
-    const attempt = state.rolls[rollIndex];
-    if (attempt !== undefined) {
-      rows.push({
-        participantId: 'unknown',
-        franchiseId: attempt.franchiseId,
-        eraId: attempt.eraId,
-        attemptIndex: attempt.attemptIndex,
-        usable: attempt.usable,
-      });
-    }
-  }
-  return rows;
-}
 
 export function seasonDraftReproduce(args: {
   input: string | null;
@@ -192,11 +131,16 @@ export function seasonDraftReproduce(args: {
     finalDigest,
     expectedDigest,
     identical,
-    rolls: rollsWithParticipants(state),
-    claims: state.claims.map((claim) => ({
-      participantId: claim.participantId,
-      franchiseId: claim.franchiseId,
-      eraId: claim.eraId,
+    offers: state.offers.map((offer) => ({
+      participantId: offer.participantId,
+      round: offer.round,
+      pickOrdinal: offer.pickOrdinal,
+      seedPath: offer.seedPath,
+      cards: offer.cards.map((card) => ({
+        playerVersionId: card.playerVersionId,
+        selectable: card.selectable,
+        coverageReason: card.coverageReason,
+      })),
     })),
     picks: state.picks.map((pick) => ({
       participantId: pick.participantId,
@@ -212,7 +156,7 @@ export function seasonDraftReproduce(args: {
     `seed ${input.seed} · ${String(input.commands.length)} commands (${String(acceptedCount)} accepted, ${String(rejections.length)} rejected)`,
     `final revision ${String(state.revision)} · status ${state.status}`,
     `final digest ${finalDigest}${expectedDigest === null ? '' : ` · expected ${expectedDigest}`}`,
-    `rolls ${String(state.rolls.length)} · claims ${String(state.claims.length)} · picks ${String(state.picks.length)}`,
+    `offers ${String(state.offers.length)} · picks ${String(state.picks.length)}`,
   ];
   for (const rejection of rejections) {
     details.push(`rejected ${rejection.commandId}: ${rejection.errorCode} (${rejection.message})`);

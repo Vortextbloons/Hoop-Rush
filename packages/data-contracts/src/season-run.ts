@@ -12,6 +12,7 @@ import {
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_DRAFT_LEGACY_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_GAME_COUNT,
   SEASON_GAME_SUMMARY_VERSION,
@@ -65,9 +66,9 @@ export {
 } from './season-roster.ts';
 export type { SeasonRosterEntry, SeasonRoster, SeasonOwnership } from './season-roster.ts';
 
-/** Completed draft facts for the human participants (M2.1). */
-export const seasonDraftFactsSchema = z.object({
-  draftVersion: z.literal(SEASON_DRAFT_VERSION),
+/** Legacy M2.1-M2.3 draft facts: franchise-era rolls, claims, and picks. */
+export const seasonLegacyDraftFactsSchema = z.object({
+  draftVersion: z.literal(SEASON_DRAFT_LEGACY_VERSION),
   participants: z.array(
     z.object({
       participantId: z.string().min(1).max(64),
@@ -93,6 +94,57 @@ export const seasonDraftFactsSchema = z.object({
     }),
   ),
 });
+export type SeasonLegacyDraftFacts = z.infer<typeof seasonLegacyDraftFactsSchema>;
+
+/**
+ * M2.3.5 draft facts: the global eight-card offers (with safety results and
+ * seed paths) and the picks taken from them. Enough recorded facts survive so
+ * reload and CLI replay reproduce the board exactly.
+ */
+export const seasonGlobalDraftFactsSchema = z.object({
+  draftVersion: z.literal(SEASON_DRAFT_VERSION),
+  participants: z.array(
+    z.object({
+      participantId: z.string().min(1).max(64),
+      franchiseId: franchiseIdSchema,
+      /** Every drawn offer for this participant, in draw order. */
+      offers: z.array(
+        z.object({
+          round: z.number().int().min(1).max(10),
+          pickOrdinal: z.number().int().min(1).max(10),
+          seedPath: z.array(z.string()).min(1),
+          cards: z.array(
+            z.object({
+              playerVersionId: playerVersionIdSchema,
+              selectable: z.boolean(),
+              coverageReason: z.string().min(1).max(256).nullable(),
+            }),
+          ),
+        }),
+      ),
+      picks: z.array(
+        z.object({
+          round: z.number().int().min(1).max(10),
+          playerVersionId: playerVersionIdSchema,
+          franchiseId: franchiseIdSchema,
+          eraId: eraIdSchema,
+          seedPath: z.array(z.string()).min(1),
+        }),
+      ),
+    }),
+  ),
+});
+export type SeasonGlobalDraftFacts = z.infer<typeof seasonGlobalDraftFactsSchema>;
+
+/**
+ * Completed draft facts for the human participants. Discriminated on the
+ * draft version: schema 4 runs keep playing under either variant, so legacy
+ * M2.3 runs and new season-draft-v2 runs both read as v4 snapshots.
+ */
+export const seasonDraftFactsSchema = z.discriminatedUnion('draftVersion', [
+  seasonGlobalDraftFactsSchema,
+  seasonLegacyDraftFactsSchema,
+]);
 export type SeasonDraftFacts = z.infer<typeof seasonDraftFactsSchema>;
 
 /** M2.1 generation audit summary attached to the run. */
@@ -128,7 +180,11 @@ export const seasonRunVersionsSchema = z.object({
   postseasonVersion: z.literal(SEASON_POSTSEASON_VERSION),
   seedDerivationVersion: z.literal(SEASON_SEED_DERIVATION_VERSION),
   playerVersionIdVersion: z.literal(PLAYER_VERSION_ID_VERSION),
-  draftVersion: z.literal(SEASON_DRAFT_VERSION),
+  /**
+   * Draft rules version: legacy M2.3 runs freeze `season-draft-v1`; new runs
+   * freeze `season-draft-v2` (global eight-card offers).
+   */
+  draftVersion: z.union([z.literal(SEASON_DRAFT_VERSION), z.literal(SEASON_DRAFT_LEGACY_VERSION)]),
   rosterRulesVersion: z.literal(SEASON_ROSTER_RULES_VERSION),
   rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
   aiVersion: z.literal(SEASON_AI_VERSION),

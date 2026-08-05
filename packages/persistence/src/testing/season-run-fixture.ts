@@ -34,6 +34,7 @@ import {
   type SeasonGame,
   type SeasonGameSimulationResult,
   type SeasonGameSummary,
+  type SeasonDraftState,
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
   type SeasonPlayerAggregate,
@@ -355,25 +356,7 @@ export function buildFixtureRun(input: {
     standings: zeroStandings(league),
     cursor: { schemaVersion: 1, completedRounds: 0 },
     postseason: emptyPostseason(fixtureSeedFromString(`${seed}:postseason`)),
-    draft: {
-      draftVersion: SEASON_DRAFT_VERSION,
-      participants: [
-        {
-          participantId: 'human-1',
-          franchiseId: 'lakers',
-          rolls: [],
-          claims: [],
-          picks: [],
-        },
-        {
-          participantId: 'human-2',
-          franchiseId: 'celtics',
-          rolls: [],
-          claims: [],
-          picks: [],
-        },
-      ],
-    },
+    draft: buildFixtureSeasonDraftFacts(seed),
     aiAssignments: fixtureAiAssignments(league),
     rotations: rosters.map(fixtureRotation),
     generationAudit: {
@@ -943,35 +926,153 @@ export function seasonRotationSetDigestFixture(rotations: readonly SeasonRotatio
   return seasonDigestHex(canonical);
 }
 
-/** Valid stored Season draft record for promotion fixtures. */
+/**
+ * Synthetic-but-schema-valid M2.3.5 global-eight draft facts (season-draft-v2)
+ * for fixture runs: two human participants, one drawn eight-card offer with
+ * at least three selectable cards, and one pick. Deterministic and
+ * self-contained (no engine dependency).
+ */
+export function buildFixtureSeasonDraftFacts(seed: string): SeasonRun['draft'] {
+  const seedPath = (participantId: string, round: number, pickOrdinal: number): string[] => [
+    'draft',
+    'offer',
+    participantId,
+    String(round),
+    String(pickOrdinal),
+    'safe-order',
+    'sample-order',
+  ];
+  const card = (n: number, selectable = true) => ({
+    playerVersionId: `pv-${String(n).padStart(32, '0')}`,
+    selectable,
+    coverageReason: selectable
+      ? null
+      : 'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+  });
+  void seed;
+  return {
+    draftVersion: SEASON_DRAFT_VERSION,
+    participants: [
+      {
+        participantId: 'human-1',
+        franchiseId: 'lakers',
+        offers: [
+          {
+            round: 1,
+            pickOrdinal: 1,
+            seedPath: seedPath('human-1', 1, 1),
+            cards: [card(1), card(2), card(3), card(4), card(5, false), card(6), card(7), card(8)],
+          },
+        ],
+        picks: [
+          {
+            round: 1,
+            playerVersionId: `pv-${'1'.padStart(32, '0')}`,
+            franchiseId: 'lakers',
+            eraId: '1990s',
+            seedPath: seedPath('human-1', 1, 1),
+          },
+        ],
+      },
+      {
+        participantId: 'human-2',
+        franchiseId: 'celtics',
+        offers: [],
+        picks: [],
+      },
+    ],
+  };
+}
+
+/**
+ * Synthetic-but-schema-valid M2.3.5 mid-draft state (season-draft-v2) for
+ * fixture runs: one drawn eight-card offer (at least three selectable cards)
+ * and one pick. Self-contained; overrides apply shallowly.
+ */
+export function buildSeasonDraftState(
+  overrides: Partial<SeasonDraftState> & { revision?: number } = {},
+): SeasonDraftState {
+  const seedPath = (participantId: string, round: number, pickOrdinal: number): string[] => [
+    'draft',
+    'offer',
+    participantId,
+    String(round),
+    String(pickOrdinal),
+    'safe-order',
+    'sample-order',
+  ];
+  const card = (n: number, selectable = true) => ({
+    playerVersionId: `pv-${String(n).padStart(32, '0')}`,
+    selectable,
+    coverageReason: selectable
+      ? null
+      : 'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks',
+  });
+  const cards = [card(1), card(2), card(3), card(4), card(5, false), card(6), card(7), card(8)];
+  const league = buildFixtureLeague('lakers');
+  const rootSeed = fixtureSeedFromString('fixture-season-draft');
+  return {
+    schemaVersion: 2,
+    draftVersion: SEASON_DRAFT_VERSION,
+    runId: 'fixture-draft-1',
+    rootSeed,
+    league,
+    catalogVersion: SEASON_DRAFT_VERSION,
+    participants: [
+      { participantId: 'human-1', franchiseId: 'lakers' },
+      { participantId: 'human-2', franchiseId: 'celtics' },
+    ],
+    firstPickParticipantId: 'human-1',
+    round: 2,
+    currentTurnParticipantId: 'human-2',
+    status: 'drafting',
+    revision: overrides.revision ?? 3,
+    currentOffer: {
+      participantId: 'human-2',
+      round: 2,
+      pickOrdinal: 2,
+      seedPath: seedPath('human-2', 2, 2),
+      cards,
+    },
+    offers: [
+      {
+        participantId: 'human-1',
+        round: 1,
+        pickOrdinal: 1,
+        seedPath: seedPath('human-1', 1, 1),
+        cards,
+      },
+    ],
+    picks: [
+      {
+        participantId: 'human-1',
+        round: 1,
+        pickOrdinal: 1,
+        playerVersionId: `pv-${'1'.padStart(32, '0')}`,
+        franchiseId: 'lakers',
+        eraId: '1990s',
+        seedPath: seedPath('human-1', 1, 1),
+      },
+    ],
+    commandLog: [],
+    ...overrides,
+  };
+}
+
+/** Valid stored Season draft record for promotion fixtures (v2 state). */
 export function buildFixtureStoredDraft(
   run: SeasonRun,
   generation: SeasonLeagueGenerationResult | null = null,
 ): StoredSeasonDraft {
+  const draft = buildSeasonDraftState();
   return {
     recordId: SEASON_DRAFT_RECORD_ID,
-    saveSchemaVersion: 1,
+    saveSchemaVersion: 2,
     draft: {
-      schemaVersion: 1,
-      draftVersion: SEASON_DRAFT_VERSION,
+      ...draft,
       runId: run.runId,
       rootSeed: run.rootSeed,
       league: run.league,
-      catalogVersion: SEASON_DRAFT_VERSION,
-      participants: [
-        { participantId: 'human-1', franchiseId: 'lakers' },
-        { participantId: 'human-2', franchiseId: 'celtics' },
-      ],
-      firstPickParticipantId: 'human-1',
-      round: 1,
-      currentTurnParticipantId: 'human-1',
-      status: 'drafting',
-      revision: 0,
-      currentReveal: null,
-      rolls: [],
-      claims: [],
-      picks: [],
-      commandLog: [],
     },
     generation,
   };

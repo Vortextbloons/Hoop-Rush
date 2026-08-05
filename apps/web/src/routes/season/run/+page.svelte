@@ -57,6 +57,8 @@
   );
 
   const names = $derived.by(() => {
+    // A plain Map snapshot (not SvelteMap): rebuilt on every refresh.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, string>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
@@ -153,10 +155,6 @@
         record: blockRecord(accepted.blockIndex),
       })),
   );
-
-  const checkpointHref = $derived(`${resolve('/season/run/checkpoint/' as RouteId)}?block=8`);
-  const blockHref = (blockIndex: number): string =>
-    `${resolve('/season/run/checkpoint/' as RouteId)}?block=${String(blockIndex)}`;
 </script>
 
 <svelte:head>
@@ -194,7 +192,7 @@
         standings.
       </p>
       <a
-        href={checkpointHref}
+        href={resolve('/season/run/checkpoint/?block=8' as RouteId)}
         class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
       >
         Review final block recap
@@ -408,7 +406,9 @@
           {#each recentBlocks as entry (entry.accepted.blockIndex)}
             <li>
               <a
-                href={blockHref(entry.accepted.blockIndex)}
+                href={resolve(
+                  `/season/run/checkpoint/?block=${String(entry.accepted.blockIndex)}` as RouteId,
+                )}
                 class="flex items-center justify-between gap-3 rounded-xl bg-surface-1 px-4 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2"
               >
                 <span class="font-mono text-[10px] font-bold uppercase text-primary">

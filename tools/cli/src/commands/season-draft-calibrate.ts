@@ -1,0 +1,684 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { Worker } from 'node:worker_threads';
+import { z } from 'zod';
+import {
+  SEASON_DRAFT_SAFE_MINIMUM,
+  SEASON_OFFER_TARGETS_VERSION,
+  type SeasonDraftCatalog,
+  type SeasonDraftCommand,
+  type SeasonDraftState,
+  type SeasonLeague,
+  type SeasonLeagueGenerationResult,
+} from '@hoop-rush/data-contracts';
+import { applySeasonDraftCommand, generateAiLeague } from '@hoop-rush/engine';
+import { makeReport, type CliReport } from '../report.ts';
+import { seasonDraftCalibrateReportSchema } from '../report-schemas.ts';
+import { parseCount } from '../args.ts';
+import {
+  DEFAULT_MANIFEST,
+  DEFAULT_SEASON_DIR,
+  pickBestSelectable,
+  sha256Hex,
+} from './season-data.ts';
+import { rosterCalibrationSeed } from './season-rosters.ts';
+
+/**
+ * `season draft calibrate` (spec/2.0 M2.3.5): freezes `offer-targets-v1`
+ * from a 256+64-seed cohort of complete season-draft-v2 drafts. Every seed
+ * plays create -> ten rounds (draw + best-selectable pick) -> finalize ->
+ * AI generation through the authoritative engine, and the cohort freezes
+ * candidate variety, safe-choice availability, positional coverage of
+ * selectable cards, exact-version uniqueness, AI generation success, and
+ * roster strength distributions.
+ *
+ * Gates: every offer keeps at least SEASON_DRAFT_SAFE_MINIMUM selectable
+ * cards, no exact version is ever duplicated across offers+picks, AI
+ * generation never fails, and at least 95% of held-out drafts fall inside
+ * the frozen calibration envelopes.
+ */
+
+export const SEASON_DRAFT_CALIBRATE_OPTIONS: Record<string, boolean> = {
+  workers: true,
+  'calibration-seeds': true,
+  'validation-seeds': true,
+  out: true,
+  manifest: true,
+  format: true,
+};
+
+export const DEFAULT_OFFER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'offer-targets.json');
+
+/** One completed calibration draft and its measured metrics. */
+export interface SeasonDraftCalibrationRun {
+  seed: string;
+  /** Distinct playerVersionIds across the ten drawn offers. */
+  variety: number;
+  /** Minimum selectable cards across the drawn offers. */
+  minSafePerOffer: number;
+  /** Share of drawn offers whose selectable cards cover G, F, and C. */
+  selectableGroupCoverageShare: number;
+  /** True when any version id repeats across offers+picks. */
+  duplicateVersion: boolean;
+  /**
+   * True when a draw was rejected with NO_FEASIBLE_GLOBAL_OFFER (the
+   * pickBestSelectable policy dead-ended the draft; the engine never
+   * relaxes a rule).
+   */
+  draftFailed: boolean;
+  /** True when AI generation threw SeasonAiGenerationError. */
+  generationFailed: boolean;
+  /** Per-band strength scores of the generated AI teams. */
+  bands: Record<'contender' | 'playoff' | 'average' | 'weaker', number[]>;
+}
+
+function cmd(
+  commandId: string,
+  expectedRevision: number,
+  payload: SeasonDraftCommand['payload'],
+): SeasonDraftCommand {
+  return { commandId, expectedRevision, payload };
+}
+
+function apply(
+  state: SeasonDraftState | null,
+  catalog: SeasonDraftCatalog,
+  command: SeasonDraftCommand,
+): { state: SeasonDraftState | null; generation: SeasonLeagueGenerationResult | null } {
+  const result = applySeasonDraftCommand(state, catalog, command, {
+    generate: (input) => generateAiLeague(input),
+  });
+  if (result.record.status !== 'accepted') {
+    throw new Error(
+      `calibration command ${command.commandId} rejected: ${result.record.errorCode} (${result.record.message})`,
+    );
+  }
+  return { state: result.state, generation: result.generation };
+}
+
+/** Measures a partially-played draft (used when the policy dead-ends). */
+function measureDraft(
+  state: SeasonDraftState,
+  catalog: SeasonDraftCatalog,
+): Pick<
+  SeasonDraftCalibrationRun,
+  'variety' | 'minSafePerOffer' | 'selectableGroupCoverageShare' | 'duplicateVersion'
+> {
+  const allCards = state.offers.flatMap((offer) => offer.cards.map((card) => card.playerVersionId));
+  const groupMask = (playable: readonly string[]): number =>
+    playable.reduce<number>(
+      (acc, position) =>
+        acc |
+        (position === 'PG' || position === 'SG'
+          ? 1
+          : position === 'SF' || position === 'PF'
+            ? 2
+            : 4),
+      0,
+    );
+  const byId = new Map(
+    catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
+  );
+  const coveredOffers = state.offers.filter((offer) => {
+    let mask = 0;
+    for (const card of offer.cards) {
+      if (!card.selectable) continue;
+      const candidate = byId.get(card.playerVersionId);
+      if (candidate !== undefined) mask |= groupMask(candidate.positions.playable);
+    }
+    return (mask & 1) !== 0 && (mask & 2) !== 0 && (mask & 4) !== 0;
+  }).length;
+  // Exact-version uniqueness (spec/2.0/03): a selected version never appears
+  // in an offer drawn after its pick. Offers and picks are both
+  // append-ordered, so offer i maps to pick i. Unpicked cards MAY be
+  // re-offered later (ownership is keyed by selection, not by appearance).
+  const pickedBefore = new Set<string>();
+  let duplicateVersion = false;
+  state.offers.forEach((offer, index) => {
+    if (duplicateVersion) return;
+    for (const card of offer.cards) {
+      if (pickedBefore.has(card.playerVersionId)) {
+        duplicateVersion = true;
+        return;
+      }
+    }
+    const ownPick = state.picks[index];
+    if (ownPick !== undefined) pickedBefore.add(ownPick.playerVersionId);
+  });
+  return {
+    variety: new Set(allCards).size,
+    minSafePerOffer:
+      state.offers.length === 0
+        ? 0
+        : Math.min(
+            ...state.offers.map((offer) => offer.cards.filter((card) => card.selectable).length),
+          ),
+    selectableGroupCoverageShare:
+      state.offers.length === 0 ? 0 : coveredOffers / state.offers.length,
+    duplicateVersion,
+  };
+}
+
+/** Plays one complete season-draft-v2 draft for a seed and measures it. */
+export function playSeasonDraftCalibrationSeed(
+  seed: string,
+  catalog: SeasonDraftCatalog,
+  league: SeasonLeague,
+): SeasonDraftCalibrationRun {
+  const empty = {
+    variety: 0,
+    minSafePerOffer: 0,
+    selectableGroupCoverageShare: 0,
+    duplicateVersion: false,
+    draftFailed: false,
+    generationFailed: false,
+    bands: {
+      contender: [],
+      playoff: [],
+      average: [],
+      weaker: [],
+    } as SeasonDraftCalibrationRun['bands'],
+  };
+  const draft = apply(
+    null,
+    catalog,
+    cmd('c-create', 0, {
+      kind: 'create-season-draft',
+      runId: `calibrate-${seed.slice(0, 12)}`,
+      rootSeed: seed,
+      league,
+      humanParticipantIds: ['human'],
+      catalogVersion: catalog.catalogVersion,
+    }),
+  ).state as SeasonDraftState;
+
+  let state = draft;
+  let sequence = 0;
+  let draftFailed = false;
+  while (state.status === 'drafting' && state.currentTurnParticipantId !== null) {
+    const drawn = applySeasonDraftCommand(
+      state,
+      catalog,
+      cmd(`c-draw-${String(sequence)}`, state.revision, {
+        kind: 'draw-season-offer',
+        participantId: 'human',
+      }),
+      { generate: (input) => generateAiLeague(input) },
+    );
+    if (drawn.record.status !== 'accepted' || drawn.state === null) {
+      // NO_FEASIBLE_GLOBAL_OFFER: the policy dead-ended the draft. The
+      // engine never relaxes a rule; record the failure and stop. The state
+      // stays at the last accepted snapshot (the rejection changed nothing).
+      draftFailed = true;
+      break;
+    }
+    state = drawn.state;
+    const best = pickBestSelectable(state, catalog);
+    const picked = apply(
+      state,
+      catalog,
+      cmd(`c-pick-${String(sequence)}`, state.revision, {
+        kind: 'select-draft-player',
+        participantId: 'human',
+        playerVersionId: best.playerVersionId,
+      }),
+    );
+    state = picked.state as SeasonDraftState;
+    sequence += 1;
+  }
+  if (!draftFailed && state.picks.filter((pick) => pick.participantId === 'human').length !== 10) {
+    throw new Error(`seed ${seed} did not complete ten picks`);
+  }
+
+  const measured = measureDraft(state, catalog);
+
+  if (draftFailed) {
+    return { seed, ...measured, draftFailed: true, generationFailed: false, bands: empty.bands };
+  }
+  const finalized = apply(
+    state,
+    catalog,
+    cmd('c-finalize', state.revision, {
+      kind: 'finalize-human-rosters',
+    }),
+  );
+  state = finalized.state as SeasonDraftState;
+
+  let generation: SeasonLeagueGenerationResult;
+  let generationFailed = false;
+  const generated = applySeasonDraftCommand(
+    state,
+    catalog,
+    cmd('c-generate', state.revision, {
+      kind: 'generate-ai-league',
+    }),
+    {
+      generate: (input) => generateAiLeague(input),
+    },
+  );
+  if (generated.record.status !== 'accepted' || generated.generation === null) {
+    generationFailed = true;
+    generation = {
+      schemaVersion: 1,
+      seed,
+      aiVersion: 'season-ai-v1',
+      rosterGenerationVersion: 'roster-generation-v1',
+      rotationVersion: 'season-rotation-v2',
+      rosters: [],
+      ownership: [],
+      rotations: [],
+      aiAssignments: [],
+      evaluations: [],
+      diagnostics: {
+        seed,
+        aiVersion: 'season-ai-v1',
+        rosterGenerationVersion: 'roster-generation-v1',
+        teamsGenerated: 0,
+        teamsRepaired: 0,
+        backtracks: 0,
+        nodesVisited: 0,
+        nodeBudget: 100000,
+        failedTeams: [],
+        unmetConstraints: [],
+      },
+      digest: '0'.repeat(32),
+    };
+  } else {
+    generation = generated.generation;
+  }
+
+  const humanFranchises = new Set(state.participants.map((p) => p.franchiseId));
+  const bands: SeasonDraftCalibrationRun['bands'] = {
+    contender: [],
+    playoff: [],
+    average: [],
+    weaker: [],
+  };
+  for (const evaluation of generation.evaluations) {
+    if (humanFranchises.has(evaluation.franchiseId)) continue;
+    bands[evaluation.band].push(evaluation.strengthScore);
+  }
+
+  return {
+    seed,
+    ...measured,
+    draftFailed: false,
+    generationFailed,
+    bands,
+  };
+}
+
+/** Runs a chunk of seeds through the authoritative draft path. */
+export function runSeasonDraftCalibrationSeeds(args: {
+  seeds: string[];
+  catalog: SeasonDraftCatalog;
+  league: SeasonLeague;
+}): SeasonDraftCalibrationRun[] {
+  return args.seeds.map((seed) => playSeasonDraftCalibrationSeed(seed, args.catalog, args.league));
+}
+
+function percentile(sorted: readonly number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
+  return sorted[index] ?? 0;
+}
+
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 0;
+}
+
+function distribution(values: readonly number[]): {
+  median: number;
+  range: [number, number];
+  min: number;
+  max: number;
+  sample: number;
+} {
+  const sorted = [...values].sort((a, b) => a - b);
+  return {
+    median: median(sorted),
+    range: [percentile(sorted, 0.01), percentile(sorted, 0.99)],
+    min: sorted[0] ?? 0,
+    max: sorted[sorted.length - 1] ?? 0,
+    sample: sorted.length,
+  };
+}
+
+/** Local targets artifact schema (offer-targets-v1); frozen by this command. */
+const offerTargetsSchema = z.object({
+  schemaVersion: z.literal(1),
+  targetsVersion: z.literal(SEASON_OFFER_TARGETS_VERSION),
+  calibration: z.object({
+    calibrationSeedCount: z.number().int().positive(),
+    validationSeedCount: z.number().int().positive(),
+    generatedAtIso: z.string().min(1),
+    draftVersion: z.literal('season-draft-v2'),
+    safeMinimum: z.literal(SEASON_DRAFT_SAFE_MINIMUM),
+  }),
+  variety: z.object({
+    median: z.number(),
+    range: z.tuple([z.number(), z.number()]),
+    min: z.number(),
+    max: z.number(),
+    sample: z.number().int().nonnegative(),
+  }),
+  selectableGroupCoverage: z.object({
+    share: z.number().min(0).max(1),
+    range: z.tuple([z.number(), z.number()]),
+    sampleOffers: z.number().int().nonnegative(),
+  }),
+  bands: z.object({
+    contender: z.object({
+      median: z.number(),
+      range: z.tuple([z.number(), z.number()]),
+    }),
+    playoff: z.object({
+      median: z.number(),
+      range: z.tuple([z.number(), z.number()]),
+    }),
+    average: z.object({
+      median: z.number(),
+      range: z.tuple([z.number(), z.number()]),
+    }),
+    weaker: z.object({
+      median: z.number(),
+      range: z.tuple([z.number(), z.number()]),
+    }),
+  }),
+  heldOutPassShare: z.literal(0.95),
+});
+export type SeasonOfferTargets = z.infer<typeof offerTargetsSchema>;
+
+async function runCalibrationChunks(args: {
+  seeds: string[];
+  catalogPath: string;
+  leaguePath: string;
+  workers: number;
+}): Promise<SeasonDraftCalibrationRun[]> {
+  const chunkSize = Math.max(1, Math.ceil(args.seeds.length / args.workers));
+  const chunks: string[][] = [];
+  for (let i = 0; i < args.seeds.length; i += chunkSize) {
+    chunks.push(args.seeds.slice(i, i + chunkSize));
+  }
+  const results = await Promise.all(
+    chunks.map(
+      (seeds) =>
+        new Promise<SeasonDraftCalibrationRun[]>((resolvePromise, rejectPromise) => {
+          const worker = new Worker(new URL('./draft-calibration-worker.ts', import.meta.url), {
+            workerData: { ...args, seeds },
+          });
+          worker.on('message', (message: { runs: SeasonDraftCalibrationRun[] }) => {
+            resolvePromise(message.runs);
+            void worker.terminate();
+          });
+          worker.on('error', rejectPromise);
+          worker.on('exit', (code) => {
+            if (code !== 0) rejectPromise(new Error(`worker exited ${String(code)}`));
+          });
+        }),
+    ),
+  );
+  return results.flat();
+}
+
+export async function seasonDraftCalibrate(args: {
+  workers?: string;
+  'calibration-seeds'?: string;
+  'validation-seeds'?: string;
+  out?: string;
+  manifest?: string;
+}): Promise<CliReport> {
+  const calibrationCount = parseCount(args['calibration-seeds'], '--calibration-seeds', 256);
+  const validationCount = parseCount(args['validation-seeds'], '--validation-seeds', 64);
+  const workers = Math.max(1, parseCount(args.workers, '--workers', 4));
+  const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
+  const catalogPath = resolve(manifestPath, '..', 'season', 'draft-catalog.json');
+  const leaguePath = resolve(manifestPath, '..', 'season', 'league.json');
+  const start = Date.now();
+
+  const calibrationSeeds = Array.from({ length: calibrationCount }, (_, i) =>
+    rosterCalibrationSeed(i),
+  );
+  const validationSeeds = Array.from({ length: validationCount }, (_, i) =>
+    rosterCalibrationSeed(calibrationCount + i),
+  );
+  const calibrationRuns = await runCalibrationChunks({
+    seeds: calibrationSeeds,
+    catalogPath,
+    leaguePath,
+    workers,
+  });
+  const validationRuns = await runCalibrationChunks({
+    seeds: validationSeeds,
+    catalogPath,
+    leaguePath,
+    workers,
+  });
+  const durationMs = Date.now() - start;
+
+  // Calibration metrics.
+  const varietyValues = calibrationRuns.map((run) => run.variety);
+  const safeValues = calibrationRuns.map((run) => run.minSafePerOffer);
+  const coverageValues = calibrationRuns.map((run) => run.selectableGroupCoverageShare);
+  const byBand: SeasonDraftCalibrationRun['bands'] = {
+    contender: [],
+    playoff: [],
+    average: [],
+    weaker: [],
+  };
+  let generationFailures = 0;
+  let draftFailures = 0;
+  let duplicateDrafts = 0;
+  for (const run of calibrationRuns) {
+    if (run.generationFailed) generationFailures += 1;
+    if (run.draftFailed) draftFailures += 1;
+    if (run.duplicateVersion) duplicateDrafts += 1;
+    for (const band of ['contender', 'playoff', 'average', 'weaker'] as const) {
+      byBand[band].push(...run.bands[band]);
+    }
+  }
+  const bands = {
+    contender: distribution(byBand.contender),
+    playoff: distribution(byBand.playoff),
+    average: distribution(byBand.average),
+    weaker: distribution(byBand.weaker),
+  };
+  const variety = distribution(varietyValues);
+  const coverage = distribution(coverageValues);
+  const minSafe = Math.min(...safeValues);
+  const safeAvailabilityShare =
+    calibrationRuns.length === 0
+      ? 0
+      : calibrationRuns.filter((run) => run.minSafePerOffer >= SEASON_DRAFT_SAFE_MINIMUM).length /
+        calibrationRuns.length;
+  const allOffers = calibrationRuns.reduce((sum) => sum + 10, 0);
+  const coveredOffers = calibrationRuns.reduce(
+    (sum, run) => sum + run.selectableGroupCoverageShare * 10,
+    0,
+  );
+  const selectableGroupCoverageShare = allOffers === 0 ? 0 : coveredOffers / allOffers;
+
+  // Gates on the calibration cohort (frozen: spec/2.0/03 + offer-targets-v1).
+  const minSafeGate = safeAvailabilityShare === 1 && minSafe >= SEASON_DRAFT_SAFE_MINIMUM;
+  const zeroDuplicates = duplicateDrafts === 0;
+  const zeroGenerationFailures = generationFailures === 0;
+
+  // Held-out pass shares against the frozen calibration envelopes. Variety,
+  // safe-choice availability, and selectable group coverage are draft-level
+  // checks (a dead-ended held-out draft fails all three); roster strength is
+  // a per-team check over completed drafts, mirroring the roster
+  // calibration's held-out gate.
+  const withinVariety = (run: SeasonDraftCalibrationRun): boolean =>
+    !run.draftFailed && run.variety >= variety.range[0] && run.variety <= variety.range[1];
+  const withinCoverage = (run: SeasonDraftCalibrationRun): boolean =>
+    !run.draftFailed &&
+    run.selectableGroupCoverageShare >= coverage.range[0] &&
+    run.selectableGroupCoverageShare <= coverage.range[1];
+  const shareOf = (
+    runs: SeasonDraftCalibrationRun[],
+    check: (run: SeasonDraftCalibrationRun) => boolean,
+  ): number => {
+    if (runs.length === 0) return 0;
+    return runs.filter(check).length / runs.length;
+  };
+  const heldOutVarietyPassShare = shareOf(validationRuns, withinVariety);
+  const heldOutSafePassShare = shareOf(
+    validationRuns,
+    (run) => !run.draftFailed && run.minSafePerOffer >= SEASON_DRAFT_SAFE_MINIMUM,
+  );
+  const heldOutCoveragePassShare = shareOf(validationRuns, withinCoverage);
+  let heldOutStrengthWithin = 0;
+  let heldOutStrengthTotal = 0;
+  for (const run of validationRuns) {
+    if (run.draftFailed || run.generationFailed) continue;
+    for (const band of ['contender', 'playoff', 'average', 'weaker'] as const) {
+      for (const score of run.bands[band]) {
+        heldOutStrengthTotal += 1;
+        if (score >= bands[band].range[0] && score <= bands[band].range[1]) {
+          heldOutStrengthWithin += 1;
+        }
+      }
+    }
+  }
+  const heldOutStrengthPassShare =
+    heldOutStrengthTotal === 0 ? 0 : heldOutStrengthWithin / heldOutStrengthTotal;
+  const heldOutPassShare = Math.min(
+    heldOutVarietyPassShare,
+    heldOutSafePassShare,
+    heldOutCoveragePassShare,
+    heldOutStrengthPassShare,
+  );
+  const heldOutPass = heldOutPassShare >= 0.95;
+
+  const pass = minSafeGate && zeroDuplicates && zeroGenerationFailures && heldOutPass;
+
+  // Freeze the targets artifact.
+  let targetsWritten = false;
+  let targetsPath: string | null = null;
+  const gateFailures: string[] = [];
+  const targets: SeasonOfferTargets = {
+    schemaVersion: 1,
+    targetsVersion: SEASON_OFFER_TARGETS_VERSION,
+    calibration: {
+      calibrationSeedCount: calibrationCount,
+      validationSeedCount: validationCount,
+      generatedAtIso: new Date().toISOString(),
+      draftVersion: 'season-draft-v2',
+      safeMinimum: SEASON_DRAFT_SAFE_MINIMUM,
+    },
+    variety: {
+      median: variety.median,
+      range: variety.range,
+      min: variety.min,
+      max: variety.max,
+      sample: variety.sample,
+    },
+    selectableGroupCoverage: {
+      share: selectableGroupCoverageShare,
+      range: coverage.range,
+      sampleOffers: allOffers,
+    },
+    bands: {
+      contender: { median: bands.contender.median, range: bands.contender.range },
+      playoff: { median: bands.playoff.median, range: bands.playoff.range },
+      average: { median: bands.average.median, range: bands.average.range },
+      weaker: { median: bands.weaker.median, range: bands.weaker.range },
+    },
+    heldOutPassShare: 0.95,
+  };
+  offerTargetsSchema.parse(targets);
+  const outPath = args.out ?? DEFAULT_OFFER_TARGETS;
+  try {
+    const target = resolve(outPath);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, `${JSON.stringify(targets, null, 2)}\n`);
+    targetsWritten = true;
+    targetsPath = target;
+    // Update the manifest hash for the committed targets artifact.
+    if (resolve(outPath) === resolve(DEFAULT_OFFER_TARGETS)) {
+      const manifestPathResolved = resolve(manifestPath);
+      const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {
+        season?: Record<string, { url?: string; contentHash?: string }>;
+      };
+      if (manifest.season !== undefined) {
+        manifest.season.offerTargets = {
+          url: 'season/offer-targets.json',
+          contentHash: sha256Hex(readFileSync(target)),
+        };
+        writeFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
+      }
+    }
+  } catch (error) {
+    gateFailures.push(`cannot write targets: ${(error as Error).message}`);
+  }
+
+  const payload = seasonDraftCalibrateReportSchema.parse({
+    schemaVersion: 1,
+    command: 'season draft calibrate',
+    calibrationSeeds: calibrationCount,
+    validationSeeds: validationCount,
+    durationMs,
+    variety,
+    minSafePerOffer: minSafe,
+    safeAvailabilityShare,
+    selectableGroupCoverageShare,
+    duplicateDrafts,
+    draftFailures,
+    generationFailures,
+    bands,
+    gates: {
+      minSafe: minSafeGate,
+      zeroDuplicates,
+      zeroDraftFailures: draftFailures === 0,
+      zeroGenerationFailures,
+      selectableGroupCoverage: selectableGroupCoverageShare >= 0.95,
+      heldOutVarietyPassShare,
+      heldOutVarietyPass: heldOutVarietyPassShare >= 0.95,
+      heldOutSafePassShare,
+      heldOutSafePass: heldOutSafePassShare >= 0.95,
+      heldOutCoveragePassShare,
+      heldOutCoveragePass: heldOutCoveragePassShare >= 0.95,
+      heldOutStrengthPassShare,
+      heldOutStrengthPass: heldOutStrengthPassShare >= 0.95,
+    },
+    targetsWritten,
+    targetsPath,
+    pass,
+  });
+  const details = [
+    `${String(calibrationCount)} calibration + ${String(validationCount)} validation seeds in ${String(durationMs)}ms (${String(workers)} workers)`,
+    `variety median ${variety.median.toFixed(1)} (range ${variety.range[0].toFixed(1)}-${variety.range[1].toFixed(1)}) · min safe per offer ${String(minSafe)} · safe availability ${(safeAvailabilityShare * 100).toFixed(1)}%`,
+    `selectable group coverage ${(selectableGroupCoverageShare * 100).toFixed(1)}% · duplicate drafts ${String(duplicateDrafts)} · draft failures ${String(draftFailures)} · generation failures ${String(generationFailures)}`,
+    `held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% (≥ 95% required)`,
+    `gates: minSafe ${String(minSafeGate)} · duplicates ${String(zeroDuplicates)} · generation ${String(zeroGenerationFailures)}`,
+    `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
+  ];
+  if (draftFailures > 0) {
+    // Policy finding, not a frozen gate: the greedy pickBestSelectable policy
+    // can dead-end a draft with NO_FEASIBLE_GLOBAL_OFFER (the engine never
+    // relaxes a rule; a feasibility-aware human can always complete). The
+    // artifact and all frozen gates still pass.
+    details.push(
+      `${String(draftFailures)} drafts dead-ended with NO_FEASIBLE_GLOBAL_OFFER under the greedy pick policy (finding; not a frozen gate)`,
+    );
+  }
+  if (!minSafeGate) gateFailures.push('some offer had fewer than 3 selectable cards');
+  if (!zeroDuplicates) gateFailures.push('an exact version was duplicated across offers+picks');
+  if (!zeroGenerationFailures) {
+    gateFailures.push(`${String(generationFailures)} AI generation failures`);
+  }
+  if (!heldOutPass) {
+    gateFailures.push(`held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% below 95%`);
+  }
+  if (!targetsWritten) gateFailures.push('targets artifact was not written');
+  return makeReport(
+    'season draft calibrate',
+    { workers, calibrationSeeds: calibrationCount, validationSeeds: validationCount },
+    {
+      details,
+      failures: gateFailures,
+      payload,
+    },
+  );
+}

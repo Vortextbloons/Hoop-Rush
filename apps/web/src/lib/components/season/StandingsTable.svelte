@@ -95,7 +95,7 @@
             <span class="w-7 shrink-0 font-mono text-[10px] font-bold text-muted-foreground">
               {ordinal(entry.rank)}
             </span>
-            {#if identity}
+            {#if manifest && identity}
               <SeasonTeamLogo
                 {manifest}
                 franchiseId={identity.franchiseId}
@@ -189,7 +189,7 @@
               </td>
               <th scope="row" class="max-w-44 truncate px-3 py-2 text-left font-semibold">
                 <span class="flex items-center gap-2">
-                  {#if identity}
+                  {#if manifest && identity}
                     <SeasonTeamLogo
                       {manifest}
                       franchiseId={identity.franchiseId}

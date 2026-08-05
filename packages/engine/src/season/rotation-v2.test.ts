@@ -53,6 +53,9 @@ const MEMBER_PLAYABLE = new Map(MEMBERS.map((member) => [member.playerVersionId,
 const STARTERS = [pv(1), pv(2), pv(3), pv(4), pv(5)];
 const BENCH = [pv(6), pv(7), pv(8), pv(9), pv(10)];
 
+/** Balanced preset target minutes for the ten roster slots, in roster order. */
+const BALANCED_TARGET_MINUTES = [33, 33, 33, 33, 33, 21, 18, 15, 12, 9] as const;
+
 function buildRotation(overrides: Partial<SeasonRotation> = {}): SeasonRotation {
   return {
     franchiseId: 'lakers',
@@ -97,18 +100,12 @@ describe('applySeasonRotationPreset (season-rotation-v2)', () => {
   it('applies the balanced table and preserves everything else', () => {
     const input = buildRotation();
     const result = applySeasonRotationPreset(input, 'balanced');
-    expect(result.targetMinutes).toEqual([
-      { playerVersionId: pv(1), minutes: 33 },
-      { playerVersionId: pv(2), minutes: 33 },
-      { playerVersionId: pv(3), minutes: 33 },
-      { playerVersionId: pv(4), minutes: 33 },
-      { playerVersionId: pv(5), minutes: 33 },
-      { playerVersionId: pv(6), minutes: 21 },
-      { playerVersionId: pv(7), minutes: 18 },
-      { playerVersionId: pv(8), minutes: 15 },
-      { playerVersionId: pv(9), minutes: 12 },
-      { playerVersionId: pv(10), minutes: 9 },
-    ]);
+    expect(result.targetMinutes).toEqual(
+      BALANCED_TARGET_MINUTES.map((minutes, index) => ({
+        playerVersionId: pv(index + 1),
+        minutes,
+      })),
+    );
     expect(rotationTargetMinutes(result)).toBe(240);
     expect(result.starters).toEqual(input.starters);
     expect(result.benchOrder).toEqual(input.benchOrder);
@@ -137,6 +134,11 @@ describe('applySeasonRotationPreset (season-rotation-v2)', () => {
       const result = applySeasonRotationPreset(buildRotation(), preset);
       expect(rotationTargetMinutes(result)).toBe(240);
       const table = SEASON_ROTATION_PRESET_TARGETS[preset];
+      if (preset === 'balanced') {
+        expect([...STARTERS.map(() => table.starters), ...table.bench]).toEqual(
+          BALANCED_TARGET_MINUTES,
+        );
+      }
       for (const starter of STARTERS) {
         expect(
           result.targetMinutes.find((entry) => entry.playerVersionId === starter)?.minutes,
@@ -320,18 +322,12 @@ describe('handleSetSeasonRotationCommand (season-rotation-v2)', () => {
     expect(result.rotation.starters).toEqual(STARTERS);
     expect(result.rotation.benchOrder).toEqual(BENCH);
     expect(result.rotation.closingFive).toEqual(STARTERS);
-    expect(result.rotation.targetMinutes).toEqual([
-      { playerVersionId: pv(1), minutes: 33 },
-      { playerVersionId: pv(2), minutes: 33 },
-      { playerVersionId: pv(3), minutes: 33 },
-      { playerVersionId: pv(4), minutes: 33 },
-      { playerVersionId: pv(5), minutes: 33 },
-      { playerVersionId: pv(6), minutes: 21 },
-      { playerVersionId: pv(7), minutes: 18 },
-      { playerVersionId: pv(8), minutes: 15 },
-      { playerVersionId: pv(9), minutes: 12 },
-      { playerVersionId: pv(10), minutes: 9 },
-    ]);
+    expect(result.rotation.targetMinutes).toEqual(
+      BALANCED_TARGET_MINUTES.map((minutes, index) => ({
+        playerVersionId: pv(index + 1),
+        minutes,
+      })),
+    );
     expect(rotationTargetMinutes(result.rotation)).toBe(240);
     expect(seasonRotationCommandResultSchema.safeParse(result).success).toBe(true);
   });

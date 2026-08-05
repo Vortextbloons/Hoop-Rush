@@ -53,6 +53,7 @@ import {
   seasonDraftStateDigest,
 } from '@hoop-rush/engine';
 import { buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
+import { pickBestSelectable } from './commands/season-data.ts';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
@@ -77,50 +78,11 @@ function cmd(
 }
 
 /**
- * Deterministic fixture pick policy: the feasible candidate in the revealed
- * pool with the highest summary overall rating. Returns the accepted command
- * so the reproduction fixture records it.
+ * Plays the committed one-human draft to completion through real commands:
+ * create -> per round: draw the global eight-card offer, pick the best
+ * selectable card -> finalize -> generate the AI league. All commands are
+ * recorded so the reproduction fixture replays them byte-for-byte.
  */
-function pickBest(
-  state: SeasonDraftState,
-  catalog: ReturnType<typeof seasonDraftCatalogSchema.parse>,
-  commandId: string,
-): { state: SeasonDraftState; command: SeasonDraftCommand } {
-  const reveal = state.currentReveal;
-  if (reveal === null) throw new Error('no reveal for the fixture pick');
-  const last = reveal.attempts[reveal.attempts.length - 1];
-  if (!last?.usable) throw new Error('revealed pool is not usable');
-  const owned = new Set(state.picks.map((p) => p.playerVersionId));
-  const candidates = catalog.candidates
-    .filter(
-      (c) =>
-        c.franchiseId === last.franchiseId &&
-        c.eraId === last.eraId &&
-        !owned.has(c.playerVersionId),
-    )
-    .sort(
-      (a, b) =>
-        b.summaryRatings.overallRating - a.summaryRatings.overallRating ||
-        a.playerVersionId.localeCompare(b.playerVersionId),
-    );
-  for (const candidate of candidates) {
-    const command = cmd(commandId, state.revision, {
-      kind: 'select-draft-player',
-      participantId: reveal.participantId,
-      playerVersionId: candidate.playerVersionId,
-    });
-    const result = applySeasonDraftCommand(state, catalog, command, {
-      generate: (input) => generateAiLeague(input),
-    });
-    if (result.record.status === 'accepted') {
-      if (result.state === null) throw new Error('fixture pick produced no state');
-      return { state: result.state, command };
-    }
-  }
-  throw new Error('fixture pick found no legal candidate');
-}
-
-/** Plays the committed one-human draft to completion through real commands. */
 function playCommittedDraft(
   catalog: ReturnType<typeof seasonDraftCatalogSchema.parse>,
   league: SeasonLeague,
@@ -131,8 +93,7 @@ function playCommittedDraft(
 } {
   const commands: SeasonDraftCommand[] = [];
   let state: SeasonDraftState | null = null;
-  let sequence = 0;
-  const apply = (command: SeasonDraftCommand): void => {
+  const apply = (command: SeasonDraftCommand): SeasonDraftState => {
     const result = applySeasonDraftCommand(state, catalog, command, {
       generate: (input) => generateAiLeague(input),
     });
@@ -143,8 +104,9 @@ function playCommittedDraft(
     }
     commands.push(command);
     state = result.state;
+    return result.state;
   };
-  apply(
+  state = apply(
     cmd('fixture-create', 0, {
       kind: 'create-season-draft',
       runId: 'fixture-season-run-1',
@@ -154,33 +116,27 @@ function playCommittedDraft(
       catalogVersion: SEASON_DRAFT_VERSION,
     }),
   );
-  while (state !== null && state.status === 'drafting' && state.currentTurnParticipantId !== null) {
+  let sequence = 0;
+  while (state.status === 'drafting' && state.currentTurnParticipantId !== null) {
     const pid = state.currentTurnParticipantId;
-    apply(
-      cmd(`fixture-reveal-${String(sequence)}`, state.revision, {
-        kind: 'reveal-draft-roll',
+    state = apply(
+      cmd(`fixture-draw-${String(sequence)}`, state.revision, {
+        kind: 'draw-season-offer',
         participantId: pid,
       }),
     );
-    const reveal = state.currentReveal;
-    const last = reveal?.attempts[reveal.attempts.length - 1];
-    if (!last) throw new Error('no reveal attempts');
-    apply(
-      cmd(`fixture-claim-${String(sequence)}`, state.revision, {
-        kind: 'claim-draft-pool',
+    const best = pickBestSelectable(state, catalog);
+    state = apply(
+      cmd(`fixture-pick-${String(sequence)}`, state.revision, {
+        kind: 'select-draft-player',
         participantId: pid,
-        franchiseId: last.franchiseId,
-        eraId: last.eraId,
+        playerVersionId: best.playerVersionId,
       }),
     );
-    const picked = pickBest(state, catalog, `fixture-pick-${String(sequence)}`);
-    commands.push(picked.command);
-    state = picked.state;
     sequence += 1;
   }
-  if (state === null) throw new Error('fixture draft produced no state');
-  const finalState: SeasonDraftState = state;
-  apply(cmd('fixture-finalize', finalState.revision, { kind: 'finalize-human-rosters' }));
+  const finalState = state;
+  state = apply(cmd('fixture-finalize', finalState.revision, { kind: 'finalize-human-rosters' }));
   const humanRosters = finalState.participants.map((participant) => ({
     franchiseId: participant.franchiseId,
     playerVersionIds: finalState.picks
@@ -195,7 +151,7 @@ function playCommittedDraft(
     humanRosters,
     targets: null,
   });
-  apply(cmd('fixture-generate', state.revision, { kind: 'generate-ai-league' }));
+  state = apply(cmd('fixture-generate', state.revision, { kind: 'generate-ai-league' }));
   return { state, commands, generation };
 }
 
@@ -376,17 +332,17 @@ function buildRun(
       participants: draft.participants.map((participant) => ({
         participantId: participant.participantId,
         franchiseId: participant.franchiseId,
-        rolls: draft.rolls.map((roll) => ({
-          franchiseId: roll.franchiseId,
-          eraId: roll.eraId,
-          attemptIndex: roll.attemptIndex,
-          usable: roll.usable,
-        })),
-        claims: draft.claims
-          .filter((claim) => claim.participantId === participant.participantId)
-          .map((claim) => ({
-            franchiseId: claim.franchiseId,
-            eraId: claim.eraId,
+        offers: draft.offers
+          .filter((offer) => offer.participantId === participant.participantId)
+          .map((offer) => ({
+            round: offer.round,
+            pickOrdinal: offer.pickOrdinal,
+            seedPath: offer.seedPath,
+            cards: offer.cards.map((card) => ({
+              playerVersionId: card.playerVersionId,
+              selectable: card.selectable,
+              coverageReason: card.coverageReason,
+            })),
           })),
         picks: draft.picks
           .filter((pick) => pick.participantId === participant.participantId)
@@ -395,6 +351,7 @@ function buildRun(
             playerVersionId: pick.playerVersionId,
             franchiseId: pick.franchiseId,
             eraId: pick.eraId,
+            seedPath: pick.seedPath,
           })),
       })),
     },

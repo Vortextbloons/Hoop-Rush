@@ -65,18 +65,18 @@ describe('cli: season draft reproduce', () => {
     const payload = seasonDraftReproduceReportSchema.parse(jsonPayload(stdout));
     expect(payload.pass).toBe(true);
     expect(payload.identical).toBe(true);
-    expect(payload.finalDigest).toBe('10ea4b28b32bdacc6b974886a0a09f98');
+    expect(payload.finalDigest).toBe('d3439ffe629a113a96a6bc68f32e49ae');
     expect(payload.acceptedCount).toBe(payload.commandCount);
     expect(payload.rejectedCount).toBe(0);
-    expect(payload.rolls).toHaveLength(23);
-    expect(payload.claims).toHaveLength(10);
+    expect(payload.offers).toHaveLength(10);
     expect(payload.picks).toHaveLength(10);
   });
 
   it('rejects malformed inputs with a usage error', async () => {
     const bad = join(REPO_ROOT, 'tools/cli/src/fixtures/season-draft-finalized.json');
-    const { code } = await runCli(['season', 'draft', 'reproduce', '--input', bad]);
+    const { code, stderr } = await runCli(['season', 'draft', 'reproduce', '--input', bad]);
     expect(code).toBe(2);
+    expect(stderr).toContain('commands input fails the schema');
   });
 
   it('reports divergences with a nonzero exit', async () => {
@@ -189,7 +189,7 @@ describe('cli: season rosters generate', () => {
   });
 
   it('rejects a non-hex seed with a usage error', async () => {
-    const { code } = await runCli([
+    const { code, stderr } = await runCli([
       'season',
       'rosters',
       'generate',
@@ -199,5 +199,6 @@ describe('cli: season rosters generate', () => {
       DRAFT_FINALIZED,
     ]);
     expect(code).toBe(2);
+    expect(stderr).toContain('--seed must be a hex seed');
   });
 });

@@ -29,7 +29,7 @@ import {
   seasonGameCalibrateReportSchema,
   seasonGameSimulateReportSchema,
 } from './report-schemas.ts';
-import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
+import { jsonPayload, REPO_ROOT, runCli, withTmpDir } from './cli-test-helpers.ts';
 
 /**
  * M2.2 `season game` CLI tests: committed fixture validity, unit tests with
@@ -491,201 +491,218 @@ function fakeRunner(
 
 describe('season game calibrate (unit, injected doubles)', () => {
   it('passes all gates on the frozen cohort and writes the targets artifact', async () => {
-    const targetsPath = join(TMP, 'game-targets-pass.json');
-    const manifestBefore = readFileSync(
-      join(REPO_ROOT, 'apps/web/static/data/manifest.json'),
-      'utf8',
-    );
-    const report = await seasonGameCalibrate(
-      { out: targetsPath, workers: '4' },
-      { runCohort: fakeRunner(presetFact) },
-    );
-    expect(report.exitCode).toBe(0);
-    const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-    expect(payload.calibrationSeedCount).toBe(SEASON_GAME_CALIBRATION_SEED_COUNT);
-    expect(payload.validationSeedCount).toBe(SEASON_GAME_VALIDATION_SEED_COUNT);
-    expect(payload.workers).toBe(4);
-    expect(payload.fixtures).toHaveLength(3);
-    expect(payload.fixtureStats).toHaveLength(3);
-    for (const stat of payload.fixtureStats) {
-      expect(stat.sample).toBe(SEASON_GAME_CALIBRATION_SEED_COUNT);
-      expect(stat.failures.games).toBe(0);
-      expect(stat.failures.checks).toBe(0);
-      expect(stat.failures.determinism).toBe(0);
-    }
-    const byId = new Map(payload.fixtureStats.map((stat) => [stat.fixtureId, stat]));
-    const balanced = byId.get('season-game-balanced');
-    const tight = byId.get('season-game-tight');
-    const benchHeavy = byId.get('season-game-bench-heavy');
-    expect(tight?.starterSecondsMedian).toBeGreaterThan(balanced?.starterSecondsMedian ?? 0);
-    expect(balanced?.starterSecondsMedian).toBeGreaterThan(benchHeavy?.starterSecondsMedian ?? 0);
-    expect(benchHeavy?.benchSecondsMedian).toBeGreaterThan(balanced?.benchSecondsMedian ?? 0);
-    expect(balanced?.benchSecondsMedian).toBeGreaterThan(tight?.benchSecondsMedian ?? 0);
-    expect(payload.gates).toEqual({
-      zeroFailures: true,
-      starterOrdering: true,
-      benchOrdering: true,
-      benchRoleNonIncreasing: true,
-      heldOutPassShare: 1,
-      heldOutPass: true,
-    });
-    expect(payload.chunkingIndependent).toBe(true);
-    expect(payload.targetsWritten).toBe(true);
-    expect(payload.pass).toBe(true);
+    await withTmpDir(async (tmp) => {
+      const targetsPath = join(tmp, 'game-targets-pass.json');
+      const manifestBefore = readFileSync(
+        join(REPO_ROOT, 'apps/web/static/data/manifest.json'),
+        'utf8',
+      );
+      const report = await seasonGameCalibrate(
+        { out: targetsPath, workers: '4' },
+        { runCohort: fakeRunner(presetFact) },
+      );
+      expect(report.exitCode).toBe(0);
+      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
+      expect(payload.calibrationSeedCount).toBe(SEASON_GAME_CALIBRATION_SEED_COUNT);
+      expect(payload.validationSeedCount).toBe(SEASON_GAME_VALIDATION_SEED_COUNT);
+      expect(payload.workers).toBe(4);
+      expect(payload.fixtures).toHaveLength(3);
+      expect(payload.fixtureStats).toHaveLength(3);
+      for (const stat of payload.fixtureStats) {
+        expect(stat.sample).toBe(SEASON_GAME_CALIBRATION_SEED_COUNT);
+        expect(stat.failures.games).toBe(0);
+        expect(stat.failures.checks).toBe(0);
+        expect(stat.failures.determinism).toBe(0);
+      }
+      const byId = new Map(payload.fixtureStats.map((stat) => [stat.fixtureId, stat]));
+      const balanced = byId.get('season-game-balanced');
+      const tight = byId.get('season-game-tight');
+      const benchHeavy = byId.get('season-game-bench-heavy');
+      expect(tight?.starterSecondsMedian).toBeGreaterThan(balanced?.starterSecondsMedian ?? 0);
+      expect(balanced?.starterSecondsMedian).toBeGreaterThan(benchHeavy?.starterSecondsMedian ?? 0);
+      expect(benchHeavy?.benchSecondsMedian).toBeGreaterThan(balanced?.benchSecondsMedian ?? 0);
+      expect(balanced?.benchSecondsMedian).toBeGreaterThan(tight?.benchSecondsMedian ?? 0);
+      expect(payload.gates).toEqual({
+        zeroFailures: true,
+        starterOrdering: true,
+        benchOrdering: true,
+        benchRoleNonIncreasing: true,
+        heldOutPassShare: 1,
+        heldOutPass: true,
+      });
+      expect(payload.chunkingIndependent).toBe(true);
+      expect(payload.targetsWritten).toBe(true);
+      expect(payload.pass).toBe(true);
 
-    const targets = seasonGameTargetsSchema.parse(JSON.parse(readFileSync(targetsPath, 'utf8')));
-    expect(targets.fixtures.map((fixture) => fixture.fixtureId)).toEqual([
-      'season-game-balanced',
-      'season-game-tight',
-      'season-game-bench-heavy',
-    ]);
-    expect(targets.gates.heldOutPass).toBe(true);
-    expect(targets.gates.starterOrdering).toBe(true);
-    expect(targets.calibration.calibrationSeedCount).toBe(SEASON_GAME_CALIBRATION_SEED_COUNT);
-    expect(targets.calibration.validationSeedCount).toBe(SEASON_GAME_VALIDATION_SEED_COUNT);
-    // A --out override must not touch the committed manifest.
-    const manifestAfter = readFileSync(
-      join(REPO_ROOT, 'apps/web/static/data/manifest.json'),
-      'utf8',
-    );
-    expect(manifestAfter).toBe(manifestBefore);
+      const targets = seasonGameTargetsSchema.parse(JSON.parse(readFileSync(targetsPath, 'utf8')));
+      expect(targets.fixtures.map((fixture) => fixture.fixtureId)).toEqual([
+        'season-game-balanced',
+        'season-game-tight',
+        'season-game-bench-heavy',
+      ]);
+      expect(targets.gates.heldOutPass).toBe(true);
+      expect(targets.gates.starterOrdering).toBe(true);
+      expect(targets.calibration.calibrationSeedCount).toBe(SEASON_GAME_CALIBRATION_SEED_COUNT);
+      expect(targets.calibration.validationSeedCount).toBe(SEASON_GAME_VALIDATION_SEED_COUNT);
+      // A --out override must not touch the committed manifest.
+      const manifestAfter = readFileSync(
+        join(REPO_ROOT, 'apps/web/static/data/manifest.json'),
+        'utf8',
+      );
+      expect(manifestAfter).toBe(manifestBefore);
+    });
   });
 
   it('worker counts never change aggregates (1 vs 4 workers)', async () => {
-    const run = async (workers: string) => {
-      const report = await seasonGameCalibrate(
-        { workers, out: join(TMP, `game-targets-workers-${workers}.json`) },
-        { runCohort: fakeRunner(presetFact) },
-      );
-      return seasonGameCalibrateReportSchema.parse(report.payload);
-    };
-    const one = await run('1');
-    const four = await run('4');
-    expect(four.fixtureStats).toEqual(one.fixtureStats);
-    expect(four.gates).toEqual(one.gates);
-    expect(four.chunkingIndependent).toBe(true);
+    await withTmpDir(async (tmp) => {
+      const run = async (workers: string) => {
+        const report = await seasonGameCalibrate(
+          { workers, out: join(tmp, `game-targets-workers-${workers}.json`) },
+          { runCohort: fakeRunner(presetFact) },
+        );
+        return seasonGameCalibrateReportSchema.parse(report.payload);
+      };
+      const one = await run('1');
+      const four = await run('4');
+      expect(four.fixtureStats).toEqual(one.fixtureStats);
+      expect(four.gates).toEqual(one.gates);
+      expect(four.chunkingIndependent).toBe(true);
+    });
   });
 
   it('fails the bench ordering gate when the bench-heavy fixture benches little', async () => {
-    const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
-      const fact = presetFact(fixtureId, seedIndex);
-      if (fixtureId === 'season-game-bench-heavy') {
-        const benchRole: number[][] = [];
-        const benchSeconds: number[] = [];
-        for (let i = 0; i < 5; i += 1) {
-          benchRole.push([300, 300]);
-          benchSeconds.push(300, 300);
+    await withTmpDir(async (tmp) => {
+      const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
+        const fact = presetFact(fixtureId, seedIndex);
+        if (fixtureId === 'season-game-bench-heavy') {
+          const benchRole: number[][] = [];
+          const benchSeconds: number[] = [];
+          for (let i = 0; i < 5; i += 1) {
+            benchRole.push([300, 300]);
+            benchSeconds.push(300, 300);
+          }
+          return {
+            ...fact,
+            benchSeconds,
+            benchRoleSeconds: benchRole,
+          };
         }
-        return {
-          ...fact,
-          benchSeconds,
-          benchRoleSeconds: benchRole,
-        };
-      }
-      return fact;
-    };
-    const report = await seasonGameCalibrate(
-      { out: join(TMP, 'game-targets-ordering.json') },
-      { runCohort: fakeRunner(factory) },
-    );
-    expect(report.exitCode).toBe(1);
-    const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-    expect(payload.gates.benchOrdering).toBe(false);
-    expect(payload.gates.starterOrdering).toBe(true);
-    expect(payload.pass).toBe(false);
-    expect(payload.targetsWritten).toBe(false);
-    expect(
-      report.failures.some(
-        (failure) => failure.includes('benchOrdering') || failure.includes('bench second medians'),
-      ),
-    ).toBe(true);
+        return fact;
+      };
+      const report = await seasonGameCalibrate(
+        { out: join(tmp, 'game-targets-ordering.json') },
+        { runCohort: fakeRunner(factory) },
+      );
+      expect(report.exitCode).toBe(1);
+      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
+      expect(payload.gates.benchOrdering).toBe(false);
+      expect(payload.gates.starterOrdering).toBe(true);
+      expect(payload.pass).toBe(false);
+      expect(payload.targetsWritten).toBe(false);
+      expect(
+        report.failures.some(
+          (failure) =>
+            failure.includes('benchOrdering') || failure.includes('bench second medians'),
+        ),
+      ).toBe(true);
+    });
   });
 
   it('fails the held-out gate when validation points leave the envelopes', async () => {
-    const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
-      const fact = presetFact(fixtureId, seedIndex);
-      if (seedIndex >= SEASON_GAME_CALIBRATION_SEED_COUNT) {
-        return { ...fact, points: [150, 149] };
-      }
-      return fact;
-    };
-    const report = await seasonGameCalibrate(
-      { out: join(TMP, 'game-targets-heldout.json') },
-      { runCohort: fakeRunner(factory) },
-    );
-    const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-    expect(payload.gates.heldOutPassShare).toBeLessThan(0.95);
-    expect(payload.gates.heldOutPass).toBe(false);
-    expect(payload.pass).toBe(false);
-    expect(payload.targetsWritten).toBe(false);
+    await withTmpDir(async (tmp) => {
+      const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
+        const fact = presetFact(fixtureId, seedIndex);
+        if (seedIndex >= SEASON_GAME_CALIBRATION_SEED_COUNT) {
+          return { ...fact, points: [150, 149] };
+        }
+        return fact;
+      };
+      const report = await seasonGameCalibrate(
+        { out: join(tmp, 'game-targets-heldout.json') },
+        { runCohort: fakeRunner(factory) },
+      );
+      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
+      expect(payload.gates.heldOutPassShare).toBeLessThan(0.95);
+      expect(payload.gates.heldOutPass).toBe(false);
+      expect(payload.pass).toBe(false);
+      expect(payload.targetsWritten).toBe(false);
+    });
   });
 
   it('fails the zero-failures gate on check failures and determinism divergences', async () => {
-    const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
-      const fact = presetFact(fixtureId, seedIndex);
-      if (seedIndex === 5) return { ...fact, checks: ['legality: unavailable player on court'] };
-      if (seedIndex === 7) return { ...fact, deterministic: false };
-      return fact;
-    };
-    const report = await seasonGameCalibrate(
-      { out: join(TMP, 'game-targets-zerofailures.json') },
-      { runCohort: fakeRunner(factory) },
-    );
-    const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-    expect(payload.gates.zeroFailures).toBe(false);
-    expect(payload.pass).toBe(false);
-    const stat = payload.fixtureStats.find((entry) => entry.fixtureId === 'season-game-balanced');
-    expect(stat?.failures.games).toBe(2);
-    expect(stat?.failures.checks).toBe(1);
-    expect(stat?.failures.determinism).toBe(1);
+    await withTmpDir(async (tmp) => {
+      const factory = (fixtureId: string, seedIndex: number): SeasonGameGameFacts => {
+        const fact = presetFact(fixtureId, seedIndex);
+        if (seedIndex === 5) return { ...fact, checks: ['legality: unavailable player on court'] };
+        if (seedIndex === 7) return { ...fact, deterministic: false };
+        return fact;
+      };
+      const report = await seasonGameCalibrate(
+        { out: join(tmp, 'game-targets-zerofailures.json') },
+        { runCohort: fakeRunner(factory) },
+      );
+      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
+      expect(payload.gates.zeroFailures).toBe(false);
+      expect(payload.pass).toBe(false);
+      const stat = payload.fixtureStats.find((entry) => entry.fixtureId === 'season-game-balanced');
+      expect(stat?.failures.games).toBe(2);
+      expect(stat?.failures.checks).toBe(1);
+      expect(stat?.failures.determinism).toBe(1);
+    });
   });
 
   it('detects worker-count dependence through the chunking probe', async () => {
-    const perturb = (fact: SeasonGameGameFacts): SeasonGameGameFacts => ({
-      ...fact,
-      starterSeconds: [
-        ...fact.starterSeconds.slice(0, 1).map((seconds) => seconds + 60),
-        ...fact.starterSeconds.slice(1),
-      ],
+    await withTmpDir(async (tmp) => {
+      const perturb = (fact: SeasonGameGameFacts): SeasonGameGameFacts => ({
+        ...fact,
+        starterSeconds: [
+          ...fact.starterSeconds.slice(0, 1).map((seconds) => seconds + 60),
+          ...fact.starterSeconds.slice(1),
+        ],
+      });
+      const report = await seasonGameCalibrate(
+        { out: join(tmp, 'game-targets-chunking.json') },
+        { runCohort: fakeRunner(presetFact, { perturbSingleChunk: perturb }) },
+      );
+      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
+      expect(payload.chunkingIndependent).toBe(false);
+      expect(payload.pass).toBe(false);
+      expect(payload.targetsWritten).toBe(false);
     });
-    const report = await seasonGameCalibrate(
-      { out: join(TMP, 'game-targets-chunking.json') },
-      { runCohort: fakeRunner(presetFact, { perturbSingleChunk: perturb }) },
-    );
-    const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-    expect(payload.chunkingIndependent).toBe(false);
-    expect(payload.pass).toBe(false);
-    expect(payload.targetsWritten).toBe(false);
   });
 
   it('refuses to freeze when a preset fixture is missing from the selection', async () => {
-    const report = await seasonGameCalibrate(
-      { fixture: 'season-game-tight', out: join(TMP, 'game-targets-single.json') },
-      { runCohort: fakeRunner(presetFact) },
-    );
-    const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-    expect(payload.fixtures).toHaveLength(1);
-    expect(payload.gates.starterOrdering).toBe(false);
-    expect(payload.gates.benchOrdering).toBe(false);
-    expect(payload.pass).toBe(false);
-    expect(payload.targetsWritten).toBe(false);
+    await withTmpDir(async (tmp) => {
+      const report = await seasonGameCalibrate(
+        { fixture: 'season-game-tight', out: join(tmp, 'game-targets-single.json') },
+        { runCohort: fakeRunner(presetFact) },
+      );
+      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
+      expect(payload.fixtures).toHaveLength(1);
+      expect(payload.gates.starterOrdering).toBe(false);
+      expect(payload.gates.benchOrdering).toBe(false);
+      expect(payload.pass).toBe(false);
+      expect(payload.targetsWritten).toBe(false);
+    });
   });
 
   it('honors explicit seed ranges and fails the held-out gate with none', async () => {
-    const report = await seasonGameCalibrate(
-      {
-        'seed-from': '0',
-        'seed-to': '63',
-        out: join(TMP, 'game-targets-range.json'),
-      },
-      { runCohort: fakeRunner(presetFact) },
-    );
-    const payload = seasonGameCalibrateReportSchema.parse(report.payload);
-    expect(payload.calibrationSeedCount).toBe(64);
-    expect(payload.validationSeedCount).toBe(0);
-    expect(payload.gates.heldOutPassShare).toBe(0);
-    expect(payload.gates.heldOutPass).toBe(false);
-    expect(payload.pass).toBe(false);
+    await withTmpDir(async (tmp) => {
+      const report = await seasonGameCalibrate(
+        {
+          'seed-from': '0',
+          'seed-to': '63',
+          out: join(tmp, 'game-targets-range.json'),
+        },
+        { runCohort: fakeRunner(presetFact) },
+      );
+      const payload = seasonGameCalibrateReportSchema.parse(report.payload);
+      expect(payload.calibrationSeedCount).toBe(64);
+      expect(payload.validationSeedCount).toBe(0);
+      expect(payload.gates.heldOutPassShare).toBe(0);
+      expect(payload.gates.heldOutPass).toBe(false);
+      expect(payload.pass).toBe(false);
+    });
   });
 
   it('throws usage errors for malformed ranges', async () => {
@@ -743,89 +760,40 @@ describe('cli: season game simulate (end-to-end, real engine)', () => {
     };
     expect(await run()).toBe(await run());
   });
-
-  it('reports a typed forfeit for the no-legal-five fixture', async () => {
-    const { code, stdout } = await runCli([
-      'season',
-      'game',
-      'simulate',
-      '--input',
-      'season-game-no-legal-five',
-      '--seed',
-      REAL_SEED,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = seasonGameSimulateReportSchema.parse(jsonPayload(stdout));
-    expect(payload.outcome).toBe('forfeit');
-    expect(payload.forfeit?.losingFranchiseId).toBe('lakers');
-    expect(payload.forfeit?.trigger).toBe('no-legal-five-tipoff');
-    expect(payload.pass).toBe(true);
-  });
-
-  it('reports the no-legal-five-both variant when both sides are invalid', async () => {
-    const { code, stdout } = await runCli([
-      'season',
-      'game',
-      'simulate',
-      '--input',
-      'season-game-no-legal-five-both',
-      '--seed',
-      REAL_SEED,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = seasonGameSimulateReportSchema.parse(jsonPayload(stdout));
-    expect(payload.outcome).toBe('no-legal-five-both');
-    expect(payload.pass).toBe(true);
-  });
-
-  it('rejects an unknown fixture with a usage error', async () => {
-    const { code } = await runCli([
-      'season',
-      'game',
-      'simulate',
-      '--input',
-      'season-game-does-not-exist',
-      '--seed',
-      REAL_SEED,
-    ]);
-    expect(code).toBe(2);
-  });
 });
 
 describe('cli: season game calibrate (end-to-end, real engine)', () => {
   it('runs a small cohort through workers and reports non-freezable gates', async () => {
-    const { code, stdout, stderr } = await runCli([
-      'season',
-      'game',
-      'calibrate',
-      '--fixture',
-      'season-game-balanced,season-game-tight,season-game-bench-heavy',
-      '--seed-from',
-      '0',
-      '--seed-to',
-      '15',
-      '--workers',
-      '2',
-      '--out',
-      join(TMP, 'game-targets-e2e.json'),
-      '--format',
-      'json',
-    ]);
-    // 16 calibration seeds with no held-out seeds: the held-out gate fails.
-    expect(code).toBe(1);
-    const payload = seasonGameCalibrateReportSchema.parse(jsonPayload(stdout, stderr));
-    expect(payload.fixtures).toHaveLength(3);
-    expect(payload.calibrationSeedCount).toBe(16);
-    expect(payload.validationSeedCount).toBe(0);
-    expect(payload.fixtureStats).toHaveLength(3);
-    expect(payload.gates.zeroFailures).toBe(true);
-    expect(payload.gates.heldOutPass).toBe(false);
-    expect(payload.pass).toBe(false);
-    expect(payload.targetsWritten).toBe(false);
-    expect(payload.workers).toBe(2);
+    await withTmpDir(async (tmp) => {
+      const { code, stdout, stderr } = await runCli([
+        'season',
+        'game',
+        'calibrate',
+        '--fixture',
+        'season-game-balanced,season-game-tight,season-game-bench-heavy',
+        '--seed-from',
+        '0',
+        '--seed-to',
+        '15',
+        '--workers',
+        '2',
+        '--out',
+        join(tmp, 'game-targets-e2e.json'),
+        '--format',
+        'json',
+      ]);
+      // 16 calibration seeds with no held-out seeds: the held-out gate fails.
+      expect(code).toBe(1);
+      const payload = seasonGameCalibrateReportSchema.parse(jsonPayload(stdout, stderr));
+      expect(payload.fixtures).toHaveLength(3);
+      expect(payload.calibrationSeedCount).toBe(16);
+      expect(payload.validationSeedCount).toBe(0);
+      expect(payload.fixtureStats).toHaveLength(3);
+      expect(payload.gates.zeroFailures).toBe(true);
+      expect(payload.gates.heldOutPass).toBe(false);
+      expect(payload.pass).toBe(false);
+      expect(payload.targetsWritten).toBe(false);
+      expect(payload.workers).toBe(2);
+    });
   }, 120_000);
 });

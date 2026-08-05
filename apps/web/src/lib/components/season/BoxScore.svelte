@@ -65,7 +65,7 @@
     class="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 px-4 py-3"
   >
     <div class="flex min-w-0 items-center gap-2">
-      {#if teamIdentity}
+      {#if manifest && teamIdentity}
         <SeasonTeamLogo
           {manifest}
           franchiseId={teamIdentity.franchiseId}
@@ -83,7 +83,7 @@
         {box.team.points} – {box.opponent.points}
       </span>
       <span>vs {opponentName}</span>
-      {#if opponentIdentity}
+      {#if manifest && opponentIdentity}
         <SeasonTeamLogo
           {manifest}
           franchiseId={opponentIdentity.franchiseId}

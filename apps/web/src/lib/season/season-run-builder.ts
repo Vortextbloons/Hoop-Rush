@@ -186,15 +186,18 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       participants: draft.participants.map((participant) => ({
         participantId: participant.participantId,
         franchiseId: participant.franchiseId,
-        rolls: draft.rolls.map((roll) => ({
-          franchiseId: roll.franchiseId,
-          eraId: roll.eraId,
-          attemptIndex: roll.attemptIndex,
-          usable: roll.usable,
-        })),
-        claims: draft.claims
-          .filter((claim) => claim.participantId === participant.participantId)
-          .map((claim) => ({ franchiseId: claim.franchiseId, eraId: claim.eraId })),
+        offers: draft.offers
+          .filter((offer) => offer.participantId === participant.participantId)
+          .map((offer) => ({
+            round: offer.round,
+            pickOrdinal: offer.pickOrdinal,
+            seedPath: offer.seedPath,
+            cards: offer.cards.map((card) => ({
+              playerVersionId: card.playerVersionId,
+              selectable: card.selectable,
+              coverageReason: card.coverageReason,
+            })),
+          })),
         picks: draft.picks
           .filter((pick) => pick.participantId === participant.participantId)
           .map((pick) => ({
@@ -202,6 +205,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
             playerVersionId: pick.playerVersionId,
             franchiseId: pick.franchiseId,
             eraId: pick.eraId,
+            seedPath: pick.seedPath,
           })),
       })),
     },

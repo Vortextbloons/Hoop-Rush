@@ -16,10 +16,10 @@ import { mockSvelteKitApp } from '../../../test/svelte-testing';
 mockSvelteKitApp();
 
 /**
- * SeasonDraftBoard component tests (M2.3 setup): the live ten-round board
- * renders engine facts — round, rolled options with deterministic recovery,
- * coverage needs, claims, and the revealed pool — and routes interactions
- * through the page callbacks.
+ * SeasonDraftBoard component tests (M2.3.5): the live ten-round board renders
+ * engine facts — round, the current turn's global eight-card offer with
+ * selectable/disabled states and coverage reasons, coverage needs, and the
+ * selected ten — and routes interactions through the page callbacks.
  */
 
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
@@ -48,7 +48,7 @@ function run(
 }
 
 /** Drives engine commands to a draft state with the given step count. */
-function draftState(steps: { revealed?: boolean; claimed?: boolean } = {}): SeasonDraftState {
+function draftState(steps: { drawn?: boolean; picked?: boolean } = {}): SeasonDraftState {
   let state = run(null, {
     kind: 'create-season-draft',
     runId: 'run-test',
@@ -57,58 +57,24 @@ function draftState(steps: { revealed?: boolean; claimed?: boolean } = {}): Seas
     humanParticipantIds: [SOLO_PARTICIPANT_ID],
     catalogVersion: CATALOG.catalogVersion,
   });
-  if (steps.revealed) {
-    state = run(state, { kind: 'reveal-draft-roll', participantId: SOLO_PARTICIPANT_ID });
+  if (steps.drawn) {
+    state = run(state, { kind: 'draw-season-offer', participantId: SOLO_PARTICIPANT_ID });
   }
-  if (steps.claimed && state) {
-    const last = state.currentReveal?.attempts.at(-1);
-    if (last) {
-      state = run(state, {
-        kind: 'claim-draft-pool',
-        participantId: SOLO_PARTICIPANT_ID,
-        franchiseId: last.franchiseId,
-        eraId: last.eraId,
-      });
+  if (steps.picked && state) {
+    const offer = state.currentOffer;
+    if (offer !== null) {
+      const card = offer.cards.find((c) => c.selectable);
+      if (card) {
+        state = run(state, {
+          kind: 'select-draft-player',
+          participantId: SOLO_PARTICIPANT_ID,
+          playerVersionId: card.playerVersionId,
+        });
+      }
     }
   }
   if (state === null) {
     throw new Error('draft state unexpectedly null');
-  }
-  return state;
-}
-
-/** Picks the first candidate of the revealed pool the engine accepts. */
-function pickFromRevealed(state: SeasonDraftState): SeasonDraftState {
-  const reveal = state.currentReveal;
-  if (reveal === null) {
-    throw new Error('no revealed draft state');
-  }
-  const last = reveal.attempts.at(-1);
-  if (last === undefined) {
-    throw new Error('no revealed attempt');
-  }
-  const pool = CATALOG.pools.find(
-    (p) => p.franchiseId === last.franchiseId && p.eraId === last.eraId,
-  );
-  if (pool === undefined) {
-    throw new Error(`no catalog pool for ${last.franchiseId} ${last.eraId}`);
-  }
-  for (const playerVersionId of pool.playerVersionIds) {
-    const result = applySeasonDraftCommand(
-      state,
-      CATALOG,
-      {
-        commandId: `cmd-${String(++commandCounter)}`,
-        expectedRevision: state.revision,
-        payload: {
-          kind: 'select-draft-player',
-          participantId: SOLO_PARTICIPANT_ID,
-          playerVersionId,
-        },
-      },
-      DEPS,
-    );
-    if (result.record.status === 'accepted' && result.state !== null) return result.state;
   }
   return state;
 }
@@ -120,14 +86,12 @@ function flowState(state: SeasonDraftState): SeasonDraftFlowState {
 function renderBoard(
   state: SeasonDraftState,
   handlers: Partial<{
-    reveal: () => void;
-    claim: () => void;
+    draw: () => void;
     pick: (playerVersionId: string) => void;
     finalize: () => void;
   }> = {},
 ) {
-  const onReveal: () => void = handlers.reveal ?? (() => undefined);
-  const onClaim: () => void = handlers.claim ?? (() => undefined);
+  const onDraw: () => void = handlers.draw ?? (() => undefined);
   const onPick: (playerVersionId: string) => void = handlers.pick ?? (() => undefined);
   const onFinalize: () => void = handlers.finalize ?? (() => undefined);
   return {
@@ -136,23 +100,22 @@ function renderBoard(
         flow: flowState(state),
         catalog: CATALOG,
         manifest: MANIFEST,
+        faces: new Map(),
         busy: false,
         error: null,
-        onReveal,
-        onClaim,
+        onDraw,
         onPick,
         onFinalize,
       },
     }),
-    onReveal,
-    onClaim,
+    onDraw,
     onPick,
     onFinalize,
   };
 }
 
 describe('SeasonDraftBoard component', () => {
-  it('shows the round heading, franchise, and coverage needs before the first roll', () => {
+  it('shows the round heading, franchise, and coverage needs before the first draw', () => {
     const { getByText, container } = renderBoard(draftState());
     expect(getByText('Round 1 of 10')).not.toBeNull();
     expect(getByText(/your franchise/)).not.toBeNull();
@@ -163,62 +126,67 @@ describe('SeasonDraftBoard component', () => {
     expect(dl?.textContent).toContain('0/3');
   });
 
-  it('offers the roll button before a reveal and fires onReveal', async () => {
-    const onReveal = vi.fn();
-    const { getByRole, onReveal: wired } = renderBoard(draftState(), { reveal: onReveal });
-    const button = getByRole('button', { name: 'Roll round 1' });
+  it('offers the draw button before an offer and fires onDraw', async () => {
+    const onDraw = vi.fn();
+    const { getByRole, onDraw: wired } = renderBoard(draftState(), { draw: onDraw });
+    const button = getByRole('button', { name: 'Draw round 1 offer' });
     expect(button).not.toBeNull();
     await fireEvent.click(button);
     expect(wired).toHaveBeenCalledTimes(1);
   });
 
-  it('shows rolled options with recovery attempts and a claim button', async () => {
-    const onClaim = vi.fn();
-    const {
-      getByText,
-      getAllByText,
-      onClaim: wired,
-    } = renderBoard(draftState({ revealed: true }), { claim: onClaim });
-    expect(getByText('Rolled options · pick 1')).not.toBeNull();
-    // Every attempt is listed; the usable one carries the "Playable" badge.
-    expect(getAllByText('Playable').length).toBeGreaterThanOrEqual(1);
-    const claim = getByText('Claim this pool').closest('button');
-    expect(claim).not.toBeNull();
-    if (claim !== null) {
-      await fireEvent.click(claim);
-    }
-    expect(wired).toHaveBeenCalledTimes(1);
-  });
-
-  it('lists the claimed pool and the revealed pool rows after claiming', async () => {
+  it('renders the eight-card offer with selectable cards clickable and disabled cards explained', async () => {
     const onPick = vi.fn();
-    const state = draftState({ revealed: true, claimed: true });
-    const { getByText, getAllByText, onPick: wired } = renderBoard(state, { pick: onPick });
-    expect(getByText('Claimed pools')).not.toBeNull();
-    expect(getAllByText('Claimed').length).toBeGreaterThanOrEqual(1);
-    // Pool rows render with a Pick button per candidate.
-    const pickButtons = getAllByText('Pick');
-    expect(pickButtons.length).toBeGreaterThan(0);
-    const firstPick = pickButtons[0]?.closest('button');
-    if (firstPick !== null && firstPick !== undefined) {
-      await fireEvent.click(firstPick);
+    const state = draftState({ drawn: true });
+    const offer = state.currentOffer;
+    if (offer === null) throw new Error('expected a drawn offer');
+    expect(offer.cards).toHaveLength(8);
+    const selectable = offer.cards.filter((card) => card.selectable);
+    const disabled = offer.cards.filter((card) => !card.selectable);
+    const { getAllByRole, getAllByText, onPick: wired } = renderBoard(state, { pick: onPick });
+    // Every selectable card renders a Pick button.
+    const pickButtons = getAllByRole('button', { name: 'Pick' });
+    expect(pickButtons.length).toBe(selectable.length);
+    // Disabled cards render their coverage reason text.
+    for (const card of disabled) {
+      expect(getAllByText(new RegExp(`Disabled · ${card.coverageReason ?? ''}`)).length).toBe(
+        selectable.length === 0 ? 1 : 1,
+      );
     }
-    expect(wired).toHaveBeenCalledTimes(1);
+    // A selectable card click routes to onPick with the version id.
+    const firstSelectable = selectable[0];
+    if (firstSelectable !== undefined && pickButtons[0] !== undefined) {
+      await fireEvent.click(pickButtons[0]);
+      expect(wired).toHaveBeenCalledWith(firstSelectable.playerVersionId);
+    }
   });
 
   it('shows the finalize action after ten picks', () => {
-    let state: SeasonDraftState = draftState();
+    let state: SeasonDraftState | null = draftState();
     for (let round = 1; round <= 10; round += 1) {
-      const revealed = run(state, {
-        kind: 'reveal-draft-roll',
+      const drawn = run(state, {
+        kind: 'draw-season-offer',
         participantId: SOLO_PARTICIPANT_ID,
       });
-      if (revealed === null) {
-        throw new Error('reveal unexpectedly failed');
+      if (drawn === null) {
+        throw new Error('draw unexpectedly failed');
       }
-      state = pickFromRevealed(revealed);
+      const offer = drawn.currentOffer;
+      if (offer === null) throw new Error('expected a drawn offer');
+      const card = offer.cards.find((c) => c.selectable);
+      if (!card) throw new Error('no selectable card');
+      const picked = run(drawn, {
+        kind: 'select-draft-player',
+        participantId: SOLO_PARTICIPANT_ID,
+        playerVersionId: card.playerVersionId,
+      });
+      if (picked === null) {
+        throw new Error('pick unexpectedly failed');
+      }
+      state = picked;
     }
-    const { getByRole } = renderBoard(state);
+    const { getByRole, getByText } = renderBoard(state);
     expect(getByRole('button', { name: 'Finalize my roster' })).not.toBeNull();
+    expect(getByText('Your ten')).not.toBeNull();
   });
 });

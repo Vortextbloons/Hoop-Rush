@@ -97,7 +97,7 @@ describe('RotationEditor component', () => {
     expect(getByText(/Closing five/)).not.toBeNull();
     // The compact mobile layout renders ten player rows too.
     expect(
-      compactRowsList(container as HTMLElement).getAllByRole('group', {
+      compactRowsList(container).getAllByRole('group', {
         name: /Minutes for/,
       }),
     ).toHaveLength(10);
@@ -124,7 +124,7 @@ describe('RotationEditor component', () => {
     if (first === undefined || label === undefined) {
       throw new Error('fixture rotation has no first starter');
     }
-    const minutes = desktopMinutesList(container as HTMLElement);
+    const minutes = desktopMinutesList(container);
     await fireEvent.click(minutes.getByRole('button', { name: `Increase minutes for ${label}` }));
     let [rotation] = onchange.mock.calls.at(-1) as [SeasonRotation, string[]];
     expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(33);
@@ -143,10 +143,10 @@ describe('RotationEditor component', () => {
     if (first === undefined || label === undefined) {
       throw new Error('fixture rotation has no first starter');
     }
-    const compact = compactRowsList(container as HTMLElement);
+    const compact = compactRowsList(container);
     const increase = compact.getByRole('button', {
       name: `Increase minutes for ${label}`,
-    }) as HTMLButtonElement;
+    });
     expect(increase.classList.contains('h-11')).toBe(true);
     expect(increase.classList.contains('w-11')).toBe(true);
     await fireEvent.click(increase);
@@ -161,17 +161,17 @@ describe('RotationEditor component', () => {
     if (bench === undefined || label === undefined) {
       throw new Error('fixture rotation has no bench player');
     }
-    const compact = compactRowsList(container as HTMLElement);
+    const compact = compactRowsList(container);
     const add = compact.getByRole('button', {
       name: `Add ${label} to the closing five`,
-    }) as HTMLButtonElement;
+    });
     await fireEvent.click(add);
     expect(onchange).toHaveBeenCalledTimes(1);
     expect(editor.rotation.closingFive).toHaveLength(5);
     expect(editor.rotation.closingFive.includes(bench)).toBe(true);
     const remove = compact.getByRole('button', {
       name: `Remove ${label} from the closing five`,
-    }) as HTMLButtonElement;
+    });
     expect(remove.getAttribute('aria-pressed')).toBe('true');
     await fireEvent.click(remove);
     expect(editor.rotation.closingFive).toHaveLength(5);
@@ -188,7 +188,7 @@ describe('RotationEditor component', () => {
     if (centerOnly === undefined) {
       throw new Error('fixture catalog has no center-only candidate');
     }
-    const starters = desktopMinutesList(container as HTMLElement);
+    const starters = desktopMinutesList(container);
     void starters;
     const select = container.querySelector(
       'select[aria-label="Starter slot 1"]',
@@ -239,7 +239,7 @@ describe('RotationEditor component', () => {
       props: { editor: broken, disabled: false, onchange: vi.fn() },
     });
     // The compact row for the offending player carries the failure.
-    const compact = compactRowsList(container as HTMLElement);
+    const compact = compactRowsList(container);
     const row = compact.getByText(benchName).closest('li');
     expect(row).not.toBeNull();
     expect(row?.textContent ?? '').toMatch(/cannot play slot/);

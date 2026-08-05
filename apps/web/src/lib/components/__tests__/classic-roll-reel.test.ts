@@ -70,26 +70,8 @@ describe('ClassicRollReel', () => {
     expect(onSettled).not.toHaveBeenCalled();
   });
 
-  it('spins on mount when spinKey starts above zero (fresh creation)', async () => {
+  it('opens the modal on mount when spinKey starts above zero, spins both reels, shows the result indicator, then closes', async () => {
     const { container, onSettled } = renderReel({ spinKey: 1 });
-
-    expect(container.querySelector(OVERLAY)).not.toBeNull();
-    const franchiseStrip = container.querySelector(FRANCHISE_STRIP);
-    const eraStrip = container.querySelector(ERA_STRIP);
-    expect(franchiseStrip?.classList.contains('reel-spinning')).toBe(true);
-    expect(eraStrip?.classList.contains('reel-spinning')).toBe(true);
-
-    await vi.advanceTimersByTimeAsync(950);
-    expect(container.querySelector(RESULT)).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(850);
-    expect(container.querySelector(OVERLAY)).toBeNull();
-    expect(onSettled).toHaveBeenCalledTimes(1);
-  });
-
-  it('opens the modal, spins both reels, shows the result indicator, then closes', async () => {
-    const { container, rerender, onSettled } = renderReel();
-
-    await rerender({ spinKey: 1 });
 
     expect(container.querySelector(OVERLAY)).not.toBeNull();
     const franchiseStrip = container.querySelector(FRANCHISE_STRIP);
@@ -115,39 +97,26 @@ describe('ClassicRollReel', () => {
     expect(onSettled).toHaveBeenCalledTimes(1);
   });
 
-  it('animates only the franchise reel with axis="franchise"', async () => {
-    const { container, rerender, onSettled } = renderReel({ axis: 'franchise' });
+  it.each<{ axis: 'franchise' | 'era'; spinning: string; idle: string; idleText: string }>([
+    { axis: 'franchise', spinning: FRANCHISE_STRIP, idle: ERA_STRIP, idleText: '1990s' },
+    { axis: 'era', spinning: ERA_STRIP, idle: FRANCHISE_STRIP, idleText: 'Los Angeles Lakers' },
+  ])(
+    'animates only the $axis reel with axis="$axis"',
+    async ({ axis, spinning, idle, idleText }) => {
+      const { container, rerender, onSettled } = renderReel({ axis });
 
-    await rerender({ spinKey: 1 });
+      await rerender({ spinKey: 1 });
 
-    const franchiseStrip = container.querySelector(FRANCHISE_STRIP);
-    const eraStrip = container.querySelector(ERA_STRIP);
-    expect(franchiseStrip?.classList.contains('reel-spinning')).toBe(true);
-    expect(eraStrip?.classList.contains('reel-spinning')).toBe(false);
-    expect(eraStrip?.textContent).toContain('1990s');
+      expect(container.querySelector(spinning)?.classList.contains('reel-spinning')).toBe(true);
+      expect(container.querySelector(idle)?.classList.contains('reel-spinning')).toBe(false);
+      expect(container.querySelector(idle)?.textContent).toContain(idleText);
 
-    await vi.advanceTimersByTimeAsync(950);
-    expect(container.querySelector(RESULT)).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(850);
-    expect(onSettled).toHaveBeenCalledTimes(1);
-  });
-
-  it('animates only the era reel with axis="era"', async () => {
-    const { container, rerender, onSettled } = renderReel({ axis: 'era' });
-
-    await rerender({ spinKey: 1 });
-
-    const franchiseStrip = container.querySelector(FRANCHISE_STRIP);
-    const eraStrip = container.querySelector(ERA_STRIP);
-    expect(franchiseStrip?.classList.contains('reel-spinning')).toBe(false);
-    expect(eraStrip?.classList.contains('reel-spinning')).toBe(true);
-    expect(franchiseStrip?.textContent).toContain('Los Angeles Lakers');
-
-    await vi.advanceTimersByTimeAsync(950);
-    expect(container.querySelector(RESULT)).not.toBeNull();
-    await vi.advanceTimersByTimeAsync(850);
-    expect(onSettled).toHaveBeenCalledTimes(1);
-  });
+      await vi.advanceTimersByTimeAsync(950);
+      expect(container.querySelector(RESULT)).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(850);
+      expect(onSettled).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('announces the final result only at settle, exactly once', async () => {
     const { container, rerender } = renderReel();

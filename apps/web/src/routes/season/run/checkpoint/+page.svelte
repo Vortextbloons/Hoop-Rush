@@ -73,6 +73,7 @@
   const manifest = $derived(shell.manifest);
 
   const playerNames = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, string>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
@@ -80,6 +81,7 @@
     return map;
   });
   const playable = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, readonly string[]>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) {
@@ -89,6 +91,7 @@
     return map;
   });
   const rosterByVersion = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, SeasonRosterEntry>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry);
@@ -289,7 +292,7 @@
                     />
                   {/if}
                   <span class="min-w-0 flex-1 truncate">
-                    {summary.homeFranchiseId === humanFranchiseId ? 'vs' : 'at'}{' '}
+                    {summary.homeFranchiseId === humanFranchiseId ? 'vs ' : 'at '}
                     {shell.franchiseName(opponentId)}
                   </span>
                   <span class="font-mono text-[10px]">
@@ -332,10 +335,12 @@
         </section>
       {/if}
 
-      <p class="font-mono text-[10px] text-muted-foreground">
-        run {run.runId} · block {acceptedBlock.blockIndex} · revision {acceptedBlock.revision} · checkpoint
-        {acceptedBlock.checkpointDigest.slice(0, 10)}…
-      </p>
+      {#if acceptedBlock}
+        <p class="font-mono text-[10px] text-muted-foreground">
+          run {run.runId} · block {acceptedBlock.blockIndex} · revision {acceptedBlock.revision} · checkpoint
+          {acceptedBlock.checkpointDigest.slice(0, 10)}…
+        </p>
+      {/if}
     </div>
   </section>
 {:else}

@@ -190,7 +190,7 @@ describe('StandingsTable', () => {
     const { container } = renderStandings();
     const rows = container.querySelectorAll('[data-season-standings-row]');
     expect(rows.length).toBe(60); // 30 cards + 30 table rows in jsdom
-    const text = container.textContent ?? '';
+    const text = container.textContent;
     expect(text).toContain('3 W');
     expect(text).toContain('Home');
     expect(text).toContain('Conference');
@@ -199,7 +199,7 @@ describe('StandingsTable', () => {
 
 describe('BoxScore', () => {
   it('shows the compact primary stats with no full columns, then expands to the full table', async () => {
-    const { getByText, container } = render(BoxScore, {
+    const { getAllByText, container } = render(BoxScore, {
       props: {
         box: makeBox(),
         opponentName: 'celtics',
@@ -209,12 +209,14 @@ describe('BoxScore', () => {
         opponentFranchiseId: 'celtics',
       },
     });
-    // Compact view: player names and Pts/Reb/Ast headers.
-    expect(getByText('Alpha')).not.toBeNull();
-    expect(getByText('Pts')).not.toBeNull();
-    expect(getByText('Reb')).not.toBeNull();
-    expect(getByText('Ast')).not.toBeNull();
-    expect(getByText('3PT')).not.toBeNull(); // full table only, also present in DOM
+    // jsdom renders all three tables (mobile compact, disclosure full, and
+    // desktop full — the Tailwind responsive classes hide nothing in jsdom),
+    // so player names and column headers match once per table.
+    expect(getAllByText('Alpha').length).toBe(3);
+    expect(getAllByText('Pts').length).toBeGreaterThanOrEqual(3);
+    expect(getAllByText('Reb').length).toBeGreaterThanOrEqual(3);
+    expect(getAllByText('Ast').length).toBeGreaterThanOrEqual(3);
+    expect(getAllByText('3PT').length).toBe(2); // full tables only
 
     const details = container.querySelector('details');
     expect(details).not.toBeNull();
@@ -225,6 +227,10 @@ describe('BoxScore', () => {
       await fireEvent.click(summary);
     }
     expect(details?.hasAttribute('open')).toBe(true);
+    // The full table only appears inside the disclosure, not in the compact
+    // primary-stat view; both full tables (disclosure + desktop) carry the
+    // 13-column headers.
+    expect(getAllByText('TO', { exact: true }).length).toBe(2);
   });
 
   it('reports the result and opponent in the header', () => {
@@ -240,10 +246,10 @@ describe('LeadersTable', () => {
   it('renders a headshot-led first-place card and ranked rows', () => {
     const { getByRole, getByText } = renderLeaders();
     expect(getByRole('heading', { name: 'Points' })).not.toBeNull();
-    // First-place card shows the leader's name and value.
+    // First-place card shows the leader's name, total value, and per-game.
     expect(getByText('v-star')).not.toBeNull();
-    expect(getByText('25')).not.toBeNull(); // value
-    expect(getByText('25.0/g')).not.toBeNull(); // per-game
+    expect(getByText('250')).not.toBeNull(); // value total
+    expect(getByText('25.0/g')).not.toBeNull(); // per-game rate
     // Ranked rows 2-4.
     expect(getByRole('listitem', { name: /Rank 2: v-second/ })).not.toBeNull();
     expect(getByRole('listitem', { name: /Rank 3: v-third/ })).not.toBeNull();
@@ -251,8 +257,9 @@ describe('LeadersTable', () => {
   });
 
   it('keeps player-season versions distinct with season labels', () => {
-    const { getByText, container } = renderLeaders();
-    expect(getByText('1995-96')).not.toBeNull();
+    const { getAllByText, container } = renderLeaders();
+    // Every version row shows its season; all four entries share 1995-96.
+    expect(getAllByText(/1995-96/).length).toBeGreaterThanOrEqual(4);
     const sections = container.querySelectorAll('[data-season-leaders-category="points"]');
     expect(sections.length).toBe(1);
   });

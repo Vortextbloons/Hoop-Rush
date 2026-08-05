@@ -173,6 +173,8 @@ const COMMANDS: Record<string, CommandEntry> = {
         simChallenge({
           lineup: getOptionString(args, 'lineup') ?? undefined,
           seed: getOptionString(args, 'seed') ?? undefined,
+          reruns: getOptionString(args, 'reruns') ?? undefined,
+          era: getOptionString(args, 'era') ?? undefined,
           profile: getOptionString(args, 'profile') ?? undefined,
           bracket: getOptionString(args, 'bracket') ?? undefined,
         }),
@@ -362,6 +364,21 @@ const COMMANDS: Record<string, CommandEntry> = {
       options: SEASON_ROSTERS_CALIBRATE_OPTIONS,
       run: (args) =>
         seasonRostersCalibrate({
+          workers: getOptionString(args, 'workers') ?? undefined,
+          'calibration-seeds': getOptionString(args, 'calibration-seeds') ?? undefined,
+          'validation-seeds': getOptionString(args, 'validation-seeds') ?? undefined,
+          out: getOptionString(args, 'out') ?? undefined,
+          manifest: getOptionString(args, 'manifest') ?? undefined,
+        }),
+    };
+  }),
+  'season draft calibrate': command(async () => {
+    const { seasonDraftCalibrate, SEASON_DRAFT_CALIBRATE_OPTIONS } =
+      await import('./commands/season-draft-calibrate.ts');
+    return {
+      options: SEASON_DRAFT_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonDraftCalibrate({
           workers: getOptionString(args, 'workers') ?? undefined,
           'calibration-seeds': getOptionString(args, 'calibration-seeds') ?? undefined,
           'validation-seeds': getOptionString(args, 'validation-seeds') ?? undefined,

@@ -52,6 +52,7 @@
   function versionSource(entry: SeasonLeaderEntry): {
     teamExternalId: string;
     logoCandidates: readonly string[];
+    seasonKey: string;
     seasonLabel: string;
   } | null {
     const rosterEntry = rosterByVersion.get(entry.playerVersionId);
@@ -62,8 +63,17 @@
     return {
       teamExternalId: modern.teamExternalId,
       logoCandidates: era.logoCandidates,
+      seasonKey: rosterEntry.seasonKey,
       seasonLabel: era.displayLabel === null ? '' : ` · ${era.displayLabel}`,
     };
+  }
+
+  /** "ABBR · 1995-96 · 10 gp" plus the era identity label when it differs. */
+  function sourceMeta(entry: SeasonLeaderEntry): string {
+    const source = versionSource(entry);
+    if (source === null)
+      return `${franchiseAbbrev(entry.franchiseId)} · ${String(entry.gamesPlayed)} gp`;
+    return `${franchiseAbbrev(entry.franchiseId)} · ${source.seasonKey} · ${String(entry.gamesPlayed)} gp${source.seasonLabel}`;
   }
 </script>
 
@@ -105,7 +115,7 @@
           {franchiseAbbrev(first.franchiseId)} · {first.gamesPlayed} gp
           {#if versionSource(first)}
             <span class="hidden min-w-0 truncate sm:inline">
-              {versionSource(first)!.seasonLabel}
+              {versionSource(first)!.seasonKey}{versionSource(first)!.seasonLabel}
             </span>
           {/if}
         </p>
@@ -138,9 +148,7 @@
               {playerName(entry.playerVersionId)}
             </span>
             <span class="block truncate font-mono text-[10px] text-muted-foreground">
-              {franchiseAbbrev(entry.franchiseId)} · {entry.gamesPlayed} gp{versionSource(entry)
-                ? versionSource(entry)!.seasonLabel
-                : ''}
+              {sourceMeta(entry)}
             </span>
           </span>
           <span class="shrink-0 text-right">

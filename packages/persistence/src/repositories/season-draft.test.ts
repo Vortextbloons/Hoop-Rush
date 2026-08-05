@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import Dexie, { type EntityTable, type Table } from 'dexie';
-import { IDBFactory } from 'fake-indexeddb';
+import { afterEach, describe, expect, it } from 'vitest';
+import Dexie from 'dexie';
 import {
   buildChallengeRun,
   buildClassicDraftState,
@@ -27,20 +26,14 @@ import {
   SEASON_DRAFT_RECORD_ID,
   type StoredSeasonDraft,
 } from '../schemas/season-draft-record.ts';
-import type {
-  StoredSeasonAcceptedBlockRow,
-  StoredSeasonActiveRunIndex,
-  StoredSeasonDetailRow,
-  StoredSeasonRunRecord,
-  StoredSeasonSummaryRow,
-} from '../schemas/season-run-record.ts';
 import type { StoredClassicDraft } from '../schemas/classic-draft-record.ts';
-import type {
-  ActiveGameRow,
-  ActiveRunCheckpoint,
-  CompletedRunIndex,
-  StoredRunRecord,
-} from '../schemas/run-record.ts';
+import type { StoredRunRecord } from '../schemas/run-record.ts';
+import {
+  TestDatabase,
+  resetIndexedDb,
+  restoreIndexedDb,
+  testDatabaseName,
+} from '../testing/repo-test-support.ts';
 
 /**
  * Season draft repository contract tests (spec/2.0/03, M2.1): the dedicated
@@ -52,54 +45,6 @@ import type {
  * fake-indexeddb with one fresh database per test.
  */
 
-/** Replaces the shared fake-indexeddb factory, isolating Dexie versioning. */
-function resetIndexedDb(): void {
-  const factory = new IDBFactory();
-  globalThis.indexedDB = factory;
-  Dexie.dependencies.indexedDB = factory;
-}
-
-class TestDatabase extends Dexie {
-  active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
-  activeGames!: Table<ActiveGameRow, [string, number]>;
-  completed!: EntityTable<StoredRunRecord, 'recordId'>;
-  history!: EntityTable<CompletedRunIndex, 'recordId'>;
-  classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
-  seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
-  seasonRuns!: EntityTable<StoredSeasonRunRecord, 'recordId'>;
-  seasonRunSummaries!: Table<StoredSeasonSummaryRow, [string, string]>;
-  seasonRunDetails!: Table<StoredSeasonDetailRow, [string, string]>;
-  seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
-  seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
-
-  constructor(name: string) {
-    super(name);
-    this.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
-    this.version(2).stores({
-      active: 'recordId',
-      activeGames: '[runId+gameNumber], runId',
-      completed: 'recordId',
-      history: 'recordId',
-    });
-    this.version(3).stores({
-      history: 'recordId, completedAtIso',
-    });
-    this.version(4).stores({
-      classicDrafts: 'recordId',
-    });
-    this.version(5).stores({
-      seasonDrafts: 'recordId',
-    });
-    this.version(6).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-    });
-  }
-}
-
 interface Adapters {
   season: DexieSeasonDraftRepository;
   challenge: DexieChallengeRepository;
@@ -108,7 +53,7 @@ interface Adapters {
 
 /** Fresh Dexie-backed repositories with one isolated database per test. */
 function makeAdapter(): Adapters {
-  const db = new TestDatabase(`test-${String(Math.random())}`);
+  const db = new TestDatabase(testDatabaseName('season-draft'));
   return {
     season: new DexieSeasonDraftRepository(db),
     challenge: new DexieChallengeRepository(db),
@@ -189,6 +134,7 @@ describe('season draft repository (dexie)', () => {
     await challenge.saveActiveRun(runRecord());
     const loaded = await season.loadSeasonDraft();
     expect(loaded?.draft.runId).toBe('fixture-draft-1');
+    expect(loaded?.saveSchemaVersion).toBe(2);
     expect(await db.seasonDrafts.count()).toBe(1);
     expect((await challenge.loadActiveRun())?.run.runId).toBe('challenge-run-1');
   });
@@ -261,6 +207,59 @@ describe('season draft repository (dexie)', () => {
     expect(withoutTimestamp(loaded as StoredSeasonDraft)).toEqual(saved);
   });
 
+  it('loads a legacy v1 stored draft unchanged (no migration, no delete)', async () => {
+    const { season, db } = makeAdapter();
+    const legacyDraft = {
+      schemaVersion: 1,
+      draftVersion: 'season-draft-v1',
+      runId: 'legacy-run-1',
+      rootSeed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+      league: buildSeasonLeague(),
+      catalogVersion: 'season-draft-v1',
+      participants: [{ participantId: 'p1', franchiseId: 'lakers' }],
+      firstPickParticipantId: 'p1',
+      round: 2,
+      currentTurnParticipantId: 'p1',
+      status: 'drafting',
+      revision: 4,
+      currentReveal: {
+        participantId: 'p1',
+        round: 2,
+        pickOrdinal: 2,
+        attempts: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
+      },
+      rolls: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
+      claims: [],
+      picks: [
+        {
+          participantId: 'p1',
+          round: 1,
+          pickOrdinal: 1,
+          playerVersionId: `pv-${'0'.repeat(32)}`,
+          franchiseId: 'lakers',
+          eraId: '1990s',
+          rollAttempts: 1,
+        },
+      ],
+      commandLog: [],
+    };
+    await db.seasonDrafts.put({
+      recordId: SEASON_DRAFT_RECORD_ID,
+      saveSchemaVersion: 1,
+      draft: legacyDraft,
+      generation: null,
+    } as never);
+    const loaded = await season.loadSeasonDraft();
+    expect(loaded).not.toBeNull();
+    expect(loaded?.saveSchemaVersion).toBe(1);
+    expect(loaded?.draft.draftVersion).toBe('season-draft-v1');
+    expect(loaded?.draft.rolls).toHaveLength(1);
+    expect(await db.seasonDrafts.count()).toBe(1);
+    // The legacy record persists untouched until the user discards it.
+    await season.clearSeasonDraft();
+    expect(await season.loadSeasonDraft()).toBeNull();
+  });
+
   it('surfaces corrupt stored rows instead of returning them', async () => {
     const { season, db } = makeAdapter();
     await season.saveSeasonDraft(recordFromState(buildSeasonDraftState()));
@@ -275,6 +274,14 @@ describe('season draft repository (dexie)', () => {
       recordId: SEASON_DRAFT_RECORD_ID,
       saveSchemaVersion: 1,
       draft: { corrupted: true },
+      generation: null,
+    } as never);
+    await expect(season.loadSeasonDraft()).rejects.toThrow();
+    // A v2-state draft stored under the legacy save version is corrupt too.
+    await db.seasonDrafts.put({
+      recordId: SEASON_DRAFT_RECORD_ID,
+      saveSchemaVersion: 1,
+      draft: buildSeasonDraftState(),
       generation: null,
     } as never);
     await expect(season.loadSeasonDraft()).rejects.toThrow();
@@ -342,6 +349,8 @@ describe('season draft repository (dexie)', () => {
 });
 
 describe('dexie season draft migration', () => {
+  afterEach(restoreIndexedDb);
+
   it('opens a v4-era save at schema version 5 and keeps existing rows intact', async () => {
     resetIndexedDb();
     const legacyDb = new Dexie('hoop-rush-saves');

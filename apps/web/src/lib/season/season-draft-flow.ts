@@ -1,6 +1,4 @@
 import type {
-  EraId,
-  FranchiseId,
   PlayerVersionId,
   SeasonDraftCatalog,
   SeasonDraftCommandPayload,
@@ -20,11 +18,17 @@ import { recordFromState, type SeasonDraftRepository } from '@hoop-rush/persiste
 import { newSeasonId } from './season-ids';
 
 /**
- * Season Run solo draft flow (spec/2.0/03, M2.1): the UI-side state machine
- * that wraps the authoritative engine commands (`applySeasonDraftCommand`) and
- * the persisted Season draft record. Business rules stay in the engine; this
- * module only issues typed commands against the live revision, persists each
- * accepted record, and exposes the presentation facts the board needs.
+ * Season Run solo draft flow (spec/2.0/03, M2.3.5, season-draft-v2): the
+ * UI-side state machine that wraps the authoritative engine commands
+ * (`applySeasonDraftCommand`) and the persisted Season draft record. Business
+ * rules stay in the engine; this module only issues typed commands against
+ * the live revision, persists each accepted record, and exposes the
+ * presentation facts the board needs.
+ *
+ * A stored legacy season-draft-v1 record (saveSchemaVersion 1) is detected
+ * and exposed distinctly through `legacyStored` so the page can show the
+ * explicit "Draft rules changed" recovery screen; `discardLegacy()` clears it
+ * via the repository (never a silent auto-delete).
  *
  * The AI league generation is synchronous and bounded by
  * `AI_GENERATION_NODE_BUDGET`; `generate()` yields to the event loop first so
@@ -71,29 +75,6 @@ export function coverageNeeds(
   return { guards, forwards, centers };
 }
 
-/** The claimable candidates of the currently revealed pool, in catalog order. */
-export function revealPoolRows(
-  state: SeasonDraftState,
-  catalog: SeasonDraftCatalog,
-): SeasonDraftCatalog['candidates'] {
-  const reveal = state.currentReveal;
-  const lastAttempt = reveal?.attempts[reveal.attempts.length - 1];
-  if (!reveal || !lastAttempt || !lastAttempt.usable) return [];
-  const pool = catalog.pools.find(
-    (p) => p.franchiseId === lastAttempt.franchiseId && p.eraId === lastAttempt.eraId,
-  );
-  if (!pool) return [];
-  const byId = new Map(catalog.candidates.map((c) => [c.playerVersionId, c]));
-  return pool.playerVersionIds
-    .map((id) => byId.get(id))
-    .filter((c): c is NonNullable<typeof c> => c !== undefined);
-}
-
-/** Roll attempts of the current reveal (deterministic invalid-roll recovery). */
-export function currentRevealAttempts(state: SeasonDraftState): SeasonDraftState['currentReveal'] {
-  return state.currentReveal;
-}
-
 export class SeasonDraftFlow {
   private readonly repo: SeasonDraftRepository;
   private readonly catalogRef: SeasonDraftCatalog;
@@ -104,6 +85,8 @@ export class SeasonDraftFlow {
   lastRecord: SeasonDraftCommandRecord | null = null;
   phase: SeasonDraftFlowPhase = 'idle';
   error: string | null = null;
+  /** True when the stored record is a legacy season-draft-v1 draft. */
+  legacyStored = false;
 
   constructor(
     repo: SeasonDraftRepository,
@@ -120,10 +103,18 @@ export class SeasonDraftFlow {
     return this.catalogRef;
   }
 
-  /** Loads a persisted draft; returns true when one exists. */
+  /**
+   * Loads a persisted draft. Returns true when a stored record exists. A
+   * legacy season-draft-v1 record is NOT loaded into the playable draft:
+   * `legacyStored` is set and the page shows the recovery screen.
+   */
   async load(): Promise<boolean> {
     const stored = await this.repo.loadSeasonDraft();
     if (stored) {
+      if (stored.saveSchemaVersion === 1) {
+        this.legacyStored = true;
+        return true;
+      }
       this.draft = stored.draft;
       this.generation = stored.generation;
       this.phase =
@@ -145,6 +136,15 @@ export class SeasonDraftFlow {
     this.lastRecord = null;
     this.phase = 'idle';
     this.error = null;
+    this.legacyStored = false;
+  }
+
+  /**
+   * Discards a stored legacy season-draft-v1 record (explicit user action on
+   * the recovery screen; never automatic).
+   */
+  async discardLegacy(): Promise<void> {
+    await this.clear();
   }
 
   /** Snapshot of the flow for the board. */
@@ -174,21 +174,9 @@ export class SeasonDraftFlow {
     return record;
   }
 
-  async reveal(participantId: string = SOLO_PARTICIPANT_ID): Promise<SeasonDraftCommandRecord> {
+  async draw(participantId: string = SOLO_PARTICIPANT_ID): Promise<SeasonDraftCommandRecord> {
     this.error = null;
-    return this.apply({ kind: 'reveal-draft-roll', participantId }, this.revision());
-  }
-
-  async claim(
-    participantId: string,
-    franchiseId: FranchiseId,
-    eraId: EraId,
-  ): Promise<SeasonDraftCommandRecord> {
-    this.error = null;
-    return this.apply(
-      { kind: 'claim-draft-pool', participantId, franchiseId, eraId },
-      this.revision(),
-    );
+    return this.apply({ kind: 'draw-season-offer', participantId }, this.revision());
   }
 
   async pick(

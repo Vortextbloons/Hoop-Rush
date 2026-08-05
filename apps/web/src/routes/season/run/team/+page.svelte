@@ -37,8 +37,6 @@
 
   const rowOf = (playerVersionId: string) =>
     editorRows.find((row) => row.member.playerVersionId === playerVersionId);
-
-  const hubHref = $derived(resolve('/season/run'));
 </script>
 
 <svelte:head>
@@ -156,7 +154,7 @@
               {/if}
             </p>
             <a
-              href={hubHref}
+              href={resolve('/season/run')}
               aria-disabled={failures.length > 0 ? 'true' : undefined}
               class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 {failures.length >
               0

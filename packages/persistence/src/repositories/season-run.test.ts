@@ -1,21 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import Dexie, { type EntityTable, type Table } from 'dexie';
-import { IDBFactory } from 'fake-indexeddb';
-import type {
-  ActiveGameRow,
-  ActiveRunCheckpoint,
-  CompletedRunIndex,
-  StoredRunRecord,
-} from '../schemas/run-record.ts';
-import type { StoredClassicDraft } from '../schemas/classic-draft-record.ts';
-import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
-import type {
-  StoredSeasonAcceptedBlockRow,
-  StoredSeasonActiveRunIndex,
-  StoredSeasonDetailRow,
-  StoredSeasonRunRecord,
-  StoredSeasonSummaryRow,
-} from '../schemas/season-run-record.ts';
+import { afterEach, describe, expect, it } from 'vitest';
+import Dexie from 'dexie';
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
 import { DexieChallengeRepository, HoopRushDatabase } from './dexie.ts';
 import { DexieSeasonDraftRepository } from './season-draft.ts';
@@ -24,6 +8,12 @@ import {
   SeasonRunLoadError,
   loadActiveRunWithSchedule,
 } from './season-run-dexie.ts';
+import {
+  TestDatabase,
+  resetIndexedDb,
+  restoreIndexedDb,
+  testDatabaseName,
+} from '../testing/repo-test-support.ts';
 import {
   buildFixtureRun,
   buildFixtureSchedule,
@@ -45,48 +35,6 @@ import type { CommitSeasonBlockInput } from './season-run.ts';
  * semantics), keeping these tests independent of the engine agent's parallel
  * block-pipeline work.
  */
-
-/** Replaces the shared fake-indexeddb factory, isolating Dexie versioning. */
-function resetIndexedDb(): void {
-  const factory = new IDBFactory();
-  globalThis.indexedDB = factory;
-  Dexie.dependencies.indexedDB = factory;
-}
-
-class TestDatabase extends Dexie {
-  active!: EntityTable<ActiveRunCheckpoint, 'recordId'>;
-  activeGames!: Table<ActiveGameRow, [string, number]>;
-  completed!: EntityTable<StoredRunRecord, 'recordId'>;
-  history!: EntityTable<CompletedRunIndex, 'recordId'>;
-  classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
-  seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
-  seasonRuns!: EntityTable<StoredSeasonRunRecord, 'recordId'>;
-  seasonRunSummaries!: Table<StoredSeasonSummaryRow, [string, string]>;
-  seasonRunDetails!: Table<StoredSeasonDetailRow, [string, string]>;
-  seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
-  seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
-
-  constructor(name: string) {
-    super(name);
-    this.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
-    this.version(2).stores({
-      active: 'recordId',
-      activeGames: '[runId+gameNumber], runId',
-      completed: 'recordId',
-      history: 'recordId',
-    });
-    this.version(3).stores({ history: 'recordId, completedAtIso' });
-    this.version(4).stores({ classicDrafts: 'recordId' });
-    this.version(5).stores({ seasonDrafts: 'recordId' });
-    this.version(6).stores({
-      seasonRuns: 'recordId',
-      seasonRunSummaries: '[runId+gameId], runId, blockIndex',
-      seasonRunDetails: '[runId+gameId], runId',
-      seasonRunBlocks: '[runId+blockIndex], runId',
-      seasonRunIndex: 'recordId',
-    });
-  }
-}
 
 interface Adapters {
   db: TestDatabase;
@@ -110,7 +58,7 @@ const sharedDataset = buildFullSeasonDataset({
 
 /** Fresh repositories with one isolated database and the stub engine seam. */
 function makeAdapters(): Adapters {
-  const db = new TestDatabase(`season-run-test-${String(Math.random())}`);
+  const db = new TestDatabase(testDatabaseName('season-run'));
   const seam = buildStubSeasonEngineSeam();
   const repo = new DexieSeasonRunRepository(db, {
     schedule: sharedDataset.schedule,
@@ -505,6 +453,8 @@ describe('season run repository (dexie)', () => {
 });
 
 describe('season run migration', () => {
+  afterEach(restoreIndexedDb);
+
   it('opens a v5-era save at schema version 6 and keeps the stored draft intact', async () => {
     resetIndexedDb();
     const run = buildFixtureRun({});

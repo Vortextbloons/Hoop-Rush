@@ -4,30 +4,52 @@ import {
   BEST_OF_ATTEMPTS,
   createEngineContext,
   simulateChallengeBestOf,
+  toSimulationPlayer,
   type ChallengeCreation,
 } from '@hoop-rush/engine';
 import {
+  LINEUP_STRUCTURE,
+  playerIdSchema,
   seedSchema,
   simulationTeamSchema,
   type ChallengeRun,
+  type PeakPlayerSeason,
+  type PlayersIndex,
+  type PlayersIndexEntry,
   type SimulationPlayer,
   type SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import { parseCount, UsageError } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import { simChallengeReportSchema } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData, loadBracketFile, loadProfileFile } from './data-loader.ts';
-import { loadFixture, UsageError } from './sim.ts';
+import { loadFixture } from './sim.ts';
 
 /**
  * `sim challenge` (spec/09): runs one complete Sandbox challenge through the
  * authoritative bracket loader, challenge commands, seed derivation,
  * aggregation, and game engine. The run always completes all 82 games; the
  * report carries the record, outcome, first loss, and exact aggregates.
+ *
+ * The lineup is always five pool players resolved from the packaged draft
+ * index (`--lineup`): ids (`playerId`, `playerId@franchiseId/eraId`) or
+ * names (`Name`, `Name@Franchise`, `Name@Franchise/era`), mirroring the web
+ * sandbox draft path (`resolvePlayerRefs` + `toSimulationPlayer`). The
+ * simulation environment defaults to the app's fixed '2010s' sandbox era.
  */
+
+/**
+ * Fixed simulation environment era for every sandbox run (matches
+ * `apps/web/src/lib/run-preamble.ts` `FIXED_SANDBOX_ERA`, spec/1.0
+ * 01-product.md: "every Sandbox run simulates in the 2010s decade").
+ */
+export const FIXED_SANDBOX_ERA = '2010s';
 
 export const SIM_CHALLENGE_OPTIONS: Record<string, boolean> = {
   lineup: true,
   seed: true,
+  reruns: true,
+  era: true,
   profile: true,
   bracket: true,
   format: true,
@@ -71,46 +93,304 @@ export function lineupForTeam(team: SimulationTeam): {
   return { lineup, players };
 }
 
+/** One resolved lineup reference: a playerId plus the pool it must come from. */
+interface PoolRef {
+  playerId: string;
+  franchiseId: string;
+  eraId: string;
+}
+
+/** Normalizes a name or label for index matching (case and inner whitespace). */
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** Display name of a franchise slot (falls back to the id). */
+function franchiseDisplayName(data: PackagedData, franchiseId: string): string {
+  return (
+    data.manifest.modernFranchiseSlots.find((franchise) => franchise.franchiseId === franchiseId)
+      ?.displayName ?? franchiseId
+  );
+}
+
+/** Resolves a franchise qualifier (franchiseId or display name) to a franchiseId. */
+function resolveFranchiseQualifier(data: PackagedData, value: string): string | null {
+  const normalized = normalizeName(value);
+  for (const franchise of data.manifest.modernFranchiseSlots) {
+    if (
+      franchise.franchiseId === normalized ||
+      normalizeName(franchise.displayName) === normalized
+    ) {
+      return franchise.franchiseId;
+    }
+  }
+  return null;
+}
+
+/** Whether an index row's name equals the given name (display or first+last). */
+function nameMatches(row: PlayersIndexEntry, name: string): boolean {
+  const normalized = normalizeName(name);
+  return (
+    normalizeName(row.displayName) === normalized ||
+    normalizeName(`${row.firstName} ${row.lastName}`) === normalized
+  );
+}
+
+/**
+ * Deterministic pick among matching rows after a franchise qualifier narrows
+ * the choice to the same player across eras: highest overall, then earliest
+ * season, then index order.
+ */
+function bestRow(rows: PlayersIndexEntry[]): PlayersIndexEntry {
+  const sorted = [...rows].sort((a, b) => {
+    if (b.overall !== a.overall) return b.overall - a.overall;
+    if (a.seasonKey !== b.seasonKey) return a.seasonKey < b.seasonKey ? -1 : 1;
+    return 0;
+  });
+  const best = sorted[0];
+  if (!best) throw new UsageError('--lineup: no matching players');
+  return best;
+}
+
+const CANDIDATE_CAP = 12;
+
+/**
+ * Resolves a player name against the index. Without a franchise qualifier the
+ * name must match exactly one row; with a franchise, remaining era choices
+ * resolve deterministically (see `bestRow`).
+ */
+function resolveName(
+  name: string,
+  franchiseId: string | undefined,
+  eraId: string | undefined,
+  index: PlayersIndex,
+  data: PackagedData,
+): PoolRef {
+  const rows = index.players.filter(
+    (row) =>
+      nameMatches(row, name) &&
+      (franchiseId === undefined || row.franchiseId === franchiseId) &&
+      (eraId === undefined || row.eraId === eraId),
+  );
+  if (rows.length === 0) {
+    const where = franchiseId
+      ? ` in ${franchiseDisplayName(data, franchiseId)}${eraId ? ` (${eraId})` : ''}`
+      : '';
+    throw new UsageError(`--lineup: no player named "${name}"${where}`);
+  }
+  if (franchiseId === undefined && rows.length > 1) {
+    const candidates = rows
+      .slice(0, CANDIDATE_CAP)
+      .map(
+        (row) => `${row.displayName}@${franchiseDisplayName(data, row.franchiseId)}/${row.eraId}`,
+      )
+      .join(', ');
+    const suffix =
+      rows.length > CANDIDATE_CAP ? `, and ${String(rows.length - CANDIDATE_CAP)} more` : '';
+    throw new UsageError(
+      `--lineup: "${name}" matches multiple peaks; qualify it: ${candidates}${suffix}`,
+    );
+  }
+  if (franchiseId === undefined) {
+    const row = rows[0];
+    if (!row) throw new UsageError(`--lineup: no player named "${name}"`);
+    return { playerId: row.playerId, franchiseId: row.franchiseId, eraId: row.eraId };
+  }
+  return bestRow(rows);
+}
+
+/** Resolves a qualified id token: `playerId@franchiseId/eraId` (exact match). */
+function resolveQualifiedId(
+  playerId: string,
+  qualifier: string,
+  token: string,
+  index: PlayersIndex,
+): PoolRef {
+  const slash = qualifier.indexOf('/');
+  if (slash === -1 || qualifier.indexOf('/', slash + 1) !== -1) {
+    throw new UsageError(
+      `--lineup: "${token}" must be a playerId, playerId@franchiseId/eraId, a player name, or name@franchise/era`,
+    );
+  }
+  const franchiseId = qualifier.slice(0, slash);
+  const eraId = qualifier.slice(slash + 1);
+  const row = index.players.find(
+    (candidate) =>
+      candidate.playerId === playerId &&
+      candidate.franchiseId === franchiseId &&
+      candidate.eraId === eraId,
+  );
+  if (!row) {
+    throw new UsageError(`--lineup: no peak for ${playerId} in ${franchiseId}/${eraId}`);
+  }
+  return { playerId, franchiseId, eraId };
+}
+
+/** Resolves a qualified name token: `Name@Franchise` or `Name@Franchise/era`. */
+function resolveQualifiedName(
+  name: string,
+  qualifier: string,
+  token: string,
+  index: PlayersIndex,
+  data: PackagedData,
+): PoolRef {
+  const slash = qualifier.indexOf('/');
+  if (slash === -1) {
+    const franchiseId = resolveFranchiseQualifier(data, qualifier);
+    if (!franchiseId) throw new UsageError(`--lineup: unknown franchise "${qualifier}"`);
+    return resolveName(name, franchiseId, undefined, index, data);
+  }
+  const franchisePart = qualifier.slice(0, slash);
+  const eraPart = qualifier.slice(slash + 1);
+  if (eraPart.includes('/')) {
+    throw new UsageError(
+      `--lineup: "${token}" must be a playerId, playerId@franchiseId/eraId, a player name, or name@franchise/era`,
+    );
+  }
+  const franchiseId = resolveFranchiseQualifier(data, franchisePart);
+  if (!franchiseId) throw new UsageError(`--lineup: unknown franchise "${franchisePart}"`);
+  const era = data.manifest.eras.find((entry) => entry.eraId === normalizeName(eraPart));
+  if (!era) throw new UsageError(`--lineup: unknown era "${eraPart}"`);
+  return resolveName(name, franchiseId, era.eraId, index, data);
+}
+
+/**
+ * Parses one `--lineup` token. Ids (`playerId`, `playerId@franchiseId/eraId`)
+ * resolve exactly. Names (`Name`, `Name@Franchise`, `Name@Franchise/era`)
+ * resolve against the draft index: the same playerId or player name can peak
+ * in several franchise/era contexts (spec/02 draft index), so ambiguous bare
+ * values are rejected with the qualifying forms; a franchise-qualified name
+ * resolves remaining era choices deterministically (best `overall`).
+ */
+function parsePoolRef(token: string, index: PlayersIndex, data: PackagedData): PoolRef {
+  const at = token.indexOf('@');
+  if (at === -1) {
+    if (playerIdSchema.safeParse(token).success) {
+      const matches = index.players.filter((row) => row.playerId === token);
+      if (matches.length === 0) {
+        throw new UsageError(`--lineup: unknown player id "${token}"`);
+      }
+      if (matches.length > 1) {
+        const candidates = matches
+          .map((row) => `${row.playerId}@${row.franchiseId}/${row.eraId}`)
+          .join(', ');
+        throw new UsageError(
+          `--lineup: player id "${token}" matches multiple peaks; qualify it: ${candidates}`,
+        );
+      }
+      const row = matches[0];
+      if (!row) throw new UsageError(`--lineup: unknown player id "${token}"`);
+      return { playerId: row.playerId, franchiseId: row.franchiseId, eraId: row.eraId };
+    }
+    return resolveName(token, undefined, undefined, index, data);
+  }
+  const left = token.slice(0, at);
+  const qualifier = token.slice(at + 1);
+  if (left.length === 0) {
+    throw new UsageError(
+      `--lineup: "${token}" must be a playerId, playerId@franchiseId/eraId, a player name, or name@franchise/era`,
+    );
+  }
+  if (playerIdSchema.safeParse(left).success) {
+    return resolveQualifiedId(left, qualifier, token, index);
+  }
+  return resolveQualifiedName(left, qualifier, token, index, data);
+}
+
+/**
+ * Resolves a comma-separated `--lineup` spec to five peak player-seasons in
+ * slot order (G,G,F,F,C). Each distinct franchise/era pool is loaded at most
+ * once, mirroring the web `resolvePlayerRefs` path.
+ */
+export function resolvePoolLineup(spec: string, data: PackagedData): PeakPlayerSeason[] {
+  const tokens = spec
+    .split(',')
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+  if (tokens.length !== 5) {
+    throw new UsageError(`--lineup requires exactly five players (got ${String(tokens.length)})`);
+  }
+  const index = data.playersIndex();
+  const refs = tokens.map((token) => parsePoolRef(token, index, data));
+  if (new Set(refs.map((ref) => ref.playerId)).size !== 5) {
+    throw new UsageError('--lineup requires five distinct players');
+  }
+  const byPool = new Map<string, Map<string, PeakPlayerSeason>>();
+  for (const key of new Set(refs.map((ref) => `${ref.franchiseId}/${ref.eraId}`))) {
+    const slash = key.indexOf('/');
+    const pool = data.pool(key.slice(0, slash), key.slice(slash + 1));
+    byPool.set(key, new Map(pool.players.map((player) => [player.playerId, player])));
+  }
+  return refs.map((ref) => {
+    const player = byPool.get(`${ref.franchiseId}/${ref.eraId}`)?.get(ref.playerId);
+    if (!player) {
+      throw new UsageError(
+        `--lineup: ${ref.playerId} is missing from the ${ref.franchiseId}/${ref.eraId} pool`,
+      );
+    }
+    return player;
+  });
+}
+
 export function simChallenge(args: {
   lineup?: string;
   seed?: string;
+  reruns?: string;
+  era?: string;
   profile?: string;
   bracket?: string;
 }): CliReport {
-  const lineupId = args.lineup ?? 'challenge-user';
+  const lineupSpec = args.lineup;
+  if (lineupSpec === undefined) {
+    throw new UsageError(
+      'sim challenge requires --lineup <playerId[,playerId@franchise/era] or Name[,Name@Franchise/era]>',
+    );
+  }
   const seed = args.seed;
   if (seed === undefined) throw new UsageError('sim challenge requires --seed <hex>');
   if (!seedSchema.safeParse(seed).success)
     throw new UsageError(`--seed must be hex (got "${seed}")`);
+  const reruns = parseCount(args.reruns, '--reruns', BEST_OF_ATTEMPTS);
+  if (reruns < 1) throw new UsageError('--reruns must be >= 1');
+  const eraId = args.era ?? FIXED_SANDBOX_ERA;
 
   const packaged = loadPackagedData();
   const data = new PackagedData(packaged.manifest, packaged.dir);
-  const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile();
+  const profile = args.profile ? loadProfileFile(args.profile) : data.eraProfile(eraId);
   const bracket = args.bracket ? loadBracketFile(args.bracket) : data.bracket();
 
-  const team = resolveUserTeam(lineupId);
-  const { lineup, players } = lineupForTeam(team);
-  const pool = data.pool('lakers', '1990s');
-  const samplePlayer = pool.players[0];
+  const resolved = resolvePoolLineup(lineupSpec, data);
+  const players = resolved.map((player) => toSimulationPlayer(player));
+  const sample = resolved[0];
   const context = createEngineContext();
 
   const creation: ChallengeCreation = {
     runId: `cli-challenge-${seed.slice(0, 16)}`,
     mode: 'sandbox',
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    homeDisplayName: team.displayName,
-    lineup,
+    franchiseId: null,
+    eraId,
+    homeDisplayName: resolved
+      .map((player) => player.displayName)
+      .join(' · ')
+      .slice(0, 96),
+    lineup: {
+      structure: [...LINEUP_STRUCTURE],
+      assignments: resolved.map((player, slotIndex) => ({
+        slotIndex: slotIndex as 0 | 1 | 2 | 3 | 4,
+        playerId: player.playerId,
+        positions: player.positions.playable,
+      })),
+    },
     players,
-    selections: players.map((player) => ({
+    selections: resolved.map((player) => ({
       playerId: player.playerId,
-      franchiseId: 'lakers',
-      eraId: '1990s',
+      franchiseId: player.franchiseId,
+      eraId: player.eraId,
     })),
     runSeed: seed,
     dataVersion: profile.dataVersion,
-    ratingVersion: samplePlayer?.source.ratingsVersion ?? 'unknown',
-    positionNormalizationVersion: samplePlayer?.positions.normalizationVersion ?? 'position-v1',
+    ratingVersion: sample?.source.ratingsVersion ?? 'unknown',
+    positionNormalizationVersion: sample?.positions.normalizationVersion ?? 'position-v1',
     engineVersion: context.engineVersion,
     profile,
     bracket,
@@ -119,10 +399,10 @@ export function simChallenge(args: {
   const started = performance.now();
   let run: ChallengeRun;
   try {
-    // Sandbox mode simulates the complete season BEST_OF_ATTEMPTS times from
-    // derived attempt seeds and keeps the best record; the chosen attempt's
-    // seed becomes the reported run seed.
-    run = simulateChallengeBestOf(creation, profile, context);
+    // Sandbox mode simulates the complete season `reruns` times from derived
+    // attempt seeds and keeps the best record; the chosen attempt's seed
+    // becomes the reported run seed.
+    run = simulateChallengeBestOf(creation, profile, context, reruns);
   } catch (error) {
     throw new Error(`challenge simulation failed: ${(error as Error).message}`);
   }
@@ -131,10 +411,11 @@ export function simChallenge(args: {
   const payload = simChallengeReportSchema.parse({
     schemaVersion: 1,
     command: 'sim challenge',
-    lineup: lineupId,
+    lineup: lineupSpec,
     seed,
+    eraId,
     chosenSeed: run.runSeed,
-    attempts: BEST_OF_ATTEMPTS,
+    attempts: reruns,
     engineVersion: context.engineVersion,
     dataVersion: run.versions.dataVersion,
     profileVersion: run.eraProfileVersion,
@@ -150,12 +431,14 @@ export function simChallenge(args: {
     playerTotals: run.aggregates.players.map((player) => ({
       playerId: player.playerId,
       gamesPlayed: player.gamesPlayed,
+      minutes: player.minutes,
       points: player.points,
       rebounds: player.rebounds.total,
       assists: player.assists,
       steals: player.steals,
       blocks: player.blocks,
       turnovers: player.turnovers,
+      fouls: player.fouls,
       fieldGoals: player.fieldGoals,
       threes: player.threes,
       freeThrows: player.freeThrows,
@@ -165,16 +448,120 @@ export function simChallenge(args: {
     invariantFailures: 0,
   });
 
+  const displayName = new Map(run.players.map((player) => [player.playerId, player.displayName]));
+  const nameWidth = Math.max(
+    6,
+    ...payload.playerTotals.map((p) => (displayName.get(p.playerId) ?? p.playerId).length),
+  );
+  const padName = (value: string) => value.padEnd(nameWidth);
+  const padNum = (value: number | string, width: number) => String(value).padStart(width);
+  const padAvg = (value: number, width: number) => value.toFixed(1).padStart(width);
+  const shots = (made: number, attempted: number, width: number) =>
+    `${String(made)}/${String(attempted)}`.padStart(width);
+  const avg = (value: number, games: number) => (games > 0 ? value / games : 0);
+  const pct = (made: number, attempted: number) =>
+    attempted > 0 ? `${((made / attempted) * 100).toFixed(1)}%` : '-';
+  const padPct = (made: number, attempted: number, width: number) =>
+    pct(made, attempted).padStart(width);
+  const totals = payload.playerTotals.reduce(
+    (acc, p) => {
+      acc.gamesPlayed += p.gamesPlayed;
+      acc.minutes += p.minutes;
+      acc.points += p.points;
+      acc.rebounds += p.rebounds;
+      acc.assists += p.assists;
+      acc.steals += p.steals;
+      acc.blocks += p.blocks;
+      acc.turnovers += p.turnovers;
+      acc.fouls += p.fouls;
+      acc.fieldGoals.made += p.fieldGoals.made;
+      acc.fieldGoals.attempted += p.fieldGoals.attempted;
+      acc.threes.made += p.threes.made;
+      acc.threes.attempted += p.threes.attempted;
+      acc.freeThrows.made += p.freeThrows.made;
+      acc.freeThrows.attempted += p.freeThrows.attempted;
+      return acc;
+    },
+    {
+      gamesPlayed: 0,
+      minutes: 0,
+      points: 0,
+      rebounds: 0,
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+      fieldGoals: { made: 0, attempted: 0 },
+      threes: { made: 0, attempted: 0 },
+      freeThrows: { made: 0, attempted: 0 },
+    },
+  );
+  const header = [
+    padName('Player'),
+    padNum('GP', 3),
+    padNum('MPG', 5),
+    padNum('PPG', 5),
+    padNum('RPG', 5),
+    padNum('APG', 5),
+    padNum('SPG', 5),
+    padNum('BPG', 5),
+    padNum('TPG', 5),
+    padNum('FPG', 5),
+    'FG'.padStart(8),
+    'FG%'.padStart(6),
+    '3P'.padStart(7),
+    '3P%'.padStart(6),
+    'FT'.padStart(8),
+    'FT%'.padStart(6),
+  ].join('  ');
+  const playerLines = payload.playerTotals.map((p) =>
+    [
+      padName(displayName.get(p.playerId) ?? p.playerId),
+      padNum(p.gamesPlayed, 3),
+      padAvg(avg(p.minutes, p.gamesPlayed), 5),
+      padAvg(avg(p.points, p.gamesPlayed), 5),
+      padAvg(avg(p.rebounds, p.gamesPlayed), 5),
+      padAvg(avg(p.assists, p.gamesPlayed), 5),
+      padAvg(avg(p.steals, p.gamesPlayed), 5),
+      padAvg(avg(p.blocks, p.gamesPlayed), 5),
+      padAvg(avg(p.turnovers, p.gamesPlayed), 5),
+      padAvg(avg(p.fouls, p.gamesPlayed), 5),
+      shots(p.fieldGoals.made, p.fieldGoals.attempted, 8),
+      padPct(p.fieldGoals.made, p.fieldGoals.attempted, 6),
+      shots(p.threes.made, p.threes.attempted, 7),
+      padPct(p.threes.made, p.threes.attempted, 6),
+      shots(p.freeThrows.made, p.freeThrows.attempted, 8),
+      padPct(p.freeThrows.made, p.freeThrows.attempted, 6),
+    ].join('  '),
+  );
+  const totalsLine = [
+    padName('Totals'),
+    padNum(totals.gamesPlayed, 3),
+    padNum(totals.minutes, 5),
+    padNum(totals.points, 5),
+    padNum(totals.rebounds, 5),
+    padNum(totals.assists, 5),
+    padNum(totals.steals, 5),
+    padNum(totals.blocks, 5),
+    padNum(totals.turnovers, 5),
+    padNum(totals.fouls, 5),
+    shots(totals.fieldGoals.made, totals.fieldGoals.attempted, 8),
+    padPct(totals.fieldGoals.made, totals.fieldGoals.attempted, 6),
+    shots(totals.threes.made, totals.threes.attempted, 7),
+    padPct(totals.threes.made, totals.threes.attempted, 6),
+    shots(totals.freeThrows.made, totals.freeThrows.attempted, 8),
+    padPct(totals.freeThrows.made, totals.freeThrows.attempted, 6),
+  ].join('  ');
   const details = [
     `record ${String(payload.record.wins)}-${String(payload.record.losses)} · outcome ${payload.outcome}${payload.firstLossGameNumber !== null ? ` · first loss game ${String(payload.firstLossGameNumber)}` : ''}`,
-    `engine ${payload.engineVersion} · data ${payload.dataVersion} · profile ${payload.profileVersion} · bracket ${payload.bracketVersion} · schedule ${payload.scheduleVersion} · seed ${seed}`,
     `best of ${String(payload.attempts)} attempts · chosen seed ${payload.chosenSeed}`,
-    `team: ${String(payload.record.gamesPlayed)} games · ${String(payload.teamPossessions)} possessions · ${String(payload.record.gamesPlayed)} played`,
-    ...payload.playerTotals.map(
-      (p) =>
-        `  ${p.playerId}: ${String(p.points)} pts · ${String(p.fieldGoals.made)}/${String(p.fieldGoals.attempted)} FG · ${String(p.threes.made)}/${String(p.threes.attempted)} 3P · ${String(p.rebounds)} REB · ${String(p.assists)} AST · ${String(p.turnovers)} TOV`,
-    ),
+    `engine ${payload.engineVersion} · data ${payload.dataVersion} · profile ${payload.profileVersion} · bracket ${payload.bracketVersion} · schedule ${payload.scheduleVersion} · era ${eraId} · seed ${seed}`,
+    `team: ${String(payload.record.gamesPlayed)} games · ${String(payload.teamPossessions)} possessions`,
+    header,
+    ...playerLines,
+    totalsLine,
     `${timingMs.toFixed(1)} ms`,
   ];
-  return makeReport('sim challenge', { lineup: lineupId, seed }, { details, payload });
+  return makeReport('sim challenge', { lineup: lineupSpec, seed }, { details, payload });
 }

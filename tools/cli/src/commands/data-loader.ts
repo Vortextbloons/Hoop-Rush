@@ -7,10 +7,12 @@ import {
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   opponentBracketSchema,
+  playersIndexSchema,
   type EraSimulationProfile,
   type FranchiseEraPool,
   type HoopRushManifest,
   type OpponentBracket,
+  type PlayersIndex,
 } from '@hoop-rush/data-contracts';
 import { UsageError } from '../args.ts';
 
@@ -71,6 +73,7 @@ export class PackagedData {
   private readonly poolCache = new Map<string, FranchiseEraPool>();
   private readonly profileCache = new Map<string, EraSimulationProfile>();
   private bracketCache: OpponentBracket | null = null;
+  private indexCache: PlayersIndex | null = null;
   private readonly poolEntries: Map<string, HoopRushManifest['pools'][number]>;
 
   constructor(manifest: HoopRushManifest, dir: string) {
@@ -111,6 +114,19 @@ export class PackagedData {
     const parsed = franchiseEraPoolSchema.safeParse(parseJson(path, bytes));
     if (!parsed.success) throw new Error(`pool ${path} fails validation`);
     this.poolCache.set(cacheKey, parsed.data);
+    return parsed.data;
+  }
+
+  /** The compact draft index (every packaged peak row), hash-verified. */
+  playersIndex(): PlayersIndex {
+    if (this.indexCache) return this.indexCache;
+    const entry = this.manifest.playersIndex;
+    if (!entry) throw new Error('no players index packaged in the manifest');
+    const { path, bytes } = this.artifact(entry.url);
+    verifyHash(path, bytes, entry.contentHash);
+    const parsed = playersIndexSchema.safeParse(parseJson(path, bytes));
+    if (!parsed.success) throw new Error(`players index ${path} fails validation`);
+    this.indexCache = parsed.data;
     return parsed.data;
   }
 

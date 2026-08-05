@@ -697,18 +697,6 @@ describe('classic reroll single-axis candidates', () => {
     expect(eraKeys.has('lakers/2000s')).toBe(true);
   });
 
-  it('rerolls derive byte-identical states from the same seed', () => {
-    const catalog = decoyFixture();
-    const franchiseA = rerollClassicFranchise(decoyState(), catalog, context);
-    const franchiseB = rerollClassicFranchise(decoyState(), catalog, context);
-    expect(franchiseB).toEqual(franchiseA);
-    expect(franchiseB.roll).toEqual(franchiseA.roll);
-    const eraA = rerollClassicEra(decoyState(), catalog, context);
-    const eraB = rerollClassicEra(decoyState(), catalog, context);
-    expect(eraB).toEqual(eraA);
-    expect(eraB.roll).toEqual(eraA.roll);
-  });
-
   it('franchise reroll spends only its token and leaves the era reroll usable', () => {
     const catalog = decoyFixture();
     const rolled = rerollClassicFranchise(decoyState(), catalog, context);

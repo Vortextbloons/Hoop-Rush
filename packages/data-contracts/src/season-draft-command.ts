@@ -6,21 +6,30 @@ import { SEASON_DRAFT_VERSION } from './season-versions.ts';
 
 /**
  * Authoritative Season Run draft command envelopes and their accepted or
- * rejected records (spec/2.0/07, M2.1). Every meaningful transition — create,
- * reveal, claim, pick, finalize, and AI league generation — flows through one
- * typed command with a `commandId` and the `expectedRevision` of the state it
- * was issued against. Duplicate command ids are idempotent; stale revisions
- * are rejected. Replaying the initial state plus the exact command sequence
- * reproduces every roll, claim, pick, rejection, and the final digest.
+ * rejected records (spec/2.0/07). Every meaningful transition — create, draw
+ * an eight-card offer, pick, finalize, and AI league generation — flows
+ * through one typed command with a `commandId` and the `expectedRevision` of
+ * the state it was issued against. Duplicate command ids are idempotent;
+ * stale revisions are rejected. Replaying the initial state plus the exact
+ * command sequence reproduces every offer, pick, rejection, and the final
+ * digest.
+ *
+ * M2.3.5 (season-draft-v2): the franchise-era reveal/claim commands are
+ * removed from the current draft; the payload union keeps them as legacy
+ * members so stored season-draft-v1 records (which embed their command logs)
+ * continue to parse. The current engine rejects legacy commands with
+ * `UNSUPPORTED_COMMAND`.
  */
 
 export const seasonDraftCommandKindSchema = z.enum([
   'create-season-draft',
-  'reveal-draft-roll',
-  'claim-draft-pool',
+  'draw-season-offer',
   'select-draft-player',
   'finalize-human-rosters',
   'generate-ai-league',
+  // Legacy season-draft-v1 commands (recovery reads only).
+  'reveal-draft-roll',
+  'claim-draft-pool',
 ]);
 export type SeasonDraftCommandKind = z.infer<typeof seasonDraftCommandKindSchema>;
 
@@ -34,16 +43,9 @@ export const createSeasonDraftPayloadSchema = z.object({
   catalogVersion: z.literal(SEASON_DRAFT_VERSION),
 });
 
-export const revealDraftRollPayloadSchema = z.object({
-  kind: z.literal('reveal-draft-roll'),
+export const drawSeasonOfferPayloadSchema = z.object({
+  kind: z.literal('draw-season-offer'),
   participantId: z.string().min(1).max(64),
-});
-
-export const claimDraftPoolPayloadSchema = z.object({
-  kind: z.literal('claim-draft-pool'),
-  participantId: z.string().min(1).max(64),
-  franchiseId: franchiseIdSchema,
-  eraId: eraIdSchema,
 });
 
 export const selectDraftPlayerPayloadSchema = z.object({
@@ -60,13 +62,27 @@ export const generateAiLeaguePayloadSchema = z.object({
   kind: z.literal('generate-ai-league'),
 });
 
+/** Legacy season-draft-v1 command payloads (stored-record reads only). */
+export const revealDraftRollPayloadSchema = z.object({
+  kind: z.literal('reveal-draft-roll'),
+  participantId: z.string().min(1).max(64),
+});
+
+export const claimDraftPoolPayloadSchema = z.object({
+  kind: z.literal('claim-draft-pool'),
+  participantId: z.string().min(1).max(64),
+  franchiseId: franchiseIdSchema,
+  eraId: eraIdSchema,
+});
+
 export const seasonDraftCommandPayloadSchema = z.discriminatedUnion('kind', [
   createSeasonDraftPayloadSchema,
-  revealDraftRollPayloadSchema,
-  claimDraftPoolPayloadSchema,
+  drawSeasonOfferPayloadSchema,
   selectDraftPlayerPayloadSchema,
   finalizeHumanRostersPayloadSchema,
   generateAiLeaguePayloadSchema,
+  revealDraftRollPayloadSchema,
+  claimDraftPoolPayloadSchema,
 ]);
 export type SeasonDraftCommandPayload = z.infer<typeof seasonDraftCommandPayloadSchema>;
 
@@ -82,12 +98,16 @@ export type SeasonDraftCommand = z.infer<typeof seasonDraftCommandSchema>;
 export const seasonDraftErrorCodeSchema = z.enum([
   'STALE_REVISION',
   'WRONG_TURN',
-  'UNAVAILABLE_POOL',
+  'NO_OFFER_DRAWN',
+  'NO_FEASIBLE_GLOBAL_OFFER',
   'OWNED_VERSION',
   'ILLEGAL_PICK',
   'UNCOMPLETABLE_ROSTER',
   'INVALID_CATALOG',
   'GENERATION_EXHAUSTED',
+  'UNSUPPORTED_COMMAND',
+  // Legacy season-draft-v1 rejection code (recovery reads only).
+  'UNAVAILABLE_POOL',
 ]);
 export type SeasonDraftErrorCode = z.infer<typeof seasonDraftErrorCodeSchema>;
 

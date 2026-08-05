@@ -120,7 +120,7 @@
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
           {shell.snapshot.acceptedBlocks.length * 10 > 82
             ? 82
-            : shell.snapshot.acceptedBlocks.length * 10}{' '}
+            : shell.snapshot.acceptedBlocks.length * 10}
           team games accepted{shell.seasonComplete ? ' (final)' : ''}
         </p>
       </div>

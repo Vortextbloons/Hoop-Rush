@@ -223,8 +223,10 @@ export type CalibrateSensitivityReport = z.infer<typeof calibrateSensitivityRepo
 export const simChallengeReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('sim challenge'),
-  lineup: z.string().min(1).max(96),
+  lineup: z.string().min(1).max(320),
   seed: z.string().min(1).max(64),
+  /** Simulation environment era (fixed '2010s' sandbox era unless --era). */
+  eraId: z.string().min(1).max(64),
   /** Run seed of the chosen best-of-N attempt (the authoritative replay seed). */
   chosenSeed: z.string().min(1).max(64),
   /** Number of whole-run attempts simulated and compared. */
@@ -245,12 +247,14 @@ export const simChallengeReportSchema = z.object({
     z.object({
       playerId: z.string().min(1).max(64),
       gamesPlayed: z.number().int().nonnegative(),
+      minutes: z.number().int().nonnegative(),
       points: z.number().int().nonnegative(),
       rebounds: z.number().int().nonnegative(),
       assists: z.number().int().nonnegative(),
       steals: z.number().int().nonnegative(),
       blocks: z.number().int().nonnegative(),
       turnovers: z.number().int().nonnegative(),
+      fouls: z.number().int().nonnegative(),
       fieldGoals: z.object({
         made: z.number().int().nonnegative(),
         attempted: z.number().int().nonnegative(),
@@ -410,7 +414,7 @@ export const seasonScheduleAuditReportSchema = z.object({
 });
 export type SeasonScheduleAuditReport = z.infer<typeof seasonScheduleAuditReportSchema>;
 
-/** Season Run draft command replay report (M2.1). */
+/** Season Run draft command replay report (M2.3.5, season-draft-v2). */
 export const seasonDraftReproduceReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season draft reproduce'),
@@ -428,20 +432,19 @@ export const seasonDraftReproduceReportSchema = z.object({
     .nullable(),
   /** True when the final digest matches the expected digest. */
   identical: z.boolean(),
-  rolls: z.array(
+  offers: z.array(
     z.object({
       participantId: z.string().min(1).max(64),
-      franchiseId: z.string().min(1).max(64),
-      eraId: z.string().min(1).max(24),
-      attemptIndex: z.number().int().nonnegative(),
-      usable: z.boolean(),
-    }),
-  ),
-  claims: z.array(
-    z.object({
-      participantId: z.string().min(1).max(64),
-      franchiseId: z.string().min(1).max(64),
-      eraId: z.string().min(1).max(24),
+      round: z.number().int().min(1).max(10),
+      pickOrdinal: z.number().int().min(1).max(10),
+      seedPath: z.array(z.string().min(1)).min(1),
+      cards: z.array(
+        z.object({
+          playerVersionId: z.string().min(1).max(64),
+          selectable: z.boolean(),
+          coverageReason: z.string().min(1).max(256).nullable(),
+        }),
+      ),
     }),
   ),
   picks: z.array(
@@ -542,6 +545,54 @@ export const seasonRostersCalibrateReportSchema = z.object({
   pass: z.boolean(),
 });
 export type SeasonRostersCalibrateReport = z.infer<typeof seasonRostersCalibrateReportSchema>;
+
+/** M2.3.5 `season draft calibrate` report payload. */
+export const seasonDraftCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season draft calibrate'),
+  calibrationSeeds: z.number().int().positive(),
+  validationSeeds: z.number().int().positive(),
+  durationMs: z.number().nonnegative(),
+  /** Distinct playerVersionIds across all ten offers, per draft. */
+  variety: distributionEntrySchema,
+  /** Minimum selectable cards across the ten offers, per draft. */
+  minSafePerOffer: z.number().int().nonnegative(),
+  /** Share of drafts where every offer had >= SEASON_DRAFT_SAFE_MINIMUM safe cards. */
+  safeAvailabilityShare: z.number().min(0).max(1),
+  /** Share of offers whose selectable cards cover all three position groups. */
+  selectableGroupCoverageShare: z.number().min(0).max(1),
+  /** Drafts with an exact-version duplicate across offers+picks. */
+  duplicateDrafts: z.number().int().nonnegative(),
+  /** Drafts the pick policy dead-ended (NO_FEASIBLE_GLOBAL_OFFER). */
+  draftFailures: z.number().int().nonnegative(),
+  /** AI generation failures across the whole cohort. */
+  generationFailures: z.number().int().nonnegative(),
+  bands: z.object({
+    contender: distributionEntrySchema,
+    playoff: distributionEntrySchema,
+    average: distributionEntrySchema,
+    weaker: distributionEntrySchema,
+  }),
+  gates: z.object({
+    minSafe: z.boolean(),
+    zeroDuplicates: z.boolean(),
+    zeroDraftFailures: z.boolean(),
+    zeroGenerationFailures: z.boolean(),
+    selectableGroupCoverage: z.boolean(),
+    heldOutVarietyPassShare: z.number().min(0).max(1),
+    heldOutVarietyPass: z.boolean(),
+    heldOutSafePassShare: z.number().min(0).max(1),
+    heldOutSafePass: z.boolean(),
+    heldOutCoveragePassShare: z.number().min(0).max(1),
+    heldOutCoveragePass: z.boolean(),
+    heldOutStrengthPassShare: z.number().min(0).max(1),
+    heldOutStrengthPass: z.boolean(),
+  }),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  pass: z.boolean(),
+});
+export type SeasonDraftCalibrateReport = z.infer<typeof seasonDraftCalibrateReportSchema>;
 
 /**
  * Overall cohort percentile bands (spec: percentile Overall normalization).

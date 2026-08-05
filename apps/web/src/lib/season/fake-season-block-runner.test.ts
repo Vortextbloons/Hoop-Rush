@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
 import type { SeasonBlockStartInput } from './season-block-runner';
 import { FakeSeasonBlockRunner } from './fake-season-block-runner';
@@ -99,7 +99,12 @@ function withWindow(shim: Record<string, unknown>): void {
 
 describe('FakeSeasonBlockRunner', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     delete (globalThis as Record<string, unknown>).window;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('streams progress to completion with no tied finals', async () => {
@@ -113,7 +118,7 @@ describe('FakeSeasonBlockRunner', () => {
     });
     const requestId = runner.startBlock(minimalInput());
     expect(events[0]).toBe('started:');
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await vi.advanceTimersByTimeAsync(3000);
     expect(events.some((e) => e === 'progress:150')).toBe(true);
     expect(events.some((e) => e.startsWith('complete:'))).toBe(true);
     expect(events.some((e) => e.startsWith('error:'))).toBe(false);
@@ -133,7 +138,7 @@ describe('FakeSeasonBlockRunner', () => {
     // The flag is consumed, so the next startBlock runs to completion.
     const requestId2 = runner.startBlock({ ...minimalInput(), commandId: 'blk-fake-2' });
     expect(requestId2).not.toBe(requestId);
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await vi.advanceTimersByTimeAsync(3000);
     expect(events.filter((e) => e === 'complete').length).toBe(1);
   });
 });

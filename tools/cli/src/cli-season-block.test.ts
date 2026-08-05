@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { seasonCandidateCheckpointSchema } from '@hoop-rush/data-contracts';
 import {
   seasonBlockAuditReportSchema,
@@ -14,14 +14,19 @@ import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
  * audit`, and `season full simulate` commands (spec/2.0/02, spec/2.0/07).
  * Every test runs the real engine pipeline over the committed v4 run
  * fixture, the packaged catalog and schedule, and the packaged era profile.
+ * BLOCK_ZERO_DIGEST was re-pinned by the M2.3.5 season-draft-v2 fixture
+ * regeneration (the committed draft now plays global eight-card offers).
  */
 
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
-const BLOCK_ZERO_DIGEST = '7b4c5c77947ab5e33ef0a7750cd1c387';
+const BLOCK_ZERO_DIGEST = 'd9f5dd2747b8bb6b79c3f9015a9dec77';
 
 describe('cli: season block simulate', () => {
-  it('simulates block 0 over the committed fixture with a clean audit', async () => {
-    const { code, stdout, stderr } = await runCli([
+  // The default block-0 boot is shared by the simulate and audit tests.
+  let blockZero: Awaited<ReturnType<typeof runCli>>;
+
+  beforeAll(async () => {
+    blockZero = await runCli([
       'season',
       'block',
       'simulate',
@@ -30,6 +35,10 @@ describe('cli: season block simulate', () => {
       '--format',
       'json',
     ]);
+  }, 60_000);
+
+  it('simulates block 0 over the committed fixture with a clean audit', () => {
+    const { code, stdout, stderr } = blockZero;
     expect(code).toBe(0);
     const payload = seasonBlockSimulateReportSchema.parse(jsonPayload(stdout, stderr));
     expect(payload.pass).toBe(true);
@@ -71,15 +80,7 @@ describe('cli: season block simulate', () => {
   it('audits a saved candidate checkpoint with digest verification', async () => {
     // Produce the checkpoint through the authoritative command path and
     // persist it to the scratch directory, then audit the file.
-    const { code, stdout, stderr } = await runCli([
-      'season',
-      'block',
-      'simulate',
-      '--input',
-      SEASON_RUN,
-      '--format',
-      'json',
-    ]);
+    const { code, stdout, stderr } = blockZero;
     expect(code).toBe(0);
     const simulate = seasonBlockSimulateReportSchema.parse(jsonPayload(stdout, stderr));
     expect(simulate.pass).toBe(true);

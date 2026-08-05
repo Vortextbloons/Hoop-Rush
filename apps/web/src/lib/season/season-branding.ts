@@ -109,6 +109,12 @@ export function initialsOf(displayName: string): string {
     .split(/\s+/)
     .filter((part) => part.length > 0);
   if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return `${parts[0]![0]}${parts[parts.length - 1]![0]}`.toUpperCase();
+  const firstChar = (part: string | undefined): string =>
+    part === undefined || part.length === 0 ? '' : (part[0] ?? '');
+  if (parts.length === 1) {
+    const only = parts[0];
+    return only === undefined ? '?' : only.slice(0, 2).toUpperCase();
+  }
+  const initials = `${firstChar(parts[0])}${firstChar(parts[parts.length - 1])}`.toUpperCase();
+  return initials === '' ? '?' : initials;
 }

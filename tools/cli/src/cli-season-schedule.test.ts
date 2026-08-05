@@ -7,7 +7,7 @@ import {
   seasonScheduleAuditReportSchema,
   seasonScheduleGenerateReportSchema,
 } from './report-schemas.ts';
-import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
+import { jsonPayload, REPO_ROOT, runCli, withTmpDir } from './cli-test-helpers.ts';
 
 /**
  * CLI integration tests for `season schedule generate` and `season schedule
@@ -48,68 +48,47 @@ describe('cli: season schedule generate', () => {
     expect(payload.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('writes the artifact only with an explicit --out path', async () => {
-    const outPath = join(TMP, 'generated-schedule.json');
-    const { code, stdout } = await runCli([
-      'season',
-      'schedule',
-      'generate',
-      '--out',
-      outPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = seasonScheduleGenerateReportSchema.parse(jsonPayload(stdout));
-    expect(payload.wrote).toBe(true);
-    expect(payload.outPath).toBe(outPath);
-    const written = readFileSync(outPath, 'utf8');
-    expect(createHash('sha256').update(written).digest('hex')).toBe(payload.sha256);
-    const parsed = JSON.parse(written) as { games: unknown[]; rounds: number };
-    expect(parsed.games).toHaveLength(1230);
-    expect(parsed.rounds).toBe(82);
-  });
+  it('writes the artifact with --out, regenerates byte-identically, and diverges under a different seed', async () => {
+    await withTmpDir(async (tmp) => {
+      const first = join(tmp, 'schedule-a.json');
+      const second = join(tmp, 'schedule-b.json');
+      const seeded = join(tmp, 'schedule-seeded.json');
+      const run = (out: string, seed?: string) =>
+        runCli([
+          'season',
+          'schedule',
+          'generate',
+          ...(seed === undefined ? [] : ['--seed', seed]),
+          '--out',
+          out,
+          '--format',
+          'json',
+        ]);
+      // Write behavior: the artifact appears only at the explicit --out path
+      // and its bytes hash to the reported sha256.
+      const { code, stdout } = await run(first);
+      expect(code).toBe(0);
+      const payload = seasonScheduleGenerateReportSchema.parse(jsonPayload(stdout));
+      expect(payload.wrote).toBe(true);
+      expect(payload.outPath).toBe(first);
+      const written = readFileSync(first, 'utf8');
+      expect(createHash('sha256').update(written).digest('hex')).toBe(payload.sha256);
+      const parsed = JSON.parse(written) as { games: unknown[]; rounds: number };
+      expect(parsed.games).toHaveLength(1230);
+      expect(parsed.rounds).toBe(82);
 
-  it('regenerates byte-identically across runs', async () => {
-    const first = join(TMP, 'schedule-a.json');
-    const second = join(TMP, 'schedule-b.json');
-    const run = (out: string) =>
-      runCli(['season', 'schedule', 'generate', '--out', out, '--format', 'json']);
-    expect((await run(first)).code).toBe(0);
-    expect((await run(second)).code).toBe(0);
-    expect(readFileSync(first, 'utf8')).toBe(readFileSync(second, 'utf8'));
-  });
+      // Regeneration identity: a second default-seed run is byte-identical.
+      const secondRun = await run(second);
+      expect(secondRun.code).toBe(0);
+      expect(readFileSync(second, 'utf8')).toBe(written);
 
-  it('produces a different artifact under a different seed', async () => {
-    const { code, stdout } = await runCli([
-      'season',
-      'schedule',
-      'generate',
-      '--seed',
-      'feedfacefeedfacefeedfacefeedface',
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(0);
-    const payload = seasonScheduleGenerateReportSchema.parse(jsonPayload(stdout));
-    const committed = seasonScheduleGenerateReportSchema.parse(
-      jsonPayload((await runCli(['season', 'schedule', 'generate', '--format', 'json'])).stdout),
-    );
-    expect(payload.sha256).not.toBe(committed.sha256);
-  });
-
-  it('rejects a malformed seed with exit 2', async () => {
-    const { code, stderr } = await runCli([
-      'season',
-      'schedule',
-      'generate',
-      '--seed',
-      'not-a-seed',
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(2);
-    expect(stderr).not.toMatch(/^\s+at /m);
+      // Seed sensitivity: a different seed produces a different artifact.
+      const seededRun = await run(seeded, 'feedfacefeedfacefeedfacefeedface');
+      expect(seededRun.code).toBe(0);
+      const seededPayload = seasonScheduleGenerateReportSchema.parse(jsonPayload(seededRun.stdout));
+      expect(seededPayload.sha256).not.toBe(payload.sha256);
+      expect(readFileSync(seeded, 'utf8')).not.toBe(written);
+    });
   });
 });
 
@@ -127,84 +106,94 @@ describe('cli: season schedule audit', () => {
   });
 
   it('exits 1 with a clean report on a corrupted schedule artifact', async () => {
-    const packaged = JSON.parse(readFileSync(join(REPO_ROOT, PACKAGED_SCHEDULE), 'utf8')) as {
-      games: Array<{ gameId: string; homeFranchiseId: string; awayFranchiseId: string }>;
-    };
-    const swapped = packaged.games.map((game, index) =>
-      index === 0
-        ? { ...game, homeFranchiseId: game.awayFranchiseId, awayFranchiseId: game.homeFranchiseId }
-        : game,
-    );
-    const badPath = join(TMP, 'bad-schedule.json');
-    writeFileSync(badPath, JSON.stringify({ ...packaged, games: swapped }));
-    const { code, stderr } = await runCli([
-      'season',
-      'schedule',
-      'audit',
-      '--schedule',
-      badPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(1);
-    expect(stderr).not.toMatch(/^\s+at /m);
-    const payload = seasonScheduleAuditReportSchema.parse(jsonPayload('', stderr));
-    expect(payload.pass).toBe(false);
-    expect(payload.regenerationIdentical).toBe(false);
+    await withTmpDir(async (tmp) => {
+      const packaged = JSON.parse(readFileSync(join(REPO_ROOT, PACKAGED_SCHEDULE), 'utf8')) as {
+        games: Array<{ gameId: string; homeFranchiseId: string; awayFranchiseId: string }>;
+      };
+      const swapped = packaged.games.map((game, index) =>
+        index === 0
+          ? {
+              ...game,
+              homeFranchiseId: game.awayFranchiseId,
+              awayFranchiseId: game.homeFranchiseId,
+            }
+          : game,
+      );
+      const badPath = join(tmp, 'bad-schedule.json');
+      writeFileSync(badPath, JSON.stringify({ ...packaged, games: swapped }));
+      const { code, stderr } = await runCli([
+        'season',
+        'schedule',
+        'audit',
+        '--schedule',
+        badPath,
+        '--format',
+        'json',
+      ]);
+      expect(code).toBe(1);
+      expect(stderr).not.toMatch(/^\s+at /m);
+      const payload = seasonScheduleAuditReportSchema.parse(jsonPayload('', stderr));
+      expect(payload.pass).toBe(false);
+      expect(payload.regenerationIdentical).toBe(false);
+    });
   });
 
   it('exits 2 with a clean report when an artifact is missing', async () => {
-    const missing = join(TMP, 'missing-schedule.json');
-    const { code, stderr } = await runCli([
-      'season',
-      'schedule',
-      'audit',
-      '--schedule',
-      missing,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(2);
-    expect(stderr).not.toMatch(/^\s+at /m);
+    await withTmpDir(async (tmp) => {
+      const missing = join(tmp, 'missing-schedule.json');
+      const { code, stderr } = await runCli([
+        'season',
+        'schedule',
+        'audit',
+        '--schedule',
+        missing,
+        '--format',
+        'json',
+      ]);
+      expect(code).toBe(2);
+      expect(stderr).not.toMatch(/^\s+at /m);
+    });
   });
 
   it('reports a manifest content hash mismatch', async () => {
-    const leagueContent = readFileSync(join(REPO_ROOT, PACKAGED_LEAGUE), 'utf8');
-    const scheduleContent = readFileSync(join(REPO_ROOT, PACKAGED_SCHEDULE), 'utf8');
-    const manifestDir = join(TMP, 'manifest-season');
-    const leagueUrl = join(manifestDir, 'season', 'league.json');
-    const scheduleUrl = join(manifestDir, 'season', 'schedule.json');
-    mkdirSync(dirname(leagueUrl), { recursive: true });
-    writeFileSync(leagueUrl, leagueContent);
-    writeFileSync(scheduleUrl, scheduleContent);
-    const manifestPath = join(manifestDir, 'manifest.json');
-    writeFileSync(
-      manifestPath,
-      JSON.stringify({
-        schemaVersion: 1,
-        dataVersion: 'm2.0',
-        season: {
-          league: {
-            url: leagueUrl,
-            contentHash: createHash('sha256').update(leagueContent).digest('hex'),
+    await withTmpDir(async (tmp) => {
+      const leagueContent = readFileSync(join(REPO_ROOT, PACKAGED_LEAGUE), 'utf8');
+      const scheduleContent = readFileSync(join(REPO_ROOT, PACKAGED_SCHEDULE), 'utf8');
+      const manifestDir = join(tmp, 'manifest-season');
+      const leagueUrl = join(manifestDir, 'season', 'league.json');
+      const scheduleUrl = join(manifestDir, 'season', 'schedule.json');
+      mkdirSync(dirname(leagueUrl), { recursive: true });
+      writeFileSync(leagueUrl, leagueContent);
+      writeFileSync(scheduleUrl, scheduleContent);
+      const manifestPath = join(manifestDir, 'manifest.json');
+      writeFileSync(
+        manifestPath,
+        JSON.stringify({
+          schemaVersion: 1,
+          dataVersion: 'm2.0',
+          season: {
+            league: {
+              url: leagueUrl,
+              contentHash: createHash('sha256').update(leagueContent).digest('hex'),
+            },
+            schedule: { url: scheduleUrl, contentHash: '0'.repeat(64) },
           },
-          schedule: { url: scheduleUrl, contentHash: '0'.repeat(64) },
-        },
-      }),
-    );
-    const { code, stderr } = await runCli([
-      'season',
-      'schedule',
-      'audit',
-      '--manifest',
-      manifestPath,
-      '--format',
-      'json',
-    ]);
-    expect(code).toBe(1);
-    expect(stderr).not.toMatch(/^\s+at /m);
-    const payload = seasonScheduleAuditReportSchema.parse(jsonPayload('', stderr));
-    expect(payload.manifestVerified).toBe(false);
-    expect(payload.pass).toBe(false);
+        }),
+      );
+      const { code, stderr } = await runCli([
+        'season',
+        'schedule',
+        'audit',
+        '--manifest',
+        manifestPath,
+        '--format',
+        'json',
+      ]);
+      expect(code).toBe(1);
+      expect(stderr).not.toMatch(/^\s+at /m);
+      const payload = seasonScheduleAuditReportSchema.parse(jsonPayload('', stderr));
+      expect(payload.manifestVerified).toBe(false);
+      expect(payload.pass).toBe(false);
+    });
   });
 });

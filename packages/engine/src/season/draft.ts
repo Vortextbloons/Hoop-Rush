@@ -1,4 +1,5 @@
 import {
+  SEASON_DRAFT_OFFER_SIZE,
   SEASON_DRAFT_VERSION,
   seasonDraftStateSchema,
   seasonLeagueSchema,
@@ -8,14 +9,14 @@ import {
   type SeasonDraftCommand,
   type SeasonDraftCommandRecord,
   type SeasonDraftErrorCode,
+  type SeasonDraftOffer,
   type SeasonDraftParticipant,
   type SeasonDraftPick,
-  type SeasonDraftReveal,
-  type SeasonDraftRollAttempt,
   type SeasonDraftState,
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
 import { validateDraftCatalog } from './catalog-validation.ts';
+import { drawGlobalOffer } from './draft-offers.ts';
 import {
   completionTargetsMet,
   legalFiveAfterAnyRemoval,
@@ -31,38 +32,31 @@ import {
 export type { SeasonAiGenerationInput, SeasonLeagueGenerationResult };
 
 /**
- * Authoritative Season Run human draft commands (spec/2.0/03, season-draft-v1,
- * M2.1). One typed command path covers creating a one- or two-human draft,
- * revealing the current participant's roll, claiming the revealed exact
- * franchise-era pair, selecting one legal player version, finalizing human
- * rosters, and generating the remaining AI league. Commands are pure: every
- * roll derives from stable seeds keyed by participant, round, pick ordinal,
- * and recovery attempt, and the state is a pure function of (create inputs,
- * seed, command sequence). Duplicate command ids are idempotent; stale
- * revisions are rejected; every result is an accepted or rejected record.
+ * Authoritative Season Run human draft commands (spec/2.0/03, season-draft-v2,
+ * M2.3.5). One typed command path covers creating a one- or two-human draft,
+ * drawing the current turn's deterministic global eight-card offer, selecting
+ * one legal player version, finalizing human rosters, and generating the
+ * remaining AI league. Commands are pure: every offer derives from stable
+ * seeds keyed by participant, round, and pick ordinal (see draft-offers.ts),
+ * and the state is a pure function of (create inputs, seed, command
+ * sequence). Duplicate command ids are idempotent; stale revisions are
+ * rejected; every result is an accepted or rejected record.
+ *
+ * The legacy M2.1-M2.3 franchise-era roll draft (season-draft-v1) is not
+ * playable through this engine: its reveal/claim commands are rejected with
+ * `UNSUPPORTED_COMMAND`, and unfinished v1 drafts surface an explicit
+ * recovery screen at the persistence/UI boundary.
  */
 
 /** Named seed keys for the draft namespace (spec/2.0/07 seed tree). */
 const DRAFT_SEED_KEYS = {
   franchiseAssignment: 'franchise-assignment',
   firstPick: 'first-pick',
-  roll: 'roll',
 } as const;
 
 const MAX_PICKS_PER_PARTICIPANT = 10;
 const ROUND_COUNT = 10;
-
-function pairKey(franchiseId: string, eraId: string): string {
-  return `${franchiseId}/${eraId}`;
-}
-
-function canonicalPoolSort<T extends { franchiseId: string; eraId: string }>(
-  pools: readonly T[],
-): T[] {
-  return [...pools].sort(
-    (a, b) => a.franchiseId.localeCompare(b.franchiseId) || a.eraId.localeCompare(b.eraId),
-  );
-}
+const MIN_CATALOG_CANDIDATES = SEASON_DRAFT_OFFER_SIZE;
 
 function participantIdsOf(state: SeasonDraftState): string[] {
   return [...state.participants.map((p) => p.participantId)].sort();
@@ -86,35 +80,6 @@ function ownedVersionIds(state: SeasonDraftState): Set<string> {
   return new Set(state.picks.map((p) => p.playerVersionId));
 }
 
-function claimedPairKeys(state: SeasonDraftState): Set<string> {
-  return new Set(state.claims.map((c) => pairKey(c.franchiseId, c.eraId)));
-}
-
-/** All candidates the participant could still roll: not owned, not in a claimed pool. */
-function availableCandidates(
-  state: SeasonDraftState,
-  catalog: SeasonDraftCatalog,
-): SeasonDraftCatalog['candidates'] {
-  const owned = ownedVersionIds(state);
-  const claimed = claimedPairKeys(state);
-  return catalog.candidates.filter(
-    (candidate) =>
-      !owned.has(candidate.playerVersionId) &&
-      !claimed.has(pairKey(candidate.franchiseId, candidate.eraId)),
-  );
-}
-
-/** Feasibility-search members for the participant's remaining pool. */
-function availableMembers(
-  state: SeasonDraftState,
-  catalog: SeasonDraftCatalog,
-): SeasonRosterMemberInput[] {
-  return availableCandidates(state, catalog).map((candidate) => ({
-    playerVersionId: candidate.playerVersionId,
-    playable: candidate.positions.playable,
-  }));
-}
-
 function membersOf(
   versionIds: readonly string[],
   catalog: SeasonDraftCatalog,
@@ -132,58 +97,9 @@ function membersOf(
 }
 
 /**
- * True when selecting any unowned member of the pool keeps the participant's
- * completion targets feasible. Candidate fungibility: only the coarse group
- * mask of the added candidate matters, so the check probes at most one
- * candidate per mask.
- */
-function poolKeepsFeasibility(
-  pool: SeasonDraftCatalog['pools'][number],
-  state: SeasonDraftState,
-  catalog: SeasonDraftCatalog,
-  participantId: string,
-): boolean {
-  const owned = ownedVersionIds(state);
-  const ownedMembers = membersOf(
-    state.picks.filter((p) => p.participantId === participantId).map((p) => p.playerVersionId),
-    catalog,
-  );
-  const remaining = MAX_PICKS_PER_PARTICIPANT - ownedMembers.length;
-  if (remaining <= 0) return false;
-  const seenMasks = new Set<number>();
-  for (const versionId of pool.playerVersionIds) {
-    if (owned.has(versionId)) continue;
-    const candidate = catalog.candidates.find((c) => c.playerVersionId === versionId);
-    if (candidate === undefined) continue;
-    const mask = candidate.positions.playable.reduce<number>(
-      (acc, position) =>
-        acc |
-        (position === 'PG' || position === 'SG'
-          ? 1
-          : position === 'SF' || position === 'PF'
-            ? 2
-            : 4),
-      0,
-    );
-    if (seenMasks.has(mask)) continue;
-    seenMasks.add(mask);
-    const probe: SeasonRosterMemberInput[] = [
-      ...ownedMembers,
-      { playerVersionId: versionId, playable: candidate.positions.playable },
-    ];
-    // The probed candidate itself is no longer available for future picks.
-    const available = availableMembers(state, catalog).filter(
-      (member) => member.playerVersionId !== versionId,
-    );
-    if (rosterFeasible(probe, available, remaining - 1)) return true;
-  }
-  return false;
-}
-
-/**
  * Canonical digest of the full draft state (deterministic facts only: turn,
- * rolls, claims, picks, status, revision, and the command log). Two states
- * are replay-identical exactly when their digests match.
+ * offers, picks, status, revision, and the command log). Two states are
+ * replay-identical exactly when their digests match.
  */
 export function seasonDraftStateDigest(state: SeasonDraftState): string {
   return seasonDigestHex(seasonDraftStateCanonical(state));
@@ -204,13 +120,9 @@ export function seasonDraftStateCanonical(state: SeasonDraftState): string {
     currentTurnParticipantId: state.currentTurnParticipantId,
     status: state.status,
     revision: state.revision,
-    currentReveal: state.currentReveal,
-    rolls: state.rolls,
-    claims: [...state.claims].sort((a, b) =>
-      `${a.participantId}:${a.franchiseId}:${a.eraId}` <
-      `${b.participantId}:${b.franchiseId}:${b.eraId}`
-        ? -1
-        : 1,
+    currentOffer: state.currentOffer,
+    offers: [...state.offers].sort((a, b) =>
+      `${a.participantId}:${String(a.round)}` < `${b.participantId}:${String(b.round)}` ? -1 : 1,
     ),
     picks: [...state.picks].sort((a, b) =>
       `${a.participantId}:${String(a.round)}` < `${b.participantId}:${String(b.round)}` ? -1 : 1,
@@ -280,10 +192,10 @@ function createDraft(command: SeasonDraftCommand, catalog: SeasonDraftCatalog): 
   if (new Set(humanIds).size !== humanIds.length) {
     return reject('INVALID_CATALOG', 'human participant ids must be distinct');
   }
-  if (catalog.pools.length < ROUND_COUNT * humanIds.length) {
+  if (catalog.candidates.length < MIN_CATALOG_CANDIDATES) {
     return reject(
       'UNCOMPLETABLE_ROSTER',
-      `catalog has ${String(catalog.pools.length)} claimable pools; need at least ${String(ROUND_COUNT * humanIds.length)} for ${String(humanIds.length)} participant(s) over ${String(ROUND_COUNT)} rounds`,
+      `catalog has ${String(catalog.candidates.length)} candidates; need at least ${String(MIN_CATALOG_CANDIDATES)} to draw a global eight-card offer`,
     );
   }
   // Distinct seeded franchise assignments for the human participants.
@@ -304,21 +216,20 @@ function createDraft(command: SeasonDraftCommand, catalog: SeasonDraftCatalog): 
     seasonNamespaceSeed(payload.rootSeed, 'draft', DRAFT_SEED_KEYS.firstPick),
   ).pick([...humanIds].sort());
   const bareState: SeasonDraftState = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     draftVersion: SEASON_DRAFT_VERSION,
     runId: payload.runId,
     rootSeed: payload.rootSeed,
     league,
-    catalogVersion: 'season-draft-v1',
+    catalogVersion: SEASON_DRAFT_VERSION,
     participants,
     firstPickParticipantId,
     round: 1,
     currentTurnParticipantId: firstPickParticipantId,
     status: 'drafting',
     revision: 1,
-    currentReveal: null,
-    rolls: [],
-    claims: [],
+    currentOffer: null,
+    offers: [],
     picks: [],
     commandLog: [],
   };
@@ -358,18 +269,20 @@ function advanceTurn(state: SeasonDraftState): {
   return { round: nextRound, currentTurnParticipantId: nextPicker };
 }
 
-function revealRoll(
+function drawOffer(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
   command: SeasonDraftCommand,
 ): CommandResult {
   const payload = command.payload;
-  if (payload.kind !== 'reveal-draft-roll') throw new Error('revealRoll requires a reveal payload');
+  if (payload.kind !== 'draw-season-offer') {
+    throw new Error('drawOffer requires a draw-season-offer payload');
+  }
   const pid = payload.participantId;
   if (state.status !== 'drafting' || state.currentTurnParticipantId === null) {
     return {
       state,
-      record: rejectedRecord(state, command, 'WRONG_TURN', 'no turn is active for a reveal'),
+      record: rejectedRecord(state, command, 'WRONG_TURN', 'no turn is active for a draw'),
       generation: null,
     };
   }
@@ -385,153 +298,42 @@ function revealRoll(
       generation: null,
     };
   }
-  const round = state.round;
-  const pickOrdinal = pickCount(state, pid) + 1;
-  if (state.currentReveal !== null) {
-    // The current turn already has a revealed pool; reveal is an accepted no-op.
+  if (state.currentOffer !== null) {
+    // The current turn already has a drawn offer; draw is an accepted no-op.
     const nextState: SeasonDraftState = { ...state, revision: state.revision + 1 };
     const record = acceptedAgainst(nextState, command, state.revision);
     return { state: withLog(nextState, record), record, generation: null };
   }
-  const claimed = claimedPairKeys(state);
-  const attempts: SeasonDraftRollAttempt[] = [];
-  const attemptedThisReveal = new Set<string>();
-  let revealedPair: { franchiseId: string; eraId: string } | null = null;
-  for (let attemptIndex = 0; ; attemptIndex += 1) {
-    const candidates = canonicalPoolSort(
-      catalog.pools.filter(
-        (pool) =>
-          !claimed.has(pairKey(pool.franchiseId, pool.eraId)) &&
-          !attemptedThisReveal.has(pairKey(pool.franchiseId, pool.eraId)),
-      ),
-    );
-    if (candidates.length === 0) {
-      return {
+  const draw = drawGlobalOffer(state, catalog, pid);
+  if (draw.status === 'too-few-candidates') {
+    return {
+      state,
+      record: rejectedRecord(
         state,
-        record: rejectedRecord(
-          state,
-          command,
-          'UNCOMPLETABLE_ROSTER',
-          'no unclaimed pool with a feasible selection remains',
-        ),
-        generation: null,
-      };
-    }
-    const rollSeed = seasonNamespaceSeed(
-      state.rootSeed,
-      'draft',
-      DRAFT_SEED_KEYS.roll,
-      pid,
-      String(round),
-      String(pickOrdinal),
-      String(attemptIndex),
-    );
-    const pool = createRng(rollSeed).pick(candidates);
-    attemptedThisReveal.add(pairKey(pool.franchiseId, pool.eraId));
-    const usable = poolKeepsFeasibility(pool, state, catalog, pid);
-    attempts.push({
-      franchiseId: pool.franchiseId,
-      eraId: pool.eraId,
-      attemptIndex,
-      usable,
-    });
-    if (usable) {
-      revealedPair = { franchiseId: pool.franchiseId, eraId: pool.eraId };
-      break;
-    }
+        command,
+        'NO_FEASIBLE_GLOBAL_OFFER',
+        `only ${String(draw.remainingCount)} unowned candidates remain; need at least ${String(SEASON_DRAFT_OFFER_SIZE)} to draw an offer`,
+      ),
+      generation: null,
+    };
   }
-  void revealedPair;
-  const reveal: SeasonDraftReveal = {
-    participantId: pid,
-    round,
-    pickOrdinal,
-    attempts,
-  };
+  if (draw.status === 'too-few-safe') {
+    return {
+      state,
+      record: rejectedRecord(
+        state,
+        command,
+        'NO_FEASIBLE_GLOBAL_OFFER',
+        `only ${String(draw.safeCount)} feasibility-safe candidates remain; need at least 3 to draw an offer`,
+      ),
+      generation: null,
+    };
+  }
+  const offer: SeasonDraftOffer = draw.offer;
   const nextState: SeasonDraftState = {
     ...state,
-    rolls: [...state.rolls, ...attempts],
-    currentReveal: reveal,
-    revision: state.revision + 1,
-  };
-  const record = acceptedAgainst(nextState, command, state.revision);
-  return { state: withLog(nextState, record), record, generation: null };
-}
-
-function claimPool(state: SeasonDraftState, command: SeasonDraftCommand): CommandResult {
-  const payload = command.payload;
-  if (payload.kind !== 'claim-draft-pool') throw new Error('claimPool requires a claim payload');
-  const pid = payload.participantId;
-  if (state.status !== 'drafting' || state.currentTurnParticipantId === null) {
-    return {
-      state,
-      record: rejectedRecord(state, command, 'WRONG_TURN', 'no turn is active for a claim'),
-      generation: null,
-    };
-  }
-  if (pid !== state.currentTurnParticipantId) {
-    return {
-      state,
-      record: rejectedRecord(
-        state,
-        command,
-        'WRONG_TURN',
-        `it is ${state.currentTurnParticipantId}'s turn, not ${pid}'s`,
-      ),
-      generation: null,
-    };
-  }
-  if (state.currentReveal === null) {
-    return {
-      state,
-      record: rejectedRecord(
-        state,
-        command,
-        'UNAVAILABLE_POOL',
-        'no pool is revealed for this turn',
-      ),
-      generation: null,
-    };
-  }
-  const reveal = state.currentReveal;
-  const lastAttempt = reveal.attempts[reveal.attempts.length - 1];
-  if (lastAttempt === undefined || !lastAttempt.usable) {
-    return {
-      state,
-      record: rejectedRecord(state, command, 'UNAVAILABLE_POOL', 'the revealed pool is not usable'),
-      generation: null,
-    };
-  }
-  if (payload.franchiseId !== lastAttempt.franchiseId || payload.eraId !== lastAttempt.eraId) {
-    return {
-      state,
-      record: rejectedRecord(
-        state,
-        command,
-        'UNAVAILABLE_POOL',
-        `claim ${payload.franchiseId}/${payload.eraId} does not match the revealed pool ${lastAttempt.franchiseId}/${lastAttempt.eraId}`,
-      ),
-      generation: null,
-    };
-  }
-  if (
-    state.claims.some(
-      (c) =>
-        c.participantId === pid &&
-        c.franchiseId === payload.franchiseId &&
-        c.eraId === payload.eraId,
-    )
-  ) {
-    // Already claimed: accepted no-op.
-    const nextState: SeasonDraftState = { ...state, revision: state.revision + 1 };
-    const record = acceptedAgainst(nextState, command, state.revision);
-    return { state: withLog(nextState, record), record, generation: null };
-  }
-  const nextState: SeasonDraftState = {
-    ...state,
-    claims: [
-      ...state.claims,
-      { participantId: pid, franchiseId: payload.franchiseId, eraId: payload.eraId },
-    ],
+    currentOffer: offer,
+    offers: [...state.offers, offer],
     revision: state.revision + 1,
   };
   const record = acceptedAgainst(nextState, command, state.revision);
@@ -572,48 +374,23 @@ function selectPlayer(
       generation: null,
     };
   }
-  if (state.currentReveal === null) {
+  if (state.currentOffer === null) {
+    return {
+      state,
+      record: rejectedRecord(state, command, 'NO_OFFER_DRAWN', 'no offer is drawn for this turn'),
+      generation: null,
+    };
+  }
+  const offer = state.currentOffer;
+  const card = offer.cards.find((c) => c.playerVersionId === payload.playerVersionId);
+  if (card === undefined) {
     return {
       state,
       record: rejectedRecord(
         state,
         command,
         'UNAVAILABLE_POOL',
-        'no pool is revealed for this turn',
-      ),
-      generation: null,
-    };
-  }
-  const reveal = state.currentReveal;
-  const lastAttempt = reveal.attempts[reveal.attempts.length - 1];
-  if (lastAttempt === undefined || !lastAttempt.usable) {
-    return {
-      state,
-      record: rejectedRecord(state, command, 'UNAVAILABLE_POOL', 'the revealed pool is not usable'),
-      generation: null,
-    };
-  }
-  const candidate = catalog.candidates.find((c) => c.playerVersionId === payload.playerVersionId);
-  if (candidate === undefined) {
-    return {
-      state,
-      record: rejectedRecord(
-        state,
-        command,
-        'UNAVAILABLE_POOL',
-        'the selected version is not in the catalog',
-      ),
-      generation: null,
-    };
-  }
-  if (candidate.franchiseId !== lastAttempt.franchiseId || candidate.eraId !== lastAttempt.eraId) {
-    return {
-      state,
-      record: rejectedRecord(
-        state,
-        command,
-        'UNAVAILABLE_POOL',
-        `version ${payload.playerVersionId} is not in the revealed pool ${lastAttempt.franchiseId}/${lastAttempt.eraId}`,
+        `version ${payload.playerVersionId} is not in the current offer`,
       ),
       generation: null,
     };
@@ -637,6 +414,32 @@ function selectPlayer(
       generation: null,
     };
   }
+  if (!card.selectable) {
+    const reason = card.coverageReason ?? 'the card is not feasibility-safe';
+    return {
+      state,
+      record: rejectedRecord(
+        state,
+        command,
+        'UNCOMPLETABLE_ROSTER',
+        `this pick is disabled: ${reason}`,
+      ),
+      generation: null,
+    };
+  }
+  const candidate = catalog.candidates.find((c) => c.playerVersionId === payload.playerVersionId);
+  if (candidate === undefined) {
+    return {
+      state,
+      record: rejectedRecord(
+        state,
+        command,
+        'UNAVAILABLE_POOL',
+        'the selected version is not in the catalog',
+      ),
+      generation: null,
+    };
+  }
   const ownedMembers = membersOf(
     state.picks.filter((p) => p.participantId === pid).map((p) => p.playerVersionId),
     catalog,
@@ -646,9 +449,10 @@ function selectPlayer(
     { playerVersionId: candidate.playerVersionId, playable: candidate.positions.playable },
   ];
   // The candidate itself is no longer available for future picks.
-  const available = availableMembers(state, catalog).filter(
-    (member) => member.playerVersionId !== candidate.playerVersionId,
-  );
+  const available = catalog.candidates
+    .filter((c) => !ownedVersionIds(state).has(c.playerVersionId))
+    .filter((c) => c.playerVersionId !== candidate.playerVersionId)
+    .map((c) => ({ playerVersionId: c.playerVersionId, playable: c.positions.playable }));
   const remaining = MAX_PICKS_PER_PARTICIPANT - ownedMembers.length - 1;
   if (!rosterFeasible(probe, available, remaining)) {
     return {
@@ -664,18 +468,18 @@ function selectPlayer(
   }
   const pick: SeasonDraftPick = {
     participantId: pid,
-    round: reveal.round,
-    pickOrdinal: reveal.pickOrdinal,
+    round: offer.round,
+    pickOrdinal: offer.pickOrdinal,
     playerVersionId: payload.playerVersionId,
     franchiseId: candidate.franchiseId,
     eraId: candidate.eraId,
-    rollAttempts: reveal.attempts.length,
+    seedPath: offer.seedPath,
   };
   const withPick = { ...state, picks: [...state.picks, pick] };
   const { round, currentTurnParticipantId } = advanceTurn(withPick);
   const nextState: SeasonDraftState = {
     ...withPick,
-    currentReveal: null,
+    currentOffer: null,
     round,
     currentTurnParticipantId,
     revision: state.revision + 1,
@@ -824,6 +628,9 @@ export interface SeasonAiGenerationDeps {
  * result when an accepted generate-ai-league command produced one. The
  * generation deps are injected so tests can substitute a fake generator;
  * production callers wire the authoritative AI seam.
+ *
+ * Legacy season-draft-v1 commands (reveal-draft-roll, claim-draft-pool) are
+ * rejected with `UNSUPPORTED_COMMAND`; this engine never plays the v1 draft.
  */
 export function applySeasonDraftCommand(
   state: SeasonDraftState | null,
@@ -848,12 +655,16 @@ export function applySeasonDraftCommand(
 
   if (state === null) {
     if (command.payload.kind !== 'create-season-draft') {
+      const errorCode: SeasonDraftErrorCode =
+        command.payload.kind === 'reveal-draft-roll' || command.payload.kind === 'claim-draft-pool'
+          ? 'UNSUPPORTED_COMMAND'
+          : 'INVALID_CATALOG';
       return {
         state: null,
         record: rejectedRecord(
           null,
           command,
-          'INVALID_CATALOG',
+          errorCode,
           'no draft exists; only create-season-draft is accepted',
         ),
         generation: null,
@@ -895,9 +706,19 @@ export function applySeasonDraftCommand(
       return { state: withLog(validatedState, record), record, generation: null };
     }
     case 'reveal-draft-roll':
-      return revealRoll(validatedState, validatedCatalog, command);
     case 'claim-draft-pool':
-      return claimPool(validatedState, command);
+      return {
+        state: validatedState,
+        record: rejectedRecord(
+          validatedState,
+          command,
+          'UNSUPPORTED_COMMAND',
+          'season-draft-v1 reveal/claim commands are not supported by season-draft-v2',
+        ),
+        generation: null,
+      };
+    case 'draw-season-offer':
+      return drawOffer(validatedState, validatedCatalog, command);
     case 'select-draft-player':
       return selectPlayer(validatedState, validatedCatalog, command);
     case 'finalize-human-rosters':

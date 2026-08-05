@@ -7,14 +7,17 @@ import {
 import { HoopRushDatabase } from './dexie.ts';
 
 /**
- * Concrete IndexedDB Season draft repository (spec/2.0/03, spec/2.0/07, M2.1).
- * Exactly one active Season draft row exists at a time in the dedicated
- * `seasonDrafts` table, isolated from the Challenge tables (`active`,
- * `activeGames`, `completed`, `history`) and the Classic draft table
- * (`classicDrafts`). Save stores the full revisioned snapshot plus the
+ * Concrete IndexedDB Season draft repository (spec/2.0/03, spec/2.0/07,
+ * M2.3.5). Exactly one active Season draft row exists at a time in the
+ * dedicated `seasonDrafts` table, isolated from the Challenge tables
+ * (`active`, `activeGames`, `completed`, `history`) and the Classic draft
+ * table (`classicDrafts`). Save stores the full revisioned snapshot plus the
  * complete command log in one atomic put; load validates every read through
  * the stored schema so corrupt rows throw instead of entering app state.
- * The repository never implements draft rules: accepted and rejected command
+ * M2.3.5: the stored record is the saveSchemaVersion-discriminated union —
+ * legacy season-draft-v1 rows load unchanged (never migrated, never silently
+ * deleted) so unfinished v1 drafts surface an explicit recovery screen. The
+ * repository never implements draft rules: accepted and rejected command
  * summaries both persist, and revision correctness is the domain's job.
  */
 

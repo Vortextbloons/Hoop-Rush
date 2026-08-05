@@ -9,12 +9,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            'vitest.config.ts',
-            'vitest.unit.config.ts',
-            'playwright.config.ts',
-            'e2e/*.ts',
-          ],
+          allowDefaultProject: ['vitest.config.ts', 'playwright.config.ts', 'e2e/*.ts'],
           maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 16,
         },
         tsconfigRootDir: import.meta.dirname,

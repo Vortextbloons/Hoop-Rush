@@ -6,6 +6,7 @@ import {
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
   seasonLeagueSchema,
+  type SeasonDraftCandidate,
   type SeasonDraftCatalog,
   type SeasonDraftState,
   type SeasonLeague,
@@ -136,4 +137,32 @@ export function fixtureHumanRoster(catalog: SeasonDraftCatalog): string[] {
     throw new Error('fixture human roster failed the legality checks');
   }
   return roster.map((member) => member.playerVersionId);
+}
+
+/**
+ * Deterministic season-draft-v2 pick policy for fixture generation and
+ * calibration cohorts: the selectable card of the current offer with the
+ * highest summary overall rating, ties broken canonically by
+ * playerVersionId. Throws when no offer is drawn or no card is selectable.
+ */
+export function pickBestSelectable(
+  state: SeasonDraftState,
+  catalog: SeasonDraftCatalog,
+): SeasonDraftCandidate {
+  const offer = state.currentOffer;
+  if (offer === null) throw new Error('no offer drawn for the fixture pick');
+  const byId = new Map(catalog.candidates.map((c) => [c.playerVersionId, c]));
+  const candidates = offer.cards
+    .filter((card) => card.selectable)
+    .map((card) => byId.get(card.playerVersionId))
+    .filter((candidate): candidate is SeasonDraftCandidate => candidate !== undefined)
+    .sort(
+      (a, b) =>
+        b.summaryRatings.overallRating - a.summaryRatings.overallRating ||
+        a.playerVersionId.localeCompare(b.playerVersionId),
+    );
+  if (candidates.length === 0) {
+    throw new Error(`offer for pick ${String(offer.pickOrdinal)} has no selectable card`);
+  }
+  return candidates[0] as SeasonDraftCandidate;
 }

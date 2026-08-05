@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
-  seasonDraftCatalogSchema,
-  type SeasonDraftCatalog,
-  type SeasonDraftCandidate,
-} from '@hoop-rush/data-contracts';
-import { rosterFeasible, type SeasonRosterMemberInput } from '@hoop-rush/engine';
+  DraftPlanner,
+  loadDraftCatalog,
+  reachLeagueHub,
+  submitBlockAndComplete,
+} from './season-helpers';
 
 /**
  * Season Run shell journeys (M2.3.5): the Hub and Team tabs inside the
@@ -24,153 +24,7 @@ import { rosterFeasible, type SeasonRosterMemberInput } from '@hoop-rush/engine'
  * through its current UI.
  */
 
-const CATALOG: SeasonDraftCatalog = seasonDraftCatalogSchema.parse(
-  await fetch('http://localhost:4173/data/season/draft-catalog.json').then((response) =>
-    response.json(),
-  ),
-);
-
-/**
- * Mirrors the engine's pick feasibility probe so the e2e always selects a
- * candidate that keeps the 4G/4F/3C completion targets feasible — the engine
- * rejects picks that would dead-end the draft, and a dead end is permanent.
- */
-class DraftPlanner {
-  private picked: SeasonRosterMemberInput[] = [];
-
-  reset(): void {
-    this.picked = [];
-  }
-
-  /** Chooses the first pool candidate the engine's feasibility probe accepts. */
-  choose(candidates: SeasonDraftCandidate[]): SeasonDraftCandidate {
-    const pickedIds = new Set(this.picked.map((p) => p.playerVersionId));
-    const available = CATALOG.candidates
-      .filter((candidate) => !pickedIds.has(candidate.playerVersionId))
-      .map((candidate): SeasonRosterMemberInput => ({
-        playerVersionId: candidate.playerVersionId,
-        playable: candidate.positions.playable,
-      }));
-    for (const candidate of candidates) {
-      const probe: SeasonRosterMemberInput[] = [
-        ...this.picked,
-        {
-          playerVersionId: candidate.playerVersionId,
-          playable: candidate.positions.playable,
-        },
-      ];
-      const remaining = 10 - probe.length;
-      const stillAvailable = available.filter(
-        (member) => member.playerVersionId !== candidate.playerVersionId,
-      );
-      if (rosterFeasible(probe, stillAvailable, remaining)) return candidate;
-    }
-    throw new Error('no feasibility-safe candidate in the revealed pool');
-  }
-
-  record(candidate: SeasonDraftCandidate): void {
-    this.picked.push({
-      playerVersionId: candidate.playerVersionId,
-      playable: candidate.positions.playable,
-    });
-  }
-}
-
 const planner = new DraftPlanner();
-
-/** Reads the revealed pool rows (name + season + positions) from the board. */
-async function revealedPoolRows(page: Page): Promise<Array<{ name: string }>> {
-  const section = page.locator('section', { has: page.getByText(/eligible versions/) });
-  const rows = section.locator('li');
-  const count = await rows.count();
-  const result: Array<{ name: string }> = [];
-  for (let i = 0; i < count; i += 1) {
-    const text = await rows.nth(i).innerText();
-    const lines = text.split('\n').map((line) => line.trim());
-    const name =
-      lines[1] ??
-      lines.find((line) => CATALOG.candidates.some((c) => c.displayName === line)) ??
-      '';
-    result.push({ name });
-  }
-  return result;
-}
-
-/** Drafts one round: roll, claim, then pick a feasibility-safe candidate. */
-async function draftOneRound(page: Page) {
-  await page.getByRole('button', { name: /^Roll round \d+$/ }).click();
-  await expect(page.getByText('Rolled options · pick')).toBeVisible();
-  await page.getByRole('button', { name: 'Claim this pool' }).click();
-  await expect(page.getByText(/eligible versions/)).toBeVisible();
-
-  const rows = await revealedPoolRows(page);
-  const candidates = rows
-    .map((row) => CATALOG.candidates.find((c) => c.displayName === row.name))
-    .filter((c): c is SeasonDraftCandidate => c !== undefined);
-  expect(candidates.length).toBeGreaterThan(0);
-  const target = planner.choose(candidates);
-
-  const section = page.locator('section', { has: page.getByText(/eligible versions/) });
-  await section
-    .locator('li')
-    .filter({ hasText: target.displayName })
-    .getByRole('button', { name: 'Pick' })
-    .click();
-  await expect(page.getByText(/eligible versions/)).toHaveCount(0, { timeout: 5000 });
-  planner.record(target);
-}
-
-/** Drafts all ten rounds. */
-async function draftTenRounds(page: Page) {
-  for (let round = 1; round <= 10; round += 1) {
-    await expect(
-      page.locator('[data-season-round-heading]', { hasText: `Round ${String(round)} of 10` }),
-    ).toBeVisible();
-    await draftOneRound(page);
-  }
-  await page.getByRole('button', { name: 'Finalize my roster' }).click();
-}
-
-/**
- * Runs the setup journey (draft, AI generation, promotion) and lands on the
- * Hub tab of the run shell. The pre-shell league route redirects into the
- * shell; we navigate directly to the Hub so the shell mounts cleanly
- * regardless of the League tab's current availability.
- */
-async function reachRunShell(page: Page) {
-  planner.reset();
-  await page.goto('/season');
-  await page.getByRole('button', { name: 'Start draft' }).click();
-  await expect(page.locator('[data-season-round-heading]')).toBeVisible();
-  await draftTenRounds(page);
-
-  await page.getByRole('button', { name: 'Generate AI league' }).click();
-  await expect(page.getByRole('heading', { name: 'League generated' })).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByRole('button', { name: 'Open the league hub' }).click();
-  // The promotion completes before the page's own goto fires; accept either
-  // the pre-shell route or its redirect target, then mount the shell fresh.
-  await expect(page).toHaveURL(/\/season\/(league|run\/league)/, { timeout: 30_000 });
-  await page.goto('/season/run/');
-  await expect(page.getByText('Next decision')).toBeVisible({ timeout: 30_000 });
-}
-
-/** Submits the current block and waits for the accepted checkpoint refresh. */
-async function submitBlockAndComplete(page: Page, blockNumber: number) {
-  await page.getByRole('button', { name: 'Lock rotation and simulate block' }).click();
-  await expect(page.getByRole('progressbar')).toBeVisible();
-  await expect(page.getByText('Block complete.')).toBeVisible({ timeout: 30_000 });
-  if (blockNumber === 9) {
-    await expect(page.getByRole('heading', { name: 'Regular season complete' })).toBeVisible({
-      timeout: 15_000,
-    });
-  } else {
-    await expect(page.getByText(`${String(blockNumber)} of 9 checkpoints accepted.`)).toBeVisible({
-      timeout: 15_000,
-    });
-  }
-}
 
 /** The mobile fixed bottom navigation (`md:hidden` on its nav element). */
 function bottomNav(page: Page) {
@@ -206,13 +60,20 @@ async function nonClosingPlayer(page: Page): Promise<{ value: string; label: str
 test.describe('season shell: hub, team, tabs, responsive', () => {
   test.describe.configure({ timeout: 240_000 });
 
+  test.beforeAll(async () => {
+    // The preview server is up before any test starts; load once up front so
+    // catalog problems surface as a single clear setup failure, not one per
+    // helper call.
+    await loadDraftCatalog();
+  });
+
   test('draft → promotion → shell hub: masthead, nine tape segments, simulate action', async ({
     page,
   }) => {
     await page.addInitScript(() => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
-    await reachRunShell(page);
+    await reachLeagueHub(page, planner, { runShell: true });
 
     // Masthead: the shell renders the human franchise heading.
     const mastheadHeading = page.getByRole('heading', { level: 1 });
@@ -237,7 +98,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.addInitScript(() => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
-    await reachRunShell(page);
+    await reachLeagueHub(page, planner, { runShell: true });
 
     await page.getByRole('button', { name: 'Lock rotation and simulate block' }).click();
     await expect(page.getByRole('progressbar')).toBeVisible({ timeout: 15_000 });
@@ -265,7 +126,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.addInitScript(() => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
-    await reachRunShell(page);
+    await reachLeagueHub(page, planner, { runShell: true });
 
     // The sticky rail marks the active tab.
     await expect(desktopRail(page)).toBeVisible();
@@ -327,7 +188,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.addInitScript(() => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
-    await reachRunShell(page);
+    await reachLeagueHub(page, planner, { runShell: true });
 
     // Bottom nav is visible with five tabs and marks the active tab.
     await expect(bottomNav(page)).toBeVisible();
@@ -360,7 +221,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.addInitScript(() => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
-    await reachRunShell(page);
+    await reachLeagueHub(page, planner, { runShell: true });
     await page.getByRole('link', { name: 'Team' }).first().click();
     await expect(page.getByRole('heading', { name: 'Roster' })).toBeVisible();
 
@@ -411,7 +272,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.addInitScript(() => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
-    await reachRunShell(page);
+    await reachLeagueHub(page, planner, { runShell: true });
     await page.getByRole('link', { name: 'Team' }).first().click();
     await expect(page.getByRole('heading', { name: 'Roster' })).toBeVisible();
 
@@ -431,9 +292,9 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.addInitScript(() => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
-    await reachRunShell(page);
+    await reachLeagueHub(page, planner, { runShell: true });
 
-    await submitBlockAndComplete(page, 1);
+    await submitBlockAndComplete(page, 1, { expectBlockHeading: false });
     await expect(page.getByText('1 of 9 checkpoints accepted.')).toBeVisible({
       timeout: 15_000,
     });

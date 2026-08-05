@@ -219,7 +219,6 @@
   const showEmptyState = $derived(
     shell.ready && shell.error === null && shell.hub !== null && shell.snapshot === null,
   );
-  const seasonSetupHref = $derived(resolve('/season'));
 </script>
 
 <svelte:head>
@@ -232,7 +231,7 @@
       <h1 class="font-display text-3xl font-extrabold">Season data unavailable</h1>
       <p class="mt-2 text-sm text-muted-foreground">{shell.error}</p>
       <a
-        href={seasonSetupHref}
+        href={resolve('/season')}
         class="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-semibold"
       >
         Back to Season setup
@@ -253,7 +252,7 @@
         Create a franchise, draft ten players, and generate the league to open your command center.
       </p>
       <a
-        href={seasonSetupHref}
+        href={resolve('/season')}
         class="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-semibold"
       >
         Start a Season Run

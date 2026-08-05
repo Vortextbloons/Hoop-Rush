@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { calibrateRunReportSchema, calibrateSensitivityReportSchema } from './report-schemas.ts';
-import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
+import { jsonPayload, REPO_ROOT, runCli, withTmpDir } from './cli-test-helpers.ts';
 
 describe('cli: calibrate commands', () => {
   it('calibrate run passes the frozen profile and emits a validated payload', async () => {
@@ -74,36 +74,40 @@ describe('cli: calibrate commands', () => {
 
   it('calibrate run exits 1 when a gate fails', async () => {
     // A tolerance of zero on one metric cannot be satisfied by a seeded batch.
-    const badProfile = JSON.parse(
-      readFileSync(join(REPO_ROOT, 'apps/web/static/data/era-sim/1990s.json'), 'utf8'),
-    ) as { targets: Record<string, { tolerance: number }> };
-    const pointsTarget = badProfile.targets.pointsPerGame;
-    if (!pointsTarget) throw new Error('profile lacks pointsPerGame target');
-    pointsTarget.tolerance = 0;
-    const badPath = join(TMP, 'bad-profile.json');
-    writeFileSync(badPath, JSON.stringify(badProfile));
-    const { code } = await runCli([
-      'calibrate',
-      'run',
-      '--samples',
-      '300',
-      '--challenge-samples',
-      '0',
-      '--opponent-games',
-      '3',
-      '--profile',
-      badPath,
-      '--allow-skipped',
-    ]);
-    expect(code).toBe(1);
+    await withTmpDir(async (tmp) => {
+      const badProfile = JSON.parse(
+        readFileSync(join(REPO_ROOT, 'apps/web/static/data/era-sim/1990s.json'), 'utf8'),
+      ) as { targets: Record<string, { tolerance: number }> };
+      const pointsTarget = badProfile.targets.pointsPerGame;
+      if (!pointsTarget) throw new Error('profile lacks pointsPerGame target');
+      pointsTarget.tolerance = 0;
+      const badPath = join(tmp, 'bad-profile.json');
+      writeFileSync(badPath, JSON.stringify(badProfile));
+      const { code } = await runCli([
+        'calibrate',
+        'run',
+        '--samples',
+        '300',
+        '--challenge-samples',
+        '0',
+        '--opponent-games',
+        '3',
+        '--profile',
+        badPath,
+        '--allow-skipped',
+      ]);
+      expect(code).toBe(1);
+    });
   }, 60_000);
 
   it('calibrate run rejects an invalid profile with exit 2', async () => {
-    const badPath = join(TMP, 'invalid-profile.json');
-    writeFileSync(badPath, JSON.stringify({ not: 'a profile' }));
-    const { code, stderr } = await runCli(['calibrate', 'run', '--profile', badPath]);
-    expect(code).toBe(2);
-    expect(stderr).toContain('profile');
+    await withTmpDir(async (tmp) => {
+      const badPath = join(tmp, 'invalid-profile.json');
+      writeFileSync(badPath, JSON.stringify({ not: 'a profile' }));
+      const { code, stderr } = await runCli(['calibrate', 'run', '--profile', badPath]);
+      expect(code).toBe(2);
+      expect(stderr).toContain('profile');
+    });
   });
 
   it('calibrate sensitivity passes every family', async () => {

@@ -6,7 +6,8 @@
   import '../app.css';
   import { ModeWatcher } from 'mode-watcher';
   import { Toaster } from 'svelte-sonner';
-  import BottomNav, { type BottomNavItem } from '$lib/components/BottomNav.svelte';
+  import BottomNav from '$lib/components/BottomNav.svelte';
+  import { isNavItemActive, type NavItem } from '$lib/nav-items';
   import { warmPlayersIndex } from '$lib/data';
 
   let { children } = $props();
@@ -15,7 +16,7 @@
 
   // Route IDs (not resolved paths): BottomNav resolves them at render time,
   // which keeps relative-base static builds correct.
-  const navItems: BottomNavItem[] = [
+  const navItems: NavItem[] = [
     { id: 'home', label: 'Home', href: '/', icon: Home },
     { id: 'roster', label: 'Roster', href: '/roster', icon: Users },
   ];
@@ -23,10 +24,8 @@
   const routeId = $derived(page.route.id);
   const showBottomNav = $derived(routeId === '/' || routeId === '/roster');
 
-  function isNavActive(item: BottomNavItem): boolean {
-    if (item.href === null || routeId === null) return false;
-    if (item.href === '/') return routeId === '/';
-    return routeId === item.href || routeId.startsWith(`${item.href}/`);
+  function isActive(item: NavItem): boolean {
+    return isNavItemActive(item, routeId);
   }
 
   function warmForRoster(itemId: string): void {
@@ -61,7 +60,7 @@
     {#if showBottomNav}
       <nav aria-label="Main navigation" class="hidden items-center gap-1 md:flex">
         {#each navItems as item (item.id)}
-          {@const active = isNavActive(item)}
+          {@const active = isActive(item)}
           <a
             href={resolve(item.href as RouteId)}
             aria-current={active ? 'page' : undefined}
@@ -85,7 +84,7 @@
 </main>
 
 {#if showBottomNav}
-  <BottomNav items={navItems} />
+  <BottomNav items={navItems} label="Main navigation" onNavigate={warmForRoster} />
 {/if}
 
 <Toaster richColors closeButton theme="system" />

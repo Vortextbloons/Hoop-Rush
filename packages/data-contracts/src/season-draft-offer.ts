@@ -46,20 +46,20 @@ export const seasonDraftOfferSchema = z
   .superRefine((offer, ctx) => {
     if (new Set(offer.cards.map((card) => card.playerVersionId)).size !== offer.cards.length) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'offer cards must be distinct player version ids',
       });
     }
     for (const card of offer.cards) {
       if (card.selectable && card.coverageReason !== null) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'selectable cards must have a null coverage reason',
         });
       }
       if (!card.selectable && card.coverageReason === null) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           message: 'disabled cards must carry a coverage reason',
         });
       }

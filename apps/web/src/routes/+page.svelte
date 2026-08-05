@@ -164,7 +164,7 @@
     {/if}
     {#if seasonRun}
       <a
-        href={resolve('/season/league')}
+        href={resolve('/season/run')}
         class="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-6 py-3 font-semibold transition-colors hover:border-line-strong"
       >
         Continue season · {seasonRun.humanWins}–{seasonRun.humanLosses} · through
