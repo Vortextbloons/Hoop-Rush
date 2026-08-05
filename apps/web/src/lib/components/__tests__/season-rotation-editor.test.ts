@@ -80,20 +80,20 @@ function desktopMinutesList(container: HTMLElement) {
   return within(section as HTMLElement);
 }
 
-/** The compact (mobile) player-rows list. */
+/** The compact (mobile) player-rows list (Minutes tab). */
 function compactRowsList(container: HTMLElement) {
-  const section = container.querySelector('section[aria-labelledby="compact-rows-heading"]');
-  if (section === null) throw new Error('compact rows section missing');
+  const section = container.querySelector('section[aria-labelledby="mobile-rotation-heading"]');
+  if (section === null) throw new Error('mobile rotation section missing');
   return within(section as HTMLElement);
 }
 
 describe('RotationEditor component', () => {
   it('shows the minute total and every roster member in both layouts', () => {
-    const { getByText, container } = renderEditor();
+    const { getByText, getByRole, container } = renderEditor();
     const total = container.querySelector('p strong');
     expect(total?.textContent).toBe('240');
-    expect(getByText('Starters')).not.toBeNull();
     expect(getByText('Bench order')).not.toBeNull();
+    expect(getByRole('heading', { name: 'Starters' })).not.toBeNull();
     expect(getByText(/Closing five/)).not.toBeNull();
     // The compact mobile layout renders ten player rows too.
     expect(
@@ -154,26 +154,25 @@ describe('RotationEditor component', () => {
     expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(33);
   });
 
-  it('closing-five toggles swap players in and out while keeping five selected', async () => {
-    const { editor, onchange, container } = renderEditor();
+  it('closing-five selects swap players while keeping five selected', async () => {
+    const { editor, onchange, container, getByRole } = renderEditor();
     const bench = editor.rotation.benchOrder[0];
-    const label = bench === undefined ? undefined : editor.names.get(bench);
-    if (bench === undefined || label === undefined) {
+    if (bench === undefined) {
       throw new Error('fixture rotation has no bench player');
     }
-    const compact = compactRowsList(container);
-    const add = compact.getByRole('button', {
-      name: `Add ${label} to the closing five`,
-    });
-    await fireEvent.click(add);
+    const originalSlot1 = editor.rotation.closingFive[1];
+    if (originalSlot1 === undefined) {
+      throw new Error('closing five missing slot 1');
+    }
+    await fireEvent.click(getByRole('button', { name: 'Closing' }));
+    const select = container.querySelector(
+      'select[aria-label="Closing slot 2"]',
+    ) as HTMLSelectElement;
+    await fireEvent.change(select, { target: { value: bench } });
     expect(onchange).toHaveBeenCalledTimes(1);
     expect(editor.rotation.closingFive).toHaveLength(5);
     expect(editor.rotation.closingFive.includes(bench)).toBe(true);
-    const remove = compact.getByRole('button', {
-      name: `Remove ${label} from the closing five`,
-    });
-    expect(remove.getAttribute('aria-pressed')).toBe('true');
-    await fireEvent.click(remove);
+    await fireEvent.change(select, { target: { value: originalSlot1 } });
     expect(editor.rotation.closingFive).toHaveLength(5);
     expect(editor.rotation.closingFive.includes(bench)).toBe(false);
     expect(editor.validate()).toEqual([]);
@@ -274,9 +273,6 @@ describe('RotationEditor component', () => {
     const preset = getByRole('button', { name: 'Balanced' }) as HTMLButtonElement;
     expect(preset.disabled).toBe(true);
     for (const button of getAllByRole('button', { name: /Increase minutes/ })) {
-      expect((button as HTMLButtonElement).disabled).toBe(true);
-    }
-    for (const button of getAllByRole('button', { name: /closing five/ })) {
       expect((button as HTMLButtonElement).disabled).toBe(true);
     }
     for (const select of getAllByRole('combobox')) {

@@ -105,8 +105,8 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
 
     // Leave the hub while the block runs: the shell layout keeps the worker
     // alive across tab switches.
-    await page.getByRole('link', { name: 'Team' }).first().click();
-    await expect(page.getByRole('heading', { name: 'Roster' })).toBeVisible();
+    await page.getByRole('link', { name: 'Rotation' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Rotation workspace' })).toBeVisible();
     await page.getByRole('link', { name: 'Schedule' }).first().click();
     await page.getByRole('link', { name: 'Hub' }).first().click();
 
@@ -120,7 +120,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await expect(segments.nth(1)).toHaveAttribute('aria-current', 'step');
   });
 
-  test('tab navigation: five tabs, aria-current, direct links, back/forward, old-route redirects', async ({
+  test('tab navigation: six tabs, aria-current, direct links, back/forward, old-route redirects', async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -136,13 +136,21 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     );
 
     // Tab links navigate within the shell.
-    await page.getByRole('link', { name: 'Team' }).first().click();
+    await page.getByRole('link', { name: 'Rotation' }).first().click();
     await expect(page).toHaveURL(/\/season\/run\/team\/?$/);
-    await expect(desktopRail(page).getByRole('link', { name: 'Team' })).toHaveAttribute(
+    await expect(desktopRail(page).getByRole('link', { name: 'Rotation' })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    await expect(page.getByRole('heading', { name: 'Roster' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rotation workspace' })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Roster' }).first().click();
+    await expect(page).toHaveURL(/\/season\/run\/roster\/?$/);
+    await expect(desktopRail(page).getByRole('link', { name: 'Roster' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(page.getByRole('heading', { name: 'Roster', level: 1 })).toBeVisible();
 
     // Schedule, League, and Leaders tabs navigate to their routes (their
     // pages land from sibling agents; the shell owns the navigation history
@@ -160,9 +168,9 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
       );
     }
 
-    // Back/forward restore Hub and Team without reloading the shell.
+    // Back/forward restore Hub and Rotation without reloading the shell.
     await page.goto('/season/run/');
-    await page.getByRole('link', { name: 'Team' }).first().click();
+    await page.getByRole('link', { name: 'Rotation' }).first().click();
     await expect(page).toHaveURL(/\/season\/run\/team\/?$/);
     await page.goBack();
     await expect(page).toHaveURL(/\/season\/run\/?$/);
@@ -172,7 +180,9 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
 
     // Direct links work.
     await page.goto('/season/run/team/');
-    await expect(page.getByRole('heading', { name: 'Roster' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Rotation workspace' })).toBeVisible();
+    await page.goto('/season/run/roster/');
+    await expect(page.getByRole('heading', { name: 'Roster', level: 1 })).toBeVisible();
 
     // Old routes redirect into the shell.
     await page.goto('/season/league');
@@ -181,7 +191,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await expect(page).toHaveURL(/\/season\/run\/checkpoint\/?$/);
   });
 
-  test('mobile: fixed five-tab bottom nav with safe-area padding; desktop: sticky rail only', async ({
+  test('mobile: fixed six-tab bottom nav with safe-area padding; desktop: sticky rail only', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -190,9 +200,9 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     });
     await reachLeagueHub(page, planner, { runShell: true });
 
-    // Bottom nav is visible with five tabs and marks the active tab.
+    // Bottom nav is visible with six tabs and marks the active tab.
     await expect(bottomNav(page)).toBeVisible();
-    await expect(bottomNav(page).getByRole('link')).toHaveCount(5);
+    await expect(bottomNav(page).getByRole('link')).toHaveCount(6);
     await expect(bottomNav(page).getByRole('link', { name: 'Hub' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -211,7 +221,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await expect(desktopRail(page)).toBeVisible();
     await expect(bottomNav(page)).toBeHidden();
-    await expect(desktopRail(page).getByRole('link')).toHaveCount(5);
+    await expect(desktopRail(page).getByRole('link')).toHaveCount(6);
   });
 
   test('team workspace on mobile: keyboard steppers, presets, closing toggle, sticky bar', async ({
@@ -222,12 +232,8 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
     await reachLeagueHub(page, planner, { runShell: true });
-    await page.getByRole('link', { name: 'Team' }).first().click();
-    await expect(page.getByRole('heading', { name: 'Roster' })).toBeVisible();
-
-    // The roster section lists the ten players with role + minutes.
-    const rosterCards = page.locator('section[aria-labelledby="roster-heading"] li');
-    await expect(rosterCards).toHaveCount(10);
+    await page.getByRole('link', { name: 'Rotation' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Rotation workspace' })).toBeVisible();
 
     // Keyboard-accessible steppers: focus + Enter adjusts minutes.
     const firstStarter = (
@@ -241,29 +247,26 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.keyboard.press('Enter');
     await expect(
       page
-        .locator('section[aria-labelledby="compact-rows-heading"] output', { hasText: /33/ })
+        .locator('section[aria-labelledby="mobile-rotation-heading"] output', { hasText: /33/ })
         .first(),
     ).toBeVisible();
 
     // Presets rewrite target minutes through the engine tables (240 stays).
     await page.getByRole('button', { name: 'Tight' }).click();
-    await expect(page.getByText('Target minutes total 240 of 240.')).toBeVisible();
+    await expect(page.getByText('240', { exact: true }).first()).toBeVisible();
 
-    // A closing-five toggle flips a non-closing player in and out.
-    const { label: benchLabel } = await nonClosingPlayer(page);
-    await page.getByRole('button', { name: `Add ${benchLabel} to the closing five` }).click();
-    await expect(
-      page.getByRole('button', { name: `Remove ${benchLabel} from the closing five` }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: `Remove ${benchLabel} from the closing five` }).click();
-    await expect(
-      page.getByRole('button', { name: `Add ${benchLabel} to the closing five` }),
-    ).toBeVisible();
+    // Closing tab: swap a non-closing bench player into slot 2.
+    const { value: benchValue } = await nonClosingPlayer(page);
+    const originalSlot2 = await page.locator('select[aria-label="Closing slot 2"]').inputValue();
+    await page.getByRole('button', { name: 'Closing' }).click();
+    await page.locator('select[aria-label="Closing slot 2"]').selectOption(benchValue);
+    await expect(page.locator('select[aria-label="Closing slot 2"]')).toHaveValue(benchValue);
+    await page.locator('select[aria-label="Closing slot 2"]').selectOption(originalSlot2);
+    await expect(page.locator('select[aria-label="Closing slot 2"]')).toHaveValue(originalSlot2);
 
-    // The sticky action bar reports a valid rotation and links to the hub.
+    // The sticky action bar reports a valid rotation and offers simulate on mobile.
     await expect(page.getByText('Rotation valid')).toBeVisible();
-    const simulate = page.getByRole('link', { name: 'Simulate next block' });
-    await expect(simulate).toHaveAttribute('href', /\/season\/run\/?$/);
+    await expect(page.getByRole('button', { name: 'Lock & simulate block' })).toBeEnabled();
   });
 
   test('team workspace on desktop: an illegal starter swap is rejected and surfaced', async ({
@@ -273,8 +276,8 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
     await reachLeagueHub(page, planner, { runShell: true });
-    await page.getByRole('link', { name: 'Team' }).first().click();
-    await expect(page.getByRole('heading', { name: 'Roster' })).toBeVisible();
+    await page.getByRole('link', { name: 'Rotation' }).first().click();
+    await expect(page.getByRole('heading', { name: 'Rotation workspace' })).toBeVisible();
 
     // Put the slot-1 guard into the center slot: the engine rejects the swap
     // and the page surfaces the rejection without committing.

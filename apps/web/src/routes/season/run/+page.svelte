@@ -356,7 +356,8 @@
             role="alert"
             class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
           >
-            The rotation is invalid — fix the highlighted issues on the Team tab before submitting.
+            The rotation is invalid — fix the highlighted issues on the Rotation tab before
+            submitting.
           </p>
         {/if}
         {#if submitError}

@@ -14,12 +14,12 @@ import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
  * audit`, and `season full simulate` commands (spec/2.0/02, spec/2.0/07).
  * Every test runs the real engine pipeline over the committed v4 run
  * fixture, the packaged catalog and schedule, and the packaged era profile.
- * BLOCK_ZERO_DIGEST was re-pinned by the M2.3.5 season-draft-v2 fixture
- * regeneration (the committed draft now plays global eight-card offers).
+ * BLOCK_ZERO_DIGEST is re-pinned whenever a committed schedule or fixture
+ * input changes, so it remains an end-to-end reproducibility sentinel.
  */
 
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
-const BLOCK_ZERO_DIGEST = 'd9f5dd2747b8bb6b79c3f9015a9dec77';
+const BLOCK_ZERO_DIGEST = '5a912b503592caecd4015416aee3b6a0';
 
 describe('cli: season block simulate', () => {
   // The default block-0 boot is shared by the simulate and audit tests.

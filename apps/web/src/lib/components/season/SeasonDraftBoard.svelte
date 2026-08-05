@@ -243,19 +243,9 @@
                 {/if}
               </div>
               <div class="min-w-0">
-                <div class="flex min-w-0 items-center gap-2">
-                  <p class="min-w-0 flex-1 truncate text-sm font-bold">
-                    {candidate?.displayName ?? card.playerVersionId}
-                  </p>
-                  {#if candidate}
-                    <span
-                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
-                      title="Overall rating"
-                    >
-                      OVR {candidate.summaryRatings.overallRating}
-                    </span>
-                  {/if}
-                </div>
+                <p class="truncate text-sm font-bold">
+                  {candidate?.displayName ?? card.playerVersionId}
+                </p>
                 <p class="truncate font-mono text-[10px] text-muted-foreground">
                   {candidate?.seasonKey ?? ''} · {candidate?.positions.playable.join('/') ?? ''}
                 </p>
@@ -359,10 +349,6 @@
               <span
                 class="truncate pl-[calc(2.5rem+0.75rem)] font-mono text-[10px] text-muted-foreground sm:shrink-0 sm:pl-0"
               >
-                {#if candidate}<span class="font-bold text-foreground"
-                    >OVR {candidate.summaryRatings.overallRating}</span
-                  > ·
-                {/if}
                 {candidate?.positions.playable.join('/') ?? ''} ·
                 {identity.displayLabel ?? franchiseAbbreviation(pick.franchiseId)} ·
                 {eraLabel(pick.eraId)}

@@ -4,7 +4,16 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
-  import { BarChart3, CalendarDays, LayoutGrid, LogOut, Trophy, Users, X } from '@lucide/svelte';
+  import {
+    BarChart3,
+    CalendarDays,
+    ClipboardList,
+    LayoutGrid,
+    LogOut,
+    Trophy,
+    Users,
+    X,
+  } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import { franchiseAbbreviation, type PlayersIndexEntry } from '@hoop-rush/data-contracts';
   import { ordinal, provisionalRanking, recordLabel } from '$lib/season/season-presentation';
@@ -35,7 +44,7 @@
   /**
    * Season Run shell (M2.3.5): owns the shared `SeasonHubState` for the
    * lifetime of the active run, loads the packaged assets and branding join
-   * once, and exposes everything to the five tabs through context. The
+   * once, and exposes everything to the six tabs through context. The
    * layout instance survives tab navigation, so an in-flight block worker
    * continues across tabs; it is torn down only when the user leaves the
    * run group.
@@ -43,7 +52,8 @@
 
   const seasonNavItems: NavItem[] = [
     { id: 'hub', label: 'Hub', href: '/season/run', icon: LayoutGrid },
-    { id: 'team', label: 'Team', href: '/season/run/team', icon: Users },
+    { id: 'team', label: 'Rotation', href: '/season/run/team', icon: ClipboardList },
+    { id: 'roster', label: 'Roster', href: '/season/run/roster', icon: Users },
     { id: 'schedule', label: 'Schedule', href: '/season/run/schedule', icon: CalendarDays },
     { id: 'league', label: 'League', href: '/season/run/league', icon: Trophy },
     { id: 'leaders', label: 'Leaders', href: '/season/run/leaders', icon: BarChart3 },

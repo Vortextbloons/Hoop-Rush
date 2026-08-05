@@ -34,7 +34,14 @@ import {
  * network code.
  */
 
-export const SEASON_SCHEDULE_GENERATION_VERSION = 'schedule-gen-v2';
+export const SEASON_SCHEDULE_GENERATION_VERSION = 'schedule-gen-v3';
+
+/**
+ * A repeat matchup needs this many intervening rounds. This keeps the
+ * synchronized 82-round abstraction from presenting a player with a string
+ * of the same opponent (the factorization itself only controls totals).
+ */
+const MINIMUM_OPPONENT_REPEAT_GAP = 1;
 
 export interface GenerateSeasonScheduleInput {
   league: SeasonLeague;
@@ -427,6 +434,68 @@ function orientScheduleFactors(
   return homeByOccurrence;
 }
 
+function factorEdgeIds(factor: Factor): Set<number> {
+  return new Set(factor.map((edge) => edge.edgeId));
+}
+
+/**
+ * The graph factorizer intentionally optimizes feasibility, not chronology;
+ * consequently its raw output can put all copies of one matchup in adjacent
+ * rounds. Reorder the already-valid perfect matchings with a deterministic
+ * greedy pass so no team faces the same opponent in back-to-back rounds.
+ * Reordering cannot alter pair counts or home/away totals.
+ */
+function spaceFactorRematches(
+  factors: readonly Factor[],
+  seed: Seed,
+  generationVersion: string,
+  attempt: number,
+): Factor[] {
+  const remaining = shuffle(
+    factors.map((factor, index) => ({ factor, index, edges: factorEdgeIds(factor) })),
+    createRng(
+      seasonNamespaceSeed(
+        seed,
+        'schedule-rounds',
+        generationVersion,
+        `attempt-${String(attempt)}`,
+        'round-order',
+      ),
+    ),
+  );
+  const ordered: Factor[] = [];
+  const recent: Set<number>[] = [];
+
+  while (remaining.length > 0) {
+    let bestIndex = -1;
+    let bestCollisions = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < remaining.length; index += 1) {
+      const candidate = remaining[index];
+      if (candidate === undefined) continue;
+      let collisions = 0;
+      for (const previous of recent) {
+        for (const edgeId of candidate.edges) {
+          if (previous.has(edgeId)) collisions += 1;
+        }
+      }
+      if (collisions < bestCollisions) {
+        bestIndex = index;
+        bestCollisions = collisions;
+        if (collisions === 0) break;
+      }
+    }
+    if (bestIndex < 0 || bestCollisions > 0) {
+      throw new Error('could not space rematches across the required round gap');
+    }
+    const selected = remaining.splice(bestIndex, 1)[0];
+    if (selected === undefined) throw new Error('missing scheduled factor');
+    ordered.push(selected.factor);
+    recent.unshift(selected.edges);
+    if (recent.length > MINIMUM_OPPONENT_REPEAT_GAP) recent.pop();
+  }
+  return ordered;
+}
+
 /** Deterministic schedule construction for one retry attempt. */
 function buildScheduleAttempt(
   league: SeasonLeague,
@@ -460,7 +529,12 @@ function buildScheduleAttempt(
   }
   const hostsTwice = orientThreeGamePairs(threeGamePairs);
   const scheduleEdges = buildScheduleEdges(league, teamOrder, teamIndex, fourGame, hostsTwice);
-  const factors = factorizeScheduleGraph(teamOrder.length, scheduleEdges, SEASON_ROUND_COUNT);
+  const factors = spaceFactorRematches(
+    factorizeScheduleGraph(teamOrder.length, scheduleEdges, SEASON_ROUND_COUNT),
+    seed,
+    generationVersion,
+    attempt,
+  );
   const homes = orientScheduleFactors(factors, scheduleEdges, teamOrder.length);
 
   const rounds: Array<Array<{ home: string; away: string }>> = [];
@@ -590,6 +664,23 @@ export function auditSeasonSchedule(schedule: SeasonSchedule, league: SeasonLeag
       failures.push(
         `round ${String(round)} must cover all ${String(SEASON_TEAM_COUNT)} franchises (got ${String(seen.size)})`,
       );
+    }
+  }
+
+  const mostRecentOpponentRound = new Map<string, Map<string, number>>();
+  for (const franchiseId of franchiseIds) mostRecentOpponentRound.set(franchiseId, new Map());
+  for (let round = 1; round <= SEASON_ROUND_COUNT; round += 1) {
+    for (const game of gamesByRound.get(round) ?? []) {
+      const previousHomeRound = mostRecentOpponentRound
+        .get(game.homeFranchiseId)
+        ?.get(game.awayFranchiseId);
+      if (previousHomeRound === round - 1) {
+        failures.push(
+          `${game.homeFranchiseId} and ${game.awayFranchiseId} repeat in consecutive rounds ${String(previousHomeRound)} and ${String(round)}`,
+        );
+      }
+      mostRecentOpponentRound.get(game.homeFranchiseId)?.set(game.awayFranchiseId, round);
+      mostRecentOpponentRound.get(game.awayFranchiseId)?.set(game.homeFranchiseId, round);
     }
   }
 
