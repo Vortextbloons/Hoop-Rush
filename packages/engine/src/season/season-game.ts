@@ -27,7 +27,12 @@ import {
   type TripContext,
 } from '../sim/possession.ts';
 import { prepareTeam } from '../sim/prepare.ts';
-import { chooseInitialUnit, planUnit, type PlannerRotationContext } from './rotation-planner.ts';
+import {
+  chooseInitialUnit,
+  planUnit,
+  plannerCandidates,
+  type PlannerRotationContext,
+} from './rotation-planner.ts';
 import { seasonHomeCourtMechanisms } from './home-court.ts';
 
 /**
@@ -160,6 +165,8 @@ class SideState {
   boundaryEvents: { foulOuts: number; removals: number } = { foulOuts: 0, removals: 0 };
   changedThisBoundary = false;
   private checkpointIndex = 0;
+  /** Cached legal-five enumeration, keyed by the availability signature. */
+  candidateCache: { signature: string; list: readonly (readonly string[])[] } | null = null;
 
   constructor(
     side: 'home' | 'away',
@@ -472,6 +479,22 @@ class SeasonGameController {
     }
   }
 
+  /**
+   * The side's legal-five enumeration, cached until availability changes.
+   * Foul-outs and removals are the only availability mutations, so the
+   * enumeration is typically built once per game instead of at every
+   * whole-minute checkpoint.
+   */
+  private cachedCandidates(side: SideState): readonly (readonly string[])[] {
+    const signature = [...side.unavailable].sort().join('\u0000');
+    if (side.candidateCache !== null && side.candidateCache.signature === signature) {
+      return side.candidateCache.list;
+    }
+    const list = plannerCandidates(side.planner, side.unavailable);
+    side.candidateCache = { signature, list };
+    return list;
+  }
+
   /** Decides whether to plan and with which recorded reason. */
   private planFor(
     side: SideState,
@@ -500,16 +523,20 @@ class SeasonGameController {
       if (eventReason === null && !crossed) return null;
     }
 
-    const unit = planUnit(side.planner, {
-      side: side.side,
-      currentUnit: side.unit,
-      unavailable: side.unavailable,
-      actualSeconds: side.regulationSeconds,
-      period: nextPeriod,
-      secondsRemaining: nextClock,
-      closingWindow,
-      scoreMargin: this.scoreMargin(),
-    });
+    const unit = planUnit(
+      side.planner,
+      {
+        side: side.side,
+        currentUnit: side.unit,
+        unavailable: side.unavailable,
+        actualSeconds: side.regulationSeconds,
+        period: nextPeriod,
+        secondsRemaining: nextClock,
+        closingWindow,
+        scoreMargin: this.scoreMargin(),
+      },
+      { candidates: this.cachedCandidates(side) },
+    );
 
     let reason: SeasonSubstitutionReason;
     if (eventReason !== null) {

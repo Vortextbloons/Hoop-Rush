@@ -167,17 +167,23 @@ export function chooseInitialUnit(
  * Best unit for the next interval under the frozen scoring and tie-break
  * rules above. Returns the current unit when it scores best (the controller
  * records a substitution only when the unit actually changes), and null when
- * no legal five exists.
+ * no legal five exists. `options.candidates` supplies a precomputed candidate
+ * list (see `plannerCandidates`) so long-running callers can cache the
+ * availability-dependent enumeration; the scoring restructure below is an
+ * exact integer rewrite of the frozen formula
+ * (score = base + sum of per-player on-court adjustments), so results are
+ * byte-identical whether or not candidates are supplied.
  */
 export function planUnit(
   context: PlannerRotationContext,
   request: PlannerUnitRequest,
+  options: { candidates?: readonly (readonly string[])[] } = {},
 ): string[] | null {
   const members = orderedPlannerMembers(context);
   const available = new Set(
     members.map((member) => member.playerVersionId).filter((id) => !request.unavailable.has(id)),
   );
-  const candidates = enumerateLegalFives(members, available);
+  const candidates = options.candidates ?? enumerateLegalFives(members, available);
   const first = candidates[0];
   if (first === undefined) return null;
 
@@ -203,13 +209,16 @@ export function planUnit(
   const rawDelta = secondsRemaining % 60 === 0 ? 60 : secondsRemaining % 60;
   const delta = Math.min(rawDelta, secondsRemaining);
 
+  const { base, adjustment } = scoreParts(delta, context, request);
+  const currentUnitSet = new Set(request.currentUnit);
+
   let best = first;
-  let bestScore = deviationScore(best, delta, context, request);
+  let bestScore = scoreOf(best, base, adjustment);
   for (const candidate of candidates.slice(1)) {
-    const candidateScore = deviationScore(candidate, delta, context, request);
+    const candidateScore = scoreOf(candidate, base, adjustment);
     const scoreCompare = candidateScore - bestScore;
     const retentionCompare =
-      currentOverlap(candidate, request.currentUnit) - currentOverlap(best, request.currentUnit);
+      overlapWith(candidate, currentUnitSet) - overlapWith(best, currentUnitSet);
     if (
       scoreCompare < 0 ||
       (scoreCompare === 0 && retentionCompare > 0) ||
@@ -220,6 +229,24 @@ export function planUnit(
     }
   }
   return [...best];
+}
+
+/**
+ * The legal-five candidate list for one side at one availability state:
+ * bench-hierarchy-ordered members filtered by `unavailable`, then the full
+ * deterministic enumeration. Constant per availability state, so callers that
+ * plan repeatedly (the Season game controller at every whole-minute
+ * checkpoint) cache this instead of re-enumerating per call.
+ */
+export function plannerCandidates(
+  context: PlannerRotationContext,
+  unavailable: ReadonlySet<string>,
+): readonly (readonly string[])[] {
+  const members = orderedPlannerMembers(context);
+  const available = new Set(
+    members.map((member) => member.playerVersionId).filter((id) => !unavailable.has(id)),
+  );
+  return enumerateLegalFives(members, available);
 }
 
 /** Lineup slot requirements shared with season/rotation.ts. */
@@ -244,35 +271,59 @@ function orderedPlannerMembers(context: PlannerRotationContext): PlannerMember[]
   return members;
 }
 
-/** Frozen deviation score: sum over the ten rostered versions of |projected - target|. */
-function deviationScore(
-  unit: readonly string[],
+/**
+ * Exact integer rewrite of the frozen deviation score. For every rostered
+ * version, score(U) = |actual(i) + delta * onCourt(i) - target(i)|. Splitting
+ * the sum into the off-court baseline (identical for every candidate) plus a
+ * per-player on-court adjustment keeps the comparison identical while
+ * reducing per-candidate work from ten lookups to five additions. All values
+ * are integer seconds, so the restructure never changes a comparison.
+ */
+function scoreParts(
   delta: number,
   context: PlannerRotationContext,
   request: PlannerUnitRequest,
-): number {
-  const onCourt = new Set(unit);
-  let total = 0;
+): { base: number; adjustment: Map<string, number> } {
+  let base = 0;
+  const adjustment = new Map<string, number>();
+  const add = (playerVersionId: string): void => {
+    const targetSeconds = context.targets.get(playerVersionId) ?? 0;
+    const actualSeconds = request.actualSeconds.get(playerVersionId) ?? 0;
+    base += Math.abs(actualSeconds - targetSeconds);
+    adjustment.set(
+      playerVersionId,
+      Math.abs(actualSeconds + delta - targetSeconds) - Math.abs(actualSeconds - targetSeconds),
+    );
+  };
   for (const playerVersionId of context.rotation.starters) {
-    total += deviationContribution(playerVersionId, delta, onCourt, context, request);
+    add(playerVersionId);
   }
   for (const playerVersionId of context.rotation.benchOrder) {
-    total += deviationContribution(playerVersionId, delta, onCourt, context, request);
+    add(playerVersionId);
+  }
+  return { base, adjustment };
+}
+
+/** score(U) = base + sum over the unit of the on-court adjustment. */
+function scoreOf(
+  unit: readonly string[],
+  base: number,
+  adjustment: ReadonlyMap<string, number>,
+): number {
+  let total = base;
+  for (const playerVersionId of unit) {
+    total += adjustment.get(playerVersionId) ?? 0;
   }
   return total;
 }
 
-function deviationContribution(
-  playerVersionId: string,
-  delta: number,
-  onCourt: ReadonlySet<string>,
-  context: PlannerRotationContext,
-  request: PlannerUnitRequest,
-): number {
-  const targetSeconds = context.targets.get(playerVersionId) ?? 0;
-  const actualSeconds = request.actualSeconds.get(playerVersionId) ?? 0;
-  const projected = actualSeconds + (onCourt.has(playerVersionId) ? delta : 0);
-  return Math.abs(projected - targetSeconds);
+/** Number of the unit's players currently on the court (prebuilt set). */
+function overlapWith(unit: readonly string[], currentUnit: ReadonlySet<string>): number {
+  let overlap = 0;
+  for (const playerVersionId of unit) {
+    if (currentUnit.has(playerVersionId)) overlap += 1;
+  }
+  return overlap;
 }
 
 /** Number of the unit's players currently on the court. */
