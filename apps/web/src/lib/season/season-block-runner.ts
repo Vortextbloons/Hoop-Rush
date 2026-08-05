@@ -336,9 +336,11 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             profileHash: artifacts.profileHash,
             priorSummaries: snapshot.summaries,
           };
-          seasonWorkerStartRequestSchema.parse(start);
+          // Parse re-builds the payload as plain data (the reactive shell
+          // proxies must never cross the structured-clone boundary).
+          const plainStart = seasonWorkerStartRequestSchema.parse(start);
           const target = createWorker();
-          target.postMessage(start);
+          target.postMessage(plainStart);
           emit({ type: 'started', requestId, blockIndex: input.blockIndex });
         } catch (error) {
           if (currentRequestId !== requestId) return;
