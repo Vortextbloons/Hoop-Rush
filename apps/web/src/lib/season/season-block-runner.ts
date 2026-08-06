@@ -162,8 +162,16 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
 
   function createWorker(): Worker {
     if (worker !== null) return worker;
-    const url = deps.workerUrl ?? new URL('../../workers/season-block-worker.ts', import.meta.url);
-    worker = new Worker(url, { type: 'module' });
+    // Vite bundles `new Worker(new URL(...))` only when the URL literal is
+    // statically visible in the `new Worker` call; a variable indirection
+    // would emit the source .ts as a raw asset and the worker would fail to
+    // load in production builds.
+    worker =
+      deps.workerUrl !== undefined
+        ? new Worker(deps.workerUrl, { type: 'module' })
+        : new Worker(new URL('../../workers/season-block-worker.ts', import.meta.url), {
+            type: 'module',
+          });
     worker.addEventListener('error', (event) => {
       if (currentRequestId === null || current === null) return;
       const requestId = currentRequestId;
