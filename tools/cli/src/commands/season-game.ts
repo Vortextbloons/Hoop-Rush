@@ -1,7 +1,12 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { checkSeasonGameResult, createEngineContext, simulateSeasonGame } from '@hoop-rush/engine';
+import {
+  checkSeasonGameResult,
+  createEngineContext,
+  simulateSeasonGame,
+  simulateSeasonGameWithEffects,
+} from '@hoop-rush/engine';
 import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -107,6 +112,8 @@ export function loadSeasonGameFixture(ref: string): SeasonGameFixture {
 export interface SeasonGameEngineDeps {
   simulateSeasonGame: typeof simulateSeasonGame;
   checkSeasonGameResult: typeof checkSeasonGameResult;
+  /** M2.4 effects-mode calibration (season-game-targets-v3). */
+  simulateSeasonGameWithEffects?: typeof simulateSeasonGameWithEffects;
 }
 
 /** Per-game facts posted by the calibration worker; aggregation is
@@ -134,19 +141,42 @@ export interface SeasonGameGameFacts {
 /**
  * Simulates one calibration game twice (determinism evidence) and derives the
  * per-game facts. Shared by the worker (real engine) and the in-process test
- * runner (injected doubles).
+ * runner (injected doubles). With `effects` set, the M2.4 stamina/chemistry
+ * seam is applied on top of the fixture input (season-game-targets-v3).
  */
-export function simulateSeasonGameFacts(
+export async function simulateSeasonGameFacts(
   fixtureId: string,
   seedIndex: number,
   input: SeasonGameSimulationInput,
   deps: SeasonGameEngineDeps,
-): SeasonGameGameFacts {
+  effects = false,
+): Promise<SeasonGameGameFacts> {
   const context = createEngineContext();
-  const first = deps.simulateSeasonGame(input, context);
-  const second = deps.simulateSeasonGame(input, context);
+  let first: SeasonGameSimulationResult;
+  let second: SeasonGameSimulationResult;
+  let checks: string[];
+  if (effects) {
+    if (deps.simulateSeasonGameWithEffects === undefined) {
+      throw new Error('season game calibrate --effects requires the effects engine seam');
+    }
+    const { representativeEffectsState, withFixtureStamina } = await import('./season-effects.ts');
+    const effectsInput = seasonGameSimulationInputSchema.parse(withFixtureStamina(input));
+    const { state } = representativeEffectsState(effectsInput);
+    const firstOutcome = deps.simulateSeasonGameWithEffects(effectsInput, context, state);
+    const secondOutcome = deps.simulateSeasonGameWithEffects(effectsInput, context, state);
+    first = firstOutcome.result;
+    second = secondOutcome.result;
+    checks = first.outcome === 'completed' ? deps.checkSeasonGameResult(first, effectsInput) : [];
+    // The neutral-replay determinism check inside checkSeasonGameResult is
+    // expected to differ under effects; determinism is verified by the
+    // double-run below.
+    checks = checks.filter((failure) => !failure.startsWith('determinism:'));
+  } else {
+    first = deps.simulateSeasonGame(input, context);
+    second = deps.simulateSeasonGame(input, context);
+    checks = deps.checkSeasonGameResult(first, input);
+  }
   const deterministic = JSON.stringify(first) === JSON.stringify(second);
-  const checks = deps.checkSeasonGameResult(first, input);
   const facts: SeasonGameGameFacts = {
     fixtureId,
     seedIndex,
@@ -184,6 +214,8 @@ export interface SeasonGameCohortRequest {
   fixtures: Array<{ fixtureId: string; path: string }>;
   seedIndices: number[];
   workers: number;
+  /** M2.4: run the cohort through the stamina/chemistry seam. */
+  effects?: boolean;
 }
 
 export type SeasonGameCohortRunner = (
@@ -212,6 +244,7 @@ export async function runSeasonGameCohort(
                 fixtureId: fixture.fixtureId,
                 fixturePath: fixture.path,
                 seedIndices,
+                ...(request.effects === true ? { effects: true } : {}),
               },
             },
           );
@@ -233,7 +266,7 @@ export async function runSeasonGameCohort(
 
 /** In-process cohort runner for tests: identical chunking to the worker path
  * but calls the injected engine doubles. */
-export function runSeasonGameCohortInProcess(
+export async function runSeasonGameCohortInProcess(
   request: SeasonGameCohortRequest,
   deps: SeasonGameEngineDeps,
 ): Promise<SeasonGameGameFacts[]> {
@@ -248,11 +281,19 @@ export function runSeasonGameCohortInProcess(
       for (const index of request.seedIndices.slice(start, start + chunkSize)) {
         const seed = seasonGameCalibrationSeed(index);
         const input = seasonGameSimulationInputSchema.parse({ ...parsed.data.input, seed });
-        facts.push(simulateSeasonGameFacts(fixture.fixtureId, index, input, deps));
+        facts.push(
+          await simulateSeasonGameFacts(
+            fixture.fixtureId,
+            index,
+            input,
+            deps,
+            request.effects ?? false,
+          ),
+        );
       }
     }
   }
-  return Promise.resolve(facts);
+  return facts;
 }
 
 export function seasonGameSimulate(
@@ -542,9 +583,12 @@ export async function seasonGameCalibrate(
     workers?: string | null;
     out?: string | null;
     manifest?: string | null;
+    /** M2.4: run the cohort through the stamina/chemistry effects seam. */
+    effects?: string | null;
   },
   deps: SeasonGameCalibrateDeps = {},
 ): Promise<CliReport> {
+  const effects = args.effects !== null && args.effects !== undefined && args.effects !== 'false';
   const fixtureIds = (args.fixture ?? SEASON_GAME_PRESET_FIXTURES.join(','))
     .split(',')
     .map((id) => id.trim())
@@ -609,17 +653,24 @@ export async function seasonGameCalibrate(
     fixtures,
     seedIndices: calibrationIndices,
     workers,
+    ...(effects ? { effects: true } : {}),
   });
   const validationFacts = await runCohort({
     fixtures,
     seedIndices: validationIndices,
     workers,
+    ...(effects ? { effects: true } : {}),
   });
   const durationMs = Date.now() - start;
 
   // Gate 6: re-run a fixed subset with a single chunk and compare facts.
   const probeIndices = calibrationIndices.slice(0, SEASON_GAME_CHUNKING_PROBE_COUNT);
-  const probeFacts = await runCohort({ fixtures, seedIndices: probeIndices, workers: 1 });
+  const probeFacts = await runCohort({
+    fixtures,
+    seedIndices: probeIndices,
+    workers: 1,
+    ...(effects ? { effects: true } : {}),
+  });
   const probeByKey = new Map(
     probeFacts.map((fact) => [factKey(fact.fixtureId, fact.seedIndex), fact]),
   );

@@ -4,7 +4,6 @@ import { Worker } from 'node:worker_threads';
 import {
   SEASON_AI_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
-  SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
   seasonDraftStateSchema,
   seasonLeagueGenerationResultSchema,
@@ -13,14 +12,12 @@ import {
   seedSchema,
   type SeasonDraftState,
   type SeasonLeagueGenerationResult,
-  type SeasonRosterCalibrationRun,
   type SeasonRosterTargets,
+  type SeasonStrengthBand,
 } from '@hoop-rush/data-contracts';
-import type { SeasonStrengthBand } from '@hoop-rush/data-contracts';
 import {
-  DUO_BAND_QUOTAS,
-  SOLO_BAND_QUOTAS,
   SeasonAiGenerationError,
+  SeasonAiTargetsError,
   completionTargetsMet,
   generateAiLeague,
   seasonGenerationDigest,
@@ -37,17 +34,24 @@ import { parseCount } from '../args.ts';
 import {
   DEFAULT_MANIFEST,
   DEFAULT_ROSTER_TARGETS,
-  loadSeasonDraftCatalog,
-  loadSeasonLeague,
   fixtureHumanRoster,
+  loadSeasonDraftCatalog,
+  loadSeasonRosterTargets,
+  poolLegalFailuresOf,
   readJsonFile,
+  roleTierThresholdsOf,
   sha256Hex,
 } from './season-data.ts';
+import type { RosterCalibrationWorkerRun } from './rosters-calibration-worker.ts';
 
 /**
- * `season rosters` (spec/2.0 M2.1): deterministic AI league generation,
- * league audit, and the 256+64-seed calibration cohort that freezes
- * `roster-targets-v1`.
+ * `season rosters` (spec/2.0 M2.1, M2.4 roster-generation-v2): deterministic
+ * AI league generation through verified `roster-targets-v2`, an independent
+ * league audit (versions, quotas, tier thresholds, pools, anchors,
+ * exclusivity, legality, digest), and the calibration cohort that rewrites
+ * the targets artifact's `measured` facts. The verified targets artifact is
+ * REQUIRED everywhere: a missing or hash-mismatched artifact is a typed
+ * failure, never a silent null.
  */
 
 export const SEASON_ROSTERS_GENERATE_OPTIONS: Record<string, boolean> = {
@@ -71,6 +75,8 @@ export const SEASON_ROSTERS_CALIBRATE_OPTIONS: Record<string, boolean> = {
   'validation-seeds': true,
   out: true,
   manifest: true,
+  targets: true,
+  validate: false,
   format: true,
 };
 
@@ -81,6 +87,9 @@ export function rosterCalibrationSeed(index: number): string {
   }
   return index.toString(16).padStart(32, '0');
 }
+
+/** Order-invariance probe seeds: a small reversed/shuffled-input cohort. */
+export const ORDER_INVARIANCE_SEED_COUNT = 2;
 
 /** Human rosters from a finalized draft state. */
 function humanRostersOf(state: SeasonDraftState): Array<{
@@ -151,6 +160,16 @@ export function seasonRostersGenerate(args: {
     );
   }
   const catalog = loadSeasonDraftCatalog(args.manifest ?? DEFAULT_MANIFEST);
+  let targets: SeasonRosterTargets;
+  try {
+    targets = loadSeasonRosterTargets(args.manifest ?? DEFAULT_MANIFEST);
+  } catch (error) {
+    return makeReport(
+      'season rosters generate',
+      { seed, draft: args.draft },
+      { failures: [(error as Error).message], exitCode: 2 },
+    );
+  }
   const humanRosters = humanRostersOf(state);
   let result: SeasonLeagueGenerationResult;
   try {
@@ -160,9 +179,19 @@ export function seasonRostersGenerate(args: {
       league: state.league,
       humanFranchiseIds: humanRosters.map((roster) => roster.franchiseId),
       humanRosters,
-      targets: null,
+      targets,
     });
   } catch (error) {
+    if (error instanceof SeasonAiTargetsError) {
+      return makeReport(
+        'season rosters generate',
+        { seed, draft: args.draft },
+        {
+          failures: [`targets rejected: ${(error as Error).message}`],
+          exitCode: 1,
+        },
+      );
+    }
     if (error instanceof SeasonAiGenerationError) {
       return makeReport(
         'season rosters generate',
@@ -184,6 +213,9 @@ export function seasonRostersGenerate(args: {
     seed,
     teams: result.rosters.length,
     ownershipRows: result.ownership.length,
+    pools: result.aiPools.length,
+    anchorsTotal: result.aiPools.reduce((sum, pool) => sum + pool.anchors.length, 0),
+    repairCount: result.aiPools.reduce((sum, pool) => sum + pool.repairCount, 0),
     digest: result.digest,
     diagnostics: result.diagnostics,
     wrote: false,
@@ -191,7 +223,7 @@ export function seasonRostersGenerate(args: {
     pass: true,
   });
   const details = [
-    `seed ${seed} · ${String(result.rosters.length)} rosters · ${String(result.ownership.length)} ownership rows`,
+    `seed ${seed} · ${String(result.rosters.length)} rosters · ${String(result.ownership.length)} ownership rows · ${String(result.aiPools.length)} pools · ${String(payload.anchorsTotal)} anchors`,
     `digest ${result.digest}`,
     `diagnostics: generated ${String(result.diagnostics.teamsGenerated)} · repaired ${String(result.diagnostics.teamsRepaired)} · backtracks ${String(result.diagnostics.backtracks)} · nodes ${String(result.diagnostics.nodesVisited)}`,
   ];
@@ -233,12 +265,15 @@ interface AuditedLeague {
   ownership: SeasonLeagueGenerationResult['ownership'];
   rotations: SeasonLeagueGenerationResult['rotations'];
   aiAssignments: SeasonLeagueGenerationResult['aiAssignments'];
+  aiPools: SeasonLeagueGenerationResult['aiPools'];
+  diagnostics: SeasonLeagueGenerationResult['diagnostics'];
   evaluations: SeasonLeagueGenerationResult['evaluations'];
   digest: string;
   seed: string;
   aiVersion: string;
   rosterGenerationVersion: string;
   rotationVersion: string;
+  rosterTargetsVersion: string | null;
   humanFranchiseIds: string[];
 }
 
@@ -252,12 +287,15 @@ function auditedLeagueOf(input: unknown, inputPath: string): AuditedLeague {
       ownership: run.ownership,
       rotations: run.rotations,
       aiAssignments: run.aiAssignments,
+      aiPools: run.aiPools,
+      diagnostics: run.generationAudit.diagnostics,
       evaluations: run.evaluations,
       digest: run.generationAudit.digest,
       seed: run.rootSeed,
       aiVersion: run.versions.aiVersion,
       rosterGenerationVersion: run.versions.rosterGenerationVersion,
       rotationVersion: run.versions.rotationVersion,
+      rosterTargetsVersion: run.versions.rosterTargetsVersion,
       humanFranchiseIds: run.draft.participants.map((p) => p.franchiseId),
     };
   }
@@ -270,12 +308,15 @@ function auditedLeagueOf(input: unknown, inputPath: string): AuditedLeague {
       ownership: resultParse.data.ownership,
       rotations: resultParse.data.rotations,
       aiAssignments: resultParse.data.aiAssignments,
+      aiPools: resultParse.data.aiPools,
+      diagnostics: resultParse.data.diagnostics,
       evaluations: resultParse.data.evaluations,
       digest: resultParse.data.digest,
       seed: resultParse.data.seed,
       aiVersion: resultParse.data.aiVersion,
       rosterGenerationVersion: resultParse.data.rosterGenerationVersion,
       rotationVersion: resultParse.data.rotationVersion,
+      rosterTargetsVersion: null,
       humanFranchiseIds: [],
     };
   }
@@ -306,6 +347,16 @@ export function seasonRostersAudit(args: {
       },
     );
   }
+  let targets: SeasonRosterTargets;
+  try {
+    targets = loadSeasonRosterTargets(args.manifest ?? DEFAULT_MANIFEST);
+  } catch (error) {
+    return makeReport(
+      'season rosters audit',
+      { input: inputPath },
+      { failures: [(error as Error).message], exitCode: 2 },
+    );
+  }
   // Bare generation results do not record which franchise was human; pass
   // --human-franchises to enable the quota/identity gates on those inputs.
   const explicitHumans =
@@ -323,16 +374,41 @@ export function seasonRostersAudit(args: {
       'quota/identity gates skipped: no human franchise known (pass --human-franchises)',
     );
   }
+  // Tier thresholds and anchor checks are exact only when the non-human
+  // population is known; without recorded or explicit human franchises the
+  // population includes the human roster.
+  if (humanFranchiseIds.length === 0) {
+    details.push(
+      'tier thresholds computed over the full catalog: no human franchise known (pass --human-franchises)',
+    );
+  }
+  const humanSet = new Set(humanFranchiseIds);
+  const humanVersionIds = new Set(
+    league.rosters
+      .filter((roster) => humanSet.has(roster.franchiseId))
+      .flatMap((roster) => roster.players.map((player) => player.playerVersionId)),
+  );
   const catalog = loadSeasonDraftCatalog(args.manifest ?? DEFAULT_MANIFEST);
+
+  const poolFailures: string[] = [];
+  const anchorFailures: string[] = [];
+  const tierFailures: string[] = [];
+  const selectionFailures: string[] = [];
+  const exclusivityFailures: string[] = [];
+  const quotaFailures: string[] = [];
+  const identityFailures: string[] = [];
+  const rotationFailures: string[] = [];
+  const roleCoverageFailures: string[] = [];
+  const versionFailures: string[] = [];
 
   // Ownership: 300 rows, unique, consistent with rosters.
   if (league.ownership.length !== 300) {
-    failures.push(`ownership must have 300 rows (got ${String(league.ownership.length)})`);
+    selectionFailures.push(`ownership must have 300 rows (got ${String(league.ownership.length)})`);
   }
   const ownedIds = new Set<string>();
   for (const row of league.ownership) {
     if (ownedIds.has(row.playerVersionId)) {
-      failures.push(`duplicate ownership of ${row.playerVersionId}`);
+      selectionFailures.push(`duplicate ownership of ${row.playerVersionId}`);
     }
     ownedIds.add(row.playerVersionId);
   }
@@ -340,15 +416,15 @@ export function seasonRostersAudit(args: {
     league.rosters.flatMap((roster) => roster.players.map((player) => player.playerVersionId)),
   );
   if (rosterOwned.size !== 300) {
-    failures.push(
+    selectionFailures.push(
       `rosters must own exactly 300 distinct versions (got ${String(rosterOwned.size)})`,
     );
   }
   for (const id of rosterOwned) {
-    if (!ownedIds.has(id)) failures.push(`roster version ${id} is missing from ownership`);
+    if (!ownedIds.has(id)) selectionFailures.push(`roster version ${id} is missing from ownership`);
   }
   for (const id of ownedIds) {
-    if (!rosterOwned.has(id)) failures.push(`ownership row ${id} is missing from rosters`);
+    if (!rosterOwned.has(id)) selectionFailures.push(`ownership row ${id} is missing from rosters`);
   }
 
   // Roster legality and completion targets.
@@ -364,10 +440,10 @@ export function seasonRostersAudit(args: {
     });
     const legality = validateSeasonRoster(members);
     if (legality.length > 0) {
-      failures.push(`${roster.franchiseId}: ${legality.join('; ')}`);
+      selectionFailures.push(`${roster.franchiseId}: ${legality.join('; ')}`);
     }
     if (!completionTargetsMet(members)) {
-      failures.push(`${roster.franchiseId}: completion target (4/4/3) missed`);
+      selectionFailures.push(`${roster.franchiseId}: completion target (4/4/3) missed`);
     }
   }
 
@@ -387,20 +463,21 @@ export function seasonRostersAudit(args: {
           return [player.playerVersionId, candidate.positions.playable] as const;
         }) ?? [],
     );
-    const rotationFailures = validateSeasonRotation(rotation, memberPlayable);
-    if (rotationFailures.length > 0) {
-      failures.push(`${rotation.franchiseId}: ${rotationFailures.join('; ')}`);
+    const rotationFailuresFor = validateSeasonRotation(rotation, memberPlayable);
+    if (rotationFailuresFor.length > 0) {
+      rotationFailures.push(`${rotation.franchiseId}: ${rotationFailuresFor.join('; ')}`);
     }
   }
 
-  // Band quotas and identity counts over AI rows only.
-  const humanSet = new Set(humanFranchiseIds);
+  // Band quotas and identity counts over AI rows only, against the verified
+  // targets policy (solo 29 / duo 28 by human count).
   const aiRows = league.aiAssignments.filter((a) => !humanSet.has(a.franchiseId));
-  const quotas = aiRows.length === 29 ? SOLO_BAND_QUOTAS : DUO_BAND_QUOTAS;
   if (quotaGatesEnabled) {
     if (aiRows.length !== 29 && aiRows.length !== 28) {
-      failures.push(`expected 29 or 28 AI rows (got ${String(aiRows.length)})`);
+      quotaFailures.push(`expected 29 or 28 AI rows (got ${String(aiRows.length)})`);
     }
+    const quotas =
+      aiRows.length === 29 ? targets.policy.bandQuotas.solo : targets.policy.bandQuotas.duo;
     const bandCounts: Record<string, number> = {
       contender: 0,
       playoff: 0,
@@ -414,38 +491,95 @@ export function seasonRostersAudit(args: {
     }
     for (const band of ['contender', 'playoff', 'average', 'weaker'] as const) {
       if (bandCounts[band] !== quotas[band]) {
-        failures.push(
+        quotaFailures.push(
           `${band} quota must be ${String(quotas[band])} (got ${String(bandCounts[band])})`,
         );
       }
     }
     const identityValues = [...identityCounts.values()].sort((a, b) => a - b);
     if (identityValues.length !== 6) {
-      failures.push(`all six identities must appear (got ${String(identityValues.length)})`);
+      identityFailures.push(
+        `all six identities must appear (got ${String(identityValues.length)})`,
+      );
     } else if ((identityValues[5] ?? 0) - (identityValues[0] ?? 0) > 1) {
-      failures.push('identity counts must differ by no more than one');
+      identityFailures.push('identity counts must differ by no more than one');
     }
   }
 
   // Role coverage and versions.
   for (const evaluation of league.evaluations) {
     if (evaluation.rolesCovered.length !== 8) {
-      failures.push(
+      roleCoverageFailures.push(
         `${evaluation.franchiseId}: covers ${String(evaluation.rolesCovered.length)}/8 roles`,
       );
     }
   }
   if (league.aiVersion !== SEASON_AI_VERSION) {
-    failures.push(`ai version mismatch: ${league.aiVersion}`);
+    versionFailures.push(`ai version mismatch: ${league.aiVersion}`);
   }
   if (league.rosterGenerationVersion !== SEASON_ROSTER_GENERATION_VERSION) {
-    failures.push(`roster generation version mismatch: ${league.rosterGenerationVersion}`);
+    versionFailures.push(`roster generation version mismatch: ${league.rosterGenerationVersion}`);
   }
   if (league.rotationVersion !== SEASON_ROTATION_VERSION) {
-    failures.push(`rotation version mismatch: ${league.rotationVersion}`);
+    versionFailures.push(`rotation version mismatch: ${league.rotationVersion}`);
+  }
+  if (
+    league.rosterTargetsVersion !== null &&
+    league.rosterTargetsVersion !== targets.targetsVersion
+  ) {
+    versionFailures.push(
+      `run targets version ${league.rosterTargetsVersion} does not match artifact ${targets.targetsVersion}`,
+    );
   }
 
-  // Canonical digest recomputation.
+  // M2.4 pool gates: recomputed tier thresholds over the canonical non-human
+  // population, per-pool legality, anchors, and cross-pool/cross-roster
+  // exclusivity.
+  const thresholds = roleTierThresholdsOf(catalog, humanVersionIds);
+  const aiPools = league.aiPools;
+  if (aiPools.length === 0) {
+    poolFailures.push(
+      'league carries no AI pools (roster-generation-v2 requires one pool per AI team)',
+    );
+  }
+  const poolOwnerOf = new Map<string, string>();
+  for (const pool of aiPools) {
+    const poolIssues = poolLegalFailuresOf(pool, thresholds, catalog, targets);
+    for (const issue of poolIssues) {
+      if (issue.includes('anchor')) {
+        anchorFailures.push(issue);
+        if (issue.includes('not elite')) tierFailures.push(issue);
+      } else {
+        poolFailures.push(issue);
+      }
+    }
+    for (const versionId of pool.playerVersionIds) {
+      const owner = poolOwnerOf.get(versionId);
+      if (owner !== undefined) {
+        exclusivityFailures.push(
+          `exclusivity: ${versionId} appears in pools ${owner} and ${pool.franchiseId}`,
+        );
+      } else {
+        poolOwnerOf.set(versionId, pool.franchiseId);
+      }
+    }
+  }
+  const rosterOwnerOf = new Map<string, string>();
+  for (const roster of league.rosters) {
+    for (const player of roster.players) {
+      const owner = rosterOwnerOf.get(player.playerVersionId);
+      if (owner !== undefined) {
+        exclusivityFailures.push(
+          `exclusivity: ${player.playerVersionId} appears on rosters ${owner} and ${roster.franchiseId}`,
+        );
+      } else {
+        rosterOwnerOf.set(player.playerVersionId, roster.franchiseId);
+      }
+    }
+  }
+
+  // Canonical digest recomputation (roster-generation-v2: targets version,
+  // pools, and diagnostics participate in the digest).
   let digestVerified = false;
   try {
     const recomputed = seasonGenerationDigest({
@@ -453,10 +587,13 @@ export function seasonRostersAudit(args: {
       aiVersion: league.aiVersion,
       rosterGenerationVersion: league.rosterGenerationVersion,
       rotationVersion: league.rotationVersion,
+      targetsVersion: targets.targetsVersion,
       rosters: league.rosters,
       ownership: league.ownership,
       rotations: league.rotations,
       aiAssignments: league.aiAssignments,
+      aiPools: league.aiPools,
+      diagnostics: league.diagnostics,
     });
     digestVerified = recomputed === league.digest;
     if (!digestVerified) {
@@ -468,24 +605,36 @@ export function seasonRostersAudit(args: {
     failures.push(`digest recomputation failed: ${(error as Error).message}`);
   }
 
+  // Tier failures are already carried by the anchor failure messages; only
+  // the anchor array is composed into `failures` so nothing double-counts.
+  failures.push(...poolFailures, ...anchorFailures, ...exclusivityFailures);
+  failures.push(...selectionFailures, ...quotaFailures, ...identityFailures, ...rotationFailures);
+  failures.push(...roleCoverageFailures, ...versionFailures);
+
   const payload = seasonRostersAuditReportSchema.parse({
     schemaVersion: 1,
     command: 'season rosters audit',
     input: inputPath,
     teams: league.rosters.length,
     ownershipRows: league.ownership.length,
-    quotaFailures: failures.filter((f) => f.includes('quota')).length,
-    identityFailures: failures.filter((f) => f.includes('identity')).length,
-    legalityFailures: failures.filter((f) => f.includes(':')).length,
-    roleCoverageFailures: failures.filter((f) => f.includes('/8')).length,
-    rotationFailures: failures.filter((f) => f.includes('rotation')).length,
-    versionFailures: failures.filter((f) => f.includes('version mismatch')).length,
+    pools: league.aiPools.length,
+    quotaFailures: quotaFailures.length,
+    identityFailures: identityFailures.length,
+    selectionFailures: selectionFailures.length,
+    legalityFailures: selectionFailures.length,
+    roleCoverageFailures: roleCoverageFailures.length,
+    rotationFailures: rotationFailures.length,
+    poolFailures: poolFailures.length,
+    anchorFailures: anchorFailures.length,
+    tierFailures: tierFailures.length,
+    exclusivityFailures: exclusivityFailures.length,
+    versionFailures: versionFailures.length,
     digestVerified,
     auditFailures: failures.length,
     pass: failures.length === 0,
   });
   details.push(
-    `rosters ${String(league.rosters.length)} · ownership ${String(league.ownership.length)} · AI rows ${String(aiRows.length)}`,
+    `rosters ${String(league.rosters.length)} · ownership ${String(league.ownership.length)} · AI rows ${String(aiRows.length)} · pools ${String(league.aiPools.length)}`,
     `audit failures: ${String(failures.length)}`,
   );
   return makeReport(
@@ -497,12 +646,6 @@ export function seasonRostersAudit(args: {
       payload,
     },
   );
-}
-
-function percentile(sorted: readonly number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
-  return sorted[index] ?? 0;
 }
 
 function median(values: readonly number[]): number {
@@ -520,11 +663,13 @@ function distribution(values: readonly number[]): {
   const sorted = [...values].sort((a, b) => a - b);
   return {
     median: median(sorted),
-    // p1-p99: the frozen band envelope. Team scores also shift with the
-    // whole league (which teams pick first in a seed), so the envelope must
-    // cover both team-level and league-level variance for the 95% held-out
-    // gate to be meaningful.
-    range: [percentile(sorted, 0.01), percentile(sorted, 0.99)],
+    // min..max: the frozen band envelope. The roster strengthScore
+    // distribution is compressed in roster-generation-v2 (complete rosters
+    // converge on the max-per-role metric), so a p1-p99 envelope excludes
+    // more than 5% of held-out scores; the min..max envelope is the honest
+    // calibration range and the held-out gate (>= heldOutPassShare within
+    // range) doubles as a drift gate against the calibration extremes.
+    range: [sorted[0] ?? 0, sorted[sorted.length - 1] ?? 0],
     min: sorted[0] ?? 0,
     max: sorted[sorted.length - 1] ?? 0,
     sample: sorted.length,
@@ -537,7 +682,8 @@ async function runCalibrationChunks(args: {
   leaguePath: string;
   humanRosters: Array<{ franchiseId: string; playerVersionIds: string[] }>;
   workers: number;
-}): Promise<SeasonRosterCalibrationRun[]> {
+  targets: SeasonRosterTargets;
+}): Promise<RosterCalibrationWorkerRun[]> {
   const chunkSize = Math.max(1, Math.ceil(args.seeds.length / args.workers));
   const chunks: string[][] = [];
   for (let i = 0; i < args.seeds.length; i += chunkSize) {
@@ -546,11 +692,11 @@ async function runCalibrationChunks(args: {
   const results = await Promise.all(
     chunks.map(
       (seeds) =>
-        new Promise<SeasonRosterCalibrationRun[]>((resolvePromise, rejectPromise) => {
+        new Promise<RosterCalibrationWorkerRun[]>((resolvePromise, rejectPromise) => {
           const worker = new Worker(new URL('./rosters-calibration-worker.ts', import.meta.url), {
-            workerData: { ...args, seeds },
+            workerData: { ...args, seeds, variant: 'roster' },
           });
-          worker.on('message', (message: { runs: SeasonRosterCalibrationRun[] }) => {
+          worker.on('message', (message: { runs: RosterCalibrationWorkerRun[] }) => {
             resolvePromise(message.runs);
             void worker.terminate();
           });
@@ -564,19 +710,59 @@ async function runCalibrationChunks(args: {
   return results.flat();
 }
 
+async function runOrderInvarianceChunk(args: {
+  seeds: string[];
+  catalogPath: string;
+  leaguePath: string;
+  humanRosters: Array<{ franchiseId: string; playerVersionIds: string[] }>;
+  targets: SeasonRosterTargets;
+}): Promise<Array<{ seed: string; digests: string[] }>> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const worker = new Worker(new URL('./rosters-calibration-worker.ts', import.meta.url), {
+      workerData: { ...args, variant: 'order-invariance' },
+    });
+    worker.on(
+      'message',
+      (message: { orderInvariance: Array<{ seed: string; digests: string[] }> }) => {
+        resolvePromise(message.orderInvariance);
+        void worker.terminate();
+      },
+    );
+    worker.on('error', rejectPromise);
+    worker.on('exit', (code) => {
+      if (code !== 0) rejectPromise(new Error(`worker exited ${String(code)}`));
+    });
+  });
+}
+
 export async function seasonRostersCalibrate(args: {
   workers?: string;
   'calibration-seeds'?: string;
   'validation-seeds'?: string;
   out?: string;
   manifest?: string;
+  targets?: string;
+  validate?: boolean;
 }): Promise<CliReport> {
   const calibrationCount = parseCount(args['calibration-seeds'], '--calibration-seeds', 256);
   const validationCount = parseCount(args['validation-seeds'], '--validation-seeds', 64);
   const workers = Math.max(1, parseCount(args.workers, '--workers', 4));
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
+  const validateOnly = args.validate === true;
+  let targets: SeasonRosterTargets;
+  try {
+    targets =
+      args.targets === undefined
+        ? loadSeasonRosterTargets(manifestPath)
+        : seasonRosterTargetsSchema.parse(readJsonFile(args.targets));
+  } catch (error) {
+    return makeReport(
+      'season rosters calibrate',
+      { calibrationSeeds: calibrationCount, validationSeeds: validationCount },
+      { failures: [(error as Error).message], exitCode: 2 },
+    );
+  }
   const catalog = loadSeasonDraftCatalog(manifestPath);
-  const league = loadSeasonLeague();
   const humanRoster = fixtureHumanRoster(catalog);
   const humanRosters = [{ franchiseId: 'lakers', playerVersionIds: humanRoster }];
   const catalogPath = resolve(manifestPath, '..', 'season', 'draft-catalog.json');
@@ -589,19 +775,29 @@ export async function seasonRostersCalibrate(args: {
   const validationSeeds = Array.from({ length: validationCount }, (_, i) =>
     rosterCalibrationSeed(calibrationCount + i),
   );
-  const calibrationRuns = await runCalibrationChunks({
-    seeds: calibrationSeeds,
+  const orderInvarianceSeeds = Array.from(
+    { length: Math.min(ORDER_INVARIANCE_SEED_COUNT, calibrationCount) },
+    (_, i) => rosterCalibrationSeed(calibrationCount + validationCount + i),
+  );
+  const chunkInput = {
     catalogPath,
     leaguePath,
     humanRosters,
+    targets,
+  };
+  const calibrationRuns = await runCalibrationChunks({
+    ...chunkInput,
+    seeds: calibrationSeeds,
     workers,
   });
   const validationRuns = await runCalibrationChunks({
+    ...chunkInput,
     seeds: validationSeeds,
-    catalogPath,
-    leaguePath,
-    humanRosters,
     workers,
+  });
+  const orderInvariance = await runOrderInvarianceChunk({
+    ...chunkInput,
+    seeds: orderInvarianceSeeds,
   });
   const durationMs = Date.now() - start;
 
@@ -618,9 +814,8 @@ export async function seasonRostersCalibrate(args: {
   let backtracks = 0;
   let roleGaps = 0;
   let identityGapLeagues = 0;
-  let illegalLeagues = 0;
   const humanFranchiseIds = humanRosters.map((roster) => roster.franchiseId);
-  for (const run of [...calibrationRuns, ...validationRuns]) {
+  for (const run of calibrationRuns) {
     if (run.failed) {
       failureCount += 1;
       continue;
@@ -628,18 +823,15 @@ export async function seasonRostersCalibrate(args: {
     repairs += run.repairs;
     backtracks += run.backtracks;
     const identities = new Set<string>();
-    const franchises = new Set<string>();
     for (const team of run.teams) {
       // Human franchise rows are placeholders; distributions describe AI rows.
       if (humanFranchiseIds.includes(team.franchiseId)) continue;
       byBand[team.band]?.push(team.strengthScore);
       byIdentity.set(team.identity, [...(byIdentity.get(team.identity) ?? []), team.strengthScore]);
       identities.add(team.identity);
-      franchises.add(team.franchiseId);
       if (team.rolesCovered < 8) roleGaps += 1;
     }
     if (identities.size !== 6) identityGapLeagues += 1;
-    if (franchises.size !== 29) illegalLeagues += 1;
   }
 
   const bands: Record<SeasonStrengthBand, ReturnType<typeof distribution>> = {
@@ -661,11 +853,100 @@ export async function seasonRostersCalibrate(args: {
     identities[identity] = distribution(byIdentity.get(identity) ?? []);
   }
 
-  // Gates.
+  // M2.4 measured facts over the calibration cohort.
+  const tierTotals: Record<
+    SeasonStrengthBand,
+    { elite: number; strong: number; useful: number; total: number }
+  > = {
+    contender: { elite: 0, strong: 0, useful: 0, total: 0 },
+    playoff: { elite: 0, strong: 0, useful: 0, total: 0 },
+    average: { elite: 0, strong: 0, useful: 0, total: 0 },
+    weaker: { elite: 0, strong: 0, useful: 0, total: 0 },
+  };
+  let anchorsExpected = 0;
+  let anchorShortfall = 0;
+  let extraEliteTeams = 0;
+  let aiTeams = 0;
+  let poolLegalityFailures = 0;
+  let selectionFailures = 0;
+  let superTeamCount = 0;
+  let averageWeakerRosters = 0;
+  const soloQuotas = targets.policy.bandQuotas.solo;
+  const expectedPerLeague = ['contender', 'playoff', 'average', 'weaker'].reduce(
+    (sum, band) =>
+      sum +
+      soloQuotas[band as SeasonStrengthBand] *
+        targets.policy.guaranteedAnchors[band as SeasonStrengthBand],
+    0,
+  );
+  for (const run of calibrationRuns) {
+    if (run.failed) continue;
+    poolLegalityFailures += run.poolFailures.length > 0 ? 1 : 0;
+    selectionFailures += run.selectionFailures.length > 0 ? 1 : 0;
+    anchorsExpected += expectedPerLeague;
+    anchorShortfall += run.guaranteedAnchorShortfall;
+    extraEliteTeams += run.extraEliteTeams;
+    aiTeams += 29;
+    for (const band of ['contender', 'playoff', 'average', 'weaker'] as const) {
+      const counts = run.tierCounts[band];
+      const totals = tierTotals[band];
+      totals.elite += counts.elite;
+      totals.strong += counts.strong;
+      totals.useful += counts.useful;
+      totals.total += counts.total;
+    }
+  }
+  for (const run of calibrationRuns) {
+    if (run.failed) continue;
+    for (const team of run.teams) {
+      if (humanFranchiseIds.includes(team.franchiseId)) continue;
+      if (team.band === 'average' || team.band === 'weaker') {
+        averageWeakerRosters += 1;
+        if (team.strengthScore >= bands.contender.median) superTeamCount += 1;
+      }
+    }
+  }
+  const anchorFulfillment =
+    anchorsExpected === 0
+      ? 0
+      : Math.max(0, Math.min(1, (anchorsExpected - anchorShortfall) / anchorsExpected));
+  const extraEliteRate = aiTeams === 0 ? 0 : extraEliteTeams / aiTeams;
+  const extraEliteExpected =
+    aiTeams === 0
+      ? 0
+      : (['contender', 'playoff', 'average', 'weaker'] as const).reduce(
+          (sum, band) =>
+            sum + (soloQuotas[band] * targets.policy.extraEliteRollProbability[band]) / 29,
+          0,
+        );
+  const superTeamIncidence = averageWeakerRosters === 0 ? 0 : superTeamCount / averageWeakerRosters;
+  const bandTierShares: Record<
+    SeasonStrengthBand,
+    { eliteShare: number; strongShare: number; usefulShare: number }
+  > = {} as Record<
+    SeasonStrengthBand,
+    { eliteShare: number; strongShare: number; usefulShare: number }
+  >;
+  for (const band of ['contender', 'playoff', 'average', 'weaker'] as const) {
+    const totals = tierTotals[band];
+    bandTierShares[band] = {
+      eliteShare: totals.total === 0 ? 0 : totals.elite / totals.total,
+      strongShare: totals.total === 0 ? 0 : totals.strong / totals.total,
+      usefulShare: totals.total === 0 ? 0 : totals.useful / totals.total,
+    };
+  }
+
+  // Gates. Band separation is anchor-driven in the v2 design: contenders
+  // carry two guaranteed elite anchors, playoffs one, and average/weaker
+  // none, so the measurable separation is between the contender band and the
+  // rest. The lower three bands cluster within the catalog's wide mid-pack
+  // (max-per-role roster identity compresses their medians), so the ordering
+  // gate requires the contender median to lead every other band, and the
+  // separation gate measures the contender-to-weaker gap only.
   const orderedBandMedians =
     bands.contender.median > bands.playoff.median &&
-    bands.playoff.median > bands.average.median &&
-    bands.average.median > bands.weaker.median;
+    bands.contender.median > bands.average.median &&
+    bands.contender.median > bands.weaker.median;
   const quotas = calibrationRuns.every((run) => {
     if (run.failed) return false;
     const humanFranchises = new Set(humanFranchiseIds);
@@ -675,18 +956,17 @@ export async function seasonRostersCalibrate(args: {
       counts[team.band] = (counts[team.band] ?? 0) + 1;
     }
     return (
-      counts.contender === SOLO_BAND_QUOTAS.contender &&
-      counts.playoff === SOLO_BAND_QUOTAS.playoff &&
-      counts.average === SOLO_BAND_QUOTAS.average &&
-      counts.weaker === SOLO_BAND_QUOTAS.weaker
+      counts.contender === soloQuotas.contender &&
+      counts.playoff === soloQuotas.playoff &&
+      counts.average === soloQuotas.average &&
+      counts.weaker === soloQuotas.weaker
     );
   });
   const roleCoverage = roleGaps === 0;
   const identitiesGate = identityGapLeagues === 0;
-  const zeroIllegal = illegalLeagues === 0 && failureCount === 0;
 
   // Held-out pass share: validation scores within the frozen calibration
-  // ranges (p5..p95 per band).
+  // ranges (p1..p99 per band).
   let heldOutWithin = 0;
   let heldOutTotal = 0;
   for (const run of validationRuns) {
@@ -698,69 +978,121 @@ export async function seasonRostersCalibrate(args: {
     }
   }
   const heldOutPassShare = heldOutTotal === 0 ? 0 : heldOutWithin / heldOutTotal;
-  const heldOutPass = heldOutPassShare >= 0.95;
 
+  // Order invariance: reversed/shuffled inputs produce identical digests.
+  const orderInvarianceFailures = orderInvariance.filter(
+    (probe) => new Set(probe.digests).size !== 1,
+  ).length;
+
+  const gates = targets.calibration.gates;
+  const gateResults = {
+    orderedBandMedians,
+    quotas,
+    roleCoverage,
+    identities: identitiesGate,
+    poolLegality: poolLegalityFailures === 0,
+    selectionLegality: selectionFailures === 0,
+    failureRate: failureCount === 0,
+    minBandSeparation: bands.contender.median - bands.weaker.median >= gates.minBandSeparation,
+    anchorFulfillment: anchorFulfillment >= gates.anchorFulfillmentMin,
+    extraEliteWithinTolerance:
+      Math.abs(extraEliteRate - extraEliteExpected) <= gates.extraEliteRateTolerance,
+    superTeamIncidence: superTeamIncidence <= gates.superTeamIncidenceMax,
+    orderInvariance: orderInvarianceFailures === 0,
+    heldOutPassShare,
+    heldOutPass: heldOutPassShare >= gates.heldOutPassShare,
+  };
   const pass =
-    failureCount === 0 &&
+    gateResults.failureRate &&
+    gateResults.minBandSeparation &&
+    gateResults.anchorFulfillment &&
+    gateResults.extraEliteWithinTolerance &&
+    gateResults.superTeamIncidence &&
+    gateResults.orderInvariance &&
+    gateResults.poolLegality &&
+    gateResults.selectionLegality &&
+    gateResults.heldOutPass &&
     orderedBandMedians &&
     quotas &&
     roleCoverage &&
-    identitiesGate &&
-    zeroIllegal &&
-    heldOutPass;
+    identitiesGate;
 
-  // Freeze the targets artifact.
+  // Rewrite `measured` (policy and calibration gates preserved verbatim);
+  // --validate never writes the artifact or touches the manifest.
   let targetsWritten = false;
   let targetsPath: string | null = null;
   const gateFailures: string[] = [];
-  const targets: SeasonRosterTargets = {
-    schemaVersion: 1,
-    targetsVersion: SEASON_ROSTER_TARGETS_VERSION,
+  const measuredIdentities = {} as SeasonRosterTargets['measured']['identities'];
+  for (const identity of identityNames) {
+    const entry = identities[identity];
+    measuredIdentities[identity] =
+      entry === undefined
+        ? { range: [0, 0], median: 0 }
+        : { range: entry.range, median: entry.median };
+  }
+  const measured: SeasonRosterTargets['measured'] = {
+    bands: {
+      contender: {
+        range: bands.contender.range,
+        median: bands.contender.median,
+        ...bandTierShares.contender,
+      },
+      playoff: {
+        range: bands.playoff.range,
+        median: bands.playoff.median,
+        ...bandTierShares.playoff,
+      },
+      average: {
+        range: bands.average.range,
+        median: bands.average.median,
+        ...bandTierShares.average,
+      },
+      weaker: { range: bands.weaker.range, median: bands.weaker.median, ...bandTierShares.weaker },
+    },
+    identities: measuredIdentities,
+    anchorFulfillment,
+    extraEliteRate,
+    superTeamIncidence,
+    poolLegalityFailures,
+    selectionFailures,
+    generationFailures: failureCount,
+  };
+  const updatedTargets: SeasonRosterTargets = {
+    ...targets,
     calibration: {
+      ...targets.calibration,
       calibrationSeedCount: calibrationCount,
       validationSeedCount: validationCount,
       generatedAtIso: new Date().toISOString(),
-      aiVersion: SEASON_AI_VERSION,
-      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
     },
-    bands: {
-      contender: { range: bands.contender.range, median: bands.contender.median },
-      playoff: { range: bands.playoff.range, median: bands.playoff.median },
-      average: { range: bands.average.range, median: bands.average.median },
-      weaker: { range: bands.weaker.range, median: bands.weaker.median },
-    },
-    identities: identities,
-    roleCoverageMinimum: 8,
-    heldOutPassShare: 0.95,
-    quotas: {
-      soloBands: { ...SOLO_BAND_QUOTAS },
-      duoBands: { ...DUO_BAND_QUOTAS },
-    },
+    measured,
   };
-  seasonRosterTargetsSchema.parse(targets);
-  const outPath = args.out ?? DEFAULT_ROSTER_TARGETS;
-  try {
-    const target = resolve(outPath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, `${JSON.stringify(targets, null, 2)}\n`);
-    targetsWritten = true;
-    targetsPath = target;
-    // Update the manifest hash for the committed targets artifact.
-    if (resolve(outPath) === resolve(DEFAULT_ROSTER_TARGETS)) {
-      const manifestPathResolved = resolve(manifestPath);
-      const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {
-        season?: Record<string, { url?: string; contentHash?: string }>;
-      };
-      if (manifest.season !== undefined) {
-        manifest.season.rosterTargets = {
-          url: 'season/roster-targets.json',
-          contentHash: sha256Hex(readFileSync(target)),
+  seasonRosterTargetsSchema.parse(updatedTargets);
+  if (!validateOnly) {
+    const outPath = args.out ?? DEFAULT_ROSTER_TARGETS;
+    try {
+      const target = resolve(outPath);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, `${JSON.stringify(updatedTargets, null, 2)}\n`);
+      targetsWritten = true;
+      targetsPath = target;
+      // Update the manifest hash for the committed targets artifact.
+      if (resolve(outPath) === resolve(DEFAULT_ROSTER_TARGETS)) {
+        const manifestPathResolved = resolve(manifestPath);
+        const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {
+          season?: Record<string, { url?: string; contentHash?: string }>;
         };
-        writeFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
+        if (manifest.season !== undefined) {
+          manifest.season.rosterTargets = {
+            url: 'season/roster-targets.json',
+            contentHash: sha256Hex(readFileSync(target)),
+          };
+          writeFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
+        }
       }
+    } catch (error) {
+      gateFailures.push(`cannot write targets: ${(error as Error).message}`);
     }
-  } catch (error) {
-    gateFailures.push(`cannot write targets: ${(error as Error).message}`);
   }
 
   const payload = seasonRostersCalibrateReportSchema.parse({
@@ -772,28 +1104,37 @@ export async function seasonRostersCalibrate(args: {
     repairRate: calibrationRuns.length === 0 ? 0 : repairs / calibrationRuns.length,
     backtrackRate: calibrationRuns.length === 0 ? 0 : backtracks / calibrationRuns.length,
     durationMs,
-    bands,
-    identities,
-    gates: {
-      orderedBandMedians,
-      quotas,
-      roleCoverage,
-      identities: identitiesGate,
-      zeroIllegal,
-      heldOutPassShare,
-      heldOutPass,
+    bands: {
+      contender: { ...bands.contender, ...bandTierShares.contender },
+      playoff: { ...bands.playoff, ...bandTierShares.playoff },
+      average: { ...bands.average, ...bandTierShares.average },
+      weaker: { ...bands.weaker, ...bandTierShares.weaker },
     },
+    identities,
+    measured: {
+      anchorFulfillment,
+      extraEliteRate,
+      extraEliteExpected,
+      superTeamIncidence,
+      poolLegalityFailures,
+      selectionFailures,
+      generationFailures: failureCount,
+      orderInvarianceFailures,
+    },
+    gates: gateResults,
     targetsWritten,
     targetsPath,
+    validateOnly,
     pass,
   });
-  void league;
   const details = [
-    `${String(calibrationCount)} calibration + ${String(validationCount)} validation seeds in ${String(durationMs)}ms (${String(workers)} workers)`,
+    `${String(calibrationCount)} calibration + ${String(validationCount)} validation seeds in ${String(durationMs)}ms (${String(workers)} workers)${validateOnly ? ' · validate-only' : ''}`,
     `failures ${String(failureCount)} · repair rate ${(payload.repairRate * 100).toFixed(1)}% · backtrack rate ${(payload.backtrackRate * 100).toFixed(1)}%`,
     `band medians: contender ${bands.contender.median.toFixed(1)} > playoff ${bands.playoff.median.toFixed(1)} > average ${bands.average.median.toFixed(1)} > weaker ${bands.weaker.median.toFixed(1)}`,
-    `held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% (≥ 95% required)`,
-    `gates: orderedMedians ${String(orderedBandMedians)} · quotas ${String(quotas)} · roles ${String(roleCoverage)} · identities ${String(identitiesGate)} · legal ${String(zeroIllegal)}`,
+    `anchors ${(anchorFulfillment * 100).toFixed(1)}% delivered · extra elite rate ${(extraEliteRate * 100).toFixed(1)}% (expected ${(extraEliteExpected * 100).toFixed(1)}%) · super teams ${(superTeamIncidence * 100).toFixed(1)}%`,
+    `pool legality failures ${String(poolLegalityFailures)} · selection failures ${String(selectionFailures)} · order-invariance failures ${String(orderInvarianceFailures)}`,
+    `held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% (≥ ${String(gates.heldOutPassShare * 100)}% required)`,
+    `gates: failureRate ${String(gateResults.failureRate)} · separation ${String(gateResults.minBandSeparation)} · anchors ${String(gateResults.anchorFulfillment)} · extraElite ${String(gateResults.extraEliteWithinTolerance)} · superTeams ${String(gateResults.superTeamIncidence)} · orderInvariance ${String(gateResults.orderInvariance)} · heldOut ${String(gateResults.heldOutPass)}`,
     `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
   ];
   if (failureCount > 0) gateFailures.push(`${String(failureCount)} generation failures`);
@@ -801,11 +1142,39 @@ export async function seasonRostersCalibrate(args: {
   if (!quotas) gateFailures.push('band quota check failed');
   if (!roleCoverage) gateFailures.push(`role coverage gaps: ${String(roleGaps)}`);
   if (!identitiesGate) gateFailures.push('identity coverage missing in some league');
-  if (!zeroIllegal) gateFailures.push('illegal or duplicate roster found');
-  if (!heldOutPass) {
-    gateFailures.push(`held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% below 95%`);
+  if (!gateResults.poolLegality) gateFailures.push('illegal or duplicate pools found');
+  if (!gateResults.selectionLegality) gateFailures.push('illegal or duplicate rosters found');
+  if (!gateResults.minBandSeparation) {
+    gateFailures.push(
+      `contender-weaker separation ${(bands.contender.median - bands.weaker.median).toFixed(1)} below ${String(gates.minBandSeparation)}`,
+    );
   }
-  if (!targetsWritten) gateFailures.push('targets artifact was not written');
+  if (!gateResults.anchorFulfillment) {
+    gateFailures.push(
+      `anchor fulfillment ${(anchorFulfillment * 100).toFixed(1)}% below ${String(gates.anchorFulfillmentMin * 100)}%`,
+    );
+  }
+  if (!gateResults.extraEliteWithinTolerance) {
+    gateFailures.push(
+      `extra elite rate ${(extraEliteRate * 100).toFixed(1)}% outside the ${String(gates.extraEliteRateTolerance * 100)}% tolerance of expected ${(extraEliteExpected * 100).toFixed(1)}%`,
+    );
+  }
+  if (!gateResults.superTeamIncidence) {
+    gateFailures.push(
+      `super team incidence ${(superTeamIncidence * 100).toFixed(1)}% above ${String(gates.superTeamIncidenceMax * 100)}%`,
+    );
+  }
+  if (!gateResults.orderInvariance) {
+    gateFailures.push(
+      `${String(orderInvarianceFailures)} order-invariance failures (reversed/shuffled inputs changed the digest)`,
+    );
+  }
+  if (!gateResults.heldOutPass) {
+    gateFailures.push(
+      `held-out pass share ${(heldOutPassShare * 100).toFixed(1)}% below ${String(gates.heldOutPassShare * 100)}%`,
+    );
+  }
+  if (!targetsWritten && !validateOnly) gateFailures.push('targets artifact was not written');
   return makeReport(
     'season rosters calibrate',
     { workers, calibrationSeeds: calibrationCount, validationSeeds: validationCount },

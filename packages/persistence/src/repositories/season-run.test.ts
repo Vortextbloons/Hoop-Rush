@@ -2,16 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
 import type { SeasonEffectsState } from '@hoop-rush/data-contracts';
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
-import {
-  storedSeasonActiveRunIndexSchema,
-  storedSeasonRunRecordV1Schema,
-} from '../schemas/season-run-record.ts';
+import { storedSeasonActiveRunIndexSchema } from '../schemas/season-run-record.ts';
 import { storedSeasonSummaryRowSchema } from '../schemas/season-run-record.ts';
 import { DexieChallengeRepository, HoopRushDatabase } from './dexie.ts';
 import { DexieSeasonDraftRepository } from './season-draft.ts';
 import {
   DexieSeasonRunRepository,
-  SeasonRunIncompatibleError,
   SeasonRunLoadError,
   loadActiveRunWithSchedule,
 } from './season-run-dexie.ts';
@@ -39,12 +35,12 @@ import type { CommitSeasonBlockInput } from './season-run.ts';
  * the accepted checkpoint never advances; a failed promotion leaves the
  * draft intact. Every load validates stored rows and audits aggregate and
  * M2.4 effects-state reconciliation, so corrupt rows throw a typed
- * `SeasonRunLoadError` instead of entering app state. Stored schema-4 runs
- * (save-schema-v1) are never migrated or rewritten: loads throw the typed
- * `SeasonRunIncompatibleError` and `loadActiveRunIncompatible()` reports
- * them for the discard screen. The engine math comes through the stub seam
- * (documented pure semantics), keeping these tests independent of the
- * engine agent's parallel block-pipeline work.
+ * `SeasonRunLoadError` instead of entering app state. Stored development
+ * rows (save-schema v1/v2, schema-4 and schema-5 runs) are auto-cleared at
+ * load and reported as null: they are never read, migrated, or preserved.
+ * The engine math comes through the stub seam (documented pure semantics),
+ * keeping these tests independent of the engine agent's parallel
+ * block-pipeline work.
  */
 
 interface Adapters {
@@ -344,10 +340,10 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || row.saveSchemaVersion !== 2) {
-      throw new Error('expected a current v2 checkpoint row');
+    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 3) {
+      throw new Error('expected a current v3 checkpoint row');
     }
-    await db.seasonRuns.put({ ...row, revision: 5 } as never);
+    await db.seasonRuns.put({ ...row, revision: 5 });
     await expect(repo.loadActiveRun()).rejects.toThrow(/revision/);
   });
 
@@ -357,14 +353,14 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || row.saveSchemaVersion !== 2) {
-      throw new Error('expected a current v2 checkpoint row');
+    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 3) {
+      throw new Error('expected a current v3 checkpoint row');
     }
     await db.seasonRuns.put({
       ...row,
       lastCheckpointDigest: 'f'.repeat(32),
       lastRotationDigest: 'e'.repeat(32),
-    } as never);
+    });
     await expect(repo.loadActiveRun()).rejects.toThrow(/lastCheckpointDigest/);
   });
 
@@ -468,12 +464,10 @@ describe('season run repository (dexie)', () => {
   });
 });
 
-describe('season run schema-v4 compatibility (M2.4)', () => {
+describe('season run development-row auto-clear (M2.4)', () => {
   /** Minimal-but-faithful stored save-schema-v1 row (schema-4 run). */
-  function legacyV1Row(
-    runId: string,
-  ): import('../schemas/season-run-record.ts').StoredSeasonRunRecordV1 {
-    return storedSeasonRunRecordV1Schema.parse({
+  function developmentV1Row(runId: string): Record<string, unknown> {
+    return {
       recordId: SEASON_RUN_RECORD_ID,
       saveSchemaVersion: 1,
       run: {
@@ -481,15 +475,36 @@ describe('season run schema-v4 compatibility (M2.4)', () => {
         schemaVersion: 4,
         versions: { runSchemaVersion: 4 },
       },
-    });
+    };
+  }
+
+  /** Development v2 row (schema-5 run, pre-v3 wrapper with effects). */
+  function developmentV2Row(adapters: Adapters): Record<string, unknown> {
+    const { run } = adapters;
+    const { games: _games, ...runWithoutGames } = run;
+    return {
+      recordId: SEASON_RUN_RECORD_ID,
+      saveSchemaVersion: 2,
+      run: runWithoutGames,
+      completedRounds: 0,
+      revision: 0,
+      lastCommandId: null,
+      lastRotationDigest: null,
+      lastCheckpointDigest: null,
+      standings: run.standings,
+      teamAggregates: [],
+      playerAggregates: [],
+      recap: null,
+      effects: buildFixtureEffectsState(run.rosters),
+    };
   }
 
   async function currentCheckpoint(
     adapters: Adapters,
-  ): Promise<import('../schemas/season-run-record.ts').StoredSeasonRunRecordV2> {
+  ): Promise<import('../schemas/season-run-record.ts').StoredSeasonRunRecord> {
     const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || row.saveSchemaVersion !== 2) {
-      throw new Error('expected a current v2 checkpoint row');
+    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 3) {
+      throw new Error('expected a current v3 checkpoint row');
     }
     return row;
   }
@@ -503,69 +518,105 @@ describe('season run schema-v4 compatibility (M2.4)', () => {
     await adapters.db.seasonRuns.put({
       ...row,
       effects: mutate(structuredClone(row.effects)),
-    } as never);
+    });
   }
 
-  it('loads a stored v1 row through the typed detection path, not a generic parse error', async () => {
+  it('reports a stored v1 row as typed incompatible on every load path and preserves it', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
-    await db.seasonRuns.put(legacyV1Row(run.runId));
+    await db.seasonRuns.put(developmentV1Row(run.runId) as never);
 
-    const error = await repo.loadActiveRun().catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(SeasonRunIncompatibleError);
-    expect(error).not.toBeInstanceOf(SeasonRunLoadError);
-    expect((error as SeasonRunIncompatibleError).info).toEqual({
-      storedSaveSchemaVersion: 1,
-      storedRunSchemaVersion: 4,
-      runId: run.runId,
+    await expect(repo.loadActiveRun()).rejects.toMatchObject({
+      name: 'SeasonRunIncompatibleError',
+      info: {
+        storedSaveSchemaVersion: 1,
+        storedRunSchemaVersion: 4,
+        runId: run.runId,
+      },
     });
-    await expect(repo.loadActiveRunWithSchedule(adapters.schedule)).rejects.toThrow(
-      SeasonRunIncompatibleError,
-    );
+    expect(await db.seasonRuns.count()).toBe(1);
+
+    await expect(repo.loadActiveRunWithSchedule(adapters.schedule)).rejects.toMatchObject({
+      name: 'SeasonRunIncompatibleError',
+    });
+    expect(await db.seasonRuns.count()).toBe(1);
   });
 
-  it('loadActiveRunIncompatible reports the typed marker without a schedule artifact', async () => {
+  it('reports a stored v2 row as typed incompatible and preserves it', async () => {
     const adapters = makeAdapters();
-    const { db, repo, run } = adapters;
-    expect(await repo.loadActiveRunIncompatible()).toBeNull();
-
-    await db.seasonRuns.put(legacyV1Row(run.runId));
-    expect(await repo.loadActiveRunIncompatible()).toEqual({
-      storedSaveSchemaVersion: 1,
-      storedRunSchemaVersion: 4,
-      runId: run.runId,
+    const { db, repo } = adapters;
+    await db.seasonRuns.put(developmentV2Row(adapters) as never);
+    await expect(repo.loadActiveRun()).rejects.toMatchObject({
+      name: 'SeasonRunIncompatibleError',
     });
-
-    await repo.clearSeasonRun(run.runId);
-    await promote(adapters);
-    expect(await repo.loadActiveRunIncompatible()).toBeNull();
-
-    await db.seasonRuns.put({ recordId: SEASON_RUN_RECORD_ID, garbage: true } as never);
-    await expect(repo.loadActiveRunIncompatible()).rejects.toThrow(SeasonRunLoadError);
+    expect(await db.seasonRuns.count()).toBe(1);
+    expect(await db.seasonRunIndex.count()).toBe(0);
   });
 
-  it('leaves the v1 row byte-for-byte untouched across detection and load attempts', async () => {
+  it('never deletes legacy rows with their summaries, details, and blocks', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
-    await db.seasonRuns.put(legacyV1Row(run.runId));
-    const before = JSON.stringify(await db.seasonRuns.get(SEASON_RUN_RECORD_ID));
-
-    await expect(repo.loadActiveRun()).rejects.toThrow(SeasonRunIncompatibleError);
-    await expect(repo.loadActiveRunWithSchedule(adapters.schedule)).rejects.toThrow(
-      SeasonRunIncompatibleError,
+    await db.seasonRuns.put(developmentV1Row(run.runId) as never);
+    const summary = sharedDataset.blocks[0]?.summaries[0];
+    if (summary === undefined) throw new Error('expected a fixture summary');
+    await db.seasonRunSummaries.put(
+      storedSeasonSummaryRowSchema.parse({
+        runId: run.runId,
+        gameId: summary.gameId,
+        blockIndex: 0,
+        round: summary.round,
+        summary,
+      }),
     );
-    await repo.loadActiveRunIncompatible();
+    await db.seasonRunIndex.put(
+      storedSeasonActiveRunIndexSchema.parse({
+        recordId: SEASON_RUN_RECORD_ID,
+        index: {
+          runId: run.runId,
+          rootSeed: 'a'.repeat(32),
+          humanFranchiseId: 'lakers',
+          completedRounds: 0,
+          revision: 0,
+          humanWins: 0,
+          humanLosses: 0,
+          updatedAtIso: '2026-08-04T12:00:00.000Z',
+        },
+      }),
+    );
 
-    expect(JSON.stringify(await db.seasonRuns.get(SEASON_RUN_RECORD_ID))).toBe(before);
-    expect(await db.seasonRunSummaries.count()).toBe(0);
+    await expect(repo.loadActiveRun()).rejects.toMatchObject({
+      name: 'SeasonRunIncompatibleError',
+    });
+    expect(await db.seasonRuns.count()).toBe(1);
+    expect(await db.seasonRunIndex.count()).toBe(1);
+    expect(await db.seasonRunSummaries.count()).toBe(1);
     expect(await db.seasonRunDetails.count()).toBe(0);
     expect(await db.seasonRunBlocks.count()).toBe(0);
   });
 
-  it('clearSeasonRun removes a v1 row and its rows', async () => {
+  it('commit and promotion reject legacy rows instead of silently rewriting them', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
-    await db.seasonRuns.put(legacyV1Row(run.runId));
+    await db.seasonRuns.put(developmentV1Row(run.runId) as never);
+
+    await expect(repo.commitSeasonBlock(commitInputFor(adapters, 0))).rejects.toMatchObject({
+      name: 'SeasonRunIncompatibleError',
+    });
+    expect(await db.seasonRuns.count()).toBe(1);
+
+    await db.seasonRuns.put(developmentV2Row(adapters) as never);
+    await expect(
+      repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run),
+    ).rejects.toMatchObject({
+      name: 'SeasonRunIncompatibleError',
+    });
+    expect(await db.seasonRuns.count()).toBe(1);
+  });
+
+  it('clearSeasonRun removes a development row and its rows', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await db.seasonRuns.put(developmentV1Row(run.runId) as never);
     await db.seasonRunIndex.put(
       storedSeasonActiveRunIndexSchema.parse({
         recordId: SEASON_RUN_RECORD_ID,
@@ -597,34 +648,15 @@ describe('season run schema-v4 compatibility (M2.4)', () => {
     expect(await db.seasonRuns.count()).toBe(0);
     expect(await db.seasonRunIndex.count()).toBe(0);
     expect(await db.seasonRunSummaries.count()).toBe(0);
-    expect(await repo.loadActiveRunIncompatible()).toBeNull();
     expect(await repo.loadActiveRun()).toBeNull();
   });
 
-  it('commit and promotion refuse to touch a stored v1 row', async () => {
-    const adapters = makeAdapters();
-    const { db, repo, run } = adapters;
-    await db.seasonRuns.put(legacyV1Row(run.runId));
-    const before = JSON.stringify(await db.seasonRuns.get(SEASON_RUN_RECORD_ID));
-
-    await expect(repo.commitSeasonBlock(commitInputFor(adapters, 0))).rejects.toThrow(
-      /clearSeasonRun/,
-    );
-    await expect(repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run)).rejects.toThrow(
-      /clearSeasonRun/,
-    );
-
-    expect(JSON.stringify(await db.seasonRuns.get(SEASON_RUN_RECORD_ID))).toBe(before);
-    expect(await db.seasonRunSummaries.count()).toBe(0);
-    expect(await db.seasonRunIndex.count()).toBe(0);
-  });
-
-  it('a fresh v2 row round-trips the effects state through promotion, commit, and reload', async () => {
+  it('a fresh v3 row round-trips the effects state through promotion, commit, and reload', async () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
     await promote(adapters);
     let row = await currentCheckpoint(adapters);
-    expect(row.saveSchemaVersion).toBe(2);
+    expect(row.saveSchemaVersion).toBe(3);
     expect(row.effects).toEqual(buildFixtureEffectsState(run.rosters));
 
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));

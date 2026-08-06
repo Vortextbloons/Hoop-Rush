@@ -246,7 +246,7 @@
             </div>
           </div>
 
-          <div class="reel w-40 shrink-0" data-axis="era" aria-hidden="true">
+          <div class="reel reel--era shrink-0" data-axis="era" aria-hidden="true">
             <div class="reel-window {eraSpinning || eraFading ? 'reel-window--active' : ''}">
               <span class="reel-payline" aria-hidden="true"></span>
               <div
@@ -281,6 +281,14 @@
           </div>
         </div>
         <p class="roll-caption">Your pool is ready</p>
+        <button
+          type="button"
+          class="roll-continue"
+          onclick={(event) => {
+            event.stopPropagation();
+            finish();
+          }}>Continue</button
+        >
       {/if}
       <p class="sr-only" aria-live="polite">{announced}</p>
     </div>
@@ -320,10 +328,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1.5rem;
+    padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right))
+      max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
     background: rgba(9, 12, 17, 0.72);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
+    touch-action: manipulation;
+    overflow: hidden;
   }
 
   .roll-overlay--ready {
@@ -332,6 +343,8 @@
 
   .roll-stage {
     width: min(560px, 100%);
+    max-width: 100%;
+    overflow: hidden;
     border-radius: 1.25rem;
     border: 1px solid var(--color-border-strong);
     background: var(--color-card);
@@ -363,6 +376,10 @@
     --reel-row-h: 72px;
     position: relative;
     min-width: 0;
+  }
+
+  .reel--era {
+    width: 6.25rem;
   }
 
   .reel-window {
@@ -589,6 +606,107 @@
     letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--color-muted-foreground);
+  }
+
+  .roll-continue {
+    display: flex;
+    margin: 0.875rem auto 0;
+    min-height: 2.75rem;
+    min-width: 10rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.625rem;
+    border: 0;
+    background: var(--color-primary);
+    padding: 0.625rem 1.25rem;
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-primary-foreground);
+    cursor: pointer;
+    outline: none;
+    touch-action: manipulation;
+  }
+
+  .roll-continue:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-ring);
+  }
+
+  @media (min-width: 640px) {
+    .roll-overlay {
+      padding: 1.5rem;
+    }
+
+    .reel--era {
+      width: 10rem;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .roll-stage {
+      padding: 1rem;
+      border-radius: 1rem;
+    }
+
+    .reels {
+      gap: 8px;
+    }
+
+    .reel-row {
+      gap: 8px;
+      padding: 0 10px;
+    }
+
+    :global(.reel-franchise-logo) {
+      height: 2rem;
+      width: 2rem;
+    }
+
+    .reel-name {
+      font-size: 13px;
+    }
+
+    .reel-row--final .reel-name {
+      font-size: 14px;
+    }
+
+    .reel-era-label {
+      font-size: 15px;
+    }
+
+    .reel-row--final .reel-era-label {
+      font-size: 18px;
+    }
+
+    .roll-result {
+      min-height: auto;
+      padding: 12px;
+    }
+
+    .roll-result .reel-lock {
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .roll-result-divider {
+      width: 3rem;
+      height: 1px;
+    }
+
+    .roll-result .reel-name {
+      font-size: 15px;
+      text-align: center;
+    }
+
+    .roll-result .reel-era-label {
+      font-size: 20px;
+    }
+
+    .roll-result .reel-franchise {
+      justify-content: center;
+    }
   }
 
   @keyframes roll-stage-in {

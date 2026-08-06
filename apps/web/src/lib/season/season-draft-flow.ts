@@ -8,7 +8,9 @@ import type {
   SeasonLeague,
   Seed,
   SeasonLeagueGenerationResult,
+  SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
+import { SEASON_DRAFT_VERSION } from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
   generateAiLeague,
@@ -25,10 +27,9 @@ import { newSeasonId } from './season-ids';
  * the live revision, persists each accepted record, and exposes the
  * presentation facts the board needs.
  *
- * A stored legacy season-draft-v1 record (saveSchemaVersion 1) is detected
- * and exposed distinctly through `legacyStored` so the page can show the
- * explicit "Draft rules changed" recovery screen; `discardLegacy()` clears it
- * via the repository (never a silent auto-delete).
+ * A stored record from an older save-schema family (pre-v3, development
+ * saves) is cleared automatically by the repository on load, so the flow
+ * always resumes from a current record or null.
  *
  * The AI league generation is synchronous and bounded by
  * `AI_GENERATION_NODE_BUDGET`; `generate()` yields to the event loop first so
@@ -85,8 +86,6 @@ export class SeasonDraftFlow {
   lastRecord: SeasonDraftCommandRecord | null = null;
   phase: SeasonDraftFlowPhase = 'idle';
   error: string | null = null;
-  /** True when the stored record is a legacy season-draft-v1 draft. */
-  legacyStored = false;
 
   constructor(
     repo: SeasonDraftRepository,
@@ -104,17 +103,13 @@ export class SeasonDraftFlow {
   }
 
   /**
-   * Loads a persisted draft. Returns true when a stored record exists. A
-   * legacy season-draft-v1 record is NOT loaded into the playable draft:
-   * `legacyStored` is set and the page shows the recovery screen.
+   * Loads a persisted draft. Returns true when a stored record exists.
+   * Older save-schema records were already cleared by the repository on
+   * load, so any stored record here is current.
    */
   async load(): Promise<boolean> {
     const stored = await this.repo.loadSeasonDraft();
     if (stored) {
-      if (stored.saveSchemaVersion === 1) {
-        this.legacyStored = true;
-        return true;
-      }
       this.draft = stored.draft;
       this.generation = stored.generation;
       this.phase =
@@ -136,15 +131,6 @@ export class SeasonDraftFlow {
     this.lastRecord = null;
     this.phase = 'idle';
     this.error = null;
-    this.legacyStored = false;
-  }
-
-  /**
-   * Discards a stored legacy season-draft-v1 record (explicit user action on
-   * the recovery screen; never automatic).
-   */
-  async discardLegacy(): Promise<void> {
-    await this.clear();
   }
 
   /** Snapshot of the flow for the board. */
@@ -167,7 +153,7 @@ export class SeasonDraftFlow {
         rootSeed: input.rootSeed,
         league: input.league,
         humanParticipantIds: [SOLO_PARTICIPANT_ID],
-        catalogVersion: this.catalogRef.catalogVersion,
+        catalogVersion: SEASON_DRAFT_VERSION,
       },
       0,
     );
@@ -245,7 +231,17 @@ export class SeasonDraftFlow {
   }
 }
 
-/** Production AI generation deps: the authoritative engine generator. */
-export function engineGenerationDeps(): SeasonAiGenerationDeps {
-  return { generate: generateAiLeague };
+/**
+ * Production AI generation deps: the authoritative engine generator with the
+ * manifest-verified roster-targets artifact injected. Generation rejects
+ * targets that do not match the AI/generator versions.
+ */
+export function engineGenerationDeps(targets: SeasonRosterTargets): SeasonAiGenerationDeps {
+  return {
+    generate: (input) =>
+      generateAiLeague({
+        ...input,
+        targets,
+      }),
+  };
 }

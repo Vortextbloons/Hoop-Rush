@@ -2,11 +2,13 @@ import {
   loadEraSimulationProfile,
   loadSeasonDraftCatalog as loadPackagedSeasonDraftCatalog,
   seasonLeagueSchema,
+  seasonRosterTargetsSchema,
   seasonScheduleSchema,
   type EraSimulationProfile,
   type SeasonDraftCatalog,
   type SeasonHomeCourtProfile,
   type SeasonLeague,
+  type SeasonRosterTargets,
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
 import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
@@ -125,6 +127,17 @@ export function loadSeasonDraftCatalog(): Promise<SeasonDraftCatalog> {
     );
     void writeCachedAsset(entry.contentHash, catalog);
     return catalog;
+  });
+}
+
+export function loadSeasonRosterTargets(): Promise<SeasonRosterTargets> {
+  return memoized('season/roster-targets', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.season?.rosterTargets;
+    if (!entry) throw new Error('The season roster-targets artifact is unavailable.');
+    return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) =>
+      seasonRosterTargetsSchema.parse(value),
+    );
   });
 }
 

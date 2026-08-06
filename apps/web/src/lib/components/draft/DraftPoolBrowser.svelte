@@ -160,20 +160,20 @@
   );
 </script>
 
-<div class="rounded-xl bg-surface-1">
-  <div class="flex min-w-0 items-center justify-between gap-3 px-4 py-3">
+<div class="rounded-none bg-surface-1 sm:rounded-xl">
+  <div class="flex min-w-0 items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
     <h2
-      class="min-w-0 truncate font-display text-lg font-extrabold tracking-tight uppercase"
+      class="min-w-0 truncate font-display text-base font-extrabold tracking-tight uppercase sm:text-lg"
       title={heading}
     >
       {heading}
     </h2>
-    <span class="shrink-0 text-label text-muted-foreground">
+    <span class="shrink-0 text-[10px] text-muted-foreground sm:text-label">
       {countLabel}
     </span>
   </div>
   {#if filtersEditable}
-    <div class="flex flex-col gap-2 px-2 pb-2">
+    <div class="flex flex-col gap-2 px-2 pb-2 sm:px-2">
       <div class="relative">
         <Search
           class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
@@ -234,7 +234,7 @@
     <p class="p-6 text-center font-mono text-xs text-muted-foreground">{emptyMessage}</p>
   {:else}
     <ul
-      class="grid max-h-[55vh] gap-1 overflow-y-auto p-2 sm:max-h-[560px] sm:grid-cols-2 xl:grid-cols-3"
+      class="grid max-h-[55vh] gap-1 overflow-y-auto p-1.5 sm:max-h-[560px] sm:grid-cols-2 sm:p-2 xl:grid-cols-3"
     >
       {#each visibleRows as player (player.franchiseId + '/' + player.eraId + '/' + player.playerId)}
         {@const card = poolCardInfo.get(player.playerId) ?? {

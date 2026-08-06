@@ -1,10 +1,12 @@
 import {
+  blockRoundRange,
   loadEraSimulationProfile,
   loadSeasonDraftCatalog,
   seasonWorkerMessageSchema,
   seasonWorkerRequestSchema,
   type SeasonBlockRunContext,
   type SeasonDraftCatalog,
+  type SeasonEffectsState,
   type SeasonGameSummary,
   type SeasonRetainedGameDetail,
   type SeasonWorkerCompleteMessage,
@@ -16,6 +18,7 @@ import { readCachedAsset, writeCachedAsset } from '../lib/pool-cache';
 import {
   assembleSeasonBlockCandidate,
   auditSeasonBlock,
+  createSeasonEffectsState,
   expandSeasonRunRosters,
   rosterPlayerIdsOf,
   seasonBlockGamesOf,
@@ -61,6 +64,8 @@ let cancelled = false;
  */
 let accumulatedRunId: string | null = null;
 let accumulatedSummaries: SeasonGameSummary[] = [];
+/** M2.4: the authoritative effects state carried across blocks in this worker. */
+let accumulatedEffects: SeasonEffectsState | null = null;
 
 function post(
   message: SeasonWorkerProgressMessage | SeasonWorkerCompleteMessage | SeasonWorkerErrorMessage,
@@ -135,6 +140,20 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
     accumulatedSummaries = [...accumulatedSummaries, ...request.newSummaries];
   }
+  // M2.4: the effects state follows the same reset/delta convention. A
+  // full reset carries the authoritative pre-block state; the delta path
+  // keeps the worker's accumulated state (the runner only sends the reset
+  // when this worker has no state for the run).
+  if (request.priorEffects !== undefined && request.priorEffects !== null) {
+    accumulatedEffects = request.priorEffects;
+  } else if (accumulatedRunId === null) {
+    postError(
+      request.requestId,
+      'internal',
+      'effects state missing for a run the worker has no state for',
+    );
+    return;
+  }
 
   let catalog;
   let profile;
@@ -151,7 +170,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const expanded = expandSeasonRunRosters(run, catalog);
   const input: SeasonBlockSimulationInput = {
     command: {
-      schemaVersion: 5,
+      schemaVersion: 6,
       blockVersion: run.versions.blockVersion,
       command: 'submit-season-block',
       commandId: request.commandId,
@@ -168,6 +187,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     humanFranchiseId: request.humanFranchiseId,
     rosterPlayerIds: rosterPlayerIdsOf(run),
     priorSummaries: accumulatedSummaries,
+    effects: accumulatedEffects ?? initialEffects(expanded),
   };
 
   const rejection = seasonBlockRejection(input);
@@ -183,6 +203,11 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const games = seasonBlockGamesOf(request.schedule, request.blockIndex);
   const summaries: SeasonGameSummary[] = [];
   const retainedDetails: SeasonRetainedGameDetail[] = [];
+  // M2.4 recovery cadence mirrors the CLI pipeline: one between-round tick
+  // per player, never before the season's first game.
+  const { fromRound } = blockRoundRange(request.blockIndex);
+  let previousRound = fromRound - 1;
+  let effects = accumulatedEffects ?? initialEffects(expanded);
   let lastProgressAt = 0;
   let latestSummary: SeasonGameSummary | null = null;
 
@@ -192,7 +217,11 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
     await yieldToEventLoop();
     throwIfCancelled();
-    const outcome = simulateSeasonBlockGame(input, game);
+    const outcome = simulateSeasonBlockGame(input, game, effects, {
+      skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
+    });
+    effects = outcome.effects;
+    previousRound = game.round;
     summaries.push(outcome.summary);
     latestSummary = outcome.summary;
     if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
@@ -214,7 +243,8 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
   }
 
-  const candidate = assembleSeasonBlockCandidate(input, summaries, retainedDetails);
+  accumulatedEffects = effects;
+  const candidate = assembleSeasonBlockCandidate(input, summaries, retainedDetails, effects);
   const auditFailures = auditSeasonBlock(candidate, input);
   if (auditFailures.length > 0) {
     throw new EngineInvariantFailure(auditFailures.join('; '));
@@ -225,6 +255,19 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     requestId: request.requestId,
     checkpoint: candidate,
   });
+}
+
+/** M2.4: the league-wide zero effects state from the expanded rosters. */
+function initialEffects(
+  expanded: ReadonlyMap<string, import('@hoop-rush/data-contracts').SeasonGamePlayerInput>,
+): SeasonEffectsState {
+  const staminaInputs = [...expanded.values()].map((player) => {
+    if (player.stamina === undefined) {
+      throw new Error(`expanded player ${player.playerVersionId} has no stamina profile`);
+    }
+    return player.stamina;
+  });
+  return createSeasonEffectsState(staminaInputs);
 }
 
 /** Worker-local cancellation signal; thrown at game boundaries. */

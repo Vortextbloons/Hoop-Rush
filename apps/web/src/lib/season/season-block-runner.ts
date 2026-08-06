@@ -1,5 +1,6 @@
 import type {
   SeasonCandidateCheckpoint,
+  SeasonEffectsState,
   SeasonGameSummary,
   SeasonHomeCourtProfile,
   SeasonRotation,
@@ -133,6 +134,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     completedRounds: number;
     commandIds: Set<string>;
     summaries: SeasonGameSummary[];
+    /** M2.4: the authoritative pre-block effects state for the next block. */
+    effects: SeasonEffectsState | null;
   } | null = null;
   /** The compact summaries the live worker already holds (per run). */
   let workerSummaryRunId: string | null = null;
@@ -282,12 +285,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           completedRounds: checkpoint.completedRounds,
           commandIds: new Set(),
           summaries: [],
+          effects: checkpoint.effects,
         };
       }
       runState.revision = checkpoint.revision + 1;
       runState.completedRounds = checkpoint.completedRounds;
       runState.commandIds.add(state.commandId);
       runState.summaries = [...runState.summaries, ...checkpoint.gameSummaries];
+      runState.effects = checkpoint.effects;
       workerSummaryRunId = checkpoint.runId;
       workerSummaryCount = runState.summaries.length;
       emit({ type: 'complete', requestId, checkpoint });
@@ -344,6 +349,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               completedRounds: snapshot.run.cursor.completedRounds,
               commandIds: new Set(snapshot.acceptedBlocks.map((block) => block.commandId)),
               summaries: snapshot.summaries,
+              effects: snapshot.effects,
             };
           }
           const revision = runState.revision;
@@ -414,6 +420,12 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             profileHash: artifacts.profileHash,
             ...(priorSummaries !== undefined ? { priorSummaries } : {}),
             ...(newSummaries !== undefined ? { newSummaries } : {}),
+            // M2.4: the authoritative pre-block effects state rides the full
+            // reset (fresh worker or resume); the delta path keeps the
+            // worker's accumulated effects state.
+            ...(priorSummaries !== undefined && runState.effects !== null
+              ? { priorEffects: runState.effects }
+              : {}),
           };
           // Parse re-builds the payload as plain data (the reactive shell
           // proxies must never cross the structured-clone boundary).

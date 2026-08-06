@@ -2,6 +2,7 @@ import {
   SEASON_BLOCK_TEAM_GAMES,
   SEASON_FINAL_BLOCK_TEAM_GAMES,
   blockRoundRange,
+  type SeasonEffectsState,
   type SeasonGame,
   type SeasonRotation,
   type SeasonUpcomingHumanGame,
@@ -37,6 +38,21 @@ export interface UpcomingGame {
   opponentFranchiseId: string;
 }
 
+/**
+ * M2.4: continuity and fatigue-risk projection for one rostered player under
+ * the pending rotation. Presented as a projection (deterministic workload
+ * model), never as a precise future outcome.
+ */
+export interface FatigueProjection {
+  playerVersionId: string;
+  displayName: string;
+  minutesAfter: number | null;
+  bandNow: string;
+  bandAfterBlock: string;
+  /** Continuity: same role + same minutes as the locked baseline. */
+  continuous: boolean;
+}
+
 export interface LockPreview {
   /** Team games that will lock: 10 for blocks 0-7, 2 for block 8. */
   gamesToLock: number;
@@ -51,6 +67,8 @@ export interface LockPreview {
   changes: RotationChange[];
   /** The human team's games in the upcoming block. */
   upcomingGames: UpcomingGame[];
+  /** M2.4 fatigue-risk + continuity projections for pending starters/closing. */
+  fatigueProjections: FatigueProjection[];
 }
 
 export function gamesToLockForBlock(blockIndex: number): number {
@@ -95,6 +113,11 @@ export function buildLockPreview(input: {
   names: ReadonlyMap<string, string>;
   games: readonly SeasonGame[];
   humanFranchiseId: string;
+  /** M2.4: recorded load + stamina for the projection (null = skip). */
+  fatigue?: {
+    effects: SeasonEffectsState;
+    staminaByVersion: ReadonlyMap<string, number>;
+  } | null;
 }): LockPreview {
   const {
     pendingHumanRotation,
@@ -105,6 +128,7 @@ export function buildLockPreview(input: {
     names,
     games,
     humanFranchiseId,
+    fatigue,
   } = input;
   const changes: RotationChange[] = [];
   const pendingMinutes = new Map(
@@ -136,6 +160,38 @@ export function buildLockPreview(input: {
     }
   }
   changes.sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+  const fatigueProjections: FatigueProjection[] = [];
+  if (fatigue !== null && fatigue !== undefined) {
+    const { effects, staminaByVersion } = fatigue;
+    const projectedIds = [...pendingHumanRotation.starters, ...pendingHumanRotation.closingFive];
+    const projected = new Set(projectedIds);
+    for (const playerVersionId of projected) {
+      const load = effects.playerStates.find((p) => p.playerVersionId === playerVersionId);
+      if (load === undefined) continue;
+      const stamina = staminaByVersion.get(playerVersionId) ?? 70;
+      const minutes = pendingMinutes.get(playerVersionId) ?? 0;
+      const roleBefore = rotationRoleOf(baselineHumanRotation, playerVersionId);
+      const roleAfter = rotationRoleOf(pendingHumanRotation, playerVersionId);
+      const minutesBefore = baselineMinutes.get(playerVersionId) ?? null;
+      const continuous = roleBefore === roleAfter && minutesBefore === minutes;
+      fatigueProjections.push({
+        playerVersionId,
+        displayName: names.get(playerVersionId) ?? playerVersionId,
+        minutesAfter: minutes,
+        bandNow: fatigueBandName(load.fatigueBasisPoints),
+        bandAfterBlock: projectedFatigueBandName(
+          load.fatigueBasisPoints,
+          minutes,
+          stamina,
+          gamesToLockForBlock(blockIndex),
+        ),
+        continuous,
+      });
+    }
+    fatigueProjections.sort((a, b) => a.displayName.localeCompare(b.displayName));
+  }
+
   return {
     gamesToLock: gamesToLockForBlock(blockIndex),
     roundRange: blockRoundRange(blockIndex),
@@ -144,7 +200,30 @@ export function buildLockPreview(input: {
     unchangedSinceLastLock: lastLockedDigest !== null && lastLockedDigest === pendingSetDigest,
     changes,
     upcomingGames: humanUpcomingGames(games, humanFranchiseId, blockIndex),
+    fatigueProjections,
   };
+}
+
+function fatigueBandName(fatigueBasisPoints: number): string {
+  if (fatigueBasisPoints < 1500) return 'Fresh';
+  if (fatigueBasisPoints < 3500) return 'Ready';
+  if (fatigueBasisPoints < 6000) return 'Tired';
+  return 'Heavy';
+}
+
+function projectedFatigueBandName(
+  currentFatigueBp: number,
+  minutesPerGame: number,
+  staminaRating: number,
+  games: number,
+): string {
+  let fatigue = currentFatigueBp;
+  for (let i = 0; i < games; i += 1) {
+    const seconds = minutesPerGame * 60;
+    fatigue += (seconds * 40 * (110 - staminaRating)) / 10_000;
+    fatigue = Math.max(0, Math.round(fatigue * ((4500 - 20 * staminaRating) / 10_000)));
+  }
+  return fatigueBandName(Math.min(10_000, fatigue));
 }
 
 /** Convenience: the full 30-rotation set digest with the human rotation swapped. */

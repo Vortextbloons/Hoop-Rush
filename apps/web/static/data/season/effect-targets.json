@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "season-effect-targets-v1",
+  "mechanismCaps": {
+    "shooterFatiguePp": 2.5,
+    "handlerFatiguePp": 1.8,
+    "defenseFatiguePp": 1.2,
+    "turnoverSecurityPp": 1,
+    "assistConversionPp": 3.5,
+    "helpDefensePp": 0.8
+  },
+  "productionEnvelopes": {
+    "scoringDeltaMax": 0.05,
+    "turnoverRateDeltaMax": 0.1,
+    "assistRateDeltaMax": 0.1
+  },
+  "chemistrySeparationBp": 1000,
+  "cohort": {
+    "seedFrom": 0,
+    "seedTo": 255
+  },
+  "heldOut": {
+    "seedFrom": 256,
+    "seedTo": 319
+  },
+  "measured": {
+    "calibration": {
+      "scoringDeltaMedian": 0,
+      "turnoverDeltaMedian": 0,
+      "assistDeltaMedian": 0.641025641025641,
+      "gamesSimulated": 768,
+      "zeroFailures": true,
+      "determinismFailures": 0
+    },
+    "heldOut": {
+      "scoringDeltaMedian": -0.4419857159583187,
+      "turnoverDeltaMedian": -4.545454545454546,
+      "assistDeltaMedian": 0,
+      "withinEnvelopeShare": 0.96875,
+      "gamesSimulated": 192
+    },
+    "roles": {
+      "tightStarterMedianFatigue": 331,
+      "balancedStarterMedianFatigue": 226,
+      "benchHeavyStarterMedianFatigue": 117,
+      "tightBenchMedianFatigue": 269,
+      "balancedBenchMedianFatigue": 421,
+      "benchHeavyBenchMedianFatigue": 515
+    },
+    "chemistry": {
+      "stableUnitMedianBp": 7957,
+      "shuffledUnitMedianBp": 6948,
+      "separationBp": 1009
+    }
+  },
+  "gates": {
+    "zeroFailures": true,
+    "determinism": true,
+    "productionEnvelopes": true,
+    "heldOutPassShare": true,
+    "rotationOrdering": true,
+    "chemistrySeparation": true,
+    "sensitivityMonotonic": true
+  },
+  "engineVersion": "m3-engine-v9",
+  "gameVersion": "season-game-v3",
+  "gameTargetsVersion": "season-game-targets-v3",
+  "generatedAtIso": "2026-08-06T18:14:31.656Z"
+}

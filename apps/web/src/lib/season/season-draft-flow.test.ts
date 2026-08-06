@@ -4,13 +4,13 @@ import {
   SEASON_DRAFT_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROTATION_VERSION,
-  type SeasonDraftLegacyState,
   type SeasonDraftState,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
 import type { SeasonDraftRepository, StoredSeasonDraft } from '@hoop-rush/persistence';
 import {
   buildSeasonAiAssignments,
+  buildSeasonAiPools,
   buildSeasonDraftCatalog,
   buildSeasonLeague,
   buildSeasonRotation,
@@ -55,7 +55,7 @@ function fakeGeneration(): SeasonLeagueGenerationResult {
     ),
   );
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     seed,
     aiVersion: SEASON_AI_VERSION,
     rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
@@ -69,6 +69,7 @@ function fakeGeneration(): SeasonLeagueGenerationResult {
     ),
     rotations,
     aiAssignments,
+    aiPools: buildSeasonAiPools(aiAssignments, 'lakers'),
     evaluations: buildFixtureEvaluations(rosters, aiAssignments),
     diagnostics: {
       seed,
@@ -263,62 +264,17 @@ describe('SeasonDraftFlow', () => {
     expect(draft.status).toBe('complete');
     expect(second.generation).not.toBeNull();
     expect(second.phase).toBe('complete');
-    expect(second.legacyStored).toBe(false);
   });
 
-  it('detects a stored legacy season-draft-v1 record and never loads it as playable', async () => {
+  it('loads a stored current record directly as the playable draft', async () => {
     const repo = new InMemorySeasonDraftRepository();
-    const legacyState: SeasonDraftLegacyState = {
-      schemaVersion: 1,
-      draftVersion: 'season-draft-v1',
-      runId: 'legacy-run-1',
-      rootSeed: ROOT_SEED,
-      league: LEAGUE,
-      catalogVersion: 'season-draft-v1',
-      participants: [{ participantId: SOLO_PARTICIPANT_ID, franchiseId: 'lakers' }],
-      firstPickParticipantId: SOLO_PARTICIPANT_ID,
-      round: 3,
-      currentTurnParticipantId: SOLO_PARTICIPANT_ID,
-      status: 'drafting',
-      revision: 5,
-      currentReveal: {
-        participantId: SOLO_PARTICIPANT_ID,
-        round: 3,
-        pickOrdinal: 3,
-        attempts: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
-      },
-      rolls: [{ franchiseId: 'lakers', eraId: '1990s', attemptIndex: 0, usable: true }],
-      claims: [],
-      picks: [
-        {
-          participantId: SOLO_PARTICIPANT_ID,
-          round: 1,
-          pickOrdinal: 1,
-          playerVersionId: `pv-${'0'.repeat(32)}`,
-          franchiseId: 'lakers',
-          eraId: '1990s',
-          rollAttempts: 1,
-        },
-      ],
-      commandLog: [],
-    };
-    await repo.saveSeasonDraft({
-      recordId: 'season-draft',
-      saveSchemaVersion: 1,
-      draft: legacyState,
-      generation: null,
-    });
     const flow = makeFlow(repo);
-    const found = await flow.load();
+    await flow.create({ rootSeed: ROOT_SEED, league: LEAGUE });
+    const reloaded = makeFlow(repo);
+    const found = await reloaded.load();
     expect(found).toBe(true);
-    expect(flow.legacyStored).toBe(true);
-    expect(flow.draft).toBeNull();
-    expect(flow.phase).toBe('idle');
-    // The legacy record survives until the explicit discard.
-    expect(await repo.loadSeasonDraft()).not.toBeNull();
-    await flow.discardLegacy();
-    expect(flow.legacyStored).toBe(false);
-    expect(await repo.loadSeasonDraft()).toBeNull();
+    expect(reloaded.draft).not.toBeNull();
+    expect(reloaded.draft?.status).toBe('drafting');
   });
 
   it('clears the persisted draft on discard', async () => {

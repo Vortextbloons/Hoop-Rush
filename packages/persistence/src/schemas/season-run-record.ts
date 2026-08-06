@@ -25,15 +25,14 @@ import {
  *
  * ## Stored save schema versions
  *
- * - v2 (M2.4): the current family. The checkpoint delta carries the
- *   authoritative M2.4 effects state (`effects`: player load + pair
- *   chemistry), committed atomically with the block checkpoint.
- * - v1 (M2.3): the legacy family for schema-4 runs. v1 rows are NOT
- *   migrated: they are read leniently here (only the identity facts the
- *   typed incompatibility detection needs), preserved byte-for-byte in
- *   IndexedDB, and removed only through the repository's
- *   `clearSeasonRun(runId)` after explicit user confirmation on the discard
- *   screen.
+ * - v3 (M2.4 roster-generation-v2): the current and only read schema. The
+ *   row wraps a schema-6 run snapshot (frozen roster-generation-v2 /
+ *   season-ai-v2 / roster-targets-v2 versions and the recorded `aiPools`)
+ *   and carries the authoritative M2.4 effects state (`effects`: player
+ *   load + pair chemistry) committed atomically with the block checkpoint.
+ * - v2 (M2.4 schema-5 runs) and v1 (M2.3 schema-4 runs) are development
+ *   rows: they are never read or migrated, and the repository auto-clears
+ *   them at load. There is no recovery record and no discard screen.
  *
  * ## Why the checkpoint does not persist the 1,230 scheduled game records
  *
@@ -65,13 +64,13 @@ import {
 export const SEASON_RUN_RECORD_ID = 'season-run';
 
 /**
- * Shared fields of the current stored checkpoint row: frozen snapshot minus
- * the scheduled game records plus the authoritative current-boundary facts.
- * `saveSchemaVersion` and the M2.4 `effects` state are added by the v2
- * variant; the v1 legacy variant reads only identity facts.
+ * The single stored Season Run checkpoint row (save schema v3, M2.4
+ * roster-generation-v2): frozen snapshot minus the scheduled game records
+ * plus the authoritative current-boundary facts and the effects state.
  */
-const seasonRunRecordFieldsSchema = z.object({
+export const seasonRunRecordFieldsSchema = z.object({
   recordId: z.literal(SEASON_RUN_RECORD_ID),
+  saveSchemaVersion: z.literal(3),
   /** Promotion-time snapshot; the 1,230 scheduled game records are omitted. */
   run: seasonRunSchema.omit({ games: true }),
   /** Rounds completed at the last accepted boundary. */
@@ -92,53 +91,17 @@ const seasonRunRecordFieldsSchema = z.object({
   playerAggregates: z.array(seasonPlayerAggregateSchema).length(SEASON_TEAM_COUNT * 10),
   /** Recap of the last accepted block; null while no block was accepted. */
   recap: seasonBlockRecapSchema.nullable(),
-  /** Written by the adapter, never by domain logic. */
-  updatedAtIso: z.iso.datetime().optional(),
-});
-
-/**
- * Legacy v1 stored row (M2.3, schema-4 runs). Read leniently and minimally:
- * the full snapshot portion is NOT validated because the live
- * `seasonRunSchema` freezes schema 5 and would reject a stored schema-4
- * snapshot. These rows are never loaded into app state — they are detected
- * through the typed `SeasonRunIncompatibleError` / `loadActiveRunIncompatible`
- * path and removed only by explicit `clearSeasonRun(runId)` after user
- * confirmation — so only the identity facts that detection and clearing need
- * are read. Extra fields (standings, aggregates, recap, ...) are left
- * untouched byte-for-byte in IndexedDB.
- */
-export const storedSeasonRunRecordV1Schema = z.object({
-  recordId: z.literal(SEASON_RUN_RECORD_ID),
-  saveSchemaVersion: z.literal(1),
-  run: z.object({
-    runId: z.string().min(1).max(64),
-    schemaVersion: z.number().int(),
-    versions: z.object({
-      runSchemaVersion: z.number().int(),
-    }),
-  }),
-});
-export type StoredSeasonRunRecordV1 = z.infer<typeof storedSeasonRunRecordV1Schema>;
-
-/** Current v2 stored checkpoint row (M2.4): adds the effects state. */
-const storedSeasonRunRecordV2Schema = seasonRunRecordFieldsSchema.extend({
-  saveSchemaVersion: z.literal(2),
   /**
    * Authoritative M2.4 effects state at the last accepted boundary: 300
    * player load states and 1,350 canonical pair chemistry states.
    */
   effects: seasonEffectsStateSchema,
+  /** Written by the adapter, never by domain logic. */
+  updatedAtIso: z.iso.datetime().optional(),
 });
-export type StoredSeasonRunRecordV2 = z.infer<typeof storedSeasonRunRecordV2Schema>;
 
-/**
- * Stored Season Run checkpoint record: current v2 or legacy v1 (typed
- * incompatibility detection and explicit discard only).
- */
-export const storedSeasonRunRecordSchema = z.discriminatedUnion('saveSchemaVersion', [
-  storedSeasonRunRecordV2Schema,
-  storedSeasonRunRecordV1Schema,
-]);
+/** The current stored Season Run checkpoint row (save schema v3). */
+export const storedSeasonRunRecordSchema = seasonRunRecordFieldsSchema;
 export type StoredSeasonRunRecord = z.infer<typeof storedSeasonRunRecordSchema>;
 
 /**

@@ -466,13 +466,19 @@ export const seasonDraftReproduceReportSchema = z.object({
 });
 export type SeasonDraftReproduceReport = z.infer<typeof seasonDraftReproduceReportSchema>;
 
-/** Season Run AI roster generation report (M2.1). */
+/** Season Run AI roster generation report (M2.1, M2.4 roster-generation-v2). */
 export const seasonRostersGenerateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season rosters generate'),
   seed: z.string().regex(/^[0-9a-f]{16,64}$/),
   teams: z.number().int().positive(),
   ownershipRows: z.number().int().positive(),
+  /** M2.4: recorded AI pools (29 solo, 28 duo). */
+  pools: z.number().int().nonnegative(),
+  /** M2.4: total matched anchors across the AI pools. */
+  anchorsTotal: z.number().int().nonnegative(),
+  /** M2.4: total pool repairs across the AI pools. */
+  repairCount: z.number().int().nonnegative(),
   digest: z.string().regex(/^[0-9a-f]{32}$/),
   diagnostics: z.object({
     teamsGenerated: z.number().int().nonnegative(),
@@ -486,18 +492,30 @@ export const seasonRostersGenerateReportSchema = z.object({
 });
 export type SeasonRostersGenerateReport = z.infer<typeof seasonRostersGenerateReportSchema>;
 
-/** Season Run roster audit report (M2.1). */
+/** Season Run roster audit report (M2.1, M2.4 roster-generation-v2). */
 export const seasonRostersAuditReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season rosters audit'),
   input: z.string().min(1),
   teams: z.number().int().positive(),
   ownershipRows: z.number().int().positive(),
+  /** M2.4: recorded AI pools (29 solo, 28 duo). */
+  pools: z.number().int().nonnegative(),
   quotaFailures: z.number().int().nonnegative(),
   identityFailures: z.number().int().nonnegative(),
+  /** M2.4: selected-roster legality failures (roster legality + ownership). */
+  selectionFailures: z.number().int().nonnegative(),
   legalityFailures: z.number().int().nonnegative(),
   roleCoverageFailures: z.number().int().nonnegative(),
   rotationFailures: z.number().int().nonnegative(),
+  /** M2.4: pool-legality failures (pool size, selections, anchor counts). */
+  poolFailures: z.number().int().nonnegative(),
+  /** M2.4: anchor-record failures (priority role, recorded score/threshold). */
+  anchorFailures: z.number().int().nonnegative(),
+  /** M2.4: anchor tier failures (anchor not elite in its qualifying role). */
+  tierFailures: z.number().int().nonnegative(),
+  /** M2.4: exact-version duplicates across pools or across rosters. */
+  exclusivityFailures: z.number().int().nonnegative(),
   versionFailures: z.number().int().nonnegative(),
   digestVerified: z.boolean(),
   auditFailures: z.number().int().nonnegative(),
@@ -514,7 +532,14 @@ const distributionEntrySchema = z.object({
   sample: z.number().int().nonnegative(),
 });
 
-/** Season Run AI roster calibration report (M2.1). */
+/** Band distribution entry with the M2.4 tier shares. */
+const bandDistributionEntrySchema = distributionEntrySchema.extend({
+  eliteShare: z.number().min(0).max(1),
+  strongShare: z.number().min(0).max(1),
+  usefulShare: z.number().min(0).max(1),
+});
+
+/** Season Run AI roster calibration report (M2.1, M2.4 roster-generation-v2). */
 export const seasonRostersCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season rosters calibrate'),
@@ -525,23 +550,44 @@ export const seasonRostersCalibrateReportSchema = z.object({
   backtrackRate: z.number().min(0).max(1),
   durationMs: z.number().nonnegative(),
   bands: z.object({
-    contender: distributionEntrySchema,
-    playoff: distributionEntrySchema,
-    average: distributionEntrySchema,
-    weaker: distributionEntrySchema,
+    contender: bandDistributionEntrySchema,
+    playoff: bandDistributionEntrySchema,
+    average: bandDistributionEntrySchema,
+    weaker: bandDistributionEntrySchema,
   }),
   identities: z.record(z.string().min(1), distributionEntrySchema),
+  /** M2.4 measured cohort facts (mirror the targets artifact `measured`). */
+  measured: z.object({
+    anchorFulfillment: z.number().min(0).max(1),
+    extraEliteRate: z.number().min(0).max(1),
+    /** Band-probability-weighted expectation of the extra-elite rate. */
+    extraEliteExpected: z.number().min(0).max(1),
+    superTeamIncidence: z.number().min(0).max(1),
+    poolLegalityFailures: z.number().int().nonnegative(),
+    selectionFailures: z.number().int().nonnegative(),
+    generationFailures: z.number().int().nonnegative(),
+    orderInvarianceFailures: z.number().int().nonnegative(),
+  }),
   gates: z.object({
     orderedBandMedians: z.boolean(),
     quotas: z.boolean(),
     roleCoverage: z.boolean(),
     identities: z.boolean(),
-    zeroIllegal: z.boolean(),
+    poolLegality: z.boolean(),
+    selectionLegality: z.boolean(),
+    failureRate: z.boolean(),
+    minBandSeparation: z.boolean(),
+    anchorFulfillment: z.boolean(),
+    extraEliteWithinTolerance: z.boolean(),
+    superTeamIncidence: z.boolean(),
+    orderInvariance: z.boolean(),
     heldOutPassShare: z.number().min(0).max(1),
     heldOutPass: z.boolean(),
   }),
   targetsWritten: z.boolean(),
   targetsPath: z.string().nullable(),
+  /** True in --validate mode (the artifact is never rewritten). */
+  validateOnly: z.boolean(),
   pass: z.boolean(),
 });
 export type SeasonRostersCalibrateReport = z.infer<typeof seasonRostersCalibrateReportSchema>;
@@ -869,3 +915,93 @@ export const seasonHomeCourtCalibrateReportSchema = z.object({
   pass: z.boolean(),
 });
 export type SeasonHomeCourtCalibrateReport = z.infer<typeof seasonHomeCourtCalibrateReportSchema>;
+
+/** M2.4 `season effects sensitivity` report payload. */
+export const seasonEffectsSensitivityReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season effects sensitivity'),
+  fixtureId: z.string().min(1),
+  fatigueLevels: z.array(z.number().int().nonnegative()),
+  rows: z.array(
+    z.object({
+      fatigueBp: z.number().int().nonnegative(),
+      shooterDelta: z.number(),
+      handlerDelta: z.number(),
+      defenseDelta: z.number(),
+      securityDelta: z.number(),
+      assistDelta: z.number(),
+      helpDelta: z.number(),
+    }),
+  ),
+  durationMs: z.number().nonnegative(),
+});
+export type SeasonEffectsSensitivityReport = z.infer<typeof seasonEffectsSensitivityReportSchema>;
+
+/** M2.4 `season effects distribution` report payload. */
+export const seasonEffectsDistributionReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season effects distribution'),
+  fixtureIds: z.array(z.string().min(1)),
+  seedFrom: z.number().int().nonnegative(),
+  seedTo: z.number().int().nonnegative(),
+  gamesSimulated: z.number().int().nonnegative(),
+  completedGames: z.number().int().nonnegative(),
+  scoringDeltaMedian: z.number(),
+  turnoverDeltaMedian: z.number(),
+  assistDeltaMedian: z.number(),
+  scoringWithinEnvelope: z.number().min(0).max(1),
+  turnoverWithinEnvelope: z.number().min(0).max(1),
+  assistWithinEnvelope: z.number().min(0).max(1),
+  checkFailures: z.number().int().nonnegative(),
+  determinismFailures: z.number().int().nonnegative(),
+  durationMs: z.number().nonnegative(),
+});
+export type SeasonEffectsDistributionReport = z.infer<typeof seasonEffectsDistributionReportSchema>;
+
+/** M2.4 `season effects roles` report payload. */
+export const seasonEffectsRolesReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season effects roles'),
+  rows: z.array(
+    z.object({
+      fixtureId: z.string().min(1),
+      starterMedianFatigue: z.number().int().nonnegative(),
+      benchMedianFatigue: z.number().int().nonnegative(),
+    }),
+  ),
+  starterOrderingPass: z.boolean(),
+  benchOrderingPass: z.boolean(),
+  durationMs: z.number().nonnegative(),
+});
+export type SeasonEffectsRolesReport = z.infer<typeof seasonEffectsRolesReportSchema>;
+
+/** M2.4 `season effects calibrate` report payload. */
+export const seasonEffectsCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season effects calibrate'),
+  targetsVersion: z.literal('season-effect-targets-v1'),
+  calibrationSeedCount: z.number().int().nonnegative(),
+  validationSeedCount: z.number().int().nonnegative(),
+  calibrationGames: z.number().int().nonnegative(),
+  heldOutGames: z.number().int().nonnegative(),
+  calibrationScoringDeltaMedian: z.number(),
+  calibrationTurnoverDeltaMedian: z.number(),
+  calibrationAssistDeltaMedian: z.number(),
+  heldOutWithinEnvelopeShare: z.number().min(0).max(1),
+  stableUnitMedianBp: z.number().int().nonnegative(),
+  shuffledUnitMedianBp: z.number().int().nonnegative(),
+  chemistrySeparationBp: z.number().int(),
+  gates: z.object({
+    zeroFailures: z.boolean(),
+    determinism: z.boolean(),
+    productionEnvelopes: z.boolean(),
+    heldOutPassShare: z.boolean(),
+    rotationOrdering: z.boolean(),
+    chemistrySeparation: z.boolean(),
+    sensitivityMonotonic: z.boolean(),
+  }),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  durationMs: z.number().nonnegative(),
+});
+export type SeasonEffectsCalibrateReport = z.infer<typeof seasonEffectsCalibrateReportSchema>;

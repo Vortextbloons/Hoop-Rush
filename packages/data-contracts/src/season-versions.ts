@@ -8,27 +8,32 @@
  */
 
 /**
- * Season Run persistence snapshot schema layout. Bumped to 5 by M2.4: the
- * run freezes the stamina, chemistry, and effect-targets material versions
- * and the candidate checkpoint carries the 300-player / 1,350-pair effects
- * state; schema 4 runs cannot continue (no effects state exists for them).
- * Bumped to 4 by M2.3: the run now freezes the block, game-summary,
- * aggregates, recap, leaders, home-court, and checkpoint material versions;
- * the Season game contract moved to season-game-v2 (home court) with
- * recalibrated season-game-targets-v2. Bumped to 3 by M2.2 (rotation-planner,
- * Season-game, and Season-game-targets material versions). Bumped to 2 by
- * M2.1 (draft facts, AI assignments, rotations, audit, new material
- * versions). The M2.0 schema v1 data is development scaffolding, not a
- * migration target.
+ * Season Run persistence snapshot schema layout. Bumped to 6 by M2.4
+ * roster-generation-v2: the run freezes the roster-generation-v2,
+ * season-ai-v2, and roster-targets-v2 material versions and carries the
+ * generated `aiPools` (one 20-player pool per AI franchise: 29 solo, 28
+ * duo); schema 5 runs cannot continue (their pools and targets do not
+ * exist). Bumped to 5 by M2.4: the run froze the stamina, chemistry, and
+ * effect-targets material versions and the candidate checkpoint carried
+ * the 300-player / 1,350-pair effects state; schema 4 runs cannot continue
+ * (no effects state exists for them). Bumped to 4 by M2.3: the run froze
+ * the block, game-summary, aggregates, recap, leaders, home-court, and
+ * checkpoint material versions; the Season game contract moved to
+ * season-game-v2 (home court) with recalibrated season-game-targets-v2.
+ * Bumped to 3 by M2.2 (rotation-planner, Season-game, and Season-game-
+ * targets material versions). Bumped to 2 by M2.1 (draft facts, AI
+ * assignments, rotations, audit, new material versions). The M2.0 schema
+ * v1 data is development scaffolding, not a migration target.
  *
- * Schema layout 5 remains the read schema after the M2.3.5 draft overhaul:
+ * Schema layout 5 remained the read schema after the M2.3.5 draft overhaul:
  * the `draft` facts and the `versions.draftVersion` field widened to a
  * discriminated union so legacy M2.3 runs (franchise-era draft facts,
  * `season-draft-v1`) and new runs (global eight-card offer facts,
- * `season-draft-v2`) both validate as schema 5. The M2.3.5 change records
+ * `season-draft-v2`) both validated as schema 5. The M2.3.5 change recorded
  * itself through the draft versions, never through a snapshot layout bump.
+ * Schema 6 continues to accept both draft-fact variants.
  */
-export const SEASON_RUN_SCHEMA_VERSION = 5;
+export const SEASON_RUN_SCHEMA_VERSION = 6;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -96,11 +101,25 @@ export const SEASON_OFFER_TARGETS_VERSION = 'offer-targets-v1';
 /** Pure ten-player Season Run roster legality rule set (game minimums). */
 export const SEASON_ROSTER_RULES_VERSION = 'season-roster-v1';
 
-/** Deterministic AI league roster generation and repair/backtracking rules. */
-export const SEASON_ROSTER_GENERATION_VERSION = 'roster-generation-v1';
+/**
+ * M2.4 roster-generation-v2 (replaces roster-generation-v1): deterministic
+ * AI league generation through per-franchise 20-player pools — band-scoped
+ * strength caps, anchor matching from canonical percentile thresholds,
+ * pool repair, and constrained ten-player roster selection with
+ * repair/backtracking diagnostics. See `season-ai.ts` for the recorded
+ * pool/selection facts and `seasonRosterTargetsSchema` (roster-targets-v2)
+ * for the frozen calibration policy and gates.
+ */
+export const SEASON_ROSTER_GENERATION_VERSION = 'roster-generation-v2';
 
-/** AI decision identities, strength bands, and roster evaluation weights. */
-export const SEASON_AI_VERSION = 'season-ai-v1';
+/**
+ * M2.4 season-ai-v2 (replaces season-ai-v1): AI decision identities,
+ * strength bands, and roster evaluation weights under roster-generation-v2.
+ * Decision identities alter documented scoring weights only; franchise
+ * identity never changes ratings, odds, or player eligibility, and Overall
+ * has no pick authority (it appears only as a report field).
+ */
+export const SEASON_AI_VERSION = 'season-ai-v2';
 
 /**
  * M2.2 rotation contract (spec/2.0/04, season-rotation-v2). Same structural
@@ -139,8 +158,16 @@ export const SEASON_GAME_VERSION = 'season-game-v3';
  */
 export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v3';
 
-/** Frozen calibration cohort targets for AI roster strength and coverage. */
-export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v1';
+/**
+ * M2.4 frozen `roster-targets-v2` calibration artifact (replaces
+ * roster-targets-v1): the band quotas, guaranteed anchors, extra-elite roll
+ * probabilities, tier ranges, identity priority roles, coverage threshold,
+ * completion targets, pool/roster sizes, percentile tiers, pool score caps,
+ * strength-outlier caps, node budgets, verification gates, and measured
+ * band/identity/incidence facts of roster-generation-v2. See
+ * `seasonRosterTargetsSchema` in season-ai.ts.
+ */
+export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v2';
 
 /**
  * M2.4 pure block simulation pipeline (spec/2.0/02 ten-game blocks,

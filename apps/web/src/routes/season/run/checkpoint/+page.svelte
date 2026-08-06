@@ -3,7 +3,11 @@
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
-  import type { SeasonGameSummary, SeasonRosterEntry } from '@hoop-rush/data-contracts';
+  import type {
+    SeasonGameSummary,
+    SeasonRetainedGameDetail,
+    SeasonRosterEntry,
+  } from '@hoop-rush/data-contracts';
   import { blockRoundRange } from '@hoop-rush/data-contracts';
   import BoxScore from '$lib/components/season/BoxScore.svelte';
   import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
@@ -13,6 +17,7 @@
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { aggregateMechanismEvidence } from '$lib/season/season-effects-view';
   import {
     boxScoreFromSummary,
     deriveBlockRecap,
@@ -35,6 +40,7 @@
 
   let blockSummaries = $state<SeasonGameSummary[]>([]);
   let retainedGameIds = $state<string[]>([]);
+  let blockDetails = $state<SeasonRetainedGameDetail[]>([]);
   let loadError = $state<string | null>(null);
 
   const requestedBlock = $derived.by(() => {
@@ -108,15 +114,17 @@
     let cancelled = false;
     blockSummaries = [];
     retainedGameIds = [];
+    blockDetails = [];
     loadError = null;
     Promise.all([hub.loadBlockSummaries(runId, blockIndex), hub.loadRetainedDetails(runId)])
       .then(([summaries, details]) => {
         if (cancelled) return;
         blockSummaries = summaries;
         const { fromRound, toRound } = blockRoundRange(blockIndex);
-        retainedGameIds = details
-          .filter((detail) => detail.round >= fromRound && detail.round <= toRound)
-          .map((detail) => detail.gameId);
+        blockDetails = details.filter(
+          (detail) => detail.round >= fromRound && detail.round <= toRound,
+        );
+        retainedGameIds = blockDetails.map((detail) => detail.gameId);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -150,6 +158,9 @@
       humanFranchiseId,
     });
   });
+
+  /** M2.4: aggregated mechanism evidence of the block's human games. */
+  const effectsEvidence = $derived(aggregateMechanismEvidence(blockDetails));
 
   function boxFor(summary: SeasonGameSummary) {
     if (!humanFranchiseId) return null;
@@ -263,6 +274,7 @@
         {manifest}
         faces={shell.facesByVersion}
         {rosterByVersion}
+        {effectsEvidence}
       />
 
       {#if humanGames.length > 0}

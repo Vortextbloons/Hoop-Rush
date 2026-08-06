@@ -42,6 +42,7 @@ import {
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
 import {
   seasonAiAssignmentSchema,
+  seasonAiPoolSchema,
   seasonGenerationDiagnosticsSchema,
   seasonRosterEvaluationSchema,
 } from './season-ai.ts';
@@ -51,16 +52,20 @@ import { seasonRotationSchema } from './season-rotation.ts';
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
  * validated record covers the frozen league, ten-player rosters, ownership,
  * schedule reference, all scheduled game identities, the block cursor,
- * postseason state, and — since schema version 5 (M2.4) — the stamina,
- * chemistry, and effect-targets material versions; schema version 4 (M2.3)
- * added the frozen block, summary, aggregates, recap, leaders, home-court,
- * and checkpoint material versions; schema version 3 (M2.2) added the
- * rotation-planner, Season-game, and Season-game-targets material versions;
- * schema version 2 (M2.1) added the completed draft facts, AI assignments,
- * generated rotations, and the generation audit summary. Completed game
- * facts live in per-block compact summary rows (season-game-summary-v2), not
- * in this snapshot's scheduled `games` array; the engine reconstructs
- * finalized game records from the schedule and summaries on demand.
+ * postseason state, and — since schema version 6 (M2.4 roster-generation-v2)
+ * — the frozen roster-generation-v2/season-ai-v2/roster-targets-v2 material
+ * versions and the recorded `aiPools` (one 20-player pool per AI franchise:
+ * 29 solo, 28 duo; human franchises get none). Schema version 5 (M2.4)
+ * added the stamina, chemistry, and effect-targets material versions;
+ * schema version 4 (M2.3) added the frozen block, summary, aggregates,
+ * recap, leaders, home-court, and checkpoint material versions; schema
+ * version 3 (M2.2) added the rotation-planner, Season-game, and
+ * Season-game-targets material versions; schema version 2 (M2.1) added the
+ * completed draft facts, AI assignments, generated rotations, and the
+ * generation audit summary. Completed game facts live in per-block compact
+ * summary rows (season-game-summary-v2), not in this snapshot's scheduled
+ * `games` array; the engine reconstructs finalized game records from the
+ * schedule and summaries on demand.
  */
 
 export {
@@ -241,6 +246,8 @@ export const seasonRunSchema = z.object({
   draft: seasonDraftFactsSchema,
   /** M2.1: band + identity assignment for every franchise (30 rows). */
   aiAssignments: z.array(seasonAiAssignmentSchema).length(SEASON_TEAM_COUNT),
+  /** M2.4 roster-generation-v2: one pool per AI franchise (29 solo, 28 duo). */
+  aiPools: z.array(seasonAiPoolSchema).min(28).max(29),
   /** M2.1: one legal rotation per franchise (30 rows). */
   rotations: z.array(seasonRotationSchema).length(SEASON_TEAM_COUNT),
   /** M2.1: generation audit summary (digest, diagnostics, versions). */
@@ -255,8 +262,11 @@ export type SeasonRun = z.infer<typeof seasonRunSchema>;
  * (spec/2.0/07): identity, cursor, league, rosters, locked rotations, and
  * versions. The worker wire carries only this context; the scheduled `games`
  * array, `standings`, `draft`, `ownership`, `postseason`, `aiAssignments`,
- * `evaluations`, and `generationAudit` stay in the persisted snapshot and
- * never cross the worker boundary. A full `SeasonRun` satisfies this shape.
+ * `aiPools`, `evaluations`, and `generationAudit` stay in the persisted
+ * snapshot and never cross the worker boundary. `aiPools` in particular are
+ * persistence-only: simulation consumes the final rosters, never the pools,
+ * so this context deliberately does not gain an `aiPools` field. A full
+ * `SeasonRun` satisfies this shape.
  */
 export const seasonBlockRunContextSchema = z.object({
   schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),

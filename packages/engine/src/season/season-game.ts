@@ -6,14 +6,18 @@
   SeasonGameSimulationResult,
   SeasonGameSideResult,
   SeasonGameTeamInput,
+  SeasonGameEffectsTransition,
+  SeasonPlayerLoadState,
   SeasonRemoval,
   SeasonRemovalEvent,
   SeasonRotation,
   SeasonRotationDeviation,
   SeasonRotationDeviationReason,
+  SeasonStaminaInput,
   SeasonSubstitution,
   SeasonSubstitutionReason,
   SeasonUnitStint,
+  SeasonEffectsState,
 } from '@hoop-rush/data-contracts';
 import type { Position, SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.ts';
@@ -34,6 +38,7 @@ import {
   type PlannerRotationContext,
 } from './rotation-planner.ts';
 import { seasonHomeCourtMechanisms } from './home-court.ts';
+import { createSeasonEffectsBuffer, type SeasonEffectsBuffer } from './effects.ts';
 
 /**
  * M2.2 Season Run game controller (spec/2.0/04, season-game-v1). Orchestrates
@@ -135,6 +140,61 @@ export function simulateSeasonGame(
   const seam = options.seam ?? defaultSeasonGameSeam(input);
   const controller = new SeasonGameController(input, context, seam);
   return controller.run();
+}
+
+/**
+ * Simulates one Season game with the M2.4 stamina/chemistry effects
+ * (season-stamina-v1 + season-chemistry-v1). Identical flow to
+ * `simulateSeasonGame` plus the per-game effects accumulation; returns the
+ * result and the explicit effects transition (pregame/postgame load states,
+ * pair increments, and mechanism evidence). `state` is the carried league
+ * effects state; every rostered player of both sides must carry a stamina
+ * profile (absence is a typed error). The neutral zero profile never reaches
+ * this entry point: Classic and neutral Season games route through
+ * `simulateSeasonGame` and stay byte-identical to M2.3.
+ */
+export function simulateSeasonGameWithEffects(
+  input: SeasonGameSimulationInput,
+  context: EngineContext,
+  state: SeasonEffectsState,
+  options: { seam?: SeasonGameAvailabilitySeam } = {},
+): { result: SeasonGameSimulationResult; transition: SeasonGameEffectsTransition } {
+  const seam = options.seam ?? defaultSeasonGameSeam(input);
+  const homeStamina = new Map<string, SeasonStaminaInput>();
+  for (const player of input.home.players) {
+    if (player.stamina === undefined) {
+      throw new Error(
+        `season effects: home player ${player.playerVersionId} has no stamina profile`,
+      );
+    }
+    homeStamina.set(player.playerVersionId, player.stamina);
+  }
+  const awayStamina = new Map<string, SeasonStaminaInput>();
+  for (const player of input.away.players) {
+    if (player.stamina === undefined) {
+      throw new Error(
+        `season effects: away player ${player.playerVersionId} has no stamina profile`,
+      );
+    }
+    awayStamina.set(player.playerVersionId, player.stamina);
+  }
+  const buffer = createSeasonEffectsBuffer(state, homeStamina, awayStamina);
+  const controller = new SeasonGameController(input, context, seam, {
+    buffer,
+    pregamePlayerStates: state.playerStates,
+  });
+  const result = controller.run();
+  const transition = controller.effectsTransition;
+  if (transition === null) {
+    throw new Error('season effects: controller produced no transition');
+  }
+  return { result, transition };
+}
+
+/** Effects mode bundle for the game controller (M2.4). */
+export interface SeasonGameEffectsMode {
+  buffer: SeasonEffectsBuffer;
+  pregamePlayerStates: readonly SeasonPlayerLoadState[];
 } /** Per-side controller state: roster, rotation facts, unit, events, stints. */
 class SideState {
   readonly side: 'home' | 'away';
@@ -235,16 +295,20 @@ class SeasonGameController {
   private readonly home: SideState;
   private readonly away: SideState;
   private readonly removalQueue: SeasonRemoval[];
+  private readonly effectsMode: SeasonGameEffectsMode | null;
   private offense: SideIndex = 0;
   private secondsRemaining = REGULATION_PERIOD_SECONDS;
   private period = 1;
   /** Display clock of the current boundary (integer; 0 at period ends). */
   private boundaryClock = 0;
+  /** Produced once per game by the effects-mode exit path. */
+  effectsTransition: SeasonGameEffectsTransition | null = null;
 
   constructor(
     input: SeasonGameSimulationInput,
     context: EngineContext,
     seam: SeasonGameAvailabilitySeam,
+    effectsMode: SeasonGameEffectsMode | null = null,
   ) {
     this.input = input;
     this.context = context;
@@ -266,6 +330,7 @@ class SeasonGameController {
         players: this.away.simPlayers.slice(0, 5),
       },
     ];
+    this.effectsMode = effectsMode;
     this.tripContext = createTripContext(
       this.rng,
       this.recorder,
@@ -273,6 +338,7 @@ class SeasonGameController {
       this.profile,
       placeholder,
       seasonHomeCourtMechanisms(input.homeCourt),
+      effectsMode?.buffer.hook,
     );
     this.removalQueue = [...seam.removals].sort((a, b) => {
       const byPeriod = a.period - b.period;
@@ -285,7 +351,7 @@ class SeasonGameController {
 
   run(): SeasonGameSimulationResult {
     const tipoffForfeit = this.tipoff();
-    if (tipoffForfeit !== null) return tipoffForfeit;
+    if (tipoffForfeit !== null) return this.exitWithEffects(tipoffForfeit);
 
     for (this.period = 1; this.period <= MAX_PERIODS; this.period += 1) {
       if (this.period > 1) {
@@ -298,6 +364,8 @@ class SeasonGameController {
           this.period <= 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS;
         this.state.periodIndex = this.period - 1;
         this.state.periodFouls = [0, 0];
+        // M2.4: halftime recovery fires exactly once between periods 2 and 3.
+        if (this.period === 3) this.effectsMode?.buffer.hook.halftime();
       }
       this.home.resetCheckpoints();
       this.away.resetCheckpoints();
@@ -305,14 +373,33 @@ class SeasonGameController {
       while (this.secondsRemaining > 0) {
         this.state.secondsRemaining = this.secondsRemaining;
         const trip = this.driveOneTrip();
-        if (trip.forfeit !== null) return trip.forfeit;
+        if (trip.forfeit !== null) return this.exitWithEffects(trip.forfeit);
         this.secondsRemaining = this.state.secondsRemaining;
         if (trip.step.ended) this.offense = (1 - this.offense) as SideIndex;
         if (trip.step.periodEnded) break;
       }
     }
 
-    return this.buildResult();
+    return this.exitWithEffects(this.buildResult());
+  }
+
+  /** Finishes the effects buffer exactly once and attaches the transition. */
+  private exitWithEffects(result: SeasonGameSimulationResult): SeasonGameSimulationResult {
+    const effects = this.effectsMode;
+    if (effects !== null && this.effectsTransition === null) {
+      const finished = effects.buffer.finishGame(
+        this.home.regulationSeconds,
+        this.away.regulationSeconds,
+      );
+      this.effectsTransition = {
+        schemaVersion: 1,
+        pregamePlayerStates: [...effects.pregamePlayerStates],
+        postgamePlayerStates: finished.postgamePlayerStates,
+        pairIncrements: finished.pairIncrements,
+        evidence: finished.evidence,
+      };
+    }
+    return result;
   }
 
   /** Tipoff: removals due at (1, 720), planner initial units, forfeits. */
@@ -620,6 +707,9 @@ class SeasonGameController {
       rosterIndices.push(rosterIndex);
     }
     this.recorder.setActiveFive(side.sideIndex, rosterIndices);
+    // M2.4: the effects hook needs the active units for unit chemistry and
+    // defensive-unit fatigue (consumes no RNG; no-op when absent).
+    this.effectsMode?.buffer.hook.setActiveUnits(this.home.unit, this.away.unit);
   }
 
   private buildUnitTeam(side: SideState): SimulationTeam {
@@ -665,6 +755,9 @@ class SeasonGameController {
       }
       this.recorder.playSeconds(side.sideIndex, rosterIndex, duration);
     }
+    // M2.4: on-court accumulation and off-court recovery for the interval
+    // (consumes no RNG; no-op when the hook is absent).
+    this.effectsMode?.buffer.hook.recordStintSeconds(side.sideIndex, duration, stint.unit);
     stint.cursor = clock;
   }
 

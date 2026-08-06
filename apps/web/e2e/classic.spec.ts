@@ -456,4 +456,39 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
     await expect(page.getByRole('link', { name: /Classic · Ratings/ })).toBeVisible();
     await expect(page.getByRole('link', { name: /five drafted players · seed/ })).toBeVisible();
   });
+
+  test('mobile: the roll overlay, slot picker, and lineup fit without horizontal overflow', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/classic');
+    await expect(page.getByRole('heading', { name: 'Five draft rounds' })).toBeVisible();
+    await page.getByRole('button', { name: 'Start Ratings draft' }).click();
+
+    await expect(page.locator('.roll-overlay')).toBeVisible();
+    await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+
+    const pool = page.locator('ul li button:not([disabled])');
+    await pool.first().click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /^Place / })
+      .first()
+      .click();
+
+    await expect(page.locator('.roll-overlay')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.locator('.roll-overlay')).not.toBeVisible({ timeout: 5000 });
+
+    await page.getByRole('link', { name: 'Your five' }).click();
+    await expect(page.getByRole('heading', { name: 'Your five' })).toBeVisible();
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(overflow).toBe(false);
+  });
 });

@@ -166,3 +166,111 @@ export function overallReportOf(members: readonly SeasonScoreMember[]): number |
   if (withOverall.length === 0) return null;
   return withOverall.reduce((sum, member) => sum + (member.overall ?? 0), 0) / withOverall.length;
 }
+
+/**
+ * Roster-generation-v2 tiering (M2.4). Percentile tiers are nearest-rank
+ * thresholds computed per role over the canonically sorted (playerVersionId
+ * ascending) non-human candidate population. Tiers are pure functions of the
+ * possession-input role scores; Overall never participates.
+ */
+
+/** The four percentile tiers in descending strength order. */
+export const TIER_ORDER = ['elite', 'strong', 'useful', 'depth'] as const;
+export type PercentileTier = (typeof TIER_ORDER)[number];
+
+/** Fixed percentiles behind each tier (p90 / p75 / p50 of a role). */
+export const TIER_PERCENTILES: Record<'elite' | 'strong' | 'useful', number> = {
+  elite: 0.9,
+  strong: 0.75,
+  useful: 0.5,
+};
+
+/** The three role-score thresholds that separate the four tiers. */
+export interface RoleThresholds {
+  elite: number;
+  strong: number;
+  useful: number;
+}
+
+/**
+ * Nearest-rank threshold: threshold(p) = sortedAsc[Math.ceil(p * n) - 1].
+ * A candidate tied at a threshold belongs to that tier (callers compare >=).
+ */
+export function nearestRankThreshold(sortedAsc: readonly number[], percentile: number): number {
+  if (sortedAsc.length === 0) return 0;
+  if (percentile <= 0) return sortedAsc[0] ?? 0;
+  if (percentile >= 1) return sortedAsc[sortedAsc.length - 1] ?? 0;
+  const index = Math.ceil(percentile * sortedAsc.length) - 1;
+  return sortedAsc[Math.min(sortedAsc.length - 1, Math.max(0, index))] ?? 0;
+}
+
+/**
+ * Per-role tier thresholds over the canonical candidate population. Callers
+ * pass the population sorted by playerVersionId ascending; the sort is
+ * explicit so the caller controls what "canonical" means.
+ */
+export function rolePercentileThresholds(
+  canonicalScores: readonly Record<SeasonRosterRole, number>[],
+): Record<SeasonRosterRole, RoleThresholds> {
+  const byRole: Record<SeasonRosterRole, number[]> = {
+    'primary-creation': [],
+    'secondary-creation': [],
+    'perimeter-shooting': [],
+    'rim-finishing-interior-scoring': [],
+    'perimeter-defense': [],
+    'interior-defense': [],
+    'offensive-rebounding': [],
+    'defensive-rebounding': [],
+  };
+  for (const scores of canonicalScores) {
+    for (const role of ROSTER_ROLES) {
+      const bucket = byRole[role];
+      bucket.push(scores[role]);
+    }
+  }
+  const thresholds = {} as Record<SeasonRosterRole, RoleThresholds>;
+  for (const role of ROSTER_ROLES) {
+    const sorted = [...byRole[role]].sort((a, b) => a - b);
+    thresholds[role] = {
+      elite: nearestRankThreshold(sorted, TIER_PERCENTILES.elite),
+      strong: nearestRankThreshold(sorted, TIER_PERCENTILES.strong),
+      useful: nearestRankThreshold(sorted, TIER_PERCENTILES.useful),
+    };
+  }
+  return thresholds;
+}
+
+/** Per-role tier of one candidate: elite >= p90, strong >= p75, useful >= p50. */
+export function percentileTierOf(
+  roleScores: Record<SeasonRosterRole, number>,
+  thresholds: Record<SeasonRosterRole, RoleThresholds>,
+): Record<SeasonRosterRole, PercentileTier> {
+  const tiers = {} as Record<SeasonRosterRole, PercentileTier>;
+  for (const role of ROSTER_ROLES) {
+    const score = roleScores[role];
+    const roleThresholds = thresholds[role];
+    if (score >= roleThresholds.elite) {
+      tiers[role] = 'elite';
+    } else if (score >= roleThresholds.strong) {
+      tiers[role] = 'strong';
+    } else if (score >= roleThresholds.useful) {
+      tiers[role] = 'useful';
+    } else {
+      tiers[role] = 'depth';
+    }
+  }
+  return tiers;
+}
+
+/** A player's pool tier is its highest tier across all eight roles. */
+export function playerPercentileTier(
+  roleTiers: Record<SeasonRosterRole, PercentileTier>,
+): PercentileTier {
+  const rank = (tier: PercentileTier): number => TIER_ORDER.indexOf(tier);
+  let best: PercentileTier = 'depth';
+  for (const role of ROSTER_ROLES) {
+    const tier = roleTiers[role];
+    if (rank(tier) < rank(best)) best = tier;
+  }
+  return best;
+}

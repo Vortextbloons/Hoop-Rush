@@ -3,13 +3,18 @@ import { dirname, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { z } from 'zod';
 import {
+  SEASON_AI_VERSION,
   SEASON_DRAFT_SAFE_MINIMUM,
+  SEASON_DRAFT_VERSION,
   SEASON_OFFER_TARGETS_VERSION,
+  SEASON_ROSTER_GENERATION_VERSION,
+  SEASON_ROTATION_VERSION,
   type SeasonDraftCatalog,
   type SeasonDraftCommand,
   type SeasonDraftState,
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
+  type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
 import { applySeasonDraftCommand, generateAiLeague } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
@@ -18,6 +23,7 @@ import { parseCount } from '../args.ts';
 import {
   DEFAULT_MANIFEST,
   DEFAULT_SEASON_DIR,
+  loadSeasonRosterTargets,
   pickBestSelectable,
   sha256Hex,
 } from './season-data.ts';
@@ -84,9 +90,10 @@ function apply(
   state: SeasonDraftState | null,
   catalog: SeasonDraftCatalog,
   command: SeasonDraftCommand,
+  targets: SeasonRosterTargets,
 ): { state: SeasonDraftState | null; generation: SeasonLeagueGenerationResult | null } {
   const result = applySeasonDraftCommand(state, catalog, command, {
-    generate: (input) => generateAiLeague(input),
+    generate: (input) => generateAiLeague({ ...input, targets }),
   });
   if (result.record.status !== 'accepted') {
     throw new Error(
@@ -164,6 +171,7 @@ export function playSeasonDraftCalibrationSeed(
   seed: string,
   catalog: SeasonDraftCatalog,
   league: SeasonLeague,
+  targets: SeasonRosterTargets,
 ): SeasonDraftCalibrationRun {
   const empty = {
     variety: 0,
@@ -188,8 +196,9 @@ export function playSeasonDraftCalibrationSeed(
       rootSeed: seed,
       league,
       humanParticipantIds: ['human'],
-      catalogVersion: catalog.catalogVersion,
+      catalogVersion: SEASON_DRAFT_VERSION,
     }),
+    targets,
   ).state as SeasonDraftState;
 
   let state = draft;
@@ -203,7 +212,7 @@ export function playSeasonDraftCalibrationSeed(
         kind: 'draw-season-offer',
         participantId: 'human',
       }),
-      { generate: (input) => generateAiLeague(input) },
+      { generate: (input) => generateAiLeague({ ...input, targets }) },
     );
     if (drawn.record.status !== 'accepted' || drawn.state === null) {
       // NO_FEASIBLE_GLOBAL_OFFER: the policy dead-ended the draft. The
@@ -222,6 +231,7 @@ export function playSeasonDraftCalibrationSeed(
         participantId: 'human',
         playerVersionId: best.playerVersionId,
       }),
+      targets,
     );
     state = picked.state as SeasonDraftState;
     sequence += 1;
@@ -241,6 +251,7 @@ export function playSeasonDraftCalibrationSeed(
     cmd('c-finalize', state.revision, {
       kind: 'finalize-human-rosters',
     }),
+    targets,
   );
   state = finalized.state as SeasonDraftState;
 
@@ -253,26 +264,27 @@ export function playSeasonDraftCalibrationSeed(
       kind: 'generate-ai-league',
     }),
     {
-      generate: (input) => generateAiLeague(input),
+      generate: (input) => generateAiLeague({ ...input, targets }),
     },
   );
   if (generated.record.status !== 'accepted' || generated.generation === null) {
     generationFailed = true;
     generation = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       seed,
-      aiVersion: 'season-ai-v1',
-      rosterGenerationVersion: 'roster-generation-v1',
-      rotationVersion: 'season-rotation-v2',
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
+      rotationVersion: SEASON_ROTATION_VERSION,
       rosters: [],
       ownership: [],
       rotations: [],
       aiAssignments: [],
+      aiPools: [],
       evaluations: [],
       diagnostics: {
         seed,
-        aiVersion: 'season-ai-v1',
-        rosterGenerationVersion: 'roster-generation-v1',
+        aiVersion: SEASON_AI_VERSION,
+        rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
         teamsGenerated: 0,
         teamsRepaired: 0,
         backtracks: 0,
@@ -313,8 +325,11 @@ export function runSeasonDraftCalibrationSeeds(args: {
   seeds: string[];
   catalog: SeasonDraftCatalog;
   league: SeasonLeague;
+  targets: SeasonRosterTargets;
 }): SeasonDraftCalibrationRun[] {
-  return args.seeds.map((seed) => playSeasonDraftCalibrationSeed(seed, args.catalog, args.league));
+  return args.seeds.map((seed) =>
+    playSeasonDraftCalibrationSeed(seed, args.catalog, args.league, args.targets),
+  );
 }
 
 function percentile(sorted: readonly number[], p: number): number {
@@ -395,6 +410,7 @@ async function runCalibrationChunks(args: {
   catalogPath: string;
   leaguePath: string;
   workers: number;
+  targets: SeasonRosterTargets;
 }): Promise<SeasonDraftCalibrationRun[]> {
   const chunkSize = Math.max(1, Math.ceil(args.seeds.length / args.workers));
   const chunks: string[][] = [];
@@ -437,6 +453,17 @@ export async function seasonDraftCalibrate(args: {
   const leaguePath = resolve(manifestPath, '..', 'season', 'league.json');
   const start = Date.now();
 
+  let rosterTargets: SeasonRosterTargets;
+  try {
+    rosterTargets = loadSeasonRosterTargets(manifestPath);
+  } catch (error) {
+    return makeReport(
+      'season draft calibrate',
+      { calibrationSeeds: calibrationCount, validationSeeds: validationCount },
+      { failures: [(error as Error).message], exitCode: 2 },
+    );
+  }
+
   const calibrationSeeds = Array.from({ length: calibrationCount }, (_, i) =>
     rosterCalibrationSeed(i),
   );
@@ -448,12 +475,14 @@ export async function seasonDraftCalibrate(args: {
     catalogPath,
     leaguePath,
     workers,
+    targets: rosterTargets,
   });
   const validationRuns = await runCalibrationChunks({
     seeds: validationSeeds,
     catalogPath,
     leaguePath,
     workers,
+    targets: rosterTargets,
   });
   const durationMs = Date.now() - start;
 

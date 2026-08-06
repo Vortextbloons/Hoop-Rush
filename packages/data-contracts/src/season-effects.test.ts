@@ -664,15 +664,18 @@ describe('season game player input stamina (M2.4)', () => {
   });
 });
 
-describe('season run schema version 5 (M2.4)', () => {
-  it('rejects schema 4 snapshots', () => {
+describe('season run schema version 6 (M2.4 roster-generation-v2)', () => {
+  it('rejects schema 4 and schema 5 snapshots', () => {
     const run = buildRun();
     expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 4 })).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 5 })).toThrow();
   });
 
-  it('freezes the three M2.4 material versions on the run', () => {
+  it('freezes the roster-generation-v2 material versions on the run', () => {
     const run = buildRun();
-    expect(run.versions.staminaVersion).toBe('season-stamina-v1');
+    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
+    expect(run.versions.aiVersion).toBe('season-ai-v2');
+    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
     expect(() =>
       seasonRunSchema.parse({
         ...run,
@@ -683,6 +686,12 @@ describe('season run schema version 5 (M2.4)', () => {
       seasonRunSchema.parse({
         ...run,
         versions: { ...run.versions, effectsTargetsVersion: 'season-effect-targets-v9' },
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, aiVersion: 'season-ai-v1' },
       }),
     ).toThrow();
   });

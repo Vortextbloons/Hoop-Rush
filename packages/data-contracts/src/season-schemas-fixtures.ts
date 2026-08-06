@@ -203,12 +203,35 @@ export function buildRun(): SeasonRun {
       displayName: `Synthetic ${String(slot + 1)}`,
     })),
   }));
+  const aiAssignments = league.teams.map((team, index) => ({
+    franchiseId: team.franchiseId,
+    band:
+      index < 4
+        ? ('contender' as const)
+        : index < 12
+          ? ('playoff' as const)
+          : index < 22
+            ? ('average' as const)
+            : ('weaker' as const),
+    identity:
+      index < 5
+        ? ('star-chaser' as const)
+        : index < 10
+          ? ('depth-builder' as const)
+          : index < 15
+            ? ('defense-first' as const)
+            : index < 20
+              ? ('shooting-first' as const)
+              : index < 25
+                ? ('continuity' as const)
+                : ('active-trader' as const),
+  }));
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     runId: 'fixture-run-1',
     rootSeed: SEED,
     versions: {
-      runSchemaVersion: 5,
+      runSchemaVersion: 6,
       leagueVersion: 'league-v1',
       scheduleVersion: 'schedule-v1',
       scheduleFormulaVersion: 'schedule-formula-v1',
@@ -218,13 +241,13 @@ export function buildRun(): SeasonRun {
       playerVersionIdVersion: 'player-version-id-v1',
       draftVersion: 'season-draft-v2',
       rosterRulesVersion: 'season-roster-v1',
-      rosterGenerationVersion: 'roster-generation-v1',
-      aiVersion: 'season-ai-v1',
+      rosterGenerationVersion: 'roster-generation-v2',
+      aiVersion: 'season-ai-v2',
       rotationVersion: 'season-rotation-v2',
       rotationPlannerVersion: 'rotation-planner-v1',
       gameVersion: 'season-game-v3',
       gameTargetsVersion: 'season-game-targets-v3',
-      rosterTargetsVersion: 'roster-targets-v1',
+      rosterTargetsVersion: 'roster-targets-v2',
       blockVersion: 'season-block-v2',
       summaryVersion: 'season-game-summary-v2',
       aggregatesVersion: 'season-aggregates-v1',
@@ -317,29 +340,8 @@ export function buildRun(): SeasonRun {
         },
       ],
     },
-    aiAssignments: league.teams.map((team, index) => ({
-      franchiseId: team.franchiseId,
-      band:
-        index < 4
-          ? ('contender' as const)
-          : index < 12
-            ? ('playoff' as const)
-            : index < 22
-              ? ('average' as const)
-              : ('weaker' as const),
-      identity:
-        index < 5
-          ? ('star-chaser' as const)
-          : index < 10
-            ? ('depth-builder' as const)
-            : index < 15
-              ? ('defense-first' as const)
-              : index < 20
-                ? ('shooting-first' as const)
-                : index < 25
-                  ? ('continuity' as const)
-                  : ('active-trader' as const),
-    })),
+    aiAssignments,
+    aiPools: buildFixtureAiPools(league, aiAssignments),
     rotations: league.teams.map((team, teamIndex) => {
       const players = rosters[teamIndex]?.players;
       if (!players) throw new Error('missing roster');
@@ -359,15 +361,15 @@ export function buildRun(): SeasonRun {
     }),
     generationAudit: {
       seed: SEED,
-      aiVersion: 'season-ai-v1',
-      rosterGenerationVersion: 'roster-generation-v1',
+      aiVersion: 'season-ai-v2',
+      rosterGenerationVersion: 'roster-generation-v2',
       rotationVersion: 'season-rotation-v2',
-      rosterTargetsVersion: 'roster-targets-v1',
+      rosterTargetsVersion: 'roster-targets-v2',
       digest: '0'.repeat(32),
       diagnostics: {
         seed: SEED,
-        aiVersion: 'season-ai-v1',
-        rosterGenerationVersion: 'roster-generation-v1',
+        aiVersion: 'season-ai-v2',
+        rosterGenerationVersion: 'roster-generation-v2',
         teamsGenerated: 29,
         teamsRepaired: 0,
         backtracks: 0,
@@ -423,6 +425,54 @@ export function buildRun(): SeasonRun {
       overallReport: 80,
     })),
   };
+}
+
+/**
+ * Deterministic roster-generation-v2 pools for the fixture run: one
+ * 20-player pool per AI franchise (29 pools; the human franchise gets
+ * none), each with ten selections, one allocation seed path per selection,
+ * and a leading anchor whose role score clears the p90 threshold. Pool
+ * versions are distinct from roster versions so the fixture never depends
+ * on pool-rosters identity.
+ */
+function buildFixtureAiPools(
+  league: SeasonLeague,
+  aiAssignments: SeasonRun['aiAssignments'],
+): SeasonRun['aiPools'] {
+  return aiAssignments
+    .filter((assignment) => assignment.franchiseId !== league.teams[0]?.franchiseId)
+    .map((assignment, poolIndex) => {
+      const playerVersionIds = Array.from({ length: 20 }, (_, slot) => {
+        const hex = `${String(poolIndex).padStart(2, '0')}${String(slot).padStart(2, '0')}`.padEnd(
+          32,
+          '0',
+        );
+        return `pv-${hex}`;
+      });
+      const anchor = playerVersionIds[0];
+      if (anchor === undefined) throw new Error('fixture pool too small');
+      const selections = playerVersionIds.slice(0, 10);
+      const seedPath = (slot: number) => ['ai', 'selection', assignment.franchiseId, String(slot)];
+      return {
+        franchiseId: assignment.franchiseId,
+        band: assignment.band,
+        identity: assignment.identity,
+        playerVersionIds,
+        anchors: [
+          {
+            playerVersionId: anchor,
+            qualifyingRole: 'primary-creation' as const,
+            percentileTier: 'elite' as const,
+            roleScore: 92,
+            percentileThreshold: 88,
+            seedPath: ['ai', 'anchors', assignment.franchiseId, '0'],
+          },
+        ],
+        selections,
+        allocationSeedPaths: selections.map((_version, slot) => seedPath(slot)),
+        repairCount: 0,
+      };
+    });
 }
 
 /** Minimal valid simulation ratings (matches `simulationRatingsSchema`). */

@@ -1,5 +1,8 @@
 import {
+  SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_CHEMISTRY_VERSION,
+  SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -7,6 +10,7 @@ import {
   SEASON_LEADERS_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
+  SEASON_STAMINA_VERSION,
   blockIndexForRound,
   blockRoundRange,
   seasonDigestHex,
@@ -339,7 +343,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         runId: input.run.runId,
         rootSeed: input.run.rootSeed,
         versions: {
-          blockVersion: 'season-block-v1',
+          blockVersion: SEASON_BLOCK_VERSION,
           summaryVersion: SEASON_GAME_SUMMARY_VERSION,
           aggregatesVersion: 'season-aggregates-v1',
           recapVersion: SEASON_RECAP_VERSION,
@@ -348,6 +352,9 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           gameVersion: SEASON_GAME_VERSION,
           gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
           seedDerivationVersion: SEASON_SEED_DERIVATION_VERSION,
+          staminaVersion: SEASON_STAMINA_VERSION,
+          chemistryVersion: SEASON_CHEMISTRY_VERSION,
+          effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
         },
         blockIndex: input.blockIndex,
         completedRounds,
@@ -359,6 +366,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         gameSummaries: summaries,
         retainedDetails: [],
         recap,
+        effects: seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters),
         digest: seasonDigestHex(`${input.run.runId}:${String(input.blockIndex)}`),
       };
       const repo = await getSeasonRunRepository();
@@ -376,6 +384,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         retainedDetails: [],
         recap,
         rotations: input.rotations,
+        effects: seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters),
       });
     } catch (error) {
       if (this.isCancelled()) return;

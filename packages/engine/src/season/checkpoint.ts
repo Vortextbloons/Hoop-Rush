@@ -9,11 +9,12 @@ import { seasonBlockRecapCanonical } from './recap.ts';
 
 /**
  * Season Run game reconstruction and canonical checkpoint digests
- * (spec/2.0/07 persistence, M2.3, season-checkpoint-v1). Completed game
+ * (spec/2.0/07 persistence, M2.3, season-checkpoint-v2). Completed game
  * facts live in per-block compact summaries, not in the run snapshot's
  * scheduled `games` array; the engine reconstructs finalized game records
  * from the schedule and summaries on demand. The checkpoint digest is a pure
- * function of the candidate's recorded facts, so uninterrupted,
+ * function of the candidate's recorded facts — including the M2.4 effects
+ * state (300 player loads + 1,350 pair chemistries) — so uninterrupted,
  * cancelled/retried, terminated/reloaded, single-worker, and CLI executions
  * must agree byte-for-byte.
  *
@@ -110,11 +111,13 @@ function standingsCanonical(candidate: SeasonCheckpointFacts): unknown {
 
 /**
  * Canonical byte-for-byte serialization of a candidate checkpoint: fixed
- * field order, every array sorted canonically, the recap canonicalized, and
- * the digest field itself excluded (a digest is a function of the facts, not
- * of itself). Identical recorded facts always serialize identically,
- * regardless of call order, internal array order, or object key insertion
- * order (keys are sorted recursively; runtime validation may reorder them).
+ * field order, every array sorted canonically, the recap canonicalized, the
+ * effects state canonically ordered (player loads by playerVersionId, pairs
+ * by the canonical a<b key), and the digest field itself excluded (a digest
+ * is a function of the facts, not of itself). Identical recorded facts
+ * always serialize identically, regardless of call order, internal array
+ * order, or object key insertion order (keys are sorted recursively; runtime
+ * validation may reorder them).
  */
 export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): string {
   return canonicalJson({
@@ -137,6 +140,16 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
     gameSummaries: [...candidate.gameSummaries].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
     retainedDetails: [...candidate.retainedDetails].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
     recap: seasonBlockRecapCanonical(candidate.recap),
+    // M2.4: the effects state participates in the digest (canonical order).
+    effects: canonicalJson({
+      schemaVersion: candidate.effects.schemaVersion,
+      playerStates: [...candidate.effects.playerStates].sort((a, b) =>
+        a.playerVersionId < b.playerVersionId ? -1 : 1,
+      ),
+      pairStates: [...candidate.effects.pairStates].sort((a, b) =>
+        a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : 1,
+      ),
+    }),
   });
 }
 

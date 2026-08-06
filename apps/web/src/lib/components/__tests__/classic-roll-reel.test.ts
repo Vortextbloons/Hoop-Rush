@@ -212,6 +212,7 @@ describe('ClassicRollReel', () => {
     await vi.advanceTimersByTimeAsync(950);
     const overlay = container.querySelector(OVERLAY);
     expect(overlay).not.toBeNull();
+    expect(container.querySelector('.roll-continue')).not.toBeNull();
     expect(onSettled).not.toHaveBeenCalled();
 
     if (overlay) {
@@ -225,6 +226,24 @@ describe('ClassicRollReel', () => {
     // The pending result timer must not double-fire onSettled.
     await vi.advanceTimersByTimeAsync(5000);
     expect(onSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes when the Continue button is clicked', async () => {
+    const { container, rerender, onSettled } = renderReel();
+
+    await rerender({ spinKey: 1 });
+    await vi.advanceTimersByTimeAsync(950);
+    const button = container.querySelector('.roll-continue');
+    expect(button).not.toBeNull();
+    expect(onSettled).not.toHaveBeenCalled();
+
+    if (button) {
+      await fireEvent.click(button);
+    }
+
+    expect(onSettled).toHaveBeenCalledTimes(1);
+    await tick();
+    expect(container.querySelector(OVERLAY)).toBeNull();
   });
 
   it('settles with the final value when franchise options are empty', async () => {

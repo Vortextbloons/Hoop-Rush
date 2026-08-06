@@ -12,6 +12,10 @@ import type {
 } from '$lib/season/season-block-runner';
 import type { SeasonRunRepository, SeasonRunSnapshot } from '@hoop-rush/persistence';
 import {
+  isSeasonRunIncompatibleError,
+  type SeasonRunIncompatibleInfo,
+} from '@hoop-rush/persistence';
+import {
   cachedSeasonSnapshotMatches,
   getCachedSeasonSnapshot,
   setCachedSeasonSnapshot,
@@ -74,6 +78,12 @@ export class SeasonHubState {
   block: BlockRunState = { ...IDLE_BLOCK };
   /** Load error surfaced to the page. */
   error: string | null = null;
+  /**
+   * M2.4: a stored run made under an older schema (schema-v4 runs cannot
+   * continue). The run rows are preserved until the user explicitly discards
+   * them through `discardIncompatibleRun`.
+   */
+  incompatible: SeasonRunIncompatibleInfo | null = null;
 
   constructor(repo: SeasonRunRepository, runner: SeasonBlockRunner) {
     this.repo = repo;
@@ -106,10 +116,30 @@ export class SeasonHubState {
         this.snapshot = getCachedSeasonSnapshot();
         this.index = index;
         this.error = null;
+        this.incompatible = null;
         this.emit();
         return;
       }
-      const snapshot = await this.repo.loadActiveRun();
+      let snapshot: SeasonRunSnapshot | null;
+      try {
+        snapshot = await this.repo.loadActiveRun();
+        this.incompatible = null;
+      } catch (error) {
+        if (isSeasonRunIncompatibleError(error)) {
+          // The stored run predates the M2.4 schema: it stays stored, but the
+          // run cannot continue; the UI shows the discard-and-restart screen.
+          // The type guard above narrowed `error`; eslint treats members of
+          // Error-typed values as unsafe, so the info is re-typed explicitly.
+          const info: SeasonRunIncompatibleInfo = error.info;
+          this.snapshot = null;
+          this.index = index;
+          this.incompatible = info;
+          this.error = null;
+          this.emit();
+          return;
+        }
+        throw error;
+      }
       this.snapshot = snapshot;
       this.index = index;
       if (
@@ -125,6 +155,20 @@ export class SeasonHubState {
       this.error = error instanceof Error ? error.message : String(error);
     }
     this.emit();
+  }
+
+  /**
+   * M2.4: explicit user discard of an incompatible stored run. The run rows
+   * are deleted only after the user confirms; nothing is migrated.
+   */
+  async discardIncompatibleRun(): Promise<void> {
+    const incompatible = this.incompatible;
+    if (incompatible === null) return;
+    await this.repo.clearSeasonRun(incompatible.runId);
+    this.incompatible = null;
+    this.snapshot = null;
+    this.index = null;
+    await this.refresh();
   }
 
   /** Next block index: the accepted-block count (0..8). */

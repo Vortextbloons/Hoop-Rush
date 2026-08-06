@@ -3,6 +3,7 @@ import fc from 'fast-check';
 import {
   SEASON_DRAFT_OFFER_SIZE,
   SEASON_DRAFT_SAFE_MINIMUM,
+  SEASON_ROSTER_TARGETS_VERSION,
   seasonDraftStateSchema,
   seasonLeagueGenerationResultSchema,
   seasonNamespaceSeed,
@@ -15,6 +16,8 @@ import {
   type SeasonDraftAcceptedRecord,
   type SeasonDraftRejectedRecord,
   type SeasonDraftOffer,
+  type SeasonAiPool,
+  type SeasonGenerationDiagnostics,
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
@@ -95,7 +98,10 @@ function fakeDeps(): SeasonAiGenerationDeps {
   return { generate: (input) => buildFakeGeneration(input) };
 }
 
-function buildFakeGeneration(input: SeasonAiGenerationInput): SeasonLeagueGenerationResult {
+/** Input arrives without the targets artifact (injected by the deps closure). */
+type FakeGenerationInput = Omit<SeasonAiGenerationInput, 'targets'>;
+
+function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGenerationResult {
   const owned = new Set<string>();
   // Human rosters are owned before any AI team is generated, mirroring the
   // authoritative generator (which seeds `unowned` from the full catalog
@@ -103,6 +109,7 @@ function buildFakeGeneration(input: SeasonAiGenerationInput): SeasonLeagueGenera
   for (const roster of input.humanRosters) {
     for (const versionId of roster.playerVersionIds) owned.add(versionId);
   }
+  const pools = new Map<string, string[]>();
   const rosters = input.league.teams.map((team) => {
     const human = input.humanRosters.find((r) => r.franchiseId === team.franchiseId);
     const players =
@@ -110,7 +117,16 @@ function buildFakeGeneration(input: SeasonAiGenerationInput): SeasonLeagueGenera
         ? human.playerVersionIds
         : (() => {
             const available = input.catalog.candidates.filter((c) => !owned.has(c.playerVersionId));
-            return available.slice(0, 10).map((c) => c.playerVersionId);
+            const picks = available.slice(0, 10).map((c) => c.playerVersionId);
+            // The private pool contains the ten selections plus ten more
+            // distinct unowned candidates (roster-generation-v2 shape).
+            const poolMembers = [
+              ...picks,
+              ...available.slice(10, 20).map((c) => c.playerVersionId),
+            ];
+            for (const memberId of poolMembers) owned.add(memberId);
+            pools.set(team.franchiseId, poolMembers);
+            return picks;
           })();
     for (const versionId of players) owned.add(versionId);
     const resolved = players.map((playerVersionId) => {
@@ -141,39 +157,66 @@ function buildFakeGeneration(input: SeasonAiGenerationInput): SeasonLeagueGenera
   );
   const aiAssignments = buildSeasonAiAssignments(input.league);
   const evaluations = buildFixtureEvaluations(rosters, aiAssignments);
-  const diagnostics = {
+  const aiPools = input.league.teams
+    .filter((team) => pools.has(team.franchiseId))
+    .map((team) => {
+      const roster = rosters.find((r) => r.franchiseId === team.franchiseId);
+      const assignment = aiAssignments.find((a) => a.franchiseId === team.franchiseId);
+      const playerVersionIds = [...(pools.get(team.franchiseId) ?? [])].sort();
+      const selections = [...(roster?.players.map((p) => p.playerVersionId) ?? [])].sort();
+      return {
+        franchiseId: team.franchiseId,
+        band: assignment?.band ?? ('average' as const),
+        identity: assignment?.identity ?? ('continuity' as const),
+        playerVersionIds,
+        anchors: [] as SeasonAiPool['anchors'],
+        selections,
+        allocationSeedPaths: selections.map((versionId) => [
+          'ai-rosters',
+          'pool-fill',
+          '0',
+          versionId,
+        ]),
+        repairCount: 0,
+      };
+    });
+  const diagnostics: SeasonGenerationDiagnostics = {
     seed: input.seed,
-    aiVersion: 'season-ai-v1',
-    rosterGenerationVersion: 'roster-generation-v1',
+    aiVersion: 'season-ai-v2',
+    rosterGenerationVersion: 'roster-generation-v2',
     teamsGenerated: 29,
     teamsRepaired: 0,
     backtracks: 0,
     nodesVisited: 29,
-    nodeBudget: 100000,
-    failedTeams: [] as string[],
-    unmetConstraints: [] as string[],
+    nodeBudget: 80000,
+    failedTeams: [],
+    unmetConstraints: [],
   };
   const digest = seasonGenerationDigest({
     seed: input.seed,
-    aiVersion: 'season-ai-v1',
-    rosterGenerationVersion: 'roster-generation-v1',
+    aiVersion: 'season-ai-v2',
+    rosterGenerationVersion: 'roster-generation-v2',
     rotationVersion: 'season-rotation-v2',
     rosters,
     ownership,
     rotations,
     aiAssignments,
+    targetsVersion: SEASON_ROSTER_TARGETS_VERSION,
+    aiPools,
+    diagnostics,
   });
   return seasonLeagueGenerationResultSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     seed: input.seed,
-    aiVersion: 'season-ai-v1',
-    rosterGenerationVersion: 'roster-generation-v1',
+    aiVersion: 'season-ai-v2',
+    rosterGenerationVersion: 'roster-generation-v2',
     rotationVersion: 'season-rotation-v2',
     rosters,
     ownership,
     rotations,
     aiAssignments,
     evaluations,
+    aiPools,
     diagnostics,
     digest,
   });
@@ -1163,16 +1206,21 @@ describe('season draft finalize and generation', () => {
     const exploding: SeasonAiGenerationDeps = {
       generate: () => {
         throw new SeasonAiGenerationError({
-          seed: SEED,
-          aiVersion: 'season-ai-v1',
-          rosterGenerationVersion: 'roster-generation-v1',
-          teamsGenerated: 20,
-          teamsRepaired: 0,
-          backtracks: 0,
-          nodesVisited: 100000,
-          nodeBudget: 100000,
-          failedTeams: ['lakers'],
-          unmetConstraints: ['role perimeter-defense on 3 teams'],
+          diagnostics: {
+            seed: SEED,
+            aiVersion: 'season-ai-v2',
+            rosterGenerationVersion: 'roster-generation-v2',
+            teamsGenerated: 20,
+            teamsRepaired: 0,
+            backtracks: 0,
+            nodesVisited: 100000,
+            nodeBudget: 80000,
+            failedTeams: ['lakers'],
+            unmetConstraints: ['role perimeter-defense on 3 teams'],
+          },
+          phase: 'pool-fill',
+          allocationState: '{}',
+          repairs: 0,
         });
       },
     };

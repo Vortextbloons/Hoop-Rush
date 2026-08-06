@@ -571,7 +571,7 @@ function generateAiLeague(
       generation: null,
     };
   }
-  const input: SeasonAiGenerationInput = {
+  const input: Omit<SeasonAiGenerationInput, 'targets'> = {
     seed: state.rootSeed,
     catalog,
     league: state.league,
@@ -582,7 +582,6 @@ function generateAiLeague(
         .filter((pick) => pick.participantId === p.participantId)
         .map((pick) => pick.playerVersionId),
     })),
-    targets: null,
   };
   let generation: SeasonLeagueGenerationResult;
   try {
@@ -613,12 +612,17 @@ function generateAiLeague(
 
 export interface SeasonAiGenerationDeps {
   /**
-   * Deterministic AI league generation. Throws `SeasonAiGenerationError`
-   * (code GENERATION_EXHAUSTED) with full diagnostics on budget exhaustion;
-   * it never relaxes a constraint. Wired to the authoritative engine
-   * implementation (season/ai.ts) at the application boundary.
+   * Deterministic AI league generation without the roster-targets artifact.
+   * Targets are injected through the deps closure so the production wiring
+   * is the single authority for which `SeasonRosterTargets` artifact a run
+   * uses: `(input) => generateAiLeague({ ...input, targets })`. Throws
+   * `SeasonAiGenerationError` (code GENERATION_EXHAUSTED) with full
+   * diagnostics on budget exhaustion and rejects mismatched targets
+   * versions through the generation guard; it never relaxes a constraint.
+   * Wired to the authoritative engine implementation (season/ai.ts) at the
+   * application boundary.
    */
-  generate: (input: SeasonAiGenerationInput) => SeasonLeagueGenerationResult;
+  generate: (input: Omit<SeasonAiGenerationInput, 'targets'>) => SeasonLeagueGenerationResult;
 }
 
 /**

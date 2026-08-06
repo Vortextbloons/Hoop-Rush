@@ -1,6 +1,7 @@
 import {
   SEASON_LEADER_DEPTH,
   SEASON_LEADER_MIN_GAME_SHARE,
+  SEASON_RECAP_VERSION,
   SEASON_ROUND_COUNT,
   type HoopRushManifest,
   type SeasonBlockRecap,
@@ -804,7 +805,7 @@ export function deriveBlockRecap(input: {
     nextBlockIndex <= 8 ? humanUpcomingGamesFromGames(games, humanFranchiseId, nextBlockIndex) : [];
   return {
     schemaVersion: 1,
-    recapVersion: 'season-recap-v1',
+    recapVersion: SEASON_RECAP_VERSION,
     runId,
     blockIndex,
     completedRounds,

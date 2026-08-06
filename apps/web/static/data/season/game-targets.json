@@ -1,51 +1,27 @@
 {
   "schemaVersion": 1,
-  "targetsVersion": "season-game-targets-v1",
-  "gameVersion": "season-game-v1",
+  "targetsVersion": "season-game-targets-v3",
+  "gameVersion": "season-game-v3",
   "plannerVersion": "rotation-planner-v1",
   "rotationVersion": "season-rotation-v2",
   "calibration": {
     "calibrationSeedCount": 1024,
     "validationSeedCount": 256,
-    "generatedAtIso": "2026-08-05T03:48:04.577Z"
+    "generatedAtIso": "2026-08-05T22:24:51.736Z"
   },
   "fixtures": [
     {
       "fixtureId": "season-game-balanced",
       "preset": "balanced",
       "sample": 1024,
-      "starterSecondsMedian": 2227,
-      "benchSecondsMedian": 655,
+      "starterSecondsMedian": 2217,
+      "benchSecondsMedian": 666,
       "benchRoleMedianSeconds": [
-        724,
-        690,
-        663,
-        649,
-        616
-      ],
-      "aggregateEnvelopes": {
-        "points": [
-          80,
-          130
-        ],
-        "possessions": [
-          85,
-          97
-        ]
-      }
-    },
-    {
-      "fixtureId": "season-game-tight",
-      "preset": "tight",
-      "sample": 1024,
-      "starterSecondsMedian": 2455,
-      "benchSecondsMedian": 431,
-      "benchRoleMedianSeconds": [
-        528,
-        502,
-        457,
-        411,
-        379
+        723,
+        708,
+        680,
+        655,
+        621
       ],
       "aggregateEnvelopes": {
         "points": [
@@ -53,7 +29,31 @@
           130
         ],
         "possessions": [
-          85,
+          84,
+          99
+        ]
+      }
+    },
+    {
+      "fixtureId": "season-game-tight",
+      "preset": "tight",
+      "sample": 1024,
+      "starterSecondsMedian": 2459,
+      "benchSecondsMedian": 426,
+      "benchRoleMedianSeconds": [
+        521,
+        490,
+        453,
+        404,
+        378
+      ],
+      "aggregateEnvelopes": {
+        "points": [
+          79,
+          130
+        ],
+        "possessions": [
+          84,
           98
         ]
       }
@@ -62,23 +62,23 @@
       "fixtureId": "season-game-bench-heavy",
       "preset": "bench-heavy",
       "sample": 1024,
-      "starterSecondsMedian": 1980,
-      "benchSecondsMedian": 900,
+      "starterSecondsMedian": 1963,
+      "benchSecondsMedian": 922,
       "benchRoleMedianSeconds": [
+        949,
         934,
-        915,
-        900,
-        891,
-        889
+        922,
+        899,
+        899
       ],
       "aggregateEnvelopes": {
         "points": [
-          80,
+          78,
           130
         ],
         "possessions": [
-          85,
-          98
+          84,
+          99
         ]
       }
     }
@@ -88,7 +88,7 @@
     "starterOrdering": true,
     "benchOrdering": true,
     "benchRoleNonIncreasing": true,
-    "heldOutPassShare": 0.9752604166666666,
+    "heldOutPassShare": 0.9846805736636245,
     "heldOutPass": true
   }
 }

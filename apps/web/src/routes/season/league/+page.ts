@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { base } from '$app/paths';
+import { resolve } from '$app/paths';
 
 /**
  * M2.3.5 compatibility redirect: the pre-shell league hub moved to the
@@ -10,5 +10,5 @@ export const prerender = true;
 export const entries: () => Array<Record<string, never>> = () => [{}];
 
 export function load() {
-  redirect(308, `${base}/season/run/league/`);
+  redirect(308, resolve('/season/run/league/'));
 }

@@ -2,7 +2,11 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
-import type { SeasonDraftCommandPayload, SeasonDraftState } from '@hoop-rush/data-contracts';
+import {
+  SEASON_DRAFT_VERSION,
+  type SeasonDraftCommandPayload,
+  type SeasonDraftState,
+} from '@hoop-rush/data-contracts';
 import { applySeasonDraftCommand } from '@hoop-rush/engine';
 import {
   buildManifest,
@@ -55,7 +59,7 @@ function draftState(steps: { drawn?: boolean; picked?: boolean } = {}): SeasonDr
     rootSeed: SEED,
     league: LEAGUE,
     humanParticipantIds: [SOLO_PARTICIPANT_ID],
-    catalogVersion: CATALOG.catalogVersion,
+    catalogVersion: SEASON_DRAFT_VERSION,
   });
   if (steps.drawn) {
     state = run(state, { kind: 'draw-season-offer', participantId: SOLO_PARTICIPANT_ID });

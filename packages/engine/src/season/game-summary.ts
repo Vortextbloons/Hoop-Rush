@@ -1,8 +1,11 @@
 import {
   SEASON_GAME_SUMMARY_VERSION,
   type SeasonCompactPlayerLine,
+  type SeasonEffectsRollup,
+  type SeasonGameEffectsTransition,
   type SeasonGameSimulationResult,
   type SeasonGameSummary,
+  type SeasonMechanismEvidence,
   type SeasonRetainedGameDetail,
   type SeasonScheduleGame,
   type SeasonTeamBox,
@@ -136,6 +139,7 @@ function zeroTeamBox(franchiseId: string): SeasonTeamBox {
 export function seasonGameSummaryFromResult(
   result: SeasonGameSimulationResult,
   game: SeasonScheduleGame,
+  effectsTransition?: SeasonGameEffectsTransition,
 ): SeasonGameSummary {
   if (result.outcome === 'no-legal-five-both') {
     throw new Error(
@@ -178,6 +182,9 @@ export function seasonGameSummaryFromResult(
     awayBox: teamBoxOf(result.away),
     homePlayers: sortedLines(result.home.players.map((player) => compactLineOf(player))),
     awayPlayers: sortedLines(result.away.players.map((player) => compactLineOf(player))),
+    ...(effectsTransition !== undefined && effectsTransition.evidence.length > 0
+      ? { effectsRollup: seasonEffectsRollupFromEvidence(effectsTransition.evidence) }
+      : {}),
   };
 }
 
@@ -191,6 +198,7 @@ export function seasonRetainedDetailFromResult(
   result: SeasonGameSimulationResult,
   game: SeasonScheduleGame,
   runId: string,
+  effectsTransition?: SeasonGameEffectsTransition,
 ): SeasonRetainedGameDetail {
   return {
     schemaVersion: 1,
@@ -200,7 +208,33 @@ export function seasonRetainedDetailFromResult(
     homeFranchiseId: game.homeFranchiseId,
     awayFranchiseId: game.awayFranchiseId,
     result,
+    ...(effectsTransition !== undefined && effectsTransition.evidence.length > 0
+      ? { mechanismEvidence: effectsTransition.evidence }
+      : {}),
   };
+}
+
+/**
+ * Compact per-game effects rollup for game summaries: mechanism, side,
+ * opportunity count, and the accumulated probability delta in integer
+ * millionths (season-game-summary-v2 retention policy).
+ */
+export function seasonEffectsRollupFromEvidence(
+  evidence: readonly SeasonMechanismEvidence[],
+): SeasonEffectsRollup[] {
+  return evidence.map((row) => ({
+    mechanism: row.mechanism,
+    side: row.side,
+    opportunities: row.opportunities,
+    deltaTotal: row.deltaTotals,
+  }));
+}
+
+/** The full mechanism evidence of a game's effects transition. */
+export function seasonEffectsEvidenceOf(
+  transition: SeasonGameEffectsTransition,
+): SeasonMechanismEvidence[] {
+  return transition.evidence;
 }
 
 /**

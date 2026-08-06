@@ -30,9 +30,7 @@ function minimalInput(): SeasonBlockStartInput {
   const rosters = TEAMS.map((franchiseId, teamIndex) => ({
     franchiseId,
     players: Array.from({ length: 10 }, (_, slot) => ({
-      playerVersionId:
-        `pv-${String(teamIndex).padStart(2, '0')}-${String(slot).padStart(2, '0')}-` +
-        'a'.repeat(24),
+      playerVersionId: `pv-${(teamIndex * 10 + slot).toString(16).padStart(32, '0')}`,
       playerId: `p-${franchiseId}-${String(slot)}`,
       franchiseId,
       eraId: '1990s',

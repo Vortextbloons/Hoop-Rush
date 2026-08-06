@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { franchiseIdSchema, seedSchema } from './ids.ts';
+import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
 import { seasonRotationSchema } from './season-rotation.ts';
 import {
@@ -10,12 +11,33 @@ import {
 } from './season-versions.ts';
 
 /**
- * Season Run AI league generation contracts (spec/2.0/03, M2.1). Decision
- * identities alter documented scoring weights only; franchise identity never
- * changes ratings, odds, or player eligibility, and Overall has no pick
- * authority (it appears only as a report field). Generation is seeded,
- * deterministic, and versioned, with repair/backtracking diagnostics that are
- * never relaxed on failure.
+ * Season Run AI league generation contracts (spec/2.0/03, M2.1, M2.4
+ * roster-generation-v2). Decision identities alter documented scoring
+ * weights only; franchise identity never changes ratings, odds, or player
+ * eligibility, and Overall has no pick authority (it appears only as a
+ * report field). Generation is seeded, deterministic, and versioned, with
+ * repair/backtracking diagnostics that are never relaxed on failure.
+ *
+ * ## roster-generation-v2 (M2.4)
+ *
+ * Generation proceeds through one recorded 20-player `SeasonAiPool` per AI
+ * franchise (29 solo, 28 duo; human franchises get none). Each pool records
+ * its franchise band + identity, exactly 20 distinct candidate versions, the
+ * `anchors` the generator matched for it, the final ten selections, the
+ * per-selection allocation seed paths (reproduction), and a `repairCount`.
+ *
+ * A pool player's tier is its highest tier across all eight roles: elite =
+ * score >= the role's p90 threshold in at least one role; else strong =
+ * >= p75 in at least one role; else useful = >= p50 in at least one role;
+ * else depth. Thresholds are nearest-rank per role over the canonically
+ * sorted (by playerVersionId) non-human candidates; ties at a threshold are
+ * included in that tier.
+ *
+ * A super team is an average- or weaker-band selected roster whose
+ * strengthScore exceeds the contender band's measured median;
+ * superTeamIncidence = such rosters / (average + weaker rosters).
+ * extraEliteRate = the share of AI teams that received an extra elite anchor
+ * beyond the band's guarantees.
  */
 
 /** Strength band quotas for the remaining AI franchises. */
@@ -84,12 +106,90 @@ export const seasonGenerationDiagnosticsSchema = z.object({
 export type SeasonGenerationDiagnostics = z.infer<typeof seasonGenerationDiagnosticsSchema>;
 
 /**
+ * One matched guaranteed/extra elite anchor (roster-generation-v2): the
+ * highest-priority pool player whose role score cleared the nearest-rank
+ * p90 threshold of its qualifying role. `percentileThreshold` records that
+ * role's p90 threshold and `seedPath` the derivation path that chose the
+ * anchor.
+ */
+export const seasonAiAnchorSchema = z.object({
+  playerVersionId: playerVersionIdSchema,
+  qualifyingRole: seasonRosterRoleSchema,
+  percentileTier: z.literal('elite'),
+  /** 0-100 anchor role score (its qualifying role). */
+  roleScore: z.number().min(0).max(100),
+  /** The qualifying role's nearest-rank p90 threshold over non-human candidates. */
+  percentileThreshold: z.number().min(0).max(100),
+  seedPath: z.array(z.string()).min(1),
+});
+export type SeasonAiAnchor = z.infer<typeof seasonAiAnchorSchema>;
+
+/**
+ * One generated 20-player pool for an AI franchise (roster-generation-v2):
+ * exactly 20 distinct candidate versions, the matched anchors, the final ten
+ * selections (a subset of the pool), one allocation seed path per selection
+ * (reproduction), and the number of repairs the pool needed. Human
+ * franchises get no pool.
+ */
+export const seasonAiPoolSchema = z
+  .object({
+    franchiseId: franchiseIdSchema,
+    band: seasonStrengthBandSchema,
+    identity: seasonAiIdentitySchema,
+    playerVersionIds: z.array(playerVersionIdSchema).length(20),
+    anchors: z.array(seasonAiAnchorSchema),
+    selections: z.array(playerVersionIdSchema).length(10),
+    /** One seed path per selection, in selection order. */
+    allocationSeedPaths: z.array(z.array(z.string()).min(1)).length(10),
+    repairCount: z.number().int().nonnegative(),
+  })
+  .superRefine((pool, ctx) => {
+    const members = new Set<string>();
+    for (const version of pool.playerVersionIds) {
+      if (members.has(version)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `pool ${pool.franchiseId} holds duplicate version ${version}`,
+        });
+      }
+      members.add(version);
+    }
+    const selected = new Set<string>();
+    for (const version of pool.selections) {
+      if (!members.has(version)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `pool ${pool.franchiseId} selection ${version} is outside the pool`,
+        });
+      }
+      if (selected.has(version)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `pool ${pool.franchiseId} selection list holds duplicate version ${version}`,
+        });
+      }
+      selected.add(version);
+    }
+    for (const anchor of pool.anchors) {
+      if (!members.has(anchor.playerVersionId)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `pool ${pool.franchiseId} anchor ${anchor.playerVersionId} is outside the pool`,
+        });
+      }
+    }
+  });
+export type SeasonAiPool = z.infer<typeof seasonAiPoolSchema>;
+
+/**
  * The atomically produced league generation result: 30 rosters, 300 ownership
- * rows, 30 legal rotations, AI assignments, strength evaluations, diagnostics,
- * and a canonical generation digest.
+ * rows, 30 legal rotations, AI assignments, strength evaluations, the
+ * recorded roster-generation-v2 AI pools, diagnostics, and a canonical
+ * generation digest. Schema 2 (M2.4) adds the `aiPools` array: one pool per
+ * AI franchise (29 solo, 28 duo), each franchise at most once.
  */
 export const seasonLeagueGenerationResultSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   seed: seedSchema,
   aiVersion: z.literal(SEASON_AI_VERSION),
   rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
@@ -98,6 +198,8 @@ export const seasonLeagueGenerationResultSchema = z.object({
   ownership: z.array(seasonOwnershipSchema).length(300),
   rotations: z.array(seasonRotationSchema).length(30),
   aiAssignments: z.array(seasonAiAssignmentSchema).length(30),
+  /** M2.4 roster-generation-v2: one pool per AI franchise (29 solo, 28 duo). */
+  aiPools: z.array(seasonAiPoolSchema).min(28).max(29),
   evaluations: z.array(seasonRosterEvaluationSchema).length(30),
   diagnostics: seasonGenerationDiagnosticsSchema,
   /** Canonical digest of the result (engine season/digest). */
@@ -118,6 +220,8 @@ export const seasonRosterCalibrationRunSchema = z.object({
       roleIds: z.array(seasonRosterRoleSchema),
     }),
   ),
+  /** M2.4: recorded pool facts the new gates audit. */
+  pools: z.array(seasonAiPoolSchema).min(28).max(29).optional(),
   repairs: z.number().int().nonnegative(),
   backtracks: z.number().int().nonnegative(),
   nodesVisited: z.number().int().nonnegative(),
@@ -134,48 +238,201 @@ export const seasonScoreRangeSchema = z.object({
 });
 export type SeasonScoreRange = z.infer<typeof seasonScoreRangeSchema>;
 
+/** Per-band measured distribution plus the elite/strong/useful shares. */
+export const seasonMeasuredBandSchema = seasonScoreRangeSchema.extend({
+  /** Share of rosters whose top tier is elite (0..1). */
+  eliteShare: z.number().min(0).max(1),
+  /** Share of rosters whose top tier is strong (0..1). */
+  strongShare: z.number().min(0).max(1),
+  /** Share of rosters whose top tier is useful (0..1). */
+  usefulShare: z.number().min(0).max(1),
+});
+export type SeasonMeasuredBand = z.infer<typeof seasonMeasuredBandSchema>;
+
 /**
- * The frozen `roster-targets-v1` artifact: calibration-derived score ranges
- * per strength band and identity, role coverage minimum, and the verification
- * gates every subsequent audit and calibration cohort must satisfy.
+ * The frozen `roster-targets-v2` artifact (M2.4): the calibration policy
+ * every roster-generation-v2 cohort must satisfy, the verification gates,
+ * and the measured facts calibration writes (validation never rewrites
+ * `measured`). v2 replaces the v1 artifact (bands/identities ranges,
+ * roleCoverageMinimum, heldOutPassShare, top-level quotas); the v1 artifact
+ * is never produced or read by roster-generation-v2.
+ *
+ * Definitions: a pool player's tier is its highest tier across all eight
+ * roles (elite = score >= p90 threshold in >= 1 role; else strong = >= p75
+ * in >= 1 role; else useful = >= p50 in >= 1 role; else depth). Thresholds
+ * are nearest-rank per role over canonically sorted (by playerVersionId)
+ * non-human candidates; ties at a threshold are included in that tier. A
+ * super team is an average- or weaker-band selected roster whose
+ * strengthScore exceeds the contender band's measured median;
+ * superTeamIncidence = such rosters / (average + weaker rosters).
+ * extraEliteRate = the share of AI teams that received an extra elite anchor
+ * beyond the band's guarantees.
+ *
+ * Calibration tuning (frozen at the v2 freeze): band separation is
+ * anchor-driven — contenders carry two guaranteed elite anchors, playoffs
+ * one, average/weaker none — and the max-per-role roster strengthScore
+ * compresses the lower bands into the catalog's wide mid-pack, so
+ * `minBandSeparation` measures the contender-to-weaker median gap and the
+ * ordering gate requires the contender median to lead every other band (the
+ * lower three are not pairwise ordered). Gate values were frozen from the
+ * 256+64 calibration cohort evidence.
  */
 export const seasonRosterTargetsSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   targetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
+  policy: z.object({
+    /** Band quotas by human-participant count (solo 29 / duo 28 AI teams). */
+    bandQuotas: z.object({
+      solo: z.object({
+        contender: z.literal(4),
+        playoff: z.literal(8),
+        average: z.literal(10),
+        weaker: z.literal(7),
+      }),
+      duo: z.object({
+        contender: z.literal(4),
+        playoff: z.literal(8),
+        average: z.literal(9),
+        weaker: z.literal(7),
+      }),
+    }),
+    /** Guaranteed elite anchors per band, delivered before any extra rolls. */
+    guaranteedAnchors: z.object({
+      contender: z.literal(2),
+      playoff: z.literal(1),
+      average: z.literal(0),
+      weaker: z.literal(0),
+    }),
+    /** Probability an AI team beyond its guarantee receives an extra elite anchor. */
+    extraEliteRollProbability: z.object({
+      contender: z.literal(0.65),
+      playoff: z.literal(0.35),
+      average: z.literal(0.2),
+      weaker: z.literal(0.08),
+    }),
+    /** Inclusive roster tier-count ranges per band ([min, max] per tier). */
+    tierRanges: z.object({
+      contender: z.object({
+        elite: z.tuple([z.literal(2), z.literal(4)]),
+        strong: z.tuple([z.literal(5), z.literal(8)]),
+        useful: z.tuple([z.literal(6), z.literal(10)]),
+      }),
+      playoff: z.object({
+        elite: z.tuple([z.literal(1), z.literal(2)]),
+        strong: z.tuple([z.literal(4), z.literal(7)]),
+        useful: z.tuple([z.literal(7), z.literal(10)]),
+      }),
+      average: z.object({
+        elite: z.tuple([z.literal(0), z.literal(1)]),
+        strong: z.tuple([z.literal(3), z.literal(6)]),
+        useful: z.tuple([z.literal(8), z.literal(11)]),
+      }),
+      weaker: z.object({
+        elite: z.tuple([z.literal(0), z.literal(1)]),
+        strong: z.tuple([z.literal(1), z.literal(4)]),
+        useful: z.tuple([z.literal(7), z.literal(10)]),
+      }),
+    }),
+    /** Role priority lists per identity; depth-builder/continuity/active-trader use all eight roles. */
+    identityPriorityRoles: z.object({
+      'star-chaser': z.array(seasonRosterRoleSchema).min(1),
+      'shooting-first': z.array(seasonRosterRoleSchema).min(1),
+      'defense-first': z.array(seasonRosterRoleSchema).min(1),
+      'depth-builder': z.array(seasonRosterRoleSchema).min(1),
+      continuity: z.array(seasonRosterRoleSchema).min(1),
+      'active-trader': z.array(seasonRosterRoleSchema).min(1),
+    }),
+    /** Minimum required share (percent) of the pool's candidate depth by role tier. */
+    roleCoverageThreshold: z.literal(35),
+    /** Roster completion targets (guards/forwards/centers). */
+    completionTargets: z.object({
+      guards: z.literal(4),
+      forwards: z.literal(4),
+      centers: z.literal(3),
+    }),
+    /** Pool size (exactly 20 distinct candidates) and selected roster size. */
+    poolSize: z.literal(20),
+    rosterSize: z.literal(10),
+    /** Nearest-rank percentile thresholds per tier. */
+    percentileTiers: z.object({
+      elite: z.literal(0.9),
+      strong: z.literal(0.75),
+      useful: z.literal(0.5),
+    }),
+    /** Pool strength caps per band (pool players above the cap are strength outliers). */
+    bandPoolScoreCaps: z.object({
+      contender: z.literal(100),
+      playoff: z.literal(92),
+      average: z.literal(84),
+      weaker: z.literal(74),
+    }),
+    /** Maximum strength outliers a pool may hold. */
+    maxPoolStrengthOutliers: z.literal(4),
+    /** Maximum strength outliers a selected roster may hold. */
+    maxRosterStrengthOutliers: z.literal(2),
+    /** Seeded-search node budgets (anchor matching, pool repair, roster selection). */
+    nodeBudgets: z.object({
+      anchorMatching: z.literal(20_000),
+      poolRepair: z.literal(40_000),
+      /**
+       * Frozen from the 256+64 calibration cohort: the bounded best-ten
+       * fallback must handle pools whose coverage forces a deep search
+       * (600_000/29 teams ≈ 20 690 nodes per team; the budget is a rare-path
+       * cap, not a per-league cost).
+       */
+      rosterSelection: z.literal(600_000),
+    }),
+  }),
   calibration: z.object({
     calibrationSeedCount: z.number().int().positive(),
     validationSeedCount: z.number().int().positive(),
     generatedAtIso: z.iso.datetime(),
     aiVersion: z.literal(SEASON_AI_VERSION),
     rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
-  }),
-  /** Ordered band ranges; contender median must exceed playoff, etc. */
-  bands: z.object({
-    contender: seasonScoreRangeSchema,
-    playoff: seasonScoreRangeSchema,
-    average: seasonScoreRangeSchema,
-    weaker: seasonScoreRangeSchema,
-  }),
-  identities: z.record(seasonAiIdentitySchema, seasonScoreRangeSchema),
-  /** Minimum distinct roles every roster must cover (8). */
-  roleCoverageMinimum: z.number().int().min(1).max(8),
-  /** Minimum share of held-out seeds whose per-band medians stay in range. */
-  heldOutPassShare: z.number().min(0).max(1),
-  /** All quotas every generated league must satisfy. */
-  quotas: z.object({
-    soloBands: z.object({
-      contender: z.number().int().positive(),
-      playoff: z.number().int().positive(),
-      average: z.number().int().positive(),
-      weaker: z.number().int().positive(),
+    /** Verification gates every subsequent audit and cohort must satisfy. */
+    gates: z.object({
+      /** Share of generated leagues that may fail generation: none. */
+      failureRateMax: z.literal(0),
+      /**
+       * Contender median minus weaker median, in strength points. Frozen
+       * from the 256+64 calibration cohort: the max-per-role roster
+       * strengthScore compresses the lower bands into the catalog's wide
+       * mid-pack, so the achievable contender-to-weaker gap is ~3.5-4.
+       */
+      minBandSeparation: z.literal(3),
+      /** Share of guaranteed anchors that must be delivered. */
+      anchorFulfillmentMin: z.literal(1),
+      /** Tolerated deviation of the measured extraEliteRate from the rolled expectation. */
+      extraEliteRateTolerance: z.literal(0.05),
+      /** Share of held-out seeds whose per-band medians must stay in range. */
+      heldOutPassShare: z.literal(0.95),
+      /** Order-invariance failures allowed: none. */
+      orderInvarianceFailuresMax: z.literal(0),
+      /**
+       * Maximum share of average/weaker rosters that may exceed the
+       * contender median. Frozen from the 256+64 cohort (measured 5-7%).
+       */
+      superTeamIncidenceMax: z.literal(0.08),
     }),
-    /** Two-human generation removes one team from the largest solo quota. */
-    duoBands: z.object({
-      contender: z.number().int().positive(),
-      playoff: z.number().int().positive(),
-      average: z.number().int().positive(),
-      weaker: z.number().int().positive(),
+  }),
+  /** Calibration writes these; validation never rewrites them. */
+  measured: z.object({
+    bands: z.object({
+      contender: seasonMeasuredBandSchema,
+      playoff: seasonMeasuredBandSchema,
+      average: seasonMeasuredBandSchema,
+      weaker: seasonMeasuredBandSchema,
     }),
+    identities: z.record(seasonAiIdentitySchema, seasonScoreRangeSchema),
+    /** Share of guaranteed anchors delivered (0..1). */
+    anchorFulfillment: z.number().min(0).max(1),
+    /** Share of AI teams with an extra elite anchor beyond guarantees (0..1). */
+    extraEliteRate: z.number().min(0).max(1),
+    /** Super teams / (average + weaker rosters) (0..1). */
+    superTeamIncidence: z.number().min(0).max(1),
+    poolLegalityFailures: z.number().int().nonnegative(),
+    selectionFailures: z.number().int().nonnegative(),
+    generationFailures: z.number().int().nonnegative(),
   }),
 });
 export type SeasonRosterTargets = z.infer<typeof seasonRosterTargetsSchema>;

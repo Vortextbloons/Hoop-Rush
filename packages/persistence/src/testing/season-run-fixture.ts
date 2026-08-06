@@ -69,10 +69,12 @@ import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/seaso
  * (season-aggregates-v1: every aggregate is a pure fold over compact
  * completed-game summaries), so the reload reconciliation audit passes
  * exactly whether the production engine seam or the stub seam is used.
- * Fixture runs are schema-5 (M2.4) with the stamina, chemistry, and
- * effect-targets material versions frozen and a valid zero `SeasonEffectsState`
- * (300 player load states, 1,350 canonical pair states) available for any
- * roster set through `buildFixtureEffectsState`.
+ * Fixture runs are schema-6 (M2.4 roster-generation-v2) with the
+ * roster-generation-v2/season-ai-v2/roster-targets-v2 and stamina,
+ * chemistry, and effect-targets material versions frozen, recorded synthetic
+ * AI pools, and a valid zero `SeasonEffectsState` (300 player load states,
+ * 1,350 canonical pair states) available for any roster set through
+ * `buildFixtureEffectsState`.
  */
 
 /** Accepted 30-franchise alignment; conference/division follow league-v1. */
@@ -314,6 +316,52 @@ function fixtureAiAssignments(league: SeasonLeague): SeasonAiAssignment[] {
   }));
 }
 
+/**
+ * Synthetic roster-generation-v2 pools for fixture runs: one 20-player pool
+ * per AI franchise (29 pools; the human franchise gets none), each with ten
+ * selections and one allocation seed path per selection. Pool versions are
+ * synthetic and never appear on rosters; the block pipeline consumes final
+ * rosters only, so these are recorded facts.
+ */
+function fixtureAiPools(league: SeasonLeague): SeasonRun['aiPools'] {
+  return league.teams
+    .filter((team) => team.control === 'ai')
+    .map((team, poolIndex) => {
+      const playerVersionIds = Array.from({ length: 20 }, (_, slot) => {
+        const hex = `${String(poolIndex).padStart(2, '0')}${String(slot).padStart(2, '0')}`.padEnd(
+          32,
+          '0',
+        );
+        return `pv-${hex}`;
+      });
+      const selections = playerVersionIds.slice(0, 10);
+      return {
+        franchiseId: team.franchiseId,
+        band: ['contender', 'playoff', 'average', 'weaker'][
+          poolIndex % 4
+        ] as SeasonAiAssignment['band'],
+        identity: [
+          'star-chaser',
+          'depth-builder',
+          'defense-first',
+          'shooting-first',
+          'continuity',
+          'active-trader',
+        ][poolIndex % 6] as SeasonAiAssignment['identity'],
+        playerVersionIds,
+        anchors: [],
+        selections,
+        allocationSeedPaths: selections.map((_version, slot) => [
+          'ai',
+          'selection',
+          team.franchiseId,
+          String(slot),
+        ]),
+        repairCount: 0,
+      };
+    });
+}
+
 function emptyPostseason(seed: string): SeasonPostseasonState {
   const game = () => ({
     gameId: 'seven-eight' as const,
@@ -434,6 +482,7 @@ export function buildFixtureRun(input: {
     postseason: emptyPostseason(fixtureSeedFromString(`${seed}:postseason`)),
     draft: buildFixtureSeasonDraftFacts(seed),
     aiAssignments: fixtureAiAssignments(league),
+    aiPools: fixtureAiPools(league),
     rotations: rosters.map(fixtureRotation),
     generationAudit: {
       seed,
@@ -1139,7 +1188,7 @@ export function buildSeasonDraftState(
   };
 }
 
-/** Valid stored Season draft record for promotion fixtures (v2 state). */
+/** Valid stored Season draft record for promotion fixtures (v3 state). */
 export function buildFixtureStoredDraft(
   run: SeasonRun,
   generation: SeasonLeagueGenerationResult | null = null,
@@ -1147,7 +1196,7 @@ export function buildFixtureStoredDraft(
   const draft = buildSeasonDraftState();
   return {
     recordId: SEASON_DRAFT_RECORD_ID,
-    saveSchemaVersion: 2,
+    saveSchemaVersion: 3,
     draft: {
       ...draft,
       runId: run.runId,

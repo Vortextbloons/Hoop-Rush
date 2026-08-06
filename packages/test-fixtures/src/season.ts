@@ -3,7 +3,9 @@ import {
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_CHEMISTRY_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -17,7 +19,9 @@ import {
   SEASON_ROSTER_SIZE,
   SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
+  SEASON_RUN_SCHEMA_VERSION,
   SEASON_SEED_NAMESPACES,
+  SEASON_STAMINA_VERSION,
   seasonNamespaceSeed,
   playerVersionId,
   type SeasonGame,
@@ -33,6 +37,7 @@ import {
   buildFixtureGenerationAudit,
   buildFixtureSeasonDraftFacts,
   buildSeasonAiAssignments,
+  buildSeasonAiPools,
   buildSeasonRotation,
 } from './season-draft.ts';
 
@@ -204,10 +209,11 @@ function emptyPostseason(rootSeed: string): SeasonPostseasonState {
  * Complete 30-team Season Run snapshot: committed schedule (caller-supplied
  * schedule — use the packaged artifact or regenerate it with
  * SEASON_COMMITTED_SCHEDULE_SEED), empty results, initial standings, block
- * cursor at round 0, postseason-ready derived seeds, and schema-v4 M2.3
- * fields (synthetic draft facts, assignments, rotations, evaluations, the
- * generation audit, and the frozen block/summary/aggregates/recap/leaders/
- * home-court/checkpoint versions).
+ * cursor at round 0, postseason-ready derived seeds, and schema-v6 M2.4
+ * fields (synthetic draft facts, assignments, roster-generation-v2 AI
+ * pools, rotations, evaluations, the generation audit, and the frozen
+ * block/summary/aggregates/recap/leaders/home-court/checkpoint/stamina/
+ * chemistry/effect-targets versions).
  */
 export function buildSeasonRunFixture(input: {
   schedule: SeasonSchedule;
@@ -229,11 +235,11 @@ export function buildSeasonRunFixture(input: {
     ),
   );
   return {
-    schemaVersion: 4,
+    schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     runId: 'fixture-season-run-1',
     rootSeed: seed,
     versions: {
-      runSchemaVersion: 4,
+      runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
       leagueVersion: league.leagueVersion,
       scheduleVersion: input.schedule.scheduleVersion,
       scheduleFormulaVersion: input.schedule.formulaVersion,
@@ -257,6 +263,9 @@ export function buildSeasonRunFixture(input: {
       leadersVersion: SEASON_LEADERS_VERSION,
       homeCourtVersion: SEASON_HOME_COURT_VERSION,
       checkpointVersion: SEASON_CHECKPOINT_VERSION,
+      staminaVersion: SEASON_STAMINA_VERSION,
+      chemistryVersion: SEASON_CHEMISTRY_VERSION,
+      effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
     },
     league,
     rosters,
@@ -279,6 +288,7 @@ export function buildSeasonRunFixture(input: {
     postseason: emptyPostseason(seed),
     draft: buildFixtureSeasonDraftFacts(),
     aiAssignments,
+    aiPools: buildSeasonAiPools(aiAssignments, 'lakers'),
     rotations,
     generationAudit: buildFixtureGenerationAudit(seed),
     evaluations: buildFixtureEvaluations(rosters, aiAssignments),

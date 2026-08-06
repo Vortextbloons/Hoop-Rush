@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  SeasonCompactPlayerLine,
-  SeasonGame,
-  SeasonGameSummary,
+import {
+  SEASON_GAME_SUMMARY_VERSION,
+  type SeasonCompactPlayerLine,
+  type SeasonGame,
+  type SeasonGameSummary,
 } from '@hoop-rush/data-contracts';
 import {
   playedScheduleCount,
@@ -76,7 +77,7 @@ function summary(
   const forfeit = status === 'forfeit';
   return {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v1',
+    summaryVersion: SEASON_GAME_SUMMARY_VERSION,
     gameId,
     round,
     homeFranchiseId,

@@ -13,6 +13,7 @@
   import {
     loadSeasonDraftCatalog,
     loadSeasonLeague,
+    loadSeasonRosterTargets,
     loadSeasonSchedule,
   } from '$lib/season/season-assets';
   import { getManifest, getPlayersIndex } from '$lib/data';
@@ -29,9 +30,9 @@
    * completed draft to an active run. The board renders engine facts only;
    * every command flows through `SeasonDraftFlow` -> `applySeasonDraftCommand`.
    *
-   * A stored legacy season-draft-v1 record (saveSchemaVersion 1) shows the
-   * explicit "Draft rules changed" recovery screen with a single
-   * discard-and-restart action — it is never auto-deleted.
+   * Stored records from older save-schema families (development saves) are
+   * cleared automatically by the repository on load; the flow always resumes
+   * from a current record or a fresh setup state.
    */
 
   let manifest = $state<HoopRushManifest | null>(null);
@@ -49,8 +50,6 @@
   let promoteError: string | null = $state(null);
   let resumeHref: string | null = $state(null);
   let hasDraft = $state(false);
-  /** True when the stored record is a legacy season-draft-v1 draft. */
-  let legacyStored = $state(false);
   let faces = $state<Map<string, SeasonFaceRef>>(new Map());
 
   $effect(() => {
@@ -61,9 +60,10 @@
       loadSeasonLeague(),
       loadSeasonDraftCatalog(),
       loadSeasonSchedule(),
+      loadSeasonRosterTargets(),
       getPlayersIndex(),
     ])
-      .then(async ([m, seasonLeague, catalog, seasonSchedule, playersIndex]) => {
+      .then(async ([m, seasonLeague, catalog, seasonSchedule, rosterTargets, playersIndex]) => {
         if (cancelled) return;
         manifest = m;
         league = seasonLeague;
@@ -82,11 +82,10 @@
         flow = new SeasonDraftFlow(
           new DexieSeasonDraftRepository(),
           catalog,
-          engineGenerationDeps(),
+          engineGenerationDeps(rosterTargets),
         );
         board = flow.state();
         hasDraft = await flow.load();
-        legacyStored = flow.legacyStored;
         board = flow.state();
         // An active run takes precedence over the draft board.
         try {
@@ -180,26 +179,8 @@
   }
 
   /**
-   * Explicit legacy-draft discard: clears the stored season-draft-v1 record
-   * through the repository and returns to a fresh setup state. The user
-   * controls this action; the app never deletes the legacy record silently.
+   * Promotes the completed draft to an active run (atomic in the repo).
    */
-  async function discardLegacy() {
-    if (!flow) return;
-    busy = true;
-    try {
-      await flow.discardLegacy();
-      legacyStored = false;
-      hasDraft = false;
-      started = false;
-      board = flow.state();
-      actionError = null;
-    } finally {
-      busy = false;
-    }
-  }
-
-  /** Promotes the completed draft to an active run (atomic in the repo). */
   async function promote() {
     if (!flow || !flow.draft || !flow.generation || !schedule) return;
     promoting = true;
@@ -291,38 +272,6 @@
       >
         Resume season
       </a>
-    </div>
-  {:else if legacyStored}
-    <div class="mt-10 max-w-2xl rounded-xl border border-destructive/30 bg-surface-1 p-6">
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Draft rules changed</p>
-      <h2 class="font-display mt-2 text-2xl font-extrabold uppercase tracking-tight">
-        This saved draft was made with the old rules
-      </h2>
-      <p class="mt-3 text-sm text-muted-foreground">
-        Season Run drafts now use ten global eight-card offers instead of the old franchise-era
-        rolls. Unfinished drafts from the previous rules cannot be converted, so they are kept
-        untouched until you decide what to do with them.
-      </p>
-      <p class="mt-3 text-sm text-muted-foreground">
-        Discarding removes the old draft from this browser and starts a fresh Season Run under the
-        current rules.
-      </p>
-      <button
-        type="button"
-        onclick={discardLegacy}
-        disabled={busy}
-        class="mt-5 inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-5 py-3 text-sm font-semibold text-destructive transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        Discard and restart
-      </button>
-      {#if actionError}
-        <p
-          role="alert"
-          class="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
-        >
-          {actionError}
-        </p>
-      {/if}
     </div>
   {:else if hasDraft && !started && board?.draft}
     <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">

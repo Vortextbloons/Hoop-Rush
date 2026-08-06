@@ -18,6 +18,7 @@ import {
 import {
   SeasonBlockValidationError,
   auditSeasonBlock,
+  createSeasonEffectsState,
   expandSeasonRunRosters,
   handleSubmitSeasonBlockCommand,
   rosterPlayerIdsOf,
@@ -26,6 +27,7 @@ import {
   seasonRotationSetDigest,
   type SeasonBlockSimulationInput,
 } from '@hoop-rush/engine';
+import type { SeasonEffectsState, SeasonStaminaInput } from '@hoop-rush/data-contracts';
 import { makeReport, type CliReport } from '../report.ts';
 import {
   seasonBlockAuditReportSchema,
@@ -91,6 +93,8 @@ export interface SeasonBlockRunnerState {
   rosterPlayerIds: Map<string, string>;
   summaries: SeasonGameSummary[];
   acceptedCommandIds: string[];
+  /** M2.4: the authoritative effects state (post-block of the last run). */
+  effects: SeasonEffectsState;
 }
 
 export function loadSeasonRunFixture(path: string): SeasonRun {
@@ -122,17 +126,37 @@ export function createSeasonBlockRunner(
   );
   const humanFranchiseId =
     run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
+  const expanded = expandSeasonRunRosters(run, catalog);
   return {
     run,
     catalog,
     schedule,
-    expanded: expandSeasonRunRosters(run, catalog),
+    expanded,
     profile,
     humanFranchiseId,
     rosterPlayerIds: rosterPlayerIdsOf(run),
     summaries: [],
     acceptedCommandIds: [],
+    effects: initialEffectsState(expanded),
   };
+}
+
+/**
+ * The schema-v6 run's initial M2.4 effects state: every expanded player must
+ * carry the build-time stamina profile (the catalog derives it), so the
+ * league-wide zero state is constructed from exactly 300 inputs.
+ */
+export function initialEffectsState(
+  expanded: ReadonlyMap<string, SeasonGamePlayerInput>,
+): SeasonEffectsState {
+  const staminaInputs: SeasonStaminaInput[] = [];
+  for (const player of expanded.values()) {
+    if (player.stamina === undefined) {
+      throw new Error(`expanded player ${player.playerVersionId} has no stamina profile`);
+    }
+    staminaInputs.push(player.stamina);
+  }
+  return createSeasonEffectsState(staminaInputs);
 }
 
 /** The 0-based block the run cursor expects next. */
@@ -178,6 +202,7 @@ export function runnerPipelineInput(
     humanFranchiseId: state.humanFranchiseId,
     rosterPlayerIds: state.rosterPlayerIds,
     priorSummaries: state.summaries,
+    effects: state.effects,
   };
 }
 
@@ -201,6 +226,7 @@ export function runBlockThroughHandler(
   }
   state.summaries = [...state.summaries, ...result.checkpoint.gameSummaries];
   state.acceptedCommandIds = [...state.acceptedCommandIds, command.commandId];
+  state.effects = result.checkpoint.effects;
   state.run = {
     ...state.run,
     cursor: { schemaVersion: 1, completedRounds: result.checkpoint.completedRounds },

@@ -166,7 +166,7 @@ describe('season block recap (M2.3)', () => {
     // a 1-game losing streak (not reported); celtics lose, lose, win -> 1.
     const win = (gameId: string): SeasonGameSummary => ({
       schemaVersion: 1,
-      summaryVersion: 'season-game-summary-v1',
+      summaryVersion: 'season-game-summary-v2',
       gameId,
       round: 1,
       homeFranchiseId: 'lakers',

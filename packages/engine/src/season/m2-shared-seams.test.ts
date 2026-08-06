@@ -9,6 +9,7 @@ import {
 } from './roster-rules.ts';
 import { buildMinimalRotation, matchStartingFive, rotationTargetMinutes } from './rotation.ts';
 import { seasonGenerationDigest } from './digest.ts';
+import type { SeasonGenerationDiagnostics } from '@hoop-rush/data-contracts';
 import { buildSeasonDraftCatalog, buildSeasonRotation } from '@hoop-rush/test-fixtures';
 
 const g = (id: string, ...positions: string[]): SeasonRosterMemberInput => ({
@@ -229,6 +230,40 @@ describe('season rotation (season-rotation-v2)', () => {
 describe('season generation digest', () => {
   it('is canonical regardless of input order', () => {
     const seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
+    const poolOf = (id: string) => {
+      const playerVersionIds = Array.from({ length: 20 }, (_, i) => {
+        const hex = `${String(i).padStart(2, '0')}0`.padEnd(32, '0');
+        return `pv-${hex}`;
+      });
+      const selections = playerVersionIds.slice(0, 10);
+      return {
+        franchiseId: id,
+        band: 'contender' as const,
+        identity: 'star-chaser' as const,
+        playerVersionIds,
+        anchors: [],
+        selections,
+        allocationSeedPaths: selections.map((_version, slot) => [
+          'ai',
+          'selection',
+          id,
+          String(slot),
+        ]),
+        repairCount: 0,
+      };
+    };
+    const diagnostics: SeasonGenerationDiagnostics = {
+      seed,
+      aiVersion: 'season-ai-v2',
+      rosterGenerationVersion: 'roster-generation-v2',
+      teamsGenerated: 2,
+      teamsRepaired: 0,
+      backtracks: 0,
+      nodesVisited: 2,
+      nodeBudget: 100000,
+      failedTeams: [],
+      unmetConstraints: [],
+    };
     const roster = (id: string) => ({
       franchiseId: id,
       players: [
@@ -321,9 +356,10 @@ describe('season generation digest', () => {
       );
     const base = {
       seed,
-      aiVersion: 'season-ai-v1',
-      rosterGenerationVersion: 'roster-generation-v1',
+      aiVersion: 'season-ai-v2',
+      rosterGenerationVersion: 'roster-generation-v2',
       rotationVersion: 'season-rotation-v2',
+      targetsVersion: 'roster-targets-v2',
       rosters: [roster('lakers'), roster('celtics')],
       ownership: [
         { playerVersionId: 'pv-2', ownerFranchiseId: 'lakers' },
@@ -334,6 +370,8 @@ describe('season generation digest', () => {
         { franchiseId: 'celtics', band: 'average' as const, identity: 'continuity' as const },
         { franchiseId: 'lakers', band: 'contender' as const, identity: 'star-chaser' as const },
       ],
+      aiPools: [poolOf('celtics'), poolOf('lakers')],
+      diagnostics,
     };
     const shuffled = {
       ...base,
@@ -347,6 +385,7 @@ describe('season generation digest', () => {
         { franchiseId: 'lakers', band: 'contender' as const, identity: 'star-chaser' as const },
         { franchiseId: 'celtics', band: 'average' as const, identity: 'continuity' as const },
       ],
+      aiPools: [poolOf('lakers'), poolOf('celtics')],
     };
     expect(seasonGenerationDigest(base)).toBe(seasonGenerationDigest(shuffled));
     expect(seasonGenerationDigest(base)).toMatch(/^[0-9a-f]{32}$/);

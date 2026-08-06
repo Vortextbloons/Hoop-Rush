@@ -401,31 +401,33 @@
   <title>Classic — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-  <div class="flex items-end justify-between gap-4">
-    <div>
-      <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Classic</p>
+<section class="mx-auto w-full max-w-6xl px-0 py-4 sm:px-6 sm:py-10">
+  <div class="flex items-start justify-between gap-3 px-3 sm:px-0">
+    <div class="min-w-0 flex-1">
+      <p class="font-mono text-[10px] tracking-[0.16em] text-primary uppercase sm:text-xs">
+        Classic
+      </p>
       {#if draft}
         <h1
-          class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
+          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:mt-2 sm:text-4xl md:text-5xl"
         >
           Classic · {variantLabel(draft.variant)}
         </h1>
       {:else}
         <h1
-          class="font-display mt-2 text-3xl font-extrabold tracking-tight uppercase sm:text-4xl md:text-5xl"
+          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:mt-2 sm:text-4xl md:text-5xl"
         >
           Five draft rounds
         </h1>
       {/if}
-      <p class="mt-3 max-w-xl text-sm text-muted-foreground">
+      <p class="mt-2 hidden max-w-xl text-sm text-muted-foreground sm:mt-3 sm:block">
         Each round rolls a franchise and an era. One franchise reroll and one era reroll, then live
         with the board.
       </p>
     </div>
     <a
       href={resolve('/')}
-      class="font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
+      class="shrink-0 pt-1 font-mono text-xs text-muted-foreground underline-offset-4 hover:underline"
     >
       Back
     </a>
@@ -451,8 +453,8 @@
     {:else if !draftLoaded}
       <p class="mt-8 font-mono text-sm text-muted-foreground">Loading draft…</p>
     {:else if !draft}
-      <div class="mt-10 flex flex-col gap-6 pb-32">
-        <div>
+      <div class="mt-6 flex flex-col gap-4 pb-32 sm:mt-10 sm:gap-6">
+        <div class="px-3 sm:px-0">
           <h2 class="font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
             Choose a variant
           </h2>
@@ -461,7 +463,7 @@
             lineup rules.
           </p>
         </div>
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-3 px-3 sm:grid-cols-2 sm:gap-4 sm:px-0">
           <button
             type="button"
             onclick={() => startDraft('ratings')}
@@ -511,13 +513,15 @@
         {/if}
       </div>
     {:else}
-      <div class="mt-10 flex flex-col gap-6 pb-32">
+      <div class="mt-6 flex flex-col gap-4 pb-32 sm:mt-10 sm:gap-6">
         {#if draft.status === 'drafting' && roll}
-          <div class="rounded-xl bg-surface-1">
-            <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div class="rounded-none bg-surface-1 sm:rounded-xl">
+            <div
+              class="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3"
+            >
               <span
                 data-round-heading
-                class="font-display text-lg font-extrabold tracking-tight uppercase"
+                class="font-display text-base font-extrabold tracking-tight uppercase sm:text-lg"
               >
                 Round {draft.round} of 5
               </span>
@@ -533,13 +537,13 @@
                 {/each}
               </span>
             </div>
-            <div class="flex flex-col gap-3 p-4">
+            <div class="flex flex-col gap-2 px-3 pb-3 sm:gap-3 sm:px-4 sm:pb-4">
               <div
-                class="grid w-full grid-cols-[minmax(0,1fr)_8.5rem] gap-2"
+                class="grid w-full grid-cols-2 gap-2"
                 aria-label={`Round ${draft.round} of 5 · ${rollIdentity?.displayLabel ?? rollFranchise?.displayName ?? roll.franchiseId} · ${rollEra?.label ?? roll.eraId}`}
               >
                 <span
-                  class="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 px-3 py-2"
+                  class="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
                   data-indicator="franchise"
                 >
                   {#if rollFranchise}
@@ -562,7 +566,7 @@
                   </span>
                 </span>
                 <span
-                  class="flex items-center justify-center rounded-lg bg-surface-2 px-3 py-2"
+                  class="flex items-center justify-center rounded-lg bg-surface-2 px-2.5 py-2 sm:px-3"
                   data-indicator="era"
                 >
                   <span class="font-display text-sm font-extrabold tracking-tight">
@@ -570,7 +574,7 @@
                   </span>
                 </span>
               </div>
-              <div class="grid w-full grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
+              <div class="grid w-full grid-cols-2 gap-2">
                 <button
                   type="button"
                   disabled={spinning || starting || !franchiseRerollAvailable}
@@ -580,12 +584,14 @@
                       ? 'Already used'
                       : 'No alternative'}
                   onclick={rerollFranchise}
-                  class="flex min-w-0 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40"
+                  class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg bg-surface-2 px-2 py-2 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-row sm:gap-2 sm:px-3"
                 >
-                  Reroll franchise
+                  <span class="text-[11px] font-semibold leading-tight sm:text-sm"
+                    >Reroll franchise</span
+                  >
                   {#if draft.rerolls.franchiseSpent}
                     <span
-                      class="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase"
+                      class="mt-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase sm:mt-0"
                     >
                       Used
                     </span>
@@ -600,12 +606,12 @@
                       ? 'Already used'
                       : 'No alternative'}
                   onclick={rerollEra}
-                  class="flex items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40"
+                  class="flex min-h-11 min-w-0 flex-col items-center justify-center rounded-lg bg-surface-2 px-2 py-2 text-center transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-row sm:gap-2 sm:px-3"
                 >
-                  Reroll era
+                  <span class="text-[11px] font-semibold leading-tight sm:text-sm">Reroll era</span>
                   {#if draft.rerolls.eraSpent}
                     <span
-                      class="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase"
+                      class="mt-0.5 font-mono text-[9px] font-bold tracking-[0.12em] text-muted-foreground uppercase sm:mt-0"
                     >
                       Used
                     </span>
@@ -661,8 +667,8 @@
               {actionError}
             </p>
           {/if}
-          <div class="rounded-xl bg-surface-1">
-            <div class="px-4 py-3">
+          <div class="rounded-none bg-surface-1 sm:rounded-xl">
+            <div class="px-3 py-3 sm:px-4">
               <h3 class="font-display text-lg font-extrabold tracking-tight uppercase">
                 Your five
               </h3>
@@ -670,7 +676,7 @@
             <ul class="flex flex-col divide-y divide-border/60">
               {#each draft.picks as pick (pick.round)}
                 {@const row = rowForPick(pick)}
-                <li class="flex items-center gap-3 px-4 py-3">
+                <li class="flex items-center gap-3 px-3 py-3 sm:px-4">
                   <span
                     class="w-16 shrink-0 font-mono text-[10px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
                   >
@@ -700,7 +706,7 @@
               {/each}
             </ul>
           </div>
-          <div>
+          <div class="px-3 sm:px-0">
             <button
               type="button"
               onclick={() => launchRun(completeDraft)}
@@ -710,7 +716,7 @@
               Retry starting the simulation
             </button>
           </div>
-          <p class="font-mono text-[10px] text-muted-foreground">
+          <p class="px-3 font-mono text-[10px] text-muted-foreground sm:px-0">
             seed {draft.seed} · draft {draft.draftId}
           </p>
         {/if}

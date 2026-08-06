@@ -32,10 +32,10 @@ import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
  * - A load validates the checkpoint and its rows, audits aggregate and
  *   effects-state reconciliation, and resumes at the last accepted boundary;
  *   unfinished worker work is never persisted.
- * - A stored schema-4 (save-schema-v1) run is never migrated or rewritten:
- *   the typed `SeasonRunIncompatibleError` /
- *   `loadActiveRunIncompatible()` path reports it for the discard screen,
- *   and only `clearSeasonRun(runId)` removes it after user confirmation.
+ * - M2.4: stored rows outside the current save-schema family (the v1/v2
+ *   development rows for schema-4 and schema-5 runs) are auto-cleared at
+ *   load and reported as null. They are never read, migrated, or preserved,
+ *   and there is no recovery record and no discard screen.
  */
 
 /** Everything the block commit writes, in one transaction. */
@@ -110,14 +110,6 @@ export interface SeasonRunRepository {
   loadActiveRunIndex(): Promise<SeasonActiveRunIndex | null>;
   /** Full validated snapshot; resumes at the last accepted boundary. */
   loadActiveRun(): Promise<SeasonRunSnapshot | null>;
-  /**
-   * Typed detection of an incompatible stored run (schema-4, save-schema
-   * v1). Returns null when no run is stored or the stored row is the
-   * current v2 family; throws `SeasonRunLoadError` when the stored row is
-   * corrupt beyond identification. Needs no schedule artifact and never
-   * rewrites the legacy row.
-   */
-  loadActiveRunIncompatible(): Promise<SeasonRunIncompatibleInfo | null>;
   /** All summaries of one block (gameId ascending). */
   loadBlockSummaries(runId: string, blockIndex: number): Promise<SeasonGameSummary[]>;
   /** Retained detail rows (gameId ascending). */

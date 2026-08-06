@@ -127,10 +127,10 @@ test.describe('sandbox draft journey', () => {
 
     const bar = page.getByRole('link', { name: /Your five/ });
     await expect(bar).toBeVisible();
-    await expect(page.getByText('Picked 0 of 5')).toBeVisible();
+    await expect(page.getByText('0/5')).toBeVisible();
 
     await placeAtSlot(page, "Shaquille O'Neal", 'Center slot 5');
-    await expect(page.getByText('Picked 1 of 5')).toBeVisible();
+    await expect(page.getByText('1/5')).toBeVisible();
 
     await bar.click();
     await expect(page.getByRole('heading', { name: 'Your five' })).toBeVisible();

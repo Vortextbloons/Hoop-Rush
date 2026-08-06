@@ -5,11 +5,14 @@
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
+  import type { SeasonGameSummary } from '@hoop-rush/data-contracts';
 
   /**
-   * Season Run roster tab (M2.3.5): the human franchise's ten drafted
-   * player-season versions with historical identity, OVR, and current rotation
-   * role/minutes. Rotation editing lives on the Rotation tab.
+   * Season Run roster tab (M2.4): the human franchise's ten drafted
+   * player-season versions with historical identity, OVR, current rotation
+   * role/minutes, the recorded fatigue band + workload, and last-game
+   * minutes. The chemistry panel shows the active-lineup chemistry and the
+   * strongest/weakest recorded pairs.
    */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
@@ -17,6 +20,7 @@
   const run = $derived(shell.run);
   const humanFranchiseId = $derived(shell.humanFranchiseId);
   const manifest = $derived(shell.manifest);
+  const effects = $derived(shell.snapshot?.effects ?? null);
 
   const roster = $derived(
     run !== null && humanFranchiseId !== null
@@ -30,6 +34,27 @@
     const row = editorRows.find((r) => r.member.playerVersionId === playerVersionId);
     return { role: row?.role ?? '—', minutes: row?.minutes ?? '—' };
   }
+
+  /** Accepted summaries of the last block (last-game minutes per player). */
+  let summaries: SeasonGameSummary[] = $state([]);
+
+  $effect(() => {
+    const hub = shell.hub;
+    const activeRunId = shell.snapshot?.run.runId ?? null;
+    const accepted = shell.snapshot?.acceptedBlocks ?? [];
+    if (hub === null || activeRunId === null || accepted.length === 0) {
+      summaries = [];
+      return;
+    }
+    const lastBlock = accepted[accepted.length - 1];
+    if (lastBlock === undefined) {
+      summaries = [];
+      return;
+    }
+    void hub.loadBlockSummaries(activeRunId, lastBlock.blockIndex).then((rows) => {
+      summaries = rows;
+    });
+  });
 </script>
 
 <svelte:head>
@@ -51,10 +76,11 @@
         Roster
       </h1>
       <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-        Ten player-season versions · role and minutes reflect the pending rotation
+        Ten player-season versions · role and minutes reflect the pending rotation · fatigue bands
+        reflect the last accepted block
       </p>
       <div class="mt-4">
-        <SeasonRosterList {roster} {manifest} {shell} {roleOf} />
+        <SeasonRosterList {roster} {manifest} {shell} {roleOf} {effects} {summaries} />
       </div>
     </section>
   {/if}

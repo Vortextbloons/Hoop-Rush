@@ -68,6 +68,7 @@ export function turnoverProbability(
   possEstimatePerTrip: number,
   profile: EraSimulationProfile,
   extraPressure = 0,
+  effectsAdjustment = 0,
 ): number {
   const c = ENGINE_CONSTANTS;
   const eraBase = profile.parameters.turnoverPerPossession;
@@ -81,7 +82,8 @@ export function turnoverProbability(
     (pressure - c.turnoverNeutralPressure) * c.turnoverPressureWeight -
     (handling - c.turnoverNeutralHandling) * c.turnoverHandlingWeight -
     (passing - c.turnoverNeutralPassing) * c.turnoverPassingWeight +
-    extraPressure;
+    extraPressure +
+    effectsAdjustment;
   return Math.min(c.turnoverMax, Math.max(c.turnoverMin, raw));
 }
 

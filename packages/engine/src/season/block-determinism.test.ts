@@ -30,7 +30,7 @@ describe('season block determinism and accounting (M2.3)', () => {
     const cancelled = (() => {
       const state = freshState();
       for (let i = 0; i < 3; i += 1) runBlock(state, i);
-      const input = pipelineInput(state.run, state.catalog, 3, state.summaries);
+      const input = pipelineInput(state.run, state.catalog, 3, state.summaries, state.effects);
       expect(() => simulateSeasonBlock(input, { cancelAfterGames: 75 })).toThrow(
         SeasonBlockCancelledError,
       );

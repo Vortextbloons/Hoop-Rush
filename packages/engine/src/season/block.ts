@@ -10,6 +10,7 @@ import {
   type SeasonCandidateCheckpoint,
   type SeasonCheckpointVersions,
   type SeasonDraftCatalog,
+  type SeasonEffectsState,
   type SeasonGamePlayerInput,
   type SeasonGameSimulationInput,
   type SeasonGameSummary,
@@ -35,7 +36,9 @@ import {
 import { SEASON_HOME_COURT_PROFILE } from './home-court.ts';
 import { auditSeasonBlockRecap, buildSeasonBlockRecap, seasonBlockGameCount } from './recap.ts';
 import { seasonRotationSetDigest, validateSeasonRotation } from './rotation.ts';
-import { simulateSeasonGame } from './season-game.ts';
+import { simulateSeasonGameWithEffects } from './season-game.ts';
+import { applySeasonGameEffectsTransition } from './effects.ts';
+import { applySeasonRecoveryTick } from './stamina.ts';
 import { auditSeasonStandings, reduceSeasonStandings } from './standings.ts';
 import type { Position } from '@hoop-rush/data-contracts';
 
@@ -55,6 +58,12 @@ import type { Position } from '@hoop-rush/data-contracts';
  * `priorSummaries` carries the compact summaries of every earlier block
  * (empty for block 0): the run snapshot does not retain compact summaries,
  * and standings/aggregates are cumulative, so the runner must supply them.
+ *
+ * M2.4: the input carries the pre-block effects state (300 player loads +
+ * 1,350 pair chemistries) and the candidate checkpoint freezes it (plus the
+ * stamina/chemistry/effect-targets material versions) unchanged. Transition
+ * folding is the stamina/chemistry workstream's seam; this pipeline only
+ * carries the state.
  *
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */
@@ -147,6 +156,15 @@ export interface SeasonBlockSimulationInput {
    * cumulative, and the run snapshot does not retain compact summaries.
    */
   priorSummaries: readonly SeasonGameSummary[];
+  /**
+   * M2.4: the pre-block/pregame effects state (300 player loads + 1,350
+   * pair chemistries) carried through the block. The pipeline carries this
+   * state into the candidate checkpoint unchanged: transition folding (per-
+   * game load and pair-chemistry deltas) is owned by the stamina/chemistry
+   * workstream and lands on top of this seam. For block 0, callers pass the
+   * zero state.
+   */
+  effects: SeasonEffectsState;
 }
 
 /** Duplicate-detection seam for the command handler. */
@@ -202,6 +220,15 @@ export function expandSeasonRunRosters(
         weightLbs: candidate.weightLbs,
         ratings: candidate.detailedRatings,
         tendencies: candidate.tendencies,
+        // M2.4: the build-time stamina profile rides the expanded input so
+        // the effects seam and recovery ticks read the derived rating.
+        stamina: {
+          schemaVersion: 1,
+          playerVersionId: player.playerVersionId,
+          rating: candidate.stamina.rating,
+          historicalMpg: candidate.stamina.historicalMpg,
+          derivationVersion: candidate.stamina.derivationVersion,
+        },
       });
     }
   }
@@ -327,15 +354,28 @@ export function simulateSeasonBlock(
   requireValidSeasonBlockCommand(input);
   const summaries: SeasonGameSummary[] = [];
   const retainedDetails: SeasonRetainedGameDetail[] = [];
+  // M2.4 recovery cadence: exactly one deterministic between-round tick per
+  // player (every team plays once per round, so the round boundary is the
+  // between-game interval). The tick fires once per round advance — before
+  // the first game of each new round — and never before the season's first
+  // game. `previousRound` starts at the block's first round minus one so a
+  // block continuation (round 10 -> 11) still ticks exactly once.
+  const { fromRound } = blockRoundRange(input.command.blockIndex);
+  let previousRound = fromRound - 1;
+  let effects = input.effects;
   for (const game of seasonBlockGamesOf(input.schedule, input.command.blockIndex)) {
     if (options.cancelAfterGames !== undefined && summaries.length >= options.cancelAfterGames) {
       throw new SeasonBlockCancelledError(input.command.blockIndex, summaries.length);
     }
-    const outcome = simulateSeasonBlockGame(input, game);
+    const outcome = simulateSeasonBlockGame(input, game, effects, {
+      skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
+    });
+    effects = outcome.effects;
+    previousRound = game.round;
     summaries.push(outcome.summary);
     if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
   }
-  return assembleSeasonBlockCandidate(input, summaries, retainedDetails);
+  return assembleSeasonBlockCandidate(input, summaries, retainedDetails, effects);
 }
 
 /**
@@ -361,15 +401,25 @@ export function seasonBlockGamesOf(
 }
 
 /**
- * Simulates one block game through `simulateSeasonGame` with the derived
- * named seed, verifies the result seed, converts to the compact summary, and
- * returns the retained detail row for human-team games. `no-legal-five-both`
- * is a typed invariant failure (a winner is never fabricated).
+ * Simulates one block game through `simulateSeasonGameWithEffects` with the
+ * derived named seed and the carried effects state, applies the between-game
+ * recovery tick (skipped only for the season's first game), verifies the
+ * result seed, converts to the compact summary (attaching the effects
+ * rollup), and returns the retained detail row for human-team games (with
+ * the full mechanism evidence) plus the authoritative next effects state.
+ * `no-legal-five-both` is a typed invariant failure (a winner is never
+ * fabricated).
  */
 export function simulateSeasonBlockGame(
   input: SeasonBlockSimulationInput,
   game: SeasonScheduleGame,
-): { summary: SeasonGameSummary; retainedDetail: SeasonRetainedGameDetail | null } {
+  effects: SeasonEffectsState,
+  options: { skipRecoveryTick?: boolean } = {},
+): {
+  summary: SeasonGameSummary;
+  retainedDetail: SeasonRetainedGameDetail | null;
+  effects: SeasonEffectsState;
+} {
   const command = input.command;
   const run = input.run;
   const gameNumberById = new Map(
@@ -429,7 +479,17 @@ export function simulateSeasonBlockGame(
     removals: [],
     homeCourt: SEASON_HOME_COURT_PROFILE,
   };
-  const result = simulateSeasonGame(gameInput, createEngineContext());
+  // M2.4: one deterministic between-game recovery tick precedes every game
+  // except the season's first (abstract schedule rounds; no calendar).
+  let pregame = effects;
+  if (!(options.skipRecoveryTick ?? false)) {
+    pregame = applySeasonRecoveryTick(pregame, staminaByVersionOf(input));
+  }
+  const { result, transition } = simulateSeasonGameWithEffects(
+    gameInput,
+    createEngineContext(),
+    pregame,
+  );
   if (result.seed !== seed) {
     throw new SeasonBlockInvariantError(
       `game ${game.gameId} result seed ${result.seed} does not match the derived seed ${seed}`,
@@ -442,7 +502,8 @@ export function simulateSeasonBlockGame(
       { seed, gameId: game.gameId, blockIndex: command.blockIndex },
     );
   }
-  const summary = seasonGameSummaryFromResult(result, game);
+  const nextEffects = applySeasonGameEffectsTransition(pregame, transition);
+  const summary = seasonGameSummaryFromResult(result, game, transition);
   const summaryFailures = auditSeasonGameSummary(summary);
   if (summaryFailures.length > 0) {
     throw new SeasonBlockInvariantError(
@@ -456,9 +517,27 @@ export function simulateSeasonBlockGame(
     (game.homeFranchiseId === input.humanFranchiseId ||
       game.awayFranchiseId === input.humanFranchiseId)
   ) {
-    retainedDetail = seasonRetainedDetailFromResult(result, game, run.runId);
+    retainedDetail = seasonRetainedDetailFromResult(result, game, run.runId, transition);
   }
-  return { summary, retainedDetail };
+  return { summary, retainedDetail, effects: nextEffects };
+}
+
+/**
+ * playerVersionId -> stamina rating for every expanded version (300 entries).
+ * Stamina profiles are required on every expanded player (the catalog
+ * derives them at build time), so a missing profile is an invariant failure.
+ */
+function staminaByVersionOf(input: SeasonBlockSimulationInput): Map<string, number> {
+  const ratings = new Map<string, number>();
+  for (const player of input.expanded.values()) {
+    if (player.stamina === undefined) {
+      throw new SeasonBlockInvariantError(
+        `expanded player ${player.playerVersionId} has no stamina profile`,
+      );
+    }
+    ratings.set(player.playerVersionId, player.stamina.rating);
+  }
+  return ratings;
 }
 
 /**
@@ -471,6 +550,7 @@ export function assembleSeasonBlockCandidate(
   input: SeasonBlockSimulationInput,
   summaries: readonly SeasonGameSummary[],
   retainedDetails: readonly SeasonRetainedGameDetail[],
+  effects: SeasonEffectsState,
 ): SeasonCandidateCheckpoint {
   const command = input.command;
   const run = input.run;
@@ -526,6 +606,11 @@ export function assembleSeasonBlockCandidate(
     gameVersion: run.versions.gameVersion,
     gameTargetsVersion: run.versions.gameTargetsVersion,
     seedDerivationVersion: run.versions.seedDerivationVersion,
+    // M2.4: the checkpoint freezes the stamina, chemistry, and effect-targets
+    // material versions with the effects state it carries.
+    staminaVersion: run.versions.staminaVersion,
+    chemistryVersion: run.versions.chemistryVersion,
+    effectsTargetsVersion: run.versions.effectsTargetsVersion,
   };
   const candidate: SeasonCandidateCheckpoint = {
     schemaVersion: 1,
@@ -543,6 +628,9 @@ export function assembleSeasonBlockCandidate(
     gameSummaries: [...summaries].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
     retainedDetails: [...retainedDetails].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
     recap,
+    // M2.4: the authoritative post-block effects state (300 player loads +
+    // 1,350 pair states after this block's games and recovery ticks).
+    effects,
     digest: '',
   };
   const digest = seasonCheckpointDigest(candidate);
@@ -732,6 +820,31 @@ export function auditSeasonBlock(
       rosterPlayerIds: input.rosterPlayerIds,
     }),
   );
+
+  // M2.4 effects-state audit: the candidate's authoritative post-block state
+  // covers exactly the 300 expanded versions and never reports a round beyond
+  // the checkpoint cursor (schema shape, ranges, pair canonicality, and
+  // uniqueness are enforced by seasonEffectsStateSchema at the boundary).
+  const effectsVersions = new Set(candidate.effects.playerStates.map((p) => p.playerVersionId));
+  if (effectsVersions.size !== 300) {
+    failures.push(
+      `effects state must carry 300 distinct players (got ${String(effectsVersions.size)})`,
+    );
+  }
+  const expandedVersions = new Set(input.expanded.keys());
+  if (
+    effectsVersions.size === expandedVersions.size &&
+    ![...effectsVersions].every((version) => expandedVersions.has(version))
+  ) {
+    failures.push('effects state player set does not match the expanded rosters');
+  }
+  for (const player of candidate.effects.playerStates) {
+    if (player.lastCompletedRound > candidate.completedRounds) {
+      failures.push(
+        `effects ${player.playerVersionId} lastCompletedRound ${String(player.lastCompletedRound)} exceeds ${String(candidate.completedRounds)}`,
+      );
+    }
+  }
 
   // Digest verification.
   const recomputed = seasonCheckpointDigest(candidate);

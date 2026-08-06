@@ -86,7 +86,7 @@ function finalSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameSum
   const awayScore = box(awayPlayers).points;
   return {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v1',
+    summaryVersion: 'season-game-summary-v2',
     gameId: 's000001',
     round: 1,
     homeFranchiseId: 'lakers',
@@ -107,7 +107,7 @@ function finalSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameSum
 function forfeitSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameSummary {
   return {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v1',
+    summaryVersion: 'season-game-summary-v2',
     gameId: 's000002',
     round: 1,
     homeFranchiseId: 'celtics',

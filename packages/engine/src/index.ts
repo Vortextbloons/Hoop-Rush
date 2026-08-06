@@ -105,8 +105,10 @@ export {
 } from './season/rotation-planner.ts';
 export {
   simulateSeasonGame,
+  simulateSeasonGameWithEffects,
   checkSeasonGameResult,
   type SeasonGameAvailabilitySeam,
+  type SeasonGameEffectsMode,
 } from './season/season-game.ts';
 export { seasonGenerationDigest, type SeasonGenerationDigestInput } from './season/digest.ts';
 export {
@@ -114,7 +116,6 @@ export {
   seasonDraftStateCanonical,
   applySeasonDraftCommand,
   type SeasonAiGenerationDeps,
-  type SeasonAiGenerationInput,
 } from './season/draft.ts';
 export {
   drawGlobalOffer,
@@ -128,12 +129,32 @@ export {
   SOLO_BAND_QUOTAS,
   DUO_BAND_QUOTAS,
   AI_GENERATION_NODE_BUDGET,
+  BAND_ORDER,
+  IDENTITIES,
+  DEFAULT_IDENTITY_PRIORITY_ROLES,
   SeasonAiGenerationError,
+  SeasonAiTargetsError,
   generateAiLeague,
   assignAiBandsAndIdentities,
   evaluateSeasonRoster,
+  fiveReachableFromCounts,
+  identityPriorityRolesOf,
   runSeasonRosterCalibrationSeeds,
+  validateSeasonRosterTargets,
+  type SeasonAiGenerationInput,
+  type SeasonAiGenerationPhase,
+  type SeasonRosterCalibrationRunV2,
 } from './season/ai.ts';
+export {
+  TIER_ORDER,
+  TIER_PERCENTILES,
+  nearestRankThreshold,
+  rolePercentileThresholds,
+  percentileTierOf,
+  playerPercentileTier,
+  type PercentileTier,
+  type RoleThresholds,
+} from './season/ai-scoring.ts';
 // M2.3 full-league blocks: home-court profile, compact summaries, aggregate
 // folding, game reconstruction, checkpoint digests, block recaps, and the
 // authoritative block pipeline shared by the worker and the CLI.
@@ -148,7 +169,51 @@ export {
   seasonGameSummaryFromResult,
   seasonRetainedDetailFromResult,
   auditSeasonGameSummary,
+  seasonEffectsRollupFromEvidence,
+  seasonEffectsEvidenceOf,
 } from './season/game-summary.ts';
+// M2.4 stamina and chemistry effects: fixed-point fatigue transitions,
+// canonical pair chemistry, the neutral effects hook, and the effects state
+// helpers the block pipeline and calibration use.
+export {
+  SEASON_STAMINA_RATING_FLOOR,
+  SEASON_STAMINA_RATING_CEIL,
+  SEASON_STAMINA_RATING_PER_MPG,
+  staminaRatingFromMpg,
+  historicalMpgOf,
+  onCourtFatigueBp,
+  offCourtRecoveryBp,
+  halftimeRemovalBp,
+  regulationShareBp,
+  recentLoadAfterGame,
+  stintMultiplierBp,
+  applySeasonRecoveryTick,
+} from './season/stamina.ts';
+export {
+  SEASON_CHEMISTRY_HALF_SHARED,
+  seasonPairKey,
+  seasonPairIsCanonical,
+  canonicalRosterPairs,
+  unitPairs,
+  pairChemistryBasisPoints,
+  unitChemistryBasisPoints,
+  unitSharedPossessions,
+} from './season/chemistry.ts';
+export {
+  SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP,
+  SEASON_EFFECTS_HANDLER_FATIGUE_MAX_PP,
+  SEASON_EFFECTS_DEFENSE_FATIGUE_MAX_PP,
+  SEASON_EFFECTS_TURNOVER_SECURITY_MAX_PP,
+  SEASON_EFFECTS_ASSIST_CONVERSION_MAX_PP,
+  SEASON_EFFECTS_HELP_DEFENSE_MAX_PP,
+  SEASON_EFFECTS_MECHANISM_CAPS,
+  createSeasonEffectsBuffer,
+  createSeasonEffectsState,
+  applySeasonGameEffectsTransition,
+  type SeasonEffectsHook,
+  type SeasonEffectsBuffer,
+  type SeasonEffectsTripFacts,
+} from './season/effects.ts';
 export {
   foldSeasonTeamAggregates,
   foldSeasonPlayerAggregates,

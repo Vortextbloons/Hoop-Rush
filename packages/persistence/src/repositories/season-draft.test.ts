@@ -5,6 +5,7 @@ import {
   buildClassicDraftState,
   buildFixtureEvaluations,
   buildSeasonAiAssignments,
+  buildSeasonAiPools,
   buildSeasonDraftState,
   buildSeasonLeague,
   buildSeasonRosters,
@@ -15,7 +16,6 @@ import {
   SEASON_AI_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROTATION_VERSION,
-  seasonDraftLegacyStateSchema,
   seasonDraftStateSchema,
   type SeasonDraftCommandRecord,
   type SeasonLeagueGenerationResult,
@@ -90,7 +90,7 @@ function generationResult(seed: string): SeasonLeagueGenerationResult {
     ),
   );
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     seed,
     aiVersion: SEASON_AI_VERSION,
     rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
@@ -104,6 +104,7 @@ function generationResult(seed: string): SeasonLeagueGenerationResult {
     ),
     rotations,
     aiAssignments,
+    aiPools: buildSeasonAiPools(aiAssignments, 'lakers'),
     evaluations: buildFixtureEvaluations(rosters, aiAssignments),
     diagnostics: {
       seed,
@@ -135,7 +136,7 @@ describe('season draft repository (dexie)', () => {
     await challenge.saveActiveRun(runRecord());
     const loaded = await season.loadSeasonDraft();
     expect(loaded?.draft.runId).toBe('fixture-draft-1');
-    expect(loaded?.saveSchemaVersion).toBe(2);
+    expect(loaded?.saveSchemaVersion).toBe(3);
     expect(await db.seasonDrafts.count()).toBe(1);
     expect((await challenge.loadActiveRun())?.run.runId).toBe('challenge-run-1');
   });
@@ -208,7 +209,7 @@ describe('season draft repository (dexie)', () => {
     expect(withoutTimestamp(loaded as StoredSeasonDraft)).toEqual(saved);
   });
 
-  it('loads a legacy v1 stored draft unchanged (no migration, no delete)', async () => {
+  it('auto-clears a stored v1/v2 development row and returns null', async () => {
     const { season, db } = makeAdapter();
     const legacyDraft = {
       schemaVersion: 1,
@@ -251,42 +252,40 @@ describe('season draft repository (dexie)', () => {
       generation: null,
     } as never);
     const loaded = await season.loadSeasonDraft();
-    expect(loaded).not.toBeNull();
-    expect(loaded?.saveSchemaVersion).toBe(1);
-    const loadedDraft = seasonDraftLegacyStateSchema.parse(loaded?.draft);
-    expect(loadedDraft.draftVersion).toBe('season-draft-v1');
-    expect(loadedDraft.rolls).toHaveLength(1);
-    expect(await db.seasonDrafts.count()).toBe(1);
-    // The legacy record persists untouched until the user discards it.
-    await season.clearSeasonDraft();
+    expect(loaded).toBeNull();
+    // The development row is auto-cleared, never read or preserved.
+    expect(await db.seasonDrafts.count()).toBe(0);
+
+    await db.seasonDrafts.put({
+      recordId: SEASON_DRAFT_RECORD_ID,
+      saveSchemaVersion: 2,
+      draft: buildSeasonDraftState(),
+      generation: null,
+    } as never);
     expect(await season.loadSeasonDraft()).toBeNull();
+    expect(await db.seasonDrafts.count()).toBe(0);
   });
 
-  it('surfaces corrupt stored rows instead of returning them', async () => {
+  it('surfaces corrupt v3 rows while auto-clearing malformed save schemas', async () => {
     const { season, db } = makeAdapter();
     await season.saveSeasonDraft(recordFromState(buildSeasonDraftState()));
+    // A v3 row with a corrupt draft snapshot throws (corruption surfaces).
+    await db.seasonDrafts.put({
+      recordId: SEASON_DRAFT_RECORD_ID,
+      saveSchemaVersion: 3,
+      draft: { corrupted: true },
+      generation: null,
+    } as never);
+    await expect(season.loadSeasonDraft()).rejects.toThrow();
+    // Unknown save-schema families are development rows: auto-cleared.
     await db.seasonDrafts.put({
       recordId: SEASON_DRAFT_RECORD_ID,
       saveSchemaVersion: 99,
       draft: buildSeasonDraftState(),
       generation: null,
     } as never);
-    await expect(season.loadSeasonDraft()).rejects.toThrow();
-    await db.seasonDrafts.put({
-      recordId: SEASON_DRAFT_RECORD_ID,
-      saveSchemaVersion: 1,
-      draft: { corrupted: true },
-      generation: null,
-    } as never);
-    await expect(season.loadSeasonDraft()).rejects.toThrow();
-    // A v2-state draft stored under the legacy save version is corrupt too.
-    await db.seasonDrafts.put({
-      recordId: SEASON_DRAFT_RECORD_ID,
-      saveSchemaVersion: 1,
-      draft: buildSeasonDraftState(),
-      generation: null,
-    } as never);
-    await expect(season.loadSeasonDraft()).rejects.toThrow();
+    expect(await season.loadSeasonDraft()).toBeNull();
+    expect(await db.seasonDrafts.count()).toBe(0);
   });
 
   it('never returns a row with the wrong recordId as the active draft', async () => {

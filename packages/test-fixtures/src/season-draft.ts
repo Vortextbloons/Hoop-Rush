@@ -1,18 +1,22 @@
 import {
   SEASON_AI_VERSION,
+  SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
+  SEASON_STAMINA_VERSION,
   playerVersionId,
   seasonDigestHex,
   type SeasonAiAssignment,
+  type SeasonAiPool,
   type SeasonDraftCatalog,
   type SeasonDraftCatalogPool,
   type SeasonDraftCandidate,
   type SeasonDraftState,
   type SeasonLeague,
   type SeasonRoster,
+  type SeasonRosterTargets,
   type SeasonRotation,
   type SeasonRun,
 } from '@hoop-rush/data-contracts';
@@ -169,6 +173,12 @@ export function buildSeasonDraftCandidate(input: {
       blockAttemptRate: 6 + ((index * 2) % 14),
       crashOffensiveGlassRate: 8 + ((index * 2) % 18),
     },
+    // M2.4: build-time stamina profile (season-stamina-v1); 45..95 rating.
+    stamina: {
+      rating: 45 + ((index * 7) % 51),
+      historicalMpg: 20 + ((index * 5) % 41),
+      derivationVersion: SEASON_STAMINA_VERSION,
+    },
   };
 }
 
@@ -202,11 +212,12 @@ export function buildSeasonDraftCatalog(
   }
   return {
     schemaVersion: 1,
-    catalogVersion: SEASON_DRAFT_VERSION,
+    catalogVersion: SEASON_DRAFT_CATALOG_VERSION,
     dataVersion: 'm10-ratings-v3.4',
     ratingsVersion: 'ratings-v3.4',
     positionNormalizationVersion: 'position-v3',
     playerVersionIdVersion: 'player-version-id-v1',
+    staminaVersion: SEASON_STAMINA_VERSION,
     pools,
     candidates,
   };
@@ -380,6 +391,163 @@ export function buildFixtureSeasonDraftFacts(): SeasonRun['draft'] {
         ],
       },
     ],
+  };
+}
+
+/**
+ * Synthetic roster-generation-v2 pools for fixture runs: one 20-player pool
+ * per AI franchise (29 pools for a 30-team league; the human franchise gets
+ * none), each with ten selections and one allocation seed path per
+ * selection. Pool versions are synthetic (never on a roster); the block
+ * pipeline consumes final rosters only, so the pools are recorded facts.
+ */
+export function buildSeasonAiPools(
+  assignments: SeasonAiAssignment[],
+  humanFranchiseId: string,
+): SeasonAiPool[] {
+  return assignments
+    .filter((assignment) => assignment.franchiseId !== humanFranchiseId)
+    .map((assignment, poolIndex) => {
+      const playerVersionIds = Array.from({ length: 20 }, (_, slot) => {
+        const hex = `${String(poolIndex).padStart(2, '0')}${String(slot).padStart(2, '0')}`.padEnd(
+          32,
+          '0',
+        );
+        return `pv-${hex}`;
+      });
+      const selections = playerVersionIds.slice(0, 10);
+      return {
+        franchiseId: assignment.franchiseId,
+        band: assignment.band,
+        identity: assignment.identity,
+        playerVersionIds,
+        anchors: [],
+        selections,
+        allocationSeedPaths: selections.map((_version, slot) => [
+          'ai',
+          'selection',
+          assignment.franchiseId,
+          String(slot),
+        ]),
+        repairCount: 0,
+      };
+    });
+}
+
+const ALL_ROSTER_ROLES = [
+  'primary-creation',
+  'secondary-creation',
+  'perimeter-shooting',
+  'rim-finishing-interior-scoring',
+  'perimeter-defense',
+  'interior-defense',
+  'offensive-rebounding',
+  'defensive-rebounding',
+] as const;
+
+/**
+ * The frozen `roster-targets-v2` artifact values for fixture runs (M2.4).
+ * Matches the committed seasonRosterTargetsSchema policy exactly; the
+ * `measured` facts are synthetic calibration-style values (fixtures never
+ * run real calibration).
+ */
+export function buildFixtureRosterTargets(): SeasonRosterTargets {
+  return {
+    schemaVersion: 2,
+    targetsVersion: SEASON_ROSTER_TARGETS_VERSION,
+    policy: {
+      bandQuotas: {
+        solo: { contender: 4, playoff: 8, average: 10, weaker: 7 },
+        duo: { contender: 4, playoff: 8, average: 9, weaker: 7 },
+      },
+      guaranteedAnchors: { contender: 2, playoff: 1, average: 0, weaker: 0 },
+      extraEliteRollProbability: { contender: 0.65, playoff: 0.35, average: 0.2, weaker: 0.08 },
+      tierRanges: {
+        contender: { elite: [2, 4], strong: [5, 8], useful: [6, 10] },
+        playoff: { elite: [1, 2], strong: [4, 7], useful: [7, 10] },
+        average: { elite: [0, 1], strong: [3, 6], useful: [8, 11] },
+        weaker: { elite: [0, 1], strong: [1, 4], useful: [7, 10] },
+      },
+      identityPriorityRoles: {
+        'star-chaser': ['primary-creation', 'secondary-creation', 'rim-finishing-interior-scoring'],
+        'shooting-first': ['perimeter-shooting'],
+        'defense-first': ['perimeter-defense', 'interior-defense'],
+        'depth-builder': [...ALL_ROSTER_ROLES],
+        continuity: [...ALL_ROSTER_ROLES],
+        'active-trader': [...ALL_ROSTER_ROLES],
+      },
+      roleCoverageThreshold: 35,
+      completionTargets: { guards: 4, forwards: 4, centers: 3 },
+      poolSize: 20,
+      rosterSize: 10,
+      percentileTiers: { elite: 0.9, strong: 0.75, useful: 0.5 },
+      bandPoolScoreCaps: { contender: 100, playoff: 92, average: 84, weaker: 74 },
+      maxPoolStrengthOutliers: 4,
+      maxRosterStrengthOutliers: 2,
+      nodeBudgets: { anchorMatching: 20000, poolRepair: 40000, rosterSelection: 600000 },
+    },
+    calibration: {
+      calibrationSeedCount: 256,
+      validationSeedCount: 64,
+      generatedAtIso: '2026-08-04T00:00:00.000Z',
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
+      gates: {
+        failureRateMax: 0,
+        minBandSeparation: 3,
+        anchorFulfillmentMin: 1,
+        extraEliteRateTolerance: 0.05,
+        heldOutPassShare: 0.95,
+        orderInvarianceFailuresMax: 0,
+        superTeamIncidenceMax: 0.08,
+      },
+    },
+    measured: {
+      bands: {
+        contender: {
+          range: [52, 92],
+          median: 74,
+          eliteShare: 0.7,
+          strongShare: 0.3,
+          usefulShare: 0,
+        },
+        playoff: {
+          range: [46, 82],
+          median: 65,
+          eliteShare: 0.4,
+          strongShare: 0.6,
+          usefulShare: 0.1,
+        },
+        average: {
+          range: [40, 72],
+          median: 57,
+          eliteShare: 0.1,
+          strongShare: 0.5,
+          usefulShare: 0.6,
+        },
+        weaker: {
+          range: [32, 64],
+          median: 49,
+          eliteShare: 0.05,
+          strongShare: 0.3,
+          usefulShare: 0.8,
+        },
+      },
+      identities: {
+        'star-chaser': { range: [40, 88], median: 64 },
+        'depth-builder': { range: [40, 85], median: 62 },
+        'defense-first': { range: [40, 85], median: 62 },
+        'shooting-first': { range: [40, 85], median: 62 },
+        continuity: { range: [40, 85], median: 62 },
+        'active-trader': { range: [40, 85], median: 62 },
+      },
+      anchorFulfillment: 1,
+      extraEliteRate: 0.4,
+      superTeamIncidence: 0.02,
+      poolLegalityFailures: 0,
+      selectionFailures: 0,
+      generationFailures: 0,
+    },
   };
 }
 

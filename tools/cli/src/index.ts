@@ -369,6 +369,8 @@ const COMMANDS: Record<string, CommandEntry> = {
           'validation-seeds': getOptionString(args, 'validation-seeds') ?? undefined,
           out: getOptionString(args, 'out') ?? undefined,
           manifest: getOptionString(args, 'manifest') ?? undefined,
+          targets: getOptionString(args, 'targets') ?? undefined,
+          validate: hasOption(args, 'validate'),
         }),
     };
   }),
@@ -403,7 +405,7 @@ const COMMANDS: Record<string, CommandEntry> = {
     const { seasonGameCalibrate, SEASON_GAME_CALIBRATE_OPTIONS } =
       await import('./commands/season-game.ts');
     return {
-      options: SEASON_GAME_CALIBRATE_OPTIONS,
+      options: { ...SEASON_GAME_CALIBRATE_OPTIONS, effects: true },
       run: (args) =>
         seasonGameCalibrate({
           fixture: getOptionString(args, 'fixture') ?? null,
@@ -412,6 +414,7 @@ const COMMANDS: Record<string, CommandEntry> = {
           workers: getOptionString(args, 'workers') ?? null,
           out: getOptionString(args, 'out') ?? null,
           manifest: getOptionString(args, 'manifest') ?? null,
+          effects: getOptionString(args, 'effects') ?? null,
         }),
     };
   }),
@@ -468,6 +471,74 @@ const COMMANDS: Record<string, CommandEntry> = {
           'seed-to': getOptionString(args, 'seed-to') ?? null,
           workers: getOptionString(args, 'workers') ?? null,
           constants: getOptionString(args, 'constants') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
+  'season effects sensitivity': command(async () => {
+    const { seasonEffectsSensitivity, SEASON_EFFECTS_OPTIONS } =
+      await import('./commands/season-effects.ts');
+    return {
+      options: SEASON_EFFECTS_OPTIONS,
+      run: (args) =>
+        seasonEffectsSensitivity({
+          fixture: getOptionString(args, 'fixture') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
+  'season effects distribution': command(async () => {
+    const { seasonEffectsDistribution, SEASON_EFFECTS_OPTIONS } =
+      await import('./commands/season-effects.ts');
+    return {
+      options: SEASON_EFFECTS_OPTIONS,
+      run: (args) =>
+        seasonEffectsDistribution({
+          fixture: getOptionString(args, 'fixture') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
+  'season effects roles': command(async () => {
+    const { seasonEffectsRoles, SEASON_EFFECTS_OPTIONS } =
+      await import('./commands/season-effects.ts');
+    return {
+      options: SEASON_EFFECTS_OPTIONS,
+      run: (args) =>
+        seasonEffectsRoles({
+          fixture: getOptionString(args, 'fixture') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
+  'season effects calibrate': command(async () => {
+    const { seasonEffectsCalibrate, SEASON_EFFECTS_OPTIONS } =
+      await import('./commands/season-effects.ts');
+    return {
+      options: SEASON_EFFECTS_OPTIONS,
+      run: (args) =>
+        seasonEffectsCalibrate({
+          fixture: getOptionString(args, 'fixture') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
           out: getOptionString(args, 'out') ?? null,
           manifest: getOptionString(args, 'manifest') ?? null,
           validate: getOptionString(args, 'validate') ?? null,

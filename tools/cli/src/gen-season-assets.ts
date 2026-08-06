@@ -20,9 +20,11 @@ import {
   SEASON_AI_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_CHEMISTRY_VERSION,
   SEASON_COMMITTED_DRAFT_SEED,
   SEASON_COMMITTED_SCHEDULE_SEED,
   SEASON_DRAFT_VERSION,
+  SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -35,9 +37,11 @@ import {
   SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
+  SEASON_STAMINA_VERSION,
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
   seasonLeagueSchema,
+  seasonRosterTargetsSchema,
   seasonRunSchema,
   seasonScheduleSchema,
   type SeasonDraftCommand,
@@ -81,11 +85,14 @@ function cmd(
  * Plays the committed one-human draft to completion through real commands:
  * create -> per round: draw the global eight-card offer, pick the best
  * selectable card -> finalize -> generate the AI league. All commands are
- * recorded so the reproduction fixture replays them byte-for-byte.
+ * recorded so the reproduction fixture replays them byte-for-byte. The AI
+ * generation consumes the verified `roster-targets-v2` artifact from the
+ * packaged season directory.
  */
 function playCommittedDraft(
   catalog: ReturnType<typeof seasonDraftCatalogSchema.parse>,
   league: SeasonLeague,
+  targets: ReturnType<typeof seasonRosterTargetsSchema.parse>,
 ): {
   state: SeasonDraftState;
   commands: SeasonDraftCommand[];
@@ -95,7 +102,7 @@ function playCommittedDraft(
   let state: SeasonDraftState | null = null;
   const apply = (command: SeasonDraftCommand): SeasonDraftState => {
     const result = applySeasonDraftCommand(state, catalog, command, {
-      generate: (input) => generateAiLeague(input),
+      generate: (input) => generateAiLeague({ ...input, targets }),
     });
     if (result.record.status !== 'accepted' || result.state === null) {
       const message =
@@ -149,7 +156,7 @@ function playCommittedDraft(
     league,
     humanFranchiseIds: humanRosters.map((roster) => roster.franchiseId),
     humanRosters,
-    targets: null,
+    targets,
   });
   state = apply(cmd('fixture-generate', state.revision, { kind: 'generate-ai-league' }));
   return { state, commands, generation };
@@ -199,6 +206,9 @@ function buildRun(
       leadersVersion: SEASON_LEADERS_VERSION,
       homeCourtVersion: SEASON_HOME_COURT_VERSION,
       checkpointVersion: SEASON_CHECKPOINT_VERSION,
+      staminaVersion: SEASON_STAMINA_VERSION,
+      chemistryVersion: SEASON_CHEMISTRY_VERSION,
+      effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
     },
     league: correctedLeague,
     rosters: generation.rosters,
@@ -356,6 +366,7 @@ function buildRun(
       })),
     },
     aiAssignments: generation.aiAssignments,
+    aiPools: generation.aiPools,
     rotations: generation.rotations,
     generationAudit: {
       seed: SEASON_COMMITTED_DRAFT_SEED,
@@ -389,8 +400,11 @@ function main(): void {
   const catalog = seasonDraftCatalogSchema.parse(
     readJson(resolve(SEASON_DIR, 'draft-catalog.json')),
   );
+  const targets = seasonRosterTargetsSchema.parse(
+    readJson(resolve(SEASON_DIR, 'roster-targets.json')),
+  );
 
-  const { state, commands, generation } = playCommittedDraft(catalog, league);
+  const { state, commands, generation } = playCommittedDraft(catalog, league, targets);
   const fixture = buildRun(schedule, league, state, generation);
   mkdirSync(FIXTURES_DIR, { recursive: true });
   writeFileSync(resolve(FIXTURES_DIR, 'season-run.json'), `${JSON.stringify(fixture, null, 2)}\n`);

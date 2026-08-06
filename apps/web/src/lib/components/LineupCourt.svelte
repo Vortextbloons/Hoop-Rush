@@ -81,15 +81,15 @@
   });
 </script>
 
-<div id="your-five" class="scroll-mt-4">
+<div id="your-five" class="scroll-mt-4 px-0 sm:px-0">
   <p class="sr-only" role="status" aria-live="polite">{announcement}</p>
-  <div class="flex items-center justify-between gap-3 px-1 py-3">
+  <div class="flex items-center justify-between gap-3 px-3 py-2.5 sm:px-1 sm:py-3">
     <h2 class="font-display text-lg font-extrabold tracking-tight uppercase">Your five</h2>
     <span class="shrink-0 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">
       {filledCount}/5
     </span>
   </div>
-  <div class="p-2 sm:p-3">
+  <div class="px-1.5 sm:p-3">
     <div class="court" role="group" aria-label="Your five on the court">
       <span class="court-arc" aria-hidden="true"></span>
       <span class="court-rim" aria-hidden="true"></span>
@@ -152,9 +152,9 @@
 <style>
   .court {
     position: relative;
-    min-height: 340px;
+    min-height: 300px;
     overflow: hidden;
-    border-radius: 0.625rem;
+    border-radius: 0;
     background: #c98c45;
     background-image: repeating-linear-gradient(
       90deg,
@@ -166,6 +166,7 @@
   @media (min-width: 640px) {
     .court {
       min-height: 410px;
+      border-radius: 0.625rem;
     }
   }
   @media (min-width: 1024px) {
@@ -220,6 +221,7 @@
     transform: translate(-50%, -50%);
     text-align: center;
     scroll-margin-top: 3rem;
+    scroll-margin-bottom: 5.5rem;
   }
   @media (min-width: 640px) {
     .slot {

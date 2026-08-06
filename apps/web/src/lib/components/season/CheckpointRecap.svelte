@@ -11,19 +11,23 @@
     franchiseIdentityOf,
     type SeasonFaceRef,
   } from '$lib/season/season-branding';
+  import {
+    deltaToPp,
+    MECHANISM_LABEL,
+    type BlockMechanismEvidenceRow,
+  } from '$lib/season/season-effects-view';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
 
   /**
    * Factual block recap (spec/2.0/02 recap, spec/2.0/11 block recap, M2.3,
-   * M2.3.5). Leads with record and standings movement, then notable
-   * performances, streaks, version-versus-version spotlights, and the next
-   * human games. Every claim derives from accepted saved facts; nothing is
-   * invented. When a manifest plus the face/roster indexes are provided,
-   * movement rows and streaks brand franchise logos, and performances and
-   * spotlights brand player headshots with their historical source logos.
-   * M2.3 recaps deliberately do NOT report injuries, trades, Influence,
-   * stamina, or chemistry claims — those systems ship in later milestones.
+   * M2.3.5, M2.4). Leads with record and standings movement, then notable
+   * performances, streaks, version-versus-version spotlights, the next
+   * human games, and — since M2.4 — a stamina/chemistry section built from
+   * the recorded mechanism evidence of the block's human games: opportunity
+   * counts, the average recorded state band, and the bounded aggregate
+   * probability movement. Every claim derives from accepted saved facts;
+   * nothing is invented.
    */
 
   let {
@@ -34,6 +38,7 @@
     manifest = null,
     faces = new Map(),
     rosterByVersion = new Map(),
+    effectsEvidence = [],
   }: {
     recap: SeasonBlockRecap;
     humanRecord: SeasonRecordMovement | null;
@@ -43,6 +48,8 @@
     manifest?: HoopRushManifest | null;
     faces?: ReadonlyMap<string, SeasonFaceRef>;
     rosterByVersion?: ReadonlyMap<string, SeasonRosterEntry>;
+    /** M2.4: aggregated mechanism evidence of the block's human games. */
+    effectsEvidence?: BlockMechanismEvidenceRow[];
   } = $props();
 
   const movementLabel = (movement: SeasonRecordMovement): string =>
@@ -324,4 +331,48 @@
       </ol>
     {/if}
   </section>
+
+  {#if effectsEvidence.length > 0}
+    <section
+      aria-labelledby="recap-effects-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+    >
+      <h2
+        id="recap-effects-heading"
+        class="font-display text-base font-extrabold uppercase tracking-tight"
+      >
+        Stamina and chemistry
+      </h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Recorded effects from your {effectsEvidence.length === 1 ? 'game' : 'games'} this block — every
+        figure comes from the saved mechanism evidence, not a simulation estimate.
+      </p>
+      <ul class="mt-3 flex flex-col gap-2">
+        {#each effectsEvidence as row (row.mechanism + row.side)}
+          {@const avgPct = Math.round(row.avgInputFraction * 100)}
+          <li class="flex flex-col gap-0.5 rounded-lg bg-surface-2 p-3">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <p class="text-sm font-semibold">{MECHANISM_LABEL[row.mechanism]}</p>
+              <p class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                {row.side} · {row.opportunities} opportunities
+              </p>
+            </div>
+            <p class="font-mono text-[10px] text-muted-foreground">
+              Average state {avgPct}% ·
+              {#if row.mechanism === 'assist-conversion' || row.mechanism === 'turnover-security' || row.mechanism === 'help-defense'}
+                unit chemistry
+              {:else}
+                fatigue
+              {/if}
+              · aggregate probability movement
+              {deltaToPp(row.deltaTotals) >= 0 ? '+' : ''}
+              {deltaToPp(row.deltaTotals).toFixed(2)}pp (per-opportunity {deltaToPp(
+                row.deltaMin,
+              ).toFixed(2)} to {deltaToPp(row.deltaMax).toFixed(2)}pp)
+            </p>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 </div>

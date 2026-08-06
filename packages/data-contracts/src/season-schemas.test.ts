@@ -16,6 +16,7 @@ import {
   seasonDraftCommandRecordSchema,
   seasonRotationSchema,
   seasonAiAssignmentSchema,
+  seasonAiPoolSchema,
   seasonGenerationDiagnosticsSchema,
   seasonLeagueGenerationResultSchema,
   seasonRosterTargetsSchema,
@@ -1152,7 +1153,7 @@ describe('season rotation schema (M2.1)', () => {
   });
 });
 
-describe('season AI contracts (M2.1)', () => {
+describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
   it('round-trips assignments and diagnostics', () => {
     const assignment = {
       franchiseId: 'lakers',
@@ -1163,8 +1164,8 @@ describe('season AI contracts (M2.1)', () => {
     expect(() => seasonAiAssignmentSchema.parse({ ...assignment, band: 'super' })).toThrow();
     const diagnostics = {
       seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
-      aiVersion: 'season-ai-v1',
-      rosterGenerationVersion: 'roster-generation-v1',
+      aiVersion: 'season-ai-v2',
+      rosterGenerationVersion: 'roster-generation-v2',
       teamsGenerated: 29,
       teamsRepaired: 1,
       backtracks: 2,
@@ -1176,6 +1177,83 @@ describe('season AI contracts (M2.1)', () => {
     expect(roundTrip(seasonGenerationDiagnosticsSchema, diagnostics).backtracks).toBe(2);
   });
 
+  it('round-trips a pool and rejects duplicate versions, outside selections, and invalid anchors', () => {
+    const member = (n: number) => `pv-${String(n).padStart(32, '0')}`;
+    const pool = {
+      franchiseId: 'lakers',
+      band: 'contender',
+      identity: 'star-chaser',
+      playerVersionIds: Array.from({ length: 20 }, (_, n) => member(n)),
+      anchors: [
+        {
+          playerVersionId: member(0),
+          qualifyingRole: 'primary-creation',
+          percentileTier: 'elite',
+          roleScore: 92,
+          percentileThreshold: 88,
+          seedPath: ['ai', 'anchors', 'lakers', '0'],
+        },
+      ],
+      selections: Array.from({ length: 10 }, (_, n) => member(n)),
+      allocationSeedPaths: Array.from({ length: 10 }, (_, n) => [
+        'ai',
+        'selection',
+        'lakers',
+        String(n),
+      ]),
+      repairCount: 1,
+    };
+    expect(roundTrip(seasonAiPoolSchema, pool).selections).toHaveLength(10);
+    // 19 and 21 member pools are rejected.
+    expect(() =>
+      seasonAiPoolSchema.parse({
+        ...pool,
+        playerVersionIds: pool.playerVersionIds.slice(0, 19),
+        selections: pool.selections.slice(0, 9),
+        allocationSeedPaths: pool.allocationSeedPaths.slice(0, 9),
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonAiPoolSchema.parse({
+        ...pool,
+        playerVersionIds: [...pool.playerVersionIds, member(20), member(21)],
+      }),
+    ).toThrow();
+    // Duplicate pool versions are rejected.
+    expect(() =>
+      seasonAiPoolSchema.parse({
+        ...pool,
+        playerVersionIds: [...pool.playerVersionIds.slice(0, 19), pool.playerVersionIds[0]],
+      }),
+    ).toThrow();
+    // Selections outside the pool are rejected.
+    expect(() =>
+      seasonAiPoolSchema.parse({
+        ...pool,
+        selections: [...pool.selections.slice(0, 9), member(20)],
+      }),
+    ).toThrow();
+    // Invalid anchors are rejected (member outside the pool, wrong tier).
+    expect(() =>
+      seasonAiPoolSchema.parse({
+        ...pool,
+        anchors: [{ ...pool.anchors[0], playerVersionId: member(20) }],
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonAiPoolSchema.parse({
+        ...pool,
+        anchors: [{ ...pool.anchors[0], percentileTier: 'strong' }],
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonAiPoolSchema.parse({
+        ...pool,
+        anchors: [{ ...pool.anchors[0], roleScore: 101 }],
+      }),
+    ).toThrow();
+  });
+
   it('rejects wrong versions in the generation result and targets', () => {
     const run = buildRun();
     const rosters = run.rosters;
@@ -1183,21 +1261,23 @@ describe('season AI contracts (M2.1)', () => {
     const aiAssignments = run.aiAssignments;
     const evaluations = run.evaluations;
     const ownership = run.ownership;
+    const aiPools = run.aiPools;
     const result = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       seed: SEED,
-      aiVersion: 'season-ai-v1',
-      rosterGenerationVersion: 'roster-generation-v1',
+      aiVersion: 'season-ai-v2',
+      rosterGenerationVersion: 'roster-generation-v2',
       rotationVersion: 'season-rotation-v2',
       rosters,
       ownership,
       rotations,
       aiAssignments,
+      aiPools,
       evaluations,
       diagnostics: {
         seed: SEED,
-        aiVersion: 'season-ai-v1',
-        rosterGenerationVersion: 'roster-generation-v1',
+        aiVersion: 'season-ai-v2',
+        rosterGenerationVersion: 'roster-generation-v2',
         teamsGenerated: 29,
         teamsRepaired: 0,
         backtracks: 0,
@@ -1209,10 +1289,170 @@ describe('season AI contracts (M2.1)', () => {
       digest: '0'.repeat(32),
     };
     expect(roundTrip(seasonLeagueGenerationResultSchema, result).rosters).toHaveLength(30);
+    expect(roundTrip(seasonLeagueGenerationResultSchema, result).aiPools).toHaveLength(29);
     expect(() =>
-      seasonLeagueGenerationResultSchema.parse({ ...result, aiVersion: 'season-ai-v2' }),
+      seasonLeagueGenerationResultSchema.parse({ ...result, aiVersion: 'season-ai-v1' }),
     ).toThrow();
+    expect(() =>
+      seasonLeagueGenerationResultSchema.parse({ ...result, schemaVersion: 1 }),
+    ).toThrow();
+    expect(() =>
+      seasonLeagueGenerationResultSchema.parse({
+        ...result,
+        aiPools: result.aiPools.slice(0, 28),
+      }),
+    ).not.toThrow();
+    expect(() =>
+      seasonLeagueGenerationResultSchema.parse({
+        ...result,
+        aiPools: result.aiPools.slice(0, 27),
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonLeagueGenerationResultSchema.parse({
+        ...result,
+        aiPools: [...result.aiPools, result.aiPools[0]],
+      }),
+    ).toThrow();
+  });
+
+  it('round-trips the frozen roster-targets-v2 artifact', () => {
     const targets = {
+      schemaVersion: 2,
+      targetsVersion: 'roster-targets-v2',
+      policy: {
+        bandQuotas: {
+          solo: { contender: 4, playoff: 8, average: 10, weaker: 7 },
+          duo: { contender: 4, playoff: 8, average: 9, weaker: 7 },
+        },
+        guaranteedAnchors: { contender: 2, playoff: 1, average: 0, weaker: 0 },
+        extraEliteRollProbability: { contender: 0.65, playoff: 0.35, average: 0.2, weaker: 0.08 },
+        tierRanges: {
+          contender: { elite: [2, 4], strong: [5, 8], useful: [6, 10] },
+          playoff: { elite: [1, 2], strong: [4, 7], useful: [7, 10] },
+          average: { elite: [0, 1], strong: [3, 6], useful: [8, 11] },
+          weaker: { elite: [0, 1], strong: [1, 4], useful: [7, 10] },
+        },
+        identityPriorityRoles: {
+          'star-chaser': [
+            'primary-creation',
+            'secondary-creation',
+            'rim-finishing-interior-scoring',
+          ],
+          'shooting-first': ['perimeter-shooting'],
+          'defense-first': ['perimeter-defense', 'interior-defense'],
+          'depth-builder': [
+            'primary-creation',
+            'secondary-creation',
+            'perimeter-shooting',
+            'rim-finishing-interior-scoring',
+            'perimeter-defense',
+            'interior-defense',
+            'offensive-rebounding',
+            'defensive-rebounding',
+          ],
+          continuity: [
+            'primary-creation',
+            'secondary-creation',
+            'perimeter-shooting',
+            'rim-finishing-interior-scoring',
+            'perimeter-defense',
+            'interior-defense',
+            'offensive-rebounding',
+            'defensive-rebounding',
+          ],
+          'active-trader': [
+            'primary-creation',
+            'secondary-creation',
+            'perimeter-shooting',
+            'rim-finishing-interior-scoring',
+            'perimeter-defense',
+            'interior-defense',
+            'offensive-rebounding',
+            'defensive-rebounding',
+          ],
+        },
+        roleCoverageThreshold: 35,
+        completionTargets: { guards: 4, forwards: 4, centers: 3 },
+        poolSize: 20,
+        rosterSize: 10,
+        percentileTiers: { elite: 0.9, strong: 0.75, useful: 0.5 },
+        bandPoolScoreCaps: { contender: 100, playoff: 92, average: 84, weaker: 74 },
+        maxPoolStrengthOutliers: 4,
+        maxRosterStrengthOutliers: 2,
+        nodeBudgets: { anchorMatching: 20000, poolRepair: 40000, rosterSelection: 600000 },
+      },
+      calibration: {
+        calibrationSeedCount: 256,
+        validationSeedCount: 64,
+        generatedAtIso: '2026-08-04T00:00:00.000Z',
+        aiVersion: 'season-ai-v2',
+        rosterGenerationVersion: 'roster-generation-v2',
+        gates: {
+          failureRateMax: 0,
+          minBandSeparation: 3,
+          anchorFulfillmentMin: 1,
+          extraEliteRateTolerance: 0.05,
+          heldOutPassShare: 0.95,
+          orderInvarianceFailuresMax: 0,
+          superTeamIncidenceMax: 0.08,
+        },
+      },
+      measured: {
+        bands: {
+          contender: {
+            range: [52, 92],
+            median: 74,
+            eliteShare: 0.7,
+            strongShare: 0.3,
+            usefulShare: 0,
+          },
+          playoff: {
+            range: [46, 82],
+            median: 65,
+            eliteShare: 0.4,
+            strongShare: 0.6,
+            usefulShare: 0.1,
+          },
+          average: {
+            range: [40, 72],
+            median: 57,
+            eliteShare: 0.1,
+            strongShare: 0.5,
+            usefulShare: 0.6,
+          },
+          weaker: {
+            range: [32, 64],
+            median: 49,
+            eliteShare: 0.05,
+            strongShare: 0.3,
+            usefulShare: 0.8,
+          },
+        },
+        identities: {
+          'star-chaser': { range: [40, 88], median: 64 },
+          'depth-builder': { range: [40, 85], median: 62 },
+          'defense-first': { range: [40, 85], median: 62 },
+          'shooting-first': { range: [40, 85], median: 62 },
+          continuity: { range: [40, 85], median: 62 },
+          'active-trader': { range: [40, 85], median: 62 },
+        },
+        anchorFulfillment: 1,
+        extraEliteRate: 0.4,
+        superTeamIncidence: 0.02,
+        poolLegalityFailures: 0,
+        selectionFailures: 0,
+        generationFailures: 0,
+      },
+    };
+    const parsed = roundTrip(seasonRosterTargetsSchema, targets);
+    expect(parsed.policy.bandQuotas.solo.contender).toBe(4);
+    expect(parsed.measured.bands.contender.median).toBe(74);
+    expect(parsed.calibration.gates.minBandSeparation).toBe(3);
+  });
+
+  it('rejects the v1 targets artifact, wrong target versions, and malformed v2 policy', () => {
+    const v1Targets = {
       schemaVersion: 1,
       targetsVersion: 'roster-targets-v1',
       calibration: {
@@ -1243,9 +1483,40 @@ describe('season AI contracts (M2.1)', () => {
         duoBands: { contender: 4, playoff: 8, average: 9, weaker: 7 },
       },
     };
-    expect(roundTrip(seasonRosterTargetsSchema, targets).roleCoverageMinimum).toBe(8);
+    // The v1 artifact is rejected outright (never produced or read by v2).
+    expect(() => seasonRosterTargetsSchema.parse(v1Targets)).toThrow();
+    expect(() => seasonRosterTargetsSchema.parse({ ...v1Targets, schemaVersion: 2 })).toThrow();
+    // Wrong target versions are rejected.
     expect(() =>
-      seasonRosterTargetsSchema.parse({ ...targets, targetsVersion: 'roster-targets-v2' }),
+      seasonRosterTargetsSchema.parse({
+        schemaVersion: 2,
+        targetsVersion: 'roster-targets-v1',
+      }),
+    ).toThrow();
+    // Null targets are rejected (the artifact is required, never nullable).
+    expect(() => seasonRosterTargetsSchema.parse(null)).toThrow();
+    expect(seasonRosterTargetsSchema.safeParse(undefined).success).toBe(false);
+  });
+
+  it('round-trips a schema-6 run with its aiPools', () => {
+    const run = roundTrip(seasonRunSchema, buildRun());
+    expect(run.schemaVersion).toBe(6);
+    expect(run.versions.runSchemaVersion).toBe(6);
+    expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
+    expect(run.versions.aiVersion).toBe('season-ai-v2');
+    expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
+    expect(run.aiPools).toHaveLength(29);
+    expect(run.aiPools.every((pool) => pool.selections.length === 10)).toBe(true);
+    expect(() =>
+      seasonRunSchema.parse({ ...run, aiPools: run.aiPools.slice(0, 28) }),
+    ).not.toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, aiPools: run.aiPools.slice(0, 27) })).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, aiPools: [] })).toThrow();
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, aiVersion: 'season-ai-v1' },
+      }),
     ).toThrow();
   });
 });

@@ -3,7 +3,9 @@ import {
   SEASON_AI_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
+  SEASON_CHEMISTRY_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -20,6 +22,7 @@ import {
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
   SEASON_SEED_NAMESPACES,
+  SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
   PLAYER_VERSION_ID_VERSION,
   seasonNamespaceSeed,
@@ -33,16 +36,17 @@ import {
 } from '@hoop-rush/data-contracts';
 
 /**
- * Assembles the initial v4 Season Run snapshot from a completed draft and its
- * AI league generation (spec/2.0/07 persistence, M2.1 -> M2.3).
+ * Assembles the initial schema-6 Season Run snapshot from a completed draft
+ * and its AI league generation (spec/2.0/07 persistence, M2.1 -> M2.4).
  *
  * TEMPORARY UI-BOUNDARY ORCHESTRATION: the authoritative builder belongs in
  * the engine/CLI (the CLI's `gen-season-assets.ts` owns an equivalent v3
  * builder). This adapter reproduces the same recorded facts — corrected league
  * control, rosters, ownership, schedule reference, scheduled games, zero
  * standings, cursor 0, postseason scaffold, draft facts, assignments,
- * rotations, audit, and evaluations — and freezes the M2.3 material versions.
- * The result is validated with `seasonRunSchema` before it can be promoted.
+ * private AI pools, rotations, audit, and evaluations — and freezes the M2.4
+ * material versions. The result is validated with `seasonRunSchema` before it
+ * can be promoted.
  */
 
 /** SHA-256 content hash of the committed schedule artifact (Web Crypto). */
@@ -135,6 +139,9 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       leadersVersion: SEASON_LEADERS_VERSION,
       homeCourtVersion: SEASON_HOME_COURT_VERSION,
       checkpointVersion: SEASON_CHECKPOINT_VERSION,
+      staminaVersion: SEASON_STAMINA_VERSION,
+      chemistryVersion: SEASON_CHEMISTRY_VERSION,
+      effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
     },
     league: correctedLeague,
     rosters: generation.rosters,
@@ -210,6 +217,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       })),
     },
     aiAssignments: generation.aiAssignments,
+    aiPools: generation.aiPools,
     rotations: generation.rotations,
     generationAudit: {
       seed: generation.seed,

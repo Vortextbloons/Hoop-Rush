@@ -4,6 +4,7 @@ import {
   seasonDraftStateSchema,
   seedSchema,
   type SeasonDraftState,
+  type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
@@ -12,7 +13,12 @@ import {
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonDraftReproduceReportSchema } from '../report-schemas.ts';
-import { loadSeasonDraftCatalog, readJsonFile } from './season-data.ts';
+import {
+  DEFAULT_MANIFEST,
+  loadSeasonDraftCatalog,
+  loadSeasonRosterTargets,
+  readJsonFile,
+} from './season-data.ts';
 
 /**
  * `season draft reproduce` (spec/2.0 M2.3.5): replays a committed command
@@ -65,7 +71,18 @@ export function seasonDraftReproduce(args: {
     );
   }
   const input = parsedInput.data;
-  const catalog = loadSeasonDraftCatalog(args.manifest ?? undefined);
+  const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
+  const catalog = loadSeasonDraftCatalog(manifestPath);
+  let targets: SeasonRosterTargets;
+  try {
+    targets = loadSeasonRosterTargets(manifestPath);
+  } catch (error) {
+    return makeReport(
+      'season draft reproduce',
+      { input: inputPath },
+      { failures: [(error as Error).message], exitCode: 2 },
+    );
+  }
 
   let state: SeasonDraftState | null = input.initialState;
   const rejections: Array<{ commandId: string; errorCode: string; message: string }> = [];
@@ -74,12 +91,8 @@ export function seasonDraftReproduce(args: {
     const result = applySeasonDraftCommand(state, catalog, command, {
       generate: (generationInput) =>
         generateAiLeague({
-          seed: generationInput.seed,
-          catalog: generationInput.catalog,
-          league: generationInput.league,
-          humanFranchiseIds: generationInput.humanFranchiseIds,
-          humanRosters: generationInput.humanRosters,
-          targets: null,
+          ...generationInput,
+          targets,
         }),
     });
     state = result.state;

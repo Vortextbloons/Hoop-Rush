@@ -258,6 +258,29 @@
   const showEmptyState = $derived(
     shell.ready && shell.error === null && shell.hub !== null && shell.snapshot === null,
   );
+
+  /** M2.4: the stored run was made under older Season rules. */
+  const incompatible = $derived(shell.hub?.incompatible ?? null);
+
+  /** Two-step discard: step 1 explains, step 2 (dialog) confirms. */
+  let discardOpen = $state(false);
+  let discarding = $state(false);
+  let discardError: string | null = $state(null);
+
+  async function confirmDiscard(): Promise<void> {
+    if (discarding) return;
+    discarding = true;
+    discardError = null;
+    try {
+      await shell.hub?.discardIncompatibleRun();
+      discardOpen = false;
+      await goto(resolve('/season'));
+    } catch (error) {
+      discardError = error instanceof Error ? error.message : String(error);
+    } finally {
+      discarding = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -283,6 +306,65 @@
       <p class="font-mono text-sm text-muted-foreground">Loading your season…</p>
     </div>
   </div>
+{:else if incompatible !== null}
+  <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
+    <div class="scoreboard-panel p-6">
+      <p class="text-label uppercase text-muted-foreground">Season rules changed</p>
+      <h1 class="mt-1 font-display text-3xl font-extrabold">
+        This saved season was made with the old rules
+      </h1>
+      <p class="mt-3 text-sm leading-relaxed text-muted-foreground">
+        Season Run now simulates stamina, workload, and pair chemistry, so runs started under the
+        previous rules (schema {incompatible.storedRunSchemaVersion}) cannot continue. Nothing has
+        been deleted: the saved season stays in your browser until you decide.
+      </p>
+      <div class="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onclick={() => (discardOpen = true)}
+          class="inline-flex items-center gap-2 rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Discard run and restart
+        </button>
+        <a
+          href={resolve('/season')}
+          class="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+        >
+          Keep it and go back
+        </a>
+      </div>
+      {#if discardError !== null}
+        <p class="mt-3 text-sm text-destructive" role="alert">{discardError}</p>
+      {/if}
+    </div>
+  </div>
+  <Dialog.Root bind:open={discardOpen}>
+    <Dialog.Content
+      class="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-background p-6 shadow-xl outline-none"
+    >
+      <Dialog.Title class="font-display text-2xl font-extrabold">Discard this season?</Dialog.Title>
+      <Dialog.Description class="mt-1 text-sm text-muted-foreground">
+        This permanently deletes the saved season (schema {incompatible.storedRunSchemaVersion})
+        from this browser. It cannot be recovered. Your next run starts fresh under the current
+        rules.
+      </Dialog.Description>
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Dialog.Close
+          class="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+        >
+          Cancel
+        </Dialog.Close>
+        <button
+          type="button"
+          onclick={confirmDiscard}
+          disabled={discarding}
+          class="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {discarding ? 'Discarding…' : 'Yes, discard the season'}
+        </button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
 {:else if showEmptyState}
   <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
     <div class="scoreboard-panel p-6">

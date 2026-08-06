@@ -51,8 +51,8 @@
   }
 </script>
 
-<section class="rounded-xl bg-surface-1" aria-labelledby="draft-value-heading">
-  <div class="flex flex-wrap items-start justify-between gap-3 px-4 py-3">
+<section class="rounded-none bg-surface-1 sm:rounded-xl" aria-labelledby="draft-value-heading">
+  <div class="flex flex-wrap items-start justify-between gap-3 px-3 py-2.5 sm:px-4 sm:py-3">
     <div>
       <p class="font-mono text-[10px] tracking-[0.14em] text-primary uppercase">Context</p>
       <h2
@@ -69,7 +69,7 @@
     {/if}
   </div>
   {#if players.length < 2}
-    <p class="p-4 text-sm text-muted-foreground">
+    <p class="px-3 py-3 text-sm text-muted-foreground sm:p-4">
       Choose at least two players to see marginal fit.
     </p>
   {:else}

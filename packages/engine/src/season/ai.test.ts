@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SEASON_AI_VERSION,
+  SEASON_ROSTER_GENERATION_VERSION,
+  SEASON_ROSTER_TARGETS_VERSION,
   seasonLeagueGenerationResultSchema,
   seasonRosterCalibrationRunSchema,
   type SeasonDraftCatalog,
   type SeasonDraftCandidate,
   type SeasonLeagueGenerationResult,
+  type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
 import {
   buildSeasonDraftCatalog,
@@ -13,11 +17,14 @@ import {
 } from '@hoop-rush/test-fixtures';
 import {
   SeasonAiGenerationError,
+  SeasonAiTargetsError,
   assignAiBandsAndIdentities,
   evaluateSeasonRoster,
   generateAiLeague,
   runSeasonRosterCalibrationSeeds,
+  validateSeasonRosterTargets,
 } from './ai.ts';
+import { ROSTER_ROLES } from './ai-scoring.ts';
 import {
   completionTargetsMet,
   validateSeasonRoster,
@@ -27,12 +34,115 @@ import { rotationTargetMinutes } from './rotation.ts';
 import { seasonDigestHex } from '@hoop-rush/data-contracts';
 
 /**
- * Season Run M2.1 AI generation tests: identity and band quotas, role
- * coverage, unique ownership, legal ten-player rosters and rotations,
- * determinism, human-roster preservation, band ordering, scoring identity
- * differentiation (Overall has no effect), calibration runs, and bounded
- * failure with typed diagnostics.
+ * Season Run M2.4 AI generation tests (season-ai-v2, roster-generation-v2):
+ * identity and band quotas, anchor guarantees, exclusive 20-member private
+ * pools, legal ten-player rosters and rotations, determinism, human-roster
+ * preservation, band ordering, scoring identity differentiation (Overall has
+ * no effect), calibration runs, and bounded failure with typed diagnostics.
  */
+
+/** The eight roles in canonical order (ROSTER_ROLES export). */
+const ALL_ROLES = [...ROSTER_ROLES];
+
+function buildTestTargets(): SeasonRosterTargets {
+  return {
+    schemaVersion: 2,
+    targetsVersion: SEASON_ROSTER_TARGETS_VERSION,
+    policy: {
+      bandQuotas: {
+        solo: { contender: 4, playoff: 8, average: 10, weaker: 7 },
+        duo: { contender: 4, playoff: 8, average: 9, weaker: 7 },
+      },
+      guaranteedAnchors: { contender: 2, playoff: 1, average: 0, weaker: 0 },
+      extraEliteRollProbability: { contender: 0.65, playoff: 0.35, average: 0.2, weaker: 0.08 },
+      tierRanges: {
+        contender: { elite: [2, 4], strong: [5, 8], useful: [6, 10] },
+        playoff: { elite: [1, 2], strong: [4, 7], useful: [7, 10] },
+        average: { elite: [0, 1], strong: [3, 6], useful: [8, 11] },
+        weaker: { elite: [0, 1], strong: [1, 4], useful: [7, 10] },
+      },
+      identityPriorityRoles: {
+        'star-chaser': ['primary-creation', 'secondary-creation', 'rim-finishing-interior-scoring'],
+        'shooting-first': ['perimeter-shooting'],
+        'defense-first': ['perimeter-defense', 'interior-defense'],
+        'depth-builder': ALL_ROLES,
+        continuity: ALL_ROLES,
+        'active-trader': ALL_ROLES,
+      },
+      roleCoverageThreshold: 35,
+      completionTargets: { guards: 4, forwards: 4, centers: 3 },
+      poolSize: 20,
+      rosterSize: 10,
+      percentileTiers: { elite: 0.9, strong: 0.75, useful: 0.5 },
+      bandPoolScoreCaps: { contender: 100, playoff: 92, average: 84, weaker: 74 },
+      maxPoolStrengthOutliers: 4,
+      maxRosterStrengthOutliers: 2,
+      nodeBudgets: { anchorMatching: 20000, poolRepair: 40000, rosterSelection: 600000 },
+    },
+    calibration: {
+      calibrationSeedCount: 64,
+      validationSeedCount: 32,
+      generatedAtIso: '2026-01-01T00:00:00.000Z',
+      aiVersion: SEASON_AI_VERSION,
+      rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
+      gates: {
+        failureRateMax: 0,
+        minBandSeparation: 3,
+        anchorFulfillmentMin: 1,
+        extraEliteRateTolerance: 0.05,
+        heldOutPassShare: 0.95,
+        orderInvarianceFailuresMax: 0,
+        superTeamIncidenceMax: 0.08,
+      },
+    },
+    measured: {
+      bands: {
+        contender: {
+          range: [55, 90],
+          median: 70,
+          eliteShare: 0.2,
+          strongShare: 0.4,
+          usefulShare: 0.6,
+        },
+        playoff: {
+          range: [50, 85],
+          median: 64,
+          eliteShare: 0.15,
+          strongShare: 0.35,
+          usefulShare: 0.55,
+        },
+        average: {
+          range: [45, 80],
+          median: 58,
+          eliteShare: 0.1,
+          strongShare: 0.3,
+          usefulShare: 0.5,
+        },
+        weaker: {
+          range: [40, 74],
+          median: 52,
+          eliteShare: 0.05,
+          strongShare: 0.2,
+          usefulShare: 0.45,
+        },
+      },
+      identities: {
+        'star-chaser': { range: [40, 90], median: 60 },
+        'depth-builder': { range: [40, 90], median: 60 },
+        'defense-first': { range: [40, 90], median: 60 },
+        'shooting-first': { range: [40, 90], median: 60 },
+        continuity: { range: [40, 90], median: 60 },
+        'active-trader': { range: [40, 90], median: 60 },
+      },
+      anchorFulfillment: 1,
+      extraEliteRate: 0,
+      superTeamIncidence: 0,
+      poolLegalityFailures: 0,
+      selectionFailures: 0,
+      generationFailures: 0,
+    },
+  };
+}
 
 const CATALOG = buildSeasonDraftCatalog({
   franchiseIds: ['lakers', 'celtics', 'bulls', 'warriors', 'heat', 'knicks', 'spurs', 'jazz'],
@@ -66,7 +176,7 @@ function soloInput(seed: string, humanFranchiseId = 'lakers') {
         playerVersionIds: humanRoster(CATALOG, humanFranchiseId, '1990s'),
       },
     ],
-    targets: null,
+    targets: buildTestTargets(),
   };
 }
 
@@ -83,12 +193,57 @@ function membersOf(
   });
 }
 
+describe('season AI targets validation', () => {
+  it('accepts a matching v2 targets artifact', () => {
+    expect(() => {
+      validateSeasonRosterTargets(buildTestTargets());
+    }).not.toThrow();
+  });
+
+  it('rejects mismatched targets versions before any allocation', () => {
+    expect(() => {
+      validateSeasonRosterTargets({
+        ...buildTestTargets(),
+        targetsVersion: 'roster-targets-v1',
+      } as unknown as SeasonRosterTargets);
+    }).toThrow(/mismatch/);
+    expect(() => {
+      validateSeasonRosterTargets({
+        ...buildTestTargets(),
+        calibration: {
+          ...buildTestTargets().calibration,
+          aiVersion: 'season-ai-v1',
+        } as unknown as SeasonRosterTargets['calibration'],
+      });
+    }).toThrow(/mismatch/);
+    expect(() => {
+      validateSeasonRosterTargets({
+        ...buildTestTargets(),
+        calibration: {
+          ...buildTestTargets().calibration,
+          rosterGenerationVersion: 'roster-generation-v1',
+        } as unknown as SeasonRosterTargets['calibration'],
+      });
+    }).toThrow(/mismatch/);
+    expect(() => {
+      generateAiLeague({
+        ...soloInput(seedFromString('bad-targets')),
+        targets: {
+          ...buildTestTargets(),
+          targetsVersion: 'roster-targets-v1',
+        } as unknown as SeasonRosterTargets,
+      });
+    }).toThrow(SeasonAiTargetsError);
+  });
+});
+
 describe('season AI band and identity assignment', () => {
   it('assigns solo quotas 4/8/10/7 with balanced identities', () => {
     const assignments = assignAiBandsAndIdentities({
       seed: seedFromString('bands'),
       league: LEAGUE,
       humanFranchiseIds: ['lakers'],
+      targets: buildTestTargets(),
     });
     expect(assignments).toHaveLength(30);
     const ai = assignments.filter((a) => a.franchiseId !== 'lakers');
@@ -117,6 +272,7 @@ describe('season AI band and identity assignment', () => {
       seed: seedFromString('bands-duo'),
       league: LEAGUE,
       humanFranchiseIds: ['lakers', 'celtics'],
+      targets: buildTestTargets(),
     });
     const ai = assignments.filter((a) => !['lakers', 'celtics'].includes(a.franchiseId));
     expect(ai).toHaveLength(28);
@@ -139,6 +295,7 @@ describe('season AI band and identity assignment', () => {
         seed,
         league: LEAGUE,
         humanFranchiseIds: ['lakers'],
+        targets: buildTestTargets(),
       }).filter((a) => a.franchiseId !== 'lakers');
       const map = new Map<string, number>();
       for (const a of rows) map.set(a.identity, (map.get(a.identity) ?? 0) + 1);
@@ -164,6 +321,7 @@ describe('season AI league generation', () => {
     expect(result.rosters).toHaveLength(30);
     expect(result.ownership).toHaveLength(300);
     expect(result.rotations).toHaveLength(30);
+    expect(result.aiPools).toHaveLength(29);
     expect(new Set(result.ownership.map((o) => o.playerVersionId)).size).toBe(300);
     for (const roster of result.rosters) {
       const members = membersOf(result, roster.franchiseId);
@@ -173,6 +331,11 @@ describe('season AI league generation', () => {
     for (const rotation of result.rotations) {
       expect(rotationTargetMinutes(rotation)).toBe(240);
       expect(rotation.closingFive).toEqual(rotation.starters);
+    }
+    for (const pool of result.aiPools) {
+      expect(pool.playerVersionIds).toHaveLength(20);
+      expect(new Set(pool.playerVersionIds).size).toBe(20);
+      expect(pool.selections).toHaveLength(10);
     }
     expect(result.diagnostics.failedTeams).toEqual([]);
     expect(result.diagnostics.unmetConstraints).toEqual([]);
@@ -194,10 +357,15 @@ describe('season AI league generation', () => {
       league: LEAGUE,
       humanFranchiseIds: ['lakers'],
       humanRosters: [{ franchiseId: 'lakers', playerVersionIds: human }],
-      targets: null,
+      targets: buildTestTargets(),
     });
     const humanRosterRow = result.rosters.find((r) => r.franchiseId === 'lakers');
     expect(humanRosterRow?.players.map((p) => p.playerVersionId).sort()).toEqual([...human].sort());
+    for (const pool of result.aiPools) {
+      for (const versionId of pool.playerVersionIds) {
+        expect(human).not.toContain(versionId);
+      }
+    }
     for (const roster of result.rosters.filter((r) => r.franchiseId !== 'lakers')) {
       for (const player of roster.players) {
         expect(human).not.toContain(player.playerVersionId);
@@ -243,18 +411,16 @@ describe('season AI league generation', () => {
         { franchiseId: 'lakers', playerVersionIds: lakersHuman },
         { franchiseId: 'celtics', playerVersionIds: celticsHuman },
       ],
-      targets: null,
+      targets: buildTestTargets(),
     });
     expect(result.rosters.find((r) => r.franchiseId === 'lakers')?.players).toHaveLength(10);
     expect(result.rosters.find((r) => r.franchiseId === 'celtics')?.players).toHaveLength(10);
+    expect(result.aiPools).toHaveLength(28);
     const ai = result.aiAssignments.filter((a) => !['lakers', 'celtics'].includes(a.franchiseId));
     expect(ai.filter((a) => a.band === 'average')).toHaveLength(9);
   });
 
   it('handles scarce centers deterministically (exactly enough C coverage)', () => {
-    // Keep center-capability only on five candidates of every pool: 29 AI
-    // teams need 3 center-capable players each (84 total) against a supply
-    // of ~150, so coverage allocation must stay deterministic and legal.
     const catalog = buildSeasonDraftCatalog({
       franchiseIds: ['lakers', 'celtics', 'bulls', 'warriors', 'heat', 'knicks', 'spurs', 'jazz'],
       eras: ['1980s', '1990s', '2000s', '2010s'],
@@ -282,9 +448,8 @@ describe('season AI league generation', () => {
       ...soloInput(seedFromString('scarce'), 'lakers'),
       catalog,
     });
-    // Validate against the same (stripped) catalog the generator used.
-    const modifiedMembers = (result: SeasonLeagueGenerationResult, franchiseId: string) => {
-      const roster = result.rosters.find((r) => r.franchiseId === franchiseId);
+    const modifiedMembers = (res: SeasonLeagueGenerationResult, franchiseId: string) => {
+      const roster = res.rosters.find((r) => r.franchiseId === franchiseId);
       if (!roster) throw new Error(`no roster for ${franchiseId}`);
       return roster.players.map((player) => {
         const candidate = catalog.candidates.find(
@@ -503,6 +668,7 @@ describe('season AI bounded failure and calibration', () => {
       humanRosters: [
         { franchiseId: 'lakers', playerVersionIds: humanRoster(CATALOG, 'lakers', '1990s') },
       ],
+      targets: buildTestTargets(),
     });
     expect(runs).toHaveLength(3);
     expect(runs.map((r) => r.seed)).toEqual(seeds);
@@ -511,6 +677,15 @@ describe('season AI bounded failure and calibration', () => {
       expect(run.failed).toBe(false);
       expect(run.teams).toHaveLength(30);
       expect(run.diagnostics).toBeNull();
+      expect(run.pools).toHaveLength(29);
+      for (const pool of run.pools ?? []) {
+        expect(pool.playerVersionIds).toHaveLength(20);
+      }
+      expect(run.poolFacts).toHaveLength(29);
+      for (const pool of run.poolFacts) {
+        expect(pool.anchorCount).toBeGreaterThanOrEqual(0);
+        expect(pool.extraEliteFlags).toBeGreaterThanOrEqual(0);
+      }
     }
   });
 });

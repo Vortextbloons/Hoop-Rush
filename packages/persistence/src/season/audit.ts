@@ -11,7 +11,7 @@ import {
   type SeasonRoster,
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
-import type { StoredSeasonRunRecordV2 } from '../schemas/season-run-record.ts';
+import type { StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 
 /**
@@ -49,8 +49,8 @@ export interface SeasonRunAuditFacts {
   rosters: readonly SeasonRoster[];
   schedule: SeasonSchedule;
   humanFranchiseId: string;
-  /** Validated current (v2) stored checkpoint row; row-level facts are authoritative. */
-  stored: StoredSeasonRunRecordV2;
+  /** Validated current (v3) stored checkpoint row; row-level facts are authoritative. */
+  stored: StoredSeasonRunRecord;
   summaries: readonly SeasonGameSummary[];
   retainedDetails: readonly SeasonRetainedGameDetail[];
   acceptedBlocks: readonly SeasonAcceptedBlock[];

@@ -1,26 +1,27 @@
 import { z } from 'zod';
 import {
-  seasonDraftLegacyStateSchema,
   seasonDraftStateSchema,
   seasonLeagueGenerationResultSchema,
-  type SeasonDraftLegacyState,
   type SeasonDraftState,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
 
 /**
  * Stored-record schema for the active Season Run draft (spec/2.0/03, spec/2.0/07,
- * M2.3.5). Exactly one record exists at a time, keyed by the literal 'season-draft'.
- * The record wraps the full revisioned draft snapshot — participants, offers,
- * picks, status, revision, current offer, and the entire command log (accepted
- * and rejected summaries) — plus the completed league generation result once a
+ * M2.3.5, M2.4). Exactly one record exists at a time, keyed by the literal
+ * 'season-draft'. The record wraps the full revisioned draft snapshot —
+ * participants, offers, picks, status, revision, current offer, and the entire
+ * command log (accepted and rejected summaries) — plus the completed league
+ * generation result (schema 2 with roster-generation-v2 aiPools) once a
  * generate-ai-league command was accepted.
  *
- * M2.3.5 (season-draft-v2): the stored record discriminates on
- * `saveSchemaVersion` — 1 wraps a legacy season-draft-v1 state (M2.1-M2.3
- * franchise-era rolls, recovery reads only) and 2 wraps a season-draft-v2
- * state. The repository saves and loads the union unchanged: no migration, no
- * silent delete, so unfinished v1 drafts surface an explicit recovery screen.
+ * Save schema v3 (M2.4 roster-generation-v2): the single current stored
+ * schema wrapping a season-draft-v2 state and the schema-2 generation
+ * result. The v1/v2 development families (season-draft-v1 states and the
+ * pre-v3 wrapper) are never read or migrated: the repository auto-clears a
+ * stored row whose `saveSchemaVersion` is not 3 at load. There is no
+ * recovery record and no discard screen for unfinished legacy drafts.
+ *
  * Persistence only stores whatever validated record it is given; revision
  * correctness is the domain's job. Every read validates the stored value at
  * the runtime boundary, so corrupt records are surfaced instead of silently
@@ -30,23 +31,11 @@ import {
 /** Single active Season draft slot; at most one row may exist. */
 export const SEASON_DRAFT_RECORD_ID = 'season-draft';
 
-const storedSeasonDraftV1Schema = z.object({
+/** The single stored Season draft record (save schema v3). */
+export const storedSeasonDraftSchema = z.object({
   recordId: z.literal(SEASON_DRAFT_RECORD_ID),
-  /** Legacy M2.1-M2.3 season-draft-v1 record (recovery reads only). */
-  saveSchemaVersion: z.literal(1),
-  /** Full revisioned season-draft-v1 snapshot including the command log. */
-  draft: seasonDraftLegacyStateSchema,
-  /** Completed generation result when generate-ai-league was accepted; else null. */
-  generation: seasonLeagueGenerationResultSchema.nullable(),
-  /** Written by the adapter, never by domain logic. */
-  updatedAtIso: z.iso.datetime().optional(),
-});
-export type StoredSeasonDraftV1 = z.infer<typeof storedSeasonDraftV1Schema>;
-
-const storedSeasonDraftV2Schema = z.object({
-  recordId: z.literal(SEASON_DRAFT_RECORD_ID),
-  /** Current save-schema family for Season Run drafts (season-draft-v2). */
-  saveSchemaVersion: z.literal(2),
+  /** Current save-schema family for Season Run drafts (M2.4). */
+  saveSchemaVersion: z.literal(3),
   /** Full revisioned season-draft-v2 snapshot including the command log. */
   draft: seasonDraftStateSchema,
   /** Completed generation result when generate-ai-league was accepted; else null. */
@@ -54,13 +43,6 @@ const storedSeasonDraftV2Schema = z.object({
   /** Written by the adapter, never by domain logic. */
   updatedAtIso: z.iso.datetime().optional(),
 });
-export type StoredSeasonDraftV2 = z.infer<typeof storedSeasonDraftV2Schema>;
-
-/** Stored Season draft record: current v2 or legacy v1 (recovery reads). */
-export const storedSeasonDraftSchema = z.discriminatedUnion('saveSchemaVersion', [
-  storedSeasonDraftV2Schema,
-  storedSeasonDraftV1Schema,
-]);
 export type StoredSeasonDraft = z.infer<typeof storedSeasonDraftSchema>;
 
 /**
@@ -72,8 +54,9 @@ export interface SeasonDraftRepository {
   /** Creates or replaces the single active Season draft record, atomically. */
   saveSeasonDraft(record: StoredSeasonDraft): Promise<void>;
   /**
-   * Loads the active Season draft record, or null when none exists. The
-   * stored union is returned unchanged (legacy v1 records load as legacy).
+   * Loads the active Season draft record, or null when none exists. A
+   * stored row whose `saveSchemaVersion` is not 3 (the v1/v2 development
+   * families) is auto-cleared and reported as null.
    */
   loadSeasonDraft(): Promise<StoredSeasonDraft | null>;
   /** Deletes the active Season draft record (no-op when absent). */
@@ -81,25 +64,16 @@ export interface SeasonDraftRepository {
 }
 
 /**
- * Wraps a draft snapshot and optional generation result into a stored record.
- * The save schema version follows the state's own schemaVersion: v2 states
- * store as saveSchemaVersion 2; legacy v1 states store as 1.
+ * Wraps a draft snapshot and optional generation result into the single v3
+ * stored record.
  */
 export function recordFromState(
-  draft: SeasonDraftState | SeasonDraftLegacyState,
+  draft: SeasonDraftState,
   generation: SeasonLeagueGenerationResult | null = null,
 ): StoredSeasonDraft {
-  if (draft.schemaVersion === 1) {
-    return {
-      recordId: SEASON_DRAFT_RECORD_ID,
-      saveSchemaVersion: 1,
-      draft,
-      generation,
-    };
-  }
   return {
     recordId: SEASON_DRAFT_RECORD_ID,
-    saveSchemaVersion: 2,
+    saveSchemaVersion: 3,
     draft,
     generation,
   };

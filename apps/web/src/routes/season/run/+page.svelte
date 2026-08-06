@@ -83,6 +83,14 @@
       snapshot !== null && snapshot.acceptedBlocks.length > 0
         ? (snapshot.acceptedBlocks[snapshot.acceptedBlocks.length - 1]?.rotationDigest ?? null)
         : null;
+    // M2.4: fatigue-risk projections need the recorded load state and the
+    // build-time stamina ratings (from the catalog).
+    const effects = snapshot?.effects ?? null;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const staminaByVersion = new Map<string, number>();
+    for (const candidate of shell.catalog?.candidates ?? []) {
+      staminaByVersion.set(candidate.playerVersionId, candidate.stamina.rating);
+    }
     return buildLockPreview({
       pendingHumanRotation: shell.editor.rotation,
       baselineHumanRotation: baseline,
@@ -92,6 +100,7 @@
       names,
       games: run.games,
       humanFranchiseId,
+      fatigue: effects === null ? null : { effects, staminaByVersion },
     });
   });
 
@@ -306,7 +315,46 @@
           </a>
         </div>
 
-        <!-- (c) Compact lock preview -->
+        <!-- (c) Fatigue risk + continuity (M2.4, projection only) -->
+        {#if preview !== null && preview.fatigueProjections.length > 0}
+          <div class="rounded-lg bg-surface-2 p-3">
+            <h3
+              class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Fatigue risk after {preview.gamesToLock === 1
+                ? '1 game'
+                : `${String(preview.gamesToLock)} games`}
+            </h3>
+            <ul class="mt-2 flex flex-col gap-1">
+              {#each preview.fatigueProjections.slice(0, 5) as projection (projection.playerVersionId)}
+                <li class="flex items-center justify-between gap-2 text-sm">
+                  <span class="min-w-0 truncate font-semibold">{projection.displayName}</span>
+                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    {projection.bandNow}
+                    <span aria-hidden="true">&rarr;</span>
+                    <span
+                      class={projection.bandAfterBlock === 'Heavy' ||
+                      projection.bandAfterBlock === 'Tired'
+                        ? 'font-bold text-amber-600 dark:text-amber-400'
+                        : 'font-bold text-foreground'}
+                    >
+                      {projection.bandAfterBlock}
+                    </span>
+                    {#if !projection.continuous}
+                      <span class="ml-1 text-foreground">· continuity change</span>
+                    {/if}
+                  </span>
+                </li>
+              {/each}
+            </ul>
+            <p class="mt-2 font-mono text-[9px] text-muted-foreground/70">
+              Projected from the pending rotation's minutes and the recorded load; shared play and
+              workload history change the actual outcome.
+            </p>
+          </div>
+        {/if}
+
+        <!-- (d) Compact lock preview -->
         <div class="rounded-lg bg-surface-2 p-3">
           <h3
             class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"

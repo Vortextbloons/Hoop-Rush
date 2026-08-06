@@ -23,10 +23,10 @@ import { SEASON_DRAFT_RECORD_ID } from './season-draft-record.ts';
  * checkpoint row is the frozen snapshot minus the 1,230 scheduled game
  * records plus cursor facts and the M2.4 effects state; summary/detail/
  * block/index rows wrap the frozen contracts. The record schema is the
- * saveSchemaVersion union — v2 current rows (with effects) and v1 legacy
- * schema-4 rows read leniently for typed incompatibility detection. Every
- * row validates at the storage boundary, so corrupt rows throw instead of
- * entering app state.
+ * single save-schema-v3 row (M2.4 roster-generation-v2) — the v1/v2
+ * development families are never read (the repository auto-clears them at
+ * load), and this schema rejects them. Every row validates at the storage
+ * boundary, so corrupt rows throw instead of entering app state.
  */
 
 function checkpointRowFixture() {
@@ -34,7 +34,7 @@ function checkpointRowFixture() {
   const { games: _games, ...runWithoutGames } = run;
   return {
     recordId: SEASON_RUN_RECORD_ID,
-    saveSchemaVersion: 2,
+    saveSchemaVersion: 3,
     run: runWithoutGames,
     completedRounds: 0,
     revision: 0,
@@ -54,7 +54,7 @@ describe('storedSeasonRunRecordSchema', () => {
   it('accepts a promotion-time checkpoint row without the scheduled games', () => {
     const row = checkpointRowFixture();
     const parsed = storedSeasonRunRecordSchema.parse(row);
-    if (parsed.saveSchemaVersion !== 2) throw new Error('expected a v2 record');
+    expect(parsed.saveSchemaVersion).toBe(3);
     expect(parsed.run.runId).toBe('fixture-season-run-1');
     expect('games' in parsed.run).toBe(false);
     expect(parsed.completedRounds).toBe(0);
@@ -93,33 +93,42 @@ describe('storedSeasonRunRecordSchema', () => {
       },
     };
     const parsed = storedSeasonRunRecordSchema.parse(row);
-    if (parsed.saveSchemaVersion !== 2) throw new Error('expected a v2 record');
+    expect(parsed.saveSchemaVersion).toBe(3);
     expect(parsed.lastCommandId).toBe('command-8');
     expect(parsed.recap?.blockIndex).toBe(8);
     expect(parsed.effects.playerStates[0]?.fatigueBasisPoints).toBe(4000);
   });
 
-  it('reads a legacy v1 row leniently for typed incompatibility detection', () => {
-    const parsed = storedSeasonRunRecordSchema.parse({
-      recordId: SEASON_RUN_RECORD_ID,
-      saveSchemaVersion: 1,
-      run: {
-        runId: 'legacy-run-1',
-        schemaVersion: 4,
-        versions: { runSchemaVersion: 4 },
-      },
-    });
-    expect(parsed.saveSchemaVersion).toBe(1);
-    if (parsed.saveSchemaVersion === 1) {
-      expect(parsed.run.versions.runSchemaVersion).toBe(4);
-      expect(parsed.run.runId).toBe('legacy-run-1');
-    }
+  it('rejects the v1 and v2 development rows outright (never read)', () => {
+    expect(
+      storedSeasonRunRecordSchema.safeParse({
+        recordId: SEASON_RUN_RECORD_ID,
+        saveSchemaVersion: 1,
+        run: {
+          runId: 'legacy-run-1',
+          schemaVersion: 4,
+          versions: { runSchemaVersion: 4 },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      storedSeasonRunRecordSchema.safeParse({
+        ...checkpointRowFixture(),
+        saveSchemaVersion: 2,
+      }).success,
+    ).toBe(false);
   });
 
-  it('rejects a v2 row without the effects state and a corrupt v1 identity', () => {
+  it('rejects a v3 row without the effects state and with a wrong save schema', () => {
     const row = checkpointRowFixture();
     const { effects: _effects, ...withoutEffects } = row;
     expect(storedSeasonRunRecordSchema.safeParse(withoutEffects).success).toBe(false);
+    expect(
+      storedSeasonRunRecordSchema.safeParse({
+        ...row,
+        saveSchemaVersion: 2,
+      }).success,
+    ).toBe(false);
     expect(
       storedSeasonRunRecordSchema.safeParse({
         ...row,

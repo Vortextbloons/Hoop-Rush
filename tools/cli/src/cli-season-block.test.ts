@@ -19,7 +19,9 @@ import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
  */
 
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
-const BLOCK_ZERO_DIGEST = '5a912b503592caecd4015416aee3b6a0';
+// Re-pinned for the roster-generation-v2 fixture (schema 6, aiPools, and the
+// effects-carrying checkpoint digest).
+const BLOCK_ZERO_DIGEST = '7477da370837565b7929c0811ec64127';
 
 describe('cli: season block simulate', () => {
   // The default block-0 boot is shared by the simulate and audit tests.
