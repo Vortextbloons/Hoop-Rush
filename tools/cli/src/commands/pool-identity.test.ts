@@ -19,7 +19,7 @@ const EXPECTED_PEAKS: Record<string, string> = {
   'James Worthy': '1990-91',
   'Nick Van Exel': '1994-95',
   'A.C. Green': '1992-93',
-  // ratings-v3.5 raw-score selection favors Fisher's 82-game 1997-98 season
+  // ratings-v3.6 raw-score selection favors Fisher's 82-game 1997-98 season
   // (more minutes + availability) over the lockout-shortened 1998-99.
   'Derek Fisher': '1997-98',
   'Robert Horry': '1997-98',

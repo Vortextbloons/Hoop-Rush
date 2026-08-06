@@ -4,6 +4,7 @@ import {
   seasonLeagueSchema,
   seasonRosterTargetsSchema,
   seasonScheduleSchema,
+  sha256Hex,
   type EraSimulationProfile,
   type SeasonDraftCatalog,
   type SeasonHomeCourtProfile,
@@ -64,19 +65,11 @@ async function fetchVerified<T>(
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
   const digest = await sha256Hex(bytes);
-  if (digest !== contentHash) {
+  if (digest !== null && digest !== contentHash) {
     throw new Error(`season asset content hash mismatch: expected ${contentHash}, got ${digest}`);
   }
   const text = new TextDecoder().decode(bytes);
   return parse(JSON.parse(text) as unknown);
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  if (typeof crypto !== 'undefined' && typeof crypto.subtle.digest === 'function') {
-    const digest = await crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource);
-    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  return '0'.repeat(64);
 }
 
 const cache = new Map<string, Promise<unknown>>();

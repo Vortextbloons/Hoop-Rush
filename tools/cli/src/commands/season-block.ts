@@ -8,9 +8,12 @@ import {
   seasonScheduleSchema,
   type EraSimulationProfile,
   type SeasonCandidateCheckpoint,
+  type SeasonCheckpointState,
   type SeasonDraftCatalog,
   type SeasonGamePlayerInput,
   type SeasonGameSummary,
+  type SeasonHealthState,
+  type SeasonObjectiveId,
   type SeasonRun,
   type SeasonSchedule,
   type SeasonSubmitBlockCommand,
@@ -19,6 +22,7 @@ import {
   SeasonBlockValidationError,
   auditSeasonBlock,
   createSeasonEffectsState,
+  deriveSeasonPostBlockState,
   expandSeasonRunRosters,
   handleSubmitSeasonBlockCommand,
   rosterPlayerIdsOf,
@@ -47,6 +51,19 @@ import {
  * All commands run the authoritative engine pipeline over a committed run
  * fixture (or a generated league) and the packaged catalog, schedule, and
  * era profile; the injectable `deps` seam lets tests substitute doubles.
+ *
+ * M2.5 (contract §9/§20): the pipeline input gains the pre-block `health`
+ * state and the locked `objectiveId`; the runner threads the post-block
+ * health/influence/transactions facts and the run state chain
+ * (`checkpointState`/`stateRevision`/`stateDigest`) through the engine's
+ * `deriveSeasonPostBlockState`. The fixture-driven commands simulate with an
+ * empty health state and a null objective (they assert structure, not
+ * economy facts); the M2.5 calibration cohorts (`season-m25-core.ts`) drive
+ * health, windows, and objectives forward the same way.
+ *
+ * The committed schema-6 fixture stays frozen until the lead regenerates it
+ * under schema 7 (M2.5 fields); until then `createSeasonBlockRunner` fails
+ * the schema parse by design.
  */
 
 export const SEASON_BLOCK_SIMULATE_OPTIONS: Record<string, boolean> = {
@@ -95,6 +112,14 @@ export interface SeasonBlockRunnerState {
   acceptedCommandIds: string[];
   /** M2.4: the authoritative effects state (post-block of the last run). */
   effects: SeasonEffectsState;
+  /** M2.5: the run-scoped health state (post-block of the last run). */
+  health: SeasonHealthState;
+  /** M2.5: the locked objective for the next block (null unless selected). */
+  objectiveId: SeasonObjectiveId | null;
+  /** M2.5: post-block run state chain facts (deriveSeasonPostBlockState). */
+  checkpointState: SeasonCheckpointState | null;
+  stateRevision: number;
+  stateDigest: string;
 }
 
 export function loadSeasonRunFixture(path: string): SeasonRun {
@@ -138,6 +163,11 @@ export function createSeasonBlockRunner(
     summaries: [],
     acceptedCommandIds: [],
     effects: initialEffectsState(expanded),
+    health: run.health,
+    objectiveId: null,
+    checkpointState: run.checkpointState,
+    stateRevision: run.stateRevision,
+    stateDigest: run.stateDigest,
   };
 }
 
@@ -184,6 +214,11 @@ export function runnerBlockCommand(
     expectedRevision: state.acceptedCommandIds.length,
     blockIndex,
     rotationDigest: seasonRotationSetDigest(state.run.rotations),
+    // M2.5: the locked objective (null for fixture-driven runs) and the
+    // asserted run state chain facts.
+    objectiveId: state.objectiveId,
+    expectedStateRevision: state.stateRevision,
+    expectedStateDigest: state.stateDigest,
   };
 }
 
@@ -203,13 +238,19 @@ export function runnerPipelineInput(
     rosterPlayerIds: state.rosterPlayerIds,
     priorSummaries: state.summaries,
     effects: state.effects,
+    // M2.5: the pre-block health state and the locked block objective.
+    health: state.health,
+    objectiveId: state.objectiveId,
   };
 }
 
 /**
  * Runs one block through the authoritative command handler and advances the
  * runner state exactly like the persistence acceptance path: summaries
- * append, the command id is recorded, and the run cursor/standings advance.
+ * append, the command id is recorded, the run cursor/standings advance, and
+ * (M2.5) the post-block health/influence/transactions facts and the run
+ * state chain (checkpointState/stateRevision/stateDigest) fold into the
+ * runner through the engine's `deriveSeasonPostBlockState`.
  */
 export function runBlockThroughHandler(
   state: SeasonBlockRunnerState,
@@ -224,15 +265,34 @@ export function runBlockThroughHandler(
   if (result.status === 'rejected') {
     throw new SeasonBlockValidationError(result.rejection);
   }
-  state.summaries = [...state.summaries, ...result.checkpoint.gameSummaries];
+  const checkpoint = result.checkpoint;
+  state.summaries = [...state.summaries, ...checkpoint.gameSummaries];
   state.acceptedCommandIds = [...state.acceptedCommandIds, command.commandId];
-  state.effects = result.checkpoint.effects;
+  state.effects = checkpoint.effects;
+  // M2.5: the candidate freezes the authoritative post-block health state;
+  // the engine derives the state chain facts from the run + candidate.
+  state.health = checkpoint.health;
+  const stateFacts = deriveSeasonPostBlockState({
+    run: state.run,
+    candidate: checkpoint,
+    commandId: command.commandId,
+    rotationDigest: command.rotationDigest,
+  });
+  state.checkpointState = stateFacts.checkpointState;
+  state.stateRevision = stateFacts.stateRevision;
+  state.stateDigest = stateFacts.stateDigest;
   state.run = {
     ...state.run,
-    cursor: { schemaVersion: 1, completedRounds: result.checkpoint.completedRounds },
-    standings: result.checkpoint.standings,
+    cursor: { schemaVersion: 1, completedRounds: checkpoint.completedRounds },
+    standings: checkpoint.standings,
+    health: checkpoint.health,
+    influence: checkpoint.influence,
+    transactions: checkpoint.transactions,
+    checkpointState: stateFacts.checkpointState,
+    stateRevision: stateFacts.stateRevision,
+    stateDigest: stateFacts.stateDigest,
   };
-  return result.checkpoint;
+  return checkpoint;
 }
 
 /** Simulates every block up to (not including) `targetBlockIndex` (resume). */
@@ -283,6 +343,9 @@ export function seasonBlockSimulate(args: {
     completedRounds: checkpoint.completedRounds,
     summaryCount: checkpoint.gameSummaries.length,
     retainedDetailCount: checkpoint.retainedDetails.length,
+    objectiveId: checkpoint.objective.objectiveId,
+    stateRevision: checkpoint.stateRevision,
+    stateDigest: checkpoint.stateDigest,
     digest: checkpoint.digest,
     durationMs,
     auditFailures,
@@ -293,6 +356,7 @@ export function seasonBlockSimulate(args: {
   const details = [
     `run ${state.run.runId} · block ${String(checkpoint.blockIndex)} · revision ${String(checkpoint.revision)} · rounds ${String(checkpoint.completedRounds)}`,
     `summaries ${String(checkpoint.gameSummaries.length)} · retained details ${String(checkpoint.retainedDetails.length)}`,
+    `objective ${checkpoint.objective.objectiveId ?? 'none'} · state revision ${String(checkpoint.stateRevision)} · state digest ${checkpoint.stateDigest}`,
     `digest ${checkpoint.digest} in ${durationMs.toFixed(0)}ms`,
     `audit failures: ${String(auditFailures.length)}`,
   ];
@@ -383,11 +447,34 @@ export function seasonFullSimulate(args: {
   const blockDigests: Array<{ blockIndex: number; digest: string; durationMs: number }> = [];
   const auditFailures: string[] = [];
   const started = performance.now();
+  // M2.5: the state-chain audit (contract §17 replay/audit extension): every
+  // block's expectedStateRevision/expectedStateDigest must equal the previous
+  // block's post-block facts, so stateDigest continuity is verified across
+  // the whole season.
+  let stateChainContinuity = true;
+  let previousPostState: { stateRevision: number; stateDigest: string } | null = null;
+  // The fixture-driven full-season path never drives the economy, so no
+  // trade window opens here (the M2.5 calibration cohorts open them).
+  const tradeWindowsOpened = 0;
   for (let blockIndex = 0; blockIndex < SEASON_BLOCK_COUNT; blockIndex += 1) {
     const command = runnerBlockCommand(state, blockIndex);
     const input = runnerPipelineInput(state, command);
     const blockStarted = performance.now();
     const checkpoint = runBlockThroughHandler(state, blockIndex);
+    if (
+      previousPostState !== null &&
+      (checkpoint.expectedStateRevision !== previousPostState.stateRevision ||
+        checkpoint.expectedStateDigest !== previousPostState.stateDigest)
+    ) {
+      stateChainContinuity = false;
+      auditFailures.push(
+        `block ${String(blockIndex)} expected state facts do not match the previous post-block facts (expected r${String(checkpoint.expectedStateRevision)}/d${checkpoint.expectedStateDigest}, previous r${String(previousPostState.stateRevision)}/d${previousPostState.stateDigest})`,
+      );
+    }
+    previousPostState = {
+      stateRevision: checkpoint.stateRevision,
+      stateDigest: checkpoint.stateDigest,
+    };
     auditFailures.push(...auditSeasonBlock(checkpoint, input));
     blockDigests.push({
       blockIndex,
@@ -397,6 +484,7 @@ export function seasonFullSimulate(args: {
   }
   const totalDurationMs = performance.now() - started;
   const finalDigest = blockDigests[blockDigests.length - 1]?.digest ?? '';
+  const finalCheckpoint = state.checkpointState;
   const payload = seasonFullSimulateReportSchema.parse({
     schemaVersion: 1,
     command: 'season full simulate',
@@ -405,8 +493,14 @@ export function seasonFullSimulate(args: {
     finalDigest,
     totalDurationMs,
     summaries: state.summaries.length,
+    stateRevision: state.stateRevision,
+    stateDigest: state.stateDigest,
+    stateChainContinuity,
+    finalInjuryCount: state.health.injuries.length,
+    finalTransactionCount: state.run.transactions.length,
+    tradeWindowsOpened,
     auditFailures,
-    pass: auditFailures.length === 0,
+    pass: auditFailures.length === 0 && stateChainContinuity,
   });
   const details = [
     `run ${state.run.runId} · ${String(blockDigests.length)} blocks · ${String(state.summaries.length)} summaries in ${totalDurationMs.toFixed(0)}ms`,
@@ -415,6 +509,8 @@ export function seasonFullSimulate(args: {
         `block ${String(entry.blockIndex)} ${entry.digest} (${entry.durationMs.toFixed(0)}ms)`,
     ),
     `final digest ${finalDigest}`,
+    `state chain r${String(state.stateRevision)} / ${state.stateDigest} · continuity ${stateChainContinuity ? 'ok' : 'BROKEN'}`,
+    `final health injuries ${String(state.health.injuries.length)} · transactions ${String(state.run.transactions.length)}${finalCheckpoint === null ? '' : ` · checkpoint block ${String(finalCheckpoint.blockIndex)}`}`,
     `audit failures: ${String(auditFailures.length)}`,
   ];
   details.push(...auditFailures.slice(0, 10));

@@ -28,8 +28,14 @@ import {
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
+  SEASON_HEALTH_VERSION,
   SEASON_HOME_COURT_VERSION,
+  SEASON_INFLUENCE_TARGETS_VERSION,
+  SEASON_INFLUENCE_VERSION,
+  SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEADERS_VERSION,
+  SEASON_OBJECTIVE_CATALOG,
+  SEASON_OBJECTIVE_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
@@ -38,9 +44,12 @@ import {
   SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_STAMINA_VERSION,
+  SEASON_TRADE_TARGETS_VERSION,
+  SEASON_TRADE_VERSION,
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
   seasonLeagueSchema,
+  seasonObjectiveStateSchema,
   seasonRosterTargetsSchema,
   seasonRunSchema,
   seasonScheduleSchema,
@@ -53,8 +62,12 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
+  createInitialSeasonInfluenceState,
+  createSeasonEffectsState,
+  expandSeasonRunRosters,
   generateAiLeague,
   seasonDraftStateDigest,
+  seasonRunStateDigest,
 } from '@hoop-rush/engine';
 import { buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { pickBestSelectable } from './commands/season-data.ts';
@@ -162,12 +175,13 @@ function playCommittedDraft(
   return { state, commands, generation };
 }
 
-/** Builds the v3 Season Run snapshot from the committed draft + generation. */
+/** Builds the v7 Season Run snapshot from the committed draft + generation. */
 function buildRun(
   schedule: SeasonSchedule,
   league: SeasonLeague,
   draft: SeasonDraftState,
   generation: SeasonLeagueGenerationResult,
+  catalog: ReturnType<typeof seasonDraftCatalogSchema.parse>,
 ): SeasonRun {
   const humanFranchiseIds = draft.participants.map((p) => p.franchiseId);
   const correctedLeague: SeasonLeague = {
@@ -177,6 +191,16 @@ function buildRun(
       control: humanFranchiseIds.includes(team.franchiseId) ? 'human' : 'ai',
     })),
   };
+  const franchiseIds = correctedLeague.teams.map((team) => team.franchiseId);
+  // M2.5: the initial objective state freezes the fixed six-entry catalog
+  // with no selections (the engine's `seasonObjectiveCatalog` is the same
+  // data-contracts constant).
+  const objectives = seasonObjectiveStateSchema.parse({
+    schemaVersion: 1,
+    objectiveVersion: SEASON_OBJECTIVE_VERSION,
+    catalog: [...SEASON_OBJECTIVE_CATALOG],
+    selections: {},
+  });
   const run: SeasonRun = {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
     runId: 'fixture-season-run-1',
@@ -209,6 +233,14 @@ function buildRun(
       staminaVersion: SEASON_STAMINA_VERSION,
       chemistryVersion: SEASON_CHEMISTRY_VERSION,
       effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
+      // M2.5: the seven new material versions.
+      healthVersion: SEASON_HEALTH_VERSION,
+      tradeVersion: SEASON_TRADE_VERSION,
+      influenceVersion: SEASON_INFLUENCE_VERSION,
+      objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
+      tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
+      influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
     },
     league: correctedLeague,
     rosters: generation.rosters,
@@ -378,8 +410,49 @@ function buildRun(
       diagnostics: generation.diagnostics,
     },
     evaluations: generation.evaluations,
+    // M2.5: a fresh run carries an empty health state, an empty transaction
+    // log, the initial Influence economy (+2 per franchise via the engine),
+    // null trade state, initial objectives, no checkpoint, and the state
+    // chain at revision 0 with the canonical state digest.
+    trade: null,
+    objectives,
+    health: {
+      schemaVersion: 1,
+      healthVersion: SEASON_HEALTH_VERSION,
+      injuries: [],
+    },
+    transactions: [],
+    influence: createInitialSeasonInfluenceState(franchiseIds),
+    checkpointState: null,
+    stateRevision: 0,
+    stateDigest: '0'.repeat(32),
   };
-  return seasonRunSchema.parse(run);
+  // The state digest covers the mutable run facts including the initial
+  // zero effects state (the same 300-player zero state the block runner
+  // starts from); the stateDigest field is excluded from its own
+  // computation, mirroring the checkpoint digest.
+  const expanded = expandSeasonRunRosters(run, catalog);
+  const staminaInputs = [...expanded.values()].map((player) => {
+    if (player.stamina === undefined) {
+      throw new Error(`expanded player ${player.playerVersionId} has no stamina profile`);
+    }
+    return player.stamina;
+  });
+  const initialEffects = createSeasonEffectsState(staminaInputs);
+  const digest = seasonRunStateDigest({
+    stateRevision: run.stateRevision,
+    checkpointState: run.checkpointState,
+    health: run.health,
+    influence: run.influence,
+    transactions: run.transactions,
+    trade: run.trade,
+    objectives: run.objectives,
+    rosters: run.rosters,
+    ownership: run.ownership,
+    rotations: run.rotations,
+    effects: initialEffects,
+  });
+  return seasonRunSchema.parse({ ...run, stateDigest: digest });
 }
 
 function main(): void {
@@ -405,7 +478,7 @@ function main(): void {
   );
 
   const { state, commands, generation } = playCommittedDraft(catalog, league, targets);
-  const fixture = buildRun(schedule, league, state, generation);
+  const fixture = buildRun(schedule, league, state, generation, catalog);
   mkdirSync(FIXTURES_DIR, { recursive: true });
   writeFileSync(resolve(FIXTURES_DIR, 'season-run.json'), `${JSON.stringify(fixture, null, 2)}\n`);
   console.log(`wrote ${resolve(FIXTURES_DIR, 'season-run.json')}`);

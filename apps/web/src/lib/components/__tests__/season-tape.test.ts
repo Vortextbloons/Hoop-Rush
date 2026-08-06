@@ -27,6 +27,8 @@ function acceptedBlock(blockIndex: number): SeasonAcceptedBlock {
     rotationDigest: 'a'.repeat(32),
     checkpointDigest: 'b'.repeat(32),
     summaryCount: 1,
+    stateRevision: blockIndex + 1,
+    stateDigest: 'c'.repeat(32),
   };
 }
 

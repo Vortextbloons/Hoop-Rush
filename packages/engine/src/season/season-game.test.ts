@@ -116,6 +116,7 @@ function buildSeasonGameInput(
       available: true,
     })),
     removals: [],
+    returns: [],
     homeCourt: SEASON_NEUTRAL_HOME_COURT,
     ...overrides,
   };
@@ -493,6 +494,146 @@ describe('season game forfeits (M2.2)', () => {
     expect(result.losingFranchiseId).toBe('celtics');
     expect(result.trigger).toBe('no-legal-five-after-removal');
     expect(checkSeasonGameResult(result, input)).toEqual([]);
+  });
+});
+
+describe('season game returns (M2.5 §11)', () => {
+  it('applies a same-game return at the next legal boundary after the removal', () => {
+    const away = buildSeasonTeam('away');
+    const target = away.players[0];
+    if (target === undefined) throw new Error('fixture missing player');
+    const { input, result } = run('return-1', {
+      away,
+      awayRotation: buildSeasonRotation(away),
+      removals: [
+        {
+          side: 'away',
+          playerVersionId: target.playerVersionId,
+          period: 2,
+          secondsRemaining: 600,
+          reason: 'injury',
+        },
+      ],
+      returns: [
+        {
+          side: 'away',
+          playerVersionId: target.playerVersionId,
+          period: 2,
+          secondsRemaining: 300,
+          reason: 'injury-return',
+        },
+      ],
+    });
+    if (result.outcome !== 'completed') throw new Error('expected a completed game');
+    const removalEvents = result.removals.filter(
+      (event) => event.playerVersionId === target.playerVersionId,
+    );
+    expect(removalEvents).toHaveLength(1);
+    expect(removalEvents[0]?.reason).toBe('injury');
+    const returnEvents = result.away.returns.filter(
+      (event) => event.playerVersionId === target.playerVersionId,
+    );
+    expect(returnEvents).toHaveLength(1);
+    const returnEvent = returnEvents[0];
+    if (returnEvent === undefined) throw new Error('expected a return event');
+    expect(returnEvent.reason).toBe('injury-return');
+    expect(returnEvent.period).toBe(2);
+    // The return applies at the next legal boundary at/after its clock.
+    expect(returnEvent.secondsRemaining).toBeLessThanOrEqual(300);
+    // The returned player re-enters after the return boundary and never
+    // plays between the removal and the return.
+    const stints = result.unitStints.filter((stint) => stint.side === 'away');
+    const playedAfter = stints.some(
+      (stint) =>
+        stint.players.includes(target.playerVersionId) &&
+        (stint.period > returnEvent.period ||
+          (stint.period === returnEvent.period &&
+            stint.startSecondsRemaining <= returnEvent.secondsRemaining)),
+    );
+    expect(playedAfter).toBe(true);
+    const deviation = result.deviations.find(
+      (entry) => entry.side === 'away' && entry.playerVersionId === target.playerVersionId,
+    );
+    expect(deviation?.reasons).toContain('injected-injury-removal');
+    expect(deviation?.reasons).toContain('injury-return');
+    expect(checkSeasonGameResult(result, input)).toEqual([]);
+  });
+
+  it('a return clock before the removal clock records both events without violating invariants', () => {
+    const away = buildSeasonTeam('away');
+    const target = away.players[1];
+    if (target === undefined) throw new Error('fixture missing player');
+    const { input, result } = run('return-2', {
+      away,
+      awayRotation: buildSeasonRotation(away),
+      removals: [
+        {
+          side: 'away',
+          playerVersionId: target.playerVersionId,
+          period: 3,
+          secondsRemaining: 300,
+          reason: 'injury',
+        },
+      ],
+      returns: [
+        {
+          side: 'away',
+          playerVersionId: target.playerVersionId,
+          period: 3,
+          secondsRemaining: 400,
+          reason: 'injury-return',
+        },
+      ],
+    });
+    if (result.outcome !== 'completed') throw new Error('expected a completed game');
+    expect(
+      result.away.returns.some((event) => event.playerVersionId === target.playerVersionId),
+    ).toBe(true);
+    expect(
+      result.removals.some(
+        (event) => event.playerVersionId === target.playerVersionId && event.reason === 'injury',
+      ),
+    ).toBe(true);
+    expect(checkSeasonGameResult(result, input)).toEqual([]);
+  });
+
+  it('an injury-reason removal flows through the existing removal path', () => {
+    const away = buildSeasonTeam('away');
+    const target = away.players[2];
+    if (target === undefined) throw new Error('fixture missing player');
+    const { input, result } = run('return-3', {
+      away,
+      awayRotation: buildSeasonRotation(away),
+      removals: [
+        {
+          side: 'away',
+          playerVersionId: target.playerVersionId,
+          period: 1,
+          secondsRemaining: 600,
+          reason: 'injury',
+        },
+      ],
+    });
+    if (result.outcome !== 'completed') throw new Error('expected a completed game');
+    const event = result.removals.find((entry) => entry.playerVersionId === target.playerVersionId);
+    expect(event?.reason).toBe('injury');
+    const deviation = result.deviations.find(
+      (entry) => entry.side === 'away' && entry.playerVersionId === target.playerVersionId,
+    );
+    expect(deviation?.reasons).toContain('injected-injury-removal');
+    expect(result.away.returns).toEqual([]);
+    expect(checkSeasonGameResult(result, input)).toEqual([]);
+  });
+
+  it('zero injury input stays byte-identical with empty return records', () => {
+    const input = buildSeasonGameInput();
+    const a = simulateSeasonGame(input, ctx);
+    const b = simulateSeasonGame(input, ctx);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    if (a.outcome !== 'completed') throw new Error('expected a completed game');
+    expect(a.home.returns).toEqual([]);
+    expect(a.away.returns).toEqual([]);
+    expect(checkSeasonGameResult(a, input)).toEqual([]);
   });
 });
 

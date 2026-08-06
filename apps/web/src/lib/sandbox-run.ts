@@ -13,6 +13,7 @@ import {
   type ChallengeCreation,
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
+import { randomUUID } from '$lib/random-id';
 import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
 
 /**
@@ -40,7 +41,7 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
   const sample = players[0];
   const context = createEngineContext();
   const creation: ChallengeCreation = {
-    runId: crypto.randomUUID(),
+    runId: randomUUID(),
     mode: 'sandbox',
     franchiseId: null,
     eraId: FIXED_SANDBOX_ERA,

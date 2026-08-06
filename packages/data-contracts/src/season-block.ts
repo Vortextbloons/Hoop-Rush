@@ -1,16 +1,21 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { seasonCandidateCheckpointSchema } from './season-checkpoint.ts';
+import { seasonObjectiveIdSchema } from './season-objective.ts';
 import { SEASON_BLOCK_VERSION, SEASON_RUN_SCHEMA_VERSION } from './season-versions.ts';
 
 /**
  * SubmitSeasonBlock command and its typed results (spec/2.0/07 required
- * command groups, M2.3, season-block-v1). Submitting a block locks the
- * submitted rotations for the block's games: the command carries the
- * canonical digest of the 30-rotation set so a stale or tampered lock is
- * rejected before any simulation runs. The engine validates the cursor,
- * revision, block boundary, command duplication, run identity, and rotation
- * legality; it returns one candidate checkpoint or one typed rejection.
+ * command groups, M2.3, season-block-v1; M2.5 adds the locked objective and
+ * the run state assertions). Submitting a block locks the submitted
+ * rotations for the block's games: the command carries the canonical digest
+ * of the 30-rotation set so a stale or tampered lock is rejected before any
+ * simulation runs. M2.5: the command also carries the locked objective id
+ * (null for the final two-game block 8) and the expected run state
+ * revision/digest the block assembles against. The engine validates the
+ * cursor, revision, block boundary, command duplication, run identity,
+ * rotation legality, and objective binding; it returns one candidate
+ * checkpoint or one typed rejection.
  */
 
 export const seasonSubmitBlockCommandSchema = z.object({
@@ -34,6 +39,14 @@ export const seasonSubmitBlockCommandSchema = z.object({
   blockIndex: z.number().int().min(0).max(8),
   /** Canonical digest of the 30 rotations being locked for this block. */
   rotationDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  /**
+   * M2.5: the locked block objective (blocks 0-7), or null for the final
+   * two-game block 8. Must have been selected and offered for this block.
+   */
+  objectiveId: seasonObjectiveIdSchema.nullable(),
+  /** M2.5: the run state facts this submission asserts. */
+  expectedStateRevision: z.number().int().nonnegative(),
+  expectedStateDigest: z.string().regex(/^[0-9a-f]{32}$/),
 });
 export type SeasonSubmitBlockCommand = z.infer<typeof seasonSubmitBlockCommandSchema>;
 
@@ -77,12 +90,28 @@ export const seasonRunMismatchRejectionSchema = z.object({
 });
 export type SeasonRunMismatchRejection = z.infer<typeof seasonRunMismatchRejectionSchema>;
 
+/**
+ * M2.5: the submitted objective does not bind to this block. `expected` is
+ * `required` when blocks 0-7 need the selected objective, `none` when block
+ * 8 must carry null, and `not-offered` when the objective was never offered
+ * for this block.
+ */
+export const seasonInvalidObjectiveRejectionSchema = z.object({
+  code: z.literal('invalid-objective'),
+  expected: z.enum(['required', 'none', 'not-offered']),
+  /** The submitted objective id when one was present. */
+  objectiveId: z.string().min(1).max(64).optional(),
+  blockIndex: z.number().int().min(0).max(8),
+});
+export type SeasonInvalidObjectiveRejection = z.infer<typeof seasonInvalidObjectiveRejectionSchema>;
+
 export const seasonSubmitBlockRejectionSchema = z.discriminatedUnion('code', [
   seasonStaleCursorRejectionSchema,
   seasonDuplicateCommandRejectionSchema,
   seasonInvalidRotationsRejectionSchema,
   seasonNonBoundaryBlockRejectionSchema,
   seasonRunMismatchRejectionSchema,
+  seasonInvalidObjectiveRejectionSchema,
 ]);
 export type SeasonSubmitBlockRejection = z.infer<typeof seasonSubmitBlockRejectionSchema>;
 

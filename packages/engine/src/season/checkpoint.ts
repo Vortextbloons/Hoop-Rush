@@ -113,11 +113,13 @@ function standingsCanonical(candidate: SeasonCheckpointFacts): unknown {
  * Canonical byte-for-byte serialization of a candidate checkpoint: fixed
  * field order, every array sorted canonically, the recap canonicalized, the
  * effects state canonically ordered (player loads by playerVersionId, pairs
- * by the canonical a<b key), and the digest field itself excluded (a digest
- * is a function of the facts, not of itself). Identical recorded facts
- * always serialize identically, regardless of call order, internal array
- * order, or object key insertion order (keys are sorted recursively; runtime
- * validation may reorder them).
+ * by the canonical a<b key), the M2.5 health/influence/transactions/
+ * objective facts canonically ordered (injuries by injuryId, ledger by
+ * entryId, transactions by transactionId), and the digest field itself
+ * excluded (a digest is a function of the facts, not of itself). Identical
+ * recorded facts always serialize identically, regardless of call order,
+ * internal array order, or object key insertion order (keys are sorted
+ * recursively; runtime validation may reorder them).
  */
 export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): string {
   return canonicalJson({
@@ -150,6 +152,32 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
         a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : 1,
       ),
     }),
+    // M2.5: the authoritative post-block health/influence/transactions
+    // facts and the locked objective evaluation participate in the digest.
+    health: canonicalJson({
+      schemaVersion: candidate.health.schemaVersion,
+      healthVersion: candidate.health.healthVersion,
+      injuries: [...candidate.health.injuries].sort((a, b) => (a.injuryId < b.injuryId ? -1 : 1)),
+    }),
+    influence: canonicalJson({
+      schemaVersion: candidate.influence.schemaVersion,
+      influenceVersion: candidate.influence.influenceVersion,
+      balances: candidate.influence.balances,
+      ledger: [...candidate.influence.ledger].sort((a, b) => (a.entryId < b.entryId ? -1 : 1)),
+      windows: candidate.influence.windows,
+      rehabs: candidate.influence.rehabs,
+    }),
+    transactions: [...candidate.transactions].sort((a, b) =>
+      a.transactionId < b.transactionId ? -1 : 1,
+    ),
+    objective: candidate.objective,
+    // M2.5: the run state chain facts asserted pre-block (the post-block
+    // facts are the commit side's derive output; the assembly placeholder
+    // zeros are part of the assembled candidate, so they serialize here).
+    expectedStateRevision: candidate.expectedStateRevision,
+    expectedStateDigest: candidate.expectedStateDigest,
+    stateRevision: candidate.stateRevision,
+    stateDigest: candidate.stateDigest,
   });
 }
 

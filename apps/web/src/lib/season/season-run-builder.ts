@@ -9,9 +9,15 @@ import {
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
+  SEASON_HEALTH_VERSION,
   SEASON_HOME_COURT_VERSION,
+  SEASON_INFLUENCE_TARGETS_VERSION,
+  SEASON_INFLUENCE_VERSION,
+  SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEADERS_VERSION,
   SEASON_LEAGUE_VERSION,
+  SEASON_OBJECTIVE_CATALOG,
+  SEASON_OBJECTIVE_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
@@ -24,9 +30,12 @@ import {
   SEASON_SEED_NAMESPACES,
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
+  SEASON_TRADE_TARGETS_VERSION,
+  SEASON_TRADE_VERSION,
   PLAYER_VERSION_ID_VERSION,
   seasonNamespaceSeed,
   seasonRunSchema,
+  sha256Hex as sha256Bytes,
   type SeasonDraftState,
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
@@ -34,10 +43,19 @@ import {
   type SeasonSchedule,
   type Seed,
 } from '@hoop-rush/data-contracts';
+import { createInitialSeasonInfluenceState } from '@hoop-rush/engine';
 
 /**
- * Assembles the initial schema-6 Season Run snapshot from a completed draft
- * and its AI league generation (spec/2.0/07 persistence, M2.1 -> M2.4).
+ * The frozen engine export lands at integration (lead-owned engine index);
+ * the builder types the call against the frozen signature until then.
+ */
+const initialInfluenceState = createInitialSeasonInfluenceState as unknown as (
+  franchiseIds: readonly string[],
+) => SeasonRun['influence'];
+
+/**
+ * Assembles the initial schema-7 Season Run snapshot from a completed draft
+ * and its AI league generation (spec/2.0/07 persistence, M2.1 -> M2.5).
  *
  * TEMPORARY UI-BOUNDARY ORCHESTRATION: the authoritative builder belongs in
  * the engine/CLI (the CLI's `gen-season-assets.ts` owns an equivalent v3
@@ -45,17 +63,21 @@ import {
  * control, rosters, ownership, schedule reference, scheduled games, zero
  * standings, cursor 0, postseason scaffold, draft facts, assignments,
  * private AI pools, rotations, audit, and evaluations — and freezes the M2.4
- * material versions. The result is validated with `seasonRunSchema` before it
- * can be promoted.
+ * and M2.5 material versions. The result is validated with `seasonRunSchema`
+ * before it can be promoted.
+ *
+ * M2.5 initial facts: an empty health state, the engine's initial Influence
+ * state (+2 per franchise with recorded initial-grant ledger entries), the
+ * fixed objective catalog with no selections, an empty transaction log, no
+ * checkpoint state, and the state chain at revision 0. `stateDigest` defaults
+ * to the all-zero placeholder per the frozen fixture guidance; the lead wires
+ * the engine's `seasonRunStateDigest` at integration so the first block
+ * command asserts the real initial digest.
  */
 
 /** SHA-256 content hash of the committed schedule artifact (Web Crypto). */
-export async function sha256Hex(material: string): Promise<string> {
-  if (typeof crypto !== 'undefined' && typeof crypto.subtle.digest === 'function') {
-    const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(material));
-    return [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  return '0'.repeat(64);
+export async function sha256Hex(material: string): Promise<string | null> {
+  return sha256Bytes(new TextEncoder().encode(material));
 }
 
 function emptyPostseason(rootSeed: Seed): SeasonRun['postseason'] {
@@ -97,11 +119,26 @@ export interface BuildSeasonRunInput {
   scheduleContentHash: string;
   draft: SeasonDraftState;
   generation: SeasonLeagueGenerationResult;
+  /**
+   * M2.5 initial state digest (defaults to the all-zero placeholder per the
+   * frozen fixture guidance; the lead wires `seasonRunStateDigest` at
+   * integration).
+   */
+  stateDigest?: string;
 }
 
 /** Builds and schema-validates the initial run snapshot for promotion. */
 export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): SeasonRun {
-  const { runId, rootSeed, league, schedule, scheduleContentHash, draft, generation } = input;
+  const {
+    runId,
+    rootSeed,
+    league,
+    schedule,
+    scheduleContentHash,
+    draft,
+    generation,
+    stateDigest = '0'.repeat(32),
+  } = input;
   const humanFranchiseIds = draft.participants.map((participant) => participant.franchiseId);
   const correctedLeague: SeasonLeague = {
     ...league,
@@ -142,6 +179,13 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       staminaVersion: SEASON_STAMINA_VERSION,
       chemistryVersion: SEASON_CHEMISTRY_VERSION,
       effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
+      healthVersion: SEASON_HEALTH_VERSION,
+      tradeVersion: SEASON_TRADE_VERSION,
+      influenceVersion: SEASON_INFLUENCE_VERSION,
+      objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
+      tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
+      influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
     },
     league: correctedLeague,
     rosters: generation.rosters,
@@ -229,6 +273,23 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       diagnostics: generation.diagnostics,
     },
     evaluations: generation.evaluations,
+    trade: null,
+    objectives: {
+      schemaVersion: 1,
+      objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      catalog: [...SEASON_OBJECTIVE_CATALOG],
+      selections: {},
+    },
+    health: {
+      schemaVersion: 1,
+      healthVersion: SEASON_HEALTH_VERSION,
+      injuries: [],
+    },
+    transactions: [],
+    influence: initialInfluenceState(league.teams.map((team) => team.franchiseId)),
+    checkpointState: null,
+    stateRevision: 0,
+    stateDigest,
   };
   return seasonRunSchema.parse(run);
 }

@@ -4,8 +4,12 @@
   import type { RouteId } from '$app/types';
   import { blockRoundRange } from '@hoop-rush/data-contracts';
   import BlockProgress from '$lib/components/season/BlockProgress.svelte';
+  import InfluencePanel from '$lib/components/season/InfluencePanel.svelte';
+  import InterruptionPanel from '$lib/components/season/InterruptionPanel.svelte';
+  import ObjectivePicker from '$lib/components/season/ObjectivePicker.svelte';
   import SeasonTape from '$lib/components/season/SeasonTape.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import TradeOffersPanel from '$lib/components/season/TradeOffersPanel.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import {
     SEASON_RUN_SHELL_CONTEXT,
@@ -26,14 +30,24 @@
     humanUpcomingGamesFromGames,
     recordLabel,
   } from '$lib/season/season-presentation';
+  import {
+    influenceViewModel,
+    objectiveChoicesViewModel,
+    type InfluenceSpendAffordance,
+  } from '$lib/season/season-influence-view';
+  import { openWindowOf, tradeOfferViewModel } from '$lib/season/season-trade-view';
+  import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
 
   /**
-   * Season Run hub tab (M2.3.5): season tape, the next-decision panel (next
-   * opponents, pending rotation changes, compact lock preview, the
-   * simulate-block action, and live block progress), and a recent-recap
+   * Season Run hub tab (M2.3.5, M2.5): season tape, the next-decision panel
+   * (next opponents, pending rotation changes, the objective picker, compact
+   * lock preview, the simulate-block action, and live block progress), the
+   * trade-offers and Influence panels (M2.5), and a recent-recap
    * affordance. Block submission routes through the shell-owned
    * `SeasonHubState`; envelope construction and validation live in
-   * `season-block-submit.ts`.
+   * `season-block-submit.ts`. When an invalid-roster interruption pauses the
+   * block, the hub renders the typed recovery panel instead of the
+   * next-decision flow.
    */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
@@ -50,6 +64,39 @@
     return `Block ${String(nextBlockIndex + 1)} of 9 · rounds ${String(fromRound)}–${String(toRound)}`;
   });
 
+  // M2.5 interruption/pending mirrors.
+  const pending = $derived(shell.pending);
+  const interruption = $derived(shell.interruption);
+  const commandError = $derived(shell.commandError);
+  const blockPaused = $derived(pending !== null || interruption !== null);
+
+  // M2.5 Influence + objective + trade panel facts.
+  const openWindow = $derived(shell.trade !== null ? openWindowOf(shell.trade) : null);
+  const influenceVm = $derived(
+    shell.influence !== null && humanFranchiseId !== null
+      ? influenceViewModel(shell.influence, humanFranchiseId, shell.health, openWindow)
+      : null,
+  );
+  const tradeOffers = $derived.by(() => {
+    if (openWindow === null || run === null) return [];
+    return openWindow.offers.map((offer) =>
+      tradeOfferViewModel(offer, run, shell.catalog, shell.franchiseName),
+    );
+  });
+  const objectiveVm = $derived(run !== null ? objectiveChoicesViewModel(run) : null);
+
+  const rehabAffordances = $derived.by((): InfluenceSpendAffordance[] => {
+    const affordances = influenceVm?.affordances ?? [];
+    const rehab = affordances.filter((affordance) => affordance.purpose === 'risky-rehab');
+    const unavailable = new Set(interruption?.unavailablePlayerVersionIds ?? []);
+    return unavailable.size > 0
+      ? rehab.filter(
+          (affordance) =>
+            affordance.playerVersionId !== null && unavailable.has(affordance.playerVersionId),
+        )
+      : rehab;
+  });
+
   const nextOpponents = $derived(
     run !== null && humanFranchiseId !== null && nextBlockIndex !== null && !seasonComplete
       ? humanUpcomingGamesFromGames(run.games, humanFranchiseId, nextBlockIndex).slice(0, 3)
@@ -64,6 +111,17 @@
       for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
     }
     return map;
+  });
+
+  /** M2.5: the objective locked for the next block (shown in the lock preview). */
+  const selectedObjective = $derived.by(() => {
+    if (run === null || nextBlockIndex === null || nextBlockIndex >= 8) return null;
+    const selection = run.objectives.selections[nextBlockIndex];
+    if (selection === undefined) return null;
+    const name =
+      shell.objectives?.catalog.find((entry) => entry.objectiveId === selection.objectiveId)
+        ?.name ?? selection.objectiveId;
+    return { objectiveId: selection.objectiveId, name };
   });
 
   const preview: LockPreview | null = $derived.by(() => {
@@ -101,6 +159,7 @@
       games: run.games,
       humanFranchiseId,
       fatigue: effects === null ? null : { effects, staminaByVersion },
+      objective: selectedObjective,
     });
   });
 
@@ -208,239 +267,333 @@
       </a>
     </section>
   {:else if snapshot !== null}
-    <!-- 2. Next decision panel -->
-    <section
-      aria-labelledby="next-decision-heading"
-      class="flex flex-col gap-4 rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
-    >
-      <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <h2
-          id="next-decision-heading"
-          class="font-display text-lg font-extrabold uppercase tracking-tight"
-        >
-          Next decision
-        </h2>
-        <span class="font-mono text-[10px] text-muted-foreground">
-          {nextBlockIndex === null ? '—' : `${String(nextBlockIndex)} of 9 checkpoints accepted.`}
-        </span>
-      </div>
-
-      <div class="grid gap-4 lg:grid-cols-3">
-        <!-- (a) Next opponents -->
-        <div class="rounded-lg bg-surface-2 p-3">
-          <h3
-            class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+    {#if blockPaused}
+      <!-- M2.5 interruption recovery: the block is paused with a pending candidate. -->
+      <InterruptionPanel
+        {interruption}
+        {pending}
+        playerName={shell.playerName}
+        injuryPlayerName={(injuryId) => {
+          const record = shell.health?.injuries.find((r) => r.injuryId === injuryId);
+          return record === undefined ? injuryId : shell.playerName(record.playerVersionId);
+        }}
+        {rehabAffordances}
+        balance={influenceVm?.balance ?? 0}
+        busy={block.phase === 'running'}
+        {commandError}
+        onRehab={(affordance) =>
+          shell.spendInfluence({
+            purpose: 'risky-rehab',
+            injuryId: affordance.injuryId ?? undefined,
+          })}
+        onForfeit={() => shell.forfeitInterruptedGame()}
+        onResume={() => shell.resumeBlock()}
+      />
+    {:else}
+      <!-- 2. Next decision panel -->
+      <section
+        aria-labelledby="next-decision-heading"
+        class="flex flex-col gap-4 rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
+      >
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2
+            id="next-decision-heading"
+            class="font-display text-lg font-extrabold uppercase tracking-tight"
           >
-            Up next
-          </h3>
-          {#if nextOpponents.length === 0}
-            <p class="mt-2 text-sm text-muted-foreground">No human games in this block.</p>
-          {:else}
-            <ol class="mt-2 flex flex-col gap-2">
-              {#each nextOpponents as game (game.gameId)}
-                {@const opponentIdentity =
-                  shell.manifest !== null
-                    ? franchiseIdentityOf(shell.manifest, game.opponentFranchiseId)
-                    : null}
-                <li class="flex items-center gap-2.5">
-                  {#if shell.manifest !== null}
-                    <SeasonTeamLogo
-                      manifest={shell.manifest}
-                      franchiseId={game.opponentFranchiseId}
-                      teamExternalId={opponentIdentity?.teamExternalId ?? ''}
-                      size="sm"
-                    />
-                  {/if}
-                  <span class="min-w-0 flex-1 truncate text-sm font-semibold">
-                    {game.humanIsHome ? 'vs' : 'at'}
-                    {shell.franchiseName(game.opponentFranchiseId)}
-                  </span>
-                  <span
-                    class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
-                  >
-                    R{game.round}
-                  </span>
-                </li>
-              {/each}
-            </ol>
-          {/if}
+            Next decision
+          </h2>
+          <span class="font-mono text-[10px] text-muted-foreground">
+            {nextBlockIndex === null ? '—' : `${String(nextBlockIndex)} of 9 checkpoints accepted.`}
+          </span>
         </div>
 
-        <!-- (b) Pending rotation changes -->
-        <div class="rounded-lg bg-surface-2 p-3">
-          <h3
-            class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
-            Pending rotation changes
-          </h3>
-          {#if preview === null}
-            <p class="mt-2 text-sm text-muted-foreground">Preparing the lock preview…</p>
-          {:else if preview.unchangedSinceLastLock}
-            <p class="mt-2 text-sm text-muted-foreground">
-              No rotation changes since the last accepted block.
-            </p>
-          {:else if preview.changes.length === 0}
-            <p class="mt-2 text-sm text-muted-foreground">
-              No changes from the saved baseline rotation.
-            </p>
-          {:else}
-            <p class="mt-2 text-sm">
-              <strong class="text-foreground">{preview.changes.length}</strong>
-              change{preview.changes.length === 1 ? '' : 's'} since the saved baseline:
-            </p>
-            <ul class="mt-1 flex flex-col gap-1">
-              {#each preview.changes.slice(0, 3) as change (change.playerVersionId)}
-                <li class="truncate text-sm">
-                  <span class="font-semibold">{change.displayName}</span>
-                  <span class="ml-2 font-mono text-[10px] text-muted-foreground">
-                    {change.roleBefore}
-                    {change.minutesBefore ?? '—'}→{change.roleAfter}
-                    {change.minutesAfter ?? '—'}
-                  </span>
-                </li>
-              {/each}
-            </ul>
-            {#if preview.changes.length > 3}
-              <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-                +{preview.changes.length - 3} more
-              </p>
-            {/if}
-          {/if}
-          <a
-            href={resolve('/season/run/team/' as RouteId)}
-            class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
-          >
-            Adjust rotation
-            <span aria-hidden="true">&rarr;</span>
-          </a>
-        </div>
+        <!-- M2.5: objective picker (blocks 0-7) -->
+        {#if objectiveVm !== null}
+          <ObjectivePicker
+            blockIndex={objectiveVm.blockIndex}
+            choices={objectiveVm.choices}
+            selectedObjectiveId={objectiveVm.selectedObjectiveId}
+            busy={block.phase === 'running'}
+            onSelect={(objectiveId) => {
+              if (objectiveVm.blockIndex !== null) {
+                shell.selectBlockObjective({ blockIndex: objectiveVm.blockIndex, objectiveId });
+              }
+            }}
+          />
+        {/if}
 
-        <!-- (c) Fatigue risk + continuity (M2.4, projection only) -->
-        {#if preview !== null && preview.fatigueProjections.length > 0}
+        <div class="grid gap-4 lg:grid-cols-3">
+          <!-- (a) Next opponents -->
           <div class="rounded-lg bg-surface-2 p-3">
             <h3
               class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
             >
-              Fatigue risk after {preview.gamesToLock === 1
-                ? '1 game'
-                : `${String(preview.gamesToLock)} games`}
+              Up next
             </h3>
-            <ul class="mt-2 flex flex-col gap-1">
-              {#each preview.fatigueProjections.slice(0, 5) as projection (projection.playerVersionId)}
-                <li class="flex items-center justify-between gap-2 text-sm">
-                  <span class="min-w-0 truncate font-semibold">{projection.displayName}</span>
-                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                    {projection.bandNow}
-                    <span aria-hidden="true">&rarr;</span>
-                    <span
-                      class={projection.bandAfterBlock === 'Heavy' ||
-                      projection.bandAfterBlock === 'Tired'
-                        ? 'font-bold text-amber-600 dark:text-amber-400'
-                        : 'font-bold text-foreground'}
-                    >
-                      {projection.bandAfterBlock}
-                    </span>
-                    {#if !projection.continuous}
-                      <span class="ml-1 text-foreground">· continuity change</span>
-                    {/if}
-                  </span>
-                </li>
-              {/each}
-            </ul>
-            <p class="mt-2 font-mono text-[9px] text-muted-foreground/70">
-              Projected from the pending rotation's minutes and the recorded load; shared play and
-              workload history change the actual outcome.
-            </p>
-          </div>
-        {/if}
-
-        <!-- (d) Compact lock preview -->
-        <div class="rounded-lg bg-surface-2 p-3">
-          <h3
-            class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-          >
-            What locks
-          </h3>
-          {#if preview === null}
-            <p class="mt-2 text-sm text-muted-foreground">Preparing…</p>
-          {:else}
-            <p class="mt-2 text-sm text-muted-foreground">
-              Submitting locks the rotation set for
-              <strong class="text-foreground">
-                {preview.gamesToLock === 1 ? '1 game' : `${String(preview.gamesToLock)} games`}
-              </strong>
-              (rounds {preview.roundRange.fromRound}–{preview.roundRange.toRound}).
-            </p>
-            {#if preview.upcomingGames.length === 0}
-              <p class="mt-2 text-sm text-muted-foreground">No human games scheduled.</p>
+            {#if nextOpponents.length === 0}
+              <p class="mt-2 text-sm text-muted-foreground">No human games in this block.</p>
             {:else}
-              <ol class="mt-1 flex flex-col gap-0.5">
-                {#each preview.upcomingGames.slice(0, 4) as game (game.gameId)}
-                  <li class="flex items-center gap-2 text-sm">
-                    <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground">
-                      R{game.round}
-                    </span>
-                    <span class="min-w-0 flex-1 truncate">
+              <ol class="mt-2 flex flex-col gap-2">
+                {#each nextOpponents as game (game.gameId)}
+                  {@const opponentIdentity =
+                    shell.manifest !== null
+                      ? franchiseIdentityOf(shell.manifest, game.opponentFranchiseId)
+                      : null}
+                  <li class="flex items-center gap-2.5">
+                    {#if shell.manifest !== null}
+                      <SeasonTeamLogo
+                        manifest={shell.manifest}
+                        franchiseId={game.opponentFranchiseId}
+                        teamExternalId={opponentIdentity?.teamExternalId ?? ''}
+                        size="sm"
+                      />
+                    {/if}
+                    <span class="min-w-0 flex-1 truncate text-sm font-semibold">
                       {game.humanIsHome ? 'vs' : 'at'}
                       {shell.franchiseName(game.opponentFranchiseId)}
+                    </span>
+                    <span
+                      class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                    >
+                      R{game.round}
                     </span>
                   </li>
                 {/each}
               </ol>
-              {#if preview.upcomingGames.length > 4}
+            {/if}
+          </div>
+
+          <!-- (b) Pending rotation changes -->
+          <div class="rounded-lg bg-surface-2 p-3">
+            <h3
+              class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Pending rotation changes
+            </h3>
+            {#if preview === null}
+              <p class="mt-2 text-sm text-muted-foreground">Preparing the lock preview…</p>
+            {:else if preview.unchangedSinceLastLock}
+              <p class="mt-2 text-sm text-muted-foreground">
+                No rotation changes since the last accepted block.
+              </p>
+            {:else if preview.changes.length === 0}
+              <p class="mt-2 text-sm text-muted-foreground">
+                No changes from the saved baseline rotation.
+              </p>
+            {:else}
+              <p class="mt-2 text-sm">
+                <strong class="text-foreground">{preview.changes.length}</strong>
+                change{preview.changes.length === 1 ? '' : 's'} since the saved baseline:
+              </p>
+              <ul class="mt-1 flex flex-col gap-1">
+                {#each preview.changes.slice(0, 3) as change (change.playerVersionId)}
+                  <li class="truncate text-sm">
+                    <span class="font-semibold">{change.displayName}</span>
+                    <span class="ml-2 font-mono text-[10px] text-muted-foreground">
+                      {change.roleBefore}
+                      {change.minutesBefore ?? '—'}→{change.roleAfter}
+                      {change.minutesAfter ?? '—'}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+              {#if preview.changes.length > 3}
                 <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-                  +{preview.upcomingGames.length - 4} more in this block
+                  +{preview.changes.length - 3} more
                 </p>
               {/if}
             {/if}
+            <a
+              href={resolve('/season/run/team/' as RouteId)}
+              class="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:underline"
+            >
+              Adjust rotation
+              <span aria-hidden="true">&rarr;</span>
+            </a>
+          </div>
+
+          <!-- (c) Fatigue risk + continuity (M2.4, projection only) -->
+          {#if preview !== null && preview.fatigueProjections.length > 0}
+            <div class="rounded-lg bg-surface-2 p-3">
+              <h3
+                class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+              >
+                Fatigue risk after {preview.gamesToLock === 1
+                  ? '1 game'
+                  : `${String(preview.gamesToLock)} games`}
+              </h3>
+              <ul class="mt-2 flex flex-col gap-1">
+                {#each preview.fatigueProjections.slice(0, 5) as projection (projection.playerVersionId)}
+                  <li class="flex items-center justify-between gap-2 text-sm">
+                    <span class="min-w-0 truncate font-semibold">{projection.displayName}</span>
+                    <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      {projection.bandNow}
+                      <span aria-hidden="true">&rarr;</span>
+                      <span
+                        class={projection.bandAfterBlock === 'Heavy' ||
+                        projection.bandAfterBlock === 'Tired'
+                          ? 'font-bold text-amber-600 dark:text-amber-400'
+                          : 'font-bold text-foreground'}
+                      >
+                        {projection.bandAfterBlock}
+                      </span>
+                      {#if !projection.continuous}
+                        <span class="ml-1 text-foreground">· continuity change</span>
+                      {/if}
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+              <p class="mt-2 font-mono text-[9px] text-muted-foreground/70">
+                Projected from the pending rotation's minutes and the recorded load; shared play and
+                workload history change the actual outcome.
+              </p>
+            </div>
           {/if}
+
+          <!-- (d) Compact lock preview -->
+          <div class="rounded-lg bg-surface-2 p-3">
+            <h3
+              class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              What locks
+            </h3>
+            {#if preview === null}
+              <p class="mt-2 text-sm text-muted-foreground">Preparing…</p>
+            {:else}
+              <p class="mt-2 text-sm text-muted-foreground">
+                Submitting locks the rotation set for
+                <strong class="text-foreground">
+                  {preview.gamesToLock === 1 ? '1 game' : `${String(preview.gamesToLock)} games`}
+                </strong>
+                (rounds {preview.roundRange.fromRound}–{preview.roundRange.toRound}).
+              </p>
+              {#if preview.objective !== null}
+                <p class="mt-1 text-sm">
+                  Objective:
+                  <strong class="text-foreground">{preview.objective.name}</strong>
+                  <span class="ml-1 font-mono text-[10px] text-muted-foreground">
+                    locks into this block
+                  </span>
+                </p>
+              {:else if nextBlockIndex !== null && nextBlockIndex < 8}
+                <p class="mt-1 text-sm text-amber-600 dark:text-amber-400">
+                  No objective selected yet — pick one above before submitting.
+                </p>
+              {/if}
+              {#if preview.upcomingGames.length === 0}
+                <p class="mt-2 text-sm text-muted-foreground">No human games scheduled.</p>
+              {:else}
+                <ol class="mt-1 flex flex-col gap-0.5">
+                  {#each preview.upcomingGames.slice(0, 4) as game (game.gameId)}
+                    <li class="flex items-center gap-2 text-sm">
+                      <span class="w-10 shrink-0 font-mono text-[10px] text-muted-foreground">
+                        R{game.round}
+                      </span>
+                      <span class="min-w-0 flex-1 truncate">
+                        {game.humanIsHome ? 'vs' : 'at'}
+                        {shell.franchiseName(game.opponentFranchiseId)}
+                      </span>
+                    </li>
+                  {/each}
+                </ol>
+                {#if preview.upcomingGames.length > 4}
+                  <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+                    +{preview.upcomingGames.length - 4} more in this block
+                  </p>
+                {/if}
+              {/if}
+            {/if}
+          </div>
         </div>
-      </div>
 
-      <!-- (d) Simulate action + (e) live progress -->
-      <div class="flex flex-col gap-3">
-        {#if rotationFailures.length > 0}
-          <p
-            role="alert"
-            class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        <!-- (d) Simulate action + (e) live progress -->
+        <div class="flex flex-col gap-3">
+          {#if rotationFailures.length > 0}
+            <p
+              role="alert"
+              class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+            >
+              The rotation is invalid — fix the highlighted issues on the Rotation tab before
+              submitting.
+            </p>
+          {/if}
+          {#if submitError}
+            <p
+              role="alert"
+              class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+            >
+              {submitError}
+            </p>
+          {/if}
+          {#if commandError !== null}
+            <p
+              role="alert"
+              class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+            >
+              {commandError.message}
+            </p>
+          {/if}
+          <button
+            type="button"
+            onclick={() => void submitBlock()}
+            disabled={!canSubmit || submitting}
+            class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
           >
-            The rotation is invalid — fix the highlighted issues on the Rotation tab before
-            submitting.
+            {block.phase === 'running'
+              ? 'Simulating block…'
+              : submitting
+                ? 'Preparing block…'
+                : 'Lock rotation and simulate block'}
+          </button>
+          <p class="hidden font-mono text-[10px] text-muted-foreground sm:block">
+            Rejections are typed: stale cursor, duplicate command, invalid rotations, non-boundary
+            block, or run mismatch. Nothing is persisted until the checkpoint passes validation.
           </p>
-        {/if}
-        {#if submitError}
-          <p
-            role="alert"
-            class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
-          >
-            {submitError}
-          </p>
-        {/if}
-        <button
-          type="button"
-          onclick={() => void submitBlock()}
-          disabled={!canSubmit || submitting}
-          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
-        >
-          {block.phase === 'running'
-            ? 'Simulating block…'
-            : submitting
-              ? 'Preparing block…'
-              : 'Lock rotation and simulate block'}
-        </button>
-        <p class="hidden font-mono text-[10px] text-muted-foreground sm:block">
-          Rejections are typed: stale cursor, duplicate command, invalid rotations, non-boundary
-          block, or run mismatch. Nothing is persisted until the checkpoint passes validation.
-        </p>
-      </div>
+        </div>
 
-      <BlockProgress
-        {block}
-        label={blockLabel}
-        onCancel={() => shell.cancelBlock()}
-        onRetry={() => shell.retryBlock()}
+        <BlockProgress
+          {block}
+          label={blockLabel}
+          onCancel={() => shell.cancelBlock()}
+          onRetry={() => shell.retryBlock()}
+        />
+      </section>
+    {/if}
+
+    <!-- M2.5: trade offers panel (open window) -->
+    {#if openWindow !== null}
+      <TradeOffersPanel
+        windowIndex={openWindow.windowIndex}
+        offers={tradeOffers}
+        busy={block.phase === 'running'}
+        onAccept={(offerId) =>
+          shell.acceptTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
+        onDecline={(offerId) =>
+          shell.declineTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
       />
-    </section>
+    {/if}
+
+    <!-- M2.5: Influence panel (balance, ledger, spend affordances) -->
+    {#if influenceVm !== null}
+      <InfluencePanel
+        balance={influenceVm.balance}
+        cap={influenceVm.cap}
+        floor={influenceVm.floor}
+        atCap={influenceVm.atCap}
+        atFloor={influenceVm.atFloor}
+        entries={influenceVm.recentEntries}
+        affordances={influenceVm.affordances}
+        busy={block.phase === 'running'}
+        playerName={shell.playerName}
+        onSpend={(affordance) =>
+          shell.spendInfluence({
+            purpose: affordance.purpose,
+            windowIndex: affordance.windowIndex ?? undefined,
+            injuryId: affordance.injuryId ?? undefined,
+          })}
+      />
+    {/if}
 
     <!-- 3. Recent recap affordance -->
     {#if recentBlocks.length > 0}

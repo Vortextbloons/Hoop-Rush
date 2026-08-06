@@ -1,12 +1,15 @@
 import {
   blockIndexForRound,
   SEASON_GAMES_PER_ROUND,
+  SEASON_INFLUENCE_CAP,
+  SEASON_ENDING_MISSED_GAMES_SENTINEL,
   SEASON_ROSTER_SIZE,
   SEASON_TEAM_COUNT,
   type SeasonAcceptedBlock,
   type SeasonGame,
   type SeasonGameSummary,
   type SeasonLeague,
+  type SeasonPendingBlockCandidate,
   type SeasonRetainedGameDetail,
   type SeasonRoster,
   type SeasonSchedule,
@@ -16,10 +19,10 @@ import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 
 /**
  * Reconciliation audit for a stored Season Run (spec/2.0/07 persistence,
- * M2.3, M2.4). Every check derives from recorded facts and the pure engine
- * helpers behind the `SeasonRunEngineSeam`, so a fresh fold always agrees
- * with the stored checkpoint and a corrupt row or a half-applied block is
- * detected instead of entering app state.
+ * M2.3, M2.4, M2.5). Every check derives from recorded facts and the pure
+ * engine helpers behind the `SeasonRunEngineSeam`, so a fresh fold always
+ * agrees with the stored checkpoint and a corrupt row or a half-applied
+ * block is detected instead of entering app state.
  *
  * Checks:
  * - schedule identity: every summary matches its schedule game, every
@@ -43,17 +46,54 @@ import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
  *   and never beyond the checkpoint's completedRounds, sharedPossessions
  *   within 0..10,000,000, and the effects player set exactly equal to the
  *   union of the 30 rosters' players.
+ * - M2.5 health state: every injury references a known player-version id
+ *   (union of the rosters) and a league franchise, its occurrence game
+ *   exists in the schedule, season-ending injuries carry the sentinel
+ *   `missedGamesRemaining`, non-eligible injuries never resolve a same-game
+ *   return, and a positive recurrence window implies an actual return.
+ * - M2.5 Influence reconciliation: every ledger entry reconciles
+ *   (`balanceAfter === balanceBefore + appliedDelta`, walking each
+ *   franchise's entries in order), the stored balances equal the ledger
+ *   recomputation, applied deltas equal requested deltas except for
+ *   cap-applied grants (0 applied above the +8 cap), and every rehab state
+ *   references a recorded injury.
+ * - M2.5 transaction chain: `appliedAtStateRevision` is monotonic
+ *   non-decreasing and never beyond the stored stateRevision.
+ * - M2.5 state chain: accepted-block `stateRevision` is strictly increasing
+ *   (at least +1 per commit) and never beyond the stored stateRevision, the
+ *   stored `stateDigest` recomputes exactly through
+ *   `seam.seasonRunStateDigest`, and `checkpointState` matches the last
+ *   accepted block exactly (null when no block was accepted).
+ * - M2.5 effects-with-trade divergence rule (LEAD DECISION, documented):
+ *   `run.effects` may differ from the checkpoint's effects only for blocks
+ *   where a trade window opened. Accepted blocks do not persist their
+ *   effects, so the checkable form is the state chain: when no window ever
+ *   opened (`trade === null`) and no command applied after the last commit
+ *   (`stored.stateRevision === lastBlock.stateRevision`), the stored facts
+ *   (including effects) must be byte-identical to the facts the last
+ *   checkpoint digested — i.e. the last accepted block's `stateDigest`
+ *   recomputes over the stored facts. A window open is the only legal
+ *   divergence point.
+ * - M2.5 trade state: at most three windows, in windowIndex order, opened
+ *   by the accepted blocks 2/4/5 (matching windowIndex 0/1/2) and never by
+ *   an unaccepted block, offer ids unique per window with matching
+ *   windowIndex, and closed windows carry no open offers (expiry at close).
+ * - M2.5 pending-block consistency: a pending candidate for an already
+ *   committed blockIndex is an error (the commit deletes the pending row in
+ *   the same transaction, so a leftover row means a bug).
  */
 export interface SeasonRunAuditFacts {
   league: SeasonLeague;
   rosters: readonly SeasonRoster[];
   schedule: SeasonSchedule;
   humanFranchiseId: string;
-  /** Validated current (v3) stored checkpoint row; row-level facts are authoritative. */
+  /** Validated current (v4) stored checkpoint row; row-level facts are authoritative. */
   stored: StoredSeasonRunRecord;
   summaries: readonly SeasonGameSummary[];
   retainedDetails: readonly SeasonRetainedGameDetail[];
   acceptedBlocks: readonly SeasonAcceptedBlock[];
+  /** M2.5: the run's pending candidate row, or null when none is stored. */
+  pending: SeasonPendingBlockCandidate | null;
 }
 
 /** Plain-JSON deep equality; key order is irrelevant. */
@@ -210,6 +250,7 @@ export function auditSeasonRunState(
     blockSummaryCounts.set(blockIndex, (blockSummaryCounts.get(blockIndex) ?? 0) + 1);
   }
   let previousCompletedRounds = 0;
+  let previousStateRevision = -1;
   acceptedBlocks.forEach((block, index) => {
     if (block.revision !== index + 1) {
       failures.push(
@@ -237,6 +278,14 @@ export function auditSeasonRunState(
         `accepted block ${String(block.blockIndex)} summaryCount ${String(block.summaryCount)} does not match stored rows (${String(storedCount)})`,
       );
     }
+    // M2.5: the run state chain — every committed block bumps the state
+    // revision by at least one, so the chain is strictly increasing.
+    if (block.stateRevision <= previousStateRevision) {
+      failures.push(
+        `accepted block ${String(block.blockIndex)} stateRevision ${String(block.stateRevision)} does not advance the state chain (previous ${String(previousStateRevision)})`,
+      );
+    }
+    previousStateRevision = block.stateRevision;
   });
 
   const last = acceptedBlocks[acceptedBlocks.length - 1];
@@ -252,7 +301,13 @@ export function auditSeasonRunState(
     if (stored.recap !== null) {
       failures.push('checkpoint carries a recap with no accepted block');
     }
+    if (stored.checkpointState !== null) {
+      failures.push('checkpoint carries checkpointState with no accepted block');
+    }
   } else {
+    // Commands can advance the state chain before the first block commits,
+    // so stateRevision may be > 0 here; checkpointState stays null (checked
+    // above) and the stored digest recomputes over the mutable facts below.
     if (stored.completedRounds !== last.completedRounds) {
       failures.push(
         `checkpoint completedRounds ${String(stored.completedRounds)} does not match the last accepted block`,
@@ -386,6 +441,269 @@ export function auditSeasonRunState(
     failures.push(
       `effects pair state count ${String(effects.pairStates.length)} is not ${String(expectedPairCount)}`,
     );
+  }
+
+  // M2.5 health state: recorded injuries are run-scoped facts.
+  const { health } = stored;
+  const healthRosterIds = seam.seasonRosterPlayerVersionIds(facts.rosters);
+  const healthRosterIdSet = new Set(healthRosterIds);
+  const leagueFranchiseIds = new Set(facts.league.teams.map((team) => team.franchiseId));
+  const healthInjuryIds = new Set<string>();
+  for (const injury of health.injuries) {
+    if (healthInjuryIds.has(injury.injuryId)) {
+      failures.push(`duplicate injury record ${injury.injuryId}`);
+    }
+    healthInjuryIds.add(injury.injuryId);
+    if (!healthRosterIdSet.has(injury.playerVersionId)) {
+      failures.push(
+        `injury ${injury.injuryId} references player ${injury.playerVersionId} outside the 30 rosters`,
+      );
+    }
+    if (!leagueFranchiseIds.has(injury.franchiseId)) {
+      failures.push(
+        `injury ${injury.injuryId} references franchise ${injury.franchiseId} outside the league`,
+      );
+    }
+    if (scheduleById.get(injury.gameId) === undefined) {
+      failures.push(`injury ${injury.injuryId} occurrence game ${injury.gameId} is not scheduled`);
+    }
+    if (
+      injury.seasonEnding &&
+      injury.missedGamesRemaining !== SEASON_ENDING_MISSED_GAMES_SENTINEL
+    ) {
+      failures.push(
+        `season-ending injury ${injury.injuryId} must carry the missed-games sentinel ${String(SEASON_ENDING_MISSED_GAMES_SENTINEL)}`,
+      );
+    }
+    if (!injury.sameGameReturn && injury.sameGameReturned !== null) {
+      failures.push(
+        `injury ${injury.injuryId} resolved a same-game return without the eligibility roll`,
+      );
+    }
+    if (injury.recurrenceWindowRoundsRemaining > 0 && injury.actualReturnRound === null) {
+      failures.push(
+        `injury ${injury.injuryId} carries a recurrence window without an actual return`,
+      );
+    }
+  }
+
+  // M2.5 Influence reconciliation: balances recompute from the append-only
+  // ledger, entry by entry (balanceAfter === balanceBefore + appliedDelta).
+  const { influence } = stored;
+  const balancesFromLedger = new Map<string, number>();
+  for (const entry of influence.ledger) {
+    const before = balancesFromLedger.get(entry.franchiseId) ?? 0;
+    if (entry.balanceAfter !== before + entry.appliedDelta) {
+      failures.push(
+        `influence ledger entry ${entry.entryId} does not reconcile ` +
+          `(balanceBefore ${String(before)} + appliedDelta ${String(entry.appliedDelta)} != balanceAfter ${String(entry.balanceAfter)})`,
+      );
+    }
+    if (entry.appliedDelta !== entry.requestedDelta) {
+      // The only legal divergence is a cap-applied grant: requested above
+      // the +8 cap applies 0. Spends are never clamped (floor is validated).
+      if (
+        entry.appliedDelta !== 0 ||
+        entry.requestedDelta <= 0 ||
+        before + entry.requestedDelta <= SEASON_INFLUENCE_CAP
+      ) {
+        failures.push(
+          `influence ledger entry ${entry.entryId} appliedDelta ${String(entry.appliedDelta)} does not match requestedDelta ${String(entry.requestedDelta)}`,
+        );
+      }
+    }
+    balancesFromLedger.set(entry.franchiseId, entry.balanceAfter);
+  }
+  for (const franchiseId of leagueFranchiseIds) {
+    const storedBalance = influence.balances[franchiseId];
+    const ledgerBalance = balancesFromLedger.get(franchiseId) ?? 0;
+    if (storedBalance === undefined) {
+      failures.push(`influence balances miss franchise ${franchiseId}`);
+    } else if (storedBalance !== ledgerBalance) {
+      failures.push(
+        `influence balance for ${franchiseId} is ${String(storedBalance)}, ledger recomputes ${String(ledgerBalance)}`,
+      );
+    }
+  }
+  for (const rehabInjuryId of Object.keys(influence.rehabs)) {
+    if (!healthInjuryIds.has(rehabInjuryId)) {
+      failures.push(`influence rehab state references unknown injury ${rehabInjuryId}`);
+    }
+  }
+  for (const [franchiseId, windowStates] of Object.entries(influence.windows)) {
+    if (!leagueFranchiseIds.has(franchiseId)) {
+      failures.push(`influence windows reference unknown franchise ${franchiseId}`);
+    }
+    const seen = new Set<number>();
+    for (const windowState of windowStates) {
+      if (seen.has(windowState.windowIndex)) {
+        failures.push(
+          `influence window spend ${franchiseId}/${String(windowState.windowIndex)} recorded twice`,
+        );
+      }
+      seen.add(windowState.windowIndex);
+      if (windowState.windowIndex < 0 || windowState.windowIndex > 2) {
+        failures.push(
+          `influence window spend ${franchiseId} carries out-of-range windowIndex ${String(windowState.windowIndex)}`,
+        );
+      }
+    }
+  }
+
+  // M2.5 transaction chain: append-only entries with monotonic revisions.
+  const { transactions } = stored;
+  let previousAppliedAt = -1;
+  const transactionIds = new Set<string>();
+  for (const entry of transactions) {
+    if (transactionIds.has(entry.transactionId)) {
+      failures.push(`duplicate transaction entry ${entry.transactionId}`);
+    }
+    transactionIds.add(entry.transactionId);
+    if (entry.appliedAtStateRevision < previousAppliedAt) {
+      failures.push(
+        `transaction ${entry.transactionId} appliedAtStateRevision ${String(entry.appliedAtStateRevision)} regresses along the log`,
+      );
+    }
+    previousAppliedAt = entry.appliedAtStateRevision;
+    if (entry.appliedAtStateRevision > stored.stateRevision) {
+      failures.push(
+        `transaction ${entry.transactionId} appliedAtStateRevision ${String(entry.appliedAtStateRevision)} exceeds the stored stateRevision ${String(stored.stateRevision)}`,
+      );
+    }
+  }
+
+  // M2.5 state chain: revision monotonicity, checkpointState consistency,
+  // and the canonical state digest recomputation.
+  if (last !== undefined) {
+    if (stored.stateRevision < last.stateRevision) {
+      failures.push(
+        `stored stateRevision ${String(stored.stateRevision)} regresses behind the last accepted block ${String(last.stateRevision)}`,
+      );
+    }
+    const expectedCheckpointState = {
+      runId: stored.run.runId,
+      blockIndex: last.blockIndex,
+      completedRounds: last.completedRounds,
+      revision: last.revision,
+      commandId: last.commandId,
+      rotationDigest: last.rotationDigest,
+      checkpointDigest: last.checkpointDigest,
+    };
+    if (!deepEqual(stored.checkpointState, expectedCheckpointState)) {
+      failures.push('checkpointState does not match the last accepted block');
+    }
+    // Effects-with-trade divergence rule (documented): when no trade window
+    // ever opened and no command applied after the last commit, the stored
+    // facts (effects included) must be byte-identical to what the last
+    // accepted block digested.
+    if (stored.trade === null && stored.stateRevision === last.stateRevision) {
+      try {
+        const recomputed = seam.seasonRunStateDigest({
+          stateRevision: stored.stateRevision,
+          checkpointState: stored.checkpointState,
+          health: stored.health,
+          influence: stored.influence,
+          transactions: stored.transactions,
+          trade: stored.trade,
+          objectives: stored.objectives,
+          rosters: stored.run.rosters,
+          ownership: stored.run.ownership,
+          rotations: stored.run.rotations,
+          effects: stored.effects,
+        });
+        if (recomputed !== last.stateDigest) {
+          failures.push(
+            'run.effects diverged from the last checkpoint effects without a trade window ' +
+              '(last block stateDigest does not recompute over the stored facts)',
+          );
+        }
+      } catch (error) {
+        failures.push(`state digest recomputation failed: ${errorMessage(error)}`);
+      }
+    }
+  }
+  try {
+    const recomputed = seam.seasonRunStateDigest({
+      stateRevision: stored.stateRevision,
+      checkpointState: stored.checkpointState,
+      health: stored.health,
+      influence: stored.influence,
+      transactions: stored.transactions,
+      trade: stored.trade,
+      objectives: stored.objectives,
+      rosters: stored.run.rosters,
+      ownership: stored.run.ownership,
+      rotations: stored.run.rotations,
+      effects: stored.effects,
+    });
+    if (recomputed !== stored.stateDigest) {
+      failures.push('stored stateDigest does not recompute over the stored mutable state');
+    }
+  } catch (error) {
+    failures.push(`state digest recomputation failed: ${errorMessage(error)}`);
+  }
+
+  // M2.5 trade state validity.
+  const { trade } = stored;
+  const windowBlockIndexByIndex: Record<number, number> = { 0: 2, 1: 4, 2: 5 };
+  if (trade !== null) {
+    if (trade.windows.length === 0) {
+      failures.push('trade state holds no windows');
+    }
+    if (trade.windows.length > 3) {
+      failures.push(`trade state holds ${String(trade.windows.length)} windows, max 3`);
+    }
+    const lastAcceptedBlockIndex = last?.blockIndex ?? -1;
+    trade.windows.forEach((window, index) => {
+      const expectedWindowIndex = index;
+      const expectedBlockIndex = windowBlockIndexByIndex[expectedWindowIndex];
+      if (window.windowIndex !== expectedWindowIndex) {
+        failures.push(
+          `trade window at position ${String(index)} carries windowIndex ${String(window.windowIndex)}, expected ${String(expectedWindowIndex)}`,
+        );
+      }
+      if (window.blockIndex !== expectedBlockIndex) {
+        failures.push(
+          `trade window ${String(window.windowIndex)} opened by block ${String(window.blockIndex)}, expected block ${String(expectedBlockIndex)}`,
+        );
+      }
+      if (window.blockIndex > lastAcceptedBlockIndex) {
+        failures.push(
+          `trade window ${String(window.windowIndex)} opened by block ${String(window.blockIndex)} that is not accepted`,
+        );
+      }
+      const offerIds = new Set<string>();
+      for (const offer of window.offers) {
+        if (offerIds.has(offer.offerId)) {
+          failures.push(
+            `duplicate trade offer ${offer.offerId} in window ${String(window.windowIndex)}`,
+          );
+        }
+        offerIds.add(offer.offerId);
+        if (offer.windowIndex !== window.windowIndex) {
+          failures.push(
+            `trade offer ${offer.offerId} windowIndex ${String(offer.windowIndex)} does not match its window`,
+          );
+        }
+      }
+      if (window.status === 'closed' && window.offers.some((offer) => offer.status === 'open')) {
+        failures.push(
+          `closed trade window ${String(window.windowIndex)} still carries open offers`,
+        );
+      }
+    });
+  }
+
+  // M2.5 pending-block consistency: a pending row for a committed block is a
+  // bug (the commit deletes it in the same transaction).
+  const pending = facts.pending;
+  if (pending !== null) {
+    if (pending.runId !== stored.run.runId) {
+      failures.push(`pending block runId ${pending.runId} does not match the checkpoint`);
+    }
+    if (pending.blockIndex < acceptedBlocks.length) {
+      failures.push(`pending block ${String(pending.blockIndex)} was already committed`);
+    }
   }
 
   return failures;

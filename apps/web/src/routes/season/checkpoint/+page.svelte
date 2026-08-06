@@ -150,6 +150,7 @@
       rosters: run.rosters.flatMap((roster) => roster.players),
       games: run.games,
       humanFranchiseId,
+      run,
     });
   });
 

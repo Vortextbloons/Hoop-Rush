@@ -155,6 +155,9 @@ function buildInput(options: {
     awayRotation: buildRotation(options.away, options.preset),
     availability,
     removals: options.removals ?? [],
+    // M2.5 (season-game-v4): the same-game-return seam; zero-injury fixtures
+    // carry an empty list so they reproduce the v3 result byte-for-byte.
+    returns: [],
     homeCourt: {
       schemaVersion: 1,
       profileVersion: 'season-home-court-v1',

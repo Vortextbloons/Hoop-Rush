@@ -25,7 +25,7 @@ export async function loadSeasonDraftCatalog(
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (expectedHash !== undefined) {
     const digest = await sha256Hex(bytes);
-    if (digest !== expectedHash) {
+    if (digest !== null && digest !== expectedHash) {
       throw new Error(
         `draft catalog content hash mismatch: expected ${expectedHash}, got ${digest}`,
       );

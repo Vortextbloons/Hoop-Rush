@@ -99,6 +99,7 @@ function buildInput(seed: string): SeasonGameSimulationInput {
       available: true,
     })),
     removals: [],
+    returns: [],
     homeCourt: SEASON_NEUTRAL_HOME_COURT,
   };
 }

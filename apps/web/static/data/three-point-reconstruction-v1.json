@@ -1,0 +1,756 @@
+{
+  "artifactVersion": "three-point-reconstruction-v1",
+  "schemaVersion": 1,
+  "fitCohort": {
+    "seasons": [
+      "1979-80",
+      "1980-81",
+      "1981-82",
+      "1982-83",
+      "1983-84"
+    ],
+    "description": "1979-80 through 1983-84 early three-point cohort; the shot was nascent and closest to the world pre-1979 players would face"
+  },
+  "featureNames": [
+    "ftRatio",
+    "ftPctShrunk",
+    "rel2pPct",
+    "fgaPer36",
+    "ftaPerFga",
+    "astPer36",
+    "isGuard",
+    "isCenter",
+    "heightInches",
+    "weightLbs",
+    "age",
+    "seasonIndex"
+  ],
+  "normalization": {
+    "ftRatio": {
+      "mean": 0.744261,
+      "std": 0.097729
+    },
+    "ftPctShrunk": {
+      "mean": 0.755561,
+      "std": 0.053337
+    },
+    "rel2pPct": {
+      "mean": -0.014554,
+      "std": 0.058215
+    },
+    "fgaPer36": {
+      "mean": 13.171126,
+      "std": 3.544806
+    },
+    "ftaPerFga": {
+      "mean": 0.320631,
+      "std": 0.133484
+    },
+    "astPer36": {
+      "mean": 3.956208,
+      "std": 2.11066
+    },
+    "isGuard": {
+      "mean": 0.474916,
+      "std": 1
+    },
+    "isCenter": {
+      "mean": 0.14214,
+      "std": 1
+    },
+    "heightInches": {
+      "mean": 78.040134,
+      "std": 3.313355
+    },
+    "weightLbs": {
+      "mean": 201.088629,
+      "std": 21.38066
+    },
+    "age": {
+      "mean": 26.464883,
+      "std": 3.2279
+    },
+    "seasonIndex": {
+      "mean": 0.515259,
+      "std": 0.350476
+    }
+  },
+  "missingDefaults": {
+    "G": {
+      "heightInches": 75,
+      "weightLbs": 185,
+      "age": 25.5
+    },
+    "F": {
+      "heightInches": 80,
+      "weightLbs": 215,
+      "age": 26
+    },
+    "C": {
+      "heightInches": 83,
+      "weightLbs": 230,
+      "age": 27
+    }
+  },
+  "position2pMeans": {
+    "G": 0.481451,
+    "F": 0.501753,
+    "C": 0.511209
+  },
+  "priors": {
+    "accuracyPrior": 0.288637,
+    "accuracyPriorAttempts": 80,
+    "attemptRatePrior": 0.023422,
+    "attemptRatePriorTrials": 80,
+    "ftPriors": {
+      "G": 0.783723,
+      "F": 0.740074,
+      "C": 0.720492
+    }
+  },
+  "regularization": {
+    "lambda": 0.5,
+    "maxIterations": 40,
+    "convergenceTolerance": 1e-9
+  },
+  "models": {
+    "accuracy": {
+      "intercept": -1.143577,
+      "coefficients": {
+        "ftRatio": 0.075902,
+        "ftPctShrunk": 0.021163,
+        "rel2pPct": -0.04108,
+        "fgaPer36": 0.03683,
+        "ftaPerFga": -0.167784,
+        "astPer36": 0.034393,
+        "isGuard": 0.32475,
+        "isCenter": -0.651044,
+        "heightInches": -0.038928,
+        "weightLbs": 0.209493,
+        "age": 0.122547,
+        "seasonIndex": -0.112137
+      },
+      "covariance": [
+        [
+          0.000255,
+          -0.000152,
+          -0.000015,
+          -0.000017,
+          -0.000043,
+          0.000077,
+          -0.000071,
+          -0.000037,
+          0.000164,
+          -0.000015,
+          -0.000011,
+          0.000012,
+          -0.000002
+        ],
+        [
+          0,
+          0.000352,
+          -0.000281,
+          -0.000001,
+          -0.000004,
+          0.000003,
+          0.000008,
+          0.000031,
+          0.000015,
+          0.000003,
+          0,
+          -0.000007,
+          -0.000001
+        ],
+        [
+          0,
+          0,
+          0.000252,
+          -0.000071,
+          -0.000066,
+          0.000059,
+          -0.000061,
+          -0.000061,
+          0.000086,
+          -0.000007,
+          0.000002,
+          -0.00006,
+          0.000029
+        ],
+        [
+          0,
+          0,
+          0,
+          0.000474,
+          -0.000057,
+          -0.000022,
+          -0.000022,
+          -0.000054,
+          0.000055,
+          -0.000033,
+          0.000024,
+          -0.000009,
+          -0.000013
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0.000208,
+          0.000069,
+          0.000029,
+          -0.000067,
+          0.000207,
+          -0.000031,
+          -0.000013,
+          0.000021,
+          -0.000004
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000345,
+          0.000023,
+          0.000183,
+          -0.000265,
+          0.000027,
+          0.000001,
+          0.000027,
+          -0.000026
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.0002,
+          -0.000246,
+          0.000113,
+          0.000029,
+          -0.000002,
+          -0.00001,
+          -0.000033
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000965,
+          0.001446,
+          0.000267,
+          0.000051,
+          0.000016,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.007395,
+          -0.000871,
+          -0.00014,
+          -0.000069,
+          -0.000059
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000312,
+          -0.000258,
+          0.000012,
+          0.000003
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000317,
+          0.000026,
+          -0.000007
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000257,
+          0.000015
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000231
+        ]
+      ]
+    },
+    "attemptRate": {
+      "intercept": -4.307939,
+      "coefficients": {
+        "ftRatio": 0.165828,
+        "ftPctShrunk": 0.139796,
+        "rel2pPct": -1.101455,
+        "fgaPer36": -0.01428,
+        "ftaPerFga": -0.850047,
+        "astPer36": 0.23952,
+        "isGuard": 1.017647,
+        "isCenter": -1.334377,
+        "heightInches": 0.136323,
+        "weightLbs": 0.094531,
+        "age": 0.079877,
+        "seasonIndex": 0.041248
+      },
+      "covariance": [
+        [
+          0.000054,
+          -0.000057,
+          0.000003,
+          -0.000004,
+          -0.000009,
+          0.000032,
+          -0.000008,
+          0,
+          0.00002,
+          -0.000004,
+          -0.000001,
+          0.000005,
+          -0.000001
+        ],
+        [
+          0,
+          0.000126,
+          -0.000074,
+          -0.000016,
+          -0.000003,
+          0.000009,
+          -0.000002,
+          0.000008,
+          0.000013,
+          -0.000001,
+          0,
+          -0.000001,
+          -0.000001
+        ],
+        [
+          0,
+          0,
+          0.000049,
+          -0.000069,
+          -0.00002,
+          0.000027,
+          -0.000011,
+          -0.000014,
+          0.000002,
+          0,
+          -0.000001,
+          -0.000009,
+          0.000005
+        ],
+        [
+          0,
+          0,
+          0,
+          0.002318,
+          -0.000072,
+          -0.000067,
+          -0.000028,
+          -0.000024,
+          0.000014,
+          -0.000021,
+          0.000017,
+          0.000018,
+          -0.00001
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0.000047,
+          0.000043,
+          0.000001,
+          -0.000014,
+          0.000033,
+          -0.000006,
+          0,
+          -0.000004,
+          0.000001
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000325,
+          0.000026,
+          0.000068,
+          -0.000093,
+          0.000011,
+          0.000002,
+          0.00001,
+          -0.000007
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000034,
+          -0.000049,
+          0.000014,
+          0.000005,
+          0,
+          0,
+          -0.000005
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000175,
+          0.00024,
+          0.000041,
+          0.000005,
+          0.000003,
+          -0.000001
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000893,
+          -0.000136,
+          -0.000016,
+          -0.000013,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.00005,
+          -0.000046,
+          0.000002,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000054,
+          0.000004,
+          0.000001
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000056,
+          0.000001
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.000052
+        ]
+      ]
+    }
+  },
+  "posteriorQuantiles": {
+    "accuracy": 0.25,
+    "attemptRate": 0.3
+  },
+  "attemptRateTranslation": {
+    "factor": 2.5,
+    "caps": {
+      "G": 0.15,
+      "F": 0.08,
+      "C": 0.02
+    },
+    "description": "conservative modern translation: reconstructed early-era attempt volume scaled 2.5x and capped per position below modern-era norms (G ~0.30, F ~0.20, C ~0.08); accuracy is never translated"
+  },
+  "confidenceThresholds": {
+    "highStdDev": 0.025,
+    "mediumStdDev": 0.045
+  },
+  "floors": {
+    "floor": 0.190527,
+    "zoneFloors": {
+      "cornerThree": 0.210527,
+      "aboveBreakThree": 0.190527
+    }
+  },
+  "ratingMapping": {
+    "points": [
+      {
+        "accuracy": 0.107877,
+        "rating": 15
+      },
+      {
+        "accuracy": 0.230175,
+        "rating": 55
+      },
+      {
+        "accuracy": 0.348977,
+        "rating": 92
+      }
+    ],
+    "clampMin": 10,
+    "clampMax": 95
+  },
+  "holdout": {
+    "accuracy": {
+      "mae": 0.095656,
+      "bias": -0.010635,
+      "overpredictionShare": 0.449884,
+      "samplePlayers": 450,
+      "positionBands": {
+        "G": {
+          "mae": 0.087022,
+          "bias": -0.011482,
+          "count": 568
+        },
+        "F": {
+          "mae": 0.117244,
+          "bias": -0.007978,
+          "count": 458
+        },
+        "C": {
+          "mae": 0.155954,
+          "bias": -0.008795,
+          "count": 170
+        }
+      },
+      "evidenceBands": [
+        {
+          "band": "1500-plus-min",
+          "mae": 0.092355,
+          "bias": -0.012219,
+          "count": 686
+        },
+        {
+          "band": "500-1499-min",
+          "mae": 0.098507,
+          "bias": -0.010252,
+          "count": 360
+        },
+        {
+          "band": "under-500-min",
+          "mae": 0.14576,
+          "bias": 0.019746,
+          "count": 150
+        }
+      ],
+      "falsePositives": {
+        "count": 49,
+        "threshold": 0.33,
+        "lowerBound": 0.29
+      },
+      "falseNegatives": {
+        "count": 175,
+        "threshold": 0.33,
+        "upperBound": 0.37
+      }
+    },
+    "attemptRate": {
+      "mae": 0.01784,
+      "bias": -0.000347,
+      "overpredictionShare": 0.644499,
+      "samplePlayers": 559,
+      "positionBands": {
+        "G": {
+          "mae": 0.031538,
+          "bias": -0.000813,
+          "count": 618
+        },
+        "F": {
+          "mae": 0.010596,
+          "bias": -0.000016,
+          "count": 599
+        },
+        "C": {
+          "mae": 0.003263,
+          "bias": -0.000026,
+          "count": 316
+        }
+      },
+      "evidenceBands": [
+        {
+          "band": "1500-plus-min",
+          "mae": 0.01596,
+          "bias": 0.000655,
+          "count": 762
+        },
+        {
+          "band": "500-1499-min",
+          "mae": 0.024621,
+          "bias": -0.004173,
+          "count": 444
+        },
+        {
+          "band": "under-500-min",
+          "mae": 0.028133,
+          "bias": -0.004419,
+          "count": 327
+        }
+      ],
+      "falsePositives": {
+        "count": 6,
+        "threshold": 0.1,
+        "lowerBound": 0.05
+      },
+      "falseNegatives": {
+        "count": 38,
+        "threshold": 0.1,
+        "upperBound": 0.15
+      }
+    },
+    "translatedAttemptRateModern": {
+      "mae": 0.28132,
+      "bias": -0.278576,
+      "overpredictionShare": 0.083653,
+      "samplePlayers": 1414,
+      "positionBands": {
+        "G": {
+          "mae": 0.28736,
+          "bias": -0.285071,
+          "count": 1795
+        },
+        "F": {
+          "mae": 0.311373,
+          "bias": -0.308539,
+          "count": 2519
+        },
+        "C": {
+          "mae": 0.125954,
+          "bias": -0.121929,
+          "count": 966
+        }
+      },
+      "evidenceBands": [
+        {
+          "band": "1500-plus-min",
+          "mae": 0.272726,
+          "bias": -0.270529,
+          "count": 1784
+        },
+        {
+          "band": "500-1499-min",
+          "mae": 0.297687,
+          "bias": -0.293723,
+          "count": 1805
+        },
+        {
+          "band": "under-500-min",
+          "mae": 0.310747,
+          "bias": -0.307255,
+          "count": 1691
+        }
+      ],
+      "falsePositives": {
+        "count": 12,
+        "threshold": 0.1,
+        "lowerBound": 0.05
+      },
+      "falseNegatives": {
+        "count": 2915,
+        "threshold": 0.1,
+        "upperBound": 0.15
+      }
+    },
+    "foldCount": 5
+  },
+  "gates": {
+    "meanBiasNonPositiveAccuracy": true,
+    "meanBiasNonPositiveTranslatedAttemptRate": true,
+    "floorBelowEstablished": true
+  },
+  "generatedBy": "hoop-rush calibrate three-point (derive-v8, ratings-v3.6)"
+}

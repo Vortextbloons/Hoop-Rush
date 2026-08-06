@@ -16,18 +16,22 @@
     MECHANISM_LABEL,
     type BlockMechanismEvidenceRow,
   } from '$lib/season/season-effects-view';
+  import type { AvailabilityStripRow } from '$lib/season/season-health-view';
+  import HealthStrip from './HealthStrip.svelte';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
 
   /**
    * Factual block recap (spec/2.0/02 recap, spec/2.0/11 block recap, M2.3,
-   * M2.3.5, M2.4). Leads with record and standings movement, then notable
-   * performances, streaks, version-versus-version spotlights, the next
-   * human games, and — since M2.4 — a stamina/chemistry section built from
-   * the recorded mechanism evidence of the block's human games: opportunity
-   * counts, the average recorded state band, and the bounded aggregate
-   * probability movement. Every claim derives from accepted saved facts;
-   * nothing is invented.
+   * M2.3.5, M2.4, M2.5). Leads with record and standings movement, then
+   * notable performances, streaks, version-versus-version spotlights, the
+   * next human games, and — since M2.4 — a stamina/chemistry section built
+   * from the recorded mechanism evidence of the block's human games:
+   * opportunity counts, the average recorded state band, and the bounded
+   * aggregate probability movement. M2.5 adds the per-player health strip
+   * (availability + recovery estimates), the block injury evidence, and the
+   * recorded objective/trade/Influence facts. Every claim derives from
+   * accepted saved facts; nothing is invented.
    */
 
   let {
@@ -39,6 +43,7 @@
     faces = new Map(),
     rosterByVersion = new Map(),
     effectsEvidence = [],
+    healthRows = [],
   }: {
     recap: SeasonBlockRecap;
     humanRecord: SeasonRecordMovement | null;
@@ -50,6 +55,8 @@
     rosterByVersion?: ReadonlyMap<string, SeasonRosterEntry>;
     /** M2.4: aggregated mechanism evidence of the block's human games. */
     effectsEvidence?: BlockMechanismEvidenceRow[];
+    /** M2.5: per-player availability rows for the health strip. */
+    healthRows?: AvailabilityStripRow[];
   } = $props();
 
   const movementLabel = (movement: SeasonRecordMovement): string =>
@@ -58,6 +65,17 @@
         ? `${ordinal(movement.positionBefore)} → ${ordinal(movement.positionAfter)}`
         : `${ordinal(movement.positionAfter)} in conference`
     })`;
+
+  /** M2.5: one-line injury evidence summary (recorded facts only). */
+  const injurySummary = $derived(
+    `${String(recap.injuryEvidence.injuries)} ${
+      recap.injuryEvidence.injuries === 1 ? 'injury' : 'injuries'
+    } across the league · ${String(recap.injuryEvidence.sameGameReturns)} same-game return${
+      recap.injuryEvidence.sameGameReturns === 1 ? '' : 's'
+    } · ${String(recap.injuryEvidence.returnedThisBlock)} returned · ${String(
+      recap.injuryEvidence.activeAtBlockEnd,
+    )} still out at block end.`,
+  );
 
   const franchiseIdentity = (franchiseId: string) =>
     manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
@@ -374,5 +392,44 @@
         {/each}
       </ul>
     </section>
+  {/if}
+
+  {#if healthRows.length > 0 || recap.injuryEvidence !== undefined}
+    <HealthStrip rows={healthRows} title="Health" />
+    {#if healthRows.length > 0}
+      <section
+        aria-labelledby="recap-injury-heading"
+        class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      >
+        <h2
+          id="recap-injury-heading"
+          class="font-display text-base font-extrabold uppercase tracking-tight"
+        >
+          Injuries this block
+        </h2>
+        <p class="mt-1 text-sm text-muted-foreground">{injurySummary}</p>
+        {#if recap.objectiveEvidence !== null}
+          <p class="mt-1 text-sm">
+            <strong class="text-foreground">Objective:</strong>
+            <span class="ml-1">{recap.objectiveEvidence.objectiveId}</span>
+            <span
+              class="ml-2 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] {recap
+                .objectiveEvidence.success
+                ? 'bg-positive/15 text-positive'
+                : 'bg-destructive/15 text-destructive'}"
+            >
+              {recap.objectiveEvidence.success ? 'Success · +1 Influence' : 'Missed'}
+            </span>
+          </p>
+        {/if}
+        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+          Trades accepted this block: {recap.tradeEvidence.tradesAccepted} · your Influence delta: {recap
+            .tradeEvidence.influenceDelta >= 0
+            ? '+'
+            : ''}{recap.tradeEvidence.influenceDelta} · balance at block end: {recap
+            .influenceBalance.humanBalance}
+        </p>
+      </section>
+    {/if}
   {/if}
 </div>

@@ -70,6 +70,8 @@ function minimalInput(): SeasonBlockStartInput {
       league: LEAGUE,
       rosters,
       games,
+      stateRevision: 0,
+      stateDigest: '0'.repeat(32),
     } as unknown as SeasonBlockStartInput['run'],
     rotations: [],
     blockIndex: 0,
@@ -77,6 +79,7 @@ function minimalInput(): SeasonBlockStartInput {
     rotationDigest: 'b'.repeat(32),
     commandId: 'blk-fake-1',
     humanFranchiseId: 'lakers',
+    objectiveId: null,
     homeCourt: {
       schemaVersion: 1,
       profileVersion: 'season-home-court-v1',

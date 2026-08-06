@@ -6,6 +6,12 @@ import { seasonStandingsSchema } from './season-standings.ts';
 import { seasonCursorSchema } from './season-cursor.ts';
 import { seasonPostseasonStateSchema } from './season-postseason.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
+import { seasonCheckpointStateSchema } from './season-checkpoint.ts';
+import { seasonHealthStateSchema } from './season-health.ts';
+import { seasonInfluenceStateSchema } from './season-influence.ts';
+import { seasonObjectiveStateSchema } from './season-objective.ts';
+import { seasonTradeStateSchema } from './season-trade.ts';
+import { seasonTransactionEntrySchema } from './season-transactions.ts';
 import {
   PLAYER_VERSION_ID_VERSION,
   SEASON_AI_VERSION,
@@ -20,9 +26,14 @@ import {
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
+  SEASON_HEALTH_VERSION,
   SEASON_HOME_COURT_VERSION,
+  SEASON_INFLUENCE_TARGETS_VERSION,
+  SEASON_INFLUENCE_VERSION,
+  SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEAGUE_VERSION,
   SEASON_LEADERS_VERSION,
+  SEASON_OBJECTIVE_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
@@ -38,6 +49,8 @@ import {
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
   SEASON_TEAM_COUNT,
+  SEASON_TRADE_TARGETS_VERSION,
+  SEASON_TRADE_VERSION,
 } from './season-versions.ts';
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
 import {
@@ -55,15 +68,21 @@ import { seasonRotationSchema } from './season-rotation.ts';
  * postseason state, and — since schema version 6 (M2.4 roster-generation-v2)
  * — the frozen roster-generation-v2/season-ai-v2/roster-targets-v2 material
  * versions and the recorded `aiPools` (one 20-player pool per AI franchise:
- * 29 solo, 28 duo; human franchises get none). Schema version 5 (M2.4)
- * added the stamina, chemistry, and effect-targets material versions;
+ * 29 solo, 28 duo; human franchises get none). Schema version 7 (M2.5)
+ * adds the run-scoped `health` (season-health-v1), `transactions`,
+ * `influence` (season-influence-v1), `checkpointState`,
+ * `stateRevision`/`stateDigest` state chain, and freezes the seven new M2.5
+ * material versions (health, trade, influence, objective, injury-targets,
+ * trade-targets, influence-targets); schema 6 runs cannot continue (no
+ * health, influence, or state chain exists for them). Schema version 5
+ * (M2.4) added the stamina, chemistry, and effect-targets material versions;
  * schema version 4 (M2.3) added the frozen block, summary, aggregates,
  * recap, leaders, home-court, and checkpoint material versions; schema
  * version 3 (M2.2) added the rotation-planner, Season-game, and
  * Season-game-targets material versions; schema version 2 (M2.1) added the
  * completed draft facts, AI assignments, generated rotations, and the
  * generation audit summary. Completed game facts live in per-block compact
- * summary rows (season-game-summary-v2), not in this snapshot's scheduled
+ * summary rows (season-game-summary-v3), not in this snapshot's scheduled
  * `games` array; the engine reconstructs finalized game records from the
  * schedule and summaries on demand.
  */
@@ -221,6 +240,20 @@ export const seasonRunVersionsSchema = z.object({
   chemistryVersion: z.literal(SEASON_CHEMISTRY_VERSION),
   /** M2.4: frozen effect-size calibration targets (season-effect-targets-v1). */
   effectsTargetsVersion: z.literal(SEASON_EFFECT_TARGETS_VERSION),
+  /** M2.5: injury and health state rules (season-health-v1). */
+  healthVersion: z.literal(SEASON_HEALTH_VERSION),
+  /** M2.5: trade contract (season-trade-v1). */
+  tradeVersion: z.literal(SEASON_TRADE_VERSION),
+  /** M2.5: Influence economy (season-influence-v1). */
+  influenceVersion: z.literal(SEASON_INFLUENCE_VERSION),
+  /** M2.5: block objectives (season-objective-v1). */
+  objectiveVersion: z.literal(SEASON_OBJECTIVE_VERSION),
+  /** M2.5: frozen injury calibration targets (injury-targets-v1). */
+  injuryTargetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
+  /** M2.5: frozen trade calibration targets (trade-targets-v1). */
+  tradeTargetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
+  /** M2.5: frozen Influence calibration targets (influence-targets-v1). */
+  influenceTargetsVersion: z.literal(SEASON_INFLUENCE_TARGETS_VERSION),
 });
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
 
@@ -254,6 +287,25 @@ export const seasonRunSchema = z.object({
   generationAudit: seasonGenerationAuditSchema,
   /** M2.1: per-roster strength evaluations (30 rows). */
   evaluations: z.array(seasonRosterEvaluationSchema).length(SEASON_TEAM_COUNT),
+  /** M2.5: run-scoped trade-window state (null until the first window opens). */
+  trade: seasonTradeStateSchema.nullable(),
+  /** M2.5: run-scoped objective selections per block 0-7 (fixed catalog). */
+  objectives: seasonObjectiveStateSchema,
+  /**
+   * M2.5: run-scoped health state (append-only injury records; availability
+   * is derived, never stored separately).
+   */
+  health: seasonHealthStateSchema,
+  /** M2.5: append-only run-scoped transaction log entries. */
+  transactions: z.array(seasonTransactionEntrySchema),
+  /** M2.5: Influence economy state (balances, ledger, windows, rehabs). */
+  influence: seasonInfluenceStateSchema,
+  /** M2.5: latest accepted checkpoint facts; null until the first block commits. */
+  checkpointState: seasonCheckpointStateSchema.nullable(),
+  /** M2.5: increments on every committed block AND every applied run command. */
+  stateRevision: z.number().int().nonnegative(),
+  /** M2.5: canonical digest of the mutable run state (32-hex, self-excluded). */
+  stateDigest: z.string().regex(/^[0-9a-f]{32}$/),
 });
 export type SeasonRun = z.infer<typeof seasonRunSchema>;
 

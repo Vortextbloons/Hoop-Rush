@@ -190,12 +190,18 @@
       const draftRepo = new DexieSeasonDraftRepository();
       const stored = await draftRepo.loadSeasonDraft();
       if (!stored) throw new Error('The completed draft record is missing.');
+      const scheduleContentHash =
+        (await sha256Hex(`${JSON.stringify(schedule)}\n`)) ??
+        manifest?.season?.schedule?.contentHash;
+      if (!scheduleContentHash) {
+        throw new Error('Unable to determine the schedule content hash.');
+      }
       const run = buildSeasonRunFromGeneration({
         runId: flow.draft.runId,
         rootSeed: flow.draft.rootSeed,
         league: flow.draft.league,
         schedule,
-        scheduleContentHash: await sha256Hex(`${JSON.stringify(schedule)}\n`),
+        scheduleContentHash,
         draft: flow.draft,
         generation: flow.generation,
       });

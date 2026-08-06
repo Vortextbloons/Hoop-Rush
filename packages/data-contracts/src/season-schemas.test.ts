@@ -21,12 +21,52 @@ import {
   seasonLeagueGenerationResultSchema,
   seasonRosterTargetsSchema,
   seasonDraftRejectedRecordSchema,
+  seasonHealthStateSchema,
+  seasonInjuryRecordSchema,
+  seasonTransactionEntrySchema,
+  seasonInfluenceStateSchema,
+  seasonInfluenceLedgerEntrySchema,
+  seasonObjectiveStateSchema,
+  seasonObjectiveEvaluationSchema,
+  seasonTradeOfferSchema,
+  seasonPendingBlockCandidateSchema,
+  seasonInvalidRosterInterruptionSchema,
+  seasonSelectBlockObjectiveCommandSchema,
+  seasonSpendInfluenceCommandSchema,
+  seasonAcceptTradeOfferCommandSchema,
+  seasonDeclineTradeOfferCommandSchema,
+  seasonResumeSeasonBlockCommandSchema,
+  seasonForfeitInterruptedGameCommandSchema,
+  seasonRunCommandSchema,
+  seasonRunCommandRejectionSchema,
+  seasonSelectBlockObjectiveResultSchema,
+  seasonSpendInfluenceResultSchema,
+  seasonAcceptTradeOfferResultSchema,
+  seasonSubmitBlockCommandSchema,
+  seasonInvalidObjectiveRejectionSchema,
+  seasonSubmitBlockRejectionSchema,
+  seasonCandidateCheckpointSchema,
+  seasonAcceptedBlockSchema,
+  seasonCheckpointStateSchema,
+  seasonWorkerStartRequestSchema,
+  seasonWorkerCancelRequestSchema,
+  seasonWorkerCompleteMessageSchema,
+  seasonGameSummarySchema,
+  seasonCompactInjuryEventSchema,
+  seasonBlockRecapSchema,
+  SEASON_NEUTRAL_HOME_COURT,
 } from './index.ts';
 import {
+  buildEmptyHealth,
+  buildInitialInfluence,
+  buildCheckpointFixture,
+  buildPendingBlockFixture,
   buildLeague,
   buildPostseason,
   buildRun,
   buildSchedule,
+  buildSummaryFixture,
+  fixturePlayerId,
   SEED,
 } from './season-schemas-fixtures.ts';
 
@@ -515,6 +555,22 @@ describe('season run schema', () => {
     expect(run.games).toHaveLength(1230);
   });
 
+  it('round-trips the M2.5 state chain fields', () => {
+    const run = roundTrip(seasonRunSchema, buildRun());
+    expect(run.health.injuries).toEqual([]);
+    expect(run.transactions).toEqual([]);
+    expect(Object.keys(run.influence.balances)).toHaveLength(30);
+    for (const balance of Object.values(run.influence.balances)) {
+      expect(balance).toBe(2);
+    }
+    expect(run.influence.ledger).toHaveLength(30);
+    expect(run.influence.ledger.every((entry) => entry.source === 'initial-grant')).toBe(true);
+    expect(run.influence.ledger.every((entry) => entry.balanceAfter === 2)).toBe(true);
+    expect(run.checkpointState).toBeNull();
+    expect(run.stateRevision).toBe(0);
+    expect(run.stateDigest).toBe('0'.repeat(32));
+  });
+
   it('rejects duplicate ownership rows', () => {
     const run = buildRun();
     const duplicated = [...run.ownership];
@@ -722,16 +778,21 @@ describe('season draft catalog schema (M2.1)', () => {
         historicalMpg: (30 + n) / 2,
         derivationVersion: 'season-stamina-v1',
       },
+      durability: {
+        rating: 45 + n,
+        derivationVersion: 'durability-v1',
+      },
     });
     const candidates = [candidate(1, ['PG']), candidate(2, ['SG']), candidate(3, ['SF'])];
     return {
       schemaVersion: 1,
-      catalogVersion: 'season-draft-catalog-v2',
+      catalogVersion: 'season-draft-catalog-v3',
       dataVersion: 'm10-ratings-v3.4',
       ratingsVersion: 'ratings-v3.4',
       positionNormalizationVersion: 'position-v3',
       playerVersionIdVersion: 'player-version-id-v1',
       staminaVersion: 'season-stamina-v1',
+      durabilityVersion: 'durability-v1',
       pools: [
         {
           franchiseId: 'lakers',
@@ -747,12 +808,16 @@ describe('season draft catalog schema (M2.1)', () => {
     const catalog = roundTrip(seasonDraftCatalogSchema, buildCatalog());
     expect(catalog.pools).toHaveLength(1);
     expect(catalog.candidates).toHaveLength(3);
-    expect(catalog.catalogVersion).toBe('season-draft-catalog-v2');
+    expect(catalog.catalogVersion).toBe('season-draft-catalog-v3');
     expect(catalog.staminaVersion).toBe('season-stamina-v1');
+    expect(catalog.durabilityVersion).toBe('durability-v1');
     for (const candidate of catalog.candidates) {
       expect(candidate.stamina.rating).toBeGreaterThanOrEqual(45);
       expect(candidate.stamina.rating).toBeLessThanOrEqual(95);
       expect(candidate.stamina.derivationVersion).toBe('season-stamina-v1');
+      expect(candidate.durability.rating).toBeGreaterThanOrEqual(45);
+      expect(candidate.durability.rating).toBeLessThanOrEqual(95);
+      expect(candidate.durability.derivationVersion).toBe('durability-v1');
     }
   });
 
@@ -769,6 +834,9 @@ describe('season draft catalog schema (M2.1)', () => {
     expect(() =>
       seasonDraftCatalogSchema.parse({ ...buildCatalog(), staminaVersion: 'season-stamina-v2' }),
     ).toThrow();
+    expect(() =>
+      seasonDraftCatalogSchema.parse({ ...buildCatalog(), durabilityVersion: 'durability-v2' }),
+    ).toThrow();
   });
 
   it('rejects duplicate candidate version ids', () => {
@@ -781,6 +849,16 @@ describe('season draft catalog schema (M2.1)', () => {
     const catalog = buildCatalog();
     const candidates = catalog.candidates.map((candidate, index) =>
       index === 0 ? { ...candidate, stamina: { ...candidate.stamina, rating: 44 } } : candidate,
+    );
+    expect(() => seasonDraftCatalogSchema.parse({ ...catalog, candidates })).toThrow();
+  });
+
+  it('rejects a candidate without a valid durability rating', () => {
+    const catalog = buildCatalog();
+    const candidates = catalog.candidates.map((candidate, index) =>
+      index === 0
+        ? { ...candidate, durability: { ...candidate.durability, rating: 96 } }
+        : candidate,
     );
     expect(() => seasonDraftCatalogSchema.parse({ ...catalog, candidates })).toThrow();
   });
@@ -1498,10 +1576,10 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     expect(seasonRosterTargetsSchema.safeParse(undefined).success).toBe(false);
   });
 
-  it('round-trips a schema-6 run with its aiPools', () => {
+  it('round-trips a schema-7 run with its aiPools and M2.5 state', () => {
     const run = roundTrip(seasonRunSchema, buildRun());
-    expect(run.schemaVersion).toBe(6);
-    expect(run.versions.runSchemaVersion).toBe(6);
+    expect(run.schemaVersion).toBe(7);
+    expect(run.versions.runSchemaVersion).toBe(7);
     expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
     expect(run.versions.aiVersion).toBe('season-ai-v2');
     expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
@@ -1518,5 +1596,981 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
         versions: { ...run.versions, aiVersion: 'season-ai-v1' },
       }),
     ).toThrow();
+  });
+
+  it('rejects a schema-6 snapshot (M2.5: schema 6 runs cannot continue)', () => {
+    const run = buildRun();
+    const schema6 = {
+      ...run,
+      schemaVersion: 6,
+      versions: { ...run.versions, runSchemaVersion: 6 },
+    };
+    expect(() => seasonRunSchema.parse(schema6)).toThrow();
+  });
+});
+
+describe('season health family (M2.5, season-health-v1)', () => {
+  it('round-trips an empty health state and rejects wrong versions', () => {
+    const state = roundTrip(seasonHealthStateSchema, buildEmptyHealth());
+    expect(state.injuries).toEqual([]);
+    expect(state.schemaVersion).toBe(1);
+    expect(() =>
+      seasonHealthStateSchema.parse({ ...buildEmptyHealth(), healthVersion: 'season-health-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonHealthStateSchema.parse({ ...buildEmptyHealth(), schemaVersion: 2 }),
+    ).toThrow();
+  });
+
+  it('round-trips an injury record and rejects corrupt shapes', () => {
+    const record = {
+      injuryId: `inj-${'a'.repeat(32)}`,
+      playerVersionId: fixturePlayerId(0),
+      franchiseId: 'lakers',
+      gameId: 's000001',
+      type: 'soft-tissue',
+      severity: 'moderate',
+      occurredBeforeHalftime: true,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 4,
+      missedGamesRemaining: 4,
+      actualReturnRound: null,
+      seasonEnding: false,
+      rehabModifier: 0,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: ['injuries', 'occurrence', 's000001', 'lakers'],
+    };
+    const parsed = roundTrip(seasonInjuryRecordSchema, record);
+    expect(parsed.severity).toBe('moderate');
+    expect(() => seasonInjuryRecordSchema.parse({ ...record, injuryId: 'inj-not-hex' })).toThrow();
+    expect(() => seasonInjuryRecordSchema.parse({ ...record, gameId: 's00000' })).toThrow();
+    expect(() => seasonInjuryRecordSchema.parse({ ...record, rehabModifier: 2 })).toThrow();
+    expect(() => seasonInjuryRecordSchema.parse({ ...record, severity: 'debilitating' })).toThrow();
+    expect(() => seasonInjuryRecordSchema.parse({ ...record, seedPath: [] })).toThrow();
+    expect(() =>
+      seasonInjuryRecordSchema.parse({ ...record, missedGamesRemaining: 10001 }),
+    ).toThrow();
+  });
+});
+
+describe('season transaction family (M2.5)', () => {
+  it('round-trips an entry and rejects corrupt shapes', () => {
+    const entry = {
+      transactionId: 'tx-trade-1',
+      commandId: 'cmd-accept-1',
+      franchiseId: 'lakers',
+      type: 'trade',
+      blockIndex: 2,
+      appliedAtStateRevision: 3,
+      payload: { offerId: 'off-abc', moved: ['pv-00000000000000000000000000000000'] },
+      explanation: 'Accepted offer off-abc',
+    };
+    const parsed = roundTrip(seasonTransactionEntrySchema, entry);
+    expect(parsed.type).toBe('trade');
+    expect(() =>
+      seasonTransactionEntrySchema.parse({ ...entry, transactionId: 'Tx-Bad' }),
+    ).toThrow();
+    expect(() =>
+      seasonTransactionEntrySchema.parse({ ...entry, explanation: 'x'.repeat(513) }),
+    ).toThrow();
+    expect(() => seasonTransactionEntrySchema.parse({ ...entry, blockIndex: 9 })).toThrow();
+    expect(() => seasonTransactionEntrySchema.parse({ ...entry, type: 'salary-dump' })).toThrow();
+  });
+
+  it('round-trips an initial-grant entry with null command and block', () => {
+    const entry = {
+      transactionId: 'tx-initial-hawks',
+      commandId: null,
+      franchiseId: 'hawks',
+      type: 'initial-grant',
+      blockIndex: null,
+      appliedAtStateRevision: 0,
+      payload: {},
+      explanation: 'Initial +2 Influence grant at run creation',
+    };
+    expect(roundTrip(seasonTransactionEntrySchema, entry).commandId).toBeNull();
+  });
+});
+
+describe('season influence family (M2.5, season-influence-v1)', () => {
+  it('round-trips the initial state (30 franchises at +2)', () => {
+    const state = roundTrip(seasonInfluenceStateSchema, buildInitialInfluence());
+    expect(Object.keys(state.balances)).toHaveLength(30);
+    expect(state.ledger).toHaveLength(30);
+    expect(state.ledger[0]?.balanceAfter).toBe(2);
+    expect(state.ledger.every((entry) => entry.appliedDelta === entry.requestedDelta)).toBe(true);
+    expect(state.windows).toEqual({});
+    expect(state.rehabs).toEqual({});
+  });
+
+  it('rejects missing franchises, wrong versions, and out-of-range balances', () => {
+    const state = buildInitialInfluence();
+    const balances = { ...state.balances };
+    delete balances.lakers;
+    expect(() => seasonInfluenceStateSchema.parse({ ...state, balances })).toThrow();
+    expect(() =>
+      seasonInfluenceStateSchema.parse({ ...state, influenceVersion: 'season-influence-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonInfluenceStateSchema.parse({
+        ...state,
+        balances: { ...state.balances, lakers: 9 },
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonInfluenceStateSchema.parse({
+        ...state,
+        balances: { ...state.balances, lakers: -4 },
+      }),
+    ).toThrow();
+  });
+
+  it('round-trips windows and rehabs state', () => {
+    const state = buildInitialInfluence();
+    const withSpends = {
+      ...state,
+      windows: { lakers: [{ windowIndex: 0, extraOfferSpent: true }] },
+      rehabs: {
+        [`inj-${'b'.repeat(32)}`]: {
+          franchiseId: 'lakers',
+          outcome: 'success',
+          commandId: 'cmd-rehab-1',
+        },
+      },
+    };
+    const parsed = roundTrip(seasonInfluenceStateSchema, withSpends);
+    expect(parsed.windows.lakers?.[0]?.extraOfferSpent).toBe(true);
+    expect(parsed.rehabs[`inj-${'b'.repeat(32)}`]?.outcome).toBe('success');
+    expect(() =>
+      seasonInfluenceStateSchema.parse({
+        ...withSpends,
+        rehabs: {
+          [`inj-${'b'.repeat(32)}`]: {
+            franchiseId: 'lakers',
+            outcome: 'maybe',
+            commandId: 'cmd-rehab-1',
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
+  it('rejects a ledger entry that would not reconcile its balance', () => {
+    // The schema validates shape; reconciliation is the audit's job, so a
+    // non-reconciling entry still parses but the audit flags it. Balances
+    // must be derivable from the ledger; the engine owns that check.
+    const entry = {
+      entryId: 'influence-block-0-lakers',
+      franchiseId: 'lakers',
+      source: 'block-grant',
+      blockIndex: 0,
+      commandId: 'cmd-submit-1',
+      requestedDelta: 1,
+      appliedDelta: 1,
+      balanceAfter: 99,
+      explanation: 'Block grant',
+    };
+    expect(() => seasonInfluenceLedgerEntrySchema.parse(entry)).not.toThrow();
+  });
+});
+
+describe('season objective family (M2.5, season-objective-v1)', () => {
+  function buildObjectiveState() {
+    return {
+      schemaVersion: 1,
+      objectiveVersion: 'season-objective-v1',
+      catalog: [
+        {
+          objectiveId: 'win-six',
+          name: 'Win Six',
+          description: "Win at least 6 of the block's team games.",
+          measure: "wins >= 6 across the block's team games",
+        },
+        {
+          objectiveId: 'defense-108',
+          name: 'Defense 108',
+          description: 'Allow at most 1,080 total points across the block.',
+          measure: 'pointsAllowed <= 1080 across the block',
+        },
+        {
+          objectiveId: 'rebound-plus-20',
+          name: 'Rebound +20',
+          description: 'Finish the block with at least a +20 total rebound margin.',
+          measure: 'reboundMargin >= 20 across the block',
+        },
+        {
+          objectiveId: 'availability-eight',
+          name: 'Availability Eight',
+          description: 'Field at least 8 available players at every tipoff.',
+          measure: 'tipsWithAtLeastEightAvailable == tipsTotal',
+        },
+        {
+          objectiveId: 'bench-320',
+          name: 'Bench 320',
+          description: 'Non-starters record at least 320 total minutes.',
+          measure: 'benchMinutes >= 320 across the block',
+        },
+        {
+          objectiveId: 'turnover-130',
+          name: 'Turnover 130',
+          description: 'Commit at most 130 turnovers across the block.',
+          measure: 'turnovers <= 130 across the block',
+        },
+      ],
+      selections: {
+        '0': { objectiveId: 'win-six', selectedByCommandId: 'cmd-obj-1', success: null },
+        '3': { objectiveId: 'bench-320', selectedByCommandId: 'cmd-obj-2', success: true },
+      },
+    };
+  }
+
+  it('round-trips a state with all six objectives and numeric-key selections', () => {
+    const state = roundTrip(seasonObjectiveStateSchema, buildObjectiveState());
+    expect(state.catalog).toHaveLength(6);
+    expect(Object.keys(state.selections)).toHaveLength(2);
+    expect(state.selections['0']?.objectiveId).toBe('win-six');
+    expect(state.selections['3']?.success).toBe(true);
+  });
+
+  it('rejects a wrong version, an incomplete catalog, and duplicate objectives', () => {
+    expect(() =>
+      seasonObjectiveStateSchema.parse({
+        ...buildObjectiveState(),
+        objectiveVersion: 'season-objective-v2',
+      }),
+    ).toThrow();
+    const state = buildObjectiveState();
+    expect(() =>
+      seasonObjectiveStateSchema.parse({ ...state, catalog: state.catalog.slice(0, 5) }),
+    ).toThrow();
+    expect(() =>
+      seasonObjectiveStateSchema.parse({
+        ...state,
+        catalog: [...state.catalog, state.catalog[0]],
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonObjectiveStateSchema.parse({
+        ...state,
+        selections: { '8': { objectiveId: 'win-six', selectedByCommandId: 'c', success: null } },
+      }),
+    ).toThrow();
+  });
+
+  it('round-trips an evaluation with recorded facts', () => {
+    const evaluation = {
+      objectiveId: 'defense-108',
+      blockIndex: 1,
+      success: true,
+      facts: {
+        games: 10,
+        wins: 7,
+        pointsAllowed: 1042,
+        reboundMargin: 28,
+        tipsWithAtLeastEightAvailable: 9,
+        tipsTotal: 10,
+        benchMinutes: 356,
+        turnovers: 112,
+      },
+      tipCountedGames: 9,
+    };
+    expect(roundTrip(seasonObjectiveEvaluationSchema, evaluation).success).toBe(true);
+  });
+});
+
+describe('season trade family (M2.5, season-trade-v1)', () => {
+  function buildOffer() {
+    return {
+      offerId: `off-${'c'.repeat(32)}`,
+      windowIndex: 0,
+      seedPath: ['trades', 'window', '0', 'offer', '0'],
+      toFranchiseId: 'hawks',
+      fromFranchiseId: 'lakers',
+      outgoingPlayerVersionIds: [fixturePlayerId(0), fixturePlayerId(1)],
+      incomingPlayerVersionIds: [fixturePlayerId(30), fixturePlayerId(31)],
+      outgoingHealth: [
+        { available: true, activeInjuryIds: [] },
+        { available: false, activeInjuryIds: [`inj-${'d'.repeat(32)}`] },
+      ],
+      incomingHealth: [
+        { available: true, activeInjuryIds: [] },
+        { available: true, activeInjuryIds: [] },
+      ],
+      valueBand: { ratioBasisPoints: 950, band: '80-120', qualified: true },
+      roleFit: {
+        outgoingRoles: ['perimeter-defense', 'interior-defense'],
+        incomingRoles: ['primary-creation'],
+        notes: 'Fills the creation gap',
+      },
+      rosterNeedFacts: { outgoingDepth: 4, incomingDepth: 1, notes: 'Thin at guard' },
+      projectedRotationChanges: 'Bench 6 moves to the closing five.',
+      projectedChemistryDisruption: { removedPairs: 15, newPairs: 17 },
+      status: 'open',
+    };
+  }
+
+  it('round-trips a 2-for-2 offer and rejects shape violations', () => {
+    const offer = roundTrip(seasonTradeOfferSchema, buildOffer());
+    expect(offer.valueBand.band).toBe('80-120');
+    expect(offer.outgoingHealth).toHaveLength(2);
+    expect(() =>
+      seasonTradeOfferSchema.parse({
+        ...buildOffer(),
+        incomingPlayerVersionIds: [fixturePlayerId(30)],
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonTradeOfferSchema.parse({
+        ...buildOffer(),
+        outgoingHealth: [{ available: true, activeInjuryIds: [] }],
+      }),
+    ).toThrow();
+    expect(() => seasonTradeOfferSchema.parse({ ...buildOffer(), status: 'pending' })).toThrow();
+    expect(() => seasonTradeOfferSchema.parse({ ...buildOffer(), offerId: 'off-x' })).toThrow();
+    expect(() =>
+      seasonTradeOfferSchema.parse({ ...buildOffer(), projectedRotationChanges: 'x'.repeat(513) }),
+    ).toThrow();
+  });
+
+  it('round-trips a 1-for-1 offer in the 85-115 band', () => {
+    const offer = {
+      ...buildOffer(),
+      outgoingPlayerVersionIds: [fixturePlayerId(0)],
+      incomingPlayerVersionIds: [fixturePlayerId(30)],
+      outgoingHealth: [{ available: true, activeInjuryIds: [] }],
+      incomingHealth: [{ available: true, activeInjuryIds: [] }],
+      valueBand: { ratioBasisPoints: 1080, band: '85-115', qualified: true },
+    };
+    expect(roundTrip(seasonTradeOfferSchema, offer).valueBand.qualified).toBe(true);
+  });
+});
+
+describe('season pending block family (M2.5)', () => {
+  it('round-trips a pending candidate', () => {
+    const pending = roundTrip(seasonPendingBlockCandidateSchema, buildPendingBlockFixture());
+    expect(pending.summaries).toEqual([]);
+    expect(pending.teamAggregates).toHaveLength(0);
+    expect(pending.playerAggregates).toHaveLength(0);
+    expect(pending.nextGameId).toBe('s000001');
+    expect(pending.blockVersion).toBe('season-block-v3');
+    expect(pending.objectiveId).toBeNull();
+  });
+
+  it('rejects wrong versions and corrupt fields', () => {
+    const pending = buildPendingBlockFixture();
+    expect(() =>
+      seasonPendingBlockCandidateSchema.parse({ ...pending, blockVersion: 'season-block-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonPendingBlockCandidateSchema.parse({ ...pending, nextGameId: 'not-a-game' }),
+    ).toThrow();
+    expect(() =>
+      seasonPendingBlockCandidateSchema.parse({
+        ...pending,
+        summaries: Array.from({ length: 151 }, () => buildSummaryFixture()),
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonPendingBlockCandidateSchema.parse({ ...pending, rotationDigest: 'x'.repeat(32) }),
+    ).toThrow();
+  });
+
+  it('round-trips an invalid-roster interruption', () => {
+    const interruption = {
+      code: 'invalid-roster',
+      runId: 'fixture-run-1',
+      blockIndex: 1,
+      commandId: 'submit-b1',
+      nextGameId: 's000016',
+      humanFranchiseId: 'hawks',
+      unavailablePlayerVersionIds: [fixturePlayerId(0), fixturePlayerId(1), fixturePlayerId(2)],
+    };
+    expect(roundTrip(seasonInvalidRosterInterruptionSchema, interruption).code).toBe(
+      'invalid-roster',
+    );
+    expect(() =>
+      seasonInvalidRosterInterruptionSchema.parse({
+        ...interruption,
+        unavailablePlayerVersionIds: [],
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonInvalidRosterInterruptionSchema.parse({ ...interruption, code: 'invalid-rotation' }),
+    ).toThrow();
+  });
+});
+
+describe('season commands (M2.5, schema 7)', () => {
+  const base = {
+    schemaVersion: 7,
+    commandId: 'cmd-1',
+    runId: 'fixture-run-1',
+    expectedStateRevision: 3,
+    expectedStateDigest: '0'.repeat(32),
+  };
+
+  it('validates the base shape on every command', () => {
+    const commands = [
+      { ...base, command: 'select-block-objective', blockIndex: 0, objectiveId: 'win-six' },
+      {
+        ...base,
+        command: 'spend-influence',
+        franchiseId: 'hawks',
+        purpose: 'extra-trade-offer',
+        windowIndex: 0,
+      },
+      {
+        ...base,
+        command: 'accept-trade-offer',
+        windowIndex: 0,
+        offerId: `off-${'c'.repeat(32)}`,
+      },
+      {
+        ...base,
+        command: 'decline-trade-offer',
+        windowIndex: 1,
+        offerId: `off-${'d'.repeat(32)}`,
+      },
+      { ...base, command: 'resume-season-block', blockIndex: 1, rotationDigest: '0'.repeat(32) },
+      { ...base, command: 'forfeit-interrupted-game', blockIndex: 1, nextGameId: 's000016' },
+    ];
+    const individual = [
+      seasonSelectBlockObjectiveCommandSchema,
+      seasonSpendInfluenceCommandSchema,
+      seasonAcceptTradeOfferCommandSchema,
+      seasonDeclineTradeOfferCommandSchema,
+      seasonResumeSeasonBlockCommandSchema,
+      seasonForfeitInterruptedGameCommandSchema,
+    ];
+    for (let index = 0; index < commands.length; index += 1) {
+      const command = commands[index];
+      const schema = individual[index];
+      if (!schema) throw new Error('command schema pair missing');
+      expect(schema.safeParse(command).success).toBe(true);
+      expect(seasonRunCommandSchema.safeParse(command).success).toBe(true);
+    }
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'select-block-objective',
+        blockIndex: 8,
+        objectiveId: 'win-six',
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'select-block-objective',
+        blockIndex: 0,
+        objectiveId: 'clutch',
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'spend-influence',
+        franchiseId: 'hawks',
+        purpose: 'risky-rehab',
+        windowIndex: 0,
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'spend-influence',
+        franchiseId: 'hawks',
+        purpose: 'extra-trade-offer',
+        injuryId: `inj-${'e'.repeat(32)}`,
+        windowIndex: 0,
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'spend-influence',
+        franchiseId: 'hawks',
+        purpose: 'extra-trade-offer',
+      }),
+    ).toThrow();
+    expect(() => seasonRunCommandSchema.parse({ ...base, command: 'unknown-command' })).toThrow();
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'resume-season-block',
+        blockIndex: 1,
+        rotationDigest: 'bad',
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'accept-trade-offer',
+        windowIndex: 3,
+        offerId: `off-${'c'.repeat(32)}`,
+      }),
+    ).toThrow();
+  });
+
+  it('round-trips every rejection shape in the combined union', () => {
+    const rejections = [
+      { code: 'run-mismatch', expectedRunId: 'fixture-run-1' },
+      { code: 'duplicate-command', commandId: 'cmd-1' },
+      {
+        code: 'stale-state',
+        expectedStateRevision: 3,
+        expectedStateDigest: '0'.repeat(32),
+        currentStateRevision: 5,
+        currentStateDigest: '1'.repeat(32),
+      },
+      { code: 'not-at-boundary', blockIndex: 2, nextUnselectedBlockIndex: 0 },
+      {
+        code: 'objective-not-offered',
+        blockIndex: 0,
+        objectiveId: 'win-six',
+        offeredObjectiveIds: ['defense-108', 'bench-320', 'turnover-130'],
+      },
+      { code: 'objective-already-selected', blockIndex: 0, objectiveId: 'win-six' },
+      {
+        code: 'insufficient-balance',
+        franchiseId: 'hawks',
+        balance: -2,
+        requestedDelta: -2,
+        floor: -3,
+      },
+      { code: 'window-not-open', franchiseId: null, windowIndex: 0 },
+      { code: 'already-spent', franchiseId: 'hawks', windowIndex: 0 },
+      { code: 'injury-not-active', injuryId: `inj-${'e'.repeat(32)}` },
+      { code: 'already-rehabbed', injuryId: `inj-${'e'.repeat(32)}` },
+      { code: 'no-window', franchiseId: 'hawks' },
+      { code: 'offer-unknown', windowIndex: 0, offerId: `off-${'f'.repeat(32)}` },
+      { code: 'offer-not-open', windowIndex: 0, offerId: `off-${'f'.repeat(32)}` },
+      {
+        code: 'roster-illegal',
+        windowIndex: 0,
+        offerId: `off-${'f'.repeat(32)}`,
+        reasons: ['resulting roster has 9 players'],
+      },
+      {
+        code: 'ownership-conflict',
+        windowIndex: 0,
+        offerId: `off-${'f'.repeat(32)}`,
+        playerVersionIds: [fixturePlayerId(0)],
+      },
+      { code: 'no-pending-block', blockIndex: 1 },
+      { code: 'block-mismatch', blockIndex: 1, pendingBlockIndex: 2 },
+      {
+        code: 'rotation-digest-mismatch',
+        rotationDigest: '0'.repeat(32),
+        pendingRotationDigest: '1'.repeat(32),
+      },
+      { code: 'game-mismatch', nextGameId: 's000016', pendingNextGameId: 's000017' },
+    ];
+    for (const rejection of rejections) {
+      expect(() => seasonRunCommandRejectionSchema.parse(rejection)).not.toThrow();
+    }
+    expect(() => seasonRunCommandRejectionSchema.parse({ code: 'nope' })).toThrow();
+  });
+
+  it('parses per-command rejection unions and result envelopes', () => {
+    const acceptedObjective = seasonSelectBlockObjectiveResultSchema.parse({
+      status: 'accepted',
+      commandId: 'cmd-1',
+      blockIndex: 0,
+      objectiveId: 'win-six',
+    });
+    if (acceptedObjective.status !== 'accepted') throw new Error('expected accepted');
+    expect(acceptedObjective.objectiveId).toBe('win-six');
+    const rejectedObjective = seasonSelectBlockObjectiveResultSchema.parse({
+      status: 'rejected',
+      commandId: 'cmd-1',
+      rejection: { code: 'not-at-boundary', blockIndex: 1, nextUnselectedBlockIndex: 0 },
+    });
+    if (rejectedObjective.status !== 'rejected') throw new Error('expected rejected');
+    expect(rejectedObjective.rejection.code).toBe('not-at-boundary');
+    const acceptedSpend = seasonSpendInfluenceResultSchema.parse({
+      status: 'accepted',
+      commandId: 'cmd-1',
+      franchiseId: 'hawks',
+      purpose: 'extra-trade-offer',
+      ledgerEntry: {
+        entryId: 'influence-spend-hawks-0',
+        franchiseId: 'hawks',
+        source: 'extra-trade-offer',
+        blockIndex: 2,
+        commandId: 'cmd-1',
+        requestedDelta: -1,
+        appliedDelta: -1,
+        balanceAfter: 1,
+        explanation: 'Extra trade offer',
+      },
+      generatedOffer: null,
+    });
+    if (acceptedSpend.status !== 'accepted') throw new Error('expected accepted');
+    expect(acceptedSpend.ledgerEntry.balanceAfter).toBe(1);
+    const acceptedTrade = seasonAcceptTradeOfferResultSchema.parse({
+      status: 'accepted',
+      commandId: 'cmd-1',
+      trade: {
+        offerId: `off-${'c'.repeat(32)}`,
+        windowIndex: 0,
+        seedPath: ['trades', 'window', '0', 'offer', '0'],
+        toFranchiseId: 'hawks',
+        fromFranchiseId: 'lakers',
+        outgoingPlayerVersionIds: [fixturePlayerId(0)],
+        incomingPlayerVersionIds: [fixturePlayerId(30)],
+        outgoingHealth: [{ available: true, activeInjuryIds: [] }],
+        incomingHealth: [{ available: true, activeInjuryIds: [] }],
+        valueBand: { ratioBasisPoints: 1000, band: '85-115', qualified: true },
+        roleFit: {
+          outgoingRoles: ['perimeter-defense'],
+          incomingRoles: ['primary-creation'],
+          notes: '',
+        },
+        rosterNeedFacts: { outgoingDepth: 4, incomingDepth: 1, notes: '' },
+        projectedRotationChanges: '',
+        projectedChemistryDisruption: { removedPairs: 8, newPairs: 8 },
+        status: 'accepted',
+      },
+      rosterChanges: [
+        { franchiseId: 'hawks', added: [fixturePlayerId(30)], removed: [fixturePlayerId(0)] },
+        { franchiseId: 'lakers', added: [fixturePlayerId(0)], removed: [fixturePlayerId(30)] },
+      ],
+    });
+    if (acceptedTrade.status !== 'accepted') throw new Error('expected accepted');
+    expect(acceptedTrade.rosterChanges).toHaveLength(2);
+  });
+
+  it('parses submit-season-block with the M2.5 objective and state fields', () => {
+    const command = {
+      schemaVersion: 7,
+      blockVersion: 'season-block-v3',
+      command: 'submit-season-block',
+      commandId: 'cmd-submit-1',
+      runId: 'fixture-run-1',
+      expectedRevision: 0,
+      blockIndex: 0,
+      rotationDigest: '0'.repeat(32),
+      objectiveId: 'win-six',
+      expectedStateRevision: 0,
+      expectedStateDigest: '0'.repeat(32),
+    };
+    expect(seasonSubmitBlockCommandSchema.safeParse(command).success).toBe(true);
+    expect(seasonRunCommandSchema.safeParse(command).success).toBe(true);
+    expect(() =>
+      seasonSubmitBlockCommandSchema.parse({ ...command, blockVersion: 'season-block-v2' }),
+    ).toThrow();
+    expect(() =>
+      seasonSubmitBlockCommandSchema.parse({ ...command, expectedStateDigest: 'bad' }),
+    ).toThrow();
+  });
+
+  it('parses the invalid-objective rejection on the submit rejection union', () => {
+    expect(() =>
+      seasonInvalidObjectiveRejectionSchema.parse({
+        code: 'invalid-objective',
+        expected: 'required',
+        objectiveId: 'win-six',
+        blockIndex: 0,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      seasonInvalidObjectiveRejectionSchema.parse({
+        code: 'invalid-objective',
+        expected: 'none',
+        blockIndex: 8,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      seasonInvalidObjectiveRejectionSchema.parse({
+        code: 'invalid-objective',
+        expected: 'maybe',
+        blockIndex: 0,
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonSubmitBlockRejectionSchema.parse({
+        code: 'invalid-objective',
+        expected: 'not-offered',
+        objectiveId: 'win-six',
+        blockIndex: 2,
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe('season checkpoint M2.5 facts', () => {
+  it('round-trips a candidate checkpoint with health, influence, transactions, and the state chain', () => {
+    const checkpoint = roundTrip(seasonCandidateCheckpointSchema, buildCheckpointFixture());
+    expect(checkpoint.health.injuries).toEqual([]);
+    expect(checkpoint.transactions).toEqual([]);
+    expect(Object.keys(checkpoint.influence.balances)).toHaveLength(30);
+    expect(checkpoint.objective.objectiveId).toBeNull();
+    expect(checkpoint.objective.success).toBeNull();
+    expect(checkpoint.expectedStateRevision).toBe(0);
+    expect(checkpoint.stateDigest).toBe('0'.repeat(32));
+    expect(checkpoint.versions.healthVersion).toBe('season-health-v1');
+    expect(checkpoint.versions.tradeTargetsVersion).toBe('trade-targets-v1');
+  });
+
+  it('rejects a season-checkpoint-v2 candidate and missing M2.5 facts', () => {
+    const checkpoint = buildCheckpointFixture();
+    expect(() =>
+      seasonCandidateCheckpointSchema.parse({
+        ...checkpoint,
+        checkpointVersion: 'season-checkpoint-v2',
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonCandidateCheckpointSchema.parse({ ...checkpoint, health: undefined }),
+    ).toThrow();
+    expect(() =>
+      seasonCandidateCheckpointSchema.parse({ ...checkpoint, stateRevision: undefined }),
+    ).toThrow();
+    expect(() =>
+      seasonCandidateCheckpointSchema.parse({
+        ...checkpoint,
+        objective: { ...checkpoint.objective, objectiveId: 'win-six' },
+      }),
+    ).not.toThrow();
+  });
+
+  it('round-trips an accepted block with the state chain and a checkpoint state', () => {
+    const accepted = {
+      runId: 'fixture-run-1',
+      blockIndex: 0,
+      completedRounds: 10,
+      revision: 0,
+      commandId: 'cmd-submit-1',
+      rotationDigest: '0'.repeat(32),
+      checkpointDigest: '0'.repeat(32),
+      summaryCount: 150,
+      stateRevision: 1,
+      stateDigest: '0'.repeat(32),
+    };
+    expect(roundTrip(seasonAcceptedBlockSchema, accepted).stateRevision).toBe(1);
+    const checkpointState = {
+      runId: 'fixture-run-1',
+      blockIndex: 0,
+      completedRounds: 10,
+      revision: 0,
+      commandId: 'cmd-submit-1',
+      rotationDigest: '0'.repeat(32),
+      checkpointDigest: '0'.repeat(32),
+    };
+    expect(roundTrip(seasonCheckpointStateSchema, checkpointState).blockIndex).toBe(0);
+    expect(() =>
+      seasonCheckpointStateSchema.parse({ ...checkpointState, checkpointDigest: 'bad' }),
+    ).toThrow();
+  });
+});
+
+describe('season worker wire v4 (M2.5)', () => {
+  function buildStartRequest() {
+    const run = buildRun();
+    return {
+      schemaVersion: 4,
+      type: 'season-block-start',
+      requestId: 'req-1',
+      runId: run.runId,
+      rootSeed: run.rootSeed,
+      blockIndex: 0,
+      expectedRevision: 0,
+      rotationDigest: '0'.repeat(32),
+      commandId: 'cmd-1',
+      run,
+      schedule: buildSchedule(),
+      homeCourt: SEASON_NEUTRAL_HOME_COURT,
+      humanFranchiseId: null,
+      catalogUrl: 'https://example.test/season/draft-catalog.json',
+      catalogHash: '0'.repeat(64),
+      profileUrl: 'https://example.test/season/era-sim.json',
+      profileHash: '0'.repeat(64),
+      priorSummaries: [],
+      priorEffects: null,
+      priorHealth: null,
+      startGameId: null,
+      objectiveId: null,
+      priorInfluence: buildInitialInfluence(),
+      expectedStateRevision: 0,
+      expectedStateDigest: '0'.repeat(32),
+    };
+  }
+
+  it('rejects wire schema 3 requests and messages', () => {
+    const start = buildStartRequest();
+    expect(() => seasonWorkerStartRequestSchema.parse({ ...start, schemaVersion: 3 })).toThrow();
+    expect(() =>
+      seasonWorkerCancelRequestSchema.parse({
+        schemaVersion: 3,
+        type: 'season-block-cancel',
+        requestId: 'req-1',
+      }),
+    ).toThrow();
+  });
+
+  it('round-trips a start request with the M2.5 fields', () => {
+    const request = roundTrip(seasonWorkerStartRequestSchema, buildStartRequest());
+    expect(request.priorHealth).toBeNull();
+    expect(request.startGameId).toBeNull();
+    expect(request.objectiveId).toBeNull();
+    expect(request.priorInfluence).not.toBeNull();
+    expect(request.expectedStateRevision).toBe(0);
+    const withResume = seasonWorkerStartRequestSchema.parse({
+      ...buildStartRequest(),
+      startGameId: 's000016',
+      objectiveId: 'win-six',
+      priorHealth: buildEmptyHealth(),
+      priorSummaries: undefined,
+      newSummaries: [buildSummaryFixture()],
+    });
+    expect(withResume.startGameId).toBe('s000016');
+    expect(withResume.objectiveId).toBe('win-six');
+    expect(() =>
+      seasonWorkerStartRequestSchema.parse({
+        ...buildStartRequest(),
+        startGameId: 'not-a-game',
+      }),
+    ).toThrow();
+  });
+
+  it('round-trips complete messages with committed and interrupted results', () => {
+    const committed = roundTrip(seasonWorkerCompleteMessageSchema, {
+      schemaVersion: 4,
+      type: 'season-block-complete',
+      requestId: 'req-1',
+      result: { status: 'committed', checkpoint: buildCheckpointFixture() },
+    });
+    expect(committed.result.status).toBe('committed');
+    const interrupted = roundTrip(seasonWorkerCompleteMessageSchema, {
+      schemaVersion: 4,
+      type: 'season-block-complete',
+      requestId: 'req-1',
+      result: { status: 'interrupted', pending: buildPendingBlockFixture() },
+    });
+    expect(interrupted.result.status).toBe('interrupted');
+    expect(() =>
+      seasonWorkerCompleteMessageSchema.parse({
+        schemaVersion: 4,
+        type: 'season-block-complete',
+        requestId: 'req-1',
+        result: { status: 'committed', pending: buildPendingBlockFixture() },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season game summary injury events (M2.5)', () => {
+  it('round-trips a summary with compact injury events', () => {
+    const withEvents = seasonGameSummarySchema.parse({
+      ...buildSummaryFixture(),
+      injuryEvents: [
+        {
+          playerVersionId: fixturePlayerId(0),
+          side: 'home',
+          type: 'soft-tissue',
+          severity: 'minor',
+          removedClock: { period: 2, seconds: 300 },
+          returned: true,
+          returnClock: { period: 3, seconds: 480 },
+        },
+        {
+          playerVersionId: fixturePlayerId(20),
+          side: 'away',
+          type: 'lower-body',
+          severity: 'major',
+          removedClock: { period: 1, seconds: 600 },
+          returned: false,
+          returnClock: null,
+        },
+      ],
+    });
+    expect(withEvents.injuryEvents).toHaveLength(2);
+    expect(withEvents.injuryEvents[1]?.returnClock).toBeNull();
+    expect(() =>
+      seasonGameSummarySchema.parse({ ...buildSummaryFixture(), injuryEvents: undefined }),
+    ).toThrow();
+    expect(() =>
+      seasonCompactInjuryEventSchema.parse({
+        playerVersionId: fixturePlayerId(0),
+        side: 'away',
+        type: 'soft-tissue',
+        severity: 'minor',
+        removedClock: { period: 2, seconds: 300 },
+        returned: true,
+        returnClock: { period: 3, seconds: 480 },
+      }),
+    ).not.toThrow();
+    expect(() =>
+      seasonCompactInjuryEventSchema.parse({
+        playerVersionId: fixturePlayerId(0),
+        side: 'home',
+        type: 'soft-tissue',
+        severity: 'minor',
+        removedClock: { period: 2, seconds: 300 },
+        returned: true,
+        returnClock: { period: 13, seconds: 0 },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('season block recap M2.5 evidence', () => {
+  it('round-trips injury, objective, trade, and influence evidence', () => {
+    const run = buildRun();
+    const recap = {
+      schemaVersion: 1,
+      recapVersion: 'season-recap-v3',
+      runId: run.runId,
+      blockIndex: 1,
+      completedRounds: 10,
+      humanRecord: null,
+      standingsMovement: [],
+      notablePerformances: [],
+      streaks: [],
+      versionSpotlights: [],
+      upcomingHumanGames: [],
+      injuryEvidence: {
+        injuries: 3,
+        bySeverity: { minor: 2, moderate: 0, major: 1, 'season-ending': 0 },
+        sameGameReturns: 1,
+        seasonEnding: 0,
+        returnedThisBlock: 2,
+        activeAtBlockEnd: 1,
+        humanTeamInjuries: [
+          {
+            playerVersionId: fixturePlayerId(0),
+            side: 'home',
+            type: 'upper-body',
+            severity: 'moderate',
+            removedClock: { period: 2, seconds: 400 },
+            returned: false,
+            returnClock: null,
+          },
+        ],
+      },
+      objectiveEvidence: {
+        objectiveId: 'defense-108',
+        success: true,
+        evaluationFacts: {
+          games: 10,
+          wins: 6,
+          pointsAllowed: 1050,
+          reboundMargin: 15,
+          tipsWithAtLeastEightAvailable: 10,
+          tipsTotal: 10,
+          benchMinutes: 340,
+          turnovers: 120,
+        },
+      },
+      tradeEvidence: { tradesAccepted: 1, influenceDelta: 2 },
+      influenceBalance: { humanBalance: 5 },
+    };
+    const parsed = roundTrip(seasonBlockRecapSchema, recap);
+    expect(parsed.injuryEvidence.bySeverity.major).toBe(1);
+    expect(parsed.objectiveEvidence?.evaluationFacts.pointsAllowed).toBe(1050);
+    expect(parsed.tradeEvidence.tradesAccepted).toBe(1);
+    expect(parsed.influenceBalance.humanBalance).toBe(5);
+    expect(() => seasonBlockRecapSchema.parse({ ...recap, objectiveEvidence: null })).not.toThrow();
   });
 });

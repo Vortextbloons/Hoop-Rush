@@ -26,7 +26,7 @@ export async function loadRosterDetails(
   const bytes = new Uint8Array(await response.arrayBuffer());
   if (expectedHash !== undefined) {
     const digest = await sha256Hex(bytes);
-    if (digest !== expectedHash) {
+    if (digest !== null && digest !== expectedHash) {
       throw new Error(
         `roster details content hash mismatch: expected ${expectedHash}, got ${digest}`,
       );

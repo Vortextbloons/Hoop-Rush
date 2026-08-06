@@ -3,14 +3,19 @@ import {
   challengeRunSchema,
   classicCompletedDraftSchema,
   classicDraftStateSchema,
+  coverageSummarySchema,
   franchiseAbbreviation,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
   lineupSchema,
   opponentTeamSchema,
   peakPlayerSeasonSchema,
+  provenanceMapSchema,
+  reconstructedThreePointProfileSchema,
+  simulationAnchorsSchema,
   simulationPlayerSchema,
   simulationTeamSchema,
+  threePointReconstructionArtifactSchema,
   workerMessageSchema,
   workerRequestSchema,
 } from './index.ts';
@@ -1307,6 +1312,255 @@ describe('worker start best-of contracts (M5)', () => {
         profile: eraProfileFixture(),
         engineVersion: 'engine-v1',
       }).success,
+    ).toBe(false);
+  });
+});
+
+describe('three-point reconstruction contracts (spec/12)', () => {
+  const validProfile = {
+    modelVersion: 'three-point-reconstruction-v1',
+    accuracyConservative: 0.281,
+    accuracyMean: 0.312,
+    accuracyStdDev: 0.042,
+    attemptRateConservative: 0.034,
+    attemptRateMean: 0.058,
+    attemptRateStdDev: 0.031,
+    confidence: 'medium',
+    floor: 0.247,
+    zoneFloors: { cornerThree: 0.267, aboveBreakThree: 0.247 },
+    evidence: { missingFeatures: 0, sourceFields: ['ftm', 'fta', 'fga', 'assists'] },
+  };
+
+  it('accepts a valid reconstructed three-point profile', () => {
+    expect(reconstructedThreePointProfileSchema.safeParse(validProfile).success).toBe(true);
+  });
+
+  it('rejects out-of-range accuracy and attempt values', () => {
+    expect(
+      reconstructedThreePointProfileSchema.safeParse({ ...validProfile, accuracyConservative: 1.2 })
+        .success,
+    ).toBe(false);
+    expect(
+      reconstructedThreePointProfileSchema.safeParse({
+        ...validProfile,
+        attemptRateConservative: -0.1,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an unknown model version', () => {
+    expect(
+      reconstructedThreePointProfileSchema.safeParse({ ...validProfile, modelVersion: 'other-v1' })
+        .success,
+    ).toBe(false);
+  });
+
+  it('accepts the profile on a simulation player and a peak player season', () => {
+    expect(
+      simulationPlayerSchema.safeParse({
+        playerId: 'p-1',
+        displayName: 'Bill Russell',
+        positions: ['C'],
+        heightInches: 82,
+        weightLbs: 220,
+        ratings: validPlayer.detailedRatings,
+        tendencies: validPlayer.tendencies,
+        anchors: { ...validPlayer.anchors, threePointAttemptRate: null, threePointPct: null },
+        reconstructedThreePoint: validProfile,
+      }).success,
+    ).toBe(true);
+    expect(
+      peakPlayerSeasonSchema.safeParse({
+        ...validPlayer,
+        schemaVersion: 5,
+        reconstructedThreePoint: validProfile,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts schema-version 5 pools', () => {
+    expect(
+      franchiseEraPoolSchema.safeParse({
+        schemaVersion: 5,
+        dataVersion: 'm10-ratings-v3.6',
+        franchiseId: 'lakers',
+        eraId: '1960s',
+        eligibility: { minimumTeamGames: 40 },
+        coverageSummary: {
+          coverageBand: 'reconstructed',
+          observedFamilies: ['scoring'],
+          derivedFamilies: ['shooting'],
+          estimatedFamilies: [],
+          reconstructedFamilies: ['three-point'],
+          missingCategories: ['three-point'],
+          lowConfidenceShare: 0.2,
+          policyVersion: 'confidence-v1',
+        },
+        players: [{ ...validPlayer, schemaVersion: 5 }],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts reconstructed provenance and the coverage family', () => {
+    expect(
+      provenanceMapSchema.safeParse({
+        threePoint: {
+          kind: 'reconstructed',
+          confidence: 'medium',
+          methodVersion: 'derive-v8',
+          sourceVersion: 'source-v1',
+          sourceFields: ['ftm', 'fta', 'fga'],
+          sourceStatus: 'not-applicable',
+          notesCode: 'three-point-reconstruction-v1',
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      coverageSummarySchema.safeParse({
+        coverageBand: 'reconstructed',
+        observedFamilies: [],
+        derivedFamilies: [],
+        estimatedFamilies: [],
+        reconstructedFamilies: ['three-point'],
+        missingCategories: ['three-point'],
+        lowConfidenceShare: 0.1,
+        policyVersion: 'confidence-v1',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('accepts threePointAttemptRate null and retains numeric zero for observed zeros', () => {
+    expect(
+      simulationAnchorsSchema.safeParse({ ...validPlayer.anchors, threePointAttemptRate: null })
+        .success,
+    ).toBe(true);
+    expect(
+      simulationAnchorsSchema.safeParse({ ...validPlayer.anchors, threePointAttemptRate: 0 })
+        .success,
+    ).toBe(true);
+    expect(
+      simulationAnchorsSchema.safeParse({ ...validPlayer.anchors, threePointAttemptRate: 1.5 })
+        .success,
+    ).toBe(false);
+  });
+
+  it('parses the versioned reconstruction artifact', () => {
+    const artifact = {
+      artifactVersion: 'three-point-reconstruction-v1',
+      schemaVersion: 1,
+      fitCohort: {
+        seasons: ['1979-80', '1980-81', '1981-82', '1982-83', '1983-84'],
+        description: 'early three-point prior cohort',
+      },
+      featureNames: ['ftRatio', 'ftPctShrunk'],
+      normalization: {
+        ftRatio: { mean: 0.8, std: 0.11 },
+        ftPctShrunk: { mean: 0.77, std: 0.05 },
+      },
+      missingDefaults: {
+        G: { heightInches: 77, weightLbs: 195, age: 26 },
+        F: { heightInches: 79, weightLbs: 215, age: 26 },
+        C: { heightInches: 83, weightLbs: 245, age: 26 },
+      },
+      position2pMeans: { G: 0.45, F: 0.45, C: 0.47 },
+      priors: {
+        accuracyPrior: 0.33,
+        accuracyPriorAttempts: 80,
+        attemptRatePrior: 0.05,
+        attemptRatePriorTrials: 80,
+        ftPriors: { G: 0.8, F: 0.77, C: 0.71 },
+      },
+      regularization: { lambda: 1, maxIterations: 25, convergenceTolerance: 1e-6 },
+      models: {
+        accuracy: {
+          intercept: -1.2,
+          coefficients: { ftRatio: 0.4 },
+          covariance: [
+            [0.05, 0],
+            [0, 0.01],
+          ],
+        },
+        attemptRate: {
+          intercept: -3.1,
+          coefficients: { ftRatio: 0.2 },
+          covariance: [
+            [0.1, 0],
+            [0, 0.02],
+          ],
+        },
+      },
+      posteriorQuantiles: { accuracy: 0.25, attemptRate: 0.3 },
+      attemptRateTranslation: {
+        factor: 2.5,
+        caps: { G: 0.15, F: 0.08, C: 0.02 },
+        description: 'conservative modern translation: 2.5x volume, capped per position',
+      },
+      confidenceThresholds: { highStdDev: 0.025, mediumStdDev: 0.045 },
+      floors: { floor: 0.247, zoneFloors: { cornerThree: 0.267, aboveBreakThree: 0.247 } },
+      ratingMapping: {
+        points: [
+          { accuracy: 0.2, rating: 25 },
+          { accuracy: 0.32, rating: 55 },
+        ],
+        clampMin: 10,
+        clampMax: 95,
+      },
+      holdout: {
+        accuracy: {
+          mae: 0.04,
+          bias: -0.002,
+          overpredictionShare: 0.45,
+          samplePlayers: 900,
+          positionBands: {
+            G: { mae: 0.04, bias: -0.001, count: 400 },
+            F: { mae: 0.04, bias: -0.002, count: 300 },
+            C: { mae: 0.05, bias: -0.003, count: 200 },
+          },
+          evidenceBands: [{ band: 'under-500-min', mae: 0.06, bias: -0.01, count: 200 }],
+          falsePositives: { count: 10, threshold: 0.33, lowerBound: 0.29 },
+          falseNegatives: { count: 5, threshold: 0.33, upperBound: 0.37 },
+        },
+        attemptRate: {
+          mae: 0.02,
+          bias: 0.001,
+          overpredictionShare: 0.4,
+          samplePlayers: 1500,
+          positionBands: {
+            G: { mae: 0.02, bias: 0, count: 600 },
+            F: { mae: 0.02, bias: -0.001, count: 500 },
+            C: { mae: 0.03, bias: -0.002, count: 400 },
+          },
+          evidenceBands: [{ band: 'under-500-min', mae: 0.03, bias: -0.01, count: 300 }],
+          falsePositives: { count: 15, threshold: 0.1, lowerBound: 0.05 },
+          falseNegatives: { count: 8, threshold: 0.1, upperBound: 0.15 },
+        },
+        translatedAttemptRateModern: {
+          mae: 0.1,
+          bias: -0.005,
+          overpredictionShare: 0.42,
+          samplePlayers: 4000,
+          positionBands: {
+            G: { mae: 0.1, bias: -0.006, count: 1800 },
+            F: { mae: 0.09, bias: -0.004, count: 1400 },
+            C: { mae: 0.08, bias: -0.002, count: 800 },
+          },
+          evidenceBands: [{ band: '1500-plus-min', mae: 0.09, bias: -0.005, count: 3500 }],
+          falsePositives: { count: 40, threshold: 0.1, lowerBound: 0.05 },
+          falseNegatives: { count: 60, threshold: 0.1, upperBound: 0.15 },
+        },
+        foldCount: 5,
+      },
+      gates: {
+        meanBiasNonPositiveAccuracy: true,
+        meanBiasNonPositiveTranslatedAttemptRate: true,
+        floorBelowEstablished: true,
+      },
+      generatedBy: 'hoop-rush calibrate three-point --write (derive-v8, ratings-v3.6)',
+    };
+    expect(threePointReconstructionArtifactSchema.safeParse(artifact).success).toBe(true);
+    expect(
+      threePointReconstructionArtifactSchema.safeParse({ ...artifact, artifactVersion: 'other-v1' })
+        .success,
     ).toBe(false);
   });
 });

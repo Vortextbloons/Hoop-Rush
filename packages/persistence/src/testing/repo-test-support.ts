@@ -6,6 +6,7 @@ import type {
   StoredSeasonAcceptedBlockRow,
   StoredSeasonActiveRunIndex,
   StoredSeasonDetailRow,
+  StoredSeasonPendingBlockRow,
   StoredSeasonRunRecord,
   StoredSeasonSummaryRow,
 } from '../schemas/season-run-record.ts';
@@ -17,7 +18,7 @@ import type {
 } from '../schemas/run-record.ts';
 
 /**
- * Shared repository test support: the 6-version Dexie store chain, the
+ * Shared repository test support: the 7-version Dexie store chain, the
  * fake-indexeddb factory swap, and deterministic database names. Every
  * repository contract suite runs against fake-indexeddb with one fresh
  * database per test; migration suites additionally swap in a fresh factory
@@ -38,6 +39,7 @@ export class TestDatabase extends Dexie {
   seasonRunDetails!: Table<StoredSeasonDetailRow, [string, string]>;
   seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
   seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
+  seasonPendingBlocks!: EntityTable<StoredSeasonPendingBlockRow, 'runId'>;
 
   constructor(name: string) {
     super(name);
@@ -58,6 +60,7 @@ export class TestDatabase extends Dexie {
       seasonRunBlocks: '[runId+blockIndex], runId',
       seasonRunIndex: 'recordId',
     });
+    this.version(7).stores({ seasonPendingBlocks: 'runId' });
   }
 }
 

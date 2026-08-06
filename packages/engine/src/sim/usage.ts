@@ -300,17 +300,22 @@ const ZONES: readonly ShotZone[] = ['rim', 'shortMid', 'longMid', 'cornerThree',
 
 /**
  * Target three-point share for one player, from the recorded season volume
- * when available. Three rules keep era growth honest:
+ * when available. Resolution order (spec/12):
  *
- * - No observed three-point attempts: the player never shoots threes. Era
- *   three-point growth must not manufacture a jump shot for a center.
- * - Very low observed volume: the observed rate stays, era growth adds only
- *   a tightly capped share.
- * - Established volume: the observed share anchors, and era growth moves the
- *   residual in bounded steps.
- *
- * Players without anchors (authored opponents, fixtures) fall back to the
- * threePointRate tendency blended toward the era rate.
+ * 1. No anchors at all (authored opponents, fixtures): the threePointRate
+ *    tendency blended toward the era rate. This branch stays first and is
+ *    unchanged.
+ * 2. Null observed attempt rate (unavailable: pre-1979 not-applicable or
+ *    genuinely missing records) with a reconstructed profile: the profile's
+ *    conservative attempt rate, clamped to the same 0.01..0.65 band. Era
+ *    growth must never manufacture a jump shot from a modern era rate for a
+ *    player whose records predate the three-point line.
+ * 3. No observed three-point attempts (null observed percentage or rate
+ *    below the evidence minimum): the player never shoots threes.
+ * 4. Very low observed volume: the observed rate stays, era growth adds only
+ *    a tightly capped share.
+ * 5. Established volume: the observed share anchors, and era growth moves the
+ *    residual in bounded steps.
  */
 export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulationProfile): number {
   const f = shooter.tendencies;
@@ -327,7 +332,20 @@ export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulati
       ),
     );
   }
-  if (observedPct === null || observedRate < ENGINE_CONSTANTS.threePointEvidenceMinimum) {
+  // Unavailable records (null rate, including pre-1979) with a reconstructed
+  // profile use the pinned conservative volume; a numeric rate, even a
+  // validated observed zero, always takes the observed paths below.
+  if (observedRate === null && shooter.reconstructedThreePoint !== undefined) {
+    return Math.min(0.65, Math.max(0.01, shooter.reconstructedThreePoint.attemptRateConservative));
+  }
+  // A null rate with no reconstructed profile means no three-point evidence:
+  // the player never shoots threes (a validated observed zero rate also
+  // lands here through the numeric path below).
+  if (
+    observedPct === null ||
+    observedRate === null ||
+    observedRate < ENGINE_CONSTANTS.threePointEvidenceMinimum
+  ) {
     return 0;
   }
   if (observedRate < ENGINE_CONSTANTS.threePointLowVolumeThreshold) {

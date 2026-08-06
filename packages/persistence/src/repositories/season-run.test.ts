@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
-import type { SeasonEffectsState } from '@hoop-rush/data-contracts';
+import type {
+  SeasonEffectsState,
+  SeasonPendingBlockCandidate,
+  SeasonRun,
+  SeasonRunCommand,
+} from '@hoop-rush/data-contracts';
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
 import { storedSeasonActiveRunIndexSchema } from '../schemas/season-run-record.ts';
 import { storedSeasonSummaryRowSchema } from '../schemas/season-run-record.ts';
@@ -19,13 +24,22 @@ import {
 } from '../testing/repo-test-support.ts';
 import {
   buildFixtureEffectsState,
+  buildFixtureInterruption,
+  buildFixturePendingBlock,
   buildFixtureRun,
   buildFixtureSchedule,
+  buildFixtureStateDigest,
   buildFixtureStoredDraft,
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
 import { buildFullSeasonDataset } from '../benchmark/season-run.ts';
-import type { CommitSeasonBlockInput } from './season-run.ts';
+import {
+  SeasonPendingBlockRejectedError,
+  SeasonRunCommandDuplicateError,
+  SeasonRunCommandRunMismatchError,
+  SeasonRunCommandStaleStateError,
+  type CommitSeasonBlockInput,
+} from './season-run.ts';
 
 /**
  * Season Run repository contract tests (spec/2.0/07 persistence, spec/2.0/10
@@ -104,6 +118,17 @@ function commitInputFor(
     recap: block.recap,
     effects: block.effects,
     rotations: block.rotations,
+    health: block.health,
+    transactions: block.transactions,
+    influence: block.influence,
+    trade: block.trade,
+    objectives: block.objectives,
+    checkpointState: block.checkpointState,
+    stateRevision: block.stateRevision,
+    stateDigest: block.stateDigest,
+    expectedStateRevision: blockIndex,
+    expectedStateDigest: block.expectedStateDigest,
+    window: null,
   };
 }
 
@@ -118,7 +143,7 @@ async function loadOrThrow(adapters: Adapters) {
 }
 
 describe('season run repository (dexie)', () => {
-  it('opens the v6 database with the season tables and keeps the other stores', async () => {
+  it('opens the v7 database with the season tables and keeps the other stores', async () => {
     const { db, seasonDraft, challenge, run } = makeAdapters();
     const names = db.tables.map((table) => table.name);
     for (const expected of [
@@ -133,6 +158,7 @@ describe('season run repository (dexie)', () => {
       'seasonRunDetails',
       'seasonRunBlocks',
       'seasonRunIndex',
+      'seasonPendingBlocks',
     ]) {
       expect(names).toContain(expected);
     }
@@ -340,8 +366,8 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 3) {
-      throw new Error('expected a current v3 checkpoint row');
+    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
+      throw new Error('expected a current v4 checkpoint row');
     }
     await db.seasonRuns.put({ ...row, revision: 5 });
     await expect(repo.loadActiveRun()).rejects.toThrow(/revision/);
@@ -353,8 +379,8 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 3) {
-      throw new Error('expected a current v3 checkpoint row');
+    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
+      throw new Error('expected a current v4 checkpoint row');
     }
     await db.seasonRuns.put({
       ...row,
@@ -503,8 +529,8 @@ describe('season run development-row auto-clear (M2.4)', () => {
     adapters: Adapters,
   ): Promise<import('../schemas/season-run-record.ts').StoredSeasonRunRecord> {
     const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 3) {
-      throw new Error('expected a current v3 checkpoint row');
+    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
+      throw new Error('expected a current v4 checkpoint row');
     }
     return row;
   }
@@ -529,7 +555,7 @@ describe('season run development-row auto-clear (M2.4)', () => {
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
       name: 'SeasonRunIncompatibleError',
       info: {
-        storedSaveSchemaVersion: 1,
+        storedSaveSchemaVersion: 4,
         storedRunSchemaVersion: 4,
         runId: run.runId,
       },
@@ -651,12 +677,12 @@ describe('season run development-row auto-clear (M2.4)', () => {
     expect(await repo.loadActiveRun()).toBeNull();
   });
 
-  it('a fresh v3 row round-trips the effects state through promotion, commit, and reload', async () => {
+  it('a fresh v4 row round-trips the effects state through promotion, commit, and reload', async () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
     await promote(adapters);
     let row = await currentCheckpoint(adapters);
-    expect(row.saveSchemaVersion).toBe(3);
+    expect(row.saveSchemaVersion).toBe(4);
     expect(row.effects).toEqual(buildFixtureEffectsState(run.rosters));
 
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
@@ -822,5 +848,594 @@ describe('season run migration', () => {
     const snapshot = await seasonRun.loadActiveRun();
     expect(snapshot?.run.games).toHaveLength(1230);
     expect(await seasonDraft.loadSeasonDraft()).toBeNull();
+  });
+});
+
+describe('season run M2.5 pending blocks (v4)', () => {
+  function pendingFor(
+    adapters: Adapters,
+    blockIndex = 0,
+    overrides: Partial<SeasonPendingBlockCandidate> = {},
+  ): SeasonPendingBlockCandidate {
+    return buildFixturePendingBlock({
+      run: adapters.run,
+      commandId: `command-${String(blockIndex)}`,
+      blockIndex,
+      expectedRevision: blockIndex,
+      expectedStateRevision: blockIndex,
+      expectedStateDigest: adapters.run.stateDigest,
+      nextGameId: `s${String(blockIndex * 150 + 16).padStart(6, '0')}`,
+      ...overrides,
+    });
+  }
+
+  it('round-trips a pending block through save, load, and discard', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await promote(adapters);
+    const pending = pendingFor(adapters);
+    await repo.savePendingBlock(
+      pending,
+      buildFixtureInterruption({
+        runId: run.runId,
+        blockIndex: 0,
+        commandId: 'command-0',
+        nextGameId: pending.nextGameId,
+      }),
+    );
+    expect(await db.seasonPendingBlocks.count()).toBe(1);
+    const loaded = await repo.loadPendingBlock(run.runId);
+    expect(loaded).not.toBeNull();
+    expect(loaded?.blockIndex).toBe(0);
+    expect(loaded?.nextGameId).toBe(pending.nextGameId);
+    expect(loaded?.expectedStateDigest).toBe(run.stateDigest);
+    await repo.discardPendingBlock(run.runId);
+    expect(await repo.loadPendingBlock(run.runId)).toBeNull();
+    expect(await db.seasonPendingBlocks.count()).toBe(0);
+  });
+
+  it('rejects a pending save when the cursor advanced past the pending block', async () => {
+    const adapters = makeAdapters();
+    const { repo } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    const pending = pendingFor(adapters, 1);
+    await expect(
+      repo.savePendingBlock(
+        pending,
+        buildFixtureInterruption({
+          runId: adapters.run.runId,
+          blockIndex: 1,
+          commandId: 'command-1',
+          nextGameId: pending.nextGameId,
+        }),
+      ),
+    ).rejects.toThrow(SeasonPendingBlockRejectedError);
+    await expect(
+      repo.savePendingBlock(
+        pendingFor(adapters, 0),
+        buildFixtureInterruption({
+          runId: adapters.run.runId,
+          blockIndex: 0,
+          commandId: 'command-0',
+          nextGameId: 's000016',
+        }),
+      ),
+    ).rejects.toThrow(SeasonPendingBlockRejectedError);
+  });
+
+  it('rejects a pending save with stale expected state facts or a mismatched run', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    const interruption = buildFixtureInterruption({
+      runId: run.runId,
+      blockIndex: 0,
+      commandId: 'command-0',
+      nextGameId: 's000016',
+    });
+    await expect(
+      repo.savePendingBlock({ ...pendingFor(adapters), expectedStateRevision: 1 }, interruption),
+    ).rejects.toThrow(SeasonPendingBlockRejectedError);
+    await expect(
+      repo.savePendingBlock(
+        { ...pendingFor(adapters), expectedStateDigest: 'f'.repeat(32) },
+        interruption,
+      ),
+    ).rejects.toThrow(SeasonPendingBlockRejectedError);
+    await expect(
+      repo.savePendingBlock({ ...pendingFor(adapters), runId: 'other-run' }, interruption),
+    ).rejects.toThrow(SeasonPendingBlockRejectedError);
+  });
+
+  it('a pending block survives a full validated reload', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    const pending = pendingFor(adapters);
+    await repo.savePendingBlock(
+      pending,
+      buildFixtureInterruption({
+        runId: run.runId,
+        blockIndex: 0,
+        commandId: 'command-0',
+        nextGameId: pending.nextGameId,
+      }),
+    );
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.acceptedBlocks).toHaveLength(0);
+    expect((await repo.loadPendingBlock(run.runId))?.nextGameId).toBe(pending.nextGameId);
+  });
+
+  it('resume commits atomically and deletes the pending row', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run, blocks } = adapters;
+    await promote(adapters);
+    const block = blocks[0];
+    if (block === undefined) throw new Error('expected fixture block 0');
+    // Interruption after 60 of the block's 150 games.
+    const partial = block.summaries.slice(0, 60);
+    const pending = buildFixturePendingBlock({
+      run,
+      commandId: 'command-0',
+      blockIndex: 0,
+      expectedRevision: 0,
+      expectedStateRevision: 0,
+      expectedStateDigest: run.stateDigest,
+      nextGameId: 's000061',
+      summaries: partial,
+    });
+    await repo.savePendingBlock(
+      pending,
+      buildFixtureInterruption({
+        runId: run.runId,
+        blockIndex: 0,
+        commandId: 'command-0',
+        nextGameId: 's000061',
+      }),
+    );
+    expect(await db.seasonPendingBlocks.count()).toBe(1);
+    // Resume completes the block: the pending's partial summaries plus the
+    // remaining games form the full block (the union, no duplicates).
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    expect(await db.seasonPendingBlocks.count()).toBe(0);
+    expect(await repo.loadPendingBlock(run.runId)).toBeNull();
+    const summaries = await repo.loadBlockSummaries(run.runId, 0);
+    expect(summaries).toHaveLength(150);
+    expect(new Set(summaries.map((summary) => summary.gameId))).toEqual(
+      new Set(block.summaries.map((summary) => summary.gameId)),
+    );
+    expect(summaries.map((summary) => summary.gameId)).toEqual(
+      block.summaries.map((summary) => summary.gameId),
+    );
+  });
+
+  it('an interrupted-resumed block equals an uninterrupted block with no duplicates', async () => {
+    const uninterrupted = makeAdapters();
+    await promote(uninterrupted);
+    await uninterrupted.repo.commitSeasonBlock(commitInputFor(uninterrupted, 0));
+
+    const resumed = makeAdapters();
+    await promote(resumed);
+    const block = resumed.blocks[0];
+    if (block === undefined) throw new Error('expected fixture block 0');
+    const partial = block.summaries.slice(0, 40);
+    const pending = buildFixturePendingBlock({
+      run: resumed.run,
+      commandId: 'command-0',
+      blockIndex: 0,
+      expectedRevision: 0,
+      expectedStateRevision: 0,
+      expectedStateDigest: resumed.run.stateDigest,
+      nextGameId: 's000041',
+      summaries: partial,
+    });
+    await resumed.repo.savePendingBlock(
+      pending,
+      buildFixtureInterruption({
+        runId: resumed.run.runId,
+        blockIndex: 0,
+        commandId: 'command-0',
+        nextGameId: 's000041',
+      }),
+    );
+    await resumed.repo.commitSeasonBlock(commitInputFor(resumed, 0));
+
+    const a = (await uninterrupted.repo.loadBlockSummaries(uninterrupted.run.runId, 0)).map(
+      (summary) => summary.gameId,
+    );
+    const b = (await resumed.repo.loadBlockSummaries(resumed.run.runId, 0)).map(
+      (summary) => summary.gameId,
+    );
+    expect(a).toEqual(b);
+    expect(new Set(a).size).toBe(150);
+  });
+
+  it('clearSeasonRun deletes the pending row too', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await promote(adapters);
+    const pending = pendingFor(adapters);
+    await repo.savePendingBlock(
+      pending,
+      buildFixtureInterruption({
+        runId: run.runId,
+        blockIndex: 0,
+        commandId: 'command-0',
+        nextGameId: pending.nextGameId,
+      }),
+    );
+    expect(await db.seasonPendingBlocks.count()).toBe(1);
+    await repo.clearSeasonRun(run.runId);
+    expect(await db.seasonPendingBlocks.count()).toBe(0);
+  });
+});
+
+describe('season run M2.5 command application (v4)', () => {
+  function selectObjectiveCommand(
+    adapters: Adapters,
+    overrides: Partial<SeasonRunCommand> = {},
+  ): SeasonRunCommand {
+    return {
+      schemaVersion: 7,
+      command: 'select-block-objective',
+      commandId: 'cmd-select-0',
+      runId: adapters.run.runId,
+      expectedStateRevision: 0,
+      expectedStateDigest: adapters.run.stateDigest,
+      blockIndex: 0,
+      objectiveId: 'win-six',
+      ...overrides,
+    } as SeasonRunCommand;
+  }
+
+  /** The engine-produced post-command run (objective selected, revision +1). */
+  function postCommandRun(adapters: Adapters): SeasonRun {
+    const { run } = adapters;
+    const objectives = {
+      ...run.objectives,
+      selections: {
+        0: { objectiveId: 'win-six' as const, selectedByCommandId: 'cmd-select-0', success: null },
+      },
+    };
+    return {
+      ...run,
+      objectives,
+      stateRevision: 1,
+      stateDigest: buildFixtureStateDigest(run, { stateRevision: 1, objectives }),
+    };
+  }
+
+  it('applies a command atomically and reloads with the audit passing', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    await repo.applySeasonRunCommand({
+      runId: run.runId,
+      command: selectObjectiveCommand(adapters),
+      run: postCommandRun(adapters),
+      pending: null,
+    });
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot?.run.stateRevision).toBe(1);
+    expect(snapshot?.run.objectives.selections[0]?.objectiveId).toBe('win-six');
+    expect(snapshot?.run.checkpointState).toBeNull();
+  });
+
+  it('rejects a stale command (revision and digest) and a run mismatch', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    await expect(
+      repo.applySeasonRunCommand({
+        runId: run.runId,
+        command: selectObjectiveCommand(adapters, { expectedStateRevision: 3 }),
+        run: postCommandRun(adapters),
+        pending: null,
+      }),
+    ).rejects.toThrow(SeasonRunCommandStaleStateError);
+    await expect(
+      repo.applySeasonRunCommand({
+        runId: run.runId,
+        command: selectObjectiveCommand(adapters, { expectedStateDigest: 'f'.repeat(32) }),
+        run: postCommandRun(adapters),
+        pending: null,
+      }),
+    ).rejects.toThrow(SeasonRunCommandStaleStateError);
+    await expect(
+      repo.applySeasonRunCommand({
+        runId: 'other-run',
+        command: selectObjectiveCommand(adapters),
+        run: postCommandRun(adapters),
+        pending: null,
+      }),
+    ).rejects.toThrow(SeasonRunCommandRunMismatchError);
+  });
+
+  it('rejects duplicate command ids from the recorded history', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    const command = selectObjectiveCommand(adapters);
+    await repo.applySeasonRunCommand({
+      runId: run.runId,
+      command,
+      run: postCommandRun(adapters),
+      pending: null,
+    });
+    // The same command id again (with the now-current state facts): the id
+    // is already recorded via the objective selection.
+    await expect(
+      repo.applySeasonRunCommand({
+        runId: run.runId,
+        command: {
+          ...command,
+          expectedStateRevision: 1,
+          expectedStateDigest: postCommandRun(adapters).stateDigest,
+        },
+        run: postCommandRun(adapters),
+        pending: null,
+      }),
+    ).rejects.toThrow(SeasonRunCommandDuplicateError);
+  });
+
+  it('rejects a command id that collides with the last accepted block command', async () => {
+    const adapters = makeAdapters();
+    const { repo, run, blocks } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    const blockState = blocks[0]?.checkpointState;
+    if (blockState === undefined) throw new Error('expected fixture checkpoint state');
+    await expect(
+      repo.applySeasonRunCommand({
+        runId: run.runId,
+        command: selectObjectiveCommand(adapters, {
+          commandId: 'command-0',
+          expectedStateRevision: 1,
+          expectedStateDigest: blocks[0]?.stateDigest ?? '0'.repeat(32),
+        }),
+        run: postCommandRun(adapters),
+        pending: null,
+      }),
+    ).rejects.toThrow(SeasonRunCommandDuplicateError);
+    void blockState;
+  });
+
+  it('a command with a non-null pending preserves the recorded interruption', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await promote(adapters);
+    const pending = buildFixturePendingBlock({
+      run,
+      commandId: 'command-0',
+      blockIndex: 0,
+      expectedRevision: 0,
+      expectedStateRevision: 0,
+      expectedStateDigest: run.stateDigest,
+      nextGameId: 's000016',
+    });
+    await repo.savePendingBlock(
+      pending,
+      buildFixtureInterruption({
+        runId: run.runId,
+        blockIndex: 0,
+        commandId: 'command-0',
+        nextGameId: 's000016',
+        unavailablePlayerVersionIds: ['pv-' + '1'.repeat(32)],
+      }),
+    );
+    // A forfeit command advances the pending to the next game.
+    const advanced = { ...pending, nextGameId: 's000017' };
+    await repo.applySeasonRunCommand({
+      runId: run.runId,
+      command: selectObjectiveCommand(adapters),
+      run: postCommandRun(adapters),
+      pending: advanced,
+    });
+    const row = await db.seasonPendingBlocks.get(run.runId);
+    expect(row?.interruption.nextGameId).toBe('s000017');
+    expect(row?.interruption.unavailablePlayerVersionIds).toEqual(['pv-' + '1'.repeat(32)]);
+  });
+});
+
+describe('season run M2.5 reload audit (v4)', () => {
+  async function currentRow(
+    adapters: Adapters,
+  ): Promise<import('../schemas/season-run-record.ts').StoredSeasonRunRecord> {
+    const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
+      throw new Error('expected a current v4 checkpoint row');
+    }
+    return row;
+  }
+
+  it('rejects a stateDigest that does not recompute over the stored facts', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    const row = await currentRow(adapters);
+    await db.seasonRuns.put({ ...row, stateDigest: 'f'.repeat(32) });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/stateDigest/);
+  });
+
+  it('rejects a stateRevision regression behind the last accepted block', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    const row = await currentRow(adapters);
+    await db.seasonRuns.put({ ...row, stateRevision: 0 });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/stateRevision/);
+  });
+
+  it('rejects an Influence balance that does not reconcile from the ledger', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    const row = await currentRow(adapters);
+    await db.seasonRuns.put({
+      ...row,
+      influence: { ...row.influence, balances: { ...row.influence.balances, lakers: 3 } },
+    });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/recomputes/);
+  });
+
+  it('rejects a ledger entry whose balanceAfter does not reconcile', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    const row = await currentRow(adapters);
+    const ledger = row.influence.ledger.map((entry, index) =>
+      index === 0 ? { ...entry, balanceAfter: 5 } : entry,
+    );
+    await db.seasonRuns.put({ ...row, influence: { ...row.influence, ledger } });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/does not reconcile/);
+  });
+
+  it('rejects health injuries referencing unknown players or games', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    const row = await currentRow(adapters);
+    const injury = {
+      injuryId: 'inj-' + 'a'.repeat(32),
+      playerVersionId: 'pv-' + 'f'.repeat(32),
+      franchiseId: 'lakers',
+      gameId: 's000001',
+      type: 'lower-body' as const,
+      severity: 'minor' as const,
+      occurredBeforeHalftime: false,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 1,
+      missedGamesRemaining: 1,
+      actualReturnRound: null,
+      seasonEnding: false,
+      rehabModifier: 0 as const,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: ['fixture'],
+    };
+    await db.seasonRuns.put({ ...row, health: { ...row.health, injuries: [injury] } });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/outside the 30 rosters/);
+  });
+
+  it('rejects a transaction entry applied beyond the stored stateRevision', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    const row = await currentRow(adapters);
+    await db.seasonRuns.put({
+      ...row,
+      transactions: [
+        {
+          transactionId: 'tx-fake',
+          commandId: null,
+          franchiseId: null,
+          type: 'initial-grant',
+          blockIndex: null,
+          appliedAtStateRevision: 5,
+          payload: {},
+          explanation: 'fake entry',
+        },
+      ],
+    });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/exceeds the stored stateRevision/);
+  });
+
+  it('rejects a checkpointState that does not match the last accepted block', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    const row = await currentRow(adapters);
+    const blockState = adapters.blocks[0]?.checkpointState;
+    if (blockState === undefined) throw new Error('expected fixture checkpoint state');
+    await db.seasonRuns.put({
+      ...row,
+      checkpointState: { ...blockState, commandId: 'other-command' },
+    });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/checkpointState/);
+  });
+
+  it('rejects a pending row for an already committed blockIndex', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    const pending = buildFixturePendingBlock({
+      run,
+      commandId: 'command-0',
+      blockIndex: 0,
+      expectedRevision: 0,
+      expectedStateRevision: 0,
+      expectedStateDigest: run.stateDigest,
+      nextGameId: 's000016',
+    });
+    // The repo guard rejects this via savePendingBlock; a row written
+    // directly (corruption) is caught by the reload audit.
+    await db.seasonPendingBlocks.put({
+      runId: run.runId,
+      block: pending,
+      interruption: {
+        code: 'invalid-roster',
+        runId: run.runId,
+        blockIndex: 0,
+        commandId: 'command-0',
+        nextGameId: 's000016',
+        humanFranchiseId: 'lakers',
+        unavailablePlayerVersionIds: ['pv-' + '1'.repeat(32)],
+      },
+    });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/already committed/);
+  });
+
+  it('commit rejects stale expected state facts and non-advancing stateRevision', async () => {
+    const adapters = makeAdapters();
+    const { repo } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    await expect(
+      repo.commitSeasonBlock({ ...commitInputFor(adapters, 1), expectedStateRevision: 5 }),
+    ).rejects.toThrow(/stale expectedStateRevision/);
+    await expect(
+      repo.commitSeasonBlock({
+        ...commitInputFor(adapters, 1),
+        expectedStateDigest: 'f'.repeat(32),
+      }),
+    ).rejects.toThrow(/stale expectedStateDigest/);
+    await expect(
+      repo.commitSeasonBlock({ ...commitInputFor(adapters, 1), stateRevision: 1 }),
+    ).rejects.toThrow(/does not advance/);
+    expect((await repo.loadActiveRun())?.acceptedBlocks).toHaveLength(1);
+  });
+
+  it('a stored save-schema-v3 row (M2.4) is reported typed incompatible and preserved', async () => {
+    const adapters = makeAdapters();
+    const { db, repo, run } = adapters;
+    const fixture = buildFixtureRun({ runId: run.runId });
+    const { games: _games, ...runWithoutGames } = fixture;
+    const row = {
+      recordId: SEASON_RUN_RECORD_ID,
+      saveSchemaVersion: 3,
+      run: runWithoutGames,
+      completedRounds: 0,
+      revision: 0,
+      lastCommandId: null,
+      lastRotationDigest: null,
+      lastCheckpointDigest: null,
+      standings: fixture.standings,
+      teamAggregates: [],
+      playerAggregates: [],
+      recap: null,
+      effects: buildFixtureEffectsState(fixture.rosters),
+    };
+    await db.seasonRuns.put(row as never);
+    await expect(repo.loadActiveRun()).rejects.toMatchObject({
+      name: 'SeasonRunIncompatibleError',
+      info: { storedSaveSchemaVersion: 4, storedRunSchemaVersion: 7 },
+    });
+    expect(await db.seasonRuns.count()).toBe(1);
   });
 });

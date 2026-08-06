@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import type {
+  SeasonBlockResumeInput,
   SeasonBlockRunner,
   SeasonBlockStartInput,
   SeasonRunnerEvent,
@@ -19,6 +20,7 @@ class FakeRunner implements SeasonBlockRunner {
   terminateCalls = 0;
   cancelCalls: string[] = [];
   startCalls: SeasonBlockStartInput[] = [];
+  resumeCalls: SeasonBlockResumeInput[] = [];
   private readonly listeners = new Set<(event: SeasonRunnerEvent) => void>();
   private lastBlockIndex = 0;
 
@@ -28,6 +30,11 @@ class FakeRunner implements SeasonBlockRunner {
     const requestId = `fake-${String(this.startCalls.length)}`;
     this.emit({ type: 'started', requestId, blockIndex: input.blockIndex });
     return requestId;
+  }
+
+  resumeBlock(input: SeasonBlockResumeInput): string {
+    this.resumeCalls.push(input);
+    return 'resume-1';
   }
 
   cancel(requestId: string): void {
@@ -77,6 +84,10 @@ function repoWith(initial: SeasonRunSnapshot | null) {
       if (runId === active?.run.runId) active = null;
       return Promise.resolve();
     }),
+    savePendingBlock: vi.fn(() => Promise.resolve()),
+    loadPendingBlock: vi.fn(() => Promise.resolve(null)),
+    discardPendingBlock: vi.fn(() => Promise.resolve()),
+    applySeasonRunCommand: vi.fn(() => Promise.resolve()),
   };
 }
 

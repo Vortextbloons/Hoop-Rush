@@ -87,6 +87,7 @@ function summary(
     homeScore,
     awayScore,
     forfeitLoserFranchiseId,
+    injuryEvents: [],
     homeBox: {
       franchiseId: homeFranchiseId,
       points: homeScore,

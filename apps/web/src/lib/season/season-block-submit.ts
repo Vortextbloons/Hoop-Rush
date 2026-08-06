@@ -1,6 +1,7 @@
 import {
   SEASON_BLOCK_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
+  type SeasonObjectiveId,
   type SeasonRotation,
   type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
@@ -12,7 +13,7 @@ import type { SeasonRunShellData } from './season-shell-context';
 import type { SeasonBlockStartInput } from './season-block-runner';
 
 /**
- * Season Run block submission (M2.3.5 hub): builds the typed
+ * Season Run block submission (M2.3.5 hub, M2.5): builds the typed
  * `SubmitBlockEnvelope` (command + runner start input) from the live shell
  * state. This is the UI's single path into `SeasonHubState.startBlock` —
  * every can-submit condition is checked here and reported as a typed
@@ -20,6 +21,13 @@ import type { SeasonBlockStartInput } from './season-block-runner';
  * generic disabled button. The envelope mirrors the pre-shell league hub's
  * builder exactly (frozen command schema, engine rotation-set digest,
  * packaged artifact URLs for the worker).
+ *
+ * M2.5: the submit command gains the locked `objectiveId` (null for the
+ * final two-game block 8; a selection is REQUIRED for blocks 0-7 — the
+ * engine rejects with `invalid-objective` otherwise) and the expected run
+ * state facts (`expectedStateRevision`/`expectedStateDigest` asserted by
+ * every command). The runner start input carries the locked objective; the
+ * runner derives the pre-block health and state facts from the snapshot.
  */
 
 export type SubmitBlockFailureCode =
@@ -30,7 +38,8 @@ export type SubmitBlockFailureCode =
   | 'season-complete'
   | 'block-busy'
   | 'rotation-invalid'
-  | 'asset-unavailable';
+  | 'asset-unavailable'
+  | 'objective-not-selected';
 
 export interface SubmitBlockFailure {
   code: SubmitBlockFailureCode;
@@ -84,6 +93,18 @@ export async function buildSubmitBlockEnvelope(
     );
   }
 
+  // M2.5: the objective is locked into the submit command. Blocks 0-7
+  // require a recorded selection (the engine rejects otherwise); the final
+  // two-game block 8 must carry null.
+  const objectiveId: SeasonObjectiveId | null =
+    nextBlockIndex >= 8 ? null : selectedObjectiveIdOf(run, nextBlockIndex);
+  if (objectiveId === null && nextBlockIndex < 8) {
+    return fail(
+      'objective-not-selected',
+      'Pick a block objective first — the selected objective locks into this block.',
+    );
+  }
+
   const pendingHumanRotation = editor.rotation;
   const blockIndex = nextBlockIndex;
   const rotations: SeasonRotation[] = run.rotations.map((rotation) =>
@@ -115,6 +136,9 @@ export async function buildSubmitBlockEnvelope(
     expectedRevision: blockIndex,
     blockIndex,
     rotationDigest,
+    objectiveId,
+    expectedStateRevision: run.stateRevision,
+    expectedStateDigest: run.stateDigest,
   };
 
   const start: SeasonBlockStartInput = {
@@ -125,6 +149,7 @@ export async function buildSubmitBlockEnvelope(
     rotationDigest,
     commandId,
     humanFranchiseId,
+    objectiveId,
     homeCourt,
     catalogUrl: artifactUrls.catalogUrl,
     catalogHash: artifactUrls.catalogHash,
@@ -133,6 +158,14 @@ export async function buildSubmitBlockEnvelope(
   };
 
   return { ok: true, envelope: { command, start } };
+}
+
+/** The recorded objective selection for a block (null when not selected). */
+function selectedObjectiveIdOf(
+  run: NonNullable<SeasonRunShellData['run']>,
+  blockIndex: number,
+): SeasonObjectiveId | null {
+  return run.objectives.selections[blockIndex]?.objectiveId ?? null;
 }
 
 function fail(code: SubmitBlockFailureCode, message: string): BuildSubmitBlockEnvelopeResult {

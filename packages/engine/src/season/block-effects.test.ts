@@ -42,6 +42,17 @@ import { expandSeasonRunRosters } from './block.ts';
 import { createSeasonEffectsState } from './effects.ts';
 import { buildMinimalRotation } from './rotation.ts';
 import { pairChemistryBasisPoints } from './chemistry.ts';
+import { createInitialSeasonInfluenceState } from './influence.ts';
+import {
+  SEASON_HEALTH_VERSION,
+  SEASON_INFLUENCE_TARGETS_VERSION,
+  SEASON_INFLUENCE_VERSION,
+  SEASON_INJURY_TARGETS_VERSION,
+  SEASON_OBJECTIVE_CATALOG,
+  SEASON_OBJECTIVE_VERSION,
+  SEASON_TRADE_TARGETS_VERSION,
+  SEASON_TRADE_VERSION,
+} from '@hoop-rush/data-contracts';
 
 /**
  * M2.4 block-level effects and determinism. The shared block test support
@@ -239,7 +250,7 @@ function buildSynthesizedRun(): { run: SeasonRun; catalog: SeasonDraftCatalog } 
       gameVersion: SEASON_GAME_VERSION,
       gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
       rosterTargetsVersion: 'roster-targets-v2',
-      checkpointVersion: 'season-checkpoint-v2',
+      checkpointVersion: 'season-checkpoint-v3',
       blockVersion: SEASON_BLOCK_VERSION,
       summaryVersion: SEASON_GAME_SUMMARY_VERSION,
       aggregatesVersion: 'season-aggregates-v1',
@@ -249,6 +260,13 @@ function buildSynthesizedRun(): { run: SeasonRun; catalog: SeasonDraftCatalog } 
       staminaVersion: SEASON_STAMINA_VERSION,
       chemistryVersion: SEASON_CHEMISTRY_VERSION,
       effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
+      healthVersion: SEASON_HEALTH_VERSION,
+      tradeVersion: SEASON_TRADE_VERSION,
+      influenceVersion: SEASON_INFLUENCE_VERSION,
+      objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
+      tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
+      influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
     },
     league,
     rosters,
@@ -383,6 +401,24 @@ function buildSynthesizedRun(): { run: SeasonRun; catalog: SeasonDraftCatalog } 
     rotations,
     generationAudit: buildFixtureGenerationAudit(TEST_SEED),
     evaluations,
+    // M2.5: run-scoped state chain and economy facts (schema 7).
+    trade: null,
+    objectives: {
+      schemaVersion: 1,
+      objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      catalog: [...SEASON_OBJECTIVE_CATALOG],
+      selections: {},
+    },
+    health: {
+      schemaVersion: 1,
+      healthVersion: SEASON_HEALTH_VERSION,
+      injuries: [],
+    },
+    transactions: [],
+    influence: createInitialSeasonInfluenceState(league.teams.map((team) => team.franchiseId)),
+    checkpointState: null,
+    stateRevision: 0,
+    stateDigest: '0'.repeat(32),
   };
   const parsed = seasonRunSchema.safeParse(run);
   if (!parsed.success) {

@@ -2,27 +2,43 @@ import type {
   HoopRushManifest,
   SeasonActiveRunIndex,
   SeasonDraftCatalog,
+  SeasonHealthState,
+  SeasonInfluenceState,
+  SeasonInvalidRosterInterruption,
   SeasonLeague,
+  SeasonObjectiveId,
+  SeasonObjectiveState,
+  SeasonPendingBlockCandidate,
   SeasonRun,
   SeasonSchedule,
   SeasonTeam,
+  SeasonTradeState,
 } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
-import type { BlockRunState, SeasonHubState } from './season-hub-state';
+import type {
+  BlockRunState,
+  SeasonHubState,
+  SeasonRunCommandError,
+  SeasonSpendInfluencePurpose,
+} from './season-hub-state';
 import type { SeasonFaceRef } from './season-branding';
 import type { RotationEditor } from './season-rotation-editor';
 
 /**
- * Season Run shell context (M2.3.5). The `/season/run` route-group layout
- * owns one `SeasonRunShellData` instance for the lifetime of the active run:
- * the shared `SeasonHubState` (snapshot, block runner), packaged assets,
- * branding join, and derived run facts. Pages under `/season/run/*` read the
- * shell from context, so switching tabs never reloads IndexedDB and never
- * terminates an in-flight block worker. The shell is destroyed only when the
- * user leaves the run group (or reloads).
+ * Season Run shell context (M2.3.5, M2.5). The `/season/run` route-group
+ * layout owns one `SeasonRunShellData` instance for the lifetime of the
+ * active run: the shared `SeasonHubState` (snapshot, block runner), packaged
+ * assets, branding join, and derived run facts. Pages under `/season/run/*`
+ * read the shell from context, so switching tabs never reloads IndexedDB and
+ * never terminates an in-flight block worker. The shell is destroyed only
+ * when the user leaves the run group (or reloads).
  *
  * The layout holds the instance in `$state` and mirrors hub events into it;
- * components read the reactive proxy directly from context.
+ * components read the reactive proxy directly from context. M2.5 adds the
+ * run-state mirrors (`health`, `influence`, `trade`, `objectives`), the
+ * interruption/pending mirrors, and the typed command actions
+ * (`selectBlockObjective`, `spendInfluence`, `acceptTradeOffer`,
+ * `declineTradeOffer`, `forfeitInterruptedGame`, `resumeBlock`).
  */
 export const SEASON_RUN_SHELL_CONTEXT = Symbol('season-run-shell');
 
@@ -55,6 +71,20 @@ export interface SeasonRunShellData {
   editor: RotationEditor | null;
   /** Identity key of the rotation the current editor was built from. */
   editorKey: string | null;
+  /** M2.5: run-scoped health mirror (null when no run is loaded). */
+  health: SeasonHealthState | null;
+  /** M2.5: run-scoped Influence mirror. */
+  influence: SeasonInfluenceState | null;
+  /** M2.5: run-scoped trade-window state mirror (null until the first window). */
+  trade: SeasonTradeState | null;
+  /** M2.5: run-scoped objective state mirror (catalog + selections). */
+  objectives: SeasonObjectiveState | null;
+  /** M2.5: uncommitted pending block candidate of an interrupted run. */
+  pending: SeasonPendingBlockCandidate | null;
+  /** M2.5: typed invalid-roster interruption (null after a reload). */
+  interruption: SeasonInvalidRosterInterruption | null;
+  /** M2.5: the last rejected between-block command (typed alert). */
+  commandError: SeasonRunCommandError | null;
   playerName: (playerVersionId: string) => string;
   playablePositions: (playerVersionId: string) => readonly string[];
   franchiseName: (franchiseId: string) => string;
@@ -64,6 +94,25 @@ export interface SeasonRunShellData {
   refresh: () => Promise<void>;
   /** Ends the current run and clears it from this browser. */
   quitRun: () => Promise<{ ok: boolean; error: string | null }>;
+  /** M2.5: selects the block's objective before submission. */
+  selectBlockObjective: (input: {
+    blockIndex: number;
+    objectiveId: SeasonObjectiveId;
+  }) => Promise<void>;
+  /** M2.5: spends Influence (extra trade offer or risky rehab). */
+  spendInfluence: (input: {
+    purpose: SeasonSpendInfluencePurpose;
+    windowIndex?: number;
+    injuryId?: string;
+  }) => Promise<void>;
+  /** M2.5: accepts an open trade offer. */
+  acceptTradeOffer: (input: { windowIndex: number; offerId: string }) => Promise<void>;
+  /** M2.5: declines an open trade offer. */
+  declineTradeOffer: (input: { windowIndex: number; offerId: string }) => Promise<void>;
+  /** M2.5: forfeits the interrupted game and advances the pending block. */
+  forfeitInterruptedGame: () => Promise<void>;
+  /** M2.5: resumes an interrupted block from its pending candidate. */
+  resumeBlock: () => Promise<void>;
 }
 
 /** Initial (empty) shell object; the layout turns it into `$state`. */
@@ -98,6 +147,13 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     seasonComplete: false,
     editor: null,
     editorKey: null,
+    health: null,
+    influence: null,
+    trade: null,
+    objectives: null,
+    pending: null,
+    interruption: null,
+    commandError: null,
     playerName: () => '—',
     playablePositions: () => [],
     franchiseName: () => '—',
@@ -106,5 +162,11 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     retryBlock: () => undefined,
     refresh: () => Promise.resolve(),
     quitRun: () => Promise.resolve({ ok: false, error: 'season shell not ready' }),
+    selectBlockObjective: () => Promise.resolve(),
+    spendInfluence: () => Promise.resolve(),
+    acceptTradeOffer: () => Promise.resolve(),
+    declineTradeOffer: () => Promise.resolve(),
+    forfeitInterruptedGame: () => Promise.resolve(),
+    resumeBlock: () => Promise.resolve(),
   };
 }

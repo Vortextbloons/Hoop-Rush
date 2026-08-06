@@ -17,6 +17,7 @@ import {
   simulationRatingsSchema,
   simulationTendenciesSchema,
   simulationAnchorsSchema,
+  reconstructedThreePointProfileSchema,
 } from './simulation.ts';
 import {
   historicalTeamIdentitySchema,
@@ -126,7 +127,7 @@ export type PlayersIndexAltIds = z.infer<typeof playersIndexAltIdsSchema>;
  * failures surface at build time, never in the browser.
  */
 export const peakPlayerSeasonSchema = z.object({
-  schemaVersion: z.union([z.literal(3), z.literal(4)]),
+  schemaVersion: z.union([z.literal(3), z.literal(4), z.literal(5)]),
   playerId: playerIdSchema,
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,
@@ -175,6 +176,8 @@ export const peakPlayerSeasonSchema = z.object({
   tendencies: simulationTendenciesSchema,
   /** Packaged simulation anchors; the engine adapter no longer recomputes them. */
   anchors: simulationAnchorsSchema,
+  /** Conservative reconstructed three-point profile (pre-1979/missing records only). */
+  reconstructedThreePoint: reconstructedThreePointProfileSchema.optional(),
   /** Field-level provenance for every packaged value (spec/12). */
   provenance: provenanceMapSchema,
   source: sourceMetadataSchema,
@@ -183,7 +186,7 @@ export type PeakPlayerSeason = z.infer<typeof peakPlayerSeasonSchema>;
 
 /** Compact, directly indexed franchise/decade pool (spec/02 fast-load artifact). */
 export const franchiseEraPoolSchema = z.object({
-  schemaVersion: z.union([z.literal(3), z.literal(4)]),
+  schemaVersion: z.union([z.literal(3), z.literal(4), z.literal(5)]),
   dataVersion: z.string().min(1).max(64),
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,

@@ -24,6 +24,7 @@
     ordinal,
     progressLabel,
   } from '$lib/season/season-presentation';
+  import { availabilityStripRows } from '$lib/season/season-health-view';
 
   /**
    * Checkpoint detail (spec/2.0/11, M2.3.5): one accepted block's recap,
@@ -156,11 +157,24 @@
       rosters: run.rosters.flatMap((roster) => roster.players),
       games: run.games,
       humanFranchiseId,
+      run,
     });
   });
 
   /** M2.4: aggregated mechanism evidence of the block's human games. */
   const effectsEvidence = $derived(aggregateMechanismEvidence(blockDetails));
+
+  /** M2.5: per-player availability rows for the checkpoint health strip. */
+  const healthRows = $derived.by(() => {
+    if (!run || !humanFranchiseId) return [];
+    const roster = run.rosters.find((r) => r.franchiseId === humanFranchiseId);
+    if (roster === undefined) return [];
+    const humanGames = run.games.filter(
+      (game) =>
+        game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId,
+    );
+    return availabilityStripRows(run.health, roster, run.rotations, humanGames, playerNames);
+  });
 
   function boxFor(summary: SeasonGameSummary) {
     if (!humanFranchiseId) return null;
@@ -275,6 +289,7 @@
         faces={shell.facesByVersion}
         {rosterByVersion}
         {effectsEvidence}
+        {healthRows}
       />
 
       {#if humanGames.length > 0}

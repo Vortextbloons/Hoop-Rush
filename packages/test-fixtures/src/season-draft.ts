@@ -2,6 +2,7 @@ import {
   SEASON_AI_VERSION,
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_DURABILITY_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
@@ -179,6 +180,13 @@ export function buildSeasonDraftCandidate(input: {
       historicalMpg: 20 + ((index * 5) % 41),
       derivationVersion: SEASON_STAMINA_VERSION,
     },
+    // M2.5: build-time durability profile (durability-v1); fixed synthetic
+    // ratings in the 45..95 contract range (the persistence/trade engines
+    // consume the rating, never the derivation facts).
+    durability: {
+      rating: 45 + ((index * 7) % 51),
+      derivationVersion: SEASON_DURABILITY_VERSION,
+    },
   };
 }
 
@@ -218,6 +226,7 @@ export function buildSeasonDraftCatalog(
     positionNormalizationVersion: 'position-v3',
     playerVersionIdVersion: 'player-version-id-v1',
     staminaVersion: SEASON_STAMINA_VERSION,
+    durabilityVersion: SEASON_DURABILITY_VERSION,
     pools,
     candidates,
   };

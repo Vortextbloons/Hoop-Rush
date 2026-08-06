@@ -24,6 +24,8 @@ import {
   type SeasonWorkerStartRequest,
 } from './index.ts';
 import {
+  buildEmptyHealth,
+  buildInitialInfluence,
   buildRun,
   buildSchedule,
   SIMULATION_RATINGS,
@@ -121,7 +123,7 @@ function buildSummary(): SeasonGameSummary {
   });
   return {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v2',
+    summaryVersion: 'season-game-summary-v3',
     gameId: 's000001',
     round: 1,
     homeFranchiseId: 'lakers',
@@ -135,6 +137,7 @@ function buildSummary(): SeasonGameSummary {
     awayBox: zeroBox('celtics'),
     homePlayers: Array.from({ length: 10 }, (_, index) => zeroLine(playerId(index))),
     awayPlayers: Array.from({ length: 10 }, (_, index) => zeroLine(playerId(10 + index))),
+    injuryEvents: [],
   };
 }
 
@@ -142,22 +145,29 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
   const run = buildRun();
   return {
     schemaVersion: 1,
-    checkpointVersion: 'season-checkpoint-v2',
+    checkpointVersion: 'season-checkpoint-v3',
     runId: run.runId,
     rootSeed: run.rootSeed,
     versions: {
-      blockVersion: 'season-block-v2',
-      summaryVersion: 'season-game-summary-v2',
+      blockVersion: 'season-block-v3',
+      summaryVersion: 'season-game-summary-v3',
       aggregatesVersion: 'season-aggregates-v1',
-      recapVersion: 'season-recap-v2',
+      recapVersion: 'season-recap-v3',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
-      gameVersion: 'season-game-v3',
-      gameTargetsVersion: 'season-game-targets-v3',
+      gameVersion: 'season-game-v4',
+      gameTargetsVersion: 'season-game-targets-v4',
       seedDerivationVersion: 'season-seeds-v1',
       staminaVersion: 'season-stamina-v1',
       chemistryVersion: 'season-chemistry-v1',
       effectsTargetsVersion: 'season-effect-targets-v1',
+      healthVersion: 'season-health-v1',
+      tradeVersion: 'season-trade-v1',
+      influenceVersion: 'season-influence-v1',
+      objectiveVersion: 'season-objective-v1',
+      injuryTargetsVersion: 'injury-targets-v1',
+      tradeTargetsVersion: 'trade-targets-v1',
+      influenceTargetsVersion: 'influence-targets-v1',
     },
     blockIndex: 0,
     completedRounds: 0,
@@ -209,7 +219,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
     retainedDetails: [],
     recap: {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v2',
+      recapVersion: 'season-recap-v3',
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 0,
@@ -219,8 +229,47 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
       streaks: [],
       versionSpotlights: [],
       upcomingHumanGames: [],
+      injuryEvidence: {
+        injuries: 0,
+        bySeverity: { minor: 0, moderate: 0, major: 0, 'season-ending': 0 },
+        sameGameReturns: 0,
+        seasonEnding: 0,
+        returnedThisBlock: 0,
+        activeAtBlockEnd: 0,
+        humanTeamInjuries: [],
+      },
+      objectiveEvidence: null,
+      tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+      influenceBalance: { humanBalance: 2 },
     },
     effects,
+    health: buildEmptyHealth(),
+    influence: buildInitialInfluence(),
+    transactions: [],
+    objective: {
+      objectiveId: null,
+      success: null,
+      evaluation: {
+        objectiveId: 'win-six',
+        blockIndex: 0,
+        success: false,
+        facts: {
+          games: 0,
+          wins: 0,
+          pointsAllowed: 0,
+          reboundMargin: 0,
+          tipsWithAtLeastEightAvailable: 0,
+          tipsTotal: 0,
+          benchMinutes: 0,
+          turnovers: 0,
+        },
+        tipCountedGames: 0,
+      },
+    },
+    expectedStateRevision: 0,
+    expectedStateDigest: '0'.repeat(32),
+    stateRevision: 0,
+    stateDigest: '0'.repeat(32),
     digest: '0'.repeat(32),
   };
 }
@@ -228,7 +277,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
 function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWorkerStartRequest {
   const run = buildRun();
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     type: 'season-block-start',
     requestId: 'req-1',
     runId: run.runId,
@@ -247,6 +296,12 @@ function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWork
     profileHash: '0'.repeat(64),
     priorSummaries: [],
     priorEffects,
+    priorHealth: null,
+    startGameId: null,
+    objectiveId: null,
+    priorInfluence: buildInitialInfluence(),
+    expectedStateRevision: 0,
+    expectedStateDigest: '0'.repeat(32),
   };
 }
 
@@ -501,10 +556,11 @@ describe('season retained game detail mechanism evidence (M2.4)', () => {
         outcome: 'no-legal-five-both' as const,
         seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
         gameNumber: 1,
-        dataVersion: 'm10-ratings-v3.5',
-        engineVersion: 'season-game-v3',
+        dataVersion: 'm10-ratings-v3.6',
+        engineVersion: 'season-game-v4',
         profileVersion: 'era-sim-v1',
       },
+      injuryEvents: [],
     };
     expect(() => seasonRetainedGameDetailSchema.parse(detail)).not.toThrow();
     const withEvidence = seasonRetainedGameDetailSchema.parse({
@@ -518,6 +574,21 @@ describe('season retained game detail mechanism evidence (M2.4)', () => {
         mechanismEvidence: Array.from({ length: 13 }, () => MECHANISM_EVIDENCE),
       }),
     ).toThrow();
+    const withInjuryEvents = seasonRetainedGameDetailSchema.parse({
+      ...detail,
+      injuryEvents: [
+        {
+          playerVersionId: playerId(0),
+          side: 'home',
+          type: 'soft-tissue',
+          severity: 'minor',
+          removedClock: { period: 2, seconds: 300 },
+          returned: true,
+          returnClock: { period: 3, seconds: 480 },
+        },
+      ],
+    });
+    expect(withInjuryEvents.injuryEvents).toHaveLength(1);
   });
 });
 
@@ -583,11 +654,11 @@ describe('season worker start request priorEffects (M2.4)', () => {
 });
 
 describe('season block recap effects evidence (M2.4)', () => {
-  it('parses recaps with and without the optional evidence', () => {
+  function buildRecap() {
     const run = buildRun();
-    const recap = {
+    return {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v2',
+      recapVersion: 'season-recap-v3',
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 0,
@@ -597,10 +668,25 @@ describe('season block recap effects evidence (M2.4)', () => {
       streaks: [],
       versionSpotlights: [],
       upcomingHumanGames: [],
+      injuryEvidence: {
+        injuries: 0,
+        bySeverity: { minor: 0, moderate: 0, major: 0, 'season-ending': 0 },
+        sameGameReturns: 0,
+        seasonEnding: 0,
+        returnedThisBlock: 0,
+        activeAtBlockEnd: 0,
+        humanTeamInjuries: [],
+      },
+      objectiveEvidence: null,
+      tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+      influenceBalance: { humanBalance: 2 },
     };
-    expect(() => seasonBlockRecapSchema.parse(recap)).not.toThrow();
+  }
+
+  it('parses recaps with and without the optional evidence', () => {
+    expect(() => seasonBlockRecapSchema.parse(buildRecap())).not.toThrow();
     const withEvidence = seasonBlockRecapSchema.parse({
-      ...recap,
+      ...buildRecap(),
       effectsEvidence: [
         {
           mechanism: 'defensive-unit-fatigue',
@@ -613,7 +699,7 @@ describe('season block recap effects evidence (M2.4)', () => {
     expect(withEvidence.effectsEvidence).toHaveLength(1);
     expect(() =>
       seasonBlockRecapSchema.parse({
-        ...recap,
+        ...buildRecap(),
         effectsEvidence: Array.from({ length: 13 }, () => ({
           mechanism: 'help-defense' as const,
           side: 'home' as const,
@@ -664,11 +750,12 @@ describe('season game player input stamina (M2.4)', () => {
   });
 });
 
-describe('season run schema version 6 (M2.4 roster-generation-v2)', () => {
-  it('rejects schema 4 and schema 5 snapshots', () => {
+describe('season run schema version 7 (M2.5)', () => {
+  it('rejects schema 4, schema 5, and schema 6 snapshots', () => {
     const run = buildRun();
     expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 4 })).toThrow();
     expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 5 })).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 6 })).toThrow();
   });
 
   it('freezes the roster-generation-v2 material versions on the run', () => {
@@ -694,5 +781,28 @@ describe('season run schema version 6 (M2.4 roster-generation-v2)', () => {
         versions: { ...run.versions, aiVersion: 'season-ai-v1' },
       }),
     ).toThrow();
+  });
+
+  it('freezes the seven M2.5 material versions and the state chain on the run', () => {
+    const run = buildRun();
+    expect(run.versions.healthVersion).toBe('season-health-v1');
+    expect(run.versions.tradeVersion).toBe('season-trade-v1');
+    expect(run.versions.influenceVersion).toBe('season-influence-v1');
+    expect(run.versions.objectiveVersion).toBe('season-objective-v1');
+    expect(run.versions.injuryTargetsVersion).toBe('injury-targets-v1');
+    expect(run.versions.tradeTargetsVersion).toBe('trade-targets-v1');
+    expect(run.versions.influenceTargetsVersion).toBe('influence-targets-v1');
+    expect(run.checkpointState).toBeNull();
+    expect(run.stateRevision).toBe(0);
+    expect(run.stateDigest).toBe('0'.repeat(32));
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, healthVersion: 'season-health-v9' },
+      }),
+    ).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, health: undefined })).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, influence: undefined })).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, stateDigest: 'not-a-digest' })).toThrow();
   });
 });

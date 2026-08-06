@@ -1,18 +1,22 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import InjuryTimeline from '$lib/components/season/InjuryTimeline.svelte';
   import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
+  import { humanInjuryTimeline } from '$lib/season/season-health-view';
   import type { SeasonGameSummary } from '@hoop-rush/data-contracts';
 
   /**
-   * Season Run roster tab (M2.4): the human franchise's ten drafted
+   * Season Run roster tab (M2.4, M2.5): the human franchise's ten drafted
    * player-season versions with historical identity, OVR, current rotation
    * role/minutes, the recorded fatigue band + workload, and last-game
    * minutes. The chemistry panel shows the active-lineup chemistry and the
-   * strongest/weakest recorded pairs.
+   * strongest/weakest recorded pairs. M2.5 adds the per-player injury
+   * timeline (type, severity, occurrence game, return facts) from the
+   * run-scoped health state.
    */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
@@ -21,6 +25,7 @@
   const humanFranchiseId = $derived(shell.humanFranchiseId);
   const manifest = $derived(shell.manifest);
   const effects = $derived(shell.snapshot?.effects ?? null);
+  const health = $derived(shell.health);
 
   const roster = $derived(
     run !== null && humanFranchiseId !== null
@@ -55,6 +60,13 @@
       summaries = rows;
     });
   });
+
+  /** M2.5: per-player injury history (health records + accepted summaries). */
+  const injuryTimeline = $derived(
+    run !== null && roster !== null && humanFranchiseId !== null && health !== null
+      ? humanInjuryTimeline(health, roster, humanFranchiseId, summaries)
+      : [],
+  );
 </script>
 
 <svelte:head>
@@ -82,6 +94,9 @@
       <div class="mt-4">
         <SeasonRosterList {roster} {manifest} {shell} {roleOf} {effects} {summaries} />
       </div>
+    </section>
+    <section aria-labelledby="injury-timeline-heading-wrap" class="min-w-0 px-3 sm:px-0">
+      <InjuryTimeline players={injuryTimeline} />
     </section>
   {/if}
 </div>

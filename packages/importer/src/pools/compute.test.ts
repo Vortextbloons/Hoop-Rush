@@ -666,7 +666,7 @@ describe('normalizePoolOveralls', () => {
         ? {
             ratingProfile: {
               schemaVersion: 2 as const,
-              modelVersion: 'ratings-model-v3.2',
+              modelVersion: 'ratings-model-v3.3',
               canonicalOverall: canonicalOverall ?? 70,
               ...(rawOverallScore !== undefined ? { rawOverallScore } : {}),
               overallPercentile: undefined,
@@ -691,7 +691,7 @@ describe('normalizePoolOveralls', () => {
     expect(p1?.summaryRatings.overallRating).toBe(99); // p = 0
     expect(p1?.ratingProfile).toEqual({
       schemaVersion: 2,
-      modelVersion: 'ratings-model-v3.2',
+      modelVersion: 'ratings-model-v3.3',
       canonicalOverall: 70,
       rawOverallScore: 90,
       overallPercentile: 0.25,
@@ -719,7 +719,7 @@ describe('normalizePoolOveralls', () => {
     expect(p2?.summaryRatings.overallRating).toBe(99); // canonical 95 ranks first
     expect(p2?.ratingProfile).toEqual({
       schemaVersion: 2,
-      modelVersion: 'ratings-model-v3.2',
+      modelVersion: 'ratings-model-v3.3',
       canonicalOverall: 95,
       overallPercentile: undefined,
       overallCohortVersion: undefined,
@@ -727,7 +727,7 @@ describe('normalizePoolOveralls', () => {
     expect(p1?.summaryRatings.overallRating).toBe(78); // p = 0.5
     expect(p1?.ratingProfile).toEqual({
       schemaVersion: 2,
-      modelVersion: 'ratings-model-v3.2',
+      modelVersion: 'ratings-model-v3.3',
       canonicalOverall: 55,
       overallPercentile: undefined,
       overallCohortVersion: undefined,

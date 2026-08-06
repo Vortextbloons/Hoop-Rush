@@ -69,6 +69,11 @@ export interface LockPreview {
   upcomingGames: UpcomingGame[];
   /** M2.4 fatigue-risk + continuity projections for pending starters/closing. */
   fatigueProjections: FatigueProjection[];
+  /**
+   * M2.5: the objective locked into the block submission (null for the
+   * final two-game block 8, or when no selection exists yet).
+   */
+  objective: { objectiveId: string; name: string } | null;
 }
 
 export function gamesToLockForBlock(blockIndex: number): number {
@@ -118,6 +123,8 @@ export function buildLockPreview(input: {
     effects: SeasonEffectsState;
     staminaByVersion: ReadonlyMap<string, number>;
   } | null;
+  /** M2.5: the objective locked into this block submission (if any). */
+  objective?: { objectiveId: string; name: string } | null;
 }): LockPreview {
   const {
     pendingHumanRotation,
@@ -129,6 +136,7 @@ export function buildLockPreview(input: {
     games,
     humanFranchiseId,
     fatigue,
+    objective,
   } = input;
   const changes: RotationChange[] = [];
   const pendingMinutes = new Map(
@@ -201,6 +209,7 @@ export function buildLockPreview(input: {
     changes,
     upcomingGames: humanUpcomingGames(games, humanFranchiseId, blockIndex),
     fatigueProjections,
+    objective: objective ?? null,
   };
 }
 

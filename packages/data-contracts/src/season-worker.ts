@@ -1,35 +1,48 @@
 import { z } from 'zod';
 import { franchiseIdSchema, seedSchema, contentHashSchema } from './ids.ts';
-import { seasonCandidateCheckpointSchema } from './season-checkpoint.ts';
+import {
+  seasonCandidateCheckpointSchema,
+  seasonCheckpointDigestSchema,
+} from './season-checkpoint.ts';
 import { seasonEffectsStateSchema } from './season-effects.ts';
 import { seasonGameSummarySchema } from './season-game-summary.ts';
+import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonHomeCourtProfileSchema } from './season-home-court.ts';
+import { seasonInfluenceStateSchema } from './season-influence.ts';
+import { seasonObjectiveIdSchema } from './season-objective.ts';
+import { seasonPendingBlockCandidateSchema } from './season-pending-block.ts';
 import { seasonBlockRunContextSchema } from './season-run.ts';
 import { seasonScheduleSchema } from './season-schedule.ts';
 
 /**
- * Season Run block worker envelopes (spec/2.0/07 background execution, M2.3).
- * Schema version 3 slims the block wire: the start request carries only the
- * run context the block pipeline reads (identity, cursor, league, rosters,
- * locked rotations, versions) — the 1,230 scheduled `games`, standings,
- * draft, ownership, postseason, AI assignments, evaluations, and generation
- * audit stay in the persisted snapshot. Prior summaries travel once per
- * fresh worker (`priorSummaries`, full reset) or as a per-block delta
- * (`newSummaries`, appended by the persistent worker); exactly one form is
- * required. The worker receives one validated block input — the run context
- * at the boundary, the schedule, the home-court profile, prior compact
- * summaries, and the asset urls/hashes for the catalog and era profile it
- * fetches and verifies itself — never touches IndexedDB, throttles progress
- * to at most four messages per second, reports fixed-size counters plus the
- * latest game identifier/result, yields between games so cancellation is
- * observed, stops on invariant failure with seed/version/game diagnostics,
- * and returns one bounded candidate checkpoint (≤ 2 MB) for application-layer
+ * Season Run block worker envelopes (spec/2.0/07 background execution, M2.3;
+ * wire schema version 4 since M2.5). Schema version 3 slims the block wire:
+ * the start request carries only the run context the block pipeline reads
+ * (identity, cursor, league, rosters, locked rotations, versions) — the
+ * 1,230 scheduled `games`, standings, draft, ownership, postseason, AI
+ * assignments, evaluations, and generation audit stay in the persisted
+ * snapshot. Prior summaries travel once per fresh worker (`priorSummaries`,
+ * full reset) or as a per-block delta (`newSummaries`, appended by the
+ * persistent worker); exactly one form is required. Wire version 4 (M2.5)
+ * threads the health state exactly like effects: `priorHealth` carries the
+ * run health state into the block, `startGameId` resumes mid-block from an
+ * interrupted pending candidate (null at block start), and `objectiveId`
+ * carries the locked block objective; the complete message returns either a
+ * committed checkpoint or an interrupted pending candidate. The worker
+ * receives one validated block input — the run context at the boundary, the
+ * schedule, the home-court profile, prior compact summaries, and the asset
+ * urls/hashes for the catalog and era profile it fetches and verifies itself
+ * — never touches IndexedDB, throttles progress to at most four messages per
+ * second, reports fixed-size counters plus the latest game
+ * identifier/result, yields between games so cancellation is observed,
+ * stops on invariant failure with seed/version/game diagnostics, and
+ * returns one bounded candidate checkpoint (≤ 2 MB) for application-layer
  * validation and acceptance.
  */
 
 export const seasonWorkerStartRequestSchema = z
   .object({
-    schemaVersion: z.literal(3),
+    schemaVersion: z.literal(4),
     type: z.literal('season-block-start'),
     requestId: z.string().min(1).max(64),
     runId: z.string().min(1).max(64),
@@ -82,6 +95,45 @@ export const seasonWorkerStartRequestSchema = z
      * the candidate checkpoint.
      */
     priorEffects: seasonEffectsStateSchema.nullable().optional(),
+    /**
+     * M2.5: the health state (append-only injury records) carried into this
+     * block, or null for block 0. The worker threads it exactly like
+     * effects: accumulate per game, reset on interruption, and report the
+     * result inside the candidate checkpoint.
+     */
+    priorHealth: seasonHealthStateSchema.nullable().optional(),
+    /**
+     * M2.5: resume mid-block from an interrupted pending candidate — the
+     * next game to simulate (null at block start). The worker simulates
+     * from this game forward; the pending candidate's summaries/health/
+     * effects/standings/aggregates travel as the accumulator seed.
+     */
+    startGameId: z
+      .string()
+      .regex(/^s[0-9]{6}$/)
+      .nullable(),
+    /**
+     * M2.5: the locked block objective (blocks 0-7), or null for the final
+     * two-game block 8.
+     */
+    objectiveId: seasonObjectiveIdSchema.nullable(),
+    /**
+     * M2.5: the pre-block Influence state (30 balances + ledger + spend
+     * tracking). The worker folds this block's grants and objective reward
+     * on top of it (engine economy functions) and reports the post-block
+     * state inside the candidate checkpoint. Always sent for schema-7 runs
+     * (null only as a defensive guard).
+     */
+    priorInfluence: seasonInfluenceStateSchema.nullable(),
+    /**
+     * M2.5: the run state facts this submission asserts (the typed
+     * command's expectedStateRevision/expectedStateDigest). The worker
+     * records them on the candidate for commit-time validation; the
+     * authoritative post-block state facts are computed by the commit side
+     * (engine `deriveSeasonPostBlockState`).
+     */
+    expectedStateRevision: z.number().int().nonnegative(),
+    expectedStateDigest: seasonCheckpointDigestSchema,
   })
   .refine((value) => (value.priorSummaries === undefined) !== (value.newSummaries === undefined), {
     message: 'exactly one of priorSummaries or newSummaries is required',
@@ -89,7 +141,7 @@ export const seasonWorkerStartRequestSchema = z
 export type SeasonWorkerStartRequest = z.infer<typeof seasonWorkerStartRequestSchema>;
 
 export const seasonWorkerCancelRequestSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(4),
   type: z.literal('season-block-cancel'),
   requestId: z.string().min(1).max(64),
 });
@@ -107,7 +159,7 @@ export type SeasonWorkerRequest = z.infer<typeof seasonWorkerRequestSchema>;
  * 32 KB.
  */
 export const seasonWorkerProgressMessageSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(4),
   type: z.literal('season-block-progress'),
   requestId: z.string().min(1).max(64),
   blockIndex: z.number().int().min(0).max(8),
@@ -121,12 +173,20 @@ export const seasonWorkerProgressMessageSchema = z.object({
 });
 export type SeasonWorkerProgressMessage = z.infer<typeof seasonWorkerProgressMessageSchema>;
 
-/** One bounded candidate checkpoint (≤ 2 MB) for application acceptance. */
+/**
+ * Completion of one block run. `committed` carries the bounded candidate
+ * checkpoint (≤ 2 MB) for application validation and acceptance;
+ * `interrupted` carries the uncommitted pending candidate (M2.5 invalid-
+ * roster interruption) for persistence and later resume.
+ */
 export const seasonWorkerCompleteMessageSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(4),
   type: z.literal('season-block-complete'),
   requestId: z.string().min(1).max(64),
-  checkpoint: seasonCandidateCheckpointSchema,
+  result: z.discriminatedUnion('status', [
+    z.object({ status: z.literal('committed'), checkpoint: seasonCandidateCheckpointSchema }),
+    z.object({ status: z.literal('interrupted'), pending: seasonPendingBlockCandidateSchema }),
+  ]),
 });
 export type SeasonWorkerCompleteMessage = z.infer<typeof seasonWorkerCompleteMessageSchema>;
 
@@ -135,7 +195,7 @@ export type SeasonWorkerErrorCode = z.infer<typeof seasonWorkerErrorCodeSchema>;
 
 /** Typed failure with determinism diagnostics (seed, version, game id). */
 export const seasonWorkerErrorMessageSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(4),
   type: z.literal('season-block-error'),
   requestId: z.string().min(1).max(64),
   code: seasonWorkerErrorCodeSchema,

@@ -72,6 +72,7 @@ function summary(
     homeScore: 110,
     awayScore: 104,
     forfeitLoserFranchiseId: null,
+    injuryEvents: [],
     homeBox: {
       franchiseId: 'lakers',
       points: 110,
@@ -422,6 +423,28 @@ describe('deriveBlockRecap', () => {
         },
       ],
       humanFranchiseId: 'lakers',
+      run: {
+        health: {
+          schemaVersion: 1,
+          healthVersion: 'season-health-v1',
+          injuries: [],
+        },
+        influence: {
+          schemaVersion: 1,
+          influenceVersion: 'season-influence-v1',
+          balances: { lakers: 3 },
+          ledger: [],
+          windows: {},
+          rehabs: {},
+        },
+        transactions: [],
+        objectives: {
+          schemaVersion: 1,
+          objectiveVersion: 'season-objective-v1',
+          catalog: [],
+          selections: {},
+        },
+      } as unknown as NonNullable<Parameters<typeof deriveBlockRecap>[0]['run']>,
     });
     expect(recap.runId).toBe('run-1');
     expect(recap.blockIndex).toBe(0);
@@ -429,5 +452,8 @@ describe('deriveBlockRecap', () => {
     expect(recap.standingsMovement).toHaveLength(30);
     expect(recap.notablePerformances.length).toBeGreaterThan(0);
     expect(recap.upcomingHumanGames.map((g) => g.gameId)).toEqual(['s000011']);
+    expect(recap.injuryEvidence.injuries).toBe(0);
+    expect(recap.tradeEvidence.tradesAccepted).toBe(0);
+    expect(recap.influenceBalance.humanBalance).toBe(3);
   });
 });

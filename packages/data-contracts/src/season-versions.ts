@@ -8,7 +8,14 @@
  */
 
 /**
- * Season Run persistence snapshot schema layout. Bumped to 6 by M2.4
+ * Season Run persistence snapshot schema layout. Bumped to 7 by M2.5
+ * (injuries, transactions, influence, objectives): the run gains the
+ * `health` (season-health-v1), `transactions`, `influence`
+ * (season-influence-v1), `checkpointState`, `stateRevision`, and
+ * `stateDigest` fields and freezes the seven new M2.5 material versions
+ * (health, trade, influence, objective, injury-targets, trade-targets,
+ * influence-targets); schema 6 runs cannot continue (no health, influence,
+ * or state chain exists for them). Bumped to 6 by M2.4
  * roster-generation-v2: the run freezes the roster-generation-v2,
  * season-ai-v2, and roster-targets-v2 material versions and carries the
  * generated `aiPools` (one 20-player pool per AI franchise: 29 solo, 28
@@ -31,9 +38,9 @@
  * `season-draft-v1`) and new runs (global eight-card offer facts,
  * `season-draft-v2`) both validated as schema 5. The M2.3.5 change recorded
  * itself through the draft versions, never through a snapshot layout bump.
- * Schema 6 continues to accept both draft-fact variants.
+ * Schema 7 continues to accept both draft-fact variants.
  */
-export const SEASON_RUN_SCHEMA_VERSION = 6;
+export const SEASON_RUN_SCHEMA_VERSION = 7;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -140,23 +147,28 @@ export const SEASON_ROTATION_VERSION = 'season-rotation-v2';
 export const SEASON_ROTATION_PLANNER_VERSION = 'rotation-planner-v1';
 
 /**
- * Season Run single-game controller (spec/2.0/04, season-game-v3, M2.4).
- * v3 adds the stamina/chemistry effects seam on the player input (the
- * optional per-player `stamina` profile; absence means the zero profile,
- * so neutral adapters used by Classic stay byte-identical to the M2.3
- * path). v2 applied the versioned home-court profile through named
- * mechanisms only; the neutral adapter remains byte-identical to the M2.2
- * fixed-five path.
+ * Season Run single-game controller (spec/2.0/04, season-game-v4, M2.5).
+ * v4 adds the M2.5 injury seam on both sides of the contract: the removal
+ * reason `injury` (alongside the injected fixture reason) and the returns
+ * seam (`seasonReturnSchema` / `seasonReturnEventSchema`, reason
+ * `injury-return`) on the game input and side results, plus the
+ * `human-interruption-forfeit` trigger. v3 (M2.4) added the optional
+ * per-player `stamina` profile (the effects seam); absence means the zero
+ * profile, so neutral adapters used by Classic stay byte-identical to the
+ * M2.3 path. A zero-injury input (no removals, no returns) must reproduce
+ * the v3 result byte-for-byte.
  */
-export const SEASON_GAME_VERSION = 'season-game-v3';
+export const SEASON_GAME_VERSION = 'season-game-v4';
 
 /**
  * Frozen Season game calibration cohort and envelopes
- * (season-game-targets-v3, M2.4): recalibrated with the stamina/chemistry
- * effects seam available; seeds 0-1023 calibration with 1024-1279 held out,
- * preset-minute ordering gates, and 95% held-out envelope coverage.
+ * (season-game-targets-v4, M2.5): regenerated because the game contract
+ * changed; zero-injury cohorts must reproduce the v3 results byte-for-byte.
+ * v3 (M2.4) recalibrated with the stamina/chemistry effects seam available,
+ * seeds 0-1023 calibration with 1024-1279 held out, preset-minute ordering
+ * gates, and 95% held-out envelope coverage.
  */
-export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v3';
+export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v4';
 
 /**
  * M2.4 frozen `roster-targets-v2` calibration artifact (replaces
@@ -170,24 +182,38 @@ export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v3';
 export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v2';
 
 /**
- * M2.4 pure block simulation pipeline (spec/2.0/02 ten-game blocks,
- * season-block-v2): validate cursor and locked rotations, expand the 300
- * drafted versions, carry the effects state (load + pair chemistry) across
- * the block, simulate in stable game-id order, convert to compact summaries
- * with effects rollups, fold standings and aggregates, audit, build the
- * recap with block-level effects evidence, and produce one candidate
- * checkpoint.
+ * M2.5 pure block simulation pipeline (spec/2.0/02 ten-game blocks,
+ * season-block-v3): v3 threads the health state (availability, injury
+ * rolls, returns, post-game recovery ticks), carries the locked block
+ * objective, stops with a typed `invalid-roster` interruption when the
+ * human cannot field five at a tipoff, supports resume from a pending
+ * candidate, and folds the post-block influence/transactions state into
+ * the candidate. v2 (M2.4) carried the effects state (load + pair
+ * chemistry) across the block and simulated in stable game-id order,
+ * converting to compact summaries with effects rollups and folding
+ * standings and aggregates.
  */
-export const SEASON_BLOCK_VERSION = 'season-block-v2';
+export const SEASON_BLOCK_VERSION = 'season-block-v3';
 
-/** Compact completed-game summary conversion (season-game-summary-v2). */
-export const SEASON_GAME_SUMMARY_VERSION = 'season-game-summary-v2';
+/**
+ * Compact completed-game summary conversion (season-game-summary-v3,
+ * M2.5): every summary carries the compact per-game injury events
+ * (`injuryEvents`), and retained human-game details roll up the same
+ * events for display.
+ */
+export const SEASON_GAME_SUMMARY_VERSION = 'season-game-summary-v3';
 
 /** Team/player aggregate folding and leaders (season-aggregates-v1). */
 export const SEASON_AGGREGATES_VERSION = 'season-aggregates-v1';
 
-/** Block recap construction from saved game, aggregate, and effects facts. */
-export const SEASON_RECAP_VERSION = 'season-recap-v2';
+/**
+ * Block recap construction from saved game, aggregate, and effects facts
+ * (season-recap-v3, M2.5). v3 adds the block-level injury, objective,
+ * trade, and influence evidence (`injuryEvidence`, `objectiveEvidence`,
+ * `tradeEvidence`, `influenceBalance`). v2 (M2.4) added the block-level
+ * effects evidence.
+ */
+export const SEASON_RECAP_VERSION = 'season-recap-v3';
 
 /** League leaders derivation, eligibility, and tie-breaking. */
 export const SEASON_LEADERS_VERSION = 'season-leaders-v1';
@@ -201,14 +227,19 @@ export const SEASON_LEADERS_VERSION = 'season-leaders-v1';
 export const SEASON_HOME_COURT_VERSION = 'season-home-court-v1';
 
 /**
- * Canonical candidate-checkpoint contract and digest (season-checkpoint-v2).
- * v2 adds the effects state (player load + pair chemistry) to the candidate
- * checkpoint and freezes the stamina, chemistry, and effect-targets material
- * versions. The digest is a pure function of the checkpoint's recorded
- * facts, so uninterrupted, cancelled/retried, terminated/reloaded,
- * single-worker, and CLI executions must agree byte-for-byte.
+ * Canonical candidate-checkpoint contract and digest (season-checkpoint-v3,
+ * M2.5). v3 adds the authoritative post-block health, influence, and
+ * transaction facts plus the locked objective evaluation to the candidate,
+ * and ties the checkpoint to the mutable run-state chain through
+ * `expectedStateRevision`/`expectedStateDigest` (asserted pre-block) and
+ * `stateRevision`/`stateDigest` (computed post-assembly). v2 (M2.4) added
+ * the effects state (player load + pair chemistry) to the candidate and
+ * froze the stamina, chemistry, and effect-targets material versions. The
+ * digest is a pure function of the checkpoint's recorded facts, so
+ * uninterrupted, cancelled/retried, terminated/reloaded, single-worker,
+ * and CLI executions must agree byte-for-byte.
  */
-export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v2';
+export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v3';
 
 /**
  * M2.4 stamina profile derivation (season-stamina-v1): the historical
@@ -235,11 +266,77 @@ export const SEASON_EFFECT_TARGETS_VERSION = 'season-effect-targets-v1';
 
 /**
  * Packaged Season Run draft catalog artifact contract
- * (season-draft-catalog-v2, M2.4): the catalog now carries the build-time
- * stamina profile on every candidate and records the stamina derivation
- * version; the draft rules version (`season-draft-v2`) is unchanged.
+ * (season-draft-catalog-v3, M2.5): the catalog derives the build-time
+ * `durability` field on every candidate from recorded games played and
+ * records the durability derivation version. v2 (M2.4) added the
+ * build-time stamina profile to every candidate and recorded the stamina
+ * derivation version; the draft rules version (`season-draft-v2`) is
+ * unchanged.
  */
-export const SEASON_DRAFT_CATALOG_VERSION = 'season-draft-catalog-v2';
+export const SEASON_DRAFT_CATALOG_VERSION = 'season-draft-catalog-v3';
+
+/**
+ * M2.5 injury and health state contract (season-health-v1): the seeded
+ * injury occurrence/recovery model — injury records, severity, recovery
+ * ranges, same-game returns, recurrence windows, and risky-rehab outcomes.
+ * Availability is derived from the recorded injuries, never stored
+ * separately.
+ */
+export const SEASON_HEALTH_VERSION = 'season-health-v1';
+
+/**
+ * M2.5 trade contract (season-trade-v1): deterministic trade-window
+ * offers (windows open after accepted checkpoints for blocks 2, 4, 5),
+ * value-band and legality evaluation, and the atomically applied ownership
+ * transfer with chemistry reset.
+ */
+export const SEASON_TRADE_VERSION = 'season-trade-v1';
+
+/**
+ * M2.5 Influence economy contract (season-influence-v1): the +2 initial
+ * grant, +1 block grants, +8 cap / -3 floor, the ledger of every recorded
+ * delta, and the two spend purposes (extra-trade-offer, risky-rehab).
+ * Balance and debt never modify gameplay mechanics; no hook exists.
+ */
+export const SEASON_INFLUENCE_VERSION = 'season-influence-v1';
+
+/**
+ * M2.5 block objectives contract (season-objective-v1): the six fixed
+ * objectives, the deterministic three-choice offers per ten-game block,
+ * selection commands, and evaluation from saved facts only.
+ */
+export const SEASON_OBJECTIVE_VERSION = 'season-objective-v1';
+
+/**
+ * M2.5 frozen injury calibration targets (injury-targets-v1): incidence
+ * envelope around the 80 bp base risk, severity distribution, recovery
+ * duration means, same-game-return rate, recurrence lift, season-ending
+ * rate, and risk-input monotonicity gates.
+ */
+export const SEASON_INJURY_TARGETS_VERSION = 'injury-targets-v1';
+
+/**
+ * M2.5 frozen trade calibration targets (trade-targets-v1): 8-15 AI trades
+ * per season, zero illegal or duplicate-ownership trades, value-band
+ * compliance, deterministic offers, and chemistry invariants.
+ */
+export const SEASON_TRADE_TARGETS_VERSION = 'trade-targets-v1';
+
+/**
+ * M2.5 frozen Influence calibration targets (influence-targets-v1):
+ * ledger reconciliation everywhere, income = 2 + acceptedBlocks per
+ * franchise, debt frequency, zero cap violations, objective success rate,
+ * and spend-rate envelopes.
+ */
+export const SEASON_INFLUENCE_TARGETS_VERSION = 'influence-targets-v1';
+
+/**
+ * M2.5 durability profile derivation (durability-v1): the build-time
+ * durability rating `round(clamp(45, 95, 45 + 50 * gamesPlayed / max(1,
+ * teamGames)))` derived from recorded games played and eligibility team
+ * games; it feeds the seeded injury-risk formula, never Overall.
+ */
+export const SEASON_DURABILITY_VERSION = 'durability-v1';
 
 /**
  * Frozen held-out home-win-rate calibration target for the season-home-court

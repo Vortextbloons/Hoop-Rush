@@ -1,8 +1,12 @@
 import {
   type SeasonBlockRecap,
+  type SeasonCheckpointState,
   type SeasonEffectsState,
   type SeasonGameSummary,
+  type SeasonHealthState,
+  type SeasonInfluenceState,
   type SeasonLeague,
+  type SeasonObjectiveState,
   type SeasonPlayerAggregate,
   type SeasonRetainedGameDetail,
   type SeasonRoster,
@@ -11,18 +15,25 @@ import {
   type SeasonSchedule,
   type SeasonStandings,
   type SeasonTeamAggregate,
+  type SeasonTradeState,
+  type SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { seasonRunEngineSeam } from '../season/engine-seam.ts';
 import { HoopRushDatabase } from '../repositories/dexie.ts';
 import { DexieSeasonRunRepository } from '../repositories/season-run-dexie.ts';
 import {
+  buildFixtureCheckpointState,
   buildFixtureEffectsState,
   buildFixtureFullSeasonSummaries,
+  buildFixtureHealthState,
+  buildFixtureInfluenceState,
+  buildFixtureObjectiveState,
   buildFixtureRecap,
   buildFixtureRetainedDetail,
   buildFixtureRun,
   buildFixtureSchedule,
+  buildFixtureStateDigest,
   buildFixtureStoredDraft,
   buildStubSeasonEngineSeam,
   fixtureSeedFromString,
@@ -110,6 +121,20 @@ interface BlockDataset {
   checkpointDigest: string;
   /** The 30 rotations locked by this block commit. */
   rotations: SeasonRotation[];
+  /** M2.5 accepted-checkpoint facts folded into the run at this commit. */
+  checkpointState: SeasonCheckpointState;
+  /** M2.5 run state chain position after this commit. */
+  stateRevision: number;
+  /** M2.5 canonical digest of the mutable run state after this commit. */
+  stateDigest: string;
+  /** M2.5 canonical digest of the pre-block mutable run state. */
+  expectedStateDigest: string;
+  /** M2.5 mutable-state facts at this boundary (row-level commit values). */
+  health: SeasonHealthState;
+  transactions: SeasonTransactionEntry[];
+  influence: SeasonInfluenceState;
+  trade: SeasonTradeState | null;
+  objectives: SeasonObjectiveState;
 }
 
 function percentile(samples: readonly number[], p: number): number {
@@ -194,6 +219,15 @@ export function buildFullSeasonDataset(input: {
   let teamAggregates: SeasonTeamAggregate[] = [];
   let playerAggregates: SeasonPlayerAggregate[] = [];
   let cumulativeCount = 0;
+  // M2.5 mutable state stays constant across fixture blocks (no injuries,
+  // no spends, no trades, no commands): only the state chain advances. The
+  // expected pre-block facts are the previous boundary's mutable state
+  // (null checkpoint and zero effects before the first block).
+  const health = buildFixtureHealthState();
+  const influence = buildFixtureInfluenceState(run.league);
+  const objectives = buildFixtureObjectiveState();
+  let previousCheckpointState: SeasonCheckpointState | null = null;
+  let previousEffects: SeasonEffectsState = buildFixtureEffectsState(rosters);
   for (let blockIndex = 0; blockIndex < 9; blockIndex += 1) {
     const { summaries } = byBlock(blockIndex);
     cumulativeCount += summaries.length;
@@ -217,6 +251,44 @@ export function buildFullSeasonDataset(input: {
       lastCompletedRound: completedRounds,
       sharedPossessions: 3000 + blockIndex * 7000,
     });
+    const checkpointDigest = digestOf(seed, blockIndex);
+    const rotationDigest = seam.seasonRotationSetDigest(run.rotations);
+    const commandId = `command-${String(blockIndex)}`;
+    const revision = blockIndex + 1;
+    const checkpointState = buildFixtureCheckpointState({
+      runId,
+      blockIndex,
+      completedRounds,
+      revision,
+      commandId,
+      rotationDigest,
+      checkpointDigest,
+    });
+    const stateRevision = revision;
+    const stateDigest = buildFixtureStateDigest(run, {
+      stateRevision,
+      checkpointState,
+      health,
+      influence,
+      transactions: [],
+      trade: null,
+      objectives,
+      rotations: run.rotations,
+      effects,
+    });
+    const expectedStateDigest = buildFixtureStateDigest(run, {
+      stateRevision: blockIndex,
+      checkpointState: previousCheckpointState,
+      health,
+      influence,
+      transactions: [],
+      trade: null,
+      objectives,
+      rotations: run.rotations,
+      effects: previousEffects,
+    });
+    previousCheckpointState = checkpointState;
+    previousEffects = effects;
     blocks.push({
       blockIndex,
       completedRounds,
@@ -229,9 +301,18 @@ export function buildFullSeasonDataset(input: {
       playerAggregates,
       recap: buildFixtureRecap({ runId, blockIndex, completedRounds }),
       effects,
-      rotationDigest: seam.seasonRotationSetDigest(run.rotations),
-      checkpointDigest: digestOf(seed, blockIndex),
+      rotationDigest,
+      checkpointDigest,
       rotations: run.rotations,
+      checkpointState,
+      stateRevision,
+      stateDigest,
+      expectedStateDigest,
+      health,
+      transactions: [],
+      influence,
+      trade: null,
+      objectives,
     });
   }
   return { run, schedule, league, rosters, humanFranchiseId, blocks };
@@ -252,6 +333,7 @@ async function storedBytes(
     [db.seasonRunDetails.toArray(), 'seasonRunDetails'],
     [db.seasonRunBlocks.toArray(), 'seasonRunBlocks'],
     [db.seasonRunIndex.toArray(), 'seasonRunIndex'],
+    [db.seasonPendingBlocks.toArray(), 'seasonPendingBlocks'],
   ];
   let total = 0;
   for (const [rowsPromise, name] of tables) {
@@ -310,6 +392,17 @@ export async function benchmarkSeasonRunPersistence(
         recap: block.recap,
         effects: block.effects,
         rotations: block.rotations,
+        health: block.health,
+        transactions: block.transactions,
+        influence: block.influence,
+        trade: block.trade,
+        objectives: block.objectives,
+        checkpointState: block.checkpointState,
+        stateRevision: block.stateRevision,
+        stateDigest: block.stateDigest,
+        expectedStateRevision: block.blockIndex,
+        expectedStateDigest: block.expectedStateDigest,
+        window: null,
       });
       commitTimes.push(performance.now() - started);
     }

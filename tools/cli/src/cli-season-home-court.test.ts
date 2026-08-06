@@ -72,6 +72,7 @@ function fakeSimulateSeasonGame(input: SeasonGameSimulationInput): SeasonGameSim
     },
     players: [],
     shotZones: [],
+    returns: [],
   });
   const homeScore = homeWins ? 110 : 100;
   const awayScore = homeWins ? 100 : 110;

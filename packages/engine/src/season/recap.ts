@@ -1,14 +1,23 @@
 import {
+  SEASON_HEALTH_VERSION,
   SEASON_RECAP_VERSION,
   seasonDigestHex,
+  type SeasonBlockInjuryEvidence,
   type SeasonBlockRecap,
+  type SeasonCompactInjuryEvent,
   type SeasonGameSummary,
+  type SeasonHealthState,
+  type SeasonInfluenceState,
   type SeasonNotablePerformance,
+  type SeasonObjectiveEvaluation,
+  type SeasonObjectiveId,
   type SeasonPlayerAggregate,
   type SeasonRecordMovement,
   type SeasonSchedule,
   type SeasonStandings,
   type SeasonStreak,
+  type SeasonTradeState,
+  type SeasonTransactionEntry,
   type SeasonUpcomingHumanGame,
   type SeasonVersionSpotlight,
 } from '@hoop-rush/data-contracts';
@@ -18,10 +27,12 @@ import { canonicalJson } from './checkpoint.ts';
 
 /**
  * Block recap construction (spec/2.0/02 recap, spec/2.0/11 block recap,
- * M2.3, season-recap-v1). Every claim derives from saved league facts: game
- * summaries, standings, aggregates, and the schedule. M2.3 recaps do not
- * report injuries, trades, Influence, stamina, or chemistry claims; those
- * systems ship in later milestones.
+ * M2.3, season-recap-v1; M2.5 season-recap-v3). Every claim derives from
+ * saved league facts: game summaries, standings, aggregates, and the
+ * schedule. M2.5 adds the block-level injury evidence (counted from the
+ * block's compact injury events and the post-block health state), the
+ * evaluated objective evidence, the trade evidence (block-level accepted
+ * trades and the human Influence delta), and the human Influence balance.
  *
  * The `summaries` input is the full ordered summary list through
  * completedRounds (block summaries are the last chunk); streaks need prior
@@ -49,6 +60,24 @@ export interface SeasonBlockRecapInput {
   rosterPlayerIds: ReadonlyMap<string, string>;
   /** Reserved for later milestones; M2.3 recaps do not consume rotations. */
   rotations?: unknown;
+  /**
+   * M2.5: the post-block health state (injury evidence). Absent in fixture-
+   * driven recaps: the health-derived counts report zero.
+   */
+  health?: SeasonHealthState;
+  /**
+   * M2.5: the locked objective evaluated at block assembly (null for the
+   * final two-game block and for fixture-driven recaps without an objective).
+   */
+  objective?: {
+    objectiveId: SeasonObjectiveId | null;
+    success: boolean | null;
+    evaluation: SeasonObjectiveEvaluation;
+  } | null;
+  /** M2.5: the post-block transaction entries (trade evidence). */
+  transactions?: readonly SeasonTransactionEntry[];
+  /** M2.5: the post-block Influence state (delta + human balance). */
+  influence?: SeasonInfluenceState;
 }
 
 /** Team games in a block (150 in blocks 0-7, 30 in the final block). */
@@ -299,6 +328,128 @@ function upcomingHumanGamesOf(input: SeasonBlockRecapInput): SeasonUpcomingHuman
 }
 
 /**
+ * M2.5 block-level injury evidence, counted from the block's compact injury
+ * events and the post-block health state: `injuries` is the total compact
+ * event count of the block's summaries (one event per rolled record),
+ * `bySeverity` the severity split, `sameGameReturns` the events whose
+ * same-game return actually applied, `seasonEnding` the season-ending
+ * events, `returnedThisBlock` the health records whose actual return round
+ * falls inside the block, `activeAtBlockEnd` the health records still
+ * active at the block end (occurrence at or before the block's last round),
+ * and `humanTeamInjuries` the compact events of the human franchise's
+ * games (bounded).
+ */
+export function blockInjuryEvidenceOf(input: {
+  blockSummaries: readonly SeasonGameSummary[];
+  health: SeasonHealthState;
+  blockIndex: number;
+  humanFranchiseId: string | null;
+}): SeasonBlockInjuryEvidence {
+  const { blockSummaries, health, blockIndex, humanFranchiseId } = input;
+  const { fromRound, toRound } = blockRoundRange(blockIndex);
+  const roundOfGame = new Map(blockSummaries.map((summary) => [summary.gameId, summary.round]));
+  const bySeverity: SeasonBlockInjuryEvidence['bySeverity'] = {
+    minor: 0,
+    moderate: 0,
+    major: 0,
+    'season-ending': 0,
+  };
+  let sameGameReturns = 0;
+  let seasonEnding = 0;
+  const humanTeamInjuries: SeasonCompactInjuryEvent[] = [];
+  for (const summary of blockSummaries) {
+    const humanSide =
+      humanFranchiseId === null
+        ? null
+        : summary.homeFranchiseId === humanFranchiseId
+          ? 'home'
+          : summary.awayFranchiseId === humanFranchiseId
+            ? 'away'
+            : null;
+    for (const event of summary.injuryEvents) {
+      bySeverity[event.severity] += 1;
+      if (event.returned) sameGameReturns += 1;
+      if (event.severity === 'season-ending') seasonEnding += 1;
+      if (humanSide !== null && event.side === humanSide && humanTeamInjuries.length < 40) {
+        humanTeamInjuries.push(event);
+      }
+    }
+  }
+  const returnedThisBlock = health.injuries.filter(
+    (record) =>
+      record.actualReturnRound !== null &&
+      record.actualReturnRound >= fromRound &&
+      record.actualReturnRound <= toRound,
+  ).length;
+  const activeAtBlockEnd = health.injuries.filter((record) => {
+    if (record.missedGamesRemaining <= 0) return false;
+    const occurrenceRound = roundOfGame.get(record.gameId) ?? 0;
+    return occurrenceRound <= toRound;
+  }).length;
+  return {
+    injuries: blockSummaries.reduce((sum, summary) => sum + summary.injuryEvents.length, 0),
+    bySeverity,
+    sameGameReturns,
+    seasonEnding,
+    returnedThisBlock,
+    activeAtBlockEnd,
+    humanTeamInjuries,
+  };
+}
+
+/**
+ * M2.5 block-level trade evidence: accepted trades with this blockIndex
+ * recorded in the post-block transactions, and the human franchise's
+ * Influence ledger delta for this block. A block itself accepts no trades
+ * (windows open after the commit), so fixture-driven blocks report zero.
+ */
+export function blockTradeEvidenceOf(input: {
+  blockIndex: number;
+  humanFranchiseId: string | null;
+  transactions: readonly SeasonTransactionEntry[] | undefined;
+  influence: SeasonInfluenceState | undefined;
+}): { tradesAccepted: number; influenceDelta: number } {
+  const tradesAccepted =
+    input.transactions?.filter(
+      (entry) => entry.type === 'trade' && entry.blockIndex === input.blockIndex,
+    ).length ?? 0;
+  let influenceDelta = 0;
+  if (input.humanFranchiseId !== null && input.influence !== undefined) {
+    influenceDelta = input.influence.ledger
+      .filter(
+        (entry) =>
+          entry.franchiseId === input.humanFranchiseId && entry.blockIndex === input.blockIndex,
+      )
+      .reduce((sum, entry) => sum + entry.appliedDelta, 0);
+  }
+  return { tradesAccepted, influenceDelta };
+}
+
+/**
+ * The human Influence balance at a block's end, reconstructed from the
+ * append-only ledger: the current balance minus every later ledger entry
+ * (LEAD DECISION: the recap shows the human balance only; the ledger is the
+ * authoritative source).
+ */
+export function humanInfluenceBalanceAtBlockEnd(
+  influence: SeasonInfluenceState,
+  humanFranchiseId: string | null,
+  blockIndex: number,
+): number {
+  if (humanFranchiseId === null) return 0;
+  const current = influence.balances[humanFranchiseId] ?? 0;
+  const laterDelta = influence.ledger
+    .filter(
+      (entry) =>
+        entry.franchiseId === humanFranchiseId &&
+        entry.blockIndex !== null &&
+        entry.blockIndex > blockIndex,
+    )
+    .reduce((sum, entry) => sum + entry.appliedDelta, 0);
+  return current - laterDelta;
+}
+
+/**
  * Builds the block recap from saved league facts only. Every array is
  * canonically sorted so serialization (and therefore the checkpoint digest)
  * never depends on internal build order.
@@ -318,6 +469,14 @@ export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlock
   const streaks = streaksOf(input.summaries);
   const versionSpotlights = versionSpotlightsOf(input);
   const upcomingHumanGames = upcomingHumanGamesOf(input);
+  const blockSummaries = blockSummariesOf(input.summaries, input.blockIndex);
+  const objective = input.objective ?? null;
+  const tradeEvidence = blockTradeEvidenceOf({
+    blockIndex: input.blockIndex,
+    humanFranchiseId: input.humanFranchiseId,
+    transactions: input.transactions,
+    influence: input.influence,
+  });
   return {
     schemaVersion: 1,
     recapVersion: SEASON_RECAP_VERSION,
@@ -330,6 +489,35 @@ export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlock
     streaks,
     versionSpotlights,
     upcomingHumanGames,
+    injuryEvidence: blockInjuryEvidenceOf({
+      blockSummaries,
+      health: input.health ?? {
+        schemaVersion: 1,
+        healthVersion: SEASON_HEALTH_VERSION,
+        injuries: [],
+      },
+      blockIndex: input.blockIndex,
+      humanFranchiseId: input.humanFranchiseId,
+    }),
+    objectiveEvidence:
+      objective !== null && objective.objectiveId !== null
+        ? {
+            objectiveId: objective.objectiveId,
+            success: objective.success === true,
+            evaluationFacts: objective.evaluation.facts,
+          }
+        : null,
+    tradeEvidence,
+    influenceBalance: {
+      humanBalance:
+        input.influence === undefined
+          ? 0
+          : humanInfluenceBalanceAtBlockEnd(
+              input.influence,
+              input.humanFranchiseId,
+              input.blockIndex,
+            ),
+    },
   };
 }
 

@@ -1,11 +1,22 @@
 import type {
+  SeasonCandidateCheckpoint,
+  SeasonEffectsState,
   SeasonGame,
   SeasonGamePlayerInput,
+  SeasonGameSummary,
+  SeasonHealthState,
+  SeasonInfluenceState,
   SeasonLeague,
+  SeasonPairChemistryState,
+  SeasonPendingBlockCandidate,
+  SeasonPlayerLoadState,
   SeasonPostseasonState,
   SeasonRun,
   SeasonSchedule,
+  SeasonTeamAggregate,
+  SeasonPlayerAggregate,
 } from './index.ts';
+import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
 
 /**
  * Self-contained Season Run contract fixtures shared by the data-contracts
@@ -185,6 +196,42 @@ export function buildPostseason(seed: string): SeasonPostseasonState {
   };
 }
 
+/** Empty M2.5 health state: no injury records yet. */
+export function buildEmptyHealth(): SeasonHealthState {
+  return {
+    schemaVersion: 1,
+    healthVersion: 'season-health-v1',
+    injuries: [],
+  };
+}
+
+/**
+ * M2.5 initial Influence state: every franchise at +2 with its recorded
+ * `initial-grant` ledger entry (blockIndex and commandId null), no windows
+ * open, and no rehab spends.
+ */
+export function buildInitialInfluence(): SeasonInfluenceState {
+  const franchises = [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west];
+  return {
+    schemaVersion: 1,
+    influenceVersion: 'season-influence-v1',
+    balances: Object.fromEntries(franchises.map((franchiseId) => [franchiseId, 2])),
+    ledger: franchises.map((franchiseId) => ({
+      entryId: `influence-initial-${franchiseId}`,
+      franchiseId,
+      source: 'initial-grant' as const,
+      blockIndex: null,
+      commandId: null,
+      requestedDelta: 2,
+      appliedDelta: 2,
+      balanceAfter: 2,
+      explanation: 'Initial +2 Influence grant at run creation',
+    })),
+    windows: {},
+    rehabs: {},
+  };
+}
+
 export function buildRun(): SeasonRun {
   const league = buildLeague();
   const schedule = buildSchedule();
@@ -227,11 +274,11 @@ export function buildRun(): SeasonRun {
                 : ('active-trader' as const),
   }));
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     runId: 'fixture-run-1',
     rootSeed: SEED,
     versions: {
-      runSchemaVersion: 6,
+      runSchemaVersion: 7,
       leagueVersion: 'league-v1',
       scheduleVersion: 'schedule-v1',
       scheduleFormulaVersion: 'schedule-formula-v1',
@@ -245,19 +292,26 @@ export function buildRun(): SeasonRun {
       aiVersion: 'season-ai-v2',
       rotationVersion: 'season-rotation-v2',
       rotationPlannerVersion: 'rotation-planner-v1',
-      gameVersion: 'season-game-v3',
-      gameTargetsVersion: 'season-game-targets-v3',
+      gameVersion: 'season-game-v4',
+      gameTargetsVersion: 'season-game-targets-v4',
       rosterTargetsVersion: 'roster-targets-v2',
-      blockVersion: 'season-block-v2',
-      summaryVersion: 'season-game-summary-v2',
+      blockVersion: 'season-block-v3',
+      summaryVersion: 'season-game-summary-v3',
       aggregatesVersion: 'season-aggregates-v1',
-      recapVersion: 'season-recap-v2',
+      recapVersion: 'season-recap-v3',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
-      checkpointVersion: 'season-checkpoint-v2',
+      checkpointVersion: 'season-checkpoint-v3',
       staminaVersion: 'season-stamina-v1',
       chemistryVersion: 'season-chemistry-v1',
       effectsTargetsVersion: 'season-effect-targets-v1',
+      healthVersion: 'season-health-v1',
+      tradeVersion: 'season-trade-v1',
+      influenceVersion: 'season-influence-v1',
+      objectiveVersion: 'season-objective-v1',
+      injuryTargetsVersion: 'injury-targets-v1',
+      tradeTargetsVersion: 'trade-targets-v1',
+      influenceTargetsVersion: 'influence-targets-v1',
     },
     league,
     rosters,
@@ -424,6 +478,19 @@ export function buildRun(): SeasonRun {
       ],
       overallReport: 80,
     })),
+    health: buildEmptyHealth(),
+    transactions: [],
+    influence: buildInitialInfluence(),
+    trade: null,
+    objectives: {
+      schemaVersion: 1,
+      objectiveVersion: 'season-objective-v1',
+      catalog: [...SEASON_OBJECTIVE_CATALOG],
+      selections: {},
+    },
+    checkpointState: null,
+    stateRevision: 0,
+    stateDigest: '0'.repeat(32),
   };
 }
 
@@ -473,6 +540,286 @@ function buildFixtureAiPools(
         repairCount: 0,
       };
     });
+}
+
+/** Deterministic fixture playerVersionId (`pv-` + 32 hex digits). */
+export function fixturePlayerId(index: number): string {
+  return `pv-${String(index).padStart(32, '0')}`;
+}
+
+/** Valid M2.4 effects state: 300 player loads, 45 canonical pairs per roster. */
+export function buildEffectsStateFixture(): SeasonEffectsState {
+  const playerStates: SeasonPlayerLoadState[] = Array.from({ length: 300 }, (_, index) => ({
+    playerVersionId: fixturePlayerId(index),
+    fatigueBasisPoints: 0,
+    recentLoadBasisPoints: 0,
+    lastCompletedRound: 0,
+  }));
+  const pairStates: SeasonPairChemistryState[] = [];
+  for (let roster = 0; roster < 30; roster += 1) {
+    for (let a = 0; a < 10; a += 1) {
+      for (let b = a + 1; b < 10; b += 1) {
+        pairStates.push({
+          a: fixturePlayerId(roster * 10 + a),
+          b: fixturePlayerId(roster * 10 + b),
+          sharedPossessions: 0,
+        });
+      }
+    }
+  }
+  return { schemaVersion: 1, playerStates, pairStates };
+}
+
+/** One zero compact player line for a fixture summary. */
+export function buildFixturePlayerLine(
+  playerVersionId: string,
+): SeasonGameSummary['homePlayers'][number] {
+  return {
+    playerVersionId,
+    seconds: 0,
+    points: 0,
+    fieldGoalsMade: 0,
+    fieldGoalsAttempted: 0,
+    threePointersMade: 0,
+    threePointersAttempted: 0,
+    freeThrowsMade: 0,
+    freeThrowsAttempted: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0,
+  };
+}
+
+/** One zero team box for a fixture summary. */
+export function buildFixtureTeamBox(franchiseId: string): SeasonGameSummary['homeBox'] {
+  return {
+    franchiseId,
+    points: 0,
+    fieldGoalsMade: 0,
+    fieldGoalsAttempted: 0,
+    threePointersMade: 0,
+    threePointersAttempted: 0,
+    freeThrowsMade: 0,
+    freeThrowsAttempted: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0,
+    possessions: 0,
+  };
+}
+
+/** One zero-value M2.5-ready summary (v3, empty injury events). */
+export function buildSummaryFixture(): SeasonGameSummary {
+  return {
+    schemaVersion: 1,
+    summaryVersion: 'season-game-summary-v3',
+    gameId: 's000001',
+    round: 1,
+    homeFranchiseId: 'lakers',
+    awayFranchiseId: 'celtics',
+    status: 'final',
+    overtimePeriods: 0,
+    homeScore: 0,
+    awayScore: 0,
+    forfeitLoserFranchiseId: null,
+    homeBox: buildFixtureTeamBox('lakers'),
+    awayBox: buildFixtureTeamBox('celtics'),
+    homePlayers: Array.from({ length: 10 }, (_, index) =>
+      buildFixturePlayerLine(fixturePlayerId(index)),
+    ),
+    awayPlayers: Array.from({ length: 10 }, (_, index) =>
+      buildFixturePlayerLine(fixturePlayerId(10 + index)),
+    ),
+    injuryEvents: [],
+  };
+}
+
+/** One zero-value aggregate row per franchise (30 rows, canonically sorted). */
+function buildTeamAggregateRows(): SeasonTeamAggregate[] {
+  return [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west].map((franchiseId) => ({
+    franchiseId,
+    gamesPlayed: 0,
+    wins: 0,
+    losses: 0,
+    points: 0,
+    fieldGoalsMade: 0,
+    fieldGoalsAttempted: 0,
+    threePointersMade: 0,
+    threePointersAttempted: 0,
+    freeThrowsMade: 0,
+    freeThrowsAttempted: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0,
+    possessions: 0,
+  }));
+}
+
+/** One zero-value aggregate row per rostered version (300 rows). */
+function buildPlayerAggregateRows(): SeasonPlayerAggregate[] {
+  return Array.from({ length: 300 }, (_, index) => ({
+    playerVersionId: fixturePlayerId(index),
+    franchiseId: 'lakers',
+    gamesPlayed: 0,
+    seconds: 0,
+    points: 0,
+    fieldGoalsMade: 0,
+    fieldGoalsAttempted: 0,
+    threePointersMade: 0,
+    threePointersAttempted: 0,
+    freeThrowsMade: 0,
+    freeThrowsAttempted: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0,
+  }));
+}
+
+/** M2.5-ready block recap (empty evidence, human balance 2). */
+function buildRecapFixture(run: SeasonRun): SeasonCandidateCheckpoint['recap'] {
+  return {
+    schemaVersion: 1,
+    recapVersion: 'season-recap-v3',
+    runId: run.runId,
+    blockIndex: 0,
+    completedRounds: 0,
+    humanRecord: null,
+    standingsMovement: [],
+    notablePerformances: [],
+    streaks: [],
+    versionSpotlights: [],
+    upcomingHumanGames: [],
+    injuryEvidence: {
+      injuries: 0,
+      bySeverity: { minor: 0, moderate: 0, major: 0, 'season-ending': 0 },
+      sameGameReturns: 0,
+      seasonEnding: 0,
+      returnedThisBlock: 0,
+      activeAtBlockEnd: 0,
+      humanTeamInjuries: [],
+    },
+    objectiveEvidence: null,
+    tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+    influenceBalance: { humanBalance: 2 },
+  };
+}
+
+/**
+ * A minimal but schema-valid M2.5 candidate checkpoint (block 0, zeroed
+ * aggregates, one zero summary, empty M2.5 state, state chain at 0).
+ */
+export function buildCheckpointFixture(): SeasonCandidateCheckpoint {
+  const run = buildRun();
+  return {
+    schemaVersion: 1,
+    checkpointVersion: 'season-checkpoint-v3',
+    runId: run.runId,
+    rootSeed: run.rootSeed,
+    versions: {
+      blockVersion: 'season-block-v3',
+      summaryVersion: 'season-game-summary-v3',
+      aggregatesVersion: 'season-aggregates-v1',
+      recapVersion: 'season-recap-v3',
+      leadersVersion: 'season-leaders-v1',
+      homeCourtVersion: 'season-home-court-v1',
+      gameVersion: 'season-game-v4',
+      gameTargetsVersion: 'season-game-targets-v4',
+      seedDerivationVersion: 'season-seeds-v1',
+      staminaVersion: 'season-stamina-v1',
+      chemistryVersion: 'season-chemistry-v1',
+      effectsTargetsVersion: 'season-effect-targets-v1',
+      healthVersion: 'season-health-v1',
+      tradeVersion: 'season-trade-v1',
+      influenceVersion: 'season-influence-v1',
+      objectiveVersion: 'season-objective-v1',
+      injuryTargetsVersion: 'injury-targets-v1',
+      tradeTargetsVersion: 'trade-targets-v1',
+      influenceTargetsVersion: 'influence-targets-v1',
+    },
+    blockIndex: 0,
+    completedRounds: 0,
+    revision: 0,
+    rotationDigest: '0'.repeat(32),
+    standings: run.standings,
+    teamAggregates: buildTeamAggregateRows(),
+    playerAggregates: buildPlayerAggregateRows(),
+    gameSummaries: [buildSummaryFixture()],
+    retainedDetails: [],
+    recap: buildRecapFixture(run),
+    effects: buildEffectsStateFixture(),
+    health: buildEmptyHealth(),
+    influence: buildInitialInfluence(),
+    transactions: [],
+    objective: {
+      objectiveId: null,
+      success: null,
+      evaluation: {
+        objectiveId: 'win-six',
+        blockIndex: 0,
+        success: false,
+        facts: {
+          games: 0,
+          wins: 0,
+          pointsAllowed: 0,
+          reboundMargin: 0,
+          tipsWithAtLeastEightAvailable: 0,
+          tipsTotal: 0,
+          benchMinutes: 0,
+          turnovers: 0,
+        },
+        tipCountedGames: 0,
+      },
+    },
+    expectedStateRevision: 0,
+    expectedStateDigest: '0'.repeat(32),
+    stateRevision: 0,
+    stateDigest: '0'.repeat(32),
+    digest: '0'.repeat(32),
+  };
+}
+
+/**
+ * A minimal but schema-valid M2.5 pending block candidate (block 0,
+ * interrupted before any summary, empty partial folds).
+ */
+export function buildPendingBlockFixture(): SeasonPendingBlockCandidate {
+  const run = buildRun();
+  return {
+    schemaVersion: 1,
+    blockVersion: 'season-block-v3',
+    runId: run.runId,
+    commandId: 'submit-b0',
+    blockIndex: 0,
+    expectedRevision: 0,
+    expectedStateRevision: 0,
+    expectedStateDigest: '0'.repeat(32),
+    objectiveId: null,
+    nextGameId: 's000001',
+    summaries: [],
+    retainedDetails: [],
+    effects: buildEffectsStateFixture(),
+    health: buildEmptyHealth(),
+    standings: run.standings,
+    teamAggregates: [],
+    playerAggregates: [],
+    rotationDigest: '0'.repeat(32),
+  };
 }
 
 /** Minimal valid simulation ratings (matches `simulationRatingsSchema`). */

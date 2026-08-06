@@ -75,6 +75,11 @@
     shell.humanFranchiseId = humanTeam?.franchiseId ?? null;
     shell.nextBlockIndex = snapshot === null ? null : snapshot.acceptedBlocks.length;
     shell.seasonComplete = (shell.nextBlockIndex ?? 0) >= 9;
+    // M2.5 run-state mirrors for the hub panels.
+    shell.health = run?.health ?? null;
+    shell.influence = run?.influence ?? null;
+    shell.trade = run?.trade ?? null;
+    shell.objectives = run?.objectives ?? null;
 
     if (run !== null) {
       const tuples: SeasonVersionTuple[] = run.rosters.flatMap((roster) =>
@@ -131,6 +136,10 @@
     shell.snapshot = hub.snapshot;
     shell.index = hub.index;
     shell.block = hub.block;
+    // M2.5 interruption/pending mirrors + the last typed command rejection.
+    shell.pending = hub.pending;
+    shell.interruption = hub.interruption;
+    shell.commandError = hub.commandError;
     recomputeRunFacts();
   }
 
@@ -216,6 +225,30 @@
       return { ok: false, error: 'season hub is not ready' };
     }
     return shell.hub.quitRun();
+  };
+  shell.selectBlockObjective = async (input) => {
+    await shell.hub?.selectBlockObjective(input);
+    mirrorHub();
+  };
+  shell.spendInfluence = async (input) => {
+    await shell.hub?.spendInfluence(input);
+    mirrorHub();
+  };
+  shell.acceptTradeOffer = async (input) => {
+    await shell.hub?.acceptTradeOffer(input);
+    mirrorHub();
+  };
+  shell.declineTradeOffer = async (input) => {
+    await shell.hub?.declineTradeOffer(input);
+    mirrorHub();
+  };
+  shell.forfeitInterruptedGame = async () => {
+    await shell.hub?.forfeitInterruptedGame();
+    mirrorHub();
+  };
+  shell.resumeBlock = async () => {
+    await shell.hub?.resumeBlock();
+    mirrorHub();
   };
   shell.playerName = (playerVersionId: string): string => {
     for (const roster of shell.run?.rosters ?? []) {

@@ -9,7 +9,13 @@ import type { PositionResponsibilityModifiers } from './position-responsibilitie
  * engine bump accompanied by a calibration report.
  */
 
-export const ENGINE_VERSION = 'm3-engine-v9';
+/**
+ * m3-engine-v10 adds the conservative reconstructed three-point path
+ * (spec/12): pre-1979 and missing-record seasons with a reconstructed
+ * profile shoot from the profile's pinned conservative volume and accuracy,
+ * with profile-level zone floors and no generic historical era penalty.
+ */
+export const ENGINE_VERSION = 'm3-engine-v10';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,

@@ -1,23 +1,25 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
+import { seasonCompactInjuryEventSchema } from './season-health.ts';
 import { seasonGameSimulationResultSchema } from './season-game-simulation.ts';
 import { seasonEffectsRollupSchema, seasonMechanismEvidenceSchema } from './season-effects.ts';
 import { SEASON_GAME_SUMMARY_VERSION } from './season-versions.ts';
 
 /**
  * Compact completed-game summaries (spec/2.0/02 retention policy, M2.3,
- * season-game-summary-v2). Every league game reduces to one summary that
- * carries the identity, result state, complete team boxes, and 20 compact
- * player stat lines; richer facts (substitutions, unit stints, deviations,
- * diagnostics) are retained only for human-team games through
- * `seasonRetainedGameDetailSchema` below.
+ * season-game-summary-v3). Every league game reduces to one summary that
+ * carries the identity, result state, complete team boxes, 20 compact
+ * player stat lines, and the M2.5 compact injury events; richer facts
+ * (substitutions, unit stints, deviations, diagnostics) are retained only
+ * for human-team games through `seasonRetainedGameDetailSchema` below.
  *
  * Compactness is part of the contract: stat lines carry exact integers only,
  * no per-game derived efficiencies, no shot zones, and no diagnostics, so
  * 1,230 summaries stay well inside the storage and message budgets. M2.4
  * adds the optional per-game effects rollup (≤ 12 mechanism-side rows),
- * which is compact enough to keep in every summary.
+ * which is compact enough to keep in every summary. M2.5 (v3) adds the
+ * compact per-game injury events.
  */
 
 /** One compact player stat line (identity = playerVersionId). */
@@ -97,6 +99,11 @@ export const seasonGameSummarySchema = z
      * the zero profile emits no rollup.
      */
     effectsRollup: z.array(seasonEffectsRollupSchema).max(12).optional(),
+    /**
+     * M2.5 compact per-game injury events (season-game-summary-v3). Every
+     * summary carries them; a zero-injury game carries an empty array.
+     */
+    injuryEvents: z.array(seasonCompactInjuryEventSchema),
   })
   .superRefine((summary, ctx) => {
     if (summary.status === 'forfeit') {
@@ -130,10 +137,12 @@ export type SeasonGameSummary = z.infer<typeof seasonGameSummarySchema>;
  * Retained detailed result for a human-team game (spec/2.0/02: richer detail
  * only for human-controlled games). Reuses the full M2.2 result contract, so
  * substitution logs, unit stints, rotation deviations, foul-outs, removals,
- * shot-zone facts, and diagnostics are preserved exactly where the product
- * explains them; these rows exist only for the human franchise's 82 games.
- * M2.4 adds the optional full mechanism evidence (≤ 12 rows) that powers
- * effect explanations; optional so M2.3 rows parse unchanged.
+ * returns, shot-zone facts, and diagnostics are preserved exactly where the
+ * product explains them; these rows exist only for the human franchise's 82
+ * games. M2.4 adds the optional full mechanism evidence (≤ 12 rows) that
+ * powers effect explanations; optional so M2.3 rows parse unchanged. M2.5
+ * (v3) adds the explicit compact injury-event rollup for display (the full
+ * removal/return events already travel inside the retained result).
  */
 export const seasonRetainedGameDetailSchema = z.object({
   schemaVersion: z.literal(1),
@@ -146,5 +155,7 @@ export const seasonRetainedGameDetailSchema = z.object({
   result: seasonGameSimulationResultSchema,
   /** M2.4: full per-mechanism evidence for effect explanations. */
   mechanismEvidence: z.array(seasonMechanismEvidenceSchema).max(12).optional(),
+  /** M2.5: compact injury-event rollup for display. */
+  injuryEvents: z.array(seasonCompactInjuryEventSchema),
 });
 export type SeasonRetainedGameDetail = z.infer<typeof seasonRetainedGameDetailSchema>;

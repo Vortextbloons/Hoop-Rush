@@ -21,20 +21,25 @@
 import {
   DERIVATION_METHOD_VERSION,
   SOURCE_VERSION,
+  THREE_POINT_RECONSTRUCTION_VERSION,
   type Confidence,
   type ProvenanceKind,
   type ProvenanceMap,
+  type ReconstructedThreePointProfile,
   type SimulationAnchors,
   type SimulationRatings,
   type SimulationTendencies,
   type SummaryRatings,
   type RatingProfile,
   type RatingsModelArtifact,
+  type ThreePointReconstructionArtifact,
 } from '@hoop-rush/data-contracts';
 import { clamp, clampRating, clampUnitInterval, safeFloat } from '../json.ts';
 import { FIELD_AVAILABILITY } from '../config.ts';
 import { deriveRatingProfile } from './v3.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
+import { predictReconstructedProfile, ratingFromAccuracy } from '../reconstruction/predict.ts';
+import { seasonIndexFor, type ReconstructionRow } from '../reconstruction/rows.ts';
 import type { StatsRow } from './stats.ts';
 
 /** League context used for era-relative translation (spec/12 environment). */
@@ -51,11 +56,21 @@ export interface DerivationInput {
   /** Mapped detailed position (PG/SG/SF/PF/C). */
   position: string;
   heightInches: number | null;
+  /** Physicals used by the three-point reconstruction predictors. */
+  weightLbs?: number | null;
+  age?: number | null;
   stats: StatsRow;
   era: SeasonContext;
   artifact?: RatingsModelArtifact;
   /** Pooled season×position-group shooting priors (made/attempted ratios). */
   ratePriors?: { threePointPctPrior?: number; freeThrowPctPrior?: number };
+  /**
+   * Checked-in three-point reconstruction artifact (spec/12). When present,
+   * pre-1979 not-applicable seasons and genuinely missing three-point
+   * records receive conservative reconstructed profiles; observed seasons
+   * and validated observed zero-attempt seasons are never touched.
+   */
+  threePointReconstruction?: ThreePointReconstructionArtifact;
 }
 
 export interface DerivedRecord {
@@ -70,6 +85,8 @@ export interface DerivedRecord {
   unclamped: Record<string, number>;
   /** Methods chosen per final field. */
   methods: Record<string, ProvenanceKind>;
+  /** Conservative reconstructed three-point profile (pre-1979/missing only). */
+  reconstructedThreePoint?: ReconstructedThreePointProfile;
 }
 
 /** Versioned position-era-role priors (shrinkage targets; never tuned per player). */
@@ -144,6 +161,10 @@ function confidenceFor(kind: ProvenanceKind): Confidence {
       return 'high';
     case 'derived':
       return 'medium';
+    case 'reconstructed':
+      // Reconstructed confidence is stamped from the model's posterior
+      // std-dev after the record; this default keeps the type total.
+      return 'low';
     default:
       return 'low';
   }
@@ -361,6 +382,40 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const ftPct = ftm !== null && fta !== null && fta > 0 ? clampUnitInterval(ftm / fta) : null;
   const threePct =
     tpm !== null && tpa !== null && tpa > 0 ? clampUnitInterval(Math.min(tpm, tpa) / tpa) : null;
+
+  // Conservative three-point reconstruction (spec/12): applied only to
+  // pre-1979 not-applicable seasons and genuinely missing three-point
+  // records (tpa null post-1979). A validated observed zero-attempt season
+  // (tpa === 0) is never reconstructed, and observed seasons never are.
+  // Without the checked-in artifact the legacy estimated fallbacks apply
+  // (the unavailable anchor contract still holds: null, never zero).
+  const reconstructionArtifact = input.threePointReconstruction;
+  const reconstructionEligible = !fieldPublished('threesAttempted', input.season) || tpa === null;
+  let reconstructedThreePoint: ReconstructedThreePointProfile | undefined;
+  if (reconstructionEligible && reconstructionArtifact !== undefined) {
+    const reconstructionRow: ReconstructionRow = {
+      playerExternalId: input.playerId ?? 'unknown',
+      season: input.season,
+      seasonIndex: seasonIndexFor(input.season),
+      positionGroup: position,
+      heightInches: input.heightInches,
+      weightLbs: input.weightLbs ?? null,
+      age: input.age ?? null,
+      minutes: totals.minutes,
+      fgm,
+      fga,
+      tpm,
+      tpa,
+      ftm,
+      fta,
+      assists: totals.assists,
+      statsSource: 'derivation',
+    };
+    reconstructedThreePoint = predictReconstructedProfile(
+      reconstructionArtifact,
+      reconstructionRow,
+    ).profile;
+  }
   const tsPct = clampUnitInterval(totals.tsPct);
   const efgPct = clampUnitInterval(totals.efgPct);
   const per = totals.per;
@@ -398,7 +453,9 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const ftComponent = ftPctShrunk !== null ? (ftPctShrunk - 0.7) * 15 : 0;
 
   // Three-point skill: observed three-point shooting when available; else a
-  // conservative spacing estimate from free-throw evidence (estimated).
+  // conservative reconstructed accuracy from the versioned model artifact
+  // (pre-1979 / genuinely missing records); else a conservative spacing
+  // estimate from free-throw evidence (estimated).
   let threeRaw: number;
   let threeKind: ProvenanceKind;
   let threeFields: string[];
@@ -406,6 +463,13 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     threeRaw = 58 + tsComponent + (threePctShrunk - 0.3) * 140 + ftComponent;
     threeKind = 'derived';
     threeFields = ['tpm', 'tpa', 'prior', 'shrink-80-attempts'];
+  } else if (reconstructedThreePoint !== undefined) {
+    threeRaw = ratingFromAccuracy(
+      reconstructionArtifact as ThreePointReconstructionArtifact,
+      reconstructedThreePoint.accuracyConservative,
+    );
+    threeKind = 'reconstructed';
+    threeFields = reconstructedThreePoint.evidence.sourceFields;
   } else if (ftPctShrunk !== null) {
     threeRaw = 52 + ftComponent * 1.2 - (position === 'C' ? 8 : 0);
     threeKind = 'estimated';
@@ -416,6 +480,14 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     threeFields = ['prior'];
   }
   record('threePoint', blend(threeRaw, 54), threeKind, threeFields);
+  if (threeKind === 'reconstructed' && reconstructedThreePoint !== undefined) {
+    // Reconstructed values carry the model version and confidence.
+    const entry = provenance['threePoint'];
+    if (entry !== undefined) {
+      entry.confidence = reconstructedThreePoint.confidence;
+      entry.notesCode = THREE_POINT_RECONSTRUCTION_VERSION;
+    }
+  }
 
   const freeThrowRaw = ftPctShrunk !== null ? 50 + (ftPctShrunk - 0.5) * 120 : 62;
   record(
@@ -625,8 +697,16 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     fgaPerGame !== null ? 'derived' : 'estimated',
     ['fga'],
   );
+  // Three-point volume used by the shot-mix tendencies. Reconstructed
+  // players (pre-1979 / missing records) use the conservative attempt rate
+  // instead of the raw position prior, so related three-point tendencies
+  // are recalculated without introducing a modern-volume assumption.
   const threeRate =
-    tpa !== null && fga !== null && fga > 0 ? tpa / fga : priors.threePointRatePrior;
+    reconstructedThreePoint !== undefined
+      ? reconstructedThreePoint.attemptRateConservative
+      : tpa !== null && fga !== null && fga > 0
+        ? tpa / fga
+        : priors.threePointRatePrior;
   const freeThrowPressure = fta !== null && fga !== null && fga > 0 ? fta / fga : usageVal / 100;
   const assistRole = clamp((apg ?? 2) / 8, 0, 1);
   const interiorRole = clamp((oreb.value / 4 + Math.max(0, (rpg ?? 4) - 4) / 12) / 2, 0, 1);
@@ -694,9 +774,20 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   ]);
 
   // Three-point volume tendency: pre-1979 the shot did not exist (league
-  // rule, not-applicable). From 1979-80 the rate is observed; absent
-  // evidence shrinks toward the position-era prior scaled by league rate.
-  if (!fieldPublished('threesAttempted', input.season)) {
+  // rule, not-applicable), so the conservative reconstructed attempt rate
+  // carries the volume. From 1979-80 the rate is observed; absent evidence
+  // shrinks toward the position-era prior scaled by league rate.
+  if (reconstructedThreePoint !== undefined) {
+    t('threePointRate', reconstructedThreePoint.attemptRateConservative * 100, 'reconstructed', [
+      ...reconstructedThreePoint.evidence.sourceFields,
+      'model',
+    ]);
+    const entry = provenance['threePointRate'];
+    if (entry !== undefined) {
+      entry.confidence = reconstructedThreePoint.confidence;
+      entry.notesCode = THREE_POINT_RECONSTRUCTION_VERSION;
+    }
+  } else if (!fieldPublished('threesAttempted', input.season)) {
     t('threePointRate', 0, 'estimated', ['prior']);
   } else if (tpa !== null && fga !== null && fga > 0) {
     t('threePointRate', (tpa / fga) * 100, 'derived', ['tpa', 'fga']);
@@ -781,7 +872,10 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
 
   // --- Anchors (season production) ----------------------------------------
   const games = Math.max(1, gp);
-  const threePointAttemptRate = tpa !== null && fga !== null && fga > 0 ? tpa / fga : 0;
+  // Unavailable three-point records (pre-1979 not-applicable, genuinely
+  // missing fields) anchor as null — never a converted zero. Numeric 0 is
+  // reserved for validated observed zero-attempt seasons (spec/12).
+  const threePointAttemptRate = tpa !== null && fga !== null && fga > 0 ? tpa / fga : null;
   const freeThrowAttemptRate = fta !== null && fga !== null && fga > 0 ? fta / fga : 0;
   // Anchor shares are consumed as 0..1 probabilities; a player with more
   // free throws than field-goal attempts saturates at 1.0 (unclamped value
@@ -802,7 +896,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     fieldGoalPct: fgPct ?? 0.45,
     threePointPct: threePct,
     freeThrowPct: ftPct ?? 0.75,
-    threePointAttemptRate: clampUnitInterval(threePointAttemptRate) ?? 0,
+    threePointAttemptRate: clampUnitInterval(threePointAttemptRate) ?? null,
     freeThrowAttemptRate: clampUnitInterval(Math.min(1, freeThrowAttemptRate)) ?? 0,
     threePointPctShrunk: threePctShrunk,
     freeThrowPctShrunk: ftPctShrunk,
@@ -833,5 +927,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     provenance,
     unclamped,
     methods,
+    ...(reconstructedThreePoint !== undefined ? { reconstructedThreePoint } : {}),
   };
 }

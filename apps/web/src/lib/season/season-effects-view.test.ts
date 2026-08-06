@@ -39,6 +39,7 @@ describe('M2.4 season effects view', () => {
         homeFranchiseId: 'lakers',
         awayFranchiseId: 'celtics',
         result: {} as never,
+        injuryEvents: [],
         mechanismEvidence: [base],
       },
       {
@@ -49,6 +50,7 @@ describe('M2.4 season effects view', () => {
         homeFranchiseId: 'lakers',
         awayFranchiseId: 'celtics',
         result: {} as never,
+        injuryEvents: [],
         mechanismEvidence: [
           {
             mechanism: 'shooter-fatigue',

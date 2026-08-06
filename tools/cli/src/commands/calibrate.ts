@@ -60,6 +60,7 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
   const totalUsage = usage.reduce((a, b) => a + b, 0);
   const meanRatings: Record<string, number> = {};
   const meanTendencies: Record<string, number> = {};
+  const meanAnchors: Record<string, number> = {};
   pool.players.forEach((player, i) => {
     const usageAt = usage[i];
     if (usageAt === undefined) return;
@@ -71,6 +72,10 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
     for (const [key, value] of Object.entries(player.tendencies)) {
       const numeric = typeof value === 'number' ? value : 0;
       meanTendencies[key] = (meanTendencies[key] ?? 0) + numeric * weight;
+    }
+    for (const [key, value] of Object.entries(player.anchors)) {
+      const numeric = typeof value === 'number' ? value : 0;
+      meanAnchors[key] = (meanAnchors[key] ?? 0) + numeric * weight;
     }
   });
   const firstPlayer = pool.players[0];
@@ -84,7 +89,66 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
   for (const key of Object.keys(tendencies) as Array<keyof typeof tendencies>) {
     tendencies[key] = meanTendencies[key] ?? tendencies[key];
   }
+
+  // Pre-1979 pools are entirely reconstructed: the synthetic average player
+  // carries the usage-weighted conservative profile and the null
+  // three-point anchors, so era calibration measures the translated volume
+  // instead of the anchor-less tendency fallback. Mixed and observed-era
+  // pools keep the legacy synthetic form (no anchors) so frozen targets
+  // remain meaningful.
+  const reconstructedPlayers = pool.players.filter((p) => p.reconstructedThreePoint !== undefined);
+  const allReconstructed = reconstructedPlayers.length === pool.players.length;
+  let averageProfile: SimulationPlayer['reconstructedThreePoint'] | undefined;
+  if (allReconstructed) {
+    const sums = {
+      accuracyConservative: 0,
+      accuracyMean: 0,
+      accuracyStdDev: 0,
+      attemptRateConservative: 0,
+      attemptRateMean: 0,
+      attemptRateStdDev: 0,
+    };
+    reconstructedPlayers.forEach((player, i) => {
+      const profile = player.reconstructedThreePoint;
+      const usageAt = usage[i];
+      if (profile === undefined || usageAt === undefined) return;
+      const weight = usageAt / totalUsage;
+      sums.accuracyConservative += profile.accuracyConservative * weight;
+      sums.accuracyMean += profile.accuracyMean * weight;
+      sums.accuracyStdDev += profile.accuracyStdDev * weight;
+      sums.attemptRateConservative += profile.attemptRateConservative * weight;
+      sums.attemptRateMean += profile.attemptRateMean * weight;
+      sums.attemptRateStdDev += profile.attemptRateStdDev * weight;
+    });
+    const source = reconstructedPlayers[0]?.reconstructedThreePoint;
+    if (source !== undefined) {
+      averageProfile = {
+        modelVersion: source.modelVersion,
+        accuracyConservative: sums.accuracyConservative,
+        accuracyMean: sums.accuracyMean,
+        accuracyStdDev: sums.accuracyStdDev,
+        attemptRateConservative: sums.attemptRateConservative,
+        attemptRateMean: sums.attemptRateMean,
+        attemptRateStdDev: sums.attemptRateStdDev,
+        confidence: source.confidence,
+        floor: source.floor,
+        zoneFloors: source.zoneFloors,
+        evidence: source.evidence,
+      };
+    }
+  }
+
   const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+  const averagedAnchors =
+    averageProfile !== undefined
+      ? ({
+          ...Object.fromEntries(
+            Object.entries(meanAnchors).map(([key, value]) => [key, Number(value.toFixed(4))]),
+          ),
+          threePointPct: null,
+          threePointAttemptRate: null,
+        } as SimulationPlayer['anchors'])
+      : undefined;
   return {
     teamId: 'league-average',
     displayName: 'League Average',
@@ -96,6 +160,9 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
       weightLbs: sample.weightLbs,
       ratings,
       tendencies,
+      ...(averagedAnchors !== undefined
+        ? { anchors: averagedAnchors, reconstructedThreePoint: averageProfile }
+        : {}),
     })),
   };
 }

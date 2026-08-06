@@ -4,6 +4,7 @@ import { positionUnionSchema } from './positions.ts';
 import { eraSimulationProfileSchema } from './era-sim-profile.ts';
 import { ratingProfileSchema } from './ratings-model.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
+import { THREE_POINT_RECONSTRUCTION_VERSION } from './versions.ts';
 
 /**
  * M2 possession-engine contracts. The engine consumes only these explicit
@@ -113,7 +114,13 @@ export const simulationAnchorsSchema = z.object({
   fieldGoalPct: z.number().min(0).max(1),
   threePointPct: z.number().min(0).max(1).nullable(),
   freeThrowPct: z.number().min(0).max(1),
-  threePointAttemptRate: z.number().min(0).max(1),
+  /**
+   * Three-point attempt share of field-goal attempts. `null` means the
+   * record is unavailable (pre-1979 not-applicable or genuinely missing
+   * evidence) and must never be read as an observed zero; numeric `0`
+   * is a validated observed zero-attempt season (spec/12).
+   */
+  threePointAttemptRate: z.number().min(0).max(1).nullable(),
   freeThrowAttemptRate: z.number().min(0).max(1),
   threePointPctShrunk: z.number().min(0).max(1).nullable().optional(),
   freeThrowPctShrunk: z.number().min(0).max(1).nullable().optional(),
@@ -122,6 +129,46 @@ export const simulationAnchorsSchema = z.object({
   rateShrinkAttempts: z.number().int().nonnegative().optional(),
 });
 export type SimulationAnchors = z.infer<typeof simulationAnchorsSchema>;
+
+/**
+ * Conservative reconstructed three-point profile (spec/12). Applied only to
+ * pre-1979 not-applicable seasons and genuinely missing three-point records;
+ * observed seasons and validated observed zero-attempt seasons never carry
+ * one. The engine reproduces the calibrated uncertainty and floors from this
+ * profile alone — it never imports model code or the fit artifact.
+ */
+export const reconstructedThreePointProfileSchema = z.object({
+  /** The offline model artifact that produced this profile. */
+  modelVersion: z.literal(THREE_POINT_RECONSTRUCTION_VERSION),
+  /** Posterior 25th-percentile three-point percentage (conservative accuracy). */
+  accuracyConservative: z.number().min(0).max(1),
+  /** Posterior mean three-point percentage (informational). */
+  accuracyMean: z.number().min(0).max(1),
+  /** Laplace posterior std-dev of the accuracy estimate. */
+  accuracyStdDev: z.number().min(0).max(0.5),
+  /** Posterior 20th-percentile 3PA/FGA (conservative attempt tendency). */
+  attemptRateConservative: z.number().min(0).max(1),
+  /** Posterior mean 3PA/FGA (informational). */
+  attemptRateMean: z.number().min(0).max(1),
+  /** Laplace posterior std-dev of the attempt-rate estimate. */
+  attemptRateStdDev: z.number().min(0).max(0.5),
+  /** Confidence band under the artifact's thresholds. */
+  confidence: z.literal('high').or(z.literal('medium')).or(z.literal('low')),
+  /** Reconstructed make-probability floor (5th percentile of early-era
+   * conservative estimates; below the established .32/.34 zone floors). */
+  floor: z.number().min(0).max(1),
+  /** Per-zone make-probability floors for reconstructed three-point shots. */
+  zoneFloors: z.object({
+    cornerThree: z.number().min(0).max(1),
+    aboveBreakThree: z.number().min(0).max(1),
+  }),
+  /** Evidence behind the prediction (missing features and source fields). */
+  evidence: z.object({
+    missingFeatures: z.number().int().nonnegative(),
+    sourceFields: z.array(z.string().min(1).max(64)),
+  }),
+});
+export type ReconstructedThreePointProfile = z.infer<typeof reconstructedThreePointProfileSchema>;
 
 /** One player exactly as the possession engine sees them. */
 export const simulationPlayerSchema = z.object({
@@ -143,6 +190,8 @@ export const simulationPlayerSchema = z.object({
   tendencies: simulationTendenciesSchema,
   /** Optional for authored opponents and legacy fixtures without source stats. */
   anchors: simulationAnchorsSchema.optional(),
+  /** Conservative reconstructed three-point profile (pre-1979/missing records only). */
+  reconstructedThreePoint: reconstructedThreePointProfileSchema.optional(),
   /** Canonical OVR is explanatory metadata; possession resolution ignores it. */
   overall: z.number().int().min(0).max(100).optional(),
   ratingProfile: ratingProfileSchema.optional(),

@@ -20,6 +20,7 @@ import { canonicalPlayerName } from '../identity.ts';
 import { positionOverrideFor } from '../positions/overrides.ts';
 import type { StatsRow } from './stats.ts';
 import { loadRatingsModelArtifact } from './artifact.ts';
+import { loadThreePointReconstructionArtifact } from '../reconstruction/artifact.ts';
 
 export interface RosterPlayer extends Record<string, unknown> {
   externalId?: string | null;
@@ -177,6 +178,7 @@ export function computeForSeason(season: string, force = false): void {
 
   const context = seasonContext(season);
   const artifact = loadRatingsModelArtifact();
+  const threePointReconstruction = loadThreePointReconstructionArtifact();
   const ratePriorsByGroup = pooledRatePriors(roster, statsList);
 
   let computed = 0;
@@ -248,15 +250,19 @@ export function computeForSeason(season: string, force = false): void {
       playerId: extId !== '' ? `p-${extId}` : (player.id ?? undefined),
       position: pos,
       heightInches: safeHeight(player.heightInches),
+      weightLbs: safeFloat(player.weightLbs),
+      age: safeFloat(stats['age'] ?? player.age, 25) || 25,
       stats,
       era: context,
       artifact,
       ratePriors: ratePriorsByGroup.get(positionGroup(pos)),
+      threePointReconstruction,
     });
     player.ratings = derived.ratings;
     player.tendencies = derived.tendencies;
     player.summaryRatings = derived.summaryRatings;
     player.anchors = derived.anchors;
+    player.reconstructedThreePoint = derived.reconstructedThreePoint;
     player.provenance = derived.provenance;
     player.unclamped = derived.unclamped;
     player.methods = derived.methods;

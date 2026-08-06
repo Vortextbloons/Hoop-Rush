@@ -1,16 +1,20 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
+import { seasonCompactInjuryEventSchema, seasonInjurySeveritySchema } from './season-health.ts';
 import { seasonEffectsSideSchema, seasonMechanismSchema } from './season-effects.ts';
+import {
+  seasonObjectiveEvaluationFactsSchema,
+  seasonObjectiveIdSchema,
+} from './season-objective.ts';
 import { SEASON_RECAP_VERSION } from './season-versions.ts';
 
 /**
- * Block recap (spec/2.0/02 recap, spec/2.0/11 block recap, M2.4,
- * season-recap-v2). Every claim derives from saved league facts: game
- * summaries, standings, aggregates, and — since v2 — the block-level
- * effects evidence. M2.4 recaps do not report injuries, trades, or
- * Influence claims; those systems ship in later milestones. All arrays are
- * bounded.
+ * Block recap (spec/2.0/02 recap, spec/2.0/11 block recap, M2.5,
+ * season-recap-v3). Every claim derives from saved league facts: game
+ * summaries, standings, aggregates, the block-level effects evidence
+ * (M2.4), and — since v3 — the block-level injury, objective, trade, and
+ * Influence evidence. All arrays are bounded.
  */
 
 /** Block-level effects evidence for one mechanism on one side (M2.4). */
@@ -23,6 +27,52 @@ export const seasonBlockEffectsEvidenceSchema = z.object({
   blockDeltaTotal: z.number().int().min(-10_000_000_000_000).max(10_000_000_000_000),
 });
 export type SeasonBlockEffectsEvidence = z.infer<typeof seasonBlockEffectsEvidenceSchema>;
+
+/**
+ * M2.5 block-level injury evidence, counted from the block's summary injury
+ * events and the health state at block end. `humanTeamInjuries` is the
+ * compact per-game list for the human franchise's games.
+ */
+export const seasonBlockInjuryEvidenceSchema = z.object({
+  injuries: z.number().int().nonnegative(),
+  bySeverity: z.record(seasonInjurySeveritySchema, z.number().int().nonnegative()),
+  sameGameReturns: z.number().int().nonnegative(),
+  seasonEnding: z.number().int().nonnegative(),
+  returnedThisBlock: z.number().int().nonnegative(),
+  activeAtBlockEnd: z.number().int().nonnegative(),
+  humanTeamInjuries: z.array(seasonCompactInjuryEventSchema).max(40),
+});
+export type SeasonBlockInjuryEvidence = z.infer<typeof seasonBlockInjuryEvidenceSchema>;
+
+/**
+ * M2.5 evaluated objective evidence for the block: the locked objective,
+ * its recorded success, and the saved evaluation facts (no invented
+ * numbers). Null for the final two-game block 8.
+ */
+export const seasonBlockObjectiveEvidenceSchema = z.object({
+  objectiveId: seasonObjectiveIdSchema,
+  success: z.boolean(),
+  evaluationFacts: seasonObjectiveEvaluationFactsSchema,
+});
+export type SeasonBlockObjectiveEvidence = z.infer<typeof seasonBlockObjectiveEvidenceSchema>;
+
+/** M2.5 block-level trade evidence (human + AI accepted trades, human delta). */
+export const seasonBlockTradeEvidenceSchema = z.object({
+  /** Block-level accepted trades (human + AI). */
+  tradesAccepted: z.number().int().nonnegative(),
+  /** The human franchise's Influence delta this block (may be negative). */
+  influenceDelta: z.number().int(),
+});
+export type SeasonBlockTradeEvidence = z.infer<typeof seasonBlockTradeEvidenceSchema>;
+
+/**
+ * M2.5 recap Influence balance (LEAD DECISION: recap shows the human
+ * balance only; the ledger is the authoritative source).
+ */
+export const seasonBlockInfluenceBalanceSchema = z.object({
+  humanBalance: z.number().int(),
+});
+export type SeasonBlockInfluenceBalance = z.infer<typeof seasonBlockInfluenceBalanceSchema>;
 
 export const seasonRecordMovementSchema = z.object({
   franchiseId: franchiseIdSchema,
@@ -114,5 +164,13 @@ export const seasonBlockRecapSchema = z.object({
    * profile emits no evidence.
    */
   effectsEvidence: z.array(seasonBlockEffectsEvidenceSchema).max(12).optional(),
+  /** M2.5: block-level injury evidence. */
+  injuryEvidence: seasonBlockInjuryEvidenceSchema,
+  /** M2.5: evaluated objective evidence; null for the final two-game block 8. */
+  objectiveEvidence: seasonBlockObjectiveEvidenceSchema.nullable(),
+  /** M2.5: block-level trade evidence. */
+  tradeEvidence: seasonBlockTradeEvidenceSchema,
+  /** M2.5: human Influence balance at block end. */
+  influenceBalance: seasonBlockInfluenceBalanceSchema,
 });
 export type SeasonBlockRecap = z.infer<typeof seasonBlockRecapSchema>;

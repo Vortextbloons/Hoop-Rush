@@ -3,7 +3,9 @@ import {
   SEASON_LEADER_MIN_GAME_SHARE,
   SEASON_RECAP_VERSION,
   SEASON_ROUND_COUNT,
+  blockRoundRange,
   type HoopRushManifest,
+  type SeasonBlockInjuryEvidence,
   type SeasonBlockRecap,
   type SeasonGame,
   type SeasonGameSummary,
@@ -14,6 +16,7 @@ import {
   type SeasonPlayerAggregate,
   type SeasonRecordMovement,
   type SeasonRosterEntry,
+  type SeasonRun,
   type SeasonStandings,
   type SeasonStandingsRow,
   type SeasonStreak,
@@ -739,7 +742,20 @@ export function deriveVersionSpotlights(
  * recaps inside `CommitSeasonBlockInput` only). Every claim — record and
  * standings movement, notable performances, streaks, version spotlights, and
  * upcoming human games — derives from saved summaries, standings, rosters,
- * and the committed schedule.
+ * and the committed schedule. M2.5 adds the block-level injury, objective,
+ * trade, and Influence evidence derived from the summaries' compact injury
+ * events, the run health/transactions/ledger, and the schedule.
+ *
+ * Derivation notes (documented approximations where the UI mirror cannot
+ * reproduce an engine-exact fact):
+ * - `activeAtBlockEnd` counts records still active in the CURRENT health
+ *   state whose occurrence game round is at or before the block's last
+ *   round (exact for the last accepted block; may undercount for older
+ *   blocks whose injuries recovered afterwards).
+ * - `objectiveEvidence` stays null: the availability evaluation facts are
+ *   not reconstructible from summaries/health after the fact; the engine
+ *   recap carries the recorded evaluation. The recorded selection outcome
+ *   (objectiveId + success) is readable from the run's objective state.
  */
 export function deriveBlockRecap(input: {
   runId: string;
@@ -752,6 +768,7 @@ export function deriveBlockRecap(input: {
   rosters: readonly SeasonRosterEntry[];
   games: readonly SeasonGame[];
   humanFranchiseId: string;
+  run: SeasonRun;
 }): SeasonBlockRecap {
   const {
     runId,
@@ -764,6 +781,7 @@ export function deriveBlockRecap(input: {
     rosters,
     games,
     humanFranchiseId,
+    run,
   } = input;
   const before = rebaseStandingsBefore(standings, league, blockSummaries);
   const rankOf = (rows: SeasonStandingsRow[], franchiseId: string, conference: string): number => {
@@ -815,6 +833,108 @@ export function deriveBlockRecap(input: {
     streaks: streaks.slice(0, 10),
     versionSpotlights: deriveVersionSpotlights(blockSummaries, rosters),
     upcomingHumanGames: upcomingHumanGames.slice(0, 10),
+    injuryEvidence: deriveBlockInjuryEvidence({
+      blockSummaries,
+      health: run.health,
+      games,
+      blockIndex,
+      humanFranchiseId,
+    }),
+    objectiveEvidence: null,
+    tradeEvidence: {
+      tradesAccepted: run.transactions.filter(
+        (entry) => entry.type === 'trade' && entry.blockIndex === blockIndex,
+      ).length,
+      influenceDelta: run.influence.ledger
+        .filter(
+          (entry) => entry.franchiseId === humanFranchiseId && entry.blockIndex === blockIndex,
+        )
+        .reduce((sum, entry) => sum + entry.appliedDelta, 0),
+    },
+    influenceBalance: { humanBalance: humanBalanceAtBlockEnd(run, humanFranchiseId, blockIndex) },
+  };
+}
+
+/**
+ * The human Influence balance at a block's end, reconstructed from the
+ * append-only ledger: the current balance minus every later ledger entry.
+ */
+export function humanBalanceAtBlockEnd(
+  run: SeasonRun,
+  humanFranchiseId: string,
+  blockIndex: number,
+): number {
+  const current = run.influence.balances[humanFranchiseId] ?? 0;
+  const laterDelta = run.influence.ledger
+    .filter(
+      (entry) =>
+        entry.franchiseId === humanFranchiseId &&
+        entry.blockIndex !== null &&
+        entry.blockIndex > blockIndex,
+    )
+    .reduce((sum, entry) => sum + entry.appliedDelta, 0);
+  return current - laterDelta;
+}
+
+/**
+ * Block-level injury evidence counted from the block's compact injury
+ * events and the run health (see `deriveBlockRecap` notes for the
+ * approximations).
+ */
+export function deriveBlockInjuryEvidence(input: {
+  blockSummaries: readonly SeasonGameSummary[];
+  health: SeasonRun['health'];
+  games: readonly SeasonGame[];
+  blockIndex: number;
+  humanFranchiseId: string;
+}): SeasonBlockInjuryEvidence {
+  const { blockSummaries, health, games, blockIndex, humanFranchiseId } = input;
+  const { fromRound, toRound } = blockRoundRange(blockIndex);
+  const roundOfGame = new Map(games.map((game) => [game.gameId, game.round]));
+  const bySeverity: SeasonBlockInjuryEvidence['bySeverity'] = {
+    minor: 0,
+    moderate: 0,
+    major: 0,
+    'season-ending': 0,
+  };
+  let sameGameReturns = 0;
+  let seasonEnding = 0;
+  const humanTeamInjuries: SeasonBlockInjuryEvidence['humanTeamInjuries'] = [];
+  for (const summary of blockSummaries) {
+    const humanSide =
+      summary.homeFranchiseId === humanFranchiseId
+        ? 'home'
+        : summary.awayFranchiseId === humanFranchiseId
+          ? 'away'
+          : null;
+    for (const event of summary.injuryEvents) {
+      bySeverity[event.severity] += 1;
+      if (event.returned) sameGameReturns += 1;
+      if (event.severity === 'season-ending') seasonEnding += 1;
+      if (humanSide !== null && event.side === humanSide && humanTeamInjuries.length < 40) {
+        humanTeamInjuries.push(event);
+      }
+    }
+  }
+  const returnedThisBlock = health.injuries.filter(
+    (record) =>
+      record.actualReturnRound !== null &&
+      record.actualReturnRound >= fromRound &&
+      record.actualReturnRound <= toRound,
+  ).length;
+  const activeAtBlockEnd = health.injuries.filter((record) => {
+    if (record.missedGamesRemaining <= 0) return false;
+    const occurrenceRound = roundOfGame.get(record.gameId) ?? 0;
+    return occurrenceRound <= toRound;
+  }).length;
+  return {
+    injuries: blockSummaries.reduce((sum, summary) => sum + summary.injuryEvents.length, 0),
+    bySeverity,
+    sameGameReturns,
+    seasonEnding,
+    returnedThisBlock,
+    activeAtBlockEnd,
+    humanTeamInjuries,
   };
 }
 

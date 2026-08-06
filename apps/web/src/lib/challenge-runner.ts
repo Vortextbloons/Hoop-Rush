@@ -11,6 +11,7 @@ import {
   type CompletedRunIndex,
   type StoredRunRecord,
 } from '@hoop-rush/persistence';
+import { randomUUID } from '$lib/random-id';
 
 /**
  * Main-thread challenge orchestration (spec/04 state ownership). The worker
@@ -181,7 +182,7 @@ export class ChallengeRunner {
     this.queue = [];
     this.queueHead = 0;
     this.lastError = null;
-    this.requestId = crypto.randomUUID();
+    this.requestId = randomUUID();
 
     this.worker = new Worker(new URL('../workers/challenge-worker.ts', import.meta.url), {
       type: 'module',

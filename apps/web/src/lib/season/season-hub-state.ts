@@ -1,11 +1,27 @@
 import {
+  SEASON_RUN_SCHEMA_VERSION,
   seasonSubmitBlockCommandSchema,
+  type SeasonAcceptTradeOfferResult,
   type SeasonActiveRunIndex,
+  type SeasonDeclineTradeOfferResult,
+  type SeasonForfeitInterruptedGameResult,
   type SeasonGameSummary,
+  type SeasonInvalidRosterInterruption,
+  type SeasonObjectiveId,
+  type SeasonPendingBlockCandidate,
+  type SeasonResumeSeasonBlockResult,
   type SeasonRetainedGameDetail,
+  type SeasonRun,
+  type SeasonRunCommand,
+  type SeasonRunCommandRejection,
+  type SeasonSelectBlockObjectiveResult,
+  type SeasonSpendInfluenceCommand,
+  type SeasonSpendInfluenceResult,
   type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
+import { handleSeasonRunCommand } from '@hoop-rush/engine';
 import type {
+  SeasonBlockResumeInput,
   SeasonBlockRunner,
   SeasonBlockStartInput,
   SeasonRunnerEvent,
@@ -15,6 +31,7 @@ import {
   isSeasonRunIncompatibleError,
   type SeasonRunIncompatibleInfo,
 } from '@hoop-rush/persistence';
+import { newSeasonId } from './season-ids';
 import {
   cachedSeasonSnapshotMatches,
   getCachedSeasonSnapshot,
@@ -22,18 +39,29 @@ import {
 } from './season-state-cache';
 
 /**
- * Season Run hub state (spec/2.0/07 background execution, M2.3): the single
- * UI-side owner of the accepted snapshot and the live block run. It reads
- * accepted state from the repository, subscribes to the frozen
+ * Season Run hub state (spec/2.0/07 background execution, M2.3, M2.5): the
+ * single UI-side owner of the accepted snapshot and the live block run. It
+ * reads accepted state from the repository, subscribes to the frozen
  * `SeasonBlockRunner` events, and re-reads the snapshot after every
  * `complete`. Block submission builds the typed `SeasonSubmitBlockCommand`
- * (commandId, expectedRevision, blockIndex, rotationDigest) and hands the
- * runner its `SeasonBlockStartInput`; cancellation and retry route through
- * the same request id. The runner (lead-owned) owns validation, canonical
- * acceptance, and atomic persistence; this module never touches IndexedDB.
+ * (commandId, expectedRevision, blockIndex, rotationDigest, objectiveId,
+ * expectedStateRevision/Digest) and hands the runner its
+ * `SeasonBlockStartInput`; cancellation and retry route through the same
+ * request id.
+ *
+ * M2.5: the hub also issues the typed between-block commands
+ * (select-block-objective, spend-influence, accept/decline-trade-offer,
+ * forfeit-interrupted-game) through the pure engine handler against the
+ * current snapshot state, persists accepted results through
+ * `repo.applySeasonRunCommand`, and mirrors the runner's `interrupted`
+ * event (pending candidate + typed invalid-roster interruption) for the
+ * interruption recovery panel. `resumeBlock` routes through the runner's
+ * `SeasonBlockResumeInput` (the interrupted submission's identity facts).
+ * The runner (persistence-owned) owns validation, canonical acceptance, and
+ * atomic persistence; this module never touches IndexedDB directly.
  */
 
-export type BlockPhase = 'idle' | 'running' | 'cancelled' | 'failed' | 'complete';
+export type BlockPhase = 'idle' | 'running' | 'interrupted' | 'cancelled' | 'failed' | 'complete';
 
 export interface BlockRunState {
   requestId: string | null;
@@ -53,6 +81,45 @@ export interface SubmitBlockEnvelope {
   command: SeasonSubmitBlockCommand;
   start: SeasonBlockStartInput;
 }
+
+/** A rejected between-block command, surfaced as a typed alert. */
+export interface SeasonRunCommandError {
+  command: SeasonRunCommand['command'];
+  /** Null when the engine handler was not implemented yet in this build. */
+  rejection: SeasonRunCommandRejection | null;
+  message: string;
+}
+
+/** The two M2.5 Influence spend purposes (data-contracts keeps them inline). */
+export type SeasonSpendInfluencePurpose = SeasonSpendInfluenceCommand['purpose'];
+
+/**
+ * The frozen engine handler contract (lead-owned `@hoop-rush/engine` export
+ * lands at integration; the hub types the call against the frozen shape
+ * through this cast until then).
+ */
+type SeasonRunCommandContext = {
+  run: SeasonRun;
+  pending: SeasonPendingBlockCandidate | null;
+  humanFranchiseId: string | null;
+};
+
+type SeasonRunCommandOutput = {
+  result:
+    | SeasonSelectBlockObjectiveResult
+    | SeasonSpendInfluenceResult
+    | SeasonAcceptTradeOfferResult
+    | SeasonDeclineTradeOfferResult
+    | SeasonResumeSeasonBlockResult
+    | SeasonForfeitInterruptedGameResult;
+  run: SeasonRun;
+  pending: SeasonPendingBlockCandidate | null;
+};
+
+const handleRunCommand = handleSeasonRunCommand as unknown as (
+  command: SeasonRunCommand,
+  context: SeasonRunCommandContext,
+) => SeasonRunCommandOutput;
 
 const IDLE_BLOCK: BlockRunState = {
   requestId: null,
@@ -84,6 +151,18 @@ export class SeasonHubState {
    * them through `discardIncompatibleRun`.
    */
   incompatible: SeasonRunIncompatibleInfo | null = null;
+  /**
+   * M2.5: the uncommitted pending block candidate of an interrupted run
+   * (persisted; survives reload). Null when no block is paused.
+   */
+  pending: SeasonPendingBlockCandidate | null = null;
+  /**
+   * M2.5: the typed invalid-roster interruption (from the runner event;
+   * null after a reload — the pending candidate still proves the pause).
+   */
+  interruption: SeasonInvalidRosterInterruption | null = null;
+  /** M2.5: the last rejected between-block command, surfaced as a typed alert. */
+  commandError: SeasonRunCommandError | null = null;
 
   constructor(repo: SeasonRunRepository, runner: SeasonBlockRunner) {
     this.repo = repo;
@@ -142,6 +221,19 @@ export class SeasonHubState {
       }
       this.snapshot = snapshot;
       this.index = index;
+      // M2.5: a persisted pending candidate survives reload; mirror it so the
+      // interruption recovery panel re-renders after a page reload.
+      if (snapshot !== null) {
+        try {
+          this.pending = await this.repo.loadPendingBlock(snapshot.run.runId);
+          if (this.pending === null) this.interruption = null;
+        } catch {
+          this.pending = null;
+        }
+      } else {
+        this.pending = null;
+        this.interruption = null;
+      }
       if (
         snapshot !== null &&
         index !== null &&
@@ -227,6 +319,170 @@ export class SeasonHubState {
     this.emit();
   }
 
+  /**
+   * M2.5: resumes an interrupted block through the runner's
+   * `SeasonBlockResumeInput` (the interrupted submission's identity facts —
+   * same command id for idempotency, the locked rotations, and the asset
+   * urls). After a reload the locked rotations are rebuilt from the run's
+   * committed set (the runner rejects a digest mismatch with a typed error);
+   * the packaged assets are re-loaded on demand.
+   */
+  async resumeBlock(): Promise<void> {
+    const pending = this.pending;
+    if (pending === null) return;
+    if (this.block.phase === 'running') return;
+    const submitted = this.block.startInput;
+    let input: SeasonBlockResumeInput;
+    if (submitted !== null) {
+      input = {
+        runId: submitted.run.runId,
+        blockIndex: submitted.blockIndex,
+        expectedRevision: submitted.expectedRevision,
+        rotationDigest: submitted.rotationDigest,
+        commandId: submitted.commandId,
+        rotations: submitted.rotations,
+        humanFranchiseId: submitted.humanFranchiseId,
+        homeCourt: submitted.homeCourt,
+        catalogUrl: submitted.catalogUrl,
+        catalogHash: submitted.catalogHash,
+        profileUrl: submitted.profileUrl,
+        profileHash: submitted.profileHash,
+      };
+    } else {
+      const run = this.snapshot?.run;
+      if (run === undefined) return;
+      const [homeCourt, urls] = await Promise.all([
+        import('./season-assets').then((module) => module.loadSeasonHomeCourtProfile()),
+        import('./season-assets').then((module) => module.seasonArtifactUrls()),
+      ]);
+      input = {
+        runId: run.runId,
+        blockIndex: pending.blockIndex,
+        expectedRevision: pending.expectedRevision,
+        rotationDigest: pending.rotationDigest,
+        commandId: pending.commandId,
+        rotations: run.rotations,
+        humanFranchiseId:
+          run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null,
+        homeCourt,
+        catalogUrl: urls.catalogUrl,
+        catalogHash: urls.catalogHash,
+        profileUrl: urls.profileUrl,
+        profileHash: urls.profileHash,
+      };
+    }
+    this.block = {
+      ...IDLE_BLOCK,
+      blockIndex: pending.blockIndex,
+      phase: 'running',
+      command: null,
+      startInput: null,
+    };
+    try {
+      const requestId = this.runner.resumeBlock(input);
+      this.block.requestId = requestId;
+    } catch (error) {
+      this.block.phase = 'failed';
+      this.block.error = {
+        code: 'internal',
+        message: error instanceof Error ? error.message : String(error),
+        seed: null,
+        gameId: null,
+      };
+    }
+    this.emit();
+  }
+
+  /** M2.5: selects the block's objective (typed command before submission). */
+  async selectBlockObjective(input: {
+    blockIndex: number;
+    objectiveId: SeasonObjectiveId;
+  }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'select-block-objective',
+      commandId: newSeasonId('obj'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      blockIndex: input.blockIndex,
+      objectiveId: input.objectiveId,
+    };
+    await this.dispatch(command);
+  }
+
+  /** M2.5: spends Influence on an extra trade offer or a risky rehab. */
+  async spendInfluence(input: {
+    purpose: SeasonSpendInfluencePurpose;
+    windowIndex?: number;
+    injuryId?: string;
+  }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'spend-influence',
+      commandId: newSeasonId('inf'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      franchiseId: this.requiredHumanFranchiseId(),
+      purpose: input.purpose,
+      ...(input.purpose === 'extra-trade-offer' ? { windowIndex: input.windowIndex } : {}),
+      ...(input.purpose === 'risky-rehab' ? { injuryId: input.injuryId } : {}),
+    };
+    await this.dispatch(command);
+  }
+
+  /** M2.5: accepts an open trade offer (atomic roster + ownership transfer). */
+  async acceptTradeOffer(input: { windowIndex: number; offerId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'accept-trade-offer',
+      commandId: newSeasonId('acc'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      windowIndex: input.windowIndex,
+      offerId: input.offerId,
+    };
+    await this.dispatch(command);
+  }
+
+  /** M2.5: declines an open trade offer (offer status -> declined). */
+  async declineTradeOffer(input: { windowIndex: number; offerId: string }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'decline-trade-offer',
+      commandId: newSeasonId('dec'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      windowIndex: input.windowIndex,
+      offerId: input.offerId,
+    };
+    await this.dispatch(command);
+  }
+
+  /**
+   * M2.5: forfeits the interrupted game (official 2-0, no player stats),
+   * advances the pending candidate, and re-checks the next game.
+   */
+  async forfeitInterruptedGame(): Promise<void> {
+    const pending = this.pending;
+    const interruption = this.interruption;
+    if (pending === null) return;
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'forfeit-interrupted-game',
+      commandId: newSeasonId('for'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      blockIndex: pending.blockIndex,
+      nextGameId: interruption?.nextGameId ?? pending.nextGameId,
+    };
+    await this.dispatch(command);
+  }
+
   /** Requests cancellation; the worker stops between games. */
   cancel(): void {
     const requestId = this.block.requestId;
@@ -280,6 +536,83 @@ export class SeasonHubState {
     });
   }
 
+  /**
+   * M2.5: dispatches one between-block command through the pure engine
+   * handler, persists the accepted mutation atomically, and refreshes the
+   * snapshot. Rejections surface as the typed `commandError` alert.
+   */
+  private async dispatch(command: SeasonRunCommand): Promise<void> {
+    const snapshot = this.snapshot;
+    this.commandError = null;
+    if (snapshot === null) {
+      this.commandError = {
+        command: command.command,
+        rejection: null,
+        message: 'The active run is not loaded yet.',
+      };
+      this.emit();
+      return;
+    }
+    try {
+      const output = handleRunCommand(command, {
+        run: snapshot.run,
+        pending: this.pending,
+        humanFranchiseId: this.humanFranchiseId(),
+      });
+      if (output.result.status === 'rejected') {
+        this.commandError = {
+          command: command.command,
+          rejection: output.result.rejection,
+          message: describeCommandRejection(command.command, output.result.rejection),
+        };
+        this.emit();
+        return;
+      }
+      await this.repo.applySeasonRunCommand({
+        runId: snapshot.run.runId,
+        command,
+        run: output.run,
+        pending: output.pending,
+      });
+      this.commandError = null;
+      await this.refresh();
+    } catch (error) {
+      this.commandError = {
+        command: command.command,
+        rejection: null,
+        message: error instanceof Error ? error.message : String(error),
+      };
+      this.emit();
+    }
+  }
+
+  private requiredRunId(): string {
+    const runId = this.snapshot?.run.runId;
+    if (runId === undefined) throw new Error('no active season run to command');
+    return runId;
+  }
+
+  private requiredStateRevision(): number {
+    return this.snapshot?.run.stateRevision ?? 0;
+  }
+
+  private requiredStateDigest(): string {
+    return this.snapshot?.run.stateDigest ?? '0'.repeat(32);
+  }
+
+  private requiredHumanFranchiseId(): string {
+    const franchiseId =
+      this.snapshot?.run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
+    if (franchiseId === null) throw new Error('the active run has no human franchise');
+    return franchiseId;
+  }
+
+  private humanFranchiseId(): string | null {
+    return (
+      this.snapshot?.run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null
+    );
+  }
+
   private onRunnerEvent(event: SeasonRunnerEvent): void {
     switch (event.type) {
       case 'started':
@@ -300,13 +633,29 @@ export class SeasonHubState {
         this.block.latestGameId = null;
         this.block.latestResult = null;
         this.block.error = null;
-        // The runner committed atomically; re-read the accepted snapshot.
+        // The runner committed atomically (deleting any pending row in the
+        // same transaction); re-read the accepted snapshot and clear the
+        // interrupted state.
+        this.pending = null;
+        this.interruption = null;
         void this.refresh();
         break;
       }
+      case 'interrupted':
+        if (this.block.blockIndex !== event.blockIndex) break;
+        this.block.phase = 'interrupted';
+        this.block.latestGameId = null;
+        this.block.latestResult = null;
+        this.block.error = null;
+        this.pending = event.pending;
+        this.interruption = event.interruption;
+        this.commandError = null;
+        break;
       case 'cancelled':
         if (this.block.blockIndex !== event.blockIndex) break;
         this.block.phase = 'cancelled';
+        this.pending = null;
+        this.interruption = null;
         break;
       case 'error':
         if (this.block.blockIndex !== event.blockIndex) break;
@@ -324,5 +673,60 @@ export class SeasonHubState {
 
   private emit(): void {
     for (const listener of this.listeners) listener();
+  }
+}
+
+/** Human-readable explanation of a typed command rejection (UI alert). */
+export function describeCommandRejection(
+  command: SeasonRunCommand['command'],
+  rejection: SeasonRunCommandRejection,
+): string {
+  switch (rejection.code) {
+    case 'run-mismatch':
+      return 'The command does not belong to the active run.';
+    case 'stale-state':
+      return `The run moved on (revision ${String(rejection.currentStateRevision)}); the command was based on stale state. Refresh and try again.`;
+    case 'duplicate-command':
+      return 'This command was already applied.';
+    case 'not-at-boundary':
+      return `Objective selection must target the next unselected block (block ${String(
+        rejection.nextUnselectedBlockIndex,
+      )}).`;
+    case 'objective-not-offered':
+      return 'That objective is not in the block’s offered set.';
+    case 'objective-already-selected':
+      return `Block ${String(rejection.blockIndex + 1)} already has a selected objective.`;
+    case 'insufficient-balance':
+      return `Influence balance ${String(rejection.balance)} cannot cover the ${String(
+        -rejection.requestedDelta,
+      )}-point spend (floor ${String(rejection.floor)}).`;
+    case 'window-not-open':
+      return 'That trade window is not open right now.';
+    case 'already-spent':
+      return 'The extra trade offer was already bought this window.';
+    case 'injury-not-active':
+      return 'That injury is no longer active.';
+    case 'already-rehabbed':
+      return 'A risky rehab was already run for that injury.';
+    case 'no-window':
+      return 'No trade window is open to spend on.';
+    case 'offer-unknown':
+      return 'That trade offer is unknown.';
+    case 'offer-not-open':
+      return 'That trade offer is no longer open.';
+    case 'roster-illegal':
+      return `That trade would leave an illegal roster: ${rejection.reasons.join('; ')}`;
+    case 'ownership-conflict':
+      return 'That trade would duplicate player ownership.';
+    case 'no-pending-block':
+      return 'There is no interrupted block to resume.';
+    case 'block-mismatch':
+      return 'The command targets a different block than the interrupted one.';
+    case 'rotation-digest-mismatch':
+      return 'The rotation set changed since the block was locked.';
+    case 'game-mismatch':
+      return 'The forfeit targets a different game than the interrupted one.';
+    default:
+      return `The ${command} command was rejected.`;
   }
 }

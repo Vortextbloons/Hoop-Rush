@@ -2,6 +2,7 @@ import {
   seasonEffectsStateSchema,
   type SeasonEffectsState,
   type SeasonGameSummary,
+  type SeasonInfluenceState,
   type SeasonLeague,
   type SeasonPairChemistryState,
   type SeasonPlayerAggregate,
@@ -16,11 +17,12 @@ import {
   seasonRotationSetDigest,
 } from '@hoop-rush/engine';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
+import { seasonRunStateDigest as seasonRunStateDigestLocal } from './state-digest.ts';
 
 /**
  * Production binding of the `SeasonRunEngineSeam` to the pure engine helpers
- * (spec/2.0/07 persistence, M2.3, M2.4). This file is the single place that
- * imports `@hoop-rush/engine`; the repository, the audit, and the test
+ * (spec/2.0/07 persistence, M2.3, M2.4, M2.5). This file is the single place
+ * that imports `@hoop-rush/engine`; the repository, the audit, and the test
  * fixtures depend only on the interface in `engine-seam-types.ts`, so a
  * signature drift in the engine implementation is fixed here and nowhere
  * else. The M2.4 effects helpers are pure TypeScript (canonical pair and
@@ -40,6 +42,20 @@ import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
  * pads the engine output with zero rows from the league and rosters. All
  * helpers are pure TypeScript; the seam imports no Svelte, Dexie, browser,
  * or network code.
+ *
+ * M2.5 TEMPORARY BINDINGS (persistence workstream): `seasonRunStateDigest`
+ * and `createInitialSeasonInfluenceState` are NOT yet exported from
+ * `@hoop-rush/engine` (the health/economy workstreams own them; the lead
+ * wires `engine/index.ts` at integration). Until then this seam binds both
+ * to deterministic local mirrors:
+ *
+ * - `seasonRunStateDigest` -> `season/state-digest.ts` (canonical pure
+ *   implementation, self-excluded digest; swap to the engine export at
+ *   integration — a swap cannot silently fork stored rows because every
+ *   reload recomputes the digest through the same binding).
+ * - `createInitialSeasonInfluenceState` -> the local mirror below of the
+ *   engine's real `createInitialSeasonInfluenceState` (frozen rule: every
+ *   franchise +2 with its recorded initial-grant ledger entry).
  */
 export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   reconstructSeasonGames,
@@ -51,6 +67,8 @@ export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   zeroSeasonEffectsState,
   seasonPairKey,
   seasonPairIsCanonical,
+  seasonRunStateDigest: seasonRunStateDigestLocal,
+  createInitialSeasonInfluenceState,
 };
 
 const ZERO_TEAM_FIELDS: Omit<
@@ -135,6 +153,42 @@ function paddedPlayerAggregates(
       }),
     )
     .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
+}
+
+/**
+ * TEMPORARY M2.5 mirror of the engine's `createInitialSeasonInfluenceState`
+ * (engine/season/influence.ts, REAL there): every franchise at +2 with its
+ * recorded `initial-grant` ledger entry (blockIndex/commandId null), empty
+ * windows and rehabs. Deterministic pure function; the lead swaps this
+ * binding for the engine export at integration.
+ */
+function createInitialSeasonInfluenceState(franchiseIds: readonly string[]): SeasonInfluenceState {
+  const balances: Record<string, number> = {};
+  const ledger: SeasonInfluenceState['ledger'] = [];
+  const windows: SeasonInfluenceState['windows'] = {};
+  for (const franchiseId of franchiseIds) {
+    balances[franchiseId] = 2;
+    ledger.push({
+      entryId: `influence-initial-${franchiseId}`,
+      franchiseId,
+      source: 'initial-grant',
+      blockIndex: null,
+      commandId: null,
+      requestedDelta: 2,
+      appliedDelta: 2,
+      balanceAfter: 2,
+      explanation: 'Initial +2 Influence grant at run creation',
+    });
+    windows[franchiseId] = [];
+  }
+  return {
+    schemaVersion: 1,
+    influenceVersion: 'season-influence-v1',
+    balances,
+    ledger,
+    windows,
+    rehabs: {},
+  };
 }
 
 /** Sorted unique player-version ids across every roster. */

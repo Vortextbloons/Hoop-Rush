@@ -123,8 +123,27 @@ Commands:
                          --input <checkpoint.json> --run <run.json>
                          --manifest <path> --profile <eraId>
   season full simulate   Simulate all nine blocks (1,230 games) and print
-                         per-block digests, the final digest, and total time.
-                         --input <run.json> --manifest <path> --profile <eraId>
+                          per-block digests, the final digest, the M2.5 state
+                          chain, and final health/transaction facts.
+                          --input <run.json> --manifest <path> --profile <eraId>
+  season health calibrate
+                          Freeze injury-targets-v1 from a season cohort plus a
+                          roll-level probe (incidence, severity, durations,
+                          same-game return, recurrence, season-ending,
+                          monotonicity, standings independence).
+                          --input <run.json> --seed-from N --seed-to N
+                          --out <path> --validate <path> --manifest <path>
+  season trade calibrate  Freeze trade-targets-v1 from seasons with windows at
+                          blocks 2/4/5 (AI trades per season, legality, value
+                          bands, determinism, chemistry invariants).
+                          --input <run.json> --seed-from N --seed-to N
+                          --out <path> --validate <path> --manifest <path>
+  season influence calibrate
+                          Freeze influence-targets-v1 (ledger reconciliation,
+                          income identity, debt frequency, cap violations,
+                          objective success, spend rates).
+                          --input <run.json> --seed-from N --seed-to N
+                          --out <path> --validate <path> --manifest <path>
   season home-court calibrate
                          Measure the tuned home-court profile against the
                          frozen 0.575 held-out target and write the evidence

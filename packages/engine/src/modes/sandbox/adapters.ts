@@ -21,6 +21,7 @@ export function toSimulationPlayer(player: PeakPlayerSeason): SimulationPlayer {
     ratings: player.detailedRatings,
     tendencies: player.tendencies,
     anchors: player.anchors,
+    reconstructedThreePoint: player.reconstructedThreePoint,
     overall: player.summaryRatings.overallRating,
     ratingProfile: player.ratingProfile,
   };

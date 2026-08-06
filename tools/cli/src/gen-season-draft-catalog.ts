@@ -1,6 +1,6 @@
 /**
- * Derives the packaged Season Run draft catalog (spec/2.0 M2.1, M2.4) from
- * the validated franchise-era pool artifacts and updates the manifest
+ * Derives the packaged Season Run draft catalog (spec/2.0 M2.1, M2.4, M2.5)
+ * from the validated franchise-era pool artifacts and updates the manifest
  * hashes. Run with `pnpm --filter @hoop-rush/cli gen-season-draft-catalog`
  * AFTER the pools exist (they are committed under apps/web/static/data/pools).
  *
@@ -13,11 +13,17 @@
  *   historicalMpg = stats.minutes / max(1, stats.gamesPlayed ?? 0)
  *   staminaRating = round(clamp(45, 95, 45 + 1.25 * historicalMpg))
  *
- * Records without usable stats (missing stats, null minutes, or zero games
- * played) derive the floor profile (0 MPG, rating 45) deterministically.
- * Conflicting records that derive the same playerVersionId with different
- * content are rejected; the catalog is validated by the
- * seasonDraftCatalogSchema before it is written.
+ * Since season-draft-catalog-v3 (M2.5) each candidate also carries the
+ * build-time durability profile (durability-v1) from the recorded
+ * `stats.gamesPlayed` and the eligibility `teamGames`:
+ *
+ *   durabilityRating = round(clamp(45, 95, 45 + 50 * gamesPlayed / max(1, teamGames)))
+ *
+ * Records without usable stats or eligibility derive the floor profile
+ * (rating 45) deterministically, mirroring the stamina floor. Conflicting
+ * records that derive the same playerVersionId with different content are
+ * rejected; the catalog is validated by the seasonDraftCatalogSchema before
+ * it is written.
  */
 
 import { createHash } from 'node:crypto';
@@ -26,10 +32,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   SEASON_DRAFT_CATALOG_VERSION,
+  SEASON_DURABILITY_VERSION,
   SEASON_STAMINA_VERSION,
   playerVersionId,
   seasonDraftCatalogSchema,
   type SeasonDraftCandidate,
+  type SeasonDraftCandidateDurability,
 } from '@hoop-rush/data-contracts';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
@@ -49,6 +57,41 @@ interface PoolEntry {
   franchiseId: string;
   eraId: string;
   playerVersionIds: string[];
+}
+
+/**
+ * The M2.5 durability rating (durability-v1):
+ * `round(clamp(45, 95, 45 + 50 * gamesPlayed / max(1, teamGames)))` from the
+ * recorded `stats.gamesPlayed` and the eligibility `teamGames`. Unusable
+ * inputs (missing stats/eligibility or non-positive counts) derive the floor
+ * profile 45, mirroring the stamina floor treatment.
+ */
+export function durabilityRatingFrom(
+  gamesPlayed: number | null | undefined,
+  teamGames: number | null | undefined,
+): number {
+  if (
+    gamesPlayed === null ||
+    gamesPlayed === undefined ||
+    teamGames === null ||
+    teamGames === undefined ||
+    gamesPlayed <= 0 ||
+    teamGames <= 0
+  ) {
+    return 45;
+  }
+  return Math.round(Math.min(95, Math.max(45, 45 + (50 * gamesPlayed) / Math.max(1, teamGames))));
+}
+
+/** The durability profile (rating + derivation version) for one pool player. */
+export function durabilityProfileOf(
+  gamesPlayed: number | null | undefined,
+  teamGames: number | null | undefined,
+): SeasonDraftCandidateDurability {
+  return {
+    rating: durabilityRatingFrom(gamesPlayed, teamGames),
+    derivationVersion: SEASON_DURABILITY_VERSION,
+  };
 }
 
 function main(): void {
@@ -96,6 +139,7 @@ function main(): void {
         detailedRatings: Record<string, number>;
         tendencies: Record<string, number>;
         stats?: { minutes: number | null; gamesPlayed: number | null };
+        eligibility?: { teamGames?: number | null };
       }>;
     };
     dataVersion = pool.dataVersion;
@@ -137,6 +181,12 @@ function main(): void {
           historicalMpg,
           derivationVersion: SEASON_STAMINA_VERSION,
         },
+        // M2.5: build-time durability profile (durability-v1) from recorded
+        // games played and the eligibility team games; floor 45 when unusable.
+        durability: durabilityProfileOf(
+          player.stats?.gamesPlayed ?? null,
+          player.eligibility?.teamGames ?? null,
+        ),
       };
       if (existing !== undefined) {
         if (JSON.stringify(existing) !== JSON.stringify(record)) {
@@ -164,6 +214,8 @@ function main(): void {
     positionNormalizationVersion: positionNormalizationVersion || 'position-v3',
     playerVersionIdVersion: 'player-version-id-v1',
     staminaVersion: SEASON_STAMINA_VERSION,
+    // M2.5: durability profile derivation version for every candidate.
+    durabilityVersion: SEASON_DURABILITY_VERSION,
     pools,
     candidates: [...candidates.values()].sort((a, b) =>
       a.playerVersionId < b.playerVersionId ? -1 : 1,

@@ -1,5 +1,6 @@
 import {
   SEASON_GAME_SUMMARY_VERSION,
+  type SeasonCompactInjuryEvent,
   type SeasonCompactPlayerLine,
   type SeasonEffectsRollup,
   type SeasonGameEffectsTransition,
@@ -134,12 +135,15 @@ function zeroTeamBox(franchiseId: string): SeasonTeamBox {
  * home/away franchise); the result's side boxes carry the franchise ids and
  * statistics. A forfeit becomes the official 2-0 with zero boxes and empty
  * player arrays. `no-legal-five-both` throws: it has no legal summary
- * representation and must never be fabricated into a winner.
+ * representation and must never be fabricated into a winner. M2.5: the
+ * optional `injuryEvents` (compact per-game injury facts) ride the summary;
+ * a zero-injury game carries an empty array.
  */
 export function seasonGameSummaryFromResult(
   result: SeasonGameSimulationResult,
   game: SeasonScheduleGame,
   effectsTransition?: SeasonGameEffectsTransition,
+  injuryEvents: readonly SeasonCompactInjuryEvent[] = [],
 ): SeasonGameSummary {
   if (result.outcome === 'no-legal-five-both') {
     throw new Error(
@@ -164,6 +168,7 @@ export function seasonGameSummaryFromResult(
       awayBox: zeroTeamBox(game.awayFranchiseId),
       homePlayers: [],
       awayPlayers: [],
+      injuryEvents: [],
     };
   }
   return {
@@ -185,6 +190,7 @@ export function seasonGameSummaryFromResult(
     ...(effectsTransition !== undefined && effectsTransition.evidence.length > 0
       ? { effectsRollup: seasonEffectsRollupFromEvidence(effectsTransition.evidence) }
       : {}),
+    injuryEvents: [...injuryEvents],
   };
 }
 
@@ -192,13 +198,15 @@ export function seasonGameSummaryFromResult(
  * Wraps the full simulation result as a retained detail row (human-team
  * games only). Reuses the complete M2.2 result contract, so substitutions,
  * unit stints, deviations, foul-outs, removals, shot-zone facts, and
- * diagnostics are preserved exactly where the product explains them.
+ * diagnostics are preserved exactly where the product explains them. M2.5:
+ * the compact injury-event rollup rides the detail for display.
  */
 export function seasonRetainedDetailFromResult(
   result: SeasonGameSimulationResult,
   game: SeasonScheduleGame,
   runId: string,
   effectsTransition?: SeasonGameEffectsTransition,
+  injuryEvents: readonly SeasonCompactInjuryEvent[] = [],
 ): SeasonRetainedGameDetail {
   return {
     schemaVersion: 1,
@@ -211,6 +219,7 @@ export function seasonRetainedDetailFromResult(
     ...(effectsTransition !== undefined && effectsTransition.evidence.length > 0
       ? { mechanismEvidence: effectsTransition.evidence }
       : {}),
+    injuryEvents: [...injuryEvents],
   };
 }
 
@@ -240,8 +249,11 @@ export function seasonEffectsEvidenceOf(
 /**
  * Audits one compact summary: for final games the team boxes equal the sum
  * of the player lines and the scores are consistent with the boxes; for
- * forfeits every non-zero field is flagged. Returns failure strings; empty
- * means valid.
+ * forfeits every non-zero field is flagged. M2.5: the compact injury events
+ * are validated structurally — forfeits carry none; every event references a
+ * rostered version of its side; one event per player per game; a returned
+ * event always carries its return clock and a non-returned event never does.
+ * Returns failure strings; empty means valid.
  */
 export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
   const failures: string[] = [];
@@ -351,6 +363,9 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
     if (summary.overtimePeriods !== 0) {
       failures.push('forfeit carries no overtime');
     }
+    if (summary.injuryEvents.length !== 0) {
+      failures.push('forfeit summary must carry no injury events');
+    }
     return failures;
   }
   if (summary.forfeitLoserFranchiseId !== null) {
@@ -358,6 +373,39 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
   }
   if (summary.homeScore === summary.awayScore) {
     failures.push('final game cannot be tied');
+  }
+
+  // M2.5 compact injury-event audit (final games only; forfeits carry none).
+  {
+    const rosteredOf = new Map<string, string>();
+    for (const side of sides) {
+      for (const line of side === 'home' ? summary.homePlayers : summary.awayPlayers) {
+        rosteredOf.set(line.playerVersionId, side);
+      }
+    }
+    const seen = new Set<string>();
+    for (const event of summary.injuryEvents) {
+      const rosteredSide = rosteredOf.get(event.playerVersionId);
+      if (rosteredSide === undefined) {
+        failures.push(`injury event references an unrostered version ${event.playerVersionId}`);
+      } else if (rosteredSide !== event.side) {
+        failures.push(
+          `injury event side ${event.side} does not match the rostered side ${rosteredSide} for ${event.playerVersionId}`,
+        );
+      }
+      if (seen.has(event.playerVersionId)) {
+        failures.push(`duplicate injury event for ${event.playerVersionId}`);
+      }
+      seen.add(event.playerVersionId);
+      if (event.returned && event.returnClock === null) {
+        failures.push(`returned injury event for ${event.playerVersionId} carries no return clock`);
+      }
+      if (!event.returned && event.returnClock !== null) {
+        failures.push(
+          `non-returned injury event for ${event.playerVersionId} carries a return clock`,
+        );
+      }
+    }
   }
   return failures;
 }

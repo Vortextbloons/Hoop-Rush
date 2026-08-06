@@ -279,6 +279,20 @@ const COMMANDS: Record<string, CommandEntry> = {
         }),
     };
   }),
+  'calibrate three-point': command(async () => {
+    const { calibrateThreePoint, CALIBRATE_THREE_POINT_OPTIONS } =
+      await import('./commands/calibrate-three-point.ts');
+    return {
+      options: CALIBRATE_THREE_POINT_OPTIONS,
+      run: (args) =>
+        calibrateThreePoint({
+          write: hasOption(args, 'write'),
+          format: getOptionString(args, 'format') ?? undefined,
+          manifest: getOptionString(args, 'manifest') ?? undefined,
+          output: getOptionString(args, 'output') ?? undefined,
+        }),
+    };
+  }),
   'combine docs': command(async () => {
     const { combineDocs, COMBINE_DOCS_OPTIONS } = await import('./commands/docs-combine.ts');
     return {
@@ -536,6 +550,57 @@ const COMMANDS: Record<string, CommandEntry> = {
       run: (args) =>
         seasonEffectsCalibrate({
           fixture: getOptionString(args, 'fixture') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
+  'season health calibrate': command(async () => {
+    const { seasonHealthCalibrate, SEASON_HEALTH_CALIBRATE_OPTIONS } =
+      await import('./commands/season-health.ts');
+    return {
+      options: SEASON_HEALTH_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonHealthCalibrate({
+          input: getOptionString(args, 'input') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
+  'season trade calibrate': command(async () => {
+    const { seasonTradeCalibrate, SEASON_TRADE_CALIBRATE_OPTIONS } =
+      await import('./commands/season-trade.ts');
+    return {
+      options: SEASON_TRADE_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonTradeCalibrate({
+          input: getOptionString(args, 'input') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
+  'season influence calibrate': command(async () => {
+    const { seasonInfluenceCalibrate, SEASON_INFLUENCE_CALIBRATE_OPTIONS } =
+      await import('./commands/season-influence.ts');
+    return {
+      options: SEASON_INFLUENCE_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonInfluenceCalibrate({
+          input: getOptionString(args, 'input') ?? null,
           'seed-from': getOptionString(args, 'seed-from') ?? null,
           'seed-to': getOptionString(args, 'seed-to') ?? null,
           workers: getOptionString(args, 'workers') ?? null,

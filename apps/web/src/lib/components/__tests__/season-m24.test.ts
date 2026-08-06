@@ -5,6 +5,7 @@ import { render } from '@testing-library/svelte';
 import { buildManifest, buildSeasonLeague, buildSeasonRosters } from '@hoop-rush/test-fixtures';
 import type {
   HoopRushManifest,
+  SeasonBlockRecap,
   SeasonEffectsState,
   SeasonGameSummary,
   SeasonRoster,
@@ -24,7 +25,10 @@ mockSvelteKitApp();
  */
 
 const MANIFEST: HoopRushManifest = buildManifest();
-const ROSTER: SeasonRoster = buildSeasonRosters(buildSeasonLeague(), 'roster-m24')[0]!;
+const ROSTER: SeasonRoster = buildSeasonRosters(
+  buildSeasonLeague(),
+  'roster-m24',
+)[0] as SeasonRoster;
 
 function effectsState(fatigue: number, shared: number): SeasonEffectsState {
   const playerStates = ROSTER.players.map((entry) => ({
@@ -70,21 +74,34 @@ function minimalShell(): SeasonRunShellData {
     seasonComplete: false,
     editor: null,
     editorKey: null,
+    health: null,
+    influence: null,
+    trade: null,
+    objectives: null,
+    pending: null,
+    interruption: null,
+    commandError: null,
     playerName: () => '',
     playablePositions: () => [],
     franchiseName: (id: string) => id,
     franchiseAbbrev: (id: string) => id,
     cancelBlock: () => undefined,
     retryBlock: () => undefined,
-    refresh: async () => undefined,
-    quitRun: async () => ({ ok: true }),
+    refresh: () => Promise.resolve(),
+    quitRun: () => Promise.resolve({ ok: true, error: null }),
+    selectBlockObjective: () => Promise.resolve(),
+    spendInfluence: () => Promise.resolve(),
+    acceptTradeOffer: () => Promise.resolve(),
+    declineTradeOffer: () => Promise.resolve(),
+    forfeitInterruptedGame: () => Promise.resolve(),
+    resumeBlock: () => Promise.resolve(),
   };
 }
 
 function summaryFor(seconds: number): SeasonGameSummary {
   return {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v2',
+    summaryVersion: 'season-game-summary-v3',
     gameId: 's000001',
     round: 1,
     homeFranchiseId: 'lakers',
@@ -94,6 +111,7 @@ function summaryFor(seconds: number): SeasonGameSummary {
     homeScore: 100,
     awayScore: 90,
     forfeitLoserFranchiseId: null,
+    injuryEvents: [],
     homeBox: {
       franchiseId: 'lakers',
       points: 100,
@@ -160,12 +178,12 @@ describe('SeasonRosterList (M2.4)', () => {
         roster: ROSTER,
         manifest: MANIFEST,
         shell: minimalShell(),
-        roleOf: (id: string) => ({ role: 'Starter G', minutes: 32 }),
+        roleOf: () => ({ role: 'Starter G', minutes: 32 }),
         effects,
         summaries: [summaryFor(1920)],
       },
     });
-    const text = container.textContent ?? '';
+    const text = container.textContent;
     // Tired band at 40% fatigue (4000 bp); the label and percent are
     // separate text nodes inside the pill span.
     expect(text).toContain('Tired');
@@ -191,7 +209,7 @@ describe('SeasonRosterList (M2.4)', () => {
         summaries: [],
       },
     });
-    const text = container.textContent ?? '';
+    const text = container.textContent;
     expect(text).not.toContain('Unit chemistry');
     expect(text).toContain('Fixture hawks 1');
   });
@@ -199,9 +217,9 @@ describe('SeasonRosterList (M2.4)', () => {
 
 describe('CheckpointRecap (M2.4)', () => {
   it('renders the mechanism-evidence section with recorded figures', () => {
-    const recap = {
+    const recap: SeasonBlockRecap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v2',
+      recapVersion: 'season-recap-v3',
       runId: 'run-1',
       blockIndex: 0,
       completedRounds: 10,
@@ -211,6 +229,18 @@ describe('CheckpointRecap (M2.4)', () => {
       streaks: [],
       versionSpotlights: [],
       upcomingHumanGames: [],
+      injuryEvidence: {
+        injuries: 0,
+        bySeverity: { minor: 0, moderate: 0, major: 0, 'season-ending': 0 },
+        sameGameReturns: 0,
+        seasonEnding: 0,
+        returnedThisBlock: 0,
+        activeAtBlockEnd: 0,
+        humanTeamInjuries: [],
+      },
+      objectiveEvidence: null,
+      tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+      influenceBalance: { humanBalance: 2 },
     };
     const { container } = render(CheckpointRecap, {
       props: {
@@ -241,7 +271,7 @@ describe('CheckpointRecap (M2.4)', () => {
         ],
       },
     });
-    const text = container.textContent ?? '';
+    const text = container.textContent;
     expect(text).toContain('Stamina and chemistry');
     expect(text).toContain('Fatigued shooters converted at a lower rate');
     expect(text).toContain('90 opportunities');
@@ -255,7 +285,7 @@ describe('CheckpointRecap (M2.4)', () => {
       props: {
         recap: {
           schemaVersion: 1,
-          recapVersion: 'season-recap-v2',
+          recapVersion: 'season-recap-v3',
           runId: 'run-1',
           blockIndex: 0,
           completedRounds: 10,
@@ -265,6 +295,18 @@ describe('CheckpointRecap (M2.4)', () => {
           streaks: [],
           versionSpotlights: [],
           upcomingHumanGames: [],
+          injuryEvidence: {
+            injuries: 0,
+            bySeverity: { minor: 0, moderate: 0, major: 0, 'season-ending': 0 },
+            sameGameReturns: 0,
+            seasonEnding: 0,
+            returnedThisBlock: 0,
+            activeAtBlockEnd: 0,
+            humanTeamInjuries: [],
+          },
+          objectiveEvidence: null,
+          tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+          influenceBalance: { humanBalance: 2 },
         },
         humanRecord: null,
         franchiseName: (id: string) => id,
@@ -273,6 +315,6 @@ describe('CheckpointRecap (M2.4)', () => {
         effectsEvidence: [],
       },
     });
-    expect(container.textContent ?? '').not.toContain('Stamina and chemistry');
+    expect(container.textContent).not.toContain('Stamina and chemistry');
   });
 });

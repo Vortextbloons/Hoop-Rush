@@ -16,7 +16,7 @@ import { defenseBpmCorrelationReportSchema } from '../report-schemas.ts';
  *
  * The gate is a regression check, not a zero-dependency claim: BPM is itself
  * a box-stat-derived aggregate, so an evidence-driven defense rating built
- * from steals/blocks/rebounds (ratings-v3.5, no BPM in any defensive
+ * from steals/blocks/rebounds (ratings-v3.6, no BPM in any defensive
  * formula) measured r = 0.8916 vs 0.9439 before the BPM removal. Reaching
  * the previous 0.75 target is structurally impossible without gutting the
  * box-stat evidence: steals alone correlate 0.75 with BPM, blocks 0.78, and

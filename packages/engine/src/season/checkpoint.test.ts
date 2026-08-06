@@ -31,7 +31,7 @@ function summaryOf(
   const awayFranchiseId = homeFranchiseId === 'lakers' ? 'celtics' : 'lakers';
   return {
     schemaVersion: 1,
-    summaryVersion: 'season-game-summary-v2',
+    summaryVersion: 'season-game-summary-v3',
     gameId,
     round,
     homeFranchiseId,
@@ -79,6 +79,7 @@ function summaryOf(
     },
     homePlayers: [],
     awayPlayers: [],
+    injuryEvents: [],
   };
 }
 

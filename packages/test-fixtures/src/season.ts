@@ -9,8 +9,14 @@ import {
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
+  SEASON_HEALTH_VERSION,
   SEASON_HOME_COURT_VERSION,
+  SEASON_INFLUENCE_TARGETS_VERSION,
+  SEASON_INFLUENCE_VERSION,
+  SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEADERS_VERSION,
+  SEASON_OBJECTIVE_CATALOG,
+  SEASON_OBJECTIVE_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
@@ -22,9 +28,13 @@ import {
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_SEED_NAMESPACES,
   SEASON_STAMINA_VERSION,
+  SEASON_TRADE_TARGETS_VERSION,
+  SEASON_TRADE_VERSION,
   seasonNamespaceSeed,
   playerVersionId,
   type SeasonGame,
+  type SeasonHealthState,
+  type SeasonInfluenceState,
   type SeasonLeague,
   type SeasonPostseasonState,
   type SeasonRoster,
@@ -89,6 +99,50 @@ const ALIGNMENT: Record<string, AlignmentEntry> = {
 };
 
 const FRANCHISE_ORDER = Object.keys(ALIGNMENT);
+
+/** M2.5 empty health state: no injury records yet (schema-valid). */
+function emptyHealth(): SeasonHealthState {
+  return {
+    schemaVersion: 1,
+    healthVersion: SEASON_HEALTH_VERSION,
+    injuries: [],
+  };
+}
+
+/**
+ * M2.5 initial Influence state for the fixture league: every franchise at
+ * +2 with its recorded `initial-grant` ledger entry (blockIndex/commandId
+ * null), no windows, no rehabs (mirror of the data-contracts fixture
+ * builder `buildInitialInfluence`).
+ */
+function initialInfluence(league: SeasonLeague): SeasonInfluenceState {
+  const balances: Record<string, number> = {};
+  const ledger: SeasonInfluenceState['ledger'] = [];
+  const windows: SeasonInfluenceState['windows'] = {};
+  for (const team of league.teams) {
+    balances[team.franchiseId] = 2;
+    ledger.push({
+      entryId: `influence-initial-${team.franchiseId}`,
+      franchiseId: team.franchiseId,
+      source: 'initial-grant',
+      blockIndex: null,
+      commandId: null,
+      requestedDelta: 2,
+      appliedDelta: 2,
+      balanceAfter: 2,
+      explanation: 'Initial +2 Influence grant at run creation',
+    });
+    windows[team.franchiseId] = [];
+  }
+  return {
+    schemaVersion: 1,
+    influenceVersion: SEASON_INFLUENCE_VERSION,
+    balances,
+    ledger,
+    windows,
+    rehabs: {},
+  };
+}
 
 /** The frozen league: 30 teams; one human franchise (default lakers), rest AI. */
 export function buildSeasonLeague(
@@ -209,11 +263,19 @@ function emptyPostseason(rootSeed: string): SeasonPostseasonState {
  * Complete 30-team Season Run snapshot: committed schedule (caller-supplied
  * schedule — use the packaged artifact or regenerate it with
  * SEASON_COMMITTED_SCHEDULE_SEED), empty results, initial standings, block
- * cursor at round 0, postseason-ready derived seeds, and schema-v6 M2.4
+ * cursor at round 0, postseason-ready derived seeds, and schema-v7 M2.5
  * fields (synthetic draft facts, assignments, roster-generation-v2 AI
- * pools, rotations, evaluations, the generation audit, and the frozen
+ * pools, rotations, evaluations, the generation audit, the frozen
  * block/summary/aggregates/recap/leaders/home-court/checkpoint/stamina/
- * chemistry/effect-targets versions).
+ * chemistry/effect-targets versions plus the seven new M2.5 material
+ * versions, and the M2.5 mutable run state: empty health, initial
+ * Influence, empty transaction log, null trade state, fixed objective
+ * catalog, null checkpoint state, and stateRevision 0).
+ *
+ * The `stateDigest` parameter defaults to the zero digest (32 zeros) and is
+ * documented for callers that run the persistence reload audit: the audit
+ * recomputes the digest through the engine seam, so such callers must pass
+ * the real digest (`seam.seasonRunStateDigest` over the initial facts).
  */
 export function buildSeasonRunFixture(input: {
   schedule: SeasonSchedule;
@@ -222,6 +284,12 @@ export function buildSeasonRunFixture(input: {
   humanFranchiseId?: string;
   /** SHA-256 of the schedule artifact; fixtures default to a placeholder. */
   scheduleContentHash?: string;
+  /**
+   * M2.5 run state digest. Defaults to '0'.repeat(32) for callers that do
+   * not run the reload audit; persistence callers must pass the digest the
+   * engine seam computes over the initial mutable state.
+   */
+  stateDigest?: string;
 }): SeasonRun {
   const seed = input.seed ?? 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
   const league =
@@ -266,6 +334,13 @@ export function buildSeasonRunFixture(input: {
       staminaVersion: SEASON_STAMINA_VERSION,
       chemistryVersion: SEASON_CHEMISTRY_VERSION,
       effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
+      healthVersion: SEASON_HEALTH_VERSION,
+      tradeVersion: SEASON_TRADE_VERSION,
+      influenceVersion: SEASON_INFLUENCE_VERSION,
+      objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
+      tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
+      influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
     },
     league,
     rosters,
@@ -292,5 +367,22 @@ export function buildSeasonRunFixture(input: {
     rotations,
     generationAudit: buildFixtureGenerationAudit(seed),
     evaluations: buildFixtureEvaluations(rosters, aiAssignments),
+    // M2.5 mutable run state: promotion-time initial values (mirror of the
+    // data-contracts fixture builders `buildEmptyHealth` /
+    // `buildInitialInfluence`; the fixed objective catalog from
+    // SEASON_OBJECTIVE_CATALOG with no selections).
+    trade: null,
+    objectives: {
+      schemaVersion: 1,
+      objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      catalog: [...SEASON_OBJECTIVE_CATALOG],
+      selections: {},
+    },
+    health: emptyHealth(),
+    transactions: [],
+    influence: initialInfluence(league),
+    checkpointState: null,
+    stateRevision: 0,
+    stateDigest: input.stateDigest ?? '0'.repeat(32),
   };
 }

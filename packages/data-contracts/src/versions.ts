@@ -39,16 +39,24 @@ export const LINEAGE_RULE_VERSION = 'lineage-v1';
 export const SOURCE_VERSION = 'source-v1';
 
 /** Field-method registry for ratings/tendency derivation (spec/12 ladder). */
-export const DERIVATION_METHOD_VERSION = 'derive-v7';
+export const DERIVATION_METHOD_VERSION = 'derive-v8';
 
 /** Detailed ratings derivation version (strict engine contracts). */
-export const RATINGS_VERSION = 'ratings-v3.5';
+export const RATINGS_VERSION = 'ratings-v3.6';
 
 /** Deterministic peak-season selection score version (spec/02). */
-export const SELECTION_SCORE_VERSION = 'selection-v3.5-ratings-v3.5';
+export const SELECTION_SCORE_VERSION = 'selection-v3.6-ratings-v3.6';
 
 /** Canonical model identifier embedded in compact player-index rows. */
-export const RATING_MODEL_VERSION = 'ratings-model-v3.2';
+export const RATING_MODEL_VERSION = 'ratings-model-v3.3';
+
+/**
+ * Versioned offline three-point reconstruction model artifact
+ * (spec/12 conservative historical reconstruction). The browser consumes
+ * only per-player reconstructed profiles; this artifact is the audit and
+ * reproducibility boundary for fitting.
+ */
+export const THREE_POINT_RECONSTRUCTION_VERSION = 'three-point-reconstruction-v1';
 
 /**
  * Cohort percentile normalization of packaged peak-season Overall values
@@ -57,7 +65,7 @@ export const RATING_MODEL_VERSION = 'ratings-model-v3.2';
 export const COHORT_NORMALIZATION_VERSION = 'overall-cohort-v1';
 
 /** Pool and players-index artifact schema versions produced by Ratings v3. */
-export const POOL_SCHEMA_VERSION = 4;
+export const POOL_SCHEMA_VERSION = 5;
 export const PLAYERS_INDEX_SCHEMA_VERSION = 5;
 
 /** Position normalization version (career-wide detailed playable union). */

@@ -88,15 +88,22 @@ export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): numb
 /**
  * Observed two-point make rate from the season anchors (null when the
  * anchors cannot support a split). Derived from field-goal percentage with
- * the three-point share removed, clamped to a plausible band.
+ * the three-point share removed, clamped to a plausible band. Players with a
+ * conservative reconstructed three-point profile (pre-1979 / missing
+ * records) split their field-goal percentage using the conservative
+ * reconstructed attempt rate and accuracy, so their two-point efficiency
+ * stays anchored instead of silently dropping out.
  */
 export function observedTwoPointPct(shooter: SimulationPlayer): number | null {
   const anchors = shooter.anchors;
   if (!anchors) return null;
-  const threeRate = anchors.threePointAttemptRate;
+  const reconstructed = shooter.reconstructedThreePoint;
+  const threeRate = anchors.threePointAttemptRate ?? reconstructed?.attemptRateConservative ?? null;
+  if (threeRate === null) return null;
   const twoShare = 1 - threeRate;
   if (twoShare < 1e-6) return null;
-  const threePct = anchors.threePointPct ?? anchors.fieldGoalPct;
+  const threePct =
+    anchors.threePointPct ?? reconstructed?.accuracyConservative ?? anchors.fieldGoalPct;
   const twoPct = (anchors.fieldGoalPct - threeRate * threePct) / twoShare;
   return Math.min(0.62, Math.max(0.32, twoPct));
 }
@@ -185,7 +192,15 @@ export function blockProbability(
   );
 }
 
-/** Make probability for one shot attempt (clamped to basketball plausibility). */
+/**
+ * Make probability for one shot attempt (clamped to basketball plausibility).
+ *
+ * Three-point resolution order (spec/12): an observed season percentage
+ * anchors the shot (blended toward the era target); a conservative
+ * reconstructed profile pins the shot at its own accuracyConservative (no
+ * skill residual, no generic historical era penalty, profile-level zone
+ * floors); otherwise the unanchored zone base applies.
+ */
 export function makeProbability(
   shooter: SimulationPlayer,
   defender: SimulationPlayer,
@@ -198,6 +213,8 @@ export function makeProbability(
   effectsAdjustment = 0,
 ): number {
   const threePointZone = isThreePointZone(zone);
+  const reconstructed = threePointZone ? shooter.reconstructedThreePoint : undefined;
+  const hasReconstructed = reconstructed !== undefined;
   const observedThreePointPct = threePointZone ? shooter.anchors?.threePointPct : null;
   const hasObservedThree = observedThreePointPct !== null && observedThreePointPct !== undefined;
   const twoAnchor = threePointZone ? null : prep.twoPointAnchor;
@@ -206,19 +223,23 @@ export function makeProbability(
     ? hasObservedThree
       ? observedThreePointPct * ENGINE_CONSTANTS.observedThreePointBlend +
         profile.targets.threePointPct.value * (1 - ENGINE_CONSTANTS.observedThreePointBlend)
-      : ENGINE_CONSTANTS.zoneBaseMake[zone]
+      : hasReconstructed
+        ? reconstructed.accuracyConservative
+        : ENGINE_CONSTANTS.zoneBaseMake[zone]
     : ENGINE_CONSTANTS.zoneBaseMake[zone] * (twoAnchor ?? 1);
   const skill = threePointZone
     ? hasObservedThree
       ? ((zoneSkillRating(shooter, zone) - 70) / 100) *
         ENGINE_CONSTANTS.anchoredThreePointSkillRange
-      : ((zoneSkillRating(shooter, zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange
+      : hasReconstructed
+        ? 0
+        : ((zoneSkillRating(shooter, zone) - 70) / 30) * ENGINE_CONSTANTS.skillRange
     : ((zoneSkillRating(shooter, zone) - 70) / 30) *
       ENGINE_CONSTANTS.skillRange *
       (anchoredTwo ? ENGINE_CONSTANTS.twoPointAnchorSkillScale : 1);
   const contest = -contestPenalty(defender, zone);
   const era =
-    anchoredTwo || hasObservedThree
+    anchoredTwo || hasObservedThree || hasReconstructed
       ? 0
       : (profile.parameters.leagueTsPct - 0.55) * ENGINE_CONSTANTS.eraEfficiencyWeight;
   // Lineup spacing raises two-point conversion for spaced teams and
@@ -241,5 +262,14 @@ export function makeProbability(
     calibration +
     homeCourtAdjustment +
     effectsAdjustment;
-  return Math.min(0.97, Math.max(ENGINE_CONSTANTS.zoneMakeFloor[zone], Math.max(0.03, raw)));
+  // Reconstructed three-point shots floor at the profile's per-zone
+  // conservative floors (corner/above-break only) instead of the generic
+  // zone floors; the profile pins both accuracy and its own uncertainty.
+  const floor =
+    threePointZone && hasReconstructed
+      ? zone === 'cornerThree'
+        ? reconstructed.zoneFloors.cornerThree
+        : reconstructed.zoneFloors.aboveBreakThree
+      : ENGINE_CONSTANTS.zoneMakeFloor[zone];
+  return Math.min(0.97, Math.max(floor, Math.max(0.03, raw)));
 }

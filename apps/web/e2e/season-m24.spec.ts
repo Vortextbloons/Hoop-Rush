@@ -32,8 +32,12 @@ async function injectLegacyRun(page: Page): Promise<void> {
           d.createObjectStore('seasonRunIndex', { keyPath: 'recordId' });
         }
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error('opening hoop-rush-saves failed'));
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('opening hoop-rush-saves failed'));
+      };
     });
     const legacyRow = {
       recordId: 'season-run',
@@ -47,8 +51,12 @@ async function injectLegacyRun(page: Page): Promise<void> {
     const tx = db.transaction(['seasonRuns'], 'readwrite');
     tx.objectStore('seasonRuns').put(legacyRow);
     await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error('legacy row injection failed'));
+      tx.oncomplete = () => {
+        resolve();
+      };
+      tx.onerror = () => {
+        reject(tx.error ?? new Error('legacy row injection failed'));
+      };
     });
     db.close();
   });
@@ -59,14 +67,22 @@ async function legacyRowCount(page: Page): Promise<number> {
   return page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('hoop-rush-saves');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error('opening hoop-rush-saves failed'));
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('opening hoop-rush-saves failed'));
+      };
     });
     const count = await new Promise<number>((resolve, reject) => {
       const tx = db.transaction(['seasonRuns'], 'readonly');
       const request = tx.objectStore('seasonRuns').count();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error('count failed'));
+      request.onsuccess = () => {
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error('count failed'));
+      };
     });
     db.close();
     return count;

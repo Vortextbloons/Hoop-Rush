@@ -8,6 +8,7 @@ import {
   toSimulationPlayer,
 } from '@hoop-rush/engine';
 import { challengeRepository } from '$lib/challenge-repo';
+import { randomUUID } from '$lib/random-id';
 import { setClassicGuardBypass } from '$lib/classic-nav-guard';
 import { resolvePlayerRefs } from '$lib/player-refs';
 import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
@@ -44,7 +45,7 @@ export async function startClassicRun(draft: ClassicDraftState, runSeed: Seed): 
   const sample = players[0];
   const context = createEngineContext();
   const creation = classic.createClassicChallenge(draft, {
-    runId: crypto.randomUUID(),
+    runId: randomUUID(),
     runSeed,
     players: players.map((player) => toSimulationPlayer(player)),
     dataVersion: profile.dataVersion,

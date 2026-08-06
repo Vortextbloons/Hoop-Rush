@@ -24,6 +24,8 @@ export const SEASON_SEED_NAMESPACES = {
   injuries: 'injuries',
   /** M2.5 generated trade offers. */
   trades: 'trades',
+  /** M2.5 deterministic objective-choice offers per block. */
+  objectives: 'objectives',
   /** Reserved: roguelike upgrade offers (M2.9). */
   upgrades: 'upgrades',
   /** M2.6 final random draw for tied postseason qualification. */

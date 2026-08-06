@@ -9,7 +9,7 @@ import { contentHashSchema, franchiseIdSchema, eraIdSchema, seasonKeySchema } fr
  * famous player look correct.
  */
 
-export const provenanceKindSchema = z.enum(['observed', 'derived', 'estimated']);
+export const provenanceKindSchema = z.enum(['observed', 'derived', 'estimated', 'reconstructed']);
 export type ProvenanceKind = z.infer<typeof provenanceKindSchema>;
 
 export const confidenceSchema = z.enum(['high', 'medium', 'low']);
@@ -80,6 +80,9 @@ export const coverageSummarySchema = z.object({
   derivedFamilies: z.array(z.string().min(1).max(64)),
   /** Field families that are estimated rather than observed. */
   estimatedFamilies: z.array(z.string().min(1).max(64)),
+  /** Field families reconstructed offline from a versioned model artifact
+   * (e.g. three-point for pre-1979 seasons; spec/12 reconstruction). */
+  reconstructedFamilies: z.array(z.string().min(1).max(64)).optional(),
   /** Genuinely missing historical categories (never zero-filled). */
   missingCategories: z.array(z.string().min(1).max(64)),
   /** Share of required fields with low confidence, 0-1. */

@@ -193,6 +193,21 @@ export interface SubmitBlockOptions {
   expectBlockHeading?: boolean;
 }
 
+/**
+ * Selects the first offered objective for the next block (M2.5: blocks 0-7
+ * require a recorded selection before submission; the engine rejects
+ * otherwise). No-op when the picker is absent (final block 8 or a run that
+ * already selected).
+ */
+export async function selectFirstObjective(page: Page): Promise<void> {
+  const picker = page.locator('[data-season-objective-picker]');
+  if ((await picker.count()) === 0) return;
+  const firstChoice = picker.locator('button').first();
+  if ((await firstChoice.count()) === 0) return;
+  await firstChoice.click();
+  await expect(picker.getByText('Selected').first()).toBeVisible({ timeout: 10_000 });
+}
+
 /** Submits the current block and waits for the accepted checkpoint refresh. */
 export async function submitBlockAndComplete(
   page: Page,
@@ -200,6 +215,7 @@ export async function submitBlockAndComplete(
   options: SubmitBlockOptions = {},
 ): Promise<void> {
   const { expectBlockHeading = true } = options;
+  await selectFirstObjective(page);
   await page.getByRole('button', { name: 'Lock rotation and simulate block' }).click();
   if (expectBlockHeading) {
     await expect(

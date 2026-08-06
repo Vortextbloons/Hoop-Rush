@@ -6,20 +6,36 @@ import {
   blockRoundRange,
   seasonNamespaceSeed,
   type EraSimulationProfile,
+  type Position,
   type SeasonBlockRunContext,
   type SeasonCandidateCheckpoint,
+  type SeasonCheckpointState,
   type SeasonCheckpointVersions,
+  type SeasonCompactInjuryEvent,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
   type SeasonGamePlayerInput,
   type SeasonGameSimulationInput,
   type SeasonGameSummary,
+  type SeasonHealthState,
+  type SeasonInfluenceState,
+  type SeasonInjuryRecord,
+  type SeasonInvalidRosterInterruption,
+  type SeasonObjectiveId,
+  type SeasonObjectiveState,
+  type SeasonPendingBlockCandidate,
+  type SeasonRemovalEvent,
+  type SeasonResumeSeasonBlockCommand,
+  type SeasonResumeSeasonBlockResult,
   type SeasonRetainedGameDetail,
+  type SeasonReturnEvent,
+  type SeasonRun,
   type SeasonSchedule,
   type SeasonScheduleGame,
   type SeasonSubmitBlockCommand,
   type SeasonSubmitBlockRejection,
   type SeasonSubmitBlockResult,
+  type SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.ts';
 import {
@@ -40,7 +56,12 @@ import { simulateSeasonGameWithEffects } from './season-game.ts';
 import { applySeasonGameEffectsTransition } from './effects.ts';
 import { applySeasonRecoveryTick } from './stamina.ts';
 import { auditSeasonStandings, reduceSeasonStandings } from './standings.ts';
-import type { Position } from '@hoop-rush/data-contracts';
+import { seasonFranchiseLegalFiveFacts, seasonGameHealthSeam } from './health.ts';
+import { applySeasonGameHealthTransition } from './injuries.ts';
+import { evaluateSeasonBlockObjective, seasonObjectiveChoicesForBlock } from './objectives.ts';
+import { applySeasonBlockInfluenceGrants, createInitialSeasonInfluenceState } from './influence.ts';
+import { seasonRunStateDigest } from './state-digest.ts';
+import { openSeasonTradeWindow, type SeasonWindowOpenResult } from './trades.ts';
 
 /**
  * M2.3 pure block pipeline (spec/2.0/02 ten-game blocks, season-block-v1).
@@ -165,12 +186,62 @@ export interface SeasonBlockSimulationInput {
    * zero state.
    */
   effects: SeasonEffectsState;
+  /**
+   * M2.5: the pre-block health state (append-only injury records). The
+   * pipeline threads it exactly like effects: per-game availability and
+   * injury rolls derive from it, every game's health transition folds on
+   * top of it, and the post-block state rides the candidate checkpoint.
+   */
+  health: SeasonHealthState;
+  /**
+   * M2.5: the locked block objective (blocks 0-7), or null for the final
+   * two-game block 8. The pipeline evaluates it at assembly from saved
+   * facts only (never invents numbers).
+   */
+  objectiveId: SeasonObjectiveId | null;
+  /**
+   * M2.5: the pre-block Influence state (30 balances + ledger + spend
+   * tracking). Optional seam: when absent, assembly starts from the
+   * run-creation initial state (the authoritative run is the commit side's
+   * source; the worker/runner thread it explicitly at integration).
+   */
+  influence?: SeasonInfluenceState;
+  /**
+   * M2.5: the pre-block run-scoped transaction entries (append-only).
+   * Optional seam: when absent, assembly starts from an empty log (the
+   * candidate then carries only this block's new entries).
+   */
+  transactions?: SeasonTransactionEntry[];
+  /**
+   * M2.5: the run's objective state (fixed catalog + selections). Optional
+   * seam for the submit-command validation path: when absent, the
+   * `invalid-objective` check is skipped (the commit side validates the
+   * locked objective against the authoritative run).
+   */
+  objectives?: SeasonObjectiveState;
+  /**
+   * M2.5: in-place per-game tip availability collection (one entry per
+   * human-team game, in block game order). `simulateSeasonBlockGame` fills
+   * it as it runs; `assembleSeasonBlockCandidate` reads it for the locked
+   * objective's availability measure. Deterministic by construction: every
+   * pipeline path simulates through the same input object.
+   */
+  collectedTipAvailability?: { gameId: string; availableCount: number }[];
 }
 
 /** Duplicate-detection seam for the command handler. */
 export interface SeasonSubmitBlockCommandInput extends SeasonBlockSimulationInput {
   /** Append-only history of command ids already accepted by the run. */
   acceptedCommandIds: readonly string[];
+  /**
+   * M2.5: the run's objective state (fixed catalog + selections). Required
+   * on the typed command path so the `invalid-objective` validation binds
+   * the submitted objectiveId to the block's deterministic offer and the
+   * recorded selection. Optional seam: when absent, the check is skipped
+   * (the commit side validates the locked objective against the
+   * authoritative run).
+   */
+  objectives?: SeasonObjectiveState;
 }
 
 /** Additive pipeline options (the worker and CLI use the one-argument form). */
@@ -297,6 +368,45 @@ export function seasonBlockRejection(
     };
   }
 
+  // M2.5: the locked objective must bind to this block. Blocks 0-7 require
+  // a selected objective that was offered for the block (deterministic
+  // three-choice set) and recorded in the run's objective selections;
+  // block 8 must carry null. Skipped when the seam does not supply the
+  // run's objective state (the commit side validates against the
+  // authoritative run).
+  if (input.objectives !== undefined) {
+    if (command.blockIndex <= 7) {
+      if (command.objectiveId === null) {
+        return {
+          code: 'invalid-objective',
+          expected: 'required',
+          blockIndex: command.blockIndex,
+        };
+      }
+      const selection = input.objectives.selections[command.blockIndex];
+      const offered = seasonObjectiveChoicesForBlock(run.rootSeed, command.blockIndex);
+      const selectedAndOffered =
+        selection !== undefined &&
+        selection.objectiveId === command.objectiveId &&
+        offered.includes(command.objectiveId);
+      if (!selectedAndOffered) {
+        return {
+          code: 'invalid-objective',
+          expected: 'not-offered',
+          objectiveId: command.objectiveId,
+          blockIndex: command.blockIndex,
+        };
+      }
+    } else if (command.objectiveId !== null) {
+      return {
+        code: 'invalid-objective',
+        expected: 'none',
+        objectiveId: command.objectiveId,
+        blockIndex: command.blockIndex,
+      };
+    }
+  }
+
   const computedDigest = seasonRotationSetDigest(run.rotations);
   const franchiseFailures: Array<{ franchiseId: string; reasons: string[] }> = [];
   if (computedDigest !== command.rotationDigest) {
@@ -363,19 +473,30 @@ export function simulateSeasonBlock(
   const { fromRound } = blockRoundRange(input.command.blockIndex);
   let previousRound = fromRound - 1;
   let effects = input.effects;
+  let health = input.health;
   for (const game of seasonBlockGamesOf(input.schedule, input.command.blockIndex)) {
     if (options.cancelAfterGames !== undefined && summaries.length >= options.cancelAfterGames) {
       throw new SeasonBlockCancelledError(input.command.blockIndex, summaries.length);
     }
-    const outcome = simulateSeasonBlockGame(input, game, effects, {
+    const outcome = simulateSeasonBlockGame(input, game, effects, health, {
       skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
     });
+    if ('interruption' in outcome) {
+      // The whole-block path (CLI/fixture runs) never expects an invalid-
+      // roster interruption: a winner is never fabricated, and the typed
+      // interruption is surfaced as an invariant failure with its facts.
+      throw new SeasonBlockInvariantError(
+        `game ${game.gameId} interrupted: the human franchise ${outcome.interruption.humanFranchiseId} cannot field a legal five from health availability`,
+        { seed: input.command.runId, gameId: game.gameId, blockIndex: input.command.blockIndex },
+      );
+    }
     effects = outcome.effects;
+    health = outcome.health;
     previousRound = game.round;
     summaries.push(outcome.summary);
     if (outcome.retainedDetail !== null) retainedDetails.push(outcome.retainedDetail);
   }
-  return assembleSeasonBlockCandidate(input, summaries, retainedDetails, effects);
+  return assembleSeasonBlockCandidate(input, summaries, retainedDetails, effects, health);
 }
 
 /**
@@ -401,12 +522,32 @@ export function seasonBlockGamesOf(
 }
 
 /**
+ * The per-game simulation outcome: either the game facts (summary, retained
+ * detail, and the next effects/health states) or a typed `invalid-roster`
+ * interruption marker when the human franchise cannot field a legal five at
+ * tipoff from health availability. The caller assembles a pending candidate
+ * from an interruption; the accepted cursor never advances.
+ */
+export type SeasonBlockGameOutcome =
+  | {
+      summary: SeasonGameSummary;
+      retainedDetail: SeasonRetainedGameDetail | null;
+      effects: SeasonEffectsState;
+      health: SeasonHealthState;
+    }
+  | { interruption: SeasonInvalidRosterInterruption };
+
+/**
  * Simulates one block game through `simulateSeasonGameWithEffects` with the
- * derived named seed and the carried effects state, applies the between-game
- * recovery tick (skipped only for the season's first game), verifies the
- * result seed, converts to the compact summary (attaching the effects
- * rollup), and returns the retained detail row for human-team games (with
- * the full mechanism evidence) plus the authoritative next effects state.
+ * derived named seed, the carried effects state, and the M2.5 health seam
+ * (availability + seeded injury rolls + same-game returns), applies the
+ * between-game recovery tick (skipped only for the season's first game),
+ * folds the game's health transition, verifies the result seed, converts to
+ * the compact summary (attaching the effects rollup and the compact injury
+ * events), and returns the retained detail row for human-team games (with
+ * the full mechanism evidence) plus the authoritative next effects/health
+ * states. Before simulation, a human-team game whose availability cannot
+ * field a legal five returns the typed interruption instead of simulating.
  * `no-legal-five-both` is a typed invariant failure (a winner is never
  * fabricated).
  */
@@ -414,12 +555,9 @@ export function simulateSeasonBlockGame(
   input: SeasonBlockSimulationInput,
   game: SeasonScheduleGame,
   effects: SeasonEffectsState,
+  health: SeasonHealthState,
   options: { skipRecoveryTick?: boolean } = {},
-): {
-  summary: SeasonGameSummary;
-  retainedDetail: SeasonRetainedGameDetail | null;
-  effects: SeasonEffectsState;
-} {
+): SeasonBlockGameOutcome {
   const command = input.command;
   const run = input.run;
   const gameNumberById = new Map(
@@ -452,6 +590,67 @@ export function simulateSeasonBlockGame(
     expandedPlayer(input, game.gameId, player.playerVersionId),
   );
   const seed = seasonNamespaceSeed(run.rootSeed, SEASON_SEED_NAMESPACES.scheduleGames, game.gameId);
+
+  // M2.4: one deterministic between-round recovery tick precedes every game
+  // except the season's first (abstract schedule rounds; no calendar). The
+  // seam reads the pregame effects state (fatigue/recent load at this game).
+  let pregame = effects;
+  if (!(options.skipRecoveryTick ?? false)) {
+    pregame = applySeasonRecoveryTick(pregame, staminaByVersionOf(input));
+  }
+
+  // M2.5: the health seam — pregame availability for all 20 players, the
+  // seeded injury rolls for this game, and the same-game return clocks.
+  const targetMinutesByPlayer = targetMinutesOf(input, game);
+  const seam = seasonGameHealthSeam(run, health, {
+    rootSeed: run.rootSeed,
+    gameId: game.gameId,
+    round: game.round,
+    homeFranchiseId: game.homeFranchiseId,
+    awayFranchiseId: game.awayFranchiseId,
+    targetMinutesByPlayer,
+    durabilityByPlayer: durabilityByVersionOf(input),
+    effects: pregame,
+  });
+
+  // M2.5: the human franchise must field a legal five from health
+  // availability at every tipoff; otherwise the block stops with the typed
+  // interruption (AI teams without a legal five forfeit through the game
+  // path). The objective's availability measure collects the human team's
+  // tip availability count per human game.
+  if (
+    input.humanFranchiseId !== null &&
+    (game.homeFranchiseId === input.humanFranchiseId ||
+      game.awayFranchiseId === input.humanFranchiseId)
+  ) {
+    const facts = seasonFranchiseLegalFiveFacts(
+      run,
+      input.humanFranchiseId,
+      health,
+      positionsOf(input),
+    );
+    if (!facts.legal) {
+      const interruption: SeasonInvalidRosterInterruption = {
+        code: 'invalid-roster',
+        runId: run.runId,
+        blockIndex: command.blockIndex,
+        commandId: command.commandId,
+        nextGameId: game.gameId,
+        humanFranchiseId: input.humanFranchiseId,
+        unavailablePlayerVersionIds: facts.unavailablePlayerVersionIds,
+      };
+      return { interruption };
+    }
+    const humanRoster = rosterByFranchise.get(input.humanFranchiseId);
+    const availableCount =
+      humanRoster === undefined
+        ? 0
+        : humanRoster.players.filter((player) => seam.pregame.get(player.playerVersionId) === true)
+            .length;
+    const collection = input.collectedTipAvailability ?? (input.collectedTipAvailability = []);
+    collection.push({ gameId: game.gameId, availableCount });
+  }
+
   const gameInput: SeasonGameSimulationInput = {
     schemaVersion: 1,
     seed,
@@ -474,17 +673,24 @@ export function simulateSeasonBlockGame(
     awayRotation,
     availability: [...homePlayers, ...awayPlayers].map((player) => ({
       playerVersionId: player.playerVersionId,
-      available: true,
+      available: seam.pregame.get(player.playerVersionId) ?? true,
     })),
-    removals: [],
+    removals: seam.removals.map((removal) => ({
+      side: sideOfPlayer(game, removal.playerVersionId, run),
+      playerVersionId: removal.playerVersionId,
+      period: removal.clock.period,
+      secondsRemaining: removal.clock.seconds,
+      reason: 'injury',
+    })),
+    returns: seam.returns.map((ret) => ({
+      side: sideOfPlayer(game, ret.playerVersionId, run),
+      playerVersionId: ret.playerVersionId,
+      period: ret.clock.period,
+      secondsRemaining: ret.clock.seconds,
+      reason: 'injury-return',
+    })),
     homeCourt: SEASON_HOME_COURT_PROFILE,
   };
-  // M2.4: one deterministic between-game recovery tick precedes every game
-  // except the season's first (abstract schedule rounds; no calendar).
-  let pregame = effects;
-  if (!(options.skipRecoveryTick ?? false)) {
-    pregame = applySeasonRecoveryTick(pregame, staminaByVersionOf(input));
-  }
   const { result, transition } = simulateSeasonGameWithEffects(
     gameInput,
     createEngineContext(),
@@ -503,7 +709,20 @@ export function simulateSeasonBlockGame(
     );
   }
   const nextEffects = applySeasonGameEffectsTransition(pregame, transition);
-  const summary = seasonGameSummaryFromResult(result, game, transition);
+
+  // M2.5: fold the game's health transition — new injuries append, same-
+  // game returns resolve from the applied return events, and the two
+  // franchises that played advance one recovery cadence.
+  const sameGameReturned = sameGameReturnResolutionsOf(seam.newInjuries, result);
+  const nextHealth = applySeasonGameHealthTransition(health, {
+    gameId: game.gameId,
+    round: game.round,
+    franchises: [game.homeFranchiseId, game.awayFranchiseId],
+    newInjuries: seam.newInjuries,
+    sameGameReturned,
+  });
+  const injuryEvents = compactInjuryEventsOf(game, run, seam, result);
+  const summary = seasonGameSummaryFromResult(result, game, transition, injuryEvents);
   const summaryFailures = auditSeasonGameSummary(summary);
   if (summaryFailures.length > 0) {
     throw new SeasonBlockInvariantError(
@@ -517,9 +736,15 @@ export function simulateSeasonBlockGame(
     (game.homeFranchiseId === input.humanFranchiseId ||
       game.awayFranchiseId === input.humanFranchiseId)
   ) {
-    retainedDetail = seasonRetainedDetailFromResult(result, game, run.runId, transition);
+    retainedDetail = seasonRetainedDetailFromResult(
+      result,
+      game,
+      run.runId,
+      transition,
+      injuryEvents,
+    );
   }
-  return { summary, retainedDetail, effects: nextEffects };
+  return { summary, retainedDetail, effects: nextEffects, health: nextHealth };
 }
 
 /**
@@ -540,17 +765,155 @@ function staminaByVersionOf(input: SeasonBlockSimulationInput): Map<string, numb
   return ratings;
 }
 
+/** playerVersionId -> rotation target minutes for the game's twenty players. */
+function targetMinutesOf(
+  input: SeasonBlockSimulationInput,
+  game: SeasonScheduleGame,
+): Map<string, number> {
+  const rotationByFranchise = new Map(
+    input.run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
+  );
+  const targets = new Map<string, number>();
+  for (const franchiseId of [game.homeFranchiseId, game.awayFranchiseId]) {
+    const rotation = rotationByFranchise.get(franchiseId);
+    if (rotation === undefined) {
+      throw new SeasonBlockInvariantError(
+        `game ${game.gameId} references rotation ${franchiseId}`,
+        { gameId: game.gameId, blockIndex: input.command.blockIndex },
+      );
+    }
+    for (const entry of rotation.targetMinutes) {
+      targets.set(entry.playerVersionId, entry.minutes);
+    }
+  }
+  return targets;
+}
+
+/** playerVersionId -> catalog durability rating (45..95) for every version. */
+function durabilityByVersionOf(input: SeasonBlockSimulationInput): Map<string, number> {
+  const ratings = new Map<string, number>();
+  for (const candidate of input.catalog.candidates) {
+    ratings.set(candidate.playerVersionId, candidate.durability.rating);
+  }
+  return ratings;
+}
+
+/** playerVersionId -> playable positions for every expanded version. */
+function positionsOf(input: SeasonBlockSimulationInput): Map<string, readonly Position[]> {
+  const positions = new Map<string, readonly Position[]>();
+  for (const player of input.expanded.values()) {
+    positions.set(player.playerVersionId, player.positions);
+  }
+  return positions;
+}
+
+/** The side of the game a rostered version plays for. */
+function sideOfPlayer(
+  game: SeasonScheduleGame,
+  playerVersionId: string,
+  run: SeasonBlockRunContext,
+): 'home' | 'away' {
+  const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
+  const homeRoster = rosterByFranchise.get(game.homeFranchiseId);
+  if (homeRoster?.players.some((player) => player.playerVersionId === playerVersionId)) {
+    return 'home';
+  }
+  const awayRoster = rosterByFranchise.get(game.awayFranchiseId);
+  if (awayRoster?.players.some((player) => player.playerVersionId === playerVersionId)) {
+    return 'away';
+  }
+  throw new Error(`season block: version ${playerVersionId} plays neither side of ${game.gameId}`);
+}
+
+/**
+ * Same-game return resolutions for the game's rolled records: a return
+ * applied when the completed result carries a return event for the player
+ * (forfeited games never resolve a return).
+ */
+function sameGameReturnResolutionsOf(
+  newInjuries: readonly SeasonInjuryRecord[],
+  result: ReturnType<typeof simulateSeasonGameWithEffects>['result'],
+): { injuryId: string; returned: boolean }[] {
+  const candidates = newInjuries.filter((record) => record.sameGameReturn);
+  if (candidates.length === 0) return [];
+  const returnedIds = new Set<string>();
+  if (result.outcome === 'completed') {
+    for (const side of [result.home, result.away]) {
+      for (const ret of side.returns) returnedIds.add(ret.playerVersionId);
+    }
+  }
+  return candidates.map((record) => ({
+    injuryId: record.injuryId,
+    returned: returnedIds.has(record.playerVersionId),
+  }));
+}
+
+/**
+ * Compact per-game injury events (season-game-summary-v3): one event per
+ * rolled record with the applied removal/return clocks (the rolled clock
+ * when the game ended before the removal could apply).
+ */
+function compactInjuryEventsOf(
+  game: SeasonScheduleGame,
+  run: SeasonBlockRunContext,
+  seam: ReturnType<typeof seasonGameHealthSeam>,
+  result: ReturnType<typeof simulateSeasonGameWithEffects>['result'],
+): SeasonCompactInjuryEvent[] {
+  if (seam.newInjuries.length === 0) return [];
+  const appliedRemovalByPlayer = new Map<string, SeasonRemovalEvent>();
+  const appliedReturnByPlayer = new Map<string, SeasonReturnEvent>();
+  if (result.outcome === 'completed') {
+    for (const event of result.removals) {
+      appliedRemovalByPlayer.set(event.playerVersionId, event);
+    }
+    for (const side of [result.home, result.away]) {
+      for (const event of side.returns) {
+        appliedReturnByPlayer.set(event.playerVersionId, event);
+      }
+    }
+  }
+  const rolledRemovalByPlayer = new Map(
+    seam.removals.map((removal) => [removal.playerVersionId, removal.clock]),
+  );
+  return seam.newInjuries.map((record) => {
+    const appliedRemoval = appliedRemovalByPlayer.get(record.playerVersionId);
+    const rolledRemoval = rolledRemovalByPlayer.get(record.playerVersionId);
+    const removedClock =
+      appliedRemoval !== undefined
+        ? { period: appliedRemoval.period, seconds: appliedRemoval.secondsRemaining }
+        : (rolledRemoval ?? { period: 1, seconds: 720 });
+    const appliedReturn = appliedReturnByPlayer.get(record.playerVersionId);
+    return {
+      playerVersionId: record.playerVersionId,
+      side: sideOfPlayer(game, record.playerVersionId, run),
+      type: record.type,
+      severity: record.severity,
+      removedClock,
+      returned: appliedReturn !== undefined,
+      returnClock:
+        appliedReturn !== undefined
+          ? { period: appliedReturn.period, seconds: appliedReturn.secondsRemaining }
+          : null,
+    };
+  });
+}
+
 /**
  * Folds everything the block produced into one audited candidate checkpoint:
  * cumulative standings and aggregates over prior + block summaries, the
- * recap, all accounting audits, and the canonical digest. Used by the
- * whole-block pipeline and by the worker's chunked loop.
+ * recap (with the M2.5 injury/objective/trade/influence evidence), the
+ * M2.5 objective evaluation from saved facts, the post-block Influence
+ * state (block grants for all 30 franchises plus the human objective
+ * reward), the block's grant transaction entries, the run state chain facts
+ * the command asserted, and the canonical digest. Used by the whole-block
+ * pipeline and by the worker's chunked loop.
  */
 export function assembleSeasonBlockCandidate(
   input: SeasonBlockSimulationInput,
   summaries: readonly SeasonGameSummary[],
   retainedDetails: readonly SeasonRetainedGameDetail[],
   effects: SeasonEffectsState,
+  health: SeasonHealthState,
 ): SeasonCandidateCheckpoint {
   const command = input.command;
   const run = input.run;
@@ -568,6 +931,34 @@ export function assembleSeasonBlockCandidate(
   const { toRound } = blockRoundRange(command.blockIndex);
   const completedRounds = toRound;
 
+  // M2.5: evaluate the locked objective from saved facts only (the human
+  // rotation identifies starters for bench-320; the collected tip
+  // availability feeds availability-eight).
+  const humanRotation =
+    input.humanFranchiseId === null
+      ? null
+      : (run.rotations.find((rotation) => rotation.franchiseId === input.humanFranchiseId) ?? null);
+  const objective = evaluateSeasonBlockObjective({
+    objectiveId: input.objectiveId,
+    blockIndex: command.blockIndex,
+    humanFranchiseId: input.humanFranchiseId,
+    rotation: humanRotation,
+    summaries: [...summaries],
+    tipAvailability: input.collectedTipAvailability ?? [],
+  });
+
+  // M2.5: the post-block Influence state (this block's grants + objective
+  // reward over the pre-block state) and the block's transaction entries.
+  const franchiseIds = run.league.teams.map((team) => team.franchiseId);
+  const preBlockInfluence = input.influence ?? createInitialSeasonInfluenceState(franchiseIds);
+  const grantResult = applySeasonBlockInfluenceGrants({
+    influence: preBlockInfluence,
+    blockIndex: command.blockIndex,
+    humanFranchiseId: input.humanFranchiseId,
+    objectiveSuccess: objective.success,
+  });
+  const postTransactions = [...(input.transactions ?? []), ...grantResult.entries];
+
   const recapInput = {
     runId: run.runId,
     blockIndex: command.blockIndex,
@@ -579,6 +970,10 @@ export function assembleSeasonBlockCandidate(
     playerAggregates: players,
     schedule: input.schedule,
     rosterPlayerIds: input.rosterPlayerIds,
+    health,
+    objective,
+    transactions: postTransactions,
+    influence: grantResult.influence,
   };
   const recap = buildSeasonBlockRecap(recapInput);
 
@@ -611,6 +1006,15 @@ export function assembleSeasonBlockCandidate(
     staminaVersion: run.versions.staminaVersion,
     chemistryVersion: run.versions.chemistryVersion,
     effectsTargetsVersion: run.versions.effectsTargetsVersion,
+    // M2.5: the checkpoint freezes the health, trade, influence, objective,
+    // and targets material versions with the facts it carries.
+    healthVersion: run.versions.healthVersion,
+    tradeVersion: run.versions.tradeVersion,
+    influenceVersion: run.versions.influenceVersion,
+    objectiveVersion: run.versions.objectiveVersion,
+    injuryTargetsVersion: run.versions.injuryTargetsVersion,
+    tradeTargetsVersion: run.versions.tradeTargetsVersion,
+    influenceTargetsVersion: run.versions.influenceTargetsVersion,
   };
   const candidate: SeasonCandidateCheckpoint = {
     schemaVersion: 1,
@@ -631,6 +1035,25 @@ export function assembleSeasonBlockCandidate(
     // M2.4: the authoritative post-block effects state (300 player loads +
     // 1,350 pair states after this block's games and recovery ticks).
     effects,
+    // M2.5: the authoritative post-block health state, the post-block
+    // Influence state (this block's grants + objective reward), and the
+    // post-block transaction entries (this block's grant entries over the
+    // carried pre-block log).
+    health,
+    influence: grantResult.influence,
+    transactions: postTransactions,
+    objective: {
+      objectiveId: objective.objectiveId,
+      success: objective.success,
+      evaluation: objective.evaluation,
+    },
+    // M2.5: the pre-block run state facts the command asserted. The
+    // post-block facts are placeholders here (LEAD DECISION): the commit
+    // side derives them through `deriveSeasonPostBlockState`.
+    expectedStateRevision: command.expectedStateRevision,
+    expectedStateDigest: command.expectedStateDigest,
+    stateRevision: 0,
+    stateDigest: '0'.repeat(32),
     digest: '',
   };
   const digest = seasonCheckpointDigest(candidate);
@@ -672,6 +1095,173 @@ export function handleSubmitSeasonBlockCommand(
     }
     throw error;
   }
+}
+
+/**
+ * M2.5: derives the post-block run state chain facts from the submitted run
+ * and the accepted candidate (LEAD DECISION §20.4): the checkpoint state
+ * (the accepted block's identity facts), `stateRevision = run.stateRevision
+ * + 1`, and the canonical `stateDigest` over the post-block run state
+ * (`seasonRunStateDigest`: state chain + candidate health/influence/
+ * transactions + the run's trade/objectives/rosters/ownership/rotations +
+ * the candidate effects). The no-window path's authoritative facts; the
+ * trade-window path re-derives through `completeSeasonBlockCommit`.
+ */
+export function deriveSeasonPostBlockState(input: {
+  run: SeasonRun;
+  candidate: SeasonCandidateCheckpoint;
+  commandId: string;
+  rotationDigest: string;
+}): { checkpointState: SeasonCheckpointState; stateRevision: number; stateDigest: string } {
+  const checkpointState: SeasonCheckpointState = {
+    runId: input.run.runId,
+    blockIndex: input.candidate.blockIndex,
+    completedRounds: input.candidate.completedRounds,
+    revision: input.candidate.revision,
+    commandId: input.commandId,
+    rotationDigest: input.rotationDigest,
+    checkpointDigest: input.candidate.digest,
+  };
+  const stateRevision = input.run.stateRevision + 1;
+  const stateDigest = seasonRunStateDigest({
+    stateRevision,
+    checkpointState,
+    health: input.candidate.health,
+    influence: input.candidate.influence,
+    transactions: input.candidate.transactions,
+    trade: input.run.trade,
+    objectives: input.run.objectives,
+    rosters: input.run.rosters,
+    ownership: input.run.ownership,
+    rotations: input.run.rotations,
+    effects: input.candidate.effects,
+  });
+  return { checkpointState, stateRevision, stateDigest };
+}
+
+/**
+ * M2.5: the full block commit seam — `deriveSeasonPostBlockState` plus the
+ * optional trade-window open on the post-block run state. Window blocks
+ * (2/4/5) open their deterministic window through `openSeasonTradeWindow`
+ * (a missing catalog throws `SeasonTradeFactsError` rather than recording
+ * an unvalidated window); non-window blocks return `window: null`. When a
+ * window opens, the returned state chain facts are the POST-WINDOW facts
+ * (the window advanced the chain by one more revision), so the persisted
+ * trade/influence/transactions/effects and the chain stay coherent.
+ */
+export function completeSeasonBlockCommit(input: {
+  run: SeasonRun;
+  candidate: SeasonCandidateCheckpoint;
+  commandId: string;
+  rotationDigest: string;
+  humanFranchiseId: string | null;
+  /** Packaged draft catalog (required for window blocks; §13/§20). */
+  catalog?: SeasonDraftCatalog;
+  /** The pre-window effects state; defaults to the candidate's. */
+  effects?: SeasonEffectsState;
+}): {
+  checkpointState: SeasonCheckpointState;
+  stateRevision: number;
+  stateDigest: string;
+  window: SeasonWindowOpenResult | null;
+} {
+  const derived = deriveSeasonPostBlockState({
+    run: input.run,
+    candidate: input.candidate,
+    commandId: input.commandId,
+    rotationDigest: input.rotationDigest,
+  });
+  const postBlockRun: SeasonRun = {
+    ...input.run,
+    cursor: { schemaVersion: 1, completedRounds: input.candidate.completedRounds },
+    standings: input.candidate.standings,
+    health: input.candidate.health,
+    influence: input.candidate.influence,
+    transactions: input.candidate.transactions,
+    checkpointState: derived.checkpointState,
+    stateRevision: derived.stateRevision,
+    stateDigest: derived.stateDigest,
+  };
+  const window = openSeasonTradeWindow({
+    run: postBlockRun,
+    blockIndex: input.candidate.blockIndex,
+    rootSeed: input.run.rootSeed,
+    humanFranchiseId: input.humanFranchiseId,
+    catalog: input.catalog,
+    effects: input.effects ?? input.candidate.effects,
+  });
+  if (window === null) {
+    return {
+      checkpointState: derived.checkpointState,
+      stateRevision: derived.stateRevision,
+      stateDigest: derived.stateDigest,
+      window: null,
+    };
+  }
+  return {
+    checkpointState: derived.checkpointState,
+    stateRevision: window.stateRevision,
+    stateDigest: window.stateDigest,
+    window,
+  };
+}
+
+/**
+ * M2.5: engine-side resume facts for an interrupted block. Validates the
+ * pending candidate against the resume identity facts (run, block, rotation
+ * digest) and returns the exact next game to simulate; the block runner
+ * executes the resume through the ordinary per-game pipeline. Rejected
+ * resumes return the typed rejection (the run command layer applies the
+ * same rules through `handleSeasonRunCommand`).
+ */
+export function resumeSeasonBlockFromPending(input: {
+  run: SeasonRun;
+  pending: SeasonPendingBlockCandidate;
+  command: SeasonResumeSeasonBlockCommand;
+}): SeasonResumeSeasonBlockResult {
+  const { run, pending, command } = input;
+  if (command.runId !== run.runId) {
+    return {
+      status: 'rejected',
+      commandId: command.commandId,
+      rejection: { code: 'run-mismatch', expectedRunId: run.runId },
+    };
+  }
+  if (pending === null) {
+    return {
+      status: 'rejected',
+      commandId: command.commandId,
+      rejection: { code: 'no-pending-block', blockIndex: command.blockIndex },
+    };
+  }
+  if (pending.blockIndex !== command.blockIndex) {
+    return {
+      status: 'rejected',
+      commandId: command.commandId,
+      rejection: {
+        code: 'block-mismatch',
+        blockIndex: command.blockIndex,
+        pendingBlockIndex: pending.blockIndex,
+      },
+    };
+  }
+  if (pending.rotationDigest !== command.rotationDigest) {
+    return {
+      status: 'rejected',
+      commandId: command.commandId,
+      rejection: {
+        code: 'rotation-digest-mismatch',
+        rotationDigest: command.rotationDigest,
+        pendingRotationDigest: pending.rotationDigest,
+      },
+    };
+  }
+  return {
+    status: 'accepted',
+    commandId: command.commandId,
+    blockIndex: pending.blockIndex,
+    nextGameId: pending.nextGameId,
+  };
 }
 
 /**
@@ -818,6 +1408,14 @@ export function auditSeasonBlock(
       playerAggregates: candidate.playerAggregates,
       schedule: input.schedule,
       rosterPlayerIds: input.rosterPlayerIds,
+      health: candidate.health,
+      objective: {
+        objectiveId: candidate.objective.objectiveId,
+        success: candidate.objective.success,
+        evaluation: candidate.objective.evaluation,
+      },
+      transactions: candidate.transactions,
+      influence: candidate.influence,
     }),
   );
 
@@ -844,6 +1442,87 @@ export function auditSeasonBlock(
         `effects ${player.playerVersionId} lastCompletedRound ${String(player.lastCompletedRound)} exceeds ${String(candidate.completedRounds)}`,
       );
     }
+  }
+
+  // M2.5 health-state audit: every recorded injury references a rostered
+  // version of a league franchise and a scheduled game at or before the
+  // checkpoint cursor (the run health is cumulative across blocks, so prior
+  // blocks' injuries are legitimate), and every active-return fact stays
+  // inside the season.
+  const expandedVersionsSet = new Set(input.expanded.keys());
+  const leagueFranchiseIds = new Set(run.league.teams.map((team) => team.franchiseId));
+  const scheduleRoundById = new Map(input.schedule.games.map((game) => [game.gameId, game.round]));
+  for (const record of candidate.health.injuries) {
+    if (!expandedVersionsSet.has(record.playerVersionId)) {
+      failures.push(
+        `injury ${record.injuryId} references an unrostered version ${record.playerVersionId}`,
+      );
+    }
+    if (!leagueFranchiseIds.has(record.franchiseId)) {
+      failures.push(`injury ${record.injuryId} references a franchise outside the league`);
+    }
+    const occurrenceRound = scheduleRoundById.get(record.gameId);
+    if (occurrenceRound === undefined) {
+      failures.push(`injury ${record.injuryId} references an unscheduled game ${record.gameId}`);
+    } else if (occurrenceRound > candidate.completedRounds) {
+      failures.push(`injury ${record.injuryId} references a game past the checkpoint cursor`);
+    }
+    if (record.actualReturnRound !== null && record.actualReturnRound > candidate.completedRounds) {
+      failures.push(
+        `injury ${record.injuryId} actualReturnRound ${String(record.actualReturnRound)} exceeds ${String(candidate.completedRounds)}`,
+      );
+    }
+    if (record.seasonEnding !== (record.severity === 'season-ending')) {
+      failures.push(`injury ${record.injuryId} seasonEnding flag does not match its severity`);
+    }
+    if (record.recurrenceWindowRoundsRemaining > 0 && record.actualReturnRound === null) {
+      failures.push(`injury ${record.injuryId} has an open window before its actual return`);
+    }
+    if (record.sameGameReturn && record.missedGamesTotal !== 0) {
+      failures.push(`injury ${record.injuryId} same-game return must carry zero missed games`);
+    }
+  }
+
+  // M2.5 objective audit: the evaluated objective binds to the command and
+  // the recorded evaluation facts. A null objective (no lock / final block)
+  // carries the unevaluated placeholder evaluation with zeroed facts, so
+  // the evaluation consistency checks apply only to evaluated objectives.
+  if (candidate.objective.objectiveId !== command.objectiveId) {
+    failures.push(
+      `candidate objective ${String(candidate.objective.objectiveId)} does not match the command ${String(command.objectiveId)}`,
+    );
+  }
+  if (candidate.objective.objectiveId !== null) {
+    if (candidate.objective.evaluation.blockIndex !== command.blockIndex) {
+      failures.push('candidate objective evaluation blockIndex does not match the command');
+    }
+    if (candidate.objective.success !== candidate.objective.evaluation.success) {
+      failures.push('candidate objective success does not match its evaluation');
+    }
+  }
+  if (command.blockIndex === 8 && candidate.objective.objectiveId !== null) {
+    failures.push('the final two-game block must carry a null objective');
+  }
+
+  // M2.5 run state chain facts: the asserted pre-block facts and the
+  // assembly placeholders the commit side patches.
+  if (candidate.expectedStateRevision !== command.expectedStateRevision) {
+    failures.push('candidate expectedStateRevision does not match the command');
+  }
+  if (candidate.expectedStateDigest !== command.expectedStateDigest) {
+    failures.push('candidate expectedStateDigest does not match the command');
+  }
+  if (candidate.stateRevision !== 0 || candidate.stateDigest !== '0'.repeat(32)) {
+    failures.push(
+      'candidate post-block state facts must be the assembly placeholders (the commit side derives them)',
+    );
+  }
+
+  // M2.5 transaction audit: unique ids, bound to this block or the carried
+  // pre-block log, and never duplicated.
+  const transactionIds = candidate.transactions.map((entry) => entry.transactionId);
+  if (new Set(transactionIds).size !== transactionIds.length) {
+    failures.push('candidate transactions contain duplicate ids');
   }
 
   // Digest verification.

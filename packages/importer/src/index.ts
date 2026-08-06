@@ -16,4 +16,5 @@ export * as pools from './pools/compute.ts';
 export * as eraProfile from './era-profile/index.ts';
 export * as manifest from './manifest/index.ts';
 export * as opponent from './opponent/index.ts';
+export * from './reconstruction/index.ts';
 export * as freeze from './freeze/index.ts';

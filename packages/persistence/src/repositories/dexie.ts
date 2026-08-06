@@ -22,6 +22,7 @@ import type {
   StoredSeasonAcceptedBlockRow,
   StoredSeasonActiveRunIndex,
   StoredSeasonDetailRow,
+  StoredSeasonPendingBlockRow,
   StoredSeasonRunRecord,
   StoredSeasonSummaryRow,
 } from '../schemas/season-run-record.ts';
@@ -55,6 +56,8 @@ export class HoopRushDatabase extends Dexie {
   seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
   /** Active-run index row; single row at 'season-run'. */
   seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
+  /** M2.5: one interrupted-block pending candidate per run, keyed by runId. */
+  seasonPendingBlocks!: EntityTable<StoredSeasonPendingBlockRow, 'runId'>;
 
   constructor() {
     super('hoop-rush-saves');
@@ -119,6 +122,15 @@ export class HoopRushDatabase extends Dexie {
     // block history, and the active-run index). Older saves keep every
     // existing table and row untouched, so no upgrade hook is needed: v6 only
     // creates the new tables in the database.
+    this.version(7).stores({
+      seasonPendingBlocks: 'runId',
+    });
+    // v7 is additive (one new self-contained table for the M2.5 interrupted-
+    // block pending candidate, one row per run). Older saves keep every
+    // existing table and row untouched, so no upgrade hook is needed: v7 only
+    // creates the new table in the database. Save-schema-v3 rows (M2.4 runs)
+    // surface through the typed incompatibility flow; they are never
+    // migrated.
   }
 }
 

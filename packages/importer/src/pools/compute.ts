@@ -96,7 +96,7 @@ export function manifestPath(): string {
 
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
-export const DATA_VERSION = 'm10-ratings-v3.5';
+export const DATA_VERSION = 'm10-ratings-v3.6';
 /** Confidence policy v1: maximum allowed low-confidence share of required fields. */
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
@@ -929,8 +929,11 @@ export function legalLineupCovered(players: readonly PoolPlayer[]): boolean {
 }
 
 /**
- * Builds the coverage summary: observed/derived/estimated families, missing
- * categories, and the low-confidence share under the versioned policy.
+ * Builds the coverage summary: observed/derived/estimated/reconstructed
+ * families, missing categories, and the low-confidence share under the
+ * versioned policy (spec/12). Reconstructed families (three-point on
+ * pre-1979 / missing-record seasons) are accounted separately from derived
+ * and estimated values.
  */
 export function buildCoverageSummary(
   players: readonly PoolPlayer[],
@@ -945,12 +948,14 @@ export function buildCoverageSummary(
   const observedFamilies = new Set<string>();
   const derivedFamilies = new Set<string>();
   const estimatedFamilies = new Set<string>();
+  const reconstructedFamilies = new Set<string>();
   const missingCategories = new Set<string>();
 
   for (const player of players) {
     for (const [field, provenance] of Object.entries(player.provenance)) {
       if (provenance.kind === 'observed') observedFamilies.add(fieldFamily(field));
       else if (provenance.kind === 'derived') derivedFamilies.add(fieldFamily(field));
+      else if (provenance.kind === 'reconstructed') reconstructedFamilies.add(fieldFamily(field));
       else estimatedFamilies.add(fieldFamily(field));
       if (provenance.sourceStatus === 'not-applicable') {
         missingCategories.add(fieldFamily(field));
@@ -971,6 +976,9 @@ export function buildCoverageSummary(
     observedFamilies: [...observedFamilies].sort(),
     derivedFamilies: [...derivedFamilies].sort(),
     estimatedFamilies: [...estimatedFamilies].sort(),
+    ...(reconstructedFamilies.size > 0
+      ? { reconstructedFamilies: [...reconstructedFamilies].sort() }
+      : {}),
     missingCategories: [...missingCategories].sort(),
     lowConfidenceShare: Math.round(lowConfidenceShare * 1000) / 1000,
     policyVersion: CONFIDENCE_POLICY_VERSION,
@@ -1322,6 +1330,9 @@ export function computePool(
       detailedRatings,
       tendencies: tendenciesOut,
       anchors: anchorsOut,
+      ...(player.reconstructedThreePoint != null
+        ? { reconstructedThreePoint: player.reconstructedThreePoint }
+        : {}),
       provenance: provenanceOut,
       source: {
         dataVersion: DATA_VERSION,

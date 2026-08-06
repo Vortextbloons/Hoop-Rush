@@ -98,6 +98,7 @@ function buildInput(
       available: true,
     })),
     removals: [],
+    returns: [],
     homeCourt,
   };
 }

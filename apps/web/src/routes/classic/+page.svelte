@@ -29,6 +29,7 @@
     type ClassicGuardTarget,
   } from '$lib/classic-nav-guard';
   import { startClassicRun } from '$lib/classic-run';
+  import { randomUUID } from '$lib/random-id';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
@@ -273,7 +274,7 @@
       spinning = true;
       const next = classic.createClassicDraft(
         {
-          draftId: crypto.randomUUID(),
+          draftId: randomUUID(),
           variant,
           seed: classicDraftSeed(),
           dataVersion: manifest.dataVersion,

@@ -6,22 +6,38 @@ import {
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
+  SEASON_HEALTH_VERSION,
   SEASON_HOME_COURT_VERSION,
+  SEASON_INFLUENCE_TARGETS_VERSION,
+  SEASON_INFLUENCE_VERSION,
+  SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEADERS_VERSION,
+  SEASON_OBJECTIVE_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
   SEASON_STAMINA_VERSION,
+  SEASON_TRADE_TARGETS_VERSION,
+  SEASON_TRADE_VERSION,
   blockIndexForRound,
   blockRoundRange,
   seasonDigestHex,
   type SeasonBlockRecap,
   type SeasonCandidateCheckpoint,
   type SeasonCompactPlayerLine,
+  type SeasonEffectsState,
   type SeasonGameSummary,
+  type SeasonHealthState,
+  type SeasonInfluenceState,
+  type SeasonInvalidRosterInterruption,
+  type SeasonPendingBlockCandidate,
+  type SeasonPlayerAggregate,
   type SeasonStandings,
+  type SeasonTeamAggregate,
+  type SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
 import { seasonRunEngineSeam, type SeasonRunSnapshot } from '@hoop-rush/persistence';
 import type {
+  SeasonBlockResumeInput,
   SeasonBlockRunner,
   SeasonBlockStartInput,
   SeasonRunnerEvent,
@@ -40,6 +56,16 @@ import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
  * Activation: the e2e spec sets `window.__HOOP_RUSH_E2E_FAKE_RUNNER__` before
  * navigation; `getSeasonBlockRunner()` then returns this fake. The fake is
  * never used in production.
+ *
+ * M2.5: the fake writes deterministic health (one active injury + one
+ * returned injury with an open recurrence window for the human team),
+ * Influence (initial +2 grant and +1 per accepted block for all 30
+ * franchises), and grant transactions into every committed checkpoint, so
+ * the health strip and the Influence panel render recorded facts. A window
+ * flag (`__HOOP_RUSH_E2E_INTERRUPT_ONCE__`) makes the next `startBlock` emit
+ * one typed `invalid-roster` interruption with a persisted pending
+ * candidate; `resumeBlock` loads the pending candidate, simulates the
+ * remaining games, and commits the full block atomically.
  */
 
 const PROGRESS_STEP_MS = 40;
@@ -87,7 +113,19 @@ declare global {
   interface Window {
     /** e2e: when true, the fake stalls the first startBlock until cancelled. */
     __HOOP_RUSH_E2E_STALL_ONCE__?: boolean;
+    /** e2e: when true, the next startBlock emits one typed interruption. */
+    __HOOP_RUSH_E2E_INTERRUPT_ONCE__?: boolean;
   }
+}
+
+/** M2.5 commit extras for the fake (the full commit input is typed against
+ * the landed `CommitSeasonBlockInput`; these are the fake-computed facts). */
+interface FakeM25CommitInput {
+  health: SeasonHealthState;
+  transactions: SeasonTransactionEntry[];
+  influence: SeasonInfluenceState;
+  stateRevision: number;
+  stateDigest: string;
 }
 
 export class FakeSeasonBlockRunner implements SeasonBlockRunner {
@@ -96,11 +134,14 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   private cancelled = false;
   private currentBlockIndex: number | null = null;
   private stallingRequestId: string | null = null;
+  /** The last submitted start input (resume re-uses its identity facts). */
+  private lastStartInput: SeasonBlockStartInput | null = null;
 
   startBlock(input: SeasonBlockStartInput): string {
     const requestId = `fake-${input.commandId}`;
     this.cancelled = false;
     this.currentBlockIndex = input.blockIndex;
+    this.lastStartInput = input;
     this.emit({ type: 'started', requestId, blockIndex: input.blockIndex });
 
     // e2e cancel/retry seam: the first startBlock stalls between games until
@@ -117,6 +158,14 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         latestGameId: null,
         latestResult: null,
       });
+      return requestId;
+    }
+
+    // e2e interruption seam: the next startBlock stops before any game with
+    // one typed invalid-roster interruption (persisted pending candidate).
+    if (typeof window !== 'undefined' && window.__HOOP_RUSH_E2E_INTERRUPT_ONCE__) {
+      window.__HOOP_RUSH_E2E_INTERRUPT_ONCE__ = false;
+      void this.interrupt(requestId, input);
       return requestId;
     }
 
@@ -172,6 +221,97 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     return requestId;
   }
 
+  /**
+   * M2.5 frozen runner extension: resumes an interrupted block from its
+   * persisted pending candidate, simulates the remaining games, and commits
+   * the full block atomically (the commit deletes the pending row).
+   * Returns the request id for cancel/terminate routing.
+   */
+  resumeBlock(input: SeasonBlockResumeInput): string {
+    const requestId = `fake-resume-${input.commandId}`;
+    if (this.cancelled) return requestId;
+    this.cancelled = false;
+    this.currentBlockIndex = input.blockIndex;
+    void (async () => {
+      try {
+        const repo = await getSeasonRunRepository();
+        const pending = await repo.loadPendingBlock(input.runId);
+        if (pending === null) throw new Error('no pending block to resume');
+        if (pending.blockIndex !== input.blockIndex) throw new Error('pending block mismatch');
+        if (pending.expectedRevision !== input.expectedRevision) {
+          throw new Error('pending expectedRevision mismatch');
+        }
+        if (pending.rotationDigest !== input.rotationDigest) {
+          throw new Error('pending rotation digest mismatch');
+        }
+        const snapshot = await repo.loadActiveRun();
+        const run = snapshot?.run ?? this.lastStartInput?.run;
+        if (run === undefined) throw new Error('no active run to resume');
+        const startInput: SeasonBlockStartInput = {
+          run,
+          rotations: input.rotations,
+          blockIndex: input.blockIndex,
+          expectedRevision: input.expectedRevision,
+          rotationDigest: input.rotationDigest,
+          commandId: input.commandId,
+          humanFranchiseId: input.humanFranchiseId,
+          objectiveId: pending.objectiveId,
+          homeCourt: input.homeCourt,
+          catalogUrl: input.catalogUrl,
+          catalogHash: input.catalogHash,
+          profileUrl: input.profileUrl,
+          profileHash: input.profileHash,
+        };
+        this.lastStartInput = startInput;
+        this.emit({ type: 'started', requestId, blockIndex: input.blockIndex });
+        const { fromRound, toRound } = blockRoundRange(input.blockIndex);
+        const blockGames = run.games
+          .filter((game) => game.round >= fromRound && game.round <= toRound)
+          .sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
+        const remaining = blockGames.filter((game) => game.gameId >= pending.nextGameId);
+        const newSummaries = remaining.map((game) =>
+          this.summaryFor(
+            startInput,
+            game.gameId,
+            game.round,
+            game.homeFranchiseId,
+            game.awayFranchiseId,
+          ),
+        );
+        const summaries = [...pending.summaries, ...newSummaries];
+        const checkpoint = await this.buildCheckpoint(
+          startInput,
+          summaries,
+          pending.health,
+          pending.effects,
+        );
+        if (this.cancelled) return;
+        await this.commitCheckpoint(startInput, pending.commandId, checkpoint, {
+          health: pending.health,
+          influence: this.fakeInfluenceFor(startInput, input.blockIndex),
+          transactions: this.fakeTransactionsFor(input.blockIndex),
+          stateRevision: pending.expectedStateRevision + 1,
+          stateDigest: seasonDigestHex(
+            `${input.runId}:${String(pending.expectedStateRevision + 1)}`,
+          ),
+        });
+        this.emit({ type: 'complete', requestId, checkpoint });
+      } catch (error) {
+        if (this.isCancelled()) return;
+        this.emit({
+          type: 'error',
+          requestId,
+          blockIndex: input.blockIndex,
+          code: 'internal',
+          message: error instanceof Error ? error.message : String(error),
+          seed: null,
+          gameId: null,
+        });
+      }
+    })();
+    return requestId;
+  }
+
   cancel(requestId: string): void {
     this.cancelled = true;
     for (const timer of this.timers) clearTimeout(timer);
@@ -197,6 +337,75 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
 
   private isCancelled(): boolean {
     return this.cancelled;
+  }
+
+  /** M2.5: emits one typed interruption and persists the pending candidate. */
+  private async interrupt(requestId: string, input: SeasonBlockStartInput): Promise<void> {
+    const pending = await this.buildPending(input);
+    const repo = await getSeasonRunRepository();
+    const humanRotation =
+      input.rotations.find((rotation) => rotation.franchiseId === input.humanFranchiseId) ?? null;
+    const interruption: SeasonInvalidRosterInterruption = {
+      code: 'invalid-roster',
+      runId: input.run.runId,
+      blockIndex: input.blockIndex,
+      commandId: pending.commandId,
+      nextGameId: pending.nextGameId,
+      humanFranchiseId: input.humanFranchiseId ?? '',
+      unavailablePlayerVersionIds: [...(humanRotation?.starters ?? [])],
+    };
+    await repo.savePendingBlock(pending, interruption);
+    this.emit({
+      type: 'interrupted',
+      requestId,
+      runId: input.run.runId,
+      blockIndex: input.blockIndex,
+      pending,
+      interruption,
+    });
+  }
+
+  /** The pending candidate for the interruption seam (no games completed). */
+  private async buildPending(input: SeasonBlockStartInput): Promise<SeasonPendingBlockCandidate> {
+    const { fromRound, toRound } = blockRoundRange(input.blockIndex);
+    const blockGames = input.run.games
+      .filter((game) => game.round >= fromRound && game.round <= toRound)
+      .sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
+    const nextHumanGame =
+      blockGames.find(
+        (game) =>
+          game.homeFranchiseId === input.humanFranchiseId ||
+          game.awayFranchiseId === input.humanFranchiseId,
+      ) ?? blockGames[0];
+    const schedule = this.scheduleOf(input);
+    const current = await loadCurrentSnapshot(schedule);
+    const allSummaries = current?.summaries ?? [];
+    const played = seasonRunEngineSeam
+      .reconstructSeasonGames(schedule, allSummaries)
+      .filter((game) => game.status !== 'scheduled');
+    return {
+      schemaVersion: 1,
+      blockVersion: SEASON_BLOCK_VERSION,
+      runId: input.run.runId,
+      commandId: input.commandId,
+      blockIndex: input.blockIndex,
+      expectedRevision: input.expectedRevision,
+      expectedStateRevision: input.run.stateRevision,
+      expectedStateDigest: input.run.stateDigest,
+      objectiveId: null,
+      nextGameId: nextHumanGame?.gameId ?? 's000001',
+      summaries: [],
+      retainedDetails: [],
+      effects: seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters),
+      health: this.interruptionHealthFor(input),
+      standings: seasonRunEngineSeam.reduceSeasonStandings(input.run.league, played),
+      teamAggregates: seasonRunEngineSeam.foldSeasonTeamAggregates(input.run.league, allSummaries),
+      playerAggregates: seasonRunEngineSeam.foldSeasonPlayerAggregates(
+        input.run.rosters,
+        allSummaries,
+      ),
+      rotationDigest: input.rotationDigest,
+    };
   }
 
   private summaryFor(
@@ -271,6 +480,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       },
       homePlayers: lines(homeRoster, homeScore),
       awayPlayers: lines(awayRoster, awayScore),
+      injuryEvents: [],
     };
   }
 
@@ -283,108 +493,19 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     const summaries: SeasonGameSummary[] = blockGames.map((game) =>
       this.summaryFor(input, game.gameId, game.round, game.homeFranchiseId, game.awayFranchiseId),
     );
-    const completedRounds = input.blockIndex === 8 ? 82 : (input.blockIndex + 1) * 10;
-    let checkpoint: SeasonCandidateCheckpoint | null = null;
+    const checkpoint = await this.buildCheckpoint(
+      input,
+      summaries,
+      this.fakeHealthFor(input),
+      null,
+    );
     try {
-      const schedule = {
-        schemaVersion: 1,
-        scheduleVersion: 'schedule-v1',
-        formulaVersion: 'schedule-formula-v1',
-        leagueVersion: 'league-v1',
-        generationSeed: '0'.repeat(32),
-        rounds: 82,
-        games: input.run.games.map((game) => ({
-          gameId: game.gameId,
-          round: game.round,
-          homeFranchiseId: game.homeFranchiseId,
-          awayFranchiseId: game.awayFranchiseId,
-        })),
-      } as const;
-      // The audit folds aggregates over ALL accepted summaries, so the commit
-      // must carry cumulative folds, not just this block's rows. The plain
-      // repository needs the schedule for loadActiveRun; use the exported
-      // schedule-aware loader (same IndexedDB, same validation path).
-      const { loadActiveRunWithSchedule } = (await import('@hoop-rush/persistence')) as unknown as {
-        loadActiveRunWithSchedule?: (schedule: unknown) => Promise<SeasonRunSnapshot | null>;
-      };
-      const current = loadActiveRunWithSchedule ? await loadActiveRunWithSchedule(schedule) : null;
-      const allSummaries = [...(current?.summaries ?? []), ...summaries];
-      const played = seasonRunEngineSeam
-        .reconstructSeasonGames(schedule, allSummaries)
-        .filter((game) => game.status !== 'scheduled');
-      const standings: SeasonStandings = seasonRunEngineSeam.reduceSeasonStandings(
-        input.run.league,
-        played,
-      );
-      const teamAggregates = seasonRunEngineSeam.foldSeasonTeamAggregates(
-        input.run.league,
-        allSummaries,
-      );
-      const playerAggregates = seasonRunEngineSeam.foldSeasonPlayerAggregates(
-        input.run.rosters,
-        allSummaries,
-      );
-      const recap: SeasonBlockRecap = {
-        schemaVersion: 1,
-        recapVersion: SEASON_RECAP_VERSION,
-        runId: input.run.runId,
-        blockIndex: input.blockIndex,
-        completedRounds,
-        humanRecord: null,
-        standingsMovement: [],
-        notablePerformances: [],
-        streaks: [],
-        versionSpotlights: [],
-        upcomingHumanGames: [],
-      };
-      checkpoint = {
-        schemaVersion: 1,
-        checkpointVersion: SEASON_CHECKPOINT_VERSION,
-        runId: input.run.runId,
-        rootSeed: input.run.rootSeed,
-        versions: {
-          blockVersion: SEASON_BLOCK_VERSION,
-          summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-          aggregatesVersion: 'season-aggregates-v1',
-          recapVersion: SEASON_RECAP_VERSION,
-          leadersVersion: SEASON_LEADERS_VERSION,
-          homeCourtVersion: SEASON_HOME_COURT_VERSION,
-          gameVersion: SEASON_GAME_VERSION,
-          gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
-          seedDerivationVersion: SEASON_SEED_DERIVATION_VERSION,
-          staminaVersion: SEASON_STAMINA_VERSION,
-          chemistryVersion: SEASON_CHEMISTRY_VERSION,
-          effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
-        },
-        blockIndex: input.blockIndex,
-        completedRounds,
-        revision: input.expectedRevision,
-        rotationDigest: input.rotationDigest,
-        standings,
-        teamAggregates,
-        playerAggregates,
-        gameSummaries: summaries,
-        retainedDetails: [],
-        recap,
-        effects: seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters),
-        digest: seasonDigestHex(`${input.run.runId}:${String(input.blockIndex)}`),
-      };
-      const repo = await getSeasonRunRepository();
-      await repo.commitSeasonBlock({
-        runId: input.run.runId,
-        revision: input.expectedRevision + 1,
-        commandId: input.commandId,
-        rotationDigest: input.rotationDigest,
-        checkpointDigest: checkpoint.digest,
-        completedRounds,
-        standings,
-        teamAggregates,
-        playerAggregates,
-        summaries,
-        retainedDetails: [],
-        recap,
-        rotations: input.rotations,
-        effects: seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters),
+      await this.commitCheckpoint(input, input.commandId, checkpoint, {
+        health: this.fakeHealthFor(input),
+        influence: this.fakeInfluenceFor(input, input.blockIndex),
+        transactions: this.fakeTransactionsFor(input.blockIndex),
+        stateRevision: input.run.stateRevision + 1,
+        stateDigest: seasonDigestHex(`${input.run.runId}:${String(input.run.stateRevision + 1)}`),
       });
     } catch (error) {
       if (this.isCancelled()) return;
@@ -402,6 +523,339 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     if (this.isCancelled()) return;
     this.emit({ type: 'complete', requestId, checkpoint });
   }
+
+  /** Builds the full candidate checkpoint for the given summaries. */
+  private async buildCheckpoint(
+    input: SeasonBlockStartInput,
+    summaries: SeasonGameSummary[],
+    health: SeasonHealthState,
+    effectsOverride: SeasonEffectsState | null,
+  ): Promise<SeasonCandidateCheckpoint> {
+    const completedRounds = input.blockIndex === 8 ? 82 : (input.blockIndex + 1) * 10;
+    const schedule = this.scheduleOf(input);
+    const current = await loadCurrentSnapshot(schedule);
+    const allSummaries = [...(current?.summaries ?? []), ...summaries];
+    const played = seasonRunEngineSeam
+      .reconstructSeasonGames(schedule, allSummaries)
+      .filter((game) => game.status !== 'scheduled');
+    const standings: SeasonStandings = seasonRunEngineSeam.reduceSeasonStandings(
+      input.run.league,
+      played,
+    );
+    const teamAggregates: SeasonTeamAggregate[] = seasonRunEngineSeam.foldSeasonTeamAggregates(
+      input.run.league,
+      allSummaries,
+    );
+    const playerAggregates: SeasonPlayerAggregate[] =
+      seasonRunEngineSeam.foldSeasonPlayerAggregates(input.run.rosters, allSummaries);
+    const recap: SeasonBlockRecap = {
+      schemaVersion: 1,
+      recapVersion: SEASON_RECAP_VERSION,
+      runId: input.run.runId,
+      blockIndex: input.blockIndex,
+      completedRounds,
+      humanRecord: null,
+      standingsMovement: [],
+      notablePerformances: [],
+      streaks: [],
+      versionSpotlights: [],
+      upcomingHumanGames: [],
+      injuryEvidence: {
+        injuries: 0,
+        bySeverity: { minor: 0, moderate: 0, major: 0, 'season-ending': 0 },
+        sameGameReturns: 0,
+        seasonEnding: 0,
+        returnedThisBlock: 0,
+        activeAtBlockEnd: health.injuries.filter((record) => record.missedGamesRemaining > 0)
+          .length,
+        humanTeamInjuries: [],
+      },
+      objectiveEvidence: null,
+      tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+      influenceBalance: {
+        humanBalance:
+          this.fakeInfluenceFor(input, input.blockIndex).balances[input.humanFranchiseId ?? ''] ??
+          0,
+      },
+    };
+    const effects =
+      effectsOverride ?? seasonRunEngineSeam.zeroSeasonEffectsState(input.run.rosters);
+    const stateRevision = input.run.stateRevision + 1;
+    return {
+      schemaVersion: 1,
+      checkpointVersion: SEASON_CHECKPOINT_VERSION,
+      runId: input.run.runId,
+      rootSeed: input.run.rootSeed,
+      versions: {
+        blockVersion: SEASON_BLOCK_VERSION,
+        summaryVersion: SEASON_GAME_SUMMARY_VERSION,
+        aggregatesVersion: 'season-aggregates-v1',
+        recapVersion: SEASON_RECAP_VERSION,
+        leadersVersion: SEASON_LEADERS_VERSION,
+        homeCourtVersion: SEASON_HOME_COURT_VERSION,
+        gameVersion: SEASON_GAME_VERSION,
+        gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
+        seedDerivationVersion: SEASON_SEED_DERIVATION_VERSION,
+        staminaVersion: SEASON_STAMINA_VERSION,
+        chemistryVersion: SEASON_CHEMISTRY_VERSION,
+        effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
+        healthVersion: SEASON_HEALTH_VERSION,
+        tradeVersion: SEASON_TRADE_VERSION,
+        influenceVersion: SEASON_INFLUENCE_VERSION,
+        objectiveVersion: SEASON_OBJECTIVE_VERSION,
+        injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
+        tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
+        influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+      },
+      blockIndex: input.blockIndex,
+      completedRounds,
+      revision: input.expectedRevision,
+      rotationDigest: input.rotationDigest,
+      standings,
+      teamAggregates,
+      playerAggregates,
+      gameSummaries: summaries,
+      retainedDetails: [],
+      recap,
+      effects,
+      health,
+      influence: this.fakeInfluenceFor(input, input.blockIndex),
+      transactions: this.fakeTransactionsFor(input.blockIndex),
+      objective: {
+        objectiveId: null,
+        success: null,
+        evaluation: {
+          objectiveId: 'win-six',
+          blockIndex: input.blockIndex,
+          success: false,
+          facts: {
+            games: 0,
+            wins: 0,
+            pointsAllowed: 0,
+            reboundMargin: 0,
+            tipsWithAtLeastEightAvailable: 0,
+            tipsTotal: 0,
+            benchMinutes: 0,
+            turnovers: 0,
+          },
+          tipCountedGames: 0,
+        },
+      },
+      expectedStateRevision: input.run.stateRevision,
+      expectedStateDigest: input.run.stateDigest,
+      stateRevision,
+      stateDigest: seasonDigestHex(`${input.run.runId}:${String(stateRevision)}`),
+      digest: seasonDigestHex(`${input.run.runId}:${String(input.blockIndex)}`),
+    };
+  }
+
+  /** Commits the checkpoint with the M2.5 run-state facts (one transaction). */
+  private async commitCheckpoint(
+    input: SeasonBlockStartInput,
+    commandId: string,
+    checkpoint: SeasonCandidateCheckpoint,
+    m25: FakeM25CommitInput,
+  ): Promise<void> {
+    const repo = await getSeasonRunRepository();
+    await repo.commitSeasonBlock({
+      runId: input.run.runId,
+      revision: checkpoint.revision + 1,
+      commandId,
+      rotationDigest: checkpoint.rotationDigest,
+      checkpointDigest: checkpoint.digest,
+      completedRounds: checkpoint.completedRounds,
+      standings: checkpoint.standings,
+      teamAggregates: checkpoint.teamAggregates,
+      playerAggregates: checkpoint.playerAggregates,
+      summaries: checkpoint.gameSummaries,
+      retainedDetails: [],
+      recap: checkpoint.recap,
+      rotations: input.rotations,
+      effects: checkpoint.effects,
+      health: m25.health,
+      transactions: m25.transactions,
+      influence: m25.influence,
+      trade: null,
+      objectives: input.run.objectives,
+      checkpointState: {
+        runId: input.run.runId,
+        blockIndex: checkpoint.blockIndex,
+        completedRounds: checkpoint.completedRounds,
+        revision: checkpoint.revision,
+        commandId,
+        rotationDigest: checkpoint.rotationDigest,
+        checkpointDigest: checkpoint.digest,
+      },
+      stateRevision: m25.stateRevision,
+      stateDigest: m25.stateDigest,
+      expectedStateRevision: input.run.stateRevision,
+      expectedStateDigest: input.run.stateDigest,
+      window: null,
+    });
+  }
+
+  /** Deterministic M2.5 health: one active injury + one returned injury for
+   * the human team (the health strip renders both states). */
+  private fakeHealthFor(input: SeasonBlockStartInput): SeasonHealthState {
+    const humanRoster =
+      input.run.rosters.find((roster) => roster.franchiseId === input.humanFranchiseId)?.players ??
+      [];
+    const activePlayer = humanRoster[0]?.playerVersionId ?? 'pv-unknown';
+    const returnedPlayer = humanRoster[1]?.playerVersionId ?? 'pv-unknown';
+    const { toRound } = blockRoundRange(input.blockIndex);
+    return {
+      schemaVersion: 1,
+      healthVersion: SEASON_HEALTH_VERSION,
+      injuries: [
+        {
+          injuryId: 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          playerVersionId: activePlayer,
+          franchiseId: input.humanFranchiseId ?? '',
+          gameId: 's000001',
+          type: 'soft-tissue',
+          severity: 'moderate',
+          occurredBeforeHalftime: false,
+          sameGameReturn: false,
+          sameGameReturned: null,
+          missedGamesTotal: 12,
+          missedGamesRemaining: 2,
+          actualReturnRound: null,
+          seasonEnding: false,
+          rehabModifier: 0 as const,
+          recurrenceWindowRoundsRemaining: 0,
+          seedPath: ['e2e', 'fake-runner', 'health', 'active'],
+        },
+        {
+          injuryId: 'inj-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          playerVersionId: returnedPlayer,
+          franchiseId: input.humanFranchiseId ?? '',
+          gameId: 's000002',
+          type: 'upper-body',
+          severity: 'minor',
+          occurredBeforeHalftime: true,
+          sameGameReturn: true,
+          sameGameReturned: true,
+          missedGamesTotal: 4,
+          missedGamesRemaining: 0,
+          actualReturnRound: toRound,
+          seasonEnding: false,
+          rehabModifier: 0 as const,
+          recurrenceWindowRoundsRemaining: 6,
+          seedPath: ['e2e', 'fake-runner', 'health', 'returned'],
+        },
+      ],
+    };
+  }
+
+  /** M2.5 interruption health: all five rotation starters unavailable. */
+  private interruptionHealthFor(input: SeasonBlockStartInput): SeasonHealthState {
+    const humanRoster =
+      input.run.rosters.find((roster) => roster.franchiseId === input.humanFranchiseId)?.players ??
+      [];
+    const humanRotation =
+      input.rotations.find((rotation) => rotation.franchiseId === input.humanFranchiseId) ?? null;
+    const starters =
+      humanRotation?.starters ?? humanRoster.slice(0, 5).map((p) => p.playerVersionId);
+    const injuries = starters.map((playerVersionId, index) => ({
+      injuryId: `inj-${String(index).padStart(31, 'c')}`,
+      playerVersionId,
+      franchiseId: input.humanFranchiseId ?? '',
+      gameId: 's000001',
+      type: 'lower-body' as const,
+      severity: 'major' as const,
+      occurredBeforeHalftime: false,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 10,
+      missedGamesRemaining: 8,
+      actualReturnRound: null,
+      seasonEnding: false,
+      rehabModifier: 0 as const,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: ['e2e', 'fake-runner', 'interruption'],
+    }));
+    return {
+      schemaVersion: 1,
+      healthVersion: SEASON_HEALTH_VERSION,
+      injuries,
+    };
+  }
+
+  /** Deterministic M2.5 Influence: +2 initial and +1 per accepted block. */
+  private fakeInfluenceFor(input: SeasonBlockStartInput, blockIndex: number): SeasonInfluenceState {
+    const franchiseIds = input.run.league.teams.map((team) => team.franchiseId);
+    const balance = 2 + blockIndex + 1;
+    const ledger: SeasonInfluenceState['ledger'] = [];
+    for (const franchiseId of franchiseIds) {
+      ledger.push({
+        entryId: `influence-initial-${franchiseId}`,
+        franchiseId,
+        source: 'initial-grant',
+        blockIndex: null,
+        commandId: null,
+        requestedDelta: 2,
+        appliedDelta: 2,
+        balanceAfter: 2,
+        explanation: 'Initial +2 Influence grant at run creation',
+      });
+      for (let block = 0; block <= blockIndex; block += 1) {
+        ledger.push({
+          entryId: `influence-block-${String(block)}-${franchiseId}`,
+          franchiseId,
+          source: 'block-grant',
+          blockIndex: block,
+          commandId: `grant-${String(block)}`,
+          requestedDelta: 1,
+          appliedDelta: 1,
+          balanceAfter: 3 + block,
+          explanation: `+1 Influence grant for accepted block ${String(block + 1)}`,
+        });
+      }
+    }
+    return {
+      schemaVersion: 1,
+      influenceVersion: SEASON_INFLUENCE_VERSION,
+      balances: Object.fromEntries(franchiseIds.map((franchiseId) => [franchiseId, balance])),
+      ledger,
+      windows: {},
+      rehabs: {},
+    };
+  }
+
+  /** Deterministic grant transactions for the accepted blocks 0..blockIndex. */
+  private fakeTransactionsFor(blockIndex: number): SeasonTransactionEntry[] {
+    const transactions: SeasonTransactionEntry[] = [];
+    for (let block = 0; block <= blockIndex; block += 1) {
+      transactions.push({
+        transactionId: `tx-grant-${String(block)}`,
+        commandId: `grant-${String(block)}`,
+        franchiseId: null,
+        type: 'block-grant',
+        blockIndex: block,
+        appliedAtStateRevision: block + 1,
+        payload: {},
+        explanation: `+1 Influence block grant for all franchises (block ${String(block + 1)})`,
+      });
+    }
+    return transactions;
+  }
+
+  private scheduleOf(input: SeasonBlockStartInput) {
+    return {
+      schemaVersion: 1,
+      scheduleVersion: 'schedule-v1',
+      formulaVersion: 'schedule-formula-v1',
+      leagueVersion: 'league-v1',
+      generationSeed: '0'.repeat(32),
+      rounds: 82,
+      games: input.run.games.map((game) => ({
+        gameId: game.gameId,
+        round: game.round,
+        homeFranchiseId: game.homeFranchiseId,
+        awayFranchiseId: game.awayFranchiseId,
+      })),
+    } as const;
+  }
   /** Games in the simulated block (also useful for specs). */
   static gamesToLock(blockIndex: number): number {
     return gamesToLockForBlock(blockIndex);
@@ -410,6 +864,14 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   static blockIndexOfRound(round: number): number {
     return blockIndexForRound(round);
   }
+}
+
+/** The validated snapshot of the accepted state (schedule-aware loader). */
+async function loadCurrentSnapshot(schedule: unknown): Promise<SeasonRunSnapshot | null> {
+  const { loadActiveRunWithSchedule } = (await import('@hoop-rush/persistence')) as unknown as {
+    loadActiveRunWithSchedule?: (schedule: unknown) => Promise<SeasonRunSnapshot | null>;
+  };
+  return loadActiveRunWithSchedule ? await loadActiveRunWithSchedule(schedule) : null;
 }
 
 export function createFakeSeasonBlockRunner(): SeasonBlockRunner {

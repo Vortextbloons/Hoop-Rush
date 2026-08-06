@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DERIVATION_METHOD_VERSION } from '@hoop-rush/data-contracts';
+import {
+  DERIVATION_METHOD_VERSION,
+  THREE_POINT_RECONSTRUCTION_VERSION,
+} from '@hoop-rush/data-contracts';
 import { derivePlayerRecord, fieldPublished, type DerivationInput } from './v2.ts';
 import { computeProductionImpact, computeRealOverall, computeSummaryRatings } from './summary.ts';
+import { loadThreePointReconstructionArtifact } from '../reconstruction/artifact.ts';
 
 const MODERN = { leaguePpg: 110, league3PARate: 0.36, pace: 99 };
 
@@ -142,6 +146,85 @@ describe('derivePlayerRecord (field-method registry)', () => {
     expect(derived.provenance['threePoint']?.kind).toBe('estimated');
     expect(derived.anchors.threePointPct).toBeNull();
     expect(derived.tendencies.threePointRate).toBe(0); // league rule: the shot did not exist
+  });
+
+  it('pre-1979 seasons receive conservative reconstructed profiles when the artifact is present', () => {
+    const artifact = loadThreePointReconstructionArtifact();
+    const derived = derivePlayerRecord(
+      input(
+        '1965-66',
+        pre1974Stats({ minutes: 2900, fgm: 700, fga: 1400, ftm: 300, fta: 360, assists: 240 }),
+        'PG',
+        { threePointReconstruction: artifact, weightLbs: 185, age: 26 },
+      ),
+    );
+    expect(derived.reconstructedThreePoint).toBeDefined();
+    const profile = derived.reconstructedThreePoint;
+    expect(profile?.modelVersion).toBe(THREE_POINT_RECONSTRUCTION_VERSION);
+    expect(profile?.attemptRateConservative).toBeGreaterThan(0);
+    expect(profile?.attemptRateConservative).toBeLessThan(1);
+    expect(profile?.accuracyConservative).toBeLessThan(profile?.accuracyMean ?? 1);
+    // Unavailable anchor contract: null, never a converted zero.
+    expect(derived.anchors.threePointAttemptRate).toBeNull();
+    expect(derived.anchors.threePointPct).toBeNull();
+    // Rating and tendency come from the conservative reconstruction.
+    expect(derived.provenance['threePoint']?.kind).toBe('reconstructed');
+    expect(derived.provenance['threePoint']?.confidence).toBe(profile?.confidence);
+    expect(derived.provenance['threePoint']?.notesCode).toBe(THREE_POINT_RECONSTRUCTION_VERSION);
+    expect(derived.provenance['threePointRate']?.kind).toBe('reconstructed');
+    expect(derived.tendencies.threePointRate).toBeCloseTo(
+      (profile?.attemptRateConservative ?? 0) * 100,
+      2,
+    );
+    // Related shot-mix tendencies are recalculated from the conservative
+    // rate, not from a modern-volume prior.
+    expect(
+      derived.tendencies.cornerThreeFrequency + derived.tendencies.aboveBreakThreeFrequency,
+    ).toBeLessThan(derived.tendencies.threePointRate + 1);
+  });
+
+  it('validated observed zero-attempt seasons are never reconstructed', () => {
+    const artifact = loadThreePointReconstructionArtifact();
+    const derived = derivePlayerRecord(
+      input('1985-86', starterStats({ tpm: 0, tpa: 0 }), 'C', {
+        threePointReconstruction: artifact,
+      }),
+    );
+    expect(derived.reconstructedThreePoint).toBeUndefined();
+    expect(derived.anchors.threePointAttemptRate).toBe(0);
+    expect(derived.provenance['threePoint']?.kind).toBe('estimated');
+    expect(derived.tendencies.threePointRate).toBe(0);
+  });
+
+  it('observed three-point seasons keep the derived path unchanged', () => {
+    const artifact = loadThreePointReconstructionArtifact();
+    const derived = derivePlayerRecord(
+      input('1985-86', starterStats(), 'SG', { threePointReconstruction: artifact }),
+    );
+    expect(derived.reconstructedThreePoint).toBeUndefined();
+    expect(derived.provenance['threePoint']?.kind).toBe('derived');
+    expect(derived.provenance['threePoint']?.sourceFields).toContain('tpm');
+    expect(derived.anchors.threePointAttemptRate).toBeCloseTo(410 / 1350, 6);
+    expect(derived.ratings.threePoint).toBeGreaterThan(50);
+  });
+
+  it('deterministic reconstruction: same inputs produce identical profiles', () => {
+    const artifact = loadThreePointReconstructionArtifact();
+    const base = {
+      season: '1965-66',
+      position: 'PG' as const,
+      heightInches: 79,
+      weightLbs: 185,
+      age: 26,
+      stats: pre1974Stats(),
+      era: MODERN,
+      threePointReconstruction: artifact,
+    };
+    const a = derivePlayerRecord(base);
+    const b = derivePlayerRecord(base);
+    expect(a.reconstructedThreePoint).toEqual(b.reconstructedThreePoint);
+    expect(a.ratings.threePoint).toBe(b.ratings.threePoint);
+    expect(a.tendencies.threePointRate).toBe(b.tendencies.threePointRate);
   });
 
   it('pre-1978 turnovers are estimated from usage context', () => {

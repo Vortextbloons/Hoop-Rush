@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "eraId": "1960s",
-  "profileVersion": "m3-1960s-v1",
+  "profileVersion": "m3-1960s-v2",
   "dataVersion": "m3.5",
   "seasons": [
     "1960-61",
@@ -15,7 +15,7 @@
     "1968-69",
     "1969-70"
   ],
-  "baselineReport": "derived from packaged 1960-61..1969-70 stints; targets frozen after calibration baseline",
+  "baselineReport": "calibrate run --samples 2000 (engine m3-engine-v10)",
   "parameters": {
     "pace": 122,
     "league3PARate": 0,
@@ -189,139 +189,139 @@
   },
   "targets": {
     "possessionsPerGame": {
-      "value": 113.46,
+      "value": 113.0415,
       "tolerance": 3,
       "minimumSample": 200
     },
     "pointsPerGame": {
-      "value": 121.1436,
+      "value": 136.1445,
       "tolerance": 5,
       "minimumSample": 200
     },
     "offensiveRating": {
-      "value": 99.298,
+      "value": 108.9107,
       "tolerance": 5,
       "minimumSample": 200
     },
     "fieldGoalPct": {
-      "value": 0.5333,
+      "value": 0.505,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "efgPct": {
-      "value": 0.5333,
+      "value": 0.5091,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "tsPct": {
-      "value": 0.5799,
+      "value": 0.5446,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "threePointRate": {
-      "value": 0,
+      "value": 0.028,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "threePointPct": {
-      "value": 0,
+      "value": 0.2907,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "freeThrowsAttemptedPerGame": {
-      "value": 37.6966,
+      "value": 34.948,
       "tolerance": 3,
       "minimumSample": 200
     },
     "freeThrowPct": {
-      "value": 0.7274,
+      "value": 0.7279,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "turnoversPerGame": {
-      "value": 20.74,
+      "value": 15.6505,
       "tolerance": 1.5,
       "minimumSample": 200
     },
     "turnoversPerPossession": {
-      "value": 0.17,
+      "value": 0.1252,
       "tolerance": 0.012,
       "minimumSample": 200
     },
     "offensiveReboundsPerGame": {
-      "value": 17.08,
+      "value": 14.752,
       "tolerance": 1.5,
       "minimumSample": 200
     },
     "offensiveReboundRate": {
-      "value": 0.28,
+      "value": 0.3009,
       "tolerance": 0.02,
       "minimumSample": 200
     },
     "assistsPerGame": {
-      "value": 17.564,
+      "value": 16.79,
       "tolerance": 2.5,
       "minimumSample": 200
     },
     "assistRate": {
-      "value": 0.3748,
+      "value": 0.3058,
       "tolerance": 0.03,
       "minimumSample": 200
     },
     "personalFoulsPerGame": {
-      "value": 25.4694,
+      "value": 33.554,
       "tolerance": 2.5,
       "minimumSample": 200
     },
     "zoneMix": {
       "rim": {
-        "value": 0.3212,
+        "value": 0.3094,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "shortMid": {
-        "value": 0.3876,
+        "value": 0.3739,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "longMid": {
-        "value": 0.2912,
+        "value": 0.2887,
         "tolerance": 0.02,
         "minimumSample": 200
       },
       "cornerThree": {
-        "value": 0,
+        "value": 0.0108,
         "tolerance": 0.015,
         "minimumSample": 200
       },
       "aboveBreakThree": {
-        "value": 0,
+        "value": 0.0171,
         "tolerance": 0.02,
         "minimumSample": 200
       }
     },
     "closeGameRate": {
-      "value": 0.28,
+      "value": 0.257,
       "tolerance": 0.04,
       "minimumSample": 2000
     },
     "blowoutRate": {
-      "value": 0.19,
+      "value": 0.234,
       "tolerance": 0.04,
       "minimumSample": 2000
     },
     "overtimeRate": {
-      "value": 0.027,
+      "value": 0.0255,
       "tolerance": 0.012,
       "minimumSample": 2000
     },
     "strongVsWeakWinRate": {
-      "value": 0.88,
+      "value": 0.852,
       "tolerance": 0.07,
       "minimumSample": 2000
     },
     "equalLineupHomeWinRate": {
-      "value": 0.5,
+      "value": 0.505,
       "tolerance": 0.05,
       "minimumSample": 2000
     }

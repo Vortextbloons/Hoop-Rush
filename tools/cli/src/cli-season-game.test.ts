@@ -260,6 +260,7 @@ function buildCompletedResult(input: SeasonGameSimulationInput): SeasonGameSimul
         };
       }),
       shotZones: [{ zone: 'rim', attempts: 10, makes: 6 }],
+      returns: [],
     };
   };
   const result: SeasonGameSimulationResult = {

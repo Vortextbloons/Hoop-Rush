@@ -10,6 +10,8 @@
   SeasonPlayerLoadState,
   SeasonRemoval,
   SeasonRemovalEvent,
+  SeasonReturn,
+  SeasonReturnEvent,
   SeasonRotation,
   SeasonRotationDeviation,
   SeasonRotationDeviationReason,
@@ -105,25 +107,33 @@ const OVERTIME_TOTAL_SECONDS = 5 * 300;
 const CHECKPOINT_MARKS: readonly number[] = [660, 600, 540, 480, 420, 360, 300, 240, 180, 120, 60];
 
 /**
- * Deterministic availability/removal seam (M2.2 uses pregame availability
- * only; tests and CLI fixtures inject same-game removals; M2.5 supplies the
- * seeded injury model through this seam). The default seam derives from the
- * input's `availability` and `removals`; tests may substitute their own.
+ * Deterministic availability/removal/return seam (M2.2 uses pregame
+ * availability only; tests and CLI fixtures inject same-game removals; M2.5
+ * supplies the seeded injury model through this seam). The default seam
+ * derives from the input's `availability`, `removals`, and `returns`; tests
+ * may substitute their own.
  */
 export interface SeasonGameAvailabilitySeam {
   /** Pregame availability per playerVersionId (both sides). */
   pregame: ReadonlyMap<string, boolean>;
   /** Same-game removals, applied at the next legal boundary at/after their clock. */
   removals: readonly SeasonRemoval[];
+  /**
+   * M2.5: same-game returns (seeded injury returns, reason `injury-return`),
+   * applied at the next legal boundary at/after their clock (mirror of
+   * removals); a returned player re-enters only at legal boundaries.
+   */
+  returns: readonly SeasonReturn[];
 }
 
-/** Default seam: input availability entries and input removals. */
+/** Default seam: input availability entries, removals, and returns. */
 export function defaultSeasonGameSeam(
   input: SeasonGameSimulationInput,
 ): SeasonGameAvailabilitySeam {
   return {
     pregame: new Map(input.availability.map((entry) => [entry.playerVersionId, entry.available])),
     removals: input.removals,
+    returns: input.returns,
   };
 }
 
@@ -219,10 +229,16 @@ class SideState {
   readonly stints: SeasonUnitStint[] = [];
   readonly foulOutEvents: SeasonFoulOut[] = [];
   readonly removalEvents: SeasonRemovalEvent[] = [];
+  /** M2.5: applied same-game return events (reason `injury-return`). */
+  readonly returnEvents: SeasonReturnEvent[] = [];
   /** Open stint: period, immutable open clock, cursor, unit; null between periods. */
   stint: { period: number; openClock: number; cursor: number; unit: string[] } | null = null;
   /** Events applied at the current boundary. */
-  boundaryEvents: { foulOuts: number; removals: number } = { foulOuts: 0, removals: 0 };
+  boundaryEvents: { foulOuts: number; removals: number; returns: number } = {
+    foulOuts: 0,
+    removals: 0,
+    returns: 0,
+  };
   changedThisBoundary = false;
   private checkpointIndex = 0;
   /** Cached legal-five enumeration, keyed by the availability signature. */
@@ -295,6 +311,7 @@ class SeasonGameController {
   private readonly home: SideState;
   private readonly away: SideState;
   private readonly removalQueue: SeasonRemoval[];
+  private readonly returnQueue: SeasonReturn[];
   private readonly effectsMode: SeasonGameEffectsMode | null;
   private offense: SideIndex = 0;
   private secondsRemaining = REGULATION_PERIOD_SECONDS;
@@ -341,6 +358,13 @@ class SeasonGameController {
       effectsMode?.buffer.hook,
     );
     this.removalQueue = [...seam.removals].sort((a, b) => {
+      const byPeriod = a.period - b.period;
+      if (byPeriod !== 0) return byPeriod;
+      const byClock = a.secondsRemaining - b.secondsRemaining;
+      if (byClock !== 0) return byClock;
+      return a.side === b.side ? 0 : a.side === 'home' ? -1 : 1;
+    });
+    this.returnQueue = [...seam.returns].sort((a, b) => {
       const byPeriod = a.period - b.period;
       if (byPeriod !== 0) return byPeriod;
       const byClock = a.secondsRemaining - b.secondsRemaining;
@@ -402,9 +426,10 @@ class SeasonGameController {
     return result;
   }
 
-  /** Tipoff: removals due at (1, 720), planner initial units, forfeits. */
+  /** Tipoff: removals/returns due at (1, 720), planner initial units, forfeits. */
   private tipoff(): SeasonGameSimulationResult | null {
     this.applyDueRemovals(1, REGULATION_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS, false);
+    this.applyDueReturns(1, REGULATION_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS, false);
     const homeUnit = chooseInitialUnit(this.home.planner, this.home.unavailable);
     const awayUnit = chooseInitialUnit(this.away.planner, this.away.unavailable);
     if (homeUnit === null && awayUnit === null) {
@@ -475,12 +500,15 @@ class SeasonGameController {
     const clock = periodEnded ? 0 : Math.floor(floatClock);
     this.boundaryClock = clock;
     for (const side of [this.home, this.away]) {
-      side.boundaryEvents = { foulOuts: 0, removals: 0 };
+      side.boundaryEvents = { foulOuts: 0, removals: 0, returns: 0 };
       side.changedThisBoundary = false;
     }
 
-    // 1. Events: removals due at/after the boundary clock, then foul-outs.
+    // 1. Events: removals due at/after the boundary clock, then returns
+    //    (a return at the same boundary re-enables the player for planning),
+    //    then foul-outs.
     this.applyDueRemovals(period, floatClock, clock, periodEnded);
+    this.applyDueReturns(period, floatClock, clock, periodEnded);
     this.applyFoulOuts(this.home, period, clock);
     this.applyFoulOuts(this.away, period, clock);
 
@@ -543,6 +571,44 @@ class SeasonGameController {
     }
   }
 
+  /**
+   * Applies every same-game return due at or before the (period,
+   * boundaryClock) boundary (mirror of removals). A returned player
+   * re-enters availability: the planner may bring them back at this
+   * boundary or a later one, always through a legal substitution.
+   */
+  private applyDueReturns(
+    period: number,
+    floatClock: number,
+    boundaryClock: number,
+    periodEnded: boolean,
+  ): void {
+    while (this.returnQueue.length > 0) {
+      const ret = this.returnQueue[0];
+      if (ret === undefined) break;
+      if (ret.period > period) break;
+      if (!periodEnded && ret.period === period && floatClock > ret.secondsRemaining) {
+        break;
+      }
+      this.returnQueue.shift();
+      const side = ret.side === 'home' ? this.home : this.away;
+      // A return never re-enables a fouled-out player (the seeded seam only
+      // returns injury-removed players; the guard keeps the invariant).
+      if (side.fouledOut.has(ret.playerVersionId)) continue;
+      side.removed.delete(ret.playerVersionId);
+      side.unavailable.delete(ret.playerVersionId);
+      side.causesFor(ret.playerVersionId).add('injury-return');
+      side.returnEvents.push({
+        side: ret.side,
+        playerVersionId: ret.playerVersionId,
+        period,
+        secondsRemaining: boundaryClock,
+        reason: ret.reason,
+      });
+      side.boundaryEvents.returns += 1;
+    }
+  }
+
   /** Removes every active player with six personal fouls at this boundary. */
   private applyFoulOuts(side: SideState, period: number, clock: number): void {
     for (const playerVersionId of side.unit) {
@@ -591,11 +657,17 @@ class SeasonGameController {
   ): { reason: SeasonSubstitutionReason; unit: string[] | null } | null {
     const hasFoulOut = side.boundaryEvents.foulOuts > 0;
     const hasRemoval = side.boundaryEvents.removals > 0;
+    const hasReturn = side.boundaryEvents.returns > 0;
+    // The substitution reason enum has no return literal; a return-driven
+    // re-plan records as a rotation-plan substitution (the deviation cause
+    // `injury-return` carries the return fact on the player's deviation).
     const eventReason: SeasonSubstitutionReason | null = hasFoulOut
       ? 'foul-out'
       : hasRemoval
         ? 'injected-injury-removal'
-        : null;
+        : hasReturn
+          ? 'rotation-plan'
+          : null;
 
     const nextPeriod = periodEnded ? period + 1 : period;
     const nextClock = periodEnded
@@ -908,6 +980,7 @@ class SeasonGameController {
         };
       }),
       shotZones: this.recorder.zoneSummary(index),
+      returns: [...side.returnEvents],
     };
   }
 
@@ -1408,7 +1481,14 @@ function substitutionAudit(
     }
   }
 
-  // Legality: no stint contains a player after their foul-out or removal clock.
+  // Legality: no stint contains a player after their foul-out or removal
+  // clock, unless a same-game return re-enabled them at or before the
+  // stint's start (the M2.5 injury seam removes and returns players).
+  const momentBefore = (
+    a: { period: number; secondsRemaining: number },
+    b: { period: number; secondsRemaining: number },
+  ): boolean =>
+    a.period < b.period || (a.period === b.period && a.secondsRemaining > b.secondsRemaining);
   for (const stint of stints) {
     for (const playerVersionId of stint.players) {
       if (unavailable.has(playerVersionId)) {
@@ -1422,16 +1502,43 @@ function substitutionAudit(
   ]) {
     for (const stint of stints) {
       if (!stint.players.includes(event.playerVersionId)) continue;
-      if (stint.period > event.period) {
+      const playsPast =
+        stint.period > event.period ||
+        (stint.period === event.period && stint.endSecondsRemaining < event.secondsRemaining);
+      if (!playsPast) continue;
+      const reenabledBeforeStintStart = result[sideKey].returns.some(
+        (ret) =>
+          ret.playerVersionId === event.playerVersionId &&
+          !momentBefore(
+            { period: stint.period, secondsRemaining: stint.startSecondsRemaining },
+            ret,
+          ),
+      );
+      if (reenabledBeforeStintStart) continue;
+      failures.push(
+        `${sideKey}: ${event.playerVersionId} plays in period ${String(stint.period)} after removal in period ${String(event.period)}`,
+      );
+    }
+  }
+  // M2.5 legality mirror for returns: no stint overlapping the unavailable
+  // window — after the player's removal boundary and before the return
+  // boundary — contains them. A stint entirely before the removal (the
+  // player was available) or entirely at/after the return boundary is legal;
+  // a return without a removal is a no-op and never flags.
+  for (const event of result[sideKey].returns) {
+    const removal = result.removals.find(
+      (entry) => entry.side === sideKey && entry.playerVersionId === event.playerVersionId,
+    );
+    if (removal === undefined) continue;
+    for (const stint of stints) {
+      if (!stint.players.includes(event.playerVersionId)) continue;
+      const stintStart = { period: stint.period, secondsRemaining: stint.startSecondsRemaining };
+      const stintEnd = { period: stint.period, secondsRemaining: stint.endSecondsRemaining };
+      const afterRemoval = momentBefore(removal, stintEnd);
+      const beforeReturn = momentBefore(stintStart, event);
+      if (afterRemoval && beforeReturn) {
         failures.push(
-          `${sideKey}: ${event.playerVersionId} plays in period ${String(stint.period)} after removal in period ${String(event.period)}`,
-        );
-      } else if (
-        stint.period === event.period &&
-        stint.endSecondsRemaining < event.secondsRemaining
-      ) {
-        failures.push(
-          `${sideKey}: ${event.playerVersionId} plays past (${String(event.period)}, ${String(event.secondsRemaining)})`,
+          `${sideKey}: ${event.playerVersionId} plays between the removal and (${String(event.period)}, ${String(event.secondsRemaining)}) return`,
         );
       }
     }
@@ -1524,6 +1631,12 @@ function deviationAudit(
     ) {
       failures.push(`${sideKey}: ${dev.playerVersionId} missing injected-injury-removal reason`);
     }
+    if (
+      result[sideKey].returns.some((e) => e.playerVersionId === dev.playerVersionId) &&
+      !dev.reasons.includes('injury-return')
+    ) {
+      failures.push(`${sideKey}: ${dev.playerVersionId} missing injury-return reason`);
+    }
   }
   let balance = 0;
   for (const dev of devs) balance += dev.actualSeconds - dev.targetSeconds;
@@ -1539,7 +1652,8 @@ function isDeviationReason(reason: string): boolean {
     reason === 'foul-out' ||
     reason === 'pregame-unavailable' ||
     reason === 'injected-injury-removal' ||
-    reason === 'contingency-legality'
+    reason === 'contingency-legality' ||
+    reason === 'injury-return'
   );
 }
 

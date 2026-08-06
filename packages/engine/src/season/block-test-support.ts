@@ -1,12 +1,18 @@
 import {
   SEASON_AI_VERSION,
   SEASON_BLOCK_VERSION,
+  SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
+  SEASON_HEALTH_VERSION,
+  SEASON_INFLUENCE_TARGETS_VERSION,
+  SEASON_INFLUENCE_VERSION,
+  SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEAGUE_VERSION,
+  SEASON_OBJECTIVE_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
@@ -20,6 +26,9 @@ import {
   SEASON_SEED_DERIVATION_VERSION,
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
+  SEASON_TRADE_TARGETS_VERSION,
+  SEASON_TRADE_VERSION,
+  SEASON_OBJECTIVE_CATALOG,
   seasonEffectsStateSchema,
   seasonNamespaceSeed,
   seasonRunSchema,
@@ -27,6 +36,7 @@ import {
   type SeasonDraftCatalog,
   type SeasonEffectsState,
   type SeasonGameSummary,
+  type SeasonHealthState,
   type SeasonLeagueGenerationResult,
   type SeasonPairChemistryState,
   type SeasonRun,
@@ -44,11 +54,13 @@ import { generateSeasonSchedule } from './schedule.ts';
 import { generateAiLeague } from './ai.ts';
 import {
   expandSeasonRunRosters,
+  deriveSeasonPostBlockState,
   rosterPlayerIdsOf,
   simulateSeasonBlock,
   type SeasonBlockSimulationInput,
 } from './block.ts';
 import { seasonRotationSetDigest } from './rotation.ts';
+import { createInitialSeasonInfluenceState } from './influence.ts';
 
 /**
  * Deterministic full-league test support for the M2.3 block pipeline: a
@@ -106,6 +118,13 @@ export const VERSIONS: SeasonCheckpointVersions = {
   staminaVersion: SEASON_STAMINA_VERSION,
   chemistryVersion: SEASON_CHEMISTRY_VERSION,
   effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
+  healthVersion: SEASON_HEALTH_VERSION,
+  tradeVersion: SEASON_TRADE_VERSION,
+  influenceVersion: SEASON_INFLUENCE_VERSION,
+  objectiveVersion: SEASON_OBJECTIVE_VERSION,
+  injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
+  tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
+  influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
 };
 
 export interface TestRun {
@@ -168,7 +187,7 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
       gameVersion: VERSIONS.gameVersion,
       gameTargetsVersion: VERSIONS.gameTargetsVersion,
       rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
-      checkpointVersion: 'season-checkpoint-v2',
+      checkpointVersion: SEASON_CHECKPOINT_VERSION,
       blockVersion: VERSIONS.blockVersion,
       summaryVersion: VERSIONS.summaryVersion,
       aggregatesVersion: VERSIONS.aggregatesVersion,
@@ -178,6 +197,13 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
       staminaVersion: VERSIONS.staminaVersion,
       chemistryVersion: VERSIONS.chemistryVersion,
       effectsTargetsVersion: VERSIONS.effectsTargetsVersion,
+      healthVersion: VERSIONS.healthVersion,
+      tradeVersion: VERSIONS.tradeVersion,
+      influenceVersion: VERSIONS.influenceVersion,
+      objectiveVersion: VERSIONS.objectiveVersion,
+      injuryTargetsVersion: VERSIONS.injuryTargetsVersion,
+      tradeTargetsVersion: VERSIONS.tradeTargetsVersion,
+      influenceTargetsVersion: VERSIONS.influenceTargetsVersion,
     },
     league,
     rosters: generation.rosters,
@@ -230,6 +256,20 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
     rotations: generation.rotations,
     generationAudit: buildFixtureGenerationAudit(TEST_SEED),
     evaluations: generation.evaluations,
+    // M2.5: run-scoped state chain and economy facts (schema 7).
+    trade: null,
+    objectives: {
+      schemaVersion: 1,
+      objectiveVersion: SEASON_OBJECTIVE_VERSION,
+      catalog: [...SEASON_OBJECTIVE_CATALOG],
+      selections: {},
+    },
+    health: emptyHealthState(),
+    transactions: [],
+    influence: createInitialSeasonInfluenceState(league.teams.map((team) => team.franchiseId)),
+    checkpointState: null,
+    stateRevision: 0,
+    stateDigest: '0'.repeat(32),
   };
   const parsed = seasonRunSchema.safeParse(run);
   if (!parsed.success) {
@@ -273,6 +313,15 @@ function fixtureAiPools(aiAssignments: SeasonRun['aiAssignments']): SeasonRun['a
         repairCount: 0,
       };
     });
+}
+
+/** The league-wide empty health state (M2.5; block 0 / fresh runs). */
+export function emptyHealthState(): SeasonHealthState {
+  return {
+    schemaVersion: 1,
+    healthVersion: SEASON_HEALTH_VERSION,
+    injuries: [],
+  };
 }
 
 function emptyPostseason(rootSeed: string): SeasonRun['postseason'] {
@@ -332,13 +381,19 @@ export function blockCommand(
 ): SeasonSubmitBlockCommand {
   return {
     schemaVersion: SEASON_RUN_SCHEMA_VERSION,
-    blockVersion: 'season-block-v2',
+    blockVersion: SEASON_BLOCK_VERSION,
     command: 'submit-season-block',
     commandId: `block-${String(blockIndex)}-${String(expectedRevision)}`,
     runId: run.runId,
     expectedRevision,
     blockIndex,
     rotationDigest: seasonRotationSetDigest(run.rotations),
+    // M2.5: fixture-driven commands carry no locked objective and assert the
+    // run's state chain facts (the pipeline's objective seam is absent, so
+    // the invalid-objective validation is skipped for these inputs).
+    objectiveId: null,
+    expectedStateRevision: run.stateRevision,
+    expectedStateDigest: run.stateDigest,
   };
 }
 
@@ -361,6 +416,13 @@ export function pipelineInput(
     rosterPlayerIds: rosterPlayerIdsOf(run),
     priorSummaries,
     effects,
+    // M2.5: the pre-block health state and the locked objective (null for
+    // fixture-driven runs); the pre-block influence and transaction log
+    // ride the run.
+    health: run.health,
+    objectiveId: null,
+    influence: run.influence,
+    transactions: run.transactions,
   };
 }
 
@@ -413,14 +475,30 @@ export function runBlock(
   state: RunnerState,
   blockIndex: number,
 ): import('@hoop-rush/data-contracts').SeasonCandidateCheckpoint {
+  const command = blockCommand(state.run, blockIndex, blockIndex);
   const input = pipelineInput(state.run, state.catalog, blockIndex, state.summaries, state.effects);
   const checkpoint = simulateSeasonBlock(input);
   state.summaries = [...state.summaries, ...checkpoint.gameSummaries];
   state.effects = checkpoint.effects;
+  // M2.5: fold the candidate facts into the run snapshot exactly like the
+  // CLI's runBlockThroughHandler: health/influence/transactions ride the
+  // checkpoint, and the run state chain derives through the engine seam.
+  const stateFacts = deriveSeasonPostBlockState({
+    run: state.run,
+    candidate: checkpoint,
+    commandId: command.commandId,
+    rotationDigest: command.rotationDigest,
+  });
   state.run = {
     ...state.run,
     cursor: { schemaVersion: 1, completedRounds: checkpoint.completedRounds },
     standings: checkpoint.standings,
+    health: checkpoint.health,
+    influence: checkpoint.influence,
+    transactions: checkpoint.transactions,
+    checkpointState: stateFacts.checkpointState,
+    stateRevision: stateFacts.stateRevision,
+    stateDigest: stateFacts.stateDigest,
   };
   return checkpoint;
 }

@@ -130,6 +130,7 @@ function buildGameInput(
       available: true,
     })),
     removals: [],
+    returns: [],
     homeCourt: SEASON_NEUTRAL_HOME_COURT,
   };
 }

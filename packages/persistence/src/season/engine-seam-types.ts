@@ -1,14 +1,21 @@
 import type {
+  SeasonCheckpointState,
   SeasonEffectsState,
   SeasonGame,
   SeasonGameSummary,
+  SeasonHealthState,
+  SeasonInfluenceState,
   SeasonLeague,
+  SeasonObjectiveState,
+  SeasonOwnership,
   SeasonPlayerAggregate,
   SeasonRoster,
   SeasonRotation,
   SeasonSchedule,
   SeasonStandings,
   SeasonTeamAggregate,
+  SeasonTradeState,
+  SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
 
 /**
@@ -71,4 +78,55 @@ export interface SeasonRunEngineSeam {
   seasonPairKey(a: string, b: string): string;
   /** True when `a < b` (canonical pair ordering). */
   seasonPairIsCanonical(a: string, b: string): boolean;
+  /**
+   * M2.5: canonical 32-hex digest of the mutable run state facts
+   * (`stateRevision`, `checkpointState`, `health`, `influence`,
+   * `transactions`, `trade`, `objectives`, `rosters`, `ownership`,
+   * `rotations`, `effects`; the stored `stateDigest` is excluded from its
+   * own computation). The reload audit recomputes the stored digest through
+   * this binding, so corrupt or half-applied mutable state is detected.
+   */
+  seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string;
+  /**
+   * M2.5: the initial run-creation Influence state — every franchise at +2
+   * with its recorded `initial-grant` ledger entry (blockIndex/commandId
+   * null), no windows, no rehabs. Used to seed the checkpoint at draft
+   * promotion.
+   */
+  createInitialSeasonInfluenceState(franchiseIds: readonly string[]): SeasonInfluenceState;
+}
+
+/** The mutable run-state facts the M2.5 state digest covers. */
+export interface SeasonRunStateDigestFacts {
+  stateRevision: number;
+  checkpointState: SeasonCheckpointState | null;
+  health: SeasonHealthState;
+  influence: SeasonInfluenceState;
+  transactions: readonly SeasonTransactionEntry[];
+  trade: SeasonTradeState | null;
+  objectives: SeasonObjectiveState;
+  rosters: readonly SeasonRoster[];
+  ownership: readonly SeasonOwnership[];
+  rotations: readonly SeasonRotation[];
+  effects: SeasonEffectsState;
+}
+
+/**
+ * Everything the block commit writes when the engine's
+ * `completeSeasonBlockCommit` produced a trade-window open (M2.5). Mirrors
+ * the engine's `SeasonWindowOpenResult` in `engine/season/trades.ts`
+ * (frozen shape, LEAD ADDENDUM item 3); persistence imports the engine only
+ * through the seam, so the structural type lives here and the lead verifies
+ * it stays identical to the engine export at integration.
+ */
+export interface SeasonWindowOpenResult {
+  trade: SeasonTradeState;
+  influence: SeasonInfluenceState;
+  transactions: SeasonTransactionEntry[];
+  rosters: SeasonRoster[];
+  ownership: SeasonOwnership[];
+  rotations: SeasonRotation[];
+  effects: SeasonEffectsState;
+  stateRevision: number;
+  stateDigest: string;
 }
