@@ -404,11 +404,10 @@ function auditPoolContent(
   }
 
   // Peak reproducibility: selectionScore recomputed from packaged fields
-  // under the current selection-score version. The raw overall is the
-  // pre-percentile rawOverallScore from the rating profile (canonical curve
-  // fallback for legacy rows without a profile).
+  // under the current selection-score version. Reuse the importer fallback
+  // so legacy rows with only canonicalOverall are handled consistently.
   for (const player of pool.players) {
-    const rawOverall = player.ratingProfile?.rawOverallScore ?? player.summaryRatings.overallRating;
+    const rawOverall = pools.rawOverallScoreFor(player, player.summaryRatings);
     const recomputed = pools.selectionScore(
       rawOverall,
       player.summaryRatings.offenseRating,

@@ -112,6 +112,7 @@ interface RosterPlayer {
   ratings: Record<string, number>;
   tendencies: Record<string, number>;
   summaryRatings: { overallRating: number; offenseRating: number; defenseRating: number } | null;
+  ratingProfile?: { rawOverallScore?: number; canonicalOverall?: number };
 }
 
 interface SeasonStats {
@@ -126,6 +127,7 @@ interface SeasonStats {
   steals: number;
   blocks: number;
   turnovers: number;
+  usageRate?: number | null;
   fgm: number;
   fga: number;
   tpm: number;
@@ -324,6 +326,7 @@ export function buildCandidateCatalog(
   }
   const candidates: FranchiseCandidates[] = [];
   const details: string[] = [];
+  const selectionKeys = new Map<string, readonly number[]>();
 
   for (const slot of manifest.modernFranchiseSlots) {
     const perPlayer = new Map<string, PeakCandidate>();
@@ -343,17 +346,26 @@ export function buildCandidateCatalog(
         if (!player?.summaryRatings) continue;
         const key = `p-${stint.playerExternalId}`;
         const summary = player.summaryRatings;
-        const score =
-          0.5 * summary.overallRating + 0.3 * summary.offenseRating + 0.2 * summary.defenseRating;
-        const previous = perPlayer.get(key);
+        const stats = statsBySeason.get(season)?.get(stint.playerExternalId);
+        const minutes = Math.trunc(stint.minutes);
+        const games = Math.trunc(stint.gamesPlayed);
+        const score = pools.selectionScore(
+          pools.rawOverallScoreFor(player as unknown as Record<string, unknown>, summary),
+          summary.offenseRating,
+          summary.defenseRating,
+          stats?.usageRate ?? null,
+          minutes,
+          games,
+        );
         const seasonStart = Number.parseInt(season.slice(0, 4), 10);
-        const previousStart = previous ? Number.parseInt(previous.seasonKey.slice(0, 4), 10) : 0;
+        const selectionKey = [score, minutes, games, -seasonStart] as const;
+        const selectionKeyId = `${slot.franchiseId}/${key}`;
+        const previous = perPlayer.get(key);
+        const previousKey = selectionKeys.get(selectionKeyId);
         if (
           previous === undefined ||
-          score > previous.score ||
-          (score === previous.score &&
-            (stint.minutes > previous.minutes ||
-              (stint.minutes === previous.minutes && seasonStart < previousStart)))
+          previousKey === undefined ||
+          pools.compareSelectionKeys(selectionKey, previousKey) > 0
         ) {
           const ratings = {} as BracketCandidatePlayer['ratings'];
           for (const keyName of RATING_KEYS) {
@@ -368,22 +380,20 @@ export function buildCandidateCatalog(
           const positions = playablePositions(
             careerLabels.get(stint.playerExternalId) ?? new Set(),
           );
-          const anchors = anchorsFromStats(
-            statsBySeason.get(season)?.get(stint.playerExternalId),
-            positions,
-          );
+          const anchors = anchorsFromStats(stats, positions);
+          selectionKeys.set(selectionKeyId, selectionKey);
           perPlayer.set(key, {
             playerId: key,
             displayName: `${player.firstName} ${player.lastName}`.trim(),
             seasonKey: season,
             heightInches: player.heightInches ?? null,
             weightLbs: player.weightLbs ?? null,
-            minutes: stint.minutes,
+            minutes,
             positions,
             ratings,
             tendencies,
             anchors,
-            score: Math.round(score * 100) / 100,
+            score,
           });
         }
       }
@@ -408,22 +418,23 @@ export function buildCandidateCatalog(
   // once, so a player with qualifying stints on two franchises (trades)
   // represents the franchise where their peak is best.
   {
-    const owner = new Map<string, { franchiseId: string; score: number; seasonStart: number }>();
+    const owner = new Map<string, { franchiseId: string; key: readonly number[] }>();
     for (const candidate of candidates) {
       for (const player of candidate.players) {
-        const seasonStart = Number.parseInt(player.seasonKey.slice(0, 4), 10);
+        const selectionKey = selectionKeys.get(`${candidate.franchiseId}/${player.playerId}`);
+        if (selectionKey === undefined) {
+          throw new Error(`missing selection key for ${candidate.franchiseId}/${player.playerId}`);
+        }
         const current = owner.get(player.playerId);
+        const comparison = current ? pools.compareSelectionKeys(selectionKey, current.key) : 1;
         if (
           current === undefined ||
-          player.score > current.score ||
-          (player.score === current.score &&
-            (seasonStart < current.seasonStart ||
-              (seasonStart === current.seasonStart && candidate.franchiseId < current.franchiseId)))
+          comparison > 0 ||
+          (comparison === 0 && candidate.franchiseId < current.franchiseId)
         ) {
           owner.set(player.playerId, {
             franchiseId: candidate.franchiseId,
-            score: player.score,
-            seasonStart,
+            key: selectionKey,
           });
         }
       }

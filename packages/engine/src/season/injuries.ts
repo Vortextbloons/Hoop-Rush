@@ -319,6 +319,10 @@ export function applySeasonGameHealthTransition(
     const record = injuries[i];
     if (record === undefined) continue;
     if (!franchiseSet.has(record.franchiseId)) continue;
+    // The season-ending sentinel is a fixed serialized fact, not a very
+    // large recovery countdown. It must survive every team-game cadence so
+    // reload validation and seeded replays see the same season-ending state.
+    if (record.seasonEnding) continue;
     if (record.missedGamesRemaining > 0) {
       record.missedGamesRemaining -= 1;
       if (record.missedGamesRemaining === 0) {
@@ -387,7 +391,14 @@ export function applyRiskyRehabOutcome(
     throw new Error(`season health: risky rehab references unknown injury ${injuryId}`);
   }
   const updated: SeasonInjuryRecord = { ...record };
-  if (outcome === 'success') {
+  if (record.seasonEnding) {
+    // A season-ending injury cannot be rehabilitated into a return during
+    // this run. Keep its fixed sentinel while still recording the spend and
+    // seeded outcome through rehabModifier.
+    updated.missedGamesTotal = SEASON_ENDING_MISSED_GAMES_SENTINEL;
+    updated.missedGamesRemaining = SEASON_ENDING_MISSED_GAMES_SENTINEL;
+    updated.rehabModifier = outcome === 'success' ? -1 : 1;
+  } else if (outcome === 'success') {
     updated.missedGamesRemaining = Math.max(1, updated.missedGamesRemaining - 1);
     updated.rehabModifier = -1;
   } else {

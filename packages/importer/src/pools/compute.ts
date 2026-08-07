@@ -592,16 +592,22 @@ export function rawOverallScoreFor(
   player: Record<string, unknown>,
   summary: SummaryRatingsRaw | undefined,
 ): number {
-  const raw = (player.ratingProfile as { rawOverallScore?: unknown } | undefined)?.rawOverallScore;
+  const profile = player.ratingProfile as
+    { rawOverallScore?: unknown; canonicalOverall?: unknown } | undefined;
+  const raw = profile?.rawOverallScore;
   if (typeof raw === 'number' && Number.isFinite(raw)) {
     return raw;
+  }
+  const canonical = profile?.canonicalOverall;
+  if (typeof canonical === 'number' && Number.isFinite(canonical)) {
+    return canonical;
   }
   // Fallback: the canonical curve value, never a percentile-shifted overall.
   return safeFloat(summary?.overallRating);
 }
 
 /**
- * selection-v2: rating blend plus modest season-availability adjustment.
+ * Versioned selection-score blend plus modest season-availability adjustment.
  * The raw overall is the pre-percentile rawOverallScore from the rating
  * profile so peak selection never depends on cohort-normalized values.
  */
@@ -664,7 +670,7 @@ function maxBy<T>(items: readonly T[], key: (item: T) => readonly number[]): T {
   let bestKey = key(first);
   for (const item of items.slice(1)) {
     const itemKey = key(item);
-    if (compareKeys(itemKey, bestKey) > 0) {
+    if (compareSelectionKeys(itemKey, bestKey) > 0) {
       best = item;
       bestKey = itemKey;
     }
@@ -672,7 +678,7 @@ function maxBy<T>(items: readonly T[], key: (item: T) => readonly number[]): T {
   return best;
 }
 
-function compareKeys(a: readonly number[], b: readonly number[]): number {
+export function compareSelectionKeys(a: readonly number[], b: readonly number[]): number {
   for (let i = 0; i < a.length; i += 1) {
     const av = a[i];
     const bv = b[i];

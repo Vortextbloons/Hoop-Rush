@@ -3,6 +3,7 @@ import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
 import { simChallengeReportSchema } from './report-schemas.ts';
 import { jsonPayload, runCli } from './cli-test-helpers.ts';
 import { loadPackagedData, PackagedData } from './commands/data-loader.ts';
+import { bestRow } from './commands/challenge.ts';
 
 const G_POSITIONS = new Set(['PG', 'SG']);
 const F_POSITIONS = new Set(['SF', 'PF']);
@@ -120,6 +121,15 @@ const franchiseOnlyNames = () => {
 };
 
 describe('cli: sim challenge', () => {
+  it('resolves a franchise-qualified name by selection score, not display Overall', () => {
+    const rows = [
+      { seasonKey: '1990-91', overall: 90, selectionScore: 62.4 },
+      { seasonKey: '1993-94', overall: 88, selectionScore: 64.8 },
+    ] as PlayersIndexEntry[];
+
+    expect(bestRow(rows).seasonKey).toBe('1993-94');
+  });
+
   it('runs a complete 82-game challenge with a validated payload', async () => {
     const { code, stdout } = await runCli([
       'sim',

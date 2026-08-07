@@ -138,12 +138,12 @@ function nameMatches(row: PlayersIndexEntry, name: string): boolean {
 
 /**
  * Deterministic pick among matching rows after a franchise qualifier narrows
- * the choice to the same player across eras: highest overall, then earliest
- * season, then index order.
+ * the choice to the same player across eras: highest selection score, then
+ * earliest season, then index order.
  */
-function bestRow(rows: PlayersIndexEntry[]): PlayersIndexEntry {
+export function bestRow(rows: PlayersIndexEntry[]): PlayersIndexEntry {
   const sorted = [...rows].sort((a, b) => {
-    if (b.overall !== a.overall) return b.overall - a.overall;
+    if (b.selectionScore !== a.selectionScore) return b.selectionScore - a.selectionScore;
     if (a.seasonKey !== b.seasonKey) return a.seasonKey < b.seasonKey ? -1 : 1;
     return 0;
   });

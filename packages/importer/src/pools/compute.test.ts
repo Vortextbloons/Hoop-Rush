@@ -36,6 +36,7 @@ import {
   parsePoolTargets,
   partitionPoolTargets,
   run,
+  rawOverallScoreFor,
   selectionScore,
   type Candidate,
   type Manifest,
@@ -623,6 +624,24 @@ describe('selectionScore', () => {
   it('treats null usage as 0 and guards zero team games', () => {
     expect(selectionScore(60, 60, 60, null, 1200, 60)).toBe(59.752);
     expect(selectionScore(60, 60, 60, 10, 30, 0)).toBe(58.656);
+  });
+});
+
+describe('rawOverallScoreFor', () => {
+  it('prefers raw and canonical profile values over normalized summary overall', () => {
+    expect(
+      rawOverallScoreFor(
+        { ratingProfile: { rawOverallScore: 64, canonicalOverall: 62 } },
+        { overallRating: 91 },
+      ),
+    ).toBe(64);
+    expect(
+      rawOverallScoreFor({ ratingProfile: { canonicalOverall: 62 } }, { overallRating: 91 }),
+    ).toBe(62);
+  });
+
+  it('falls back to summary overall only for legacy rows without a profile', () => {
+    expect(rawOverallScoreFor({}, { overallRating: 91 })).toBe(91);
   });
 });
 

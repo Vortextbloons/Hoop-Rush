@@ -62,7 +62,7 @@ Commands:
                                               Name | Name@Franchise | Name@Franchise/era.
                                               Ambiguous ids/names are rejected with
                                               qualifying forms; a franchise-qualified
-                                              name picks the best peak (highest overall)
+                                              name picks the best peak (highest selection score)
                          --seed <hex>          Run seed (required)
                          --reruns N            Best-of whole-season attempts (default 2)
                          --era <eraId>         Simulation era (default 2010s; selects the

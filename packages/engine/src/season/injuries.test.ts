@@ -438,6 +438,42 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     expect(health.injuries[0]?.missedGamesRemaining).toBe(2);
   });
 
+  it('preserves the season-ending sentinel across every team-game cadence', () => {
+    const record: SeasonInjuryRecord = {
+      injuryId: 'inj-' + 's'.repeat(32),
+      playerVersionId: 'pv-season-ending',
+      franchiseId: 'lakers',
+      gameId: 's000001',
+      type: 'lower-body',
+      severity: 'season-ending',
+      occurredBeforeHalftime: false,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: SEASON_ENDING_MISSED_GAMES_SENTINEL,
+      missedGamesRemaining: SEASON_ENDING_MISSED_GAMES_SENTINEL,
+      actualReturnRound: null,
+      seasonEnding: true,
+      rehabModifier: 0,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: ['injuries', 's000001', 'pv-season-ending', 'occurrence'],
+    };
+    let health = healthWith([record]);
+    for (let round = 2; round <= 82; round += 1) {
+      health = applySeasonGameHealthTransition(health, {
+        gameId: `s${String(round).padStart(6, '0')}`,
+        round,
+        franchises: ['lakers', 'celtics'],
+        newInjuries: [],
+        sameGameReturned: [],
+      });
+    }
+    expect(health.injuries[0]?.missedGamesTotal).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
+    expect(health.injuries[0]?.missedGamesRemaining).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
+    expect(health.injuries[0]?.actualReturnRound).toBeNull();
+    expect(health.injuries[0]?.recurrenceWindowRoundsRemaining).toBe(0);
+    expect(seasonPlayerAvailable(health, record.playerVersionId)).toBe(false);
+  });
+
   it('appends new injuries with their game facts and resolves same-game returns', () => {
     let rolled = forcedRoll('root-r', 's000003', 'pv-3');
     for (let attempt = 0; attempt < 200 && !rolled.occurred; attempt += 1) {
@@ -521,5 +557,34 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     const worsened = applyRiskyRehabOutcome(healthWith([record]), record.injuryId, 'failure');
     expect(worsened.injuries[0]?.missedGamesRemaining).toBe(11);
     expect(worsened.injuries[0]?.rehabModifier).toBe(1);
+  });
+
+  it('keeps the season-ending sentinel fixed when risky rehab is spent', () => {
+    const record: SeasonInjuryRecord = {
+      injuryId: 'inj-' + 'r'.repeat(32),
+      playerVersionId: 'pv-rehab-season-ending',
+      franchiseId: 'lakers',
+      gameId: 's000001',
+      type: 'illness',
+      severity: 'season-ending',
+      occurredBeforeHalftime: false,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: SEASON_ENDING_MISSED_GAMES_SENTINEL,
+      missedGamesRemaining: SEASON_ENDING_MISSED_GAMES_SENTINEL,
+      actualReturnRound: null,
+      seasonEnding: true,
+      rehabModifier: 0,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: ['injuries', 's000001', 'pv-rehab-season-ending', 'occurrence'],
+    };
+    const success = applyRiskyRehabOutcome(healthWith([record]), record.injuryId, 'success');
+    expect(success.injuries[0]?.missedGamesTotal).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
+    expect(success.injuries[0]?.missedGamesRemaining).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
+    expect(success.injuries[0]?.rehabModifier).toBe(-1);
+    const failure = applyRiskyRehabOutcome(healthWith([record]), record.injuryId, 'failure');
+    expect(failure.injuries[0]?.missedGamesTotal).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
+    expect(failure.injuries[0]?.missedGamesRemaining).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
+    expect(failure.injuries[0]?.rehabModifier).toBe(1);
   });
 });

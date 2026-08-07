@@ -1,4 +1,5 @@
 import {
+  SEASON_ENDING_MISSED_GAMES_SENTINEL,
   SEASON_BLOCK_COUNT,
   SEASON_ROUND_COUNT,
   SEASON_SEED_NAMESPACES,
@@ -1558,6 +1559,15 @@ export function auditSeasonBlock(
     }
     if (record.seasonEnding !== (record.severity === 'season-ending')) {
       failures.push(`injury ${record.injuryId} seasonEnding flag does not match its severity`);
+    }
+    if (
+      record.seasonEnding &&
+      (record.missedGamesTotal !== SEASON_ENDING_MISSED_GAMES_SENTINEL ||
+        record.missedGamesRemaining !== SEASON_ENDING_MISSED_GAMES_SENTINEL)
+    ) {
+      failures.push(
+        `season-ending injury ${record.injuryId} must carry the missed-games sentinel ${String(SEASON_ENDING_MISSED_GAMES_SENTINEL)}`,
+      );
     }
     if (record.recurrenceWindowRoundsRemaining > 0 && record.actualReturnRound === null) {
       failures.push(`injury ${record.injuryId} has an open window before its actual return`);
