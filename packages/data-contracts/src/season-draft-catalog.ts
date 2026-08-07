@@ -19,21 +19,35 @@ import {
   SEASON_DURABILITY_VERSION,
   SEASON_STAMINA_VERSION,
 } from './season-versions.ts';
-import { simulationRatingsSchema, simulationTendenciesSchema } from './simulation.ts';
+import {
+  reconstructedThreePointProfileSchema,
+  simulationAnchorsSchema,
+  simulationRatingsSchema,
+  simulationTendenciesSchema,
+} from './simulation.ts';
 
 /**
  * The compact packaged Season Run draft catalog (spec/2.0 M2.1, M2.4,
- * M2.5). Derived at build time from the validated franchise-era pools, so
- * the browser never scans historical datasets: one deduplicated candidate
- * record per `playerVersionId` with every identity, position, summary,
- * physical, simulation-rating, tendency, stamina, and durability field
- * roster scoring needs. Pools reference their members by version id so
- * rolls resolve to candidates directly. Since season-draft-catalog-v2
+ * M2.5, projection milestone). Derived at build time from the validated
+ * franchise-era pools, so the browser never scans historical datasets: one
+ * deduplicated candidate record per `playerVersionId` with every identity,
+ * position, summary, physical, simulation-rating, tendency, stamina,
+ * durability, and — since season-draft-catalog-v4 — anchor field roster
+ * scoring and projection need. Pools reference their members by version id
+ * so rolls resolve to candidates directly. Since season-draft-catalog-v2
  * (M2.4) each candidate carries its build-time stamina profile and the
  * catalog records the stamina derivation version; since v3 (M2.5) each
  * candidate also carries its build-time durability rating and the catalog
  * records the durability derivation version.
+ *
+ * v4 (projection milestone) adds the validated observed `anchors` and an
+ * optional `reconstructedThreePoint` profile from the packaged pool record.
+ * Anchors are projection-ready inputs only: they never thread into the
+ * Season game adapter, so current Season simulation outcomes are unchanged
+ * until a separate Season game version says otherwise. Missing anchors keep
+ * the possession engine's missing-data semantics.
  */
+export const SEASON_DRAFT_CATALOG_V3 = 'season-draft-catalog-v3';
 
 /** One canonical franchise-era pool and its playerVersionId members. */
 export const seasonDraftCatalogPoolSchema = z.object({
@@ -76,7 +90,10 @@ export type SeasonDraftCandidateDurability = z.infer<typeof seasonDraftCandidate
  * summary ratings, physical data, simulation ratings, tendencies, the M2.4
  * stamina profile, and the M2.5 durability rating are required fields:
  * roster scoring is a pure function of these recorded possession inputs,
- * never of Overall or of anything the browser infers.
+ * never of Overall or of anything the browser infers. Since
+ * season-draft-catalog-v4 each candidate also carries the validated
+ * observed `anchors` (required by v4 at the catalog boundary) and an
+ * optional `reconstructedThreePoint` profile.
  */
 export const seasonDraftCandidateSchema = z.object({
   playerVersionId: playerVersionIdSchema,
@@ -101,6 +118,14 @@ export const seasonDraftCandidateSchema = z.object({
   stamina: seasonDraftCandidateStaminaSchema,
   /** M2.5: build-time durability rating (durability-v1). */
   durability: seasonDraftCandidateDurabilitySchema,
+  /**
+   * Projection milestone (v4): validated observed season anchors copied
+   * from the packaged pool record. Optional in the schema so v3 catalogs
+   * still load; the catalog-level refine requires anchors for v4 records.
+   */
+  anchors: simulationAnchorsSchema.optional(),
+  /** Projection milestone (v4): optional reconstructed three-point profile. */
+  reconstructedThreePoint: reconstructedThreePointProfileSchema.optional(),
 });
 export type SeasonDraftCandidate = z.infer<typeof seasonDraftCandidateSchema>;
 
@@ -108,11 +133,15 @@ export const seasonDraftCatalogSchema = z
   .object({
     schemaVersion: z.literal(1),
     /**
-     * Catalog artifact contract version (season-draft-catalog-v3 since M2.5
-     * added the durability profile; v2 since M2.4 added stamina);
-     * independent of the draft rules version.
+     * Catalog artifact contract version: season-draft-catalog-v4 since the
+     * projection milestone added anchors; v3 since M2.5 added durability;
+     * v2 since M2.4 added stamina. Both v4 and v3 layouts load so committed
+     * v3 assets remain playable until regeneration.
      */
-    catalogVersion: z.literal(SEASON_DRAFT_CATALOG_VERSION),
+    catalogVersion: z.union([
+      z.literal(SEASON_DRAFT_CATALOG_VERSION),
+      z.literal(SEASON_DRAFT_CATALOG_V3),
+    ]),
     dataVersion: z.string().min(1).max(64),
     ratingsVersion: z.string().min(1).max(64),
     positionNormalizationVersion: positionNormalizationVersionSchema,
@@ -134,6 +163,12 @@ export const seasonDraftCatalogSchema = z
         });
       }
       seen.add(candidate.playerVersionId);
+      if (catalog.catalogVersion === SEASON_DRAFT_CATALOG_VERSION && !candidate.anchors) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `v4 candidate ${candidate.playerVersionId} is missing the validated anchors`,
+        });
+      }
     }
     for (const pool of catalog.pools) {
       for (const member of pool.playerVersionIds) {

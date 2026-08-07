@@ -22,4 +22,13 @@ describe('bracketGenerate', () => {
       UsageError,
     );
   });
+
+  it('rejects benchmark samples too low for stable percentile separation', () => {
+    expect(() =>
+      bracketGenerate({
+        seed: '8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d',
+        samples: '6',
+      }),
+    ).toThrow(/at least 32/);
+  });
 });

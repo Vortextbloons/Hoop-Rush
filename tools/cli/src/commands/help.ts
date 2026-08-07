@@ -76,7 +76,8 @@ Commands:
                          --input <path>   Manifest path (default apps/web/static/data/manifest.json)
   bracket generate       (dev) Author the frozen bracket from packaged NBA data and
                          commit it with the manifest. Deterministic under --seed.
-                         --seed <hex> --proposals N --samples N --min-score N
+                         --seed <hex> --proposals N (default 32) --samples N (default 32, min 32)
+                         --min-score N (default 45)
   benchmark              Measure pool cold/cached, warm single-game, and 82-game throughput.
                          --fixture <id> (default equal) --samples N (default 50)
                          --seed-from N --workers N

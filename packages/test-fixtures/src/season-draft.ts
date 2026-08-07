@@ -187,6 +187,26 @@ export function buildSeasonDraftCandidate(input: {
       rating: 45 + ((index * 7) % 51),
       derivationVersion: SEASON_DURABILITY_VERSION,
     },
+    // Projection milestone (season-draft-catalog-v4): validated observed
+    // anchors. Fixed synthetic values in the contract ranges so projection
+    // fixtures exercise the observed-anchor paths.
+    anchors: {
+      gamesPlayed: 60 + ((index * 3) % 21),
+      minutesPerGame: 24 + ((index * 2) % 20),
+      pointsPerGame: 8 + ((index * 4) % 14),
+      reboundsPerGame: 3 + ((index * 2) % 8),
+      offensiveReboundsPerGame: 0.8 + (index % 4) / 10,
+      defensiveReboundsPerGame: 2 + ((index * 2) % 7),
+      assistsPerGame: 1.5 + (index % 5) / 2,
+      stealsPerGame: 0.5 + (index % 3) / 4,
+      blocksPerGame: 0.2 + (index % 3) / 5,
+      turnoversPerGame: 1 + (index % 4) / 2,
+      fieldGoalPct: 0.4 + ((index * 3) % 120) / 1000,
+      threePointPct: index % 2 === 0 ? 0.3 + ((index * 4) % 250) / 1000 : null,
+      freeThrowPct: 0.7 + ((index * 5) % 200) / 1000,
+      threePointAttemptRate: index % 2 === 0 ? 0.05 + ((index * 2) % 200) / 1000 : null,
+      freeThrowAttemptRate: 0.15 + ((index * 3) % 100) / 1000,
+    },
   };
 }
 

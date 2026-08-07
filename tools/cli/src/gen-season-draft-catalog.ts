@@ -19,6 +19,12 @@
  *
  *   durabilityRating = round(clamp(45, 95, 45 + 50 * gamesPlayed / max(1, teamGames)))
  *
+ * Since season-draft-catalog-v4 (projection milestone) each candidate also
+ * carries the validated observed `anchors` and the optional
+ * `reconstructedThreePoint` profile from the packaged pool record. These
+ * fields are projection-ready inputs only; the Season game adapter does not
+ * consume them, so Season simulation outcomes are unchanged.
+ *
  * Records without usable stats or eligibility derive the floor profile
  * (rating 45) deterministically, mirroring the stamina floor. Conflicting
  * records that derive the same playerVersionId with different content are
@@ -140,6 +146,10 @@ function main(): void {
         tendencies: Record<string, number>;
         stats?: { minutes: number | null; gamesPlayed: number | null };
         eligibility?: { teamGames?: number | null };
+        // Projection milestone (v4): validated observed anchors and optional
+        // reconstructed three-point profile from the packaged pool record.
+        anchors?: SeasonDraftCandidate['anchors'];
+        reconstructedThreePoint?: SeasonDraftCandidate['reconstructedThreePoint'];
       }>;
     };
     dataVersion = pool.dataVersion;
@@ -187,6 +197,11 @@ function main(): void {
           player.stats?.gamesPlayed ?? null,
           player.eligibility?.teamGames ?? null,
         ),
+        // Projection milestone (v4): copy the validated observed anchors and
+        // the optional reconstructed three-point profile verbatim from the
+        // packaged pool record (never recomputed; missing stays missing).
+        anchors: player.anchors,
+        reconstructedThreePoint: player.reconstructedThreePoint,
       };
       if (existing !== undefined) {
         if (JSON.stringify(existing) !== JSON.stringify(record)) {

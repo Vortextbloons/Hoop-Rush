@@ -46,6 +46,7 @@ export const BRACKET_GENERATE_OPTIONS: Record<string, boolean> = {
 /** Committed seed of the frozen bracket artifact; regeneration uses it. */
 const COMMITTED_GENERATION_SEED: Seed = '8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d';
 const GENERATION_VERSION = 'bracket-m3-v3';
+const MIN_BRACKET_SAMPLES = 32;
 
 const NBA_ROOT = resolve(REPO_ROOT, 'raw-data/nba');
 const OPPONENTS_DIR = resolve(REPO_ROOT, 'apps/web/static/data/opponents');
@@ -471,7 +472,12 @@ export function bracketGenerate(args: {
     throw new UsageError(`--seed must be hex (got "${seed}")`);
   }
   const proposals = parseCount(args.proposals, '--proposals', 32);
-  const samples = parseCount(args.samples, '--samples', 6);
+  const samples = parseCount(args.samples, '--samples', MIN_BRACKET_SAMPLES);
+  if (samples < MIN_BRACKET_SAMPLES) {
+    throw new UsageError(
+      `--samples must be at least ${String(MIN_BRACKET_SAMPLES)} for stable bracket percentile separation`,
+    );
+  }
   const minScore = parseCount(args['min-score'], '--min-score', 45);
   const dataVersion = args['data-version'];
 

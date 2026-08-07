@@ -266,14 +266,57 @@ export const SEASON_EFFECT_TARGETS_VERSION = 'season-effect-targets-v1';
 
 /**
  * Packaged Season Run draft catalog artifact contract
- * (season-draft-catalog-v3, M2.5): the catalog derives the build-time
- * `durability` field on every candidate from recorded games played and
- * records the durability derivation version. v2 (M2.4) added the
- * build-time stamina profile to every candidate and recorded the stamina
- * derivation version; the draft rules version (`season-draft-v2`) is
- * unchanged.
+ * (season-draft-catalog-v4, projection milestone): every candidate carries
+ * the validated observed `anchors` and an optional `reconstructedThreePoint`
+ * profile from its packaged pool record, so roster builders can run the
+ * deterministic possession-level projection without scanning historical
+ * datasets. v3 (M2.5) added the build-time `durability` field; v2 (M2.4)
+ * added the build-time stamina profile. The draft rules version
+ * (`season-draft-v2`) is unchanged, and the projection fields never thread
+ * into the Season game adapter (Season game inputs are unchanged until a
+ * separate Season game version says otherwise).
  */
-export const SEASON_DRAFT_CATALOG_VERSION = 'season-draft-catalog-v3';
+export const SEASON_DRAFT_CATALOG_VERSION = 'season-draft-catalog-v4';
+
+/**
+ * Frozen projection model artifact contract (projection-model-v1): the
+ * versioned neutral and archetype reference lineups per era, normalization
+ * baselines, ranking group weights, weakness thresholds and penalties, the
+ * bounded candidate-search policy, cohort definitions, and monotonic gates
+ * the projection layer reads. The artifact is derived at build time from
+ * packaged pool aggregates; the engine never recomputes or tunes it.
+ */
+export const PROJECTION_MODEL_VERSION = 'projection-model-v1';
+
+/**
+ * Projection normalization and digest contract (projection-schema-v1): the
+ * canonical component normalization, digest material ordering, and audit
+ * format for base-five and Season projections.
+ */
+export const PROJECTION_SCHEMA_VERSION = 'projection-schema-v1';
+
+/**
+ * Season projection composition contract (season-projection-v1): named
+ * representative units, rotation-trace weights, continuity, contingency,
+ * matchup, and redundancy metrics produced by composing the base projector
+ * over a ten-player roster and rotation.
+ */
+export const SEASON_PROJECTION_VERSION = 'season-projection-v1';
+
+/**
+ * Frozen Season projection calibration cohort and envelope artifact
+ * (season-projection-targets-v1): error envelopes, ordering and continuity
+ * gates, cohort splits, and monotonic sanity gates for Season projections.
+ */
+export const SEASON_PROJECTION_TARGETS_VERSION = 'season-projection-targets-v1';
+
+/**
+ * Human roster autofill contract (season-roster-autofill-v1): the typed
+ * engine command that completes a Season roster with projection-ranked
+ * candidates while preserving locks, ownership, legality, and feasibility
+ * rules; it never relaxes a constraint.
+ */
+export const SEASON_ROSTER_AUTOFILL_VERSION = 'season-roster-autofill-v1';
 
 /**
  * M2.5 injury and health state contract (season-health-v1): the seeded

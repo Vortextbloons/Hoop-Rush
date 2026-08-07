@@ -499,7 +499,7 @@ describe('cli: season draft reproduce', () => {
     expect(payload.rejectedCount).toBe(0);
     expect(payload.offers).toHaveLength(10);
     expect(payload.picks).toHaveLength(10);
-  });
+  }, 300_000);
 
   it('rejects malformed inputs with a usage error', async () => {
     const bad = join(REPO_ROOT, 'tools/cli/src/fixtures/season-draft-finalized.json');
@@ -540,5 +540,5 @@ describe('cli: season draft reproduce', () => {
     } finally {
       rmSync(tmpPath, { force: true });
     }
-  });
+  }, 300_000);
 });

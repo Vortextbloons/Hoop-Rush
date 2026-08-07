@@ -462,16 +462,17 @@ function unitVersionIdsOf(team: SimulationTeam): readonly string[] {
 }
 
 /**
- * Assist probability for a made field goal on a passed possession. Anchored
- * so a passer at the population anchor rating converts at the era assist
- * rate, then modulated by creation ability, the play type (rolls, cuts, and
+ * Assist probability for a made field goal on a passed possession (pure;
+ * shared by the sampled pipeline and the projection layer). Anchored so a
+ * passer at the population anchor rating converts at the era assist rate,
+ * then modulated by creation ability, the play type (rolls, cuts, and
  * transition finishes are real passes; post-ups and isolations rarely earn
  * an assist), the shot zone (rim finishes off passes convert as assists),
- * and the shooter's finishing at the zone. The anchor factor is hoisted per
- * game (a pure function of the profile).
+ * and the shooter's finishing at the zone.
  */
-function assistProbability(
-  ctx: TripContext,
+export function assistProbabilityPure(
+  profile: EraSimulationProfile,
+  passingAnchorFactor: number,
   passer: SimulationPlayer,
   action: ActionType,
   zone: ShotZone,
@@ -514,16 +515,36 @@ function assistProbability(
     0.99,
     Math.max(
       0.05,
-      ctx.profile.parameters.assistRate *
+      profile.parameters.assistRate *
         0.95 *
         roleFactor *
         creation *
         actionFactor *
         zoneFactor *
         finishing *
-        (factor / Math.max(1e-9, ctx.passingAnchorFactor)) +
+        (factor / Math.max(1e-9, passingAnchorFactor)) +
         effectsAdjustment,
     ),
+  );
+}
+
+/** The sampled assist probability inside the per-game trip context. */
+function assistProbability(
+  ctx: TripContext,
+  passer: SimulationPlayer,
+  action: ActionType,
+  zone: ShotZone,
+  shooter: SimulationPlayer,
+  effectsAdjustment = 0,
+): number {
+  return assistProbabilityPure(
+    ctx.profile,
+    ctx.passingAnchorFactor,
+    passer,
+    action,
+    zone,
+    shooter,
+    effectsAdjustment,
   );
 }
 

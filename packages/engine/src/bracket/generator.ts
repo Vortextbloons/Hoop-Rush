@@ -73,7 +73,9 @@ export interface BracketGenerationOptions {
 }
 
 const DEFAULT_PROPOSALS = 32;
-const DEFAULT_SAMPLES = 6;
+// Six games is too coarse for percentile ranking: many proposals share the
+// same win rate and the bracket cannot satisfy its strength-band constraints.
+const DEFAULT_SAMPLES = 32;
 const DEFAULT_MIN_PLAYER_SCORE = 45;
 
 interface Proposal {

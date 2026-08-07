@@ -235,16 +235,18 @@ export function pickShot(
   };
 }
 
-/** Selects a plausible passer while preventing self-assists. */
-export function pickAssister(
+/**
+ * Assister selection weights for one made basket (pure; shared by
+ * `pickAssister` and the projection layer). Candidates are the four non-
+ * shooters; the initiator earns a strong bonus when he did not take the shot.
+ */
+export function assisterWeights(
   team: SimulationTeam,
   shooter: SimulationPlayer,
   initiator: SimulationPlayer,
-  rng: Rng,
-): SimulationPlayer | null {
+): number[] {
   const candidates = team.players.filter((p) => p.playerId !== shooter.playerId);
-  if (candidates.length === 0) return null;
-  const weights = candidates.map((p) => {
+  return candidates.map((p) => {
     const observedCreation = p.anchors?.assistsPerGame;
     const roleWeight =
       observedCreation === undefined
@@ -255,7 +257,18 @@ export function pickAssister(
     const initiatorBonus = p.playerId === initiator.playerId ? 1.35 : 1;
     return roleWeight * passingWeight * creationMod * initiatorBonus;
   });
-  return rng.weightedPick(candidates, weights);
+}
+
+/** Selects a plausible passer while preventing self-assists. */
+export function pickAssister(
+  team: SimulationTeam,
+  shooter: SimulationPlayer,
+  initiator: SimulationPlayer,
+  rng: Rng,
+): SimulationPlayer | null {
+  const candidates = team.players.filter((p) => p.playerId !== shooter.playerId);
+  if (candidates.length === 0) return null;
+  return rng.weightedPick(candidates, assisterWeights(team, shooter, initiator));
 }
 
 /** Weight profile for a defender based on zone-relevant defense only. */
@@ -490,21 +503,27 @@ export function twoPointZoneSharesFromBlend(weights: readonly number[]): [number
 }
 
 /**
+ * Applies the play-type zone pulls to a rescaled zone base (pure; shared by
+ * `pickZone` and the projection layer so expected zone shares use the exact
+ * sampled weight vector).
+ */
+export function applyZonePulls(action: ActionType, base: readonly number[], driveRate: number): number[] {
+  const weights = base.slice();
+  weights[0] = (weights[0] ?? 0) * (action === 'transition' ? 1.1 : action === 'postUp' ? 1.02 : 1);
+  if (action === 'isolation' || action === 'pickAndRoll') {
+    weights[0] = weights[0] * (0.9 + Math.min(40, driveRate) / 100);
+  }
+  weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
+  return weights;
+}
+
+/**
  * Selects the shot zone from the precomputed rescaled base, modulated by the
  * play type. The cached base is copied so the per-game cache stays pristine
  * across trips.
  */
 export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
-  const weights = prep.base.slice();
-
-  // Play-type zone pulls stay modest so they refine the shot profile instead
-  // of dragging the whole league toward the paint.
-  weights[0] = (weights[0] ?? 0) * (action === 'transition' ? 1.1 : action === 'postUp' ? 1.02 : 1);
-  if (action === 'isolation' || action === 'pickAndRoll') {
-    weights[0] = weights[0] * (0.9 + Math.min(40, prep.driveRate) / 100);
-  }
-  weights[1] = (weights[1] ?? 0) * (action === 'postUp' ? 1.05 : 1);
-  return rng.weightedPick(ZONES, weights);
+  return rng.weightedPick(ZONES, applyZonePulls(action, prep.base, prep.driveRate));
 }
 
 /** Whether a zone is worth three points. */
