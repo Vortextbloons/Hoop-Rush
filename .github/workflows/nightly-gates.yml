@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
 
       - name: Typecheck
@@ -73,6 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
 
       - name: Cache Playwright browsers
