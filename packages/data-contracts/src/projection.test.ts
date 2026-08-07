@@ -26,12 +26,16 @@ import {
 
 type Position = 'PG' | 'SG' | 'SF' | 'PF' | 'C';
 
-function buildPlayer(index: number, positions: Position[], displayName = `Player ${String(index)}`): SimulationPlayer {
+function buildPlayer(
+  index: number,
+  positions: Position[],
+  displayName = `Player ${String(index)}`,
+): SimulationPlayer {
   return {
     playerId: `p-proj-${String(index)}`,
     playerVersionId: `pv-${String(index).padStart(32, '0')}`,
     displayName,
-    positions: positions as SimulationPlayer['positions'],
+    positions,
     heightInches: 78,
     weightLbs: 215,
     ratings: { ...SIMULATION_RATINGS },
@@ -134,8 +138,21 @@ function buildSide(points = 108): ProjectionSide {
       defensiveRebounding: 60,
       expectedOpponentShotQuality: 0.5,
     },
-    turnoverCauses: { stealShare: 0.35, nonStealShare: 0.65, expectedSteals: 4.5, expectedOther: 8.5 },
-    actions: { isolation: 0.12, pickAndRoll: 0.3, spotUp: 0.25, transition: 0.15, postUp: 0.08, cut: 0.06, pickAndRollRoll: 0.04 },
+    turnoverCauses: {
+      stealShare: 0.35,
+      nonStealShare: 0.65,
+      expectedSteals: 4.5,
+      expectedOther: 8.5,
+    },
+    actions: {
+      isolation: 0.12,
+      pickAndRoll: 0.3,
+      spotUp: 0.25,
+      transition: 0.15,
+      postUp: 0.08,
+      cut: 0.06,
+      pickAndRollRoll: 0.04,
+    },
     zones: { rim: 0.35, shortMid: 0.22, longMid: 0.16, cornerThree: 0.1, aboveBreakThree: 0.17 },
     shooters: { G1: 0.28, G2: 0.24, F1: 0.2, F2: 0.16, C: 0.12 },
     players: buildContributions(),
@@ -182,19 +199,14 @@ function buildReference(eraId: string, archetype: ProjectionMatchupArchetype) {
     referenceId: `ref-${eraId}-${archetype}`,
     archetype,
     eraId,
+    referenceHash: 'd'.repeat(64),
     players: [
       buildPlayer(1, ['PG']),
       buildPlayer(2, ['SG']),
       buildPlayer(3, ['SF']),
       buildPlayer(4, ['PF']),
       buildPlayer(5, ['C']),
-    ] as [
-      SimulationPlayer,
-      SimulationPlayer,
-      SimulationPlayer,
-      SimulationPlayer,
-      SimulationPlayer,
-    ],
+    ] as [SimulationPlayer, SimulationPlayer, SimulationPlayer, SimulationPlayer, SimulationPlayer],
   };
 }
 
@@ -218,6 +230,11 @@ function buildModel(): ProjectionModelArtifact {
     },
     scales: {
       creation: { baseline: 50, perPoint: 1, min: 0, max: 100, higherIsBetter: true },
+    },
+    componentWeights: {
+      creation: 1,
+      spacing: 1,
+      defense: 1,
     },
     weights: { basketballMean: 0.4, rotationMean: 0.35, robustnessMean: 0.25 },
     weaknesses: [
@@ -269,7 +286,7 @@ describe('projection model artifact schema', () => {
   it('round-trips a valid model', () => {
     const model = roundTrip(projectionModelArtifactSchema, buildModel());
     expect(model.modelVersion).toBe(PROJECTION_MODEL_VERSION);
-    expect(model.references['1990s']!.archetypes).toHaveLength(4);
+    expect(model.references['1990s']?.archetypes).toHaveLength(4);
     expect(model.search.closeScenarioWeight).toBe(0.2);
   });
 
@@ -287,14 +304,17 @@ describe('projection model artifact schema', () => {
 
   it('rejects a model without any references', () => {
     const model = buildModel();
-    const entries = Object.keys(model.references);
-    for (const key of entries) delete model.references[key as keyof typeof model.references];
+    model.references = {};
     expect(() => projectionModelArtifactSchema.parse(model)).toThrow();
   });
 
   it('requires all matchup archetypes except neutral', () => {
     const model = buildModel();
-    model.references['1990s']!.archetypes = model.references['1990s']!.archetypes.slice(0, 3);
+    const referenceSet = model.references['1990s'];
+    if (referenceSet === undefined) {
+      throw new Error('projection fixture is missing its 1990s reference set');
+    }
+    referenceSet.archetypes = referenceSet.archetypes.slice(0, 3);
     expect(() => projectionModelArtifactSchema.parse(model)).toThrow();
   });
 });
@@ -329,7 +349,13 @@ describe('season projection schema', () => {
     return {
       unitId,
       kind,
-      players: ['pv-00000000000000000000000000000001', 'pv-00000000000000000000000000000002', 'pv-00000000000000000000000000000003', 'pv-00000000000000000000000000000004', 'pv-00000000000000000000000000000005'],
+      players: [
+        'pv-00000000000000000000000000000001',
+        'pv-00000000000000000000000000000002',
+        'pv-00000000000000000000000000000003',
+        'pv-00000000000000000000000000000004',
+        'pv-00000000000000000000000000000005',
+      ],
       weight,
       base: buildBase(),
     };
@@ -432,7 +458,12 @@ describe('season projection targets schema', () => {
     const targets = roundTrip(seasonProjectionTargetsSchema, {
       schemaVersion: 1,
       targetsVersion: SEASON_PROJECTION_TARGETS_VERSION,
-      cohorts: { calibrationRosters: 64, validationRosters: 32, heldOutRosters: 64, gamesPerRoster: 32 },
+      cohorts: {
+        calibrationRosters: 64,
+        validationRosters: 32,
+        heldOutRosters: 64,
+        gamesPerRoster: 32,
+      },
       gates: {
         netRatingMaeMax: 6,
         netRatingBiasMax: 3,
@@ -456,7 +487,7 @@ describe('season projection targets schema', () => {
 
 describe('season draft catalog v4', () => {
   function buildCatalog(): SeasonDraftCatalog {
-    const candidate = (n: number, positions: Position[]): SeasonDraftCandidate => ({
+    const candidate = (n: number, positions: [Position, ...Position[]]): SeasonDraftCandidate => ({
       playerVersionId: `pv-${String(n).padStart(32, '0')}`,
       playerId: `p-${String(n)}`,
       franchiseId: 'lakers',
@@ -465,7 +496,7 @@ describe('season draft catalog v4', () => {
       displayName: `Candidate ${String(n)}`,
       playerExternalId: '101',
       positions: {
-        primary: positions[0]!,
+        primary: positions[0],
         secondary: [],
         playable: positions,
         normalizationVersion: 'position-v3',

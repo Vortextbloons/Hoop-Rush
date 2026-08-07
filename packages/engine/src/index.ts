@@ -301,3 +301,19 @@ export { openSeasonTradeWindow, type SeasonWindowOpenResult } from './season/tra
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
 export * as classic from './modes/classic/draft.ts';
+// Projection milestone: deterministic, calculation-only base and Season
+// projections over the possession engine's pure probability functions.
+// Seedless; no Overall-derived value is used.
+export {
+  projectBaseFive,
+  projectExpectedLedger,
+  expectedStealShare,
+  neutralReference,
+  archetypeReference,
+  archetypeReferences,
+  resolveReference,
+  identifyWeaknesses,
+  weaknessPenalty,
+  ProjectionCache,
+  type ProjectionCacheStats,
+} from './projection/index.ts';

@@ -46,6 +46,8 @@ export const projectionReferenceFiveSchema = z.object({
   referenceId: z.string().min(1).max(64),
   archetype: projectionMatchupArchetypeSchema,
   eraId: eraIdSchema,
+  /** SHA-256 content hash of the five-player snapshot (build-time). */
+  referenceHash: contentHashSchema,
   players: z.tuple([
     simulationPlayerSchema,
     simulationPlayerSchema,
@@ -194,6 +196,8 @@ export const projectionModelArtifactSchema = z.object({
     }),
   /** 0-100 normalization for every named projected component. */
   scales: z.record(z.string().min(1).max(64), projectionComponentScaleSchema),
+  /** Composite-score weights per named component group (tuned by calibration). */
+  componentWeights: z.record(z.string().min(1).max(64), z.number().min(0)),
   /** Composite ranking group weights. */
   weights: z.object({
     basketballMean: z.literal(0.4),
@@ -428,7 +432,10 @@ export const baseFiveProjectionSchema = z
         message: 'defensiveRatingAllowed must equal the defense ledger points',
       });
     }
-    if (projection.ratings.netRating !== projection.ratings.offensiveRating - projection.ratings.defensiveRatingAllowed) {
+    if (
+      projection.ratings.netRating !==
+      projection.ratings.offensiveRating - projection.ratings.defensiveRatingAllowed
+    ) {
       ctx.addIssue({
         code: 'custom',
         message: 'netRating must equal offensiveRating minus defensiveRatingAllowed',
