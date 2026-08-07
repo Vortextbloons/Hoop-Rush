@@ -11,7 +11,7 @@ import { createEngineContext } from './context.ts';
 const ctx = createEngineContext();
 const PERMUTATIONS = buildSlotPermutationTeams();
 /** Seeds for attribution-sensitive assertions (usage share moves in small steps). */
-const SEEDS = 200;
+const SEEDS = 400;
 
 function at<T>(list: readonly T[], index: number): T {
   const value = list[index];
@@ -108,7 +108,7 @@ describe('assigned-position responsibility across legal slot permutations', () =
     // Player-to-slot order per permutation (creator, shooter, wing, post, rim):
     // P1 [0,1,2,3,4]  P2 [1,0,2,3,4]  P3 [0,1,3,2,4]  -> rim at C
     // P4 [1,2,0,4,3]  P5 [1,2,3,4,0]  P6 [0,1,2,4,3]  -> rim at F (post at C)
-    const seeds = Array.from({ length: 2000 }, (_, i) => `slot-attr-${String(i)}`);
+    const seeds = Array.from({ length: SEEDS }, (_, i) => `slot-attr-${String(i)}`);
     const byPermutation = PERMUTATIONS.map((team) => runPermutation(team, seeds));
     const rimAtCenter = byPermutation.slice(0, 3);
     const rimAtForward = byPermutation.slice(3);

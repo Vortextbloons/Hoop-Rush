@@ -1,6 +1,5 @@
 import type {
   PlayerVersionId,
-  SeasonAiGenerationInput,
   SeasonDraftCatalog,
   SeasonDraftCommandPayload,
   SeasonDraftCommandRecord,
@@ -14,8 +13,8 @@ import type {
 import { SEASON_DRAFT_VERSION } from '@hoop-rush/data-contracts';
 import {
   applySeasonDraftCommand,
-  generateAiLeague,
   type SeasonAiGenerationDeps,
+  type SeasonAiGenerationInput,
 } from '@hoop-rush/engine';
 import { recordFromState, type SeasonDraftRepository } from '@hoop-rush/persistence';
 import { newSeasonId } from './season-ids';
@@ -121,7 +120,7 @@ export class SeasonDraftFlow {
       this.useWorker = false;
     } else {
       this.targets = targetsOrDeps;
-      this.deps = engineGenerationDeps(targetsOrDeps, this.generationBridge);
+      this.deps = engineGenerationDeps(this.generationBridge);
       this.useWorker = true;
     }
   }
@@ -339,24 +338,22 @@ export class SeasonDraftFlow {
 }
 
 /**
- * Production AI generation deps: the authoritative engine generator with the
- * manifest-verified roster-targets artifact injected. Generation rejects
- * targets that do not match the AI/generator versions.
+ * Production AI generation deps: the worker precomputes the generation result
+ * and `apply()` replays it through the authoritative draft command without
+ * running the heavy generator on the main thread.
  */
-export function engineGenerationDeps(
-  targets: SeasonRosterTargets,
-  bridge?: { precomputed: SeasonLeagueGenerationResult | null },
-): SeasonAiGenerationDeps {
+export function engineGenerationDeps(bridge: {
+  precomputed: SeasonLeagueGenerationResult | null;
+}): SeasonAiGenerationDeps {
   return {
-    generate: (input) => {
-      const precomputed = bridge?.precomputed;
-      if (precomputed !== null && precomputed !== undefined) {
-        return precomputed;
+    generate: () => {
+      const precomputed = bridge.precomputed;
+      if (precomputed === null) {
+        throw new Error(
+          'AI league generation must finish in the worker before applying generate-ai-league',
+        );
       }
-      return generateAiLeague({
-        ...input,
-        targets,
-      });
+      return precomputed;
     },
   };
 }

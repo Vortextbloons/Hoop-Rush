@@ -38,6 +38,35 @@
   ];
   let filter = $state<ScheduleFilter>('all');
 
+  /**
+   * Box scores mount only when their <details> opens (progressive
+   * disclosure): each row's three table variants stay out of the DOM until
+   * first expanded, then remain mounted so closing/reopening is instant.
+   */
+  let openedBoxScores = $state.raw(new Set<string>());
+  function onBoxScoreToggle(event: Event, gameId: string) {
+    if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
+    if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
+    openedBoxScores = new Set([...openedBoxScores, gameId]);
+  }
+
+  /**
+   * Responsive split: once the viewport is known, only the active variant of
+   * the schedule mounts. Null = unknown (SSR, jsdom, no matchMedia): both
+   * variants render, exactly like the historical markup.
+   */
+  let desktopViewport = $state<boolean | null>(null);
+  $effect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(min-width: 768px)');
+    const update = () => {
+      desktopViewport = media.matches;
+    };
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  });
+
   const rows = $derived(
     shell.run && shell.snapshot && shell.humanFranchiseId
       ? scheduleBlockRows(shell.run.games, shell.snapshot.summaries, shell.humanFranchiseId)
@@ -178,138 +207,150 @@
             </div>
 
             <!-- Mobile: one card per game; completed games expand to a box score -->
-            <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
-              {#each group.rows as row (row.gameId)}
-                {@const box = boxFor(row)}
-                <li data-season-schedule-row class="overflow-hidden bg-surface-1 md:rounded-xl">
-                  <div
-                    class="grid grid-cols-[2rem_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 sm:gap-x-3 sm:px-4"
-                  >
-                    <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                      R{row.round}
-                    </span>
-                    {#if identityOf(row.opponentFranchiseId)}
-                      <SeasonTeamLogo
-                        {manifest}
-                        franchiseId={row.opponentFranchiseId}
-                        teamExternalId={identityOf(row.opponentFranchiseId)!.teamExternalId}
-                        alt={`${shell.franchiseName(row.opponentFranchiseId)} logo`}
-                        size="sm"
-                      />
-                    {:else}
-                      <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
-                    {/if}
-                    <p class="min-w-0 text-sm font-semibold leading-tight">
-                      <span
-                        class="mr-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-                      >
-                        {row.humanIsHome ? 'vs' : 'at'}
+            {#if desktopViewport !== true}
+              <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
+                {#each group.rows as row (row.gameId)}
+                  {@const box = boxFor(row)}
+                  <li data-season-schedule-row class="overflow-hidden bg-surface-1 md:rounded-xl">
+                    <div
+                      class="grid grid-cols-[2rem_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 sm:gap-x-3 sm:px-4"
+                    >
+                      <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                        R{row.round}
                       </span>
-                      <span class="break-words">{shell.franchiseName(row.opponentFranchiseId)}</span
-                      >
-                    </p>
-                    <div class="shrink-0 pl-1 text-right tabular-nums">
-                      {#if row.won === null}
-                        <span class="font-mono text-[10px] text-muted-foreground">scheduled</span>
-                      {:else}
-                        <span
-                          class="block font-mono text-sm font-bold leading-none {row.won
-                            ? 'text-primary'
-                            : 'text-muted-foreground'}"
-                        >
-                          {row.won ? 'W' : 'L'}
-                        </span>
-                        <span class="mt-0.5 block font-mono text-[10px] leading-none">
-                          {row.humanScore}–{row.opponentScore}
-                          {#if row.forfeit}· forfeit{/if}
-                        </span>
-                      {/if}
-                    </div>
-                  </div>
-                  {#if box}
-                    <details class="group border-t border-border/50">
-                      <summary
-                        class="cursor-pointer px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring md:px-4 [&::-webkit-details-marker]:hidden"
-                      >
-                        Box score
-                      </summary>
-                      <div class="border-t border-border/40 p-3">
-                        <BoxScore
-                          {box}
-                          opponentName={shell.franchiseName(row.opponentFranchiseId)}
-                          resultLabel={resultLabel(row)}
+                      {#if identityOf(row.opponentFranchiseId)}
+                        <SeasonTeamLogo
                           {manifest}
-                          teamFranchiseId={humanFranchiseId}
-                          opponentFranchiseId={row.opponentFranchiseId}
+                          franchiseId={row.opponentFranchiseId}
+                          teamExternalId={identityOf(row.opponentFranchiseId)!.teamExternalId}
+                          alt={`${shell.franchiseName(row.opponentFranchiseId)} logo`}
+                          size="sm"
                         />
-                      </div>
-                    </details>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-
-            <!-- Desktop: denser table in a scroll wrapper -->
-            <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
-              <table class="w-full min-w-[56rem] text-sm">
-                <caption class="sr-only">
-                  Block {group.blockIndex + 1} games — rounds {group.fromRound}–{group.toRound}
-                </caption>
-                <thead>
-                  <tr
-                    class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-                  >
-                    <th scope="col" class="px-4 py-2 text-left font-medium">R</th>
-                    <th scope="col" class="px-4 py-2 text-left font-medium">Matchup</th>
-                    <th scope="col" class="px-4 py-2 text-right font-medium">Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {#each group.rows as row (row.gameId)}
-                    <tr data-season-schedule-row class="border-b border-border/40">
-                      <td class="px-4 py-2 font-mono text-[10px] text-muted-foreground">
-                        {row.round}
-                      </td>
-                      <td class="px-4 py-2">
-                        <span class="flex items-center gap-2">
-                          {#if identityOf(row.opponentFranchiseId)}
-                            <SeasonTeamLogo
-                              {manifest}
-                              franchiseId={row.opponentFranchiseId}
-                              teamExternalId={identityOf(row.opponentFranchiseId)!.teamExternalId}
-                              alt=""
-                              size="sm"
-                            />
-                          {/if}
-                          <span
-                            class="font-mono text-[10px] text-muted-foreground"
-                            aria-label={row.humanIsHome ? 'home' : 'away'}
-                          >
-                            {row.humanIsHome ? 'vs' : 'at'}
-                          </span>
-                          <span class="truncate font-semibold">
-                            {shell.franchiseName(row.opponentFranchiseId)}
-                          </span>
+                      {:else}
+                        <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
+                      {/if}
+                      <p class="min-w-0 text-sm font-semibold leading-tight">
+                        <span
+                          class="mr-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+                        >
+                          {row.humanIsHome ? 'vs' : 'at'}
                         </span>
-                      </td>
-                      <td class="px-4 py-2 text-right">
+                        <span class="break-words"
+                          >{shell.franchiseName(row.opponentFranchiseId)}</span
+                        >
+                      </p>
+                      <div class="shrink-0 pl-1 text-right tabular-nums">
                         {#if row.won === null}
                           <span class="font-mono text-[10px] text-muted-foreground">scheduled</span>
                         {:else}
-                          <span class="font-semibold {row.won ? 'text-primary' : ''}">
+                          <span
+                            class="block font-mono text-sm font-bold leading-none {row.won
+                              ? 'text-primary'
+                              : 'text-muted-foreground'}"
+                          >
                             {row.won ? 'W' : 'L'}
                           </span>
-                          <span class="ml-2 font-mono text-[10px]">
+                          <span class="mt-0.5 block font-mono text-[10px] leading-none">
                             {row.humanScore}–{row.opponentScore}
                             {#if row.forfeit}· forfeit{/if}
                           </span>
                         {/if}
-                      </td>
+                      </div>
+                    </div>
+                    {#if box}
+                      <details
+                        class="group border-t border-border/50"
+                        ontoggle={(event) => onBoxScoreToggle(event, row.gameId)}
+                      >
+                        <summary
+                          class="cursor-pointer px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring md:px-4 [&::-webkit-details-marker]:hidden"
+                        >
+                          Box score
+                        </summary>
+                        <div class="border-t border-border/40 p-3">
+                          {#if openedBoxScores.has(row.gameId)}
+                            <BoxScore
+                              {box}
+                              opponentName={shell.franchiseName(row.opponentFranchiseId)}
+                              resultLabel={resultLabel(row)}
+                              {manifest}
+                              teamFranchiseId={humanFranchiseId}
+                              opponentFranchiseId={row.opponentFranchiseId}
+                            />
+                          {/if}
+                        </div>
+                      </details>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+
+            <!-- Desktop: denser table in a scroll wrapper -->
+            {#if desktopViewport !== false}
+              <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
+                <table class="w-full min-w-[56rem] text-sm">
+                  <caption class="sr-only">
+                    Block {group.blockIndex + 1} games — rounds {group.fromRound}–{group.toRound}
+                  </caption>
+                  <thead>
+                    <tr
+                      class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
+                    >
+                      <th scope="col" class="px-4 py-2 text-left font-medium">R</th>
+                      <th scope="col" class="px-4 py-2 text-left font-medium">Matchup</th>
+                      <th scope="col" class="px-4 py-2 text-right font-medium">Result</th>
                     </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {#each group.rows as row (row.gameId)}
+                      <tr data-season-schedule-row class="border-b border-border/40">
+                        <td class="px-4 py-2 font-mono text-[10px] text-muted-foreground">
+                          {row.round}
+                        </td>
+                        <td class="px-4 py-2">
+                          <span class="flex items-center gap-2">
+                            {#if identityOf(row.opponentFranchiseId)}
+                              <SeasonTeamLogo
+                                {manifest}
+                                franchiseId={row.opponentFranchiseId}
+                                teamExternalId={identityOf(row.opponentFranchiseId)!.teamExternalId}
+                                alt=""
+                                size="sm"
+                              />
+                            {/if}
+                            <span
+                              class="font-mono text-[10px] text-muted-foreground"
+                              aria-label={row.humanIsHome ? 'home' : 'away'}
+                            >
+                              {row.humanIsHome ? 'vs' : 'at'}
+                            </span>
+                            <span class="truncate font-semibold">
+                              {shell.franchiseName(row.opponentFranchiseId)}
+                            </span>
+                          </span>
+                        </td>
+                        <td class="px-4 py-2 text-right">
+                          {#if row.won === null}
+                            <span class="font-mono text-[10px] text-muted-foreground"
+                              >scheduled</span
+                            >
+                          {:else}
+                            <span class="font-semibold {row.won ? 'text-primary' : ''}">
+                              {row.won ? 'W' : 'L'}
+                            </span>
+                            <span class="ml-2 font-mono text-[10px]">
+                              {row.humanScore}–{row.opponentScore}
+                              {#if row.forfeit}· forfeit{/if}
+                            </span>
+                          {/if}
+                        </td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            {/if}
           </section>
         {/each}
       </div>

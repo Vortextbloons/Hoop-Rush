@@ -277,7 +277,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
 function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWorkerStartRequest {
   const run = buildRun();
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     type: 'season-block-start',
     requestId: 'req-1',
     runId: run.runId,

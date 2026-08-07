@@ -57,7 +57,7 @@ export const seasonNotAtBoundaryRejectionSchema = z.object({
   code: z.literal('not-at-boundary'),
   /** The block the command targeted. */
   blockIndex: z.number().int().min(0).max(7),
-  /** The next unselected block the run actually expects. */
+  /** The current playable block the run expects (blocks 0-7 only). */
   nextUnselectedBlockIndex: z.number().int().min(0).max(7),
 });
 export type SeasonNotAtBoundaryRejection = z.infer<typeof seasonNotAtBoundaryRejectionSchema>;

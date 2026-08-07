@@ -5,9 +5,11 @@ import type {
 } from '@hoop-rush/data-contracts';
 import {
   actionWeights,
+  defenderBase,
   teamInitiatorWeights,
   teammateShotWeights,
   zonePrep,
+  type DefenderBase,
   type TeammateShots,
   type ZonePrep,
 } from './usage.ts';
@@ -76,6 +78,8 @@ export interface TeamPrep {
    * initiator, action, roll-man, defender, and rebounder weights).
    */
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>;
+  /** Defender selection base: zone weights + rim protection per slot. */
+  defenderBase: DefenderBase;
 }
 
 /** Builds the per-game preparation tables for one team. */
@@ -133,5 +137,24 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
     zonePrep: zonePrepByPlayer,
     twoPointAnchor: twoPointAnchorByPlayer,
     positionModifiers: positionModifiersByPlayer,
+    defenderBase: defenderBase(team, positionModifiersByPlayer),
   };
+}
+
+/**
+ * Memoized preparation for identical (team, profile) pairs. prepareTeam is
+ * pure and every prep value is consumed read-only (weightedPick never
+ * mutates weights; pickZone copies before mutating), so repeated benchmark,
+ * calibration, and bracket sample games against the same team objects reuse
+ * the per-game tables instead of rebuilding them. Entries die with their
+ * team objects (WeakMap), so a long Season Run cannot grow unbounded.
+ */
+const prepCache = new WeakMap<SimulationTeam, { profile: EraSimulationProfile; prep: TeamPrep }>();
+
+export function prepareTeamCached(team: SimulationTeam, profile: EraSimulationProfile): TeamPrep {
+  const cached = prepCache.get(team);
+  if (cached !== undefined && cached.profile === profile) return cached.prep;
+  const prep = prepareTeam(team, profile);
+  prepCache.set(team, { profile, prep });
+  return prep;
 }

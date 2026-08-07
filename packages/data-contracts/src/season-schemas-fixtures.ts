@@ -766,12 +766,17 @@ export function buildPendingBlockFixture(): SeasonPendingBlockCandidate {
   };
 }
 
-/** Minimal valid simulation ratings (matches `simulationRatingsSchema`). */
+/**
+ * Minimal valid simulation ratings (matches `simulationRatingsSchema`).
+ * The four scoring values match the fixture player defaults in
+ * `@hoop-rush/test-fixtures` (`buildSimulationPlayer` derives from these),
+ * so the season-game fixtures and the sim fixtures share one canonical set.
+ */
 export const SIMULATION_RATINGS: SeasonGamePlayerInput['ratings'] = {
-  insideScoring: 70,
-  closeShot: 68,
-  midrange: 66,
-  threePoint: 62,
+  insideScoring: 78,
+  closeShot: 70,
+  midrange: 68,
+  threePoint: 65,
   freeThrow: 74,
   ballHandling: 70,
   passing: 70,

@@ -1,8 +1,9 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   DraftPlanner,
   loadDraftCatalog,
   reachLeagueHub,
+  selectFirstObjective,
   submitBlockAndComplete,
 } from './season-helpers';
 
@@ -204,12 +205,3 @@ test.describe('season M2.5: health, objectives, Influence, trades, interruption'
     await expect(page.getByText('Recurrence risk').first()).toBeVisible();
   });
 });
-
-async function selectFirstObjective(page: Page): Promise<void> {
-  const picker = page.locator('[data-season-objective-picker]');
-  if ((await picker.count()) === 0) return;
-  const firstChoice = picker.locator('button').first();
-  if ((await firstChoice.count()) === 0) return;
-  await firstChoice.click();
-  await expect(picker.getByText('Selected').first()).toBeVisible({ timeout: 10_000 });
-}

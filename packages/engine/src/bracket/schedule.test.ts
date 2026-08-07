@@ -1,39 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { SEASON_ALIGNMENT } from '@hoop-rush/data-contracts';
 import { buildFixtureBracket, seedFromString } from '@hoop-rush/test-fixtures';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 
-const ALL_FRANCHISES = [
-  'hawks',
-  'celtics',
-  'nets',
-  'hornets',
-  'bulls',
-  'cavaliers',
-  'mavericks',
-  'nuggets',
-  'pistons',
-  'warriors',
-  'rockets',
-  'pacers',
-  'clippers',
-  'lakers',
-  'grizzlies',
-  'heat',
-  'bucks',
-  'timberwolves',
-  'pelicans',
-  'knicks',
-  'thunder',
-  'magic',
-  'sixers',
-  'suns',
-  'blazers',
-  'kings',
-  'spurs',
-  'raptors',
-  'jazz',
-  'wizards',
-];
+/** Canonical 30-franchise id order (single source: SEASON_ALIGNMENT). */
+const ALL_FRANCHISES = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
 
 function opponentIds(prefix = 'bracket-'): string[] {
   return ALL_FRANCHISES.map((franchise) =>

@@ -149,14 +149,14 @@
   }
 
   /**
-   * Card eligibility for every visible pool row, keyed by playerId. The cards
-   * only depend on the lineup slots (plus each player's positions), so the map
-   * is rebuilt once per slot change and looked up in the template instead of
-   * recomputing per rendered row.
+   * Card eligibility keyed by playerId, built once per slot/pool change.
+   * poolCardInfoFor only reads the lineup slots and each player's positions,
+   * so the map is computed over the whole scoped pool (a superset of the
+   * visible rows) and never rebuilt for search keystrokes or pagination.
    */
   const poolCardInfo = $derived.by(
     (): ReadonlyMap<string, PoolCardInfo> =>
-      new Map(visibleRows.map((player) => [player.playerId, poolCardInfoFor(player)])),
+      new Map(rows.map((player) => [player.playerId, poolCardInfoFor(player)])),
   );
 </script>
 

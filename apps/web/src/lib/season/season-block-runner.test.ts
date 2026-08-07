@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CommitSeasonBlockInput, SeasonRunRepository } from '@hoop-rush/persistence';
 import {
   SEASON_NEUTRAL_HOME_COURT,
   seasonWorkerCancelRequestSchema,
+  seasonWorkerContinueRequestSchema,
   seasonWorkerStartRequestSchema,
   type SeasonBlockRecap,
   type SeasonCandidateCheckpoint,
@@ -453,6 +454,11 @@ describe('season block runner (M2.5 wire)', () => {
   beforeEach(() => {
     FakeWorker.instances = [];
     vi.stubGlobal('Worker', FakeWorker);
+    // The accept path resolves the packaged draft catalog through a real
+    // fetch (loadSeasonDraftCatalog); a rejecting stub keeps the commit
+    // orchestration deterministic and offline. The runner treats a failed
+    // catalog load as null, so no window opens in these tests.
+    vi.stubGlobal('fetch', () => Promise.reject(new Error('fetch stubbed for runner tests')));
     schedule = generateSeasonSchedule({ league: LEAGUE, seed: 'a'.repeat(32) });
   });
 
@@ -480,7 +486,7 @@ describe('season block runner (M2.5 wire)', () => {
     expect(raw).toBeDefined();
     // The frozen wire envelope parses the posted payload (schema 4).
     const start = seasonWorkerStartRequestSchema.parse(raw);
-    expect(start.schemaVersion).toBe(4);
+    expect(start.schemaVersion).toBe(5);
     expect(start.runId).toBe(run.runId);
     expect(start.objectiveId).toBe('win-six');
     expect(start.startGameId).toBeNull();
@@ -522,7 +528,7 @@ describe('season block runner (M2.5 wire)', () => {
 
     expect(FakeWorker.instances).toHaveLength(1);
     const start = seasonWorkerStartRequestSchema.parse(FakeWorker.instances[0]?.posted[0]);
-    expect(start.schemaVersion).toBe(4);
+    expect(start.schemaVersion).toBe(5);
     expect(start.startGameId).toBe('s000016');
     expect(start.objectiveId).toBe('win-six');
     expect(start.priorHealth).toEqual(pending.health);
@@ -544,7 +550,7 @@ describe('season block runner (M2.5 wire)', () => {
     const cancelRaw = FakeWorker.instances[0]?.posted[1];
     expect(cancelRaw).toBeDefined();
     const cancel = seasonWorkerCancelRequestSchema.parse(cancelRaw);
-    expect(cancel.schemaVersion).toBe(4);
+    expect(cancel.schemaVersion).toBe(5);
     expect(cancel.requestId).toBe(requestId);
   });
 
@@ -589,6 +595,41 @@ describe('season block runner (M2.5 wire)', () => {
     expect(events.some((event) => event === 'error')).toBe(true);
   });
 
+  it('reconciles an in-memory cursor with persistence before starting the worker', async () => {
+    const run = makeRun();
+    const repository = makeRepository(run);
+    const runner = createSeasonBlockRunner({
+      repository,
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: Array<{ type: string; requestId?: string }> = [];
+    runner.subscribe((event) => events.push(event));
+    runner.startBlock(startInput(run));
+    await flush();
+    const worker = FakeWorker.instances[0];
+    expect(worker).toBeDefined();
+    const started = events.find((event) => event.type === 'started');
+    const requestId = started?.requestId ?? 'sb-1';
+    worker?.emit({
+      schemaVersion: 5,
+      type: 'season-block-complete',
+      requestId,
+      result: { status: 'committed', checkpoint: makeCandidate(run) },
+    });
+    await flush();
+    expect(events.some((event) => event.type === 'complete')).toBe(true);
+
+    // The stub repository never updates acceptedBlocks on commit, so the
+    // in-memory cursor advances while persistence still reports revision 0.
+    runner.startBlock(startInput(run, { commandId: 'cmd-2' }));
+    await flush();
+    expect(events.filter((event) => event.type === 'started')).toHaveLength(2);
+    expect(events.some((event) => event.type === 'error')).toBe(false);
+    expect(FakeWorker.instances[0]?.posted).toHaveLength(2);
+  });
+
   it('commits an accepted candidate through completeSeasonBlockCommit with the M2.5 input', async () => {
     const run = makeRun();
     const repository = makeRepository(run);
@@ -608,7 +649,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const candidate = makeCandidate(run);
     worker?.emit({
-      schemaVersion: 4,
+      schemaVersion: 5,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -637,6 +678,49 @@ describe('season block runner (M2.5 wire)', () => {
     expect(input.checkpointState).toMatchObject({ runId: run.runId, blockIndex: 0 });
   });
 
+  it('sends a wire-v5 continuation when the worker already holds the run context', async () => {
+    const run = makeRun();
+    const repository = makeRepository(run);
+    const runner = createSeasonBlockRunner({
+      repository,
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: Array<{ type: string; requestId?: string }> = [];
+    runner.subscribe((event) => events.push(event));
+    runner.startBlock(startInput(run));
+    await flush();
+    const worker = FakeWorker.instances[0];
+    expect(worker).toBeDefined();
+    const started = events.find((event) => event.type === 'started');
+    const requestId = started?.requestId ?? 'sb-1';
+    const candidate = makeCandidate(run);
+    worker?.emit({
+      schemaVersion: 5,
+      type: 'season-block-complete',
+      requestId,
+      result: { status: 'committed', checkpoint: candidate },
+    });
+    await flush();
+    expect(events.some((event) => event.type === 'complete')).toBe(true);
+
+    // Block 1: the persistent worker holds the run context (schedule, league,
+    // rosters), so only the per-block deltas travel — no run/schedule payload.
+    runner.startBlock(startInput(run, { blockIndex: 1, expectedRevision: 1, commandId: 'cmd-2' }));
+    await flush();
+    const continuation = seasonWorkerContinueRequestSchema.parse(worker?.posted[1]);
+    expect(continuation.type).toBe('season-block-continue');
+    expect(continuation.runId).toBe(run.runId);
+    expect(continuation.blockIndex).toBe(1);
+    expect(continuation.commandId).toBe('cmd-2');
+    expect(continuation.newSummaries).toEqual([]);
+    expect(continuation.rotations).toHaveLength(run.rotations.length);
+    expect(continuation.humanFranchiseId).toBe('lakers');
+    expect('schedule' in continuation).toBe(false);
+    expect('run' in continuation).toBe(false);
+  });
+
   it('rejects a candidate whose expected state facts do not match the run', async () => {
     const run = makeRun();
     const repository = makeRepository(run);
@@ -656,7 +740,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const candidate = makeCandidate(run, { expectedStateRevision: 5 });
     worker?.emit({
-      schemaVersion: 4,
+      schemaVersion: 5,
       type: 'season-block-complete',
       requestId,
       result: { status: 'committed', checkpoint: candidate },
@@ -687,7 +771,7 @@ describe('season block runner (M2.5 wire)', () => {
     const requestId = started?.requestId ?? 'sb-1';
     const pending = makePending(run);
     worker?.emit({
-      schemaVersion: 4,
+      schemaVersion: 5,
       type: 'season-block-complete',
       requestId,
       result: { status: 'interrupted', pending },

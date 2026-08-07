@@ -29,7 +29,7 @@ import {
   shootingFoulProbability,
 } from './fouls.ts';
 import { pickRebounder, resolveRebound } from './rebounding.ts';
-import { prepareTeam, enginePlayerKey, type TeamPrep } from './prepare.ts';
+import { prepareTeamCached, enginePlayerKey, type TeamPrep } from './prepare.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import { creationScore } from '../domain/archetypes.ts';
 import type { SeasonHomeCourtMechanisms } from '../season/home-court.ts';
@@ -140,7 +140,7 @@ export function createTripContext(
     profile,
     teams,
     teamUnits: [unitVersionIdsOf(teams[0]), unitVersionIdsOf(teams[1])],
-    preps: [prepareTeam(teams[0], profile), prepareTeam(teams[1], profile)],
+    preps: [prepareTeamCached(teams[0], profile), prepareTeamCached(teams[1], profile)],
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
     passingAnchorFactor: 0.5 + (profile.parameters.assistAnchorRating - 50) / 100,
@@ -691,14 +691,7 @@ function resolveShot(
   }
   const zone = pickZone(action, zonePrep, rng);
   const shooterSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(shooter)) ?? -1;
-  const defender = pickDefender(
-    defense,
-    shooter,
-    zone,
-    rng,
-    defensePrep.positionModifiers,
-    shooterSlot,
-  );
+  const defender = pickDefender(defense, zone, rng, defensePrep.defenderBase, shooterSlot);
 
   const three = isThreePointZone(zone);
   const defenderSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(defender)) ?? -1;

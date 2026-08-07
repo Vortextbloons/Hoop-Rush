@@ -1,10 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
-import {
-  seasonDraftCatalogSchema,
-  type SeasonDraftCatalog,
-  type SeasonDraftCandidate,
-} from '@hoop-rush/data-contracts';
-import { rosterFeasible, type SeasonRosterMemberInput } from '@hoop-rush/engine';
+import { expect, test } from '@playwright/test';
+import { SEASON_ALIGNMENT } from '@hoop-rush/data-contracts';
+import { DraftPlanner, draftOneRound, reachLeagueHub } from './season-helpers';
 
 /**
  * Season Run M2.3.5 draft journeys (season-draft-v2): home -> /season -> ten
@@ -18,138 +14,12 @@ import { rosterFeasible, type SeasonRosterMemberInput } from '@hoop-rush/engine'
  * the deterministic fake `SeasonBlockRunner` (commits through the
  * authoritative engine seam folds, so reload audits pass exactly like a real
  * checkpoint). The draft, AI generation, and promotion run the real engine
- * and the real IndexedDB repository.
+ * and the real IndexedDB repository. Draft scaffolding (the lazy-loaded
+ * catalog, feasibility-safe planner, and round helpers) lives in
+ * season-helpers.ts.
  */
-
-const CATALOG: SeasonDraftCatalog = seasonDraftCatalogSchema.parse(
-  await fetch('http://localhost:4173/data/season/draft-catalog.json').then((response) =>
-    response.json(),
-  ),
-);
-
-/**
- * Mirrors the engine's pick feasibility probe so the e2e always selects a
- * candidate that keeps the 4G/4F/3C completion targets feasible — the engine
- * rejects picks that would dead-end the draft, and a dead end is permanent.
- */
-class DraftPlanner {
-  private picked: SeasonRosterMemberInput[] = [];
-
-  reset(): void {
-    this.picked = [];
-  }
-
-  /** Chooses the first offer card the engine's feasibility probe accepts. */
-  choose(candidates: SeasonDraftCandidate[]): SeasonDraftCandidate {
-    const pickedIds = new Set(this.picked.map((p) => p.playerVersionId));
-    const available = CATALOG.candidates
-      .filter((candidate) => !pickedIds.has(candidate.playerVersionId))
-      .map((candidate): SeasonRosterMemberInput => ({
-        playerVersionId: candidate.playerVersionId,
-        playable: candidate.positions.playable,
-      }));
-    for (const candidate of candidates) {
-      const probe: SeasonRosterMemberInput[] = [
-        ...this.picked,
-        {
-          playerVersionId: candidate.playerVersionId,
-          playable: candidate.positions.playable,
-        },
-      ];
-      const remaining = 10 - probe.length;
-      const stillAvailable = available.filter(
-        (member) => member.playerVersionId !== candidate.playerVersionId,
-      );
-      if (rosterFeasible(probe, stillAvailable, remaining)) return candidate;
-    }
-    throw new Error('no feasibility-safe candidate in the drawn offer');
-  }
-
-  record(candidate: SeasonDraftCandidate): void {
-    this.picked.push({
-      playerVersionId: candidate.playerVersionId,
-      playable: candidate.positions.playable,
-    });
-  }
-}
 
 const planner = new DraftPlanner();
-/** The board's current-offer section (aria-labelledby="season-offer-heading"). */
-function offerSection(page: Page) {
-  return page.locator('section[aria-labelledby="season-offer-heading"]');
-}
-
-/**
- * Resolves the drawn offer cards to catalog candidates. Cards render the
- * displayName on one line and "<seasonKey> · <positions>" on the next, so
- * each card is matched by its own name + season pair (displayName alone is
- * ambiguous when several versions of one person share it).
- */
-async function offerCardCandidates(page: Page): Promise<SeasonDraftCandidate[]> {
-  const cards = offerSection(page).locator('li');
-  const count = await cards.count();
-  const candidates: SeasonDraftCandidate[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const text = await cards.nth(i).innerText();
-    const lines = text.split('\n').map((line) => line.trim());
-    const name = lines.find((line) => CATALOG.candidates.some((c) => c.displayName === line));
-    const season = lines
-      .find((line) => /^\d{4}-\d{2}/.test(line))
-      ?.split('·')[0]
-      ?.trim();
-    const candidate = CATALOG.candidates.find(
-      (c) => c.displayName === name && c.seasonKey === season,
-    );
-    if (candidate !== undefined) candidates.push(candidate);
-  }
-  return candidates;
-}
-
-/** Drafts one round: draw the eight-card offer, then pick a safe card. */
-async function draftOneRound(page: Page) {
-  await page.getByRole('button', { name: /^Draw round \d+ offer$/ }).click();
-  await expect(page.getByText(/^Offer · pick \d+$/)).toBeVisible();
-
-  const candidates = await offerCardCandidates(page);
-  expect(candidates.length).toBe(8);
-  const target = planner.choose(candidates);
-
-  await offerSection(page)
-    .locator('li')
-    .filter({ hasText: `${target.displayName} ${target.seasonKey}` })
-    .getByRole('button', { name: 'Pick' })
-    .click();
-  await expect(page.getByText(/^Offer · pick \d+$/)).toHaveCount(0, { timeout: 5000 });
-  planner.record(target);
-}
-
-/** Drafts all ten rounds. */
-async function draftTenRounds(page: Page) {
-  for (let round = 1; round <= 10; round += 1) {
-    await expect(
-      page.locator('[data-season-round-heading]', { hasText: `Round ${String(round)} of 10` }),
-    ).toBeVisible();
-    await draftOneRound(page);
-  }
-  await page.getByRole('button', { name: 'Finalize my roster' }).click();
-}
-
-/** Runs the full setup journey: draft, AI generation, promotion, run shell. */
-async function reachRunShell(page: Page) {
-  planner.reset();
-  await page.goto('/season');
-  await page.getByRole('button', { name: 'Start draft' }).click();
-  await expect(page.locator('[data-season-round-heading]')).toBeVisible();
-  await draftTenRounds(page);
-
-  await page.getByRole('button', { name: 'Generate AI league' }).click();
-  await expect(page.getByRole('heading', { name: 'League generated' })).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByRole('button', { name: 'Open the league hub' }).click();
-  await expect(page).toHaveURL(/\/season\/run\/?$/, { timeout: 30_000 });
-  await expect(page.getByText('Next decision')).toBeVisible({ timeout: 30_000 });
-}
 
 test.describe('season run: draft journey, resume, legacy recovery', () => {
   test.describe.configure({ timeout: 180_000 });
@@ -166,7 +36,7 @@ test.describe('season run: draft journey, resume, legacy recovery', () => {
       await expect(page).toHaveURL(/\/season\/?$/);
       await expect(page.getByRole('heading', { name: 'Ten rounds. One league.' })).toBeVisible();
 
-      await reachRunShell(page);
+      await reachLeagueHub(page, planner);
 
       // The shell presents the masthead, nine tape segments, and the action.
       const mastheadHeading = page.getByRole('heading', { level: 1 });
@@ -190,8 +60,8 @@ test.describe('season run: draft journey, resume, legacy recovery', () => {
     await page.goto('/season');
     await page.getByRole('button', { name: 'Start draft' }).click();
     await expect(page.locator('[data-season-round-heading]')).toBeVisible();
-    await draftOneRound(page);
-    await draftOneRound(page);
+    await draftOneRound(page, planner);
+    await draftOneRound(page, planner);
 
     await page.reload();
     await expect(page.getByRole('button', { name: 'Resume draft' })).toBeVisible();
@@ -227,39 +97,11 @@ test.describe('season run: draft journey, resume, legacy recovery', () => {
         };
       });
       // The stored v1 record must pass the frozen league schema: 30 teams
-      // with the league-v1 conference/division alignment.
-      const alignment = [
-        ['hawks', 'east', 'southeast'],
-        ['celtics', 'east', 'atlantic'],
-        ['nets', 'east', 'atlantic'],
-        ['hornets', 'east', 'southeast'],
-        ['bulls', 'east', 'central'],
-        ['cavaliers', 'east', 'central'],
-        ['pistons', 'east', 'central'],
-        ['pacers', 'east', 'central'],
-        ['heat', 'east', 'southeast'],
-        ['bucks', 'east', 'central'],
-        ['knicks', 'east', 'atlantic'],
-        ['magic', 'east', 'southeast'],
-        ['sixers', 'east', 'atlantic'],
-        ['raptors', 'east', 'atlantic'],
-        ['wizards', 'east', 'southeast'],
-        ['mavericks', 'west', 'southwest'],
-        ['nuggets', 'west', 'northwest'],
-        ['warriors', 'west', 'pacific'],
-        ['rockets', 'west', 'southwest'],
-        ['clippers', 'west', 'pacific'],
-        ['lakers', 'west', 'pacific'],
-        ['grizzlies', 'west', 'southwest'],
-        ['timberwolves', 'west', 'northwest'],
-        ['pelicans', 'west', 'southwest'],
-        ['thunder', 'west', 'northwest'],
-        ['suns', 'west', 'pacific'],
-        ['blazers', 'west', 'northwest'],
-        ['kings', 'west', 'pacific'],
-        ['spurs', 'west', 'southwest'],
-        ['jazz', 'west', 'northwest'],
-      ] as const;
+      // with the league-v1 conference/division alignment (canonical source:
+      // SEASON_ALIGNMENT in @hoop-rush/data-contracts).
+      const alignment = SEASON_ALIGNMENT.map(
+        ({ franchiseId, conference, division }) => [franchiseId, conference, division] as const,
+      );
       const legacy = {
         recordId: 'season-draft',
         saveSchemaVersion: 1,
@@ -375,7 +217,7 @@ test.describe('season run: draft journey, resume, legacy recovery', () => {
     await page.addInitScript(() => {
       window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
     });
-    await reachRunShell(page);
+    await reachLeagueHub(page, planner);
 
     // Reloading the shell keeps the promoted run (draft record was consumed).
     await page.reload();

@@ -13,7 +13,7 @@
     "format:check": "prettier --check .",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:quick": "vitest run --exclude \"**/generator*.test.ts\" --exclude \"**/cli-*.test.ts\" --exclude \"**/block-determinism.test.ts\" --exclude \"**/properties.test.ts\" --exclude \"**/season-game-properties.test.ts\"",
+    "test:quick": "vitest run --exclude \"**/generator*.test.ts\" --exclude \"**/cli-season-rosters*.test.ts\" --exclude \"**/cli-season-m25.test.ts\" --exclude \"**/block-determinism.test.ts\" --exclude \"**/properties.test.ts\" --exclude \"**/season-game-properties.test.ts\"",
     "static": "pnpm --parallel -r run \"/^(check|lint)$/\"",
     "e2e": "pnpm --filter @hoop-rush/web e2e",
     "e2e:smoke": "pnpm --filter @hoop-rush/web e2e:smoke",

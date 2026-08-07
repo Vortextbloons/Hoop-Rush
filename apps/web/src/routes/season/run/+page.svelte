@@ -182,6 +182,7 @@
     submitting = true;
     submitError = null;
     try {
+      await shell.refresh?.();
       const result = await buildSubmitBlockEnvelope(shell);
       if (!result.ok) {
         submitError = result.error.message;

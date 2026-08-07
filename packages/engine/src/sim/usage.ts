@@ -270,30 +270,56 @@ function defenderWeight(defender: SimulationPlayer, zone: ShotZone): number {
 }
 
 /**
+ * Per-game defender selection base for one team: defenderWeight for every
+ * (slot, zone) plus the assigned-slot rim-protection factor (interior zones
+ * only). Both are deterministic per (defender, zone), so they are computed
+ * once per game; only the slot-group matchup factor varies per shot.
+ */
+export interface DefenderBase {
+  /** defenderWeight per (slot, zone), zone-major: weights[zoneIndex][slot]. */
+  weights: number[][];
+  /** Rim-protection factor per slot (applied on interior zones only). */
+  rimProtection: number[];
+}
+
+/** Builds the per-game defender selection base for one team. */
+export function defenderBase(
+  team: SimulationTeam,
+  positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
+): DefenderBase {
+  return {
+    weights: ZONES.map((zone) => team.players.map((defender) => defenderWeight(defender, zone))),
+    rimProtection: team.players.map(
+      (defender) => positionModifiers.get(defender.playerId)?.rimProtection ?? 1,
+    ),
+  };
+}
+
+/**
  * Selects the primary defender, favoring same-slot-group matchups (assigned
  * slots, never native position unions) and zone-relevant defense. On interior
  * zones the defender's assigned-slot rim-protection modifier shapes how often
- * bigs are assigned the block-check responsibility.
+ * bigs are assigned the block-check responsibility. The per-(slot, zone)
+ * base comes from `defenderBase`; the tight loop applies only the slot-group
+ * matchup factor, keeping the historical multiply order `(weight * match) * rim`.
  */
 export function pickDefender(
   team: SimulationTeam,
-  shooter: SimulationPlayer,
   zone: ShotZone,
   rng: Rng,
-  positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
+  base: DefenderBase,
   shooterSlot: number,
 ): SimulationPlayer {
   const interior = zone === 'rim' || zone === 'shortMid';
-  return rng.weightedPick(
-    team.players,
-    team.players.map((defender, slot) => {
-      const modifiers = positionModifiers.get(defender.playerId);
-      const rimProtection = interior ? (modifiers?.rimProtection ?? 1) : 1;
-      return (
-        defenderWeight(defender, zone) * sameGroupMatchWeight(slot, shooterSlot) * rimProtection
-      );
-    }),
-  );
+  const zoneIndex = ZONES.indexOf(zone);
+  const zoneWeights = base.weights[zoneIndex] ?? [];
+  const weights = new Array<number>(team.players.length);
+  for (let slot = 0; slot < team.players.length; slot += 1) {
+    const match = sameGroupMatchWeight(slot, shooterSlot);
+    const rim = interior ? (base.rimProtection[slot] ?? 1) : 1;
+    weights[slot] = (zoneWeights[slot] ?? 0) * match * rim;
+  }
+  return rng.weightedPick(team.players, weights);
 }
 
 const ZONES: readonly ShotZone[] = ['rim', 'shortMid', 'longMid', 'cornerThree', 'aboveBreakThree'];
@@ -400,23 +426,51 @@ export function blendedZoneWeights(
 }
 
 /**
- * Per-player zone preparation: the unmutated era-blended zone mix plus the
- * three-point volume target. Both are pure functions of the player and
- * profile, so they are computed once per game. `pickZone` copies the blend
- * before mutating it; callers must never mutate the cached array.
+ * Rescales an era-blended zone mix to the player's three-point volume target:
+ * the pre-play-type weight vector pickZone samples. Pure and fixed per player
+ * per game, so it is computed once in `zonePrep`; `pickZone` copies it before
+ * applying the action pulls.
+ */
+export function rescaleZoneWeights(blend: readonly number[], targetThreeRate: number): number[] {
+  const weights = blend.slice();
+  const currentThree = (weights[3] ?? 0) + (weights[4] ?? 0);
+  const currentTwo = Math.max(
+    1e-9,
+    weights.reduce((sum, value, index) => (index < 3 ? sum + value : sum), 0),
+  );
+  const targetTwoRate = 1 - targetThreeRate;
+  const threeScale = targetThreeRate / Math.max(1e-9, currentThree);
+  const twoScale = targetTwoRate / currentTwo;
+  for (let index = 0; index < weights.length; index += 1) {
+    weights[index] = (weights[index] ?? 0) * (index < 3 ? twoScale : threeScale);
+  }
+  return weights;
+}
+
+/**
+ * Per-player zone preparation: the unmutated era-blended zone mix, the
+ * three-point volume target, and the mix rescaled to that target. All are
+ * pure functions of the player and profile, so they are computed once per
+ * game. `pickZone` copies the rescaled base before mutating it; callers must
+ * never mutate the cached arrays.
  */
 export interface ZonePrep {
   blend: number[];
   threePointTarget: number;
   driveRate: number;
+  /** The era blend rescaled to the three-point target (pre play-type pulls). */
+  base: number[];
 }
 
 /** Computes the pristine zone prep for one player. */
 export function zonePrep(shooter: SimulationPlayer, profile: EraSimulationProfile): ZonePrep {
+  const blend = blendedZoneWeights(shooter, profile);
+  const targetThreeRate = threePointTarget(shooter, profile);
   return {
-    blend: blendedZoneWeights(shooter, profile),
-    threePointTarget: threePointTarget(shooter, profile),
+    blend,
+    threePointTarget: targetThreeRate,
     driveRate: shooter.tendencies.driveRate,
+    base: rescaleZoneWeights(blend, targetThreeRate),
   };
 }
 
@@ -436,27 +490,12 @@ export function twoPointZoneSharesFromBlend(weights: readonly number[]): [number
 }
 
 /**
- * Selects the shot zone from the precomputed era-blended mix, rescaled to the
- * three-point target and modulated by the play type. The cached blend is
- * copied so the per-game cache stays pristine across trips.
+ * Selects the shot zone from the precomputed rescaled base, modulated by the
+ * play type. The cached base is copied so the per-game cache stays pristine
+ * across trips.
  */
 export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
-  const weights = prep.blend.slice();
-
-  // Historical three-point volume is a strong role anchor (see
-  // threePointTarget): the era rate never manufactures a jump shot.
-  const targetThreeRate = prep.threePointTarget;
-  const currentThree = (weights[3] ?? 0) + (weights[4] ?? 0);
-  const currentTwo = Math.max(
-    1e-9,
-    weights.reduce((sum, value, index) => (index < 3 ? sum + value : sum), 0),
-  );
-  const targetTwoRate = 1 - targetThreeRate;
-  const threeScale = targetThreeRate / Math.max(1e-9, currentThree);
-  const twoScale = targetTwoRate / currentTwo;
-  for (let index = 0; index < weights.length; index += 1) {
-    weights[index] = (weights[index] ?? 0) * (index < 3 ? twoScale : threeScale);
-  }
+  const weights = prep.base.slice();
 
   // Play-type zone pulls stay modest so they refine the shot profile instead
   // of dragging the whole league toward the paint.

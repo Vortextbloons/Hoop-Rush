@@ -37,6 +37,17 @@ export const DEFAULT_RATINGS_MODEL_ARTIFACT: RatingsModelArtifact = {
 export function loadRatingsModelArtifact(
   path = join(PUBLIC_DATA, 'ratings-model.json'),
 ): RatingsModelArtifact {
+  const memo = ratingsModelArtifactByPath.get(path);
+  if (memo !== undefined) return memo;
+  const artifact = loadRatingsModelArtifactUncached(path);
+  ratingsModelArtifactByPath.set(path, artifact);
+  return artifact;
+}
+
+/** The artifact is immutable per build; repeat loads (per season) reuse it. */
+const ratingsModelArtifactByPath = new Map<string, RatingsModelArtifact>();
+
+function loadRatingsModelArtifactUncached(path: string): RatingsModelArtifact {
   if (!fileExists(path)) return DEFAULT_RATINGS_MODEL_ARTIFACT;
   const parsed = ratingsModelArtifactSchema.safeParse(readJson(path));
   if (!parsed.success) {

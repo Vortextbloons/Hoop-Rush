@@ -269,6 +269,19 @@ export function fitThreePointReconstruction(
 export function loadThreePointReconstructionArtifact(
   path: string = reconstructionArtifactPath(),
 ): ThreePointReconstructionArtifact {
+  const memo = threePointArtifactByPath.get(path);
+  if (memo !== undefined) return memo;
+  const artifact = loadThreePointReconstructionArtifactUncached(path);
+  threePointArtifactByPath.set(path, artifact);
+  return artifact;
+}
+
+/** The artifact is immutable per build; repeat loads (per season) reuse it. */
+const threePointArtifactByPath = new Map<string, ThreePointReconstructionArtifact>();
+
+function loadThreePointReconstructionArtifactUncached(
+  path: string,
+): ThreePointReconstructionArtifact {
   if (!fileExists(path)) {
     throw new Error(
       `three-point reconstruction artifact missing at ${path}; run \`hoop-rush calibrate three-point --write\` first`,
@@ -301,6 +314,8 @@ export function writeThreePointReconstructionArtifact(
     throw new Error('refusing to write artifact: reconstructed floor not below the .32/.34 floors');
   }
   writeFileSync(path, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+  // A fresh write supersedes any memoized load for the same path.
+  threePointArtifactByPath.delete(path);
 }
 
 /** Validates the existing artifact against the gate requirements. */

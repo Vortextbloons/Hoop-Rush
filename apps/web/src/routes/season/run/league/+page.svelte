@@ -96,6 +96,23 @@
     { key: 'bpg', label: 'BPG' },
     { key: 'topg', label: 'TOPG' },
   ];
+
+  /**
+   * Responsive split: once the viewport is known, only the active variant of
+   * the stats list mounts. Null = unknown (SSR, jsdom, no matchMedia): both
+   * variants render, exactly like the historical markup.
+   */
+  let desktopViewport = $state<boolean | null>(null);
+  $effect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia('(min-width: 768px)');
+    const update = () => {
+      desktopViewport = media.matches;
+    };
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  });
 </script>
 
 <svelte:head>
@@ -205,118 +222,130 @@
         </p>
       {:else}
         <!-- Mobile: per-team stat cards -->
-        <ul class="mt-6 flex flex-col gap-0 md:hidden md:gap-2">
-          {#each teamStats as team (team.franchiseId)}
-            {@const isHuman = team.franchiseId === humanFranchiseId}
-            {@const identity = identityOf(team.franchiseId)}
-            <li
-              data-season-team-stats-row
-              aria-label={isHuman
-                ? `${shell.franchiseName(team.franchiseId)} (your team)`
-                : undefined}
-              class="overflow-hidden bg-surface-1 px-3 py-3 sm:rounded-xl sm:px-4 {isHuman
-                ? 'ring-1 ring-primary/40'
-                : ''}"
-            >
-              <div class="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2">
-                {#if identity}
-                  <SeasonTeamLogo
-                    {manifest}
-                    franchiseId={identity.franchiseId}
-                    teamExternalId={identity.teamExternalId}
-                    alt=""
-                    size="sm"
-                  />
-                {:else}
-                  <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
-                {/if}
-                <span class="min-w-0 truncate font-semibold">
-                  {shell.franchiseName(team.franchiseId)}
-                  {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
-                </span>
-                <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                  {team.gamesPlayed} GP
-                </span>
-                <span class="shrink-0 font-mono text-[10px] font-bold">
-                  {team.diff > 0 ? '+' : ''}{team.diff}
-                </span>
-              </div>
-              <dl class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1">
-                {#each statCells as cell (cell.key)}
-                  <div class="flex items-center justify-between gap-2">
-                    <dt class="font-mono text-[10px] text-muted-foreground">{cell.label}</dt>
-                    <dd class="font-mono text-[10px] font-bold">
-                      {team[cell.key].toFixed(1)}
-                    </dd>
-                  </div>
-                {/each}
-              </dl>
-            </li>
-          {/each}
-        </ul>
+        {#if desktopViewport !== true}
+          <ul class="mt-6 flex flex-col gap-0 md:hidden md:gap-2">
+            {#each teamStats as team (team.franchiseId)}
+              {@const isHuman = team.franchiseId === humanFranchiseId}
+              {@const identity = identityOf(team.franchiseId)}
+              <li
+                data-season-team-stats-row
+                aria-label={isHuman
+                  ? `${shell.franchiseName(team.franchiseId)} (your team)`
+                  : undefined}
+                class="overflow-hidden bg-surface-1 px-3 py-3 sm:rounded-xl sm:px-4 {isHuman
+                  ? 'ring-1 ring-primary/40'
+                  : ''}"
+              >
+                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2">
+                  {#if identity}
+                    <SeasonTeamLogo
+                      {manifest}
+                      franchiseId={identity.franchiseId}
+                      teamExternalId={identity.teamExternalId}
+                      alt=""
+                      size="sm"
+                    />
+                  {:else}
+                    <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
+                  {/if}
+                  <span class="min-w-0 truncate font-semibold">
+                    {shell.franchiseName(team.franchiseId)}
+                    {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
+                  </span>
+                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                    {team.gamesPlayed} GP
+                  </span>
+                  <span class="shrink-0 font-mono text-[10px] font-bold">
+                    {team.diff > 0 ? '+' : ''}{team.diff}
+                  </span>
+                </div>
+                <dl class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1">
+                  {#each statCells as cell (cell.key)}
+                    <div class="flex items-center justify-between gap-2">
+                      <dt class="font-mono text-[10px] text-muted-foreground">{cell.label}</dt>
+                      <dd class="font-mono text-[10px] font-bold">
+                        {team[cell.key].toFixed(1)}
+                      </dd>
+                    </div>
+                  {/each}
+                </dl>
+              </li>
+            {/each}
+          </ul>
+        {/if}
 
         <!-- Desktop: complete team stats table -->
-        <div class="mt-6 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
-          <table class="w-full min-w-[42rem] text-sm">
-            <caption class="sr-only"> League team statistics — all 30 teams </caption>
-            <thead>
-              <tr
-                class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                <th scope="col" class="px-4 py-2 text-left font-medium">Team</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">GP</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">PPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">RPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">APG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">SPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">BPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">TOPG</th>
-                <th scope="col" class="px-4 py-2 text-right font-medium">Diff</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each teamStats as team (team.franchiseId)}
-                {@const isHuman = team.franchiseId === humanFranchiseId}
-                {@const identity = identityOf(team.franchiseId)}
+        {#if desktopViewport !== false}
+          <div class="mt-6 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
+            <table class="w-full min-w-[42rem] text-sm">
+              <caption class="sr-only"> League team statistics — all 30 teams </caption>
+              <thead>
                 <tr
-                  data-season-team-stats-row
-                  class="border-b border-border/40 {isHuman ? 'bg-primary/10' : ''}"
-                  aria-label={isHuman
-                    ? `${shell.franchiseName(team.franchiseId)} (your team)`
-                    : undefined}
+                  class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
                 >
-                  <th scope="row" class="max-w-48 truncate px-4 py-2 text-left font-semibold">
-                    <span class="flex items-center gap-2">
-                      {#if identity}
-                        <SeasonTeamLogo
-                          {manifest}
-                          franchiseId={identity.franchiseId}
-                          teamExternalId={identity.teamExternalId}
-                          alt=""
-                          size="sm"
-                        />
-                      {/if}
-                      <span class="min-w-0 truncate">
-                        {shell.franchiseName(team.franchiseId)}
-                        {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
-                      </span>
-                    </span>
-                  </th>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{team.gamesPlayed}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{team.ppg.toFixed(1)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{team.rpg.toFixed(1)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{team.apg.toFixed(1)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{team.spg.toFixed(1)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{team.bpg.toFixed(1)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px]">{team.topg.toFixed(1)}</td>
-                  <td class="px-4 py-2 text-right font-mono text-[10px] font-bold">
-                    {team.diff > 0 ? '+' : ''}{team.diff}
-                  </td>
+                  <th scope="col" class="px-4 py-2 text-left font-medium">Team</th>
+                  <th scope="col" class="px-4 py-2 text-right font-medium">GP</th>
+                  <th scope="col" class="px-4 py-2 text-right font-medium">PPG</th>
+                  <th scope="col" class="px-4 py-2 text-right font-medium">RPG</th>
+                  <th scope="col" class="px-4 py-2 text-right font-medium">APG</th>
+                  <th scope="col" class="px-4 py-2 text-right font-medium">SPG</th>
+                  <th scope="col" class="px-4 py-2 text-right font-medium">BPG</th>
+                  <th scope="col" class="px-4 py-2 text-right font-medium">TOPG</th>
+                  <th scope="col" class="px-4 py-2 text-right font-medium">Diff</th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {#each teamStats as team (team.franchiseId)}
+                  {@const isHuman = team.franchiseId === humanFranchiseId}
+                  {@const identity = identityOf(team.franchiseId)}
+                  <tr
+                    data-season-team-stats-row
+                    class="border-b border-border/40 {isHuman ? 'bg-primary/10' : ''}"
+                    aria-label={isHuman
+                      ? `${shell.franchiseName(team.franchiseId)} (your team)`
+                      : undefined}
+                  >
+                    <th scope="row" class="max-w-48 truncate px-4 py-2 text-left font-semibold">
+                      <span class="flex items-center gap-2">
+                        {#if identity}
+                          <SeasonTeamLogo
+                            {manifest}
+                            franchiseId={identity.franchiseId}
+                            teamExternalId={identity.teamExternalId}
+                            alt=""
+                            size="sm"
+                          />
+                        {/if}
+                        <span class="min-w-0 truncate">
+                          {shell.franchiseName(team.franchiseId)}
+                          {#if isHuman}<span class="text-primary" aria-label="your team">*</span
+                            >{/if}
+                        </span>
+                      </span>
+                    </th>
+                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.gamesPlayed}</td>
+                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.ppg.toFixed(1)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.rpg.toFixed(1)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.apg.toFixed(1)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.spg.toFixed(1)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.bpg.toFixed(1)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]"
+                      >{team.topg.toFixed(1)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px] font-bold">
+                      {team.diff > 0 ? '+' : ''}{team.diff}
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
         <p class="mt-2 font-mono text-[10px] text-muted-foreground">
           Folded from accepted game summaries; rates are per team game played. Diff is total point
           differential (all games, no tiebreak).

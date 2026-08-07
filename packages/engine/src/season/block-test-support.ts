@@ -1,5 +1,6 @@
 import {
   SEASON_AI_VERSION,
+  SEASON_ALIGNMENT,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
@@ -72,38 +73,22 @@ import { createInitialSeasonInfluenceState } from './influence.ts';
 
 export const TEST_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 
-export const ALL_FRANCHISES = [
-  'hawks',
-  'celtics',
-  'nets',
-  'hornets',
-  'bulls',
-  'cavaliers',
-  'pistons',
-  'pacers',
-  'heat',
-  'bucks',
-  'knicks',
-  'magic',
-  'sixers',
-  'raptors',
-  'wizards',
-  'mavericks',
-  'nuggets',
-  'warriors',
-  'rockets',
-  'clippers',
-  'lakers',
-  'grizzlies',
-  'timberwolves',
-  'pelicans',
-  'thunder',
-  'suns',
-  'blazers',
-  'kings',
-  'spurs',
-  'jazz',
-] as const;
+/**
+ * The 30 franchise ids in the engine fixtures' frozen order (east
+ * conference first, then west, each in canonical SEASON_ALIGNMENT order).
+ * Derived from the canonical alignment in `@hoop-rush/data-contracts` so
+ * the fixture ids cannot drift from the league fact; the explicit
+ * east-then-west ordering is frozen because generation outputs (catalog,
+ * rosters, schedule) are order-sensitive.
+ */
+export const ALL_FRANCHISES: readonly string[] = [
+  ...SEASON_ALIGNMENT.filter((entry) => entry.conference === 'east').map(
+    (entry) => entry.franchiseId,
+  ),
+  ...SEASON_ALIGNMENT.filter((entry) => entry.conference === 'west').map(
+    (entry) => entry.franchiseId,
+  ),
+];
 
 export const VERSIONS: SeasonCheckpointVersions = {
   blockVersion: SEASON_BLOCK_VERSION,

@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Position, SeasonRotation } from '@hoop-rush/data-contracts';
-import { buildMinimalRotation } from '@hoop-rush/engine';
-import { buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
+import type { Position } from '@hoop-rush/data-contracts';
 import {
   ROTATION_PRESETS,
   createRotationEditor,
@@ -11,6 +9,12 @@ import {
   rotationRoleOf,
   type RotationMember,
 } from './season-rotation-editor';
+import {
+  CANDIDATES,
+  legalRotation,
+  rotationMembers,
+  rotationPlayableOf,
+} from './season-rotation-test-support';
 
 /**
  * M2.3 rotation editor unit tests: every mutation stays inside the engine
@@ -18,48 +22,16 @@ import {
  * into a submission the engine would reject.
  */
 
-const CATALOG = buildSeasonDraftCatalog({
-  franchiseIds: ['lakers'],
-  eras: ['1990s'],
-  playersPerPool: 10,
-});
-const POOL = CATALOG.pools[0];
-if (POOL === undefined) {
-  throw new Error('fixture catalog has no pool');
-}
-const CANDIDATES = POOL.playerVersionIds.map((id) => {
-  const candidate = CATALOG.candidates.find((c) => c.playerVersionId === id);
-  if (candidate === undefined) {
-    throw new Error(`fixture catalog misses candidate ${id}`);
-  }
-  return candidate;
-});
-
 function members(): RotationMember[] {
-  return CANDIDATES.map((candidate) => ({
-    playerVersionId: candidate.playerVersionId,
-    displayName: candidate.displayName,
-    playable: candidate.positions.playable,
-  }));
+  return rotationMembers();
 }
 
 function playableOf(playerVersionId: string): readonly Position[] {
-  const candidate = CANDIDATES.find((c) => c.playerVersionId === playerVersionId);
-  if (candidate === undefined) {
-    throw new Error(`fixture catalog misses candidate ${playerVersionId}`);
-  }
-  return candidate.positions.playable;
+  return rotationPlayableOf(playerVersionId);
 }
 
-/** Legal rotation over the ten fixture candidates (engine-built). */
-function rotation(): SeasonRotation {
-  return buildMinimalRotation({
-    franchiseId: 'lakers',
-    members: members().map((member) => ({
-      playerVersionId: member.playerVersionId,
-      playable: member.playable,
-    })),
-  });
+function rotation() {
+  return legalRotation();
 }
 
 function editor() {

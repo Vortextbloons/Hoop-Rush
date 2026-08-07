@@ -1,4 +1,8 @@
-import { fnv1a32 } from '@hoop-rush/data-contracts';
+import {
+  SIMULATION_RATINGS,
+  SIMULATION_TENDENCIES,
+  seedFromString,
+} from '@hoop-rush/data-contracts';
 import type {
   BracketOpponent,
   BracketScheduleEntry,
@@ -14,7 +18,6 @@ import type {
   PeakPlayerSeason,
   PlayerSeasonStats,
   RunAggregates,
-  Seed,
   SimulationPlayer,
   SimulationRatings,
   SimulationTeam,
@@ -27,9 +30,7 @@ import type {
  * at each level; nested sections use named arguments.
  */
 
-export function seedFromString(value: string): Seed {
-  return fnv1a32(value).toString(16).padStart(8, '0').repeat(4);
-}
+export { seedFromString };
 
 const DEFAULT_SUMMARY_RATINGS: SummaryRatings = {
   overallRating: 90,
@@ -572,55 +573,15 @@ export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): O
 
 /**
  * M2 simulation fixtures. Defaults model a solid 1990s rotation player so
- * fixture lineups vary only along the dimensions tests care about.
+ * fixture lineups vary only along the dimensions tests care about. The
+ * canonical rating/tendency literals live in `@hoop-rush/data-contracts`
+ * (`SIMULATION_RATINGS` / `SIMULATION_TENDENCIES`); these derive from them
+ * so the season-game fixtures and the sim fixtures cannot drift apart.
  */
 
-const DEFAULT_SIM_RATINGS: SimulationRatings = {
-  insideScoring: 78,
-  closeShot: 70,
-  midrange: 68,
-  threePoint: 65,
-  freeThrow: 74,
-  ballHandling: 70,
-  passing: 70,
-  offensiveIq: 70,
-  offensiveRebound: 60,
-  defensiveRebound: 65,
-  perimeterDefense: 62,
-  interiorDefense: 62,
-  steal: 60,
-  block: 60,
-  defensiveIq: 62,
-  speed: 70,
-  strength: 65,
-  vertical: 66,
-};
+const DEFAULT_SIM_RATINGS: SimulationRatings = { ...SIMULATION_RATINGS };
 
-const DEFAULT_SIM_TENDENCIES = {
-  usageRate: 20,
-  passRate: 30,
-  shotRate: 25,
-  driveRate: 18,
-  postUpRate: 5,
-  rimFrequency: 30,
-  shortMidFrequency: 20,
-  longMidFrequency: 14,
-  cornerThreeFrequency: 8,
-  aboveBreakThreeFrequency: 12,
-  threePointRate: 20,
-  freeThrowRate: 22,
-  turnoverRate: 12,
-  isolationRate: 10,
-  pickAndRollBallHandlerRate: 25,
-  pickAndRollRollManRate: 10,
-  spotUpRate: 20,
-  transitionRate: 15,
-  cutRate: 10,
-  foulRate: 2,
-  stealAttemptRate: 8,
-  blockAttemptRate: 10,
-  crashOffensiveGlassRate: 12,
-} as const;
+const DEFAULT_SIM_TENDENCIES = { ...SIMULATION_TENDENCIES };
 
 export function buildSimulationPlayer(overrides: Partial<SimulationPlayer> = {}): SimulationPlayer {
   return {

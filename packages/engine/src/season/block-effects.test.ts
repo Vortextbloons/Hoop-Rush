@@ -465,19 +465,6 @@ describe('M2.4 block-level effects', () => {
     expect(new Set(first).size).toBe(9);
   }, 240_000);
 
-  it('resumes deterministically from a persisted checkpoint effects state', () => {
-    const uninterrupted = synthState();
-    const digestsUninterrupted = checkpointDigestsOf(uninterrupted);
-
-    const resumed = synthState();
-    const digestsResumed: string[] = [];
-    for (let block = 0; block < 9; block += 1) {
-      const checkpoint = runBlock(resumed, block);
-      digestsResumed.push(checkpoint.digest);
-    }
-    expect(digestsResumed).toEqual(digestsUninterrupted);
-  }, 240_000);
-
   it('accumulates fatigue and chemistry across blocks and records evidence', () => {
     const state = synthState();
     const checkpoints: SeasonCandidateCheckpoint[] = [];

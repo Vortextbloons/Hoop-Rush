@@ -11,6 +11,7 @@ import {
   type SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
 import { seasonObjectiveChoicesForBlock } from '@hoop-rush/engine';
+import { SEASON_ROUND_COUNT } from '@hoop-rush/data-contracts';
 
 /**
  * M2.5 Influence + objective presentation (season-influence-v1,
@@ -154,7 +155,7 @@ export interface ObjectiveChoiceViewModel {
 }
 
 export interface ObjectiveChoicesViewModel {
-  /** The next unselected block (0-7); null when none remains or the season is complete. */
+  /** The current playable block (0-7); null when none remains or the season is complete. */
   blockIndex: number | null;
   /** The block's deterministic three-choice set (empty when no block remains). */
   choices: ObjectiveChoiceViewModel[];
@@ -176,13 +177,14 @@ export interface ObjectiveChoicesViewModel {
 }
 
 /**
- * The objective picker facts for the next unselected block: the three
+ * The objective picker facts for the current playable block: the three
  * deterministic choices (engine `seasonObjectiveChoicesForBlock`), the
  * recorded selection, and its recorded evaluation once the block committed.
- * Block 8 (the final two-game block) never selects.
+ * Block 8 (the final two-game block) never selects. The picker stays on the
+ * current block after a selection until that block is simulated.
  */
 export function objectiveChoicesViewModel(run: SeasonRun): ObjectiveChoicesViewModel {
-  const blockIndex = nextObjectiveBlock(run);
+  const blockIndex = currentObjectiveBlock(run);
   const definitions = new Map(SEASON_OBJECTIVE_CATALOG.map((entry) => [entry.objectiveId, entry]));
   if (blockIndex === null) {
     return {
@@ -233,11 +235,16 @@ function lastEvaluatedSelection(
   return null;
 }
 
-/** The next block (0-7) without a recorded objective selection. */
-export function nextObjectiveBlock(run: SeasonRun): number | null {
-  if (run.cursor.completedRounds >= 82) return null;
-  for (let blockIndex = 0; blockIndex <= 7; blockIndex += 1) {
-    if (run.objectives.selections[blockIndex] === undefined) return blockIndex;
-  }
-  return null;
+/** Accepted blocks implied by the run cursor (one block per ten rounds). */
+function acceptedBlockCountOf(completedRounds: number): number {
+  if (completedRounds <= 0) return 0;
+  return Math.ceil(completedRounds / 10);
+}
+
+/** The 0-based block index the run is about to play (blocks 0-7 only). */
+export function currentObjectiveBlock(run: SeasonRun): number | null {
+  if (run.cursor.completedRounds >= SEASON_ROUND_COUNT) return null;
+  const blockIndex = acceptedBlockCountOf(run.cursor.completedRounds);
+  if (blockIndex >= 8) return null;
+  return blockIndex;
 }

@@ -573,7 +573,28 @@ export function auditSeasonRunState(
   }
 
   // M2.5 state chain: revision monotonicity, checkpointState consistency,
-  // and the canonical state digest recomputation.
+  // and the canonical state digest recomputation. The digest facts are
+  // byte-identical for both checks below, so the digest is computed once
+  // and reused; a failure is reported per check exactly as before.
+  let recomputedDigest: string | null = null;
+  let digestFailure: string | null = null;
+  try {
+    recomputedDigest = seam.seasonRunStateDigest({
+      stateRevision: stored.stateRevision,
+      checkpointState: stored.checkpointState,
+      health: stored.health,
+      influence: stored.influence,
+      transactions: stored.transactions,
+      trade: stored.trade,
+      objectives: stored.objectives,
+      rosters: stored.run.rosters,
+      ownership: stored.run.ownership,
+      rotations: stored.run.rotations,
+      effects: stored.effects,
+    });
+  } catch (error) {
+    digestFailure = `state digest recomputation failed: ${errorMessage(error)}`;
+  }
   if (last !== undefined) {
     if (stored.stateRevision < last.stateRevision) {
       failures.push(
@@ -597,50 +618,20 @@ export function auditSeasonRunState(
     // facts (effects included) must be byte-identical to what the last
     // accepted block digested.
     if (stored.trade === null && stored.stateRevision === last.stateRevision) {
-      try {
-        const recomputed = seam.seasonRunStateDigest({
-          stateRevision: stored.stateRevision,
-          checkpointState: stored.checkpointState,
-          health: stored.health,
-          influence: stored.influence,
-          transactions: stored.transactions,
-          trade: stored.trade,
-          objectives: stored.objectives,
-          rosters: stored.run.rosters,
-          ownership: stored.run.ownership,
-          rotations: stored.run.rotations,
-          effects: stored.effects,
-        });
-        if (recomputed !== last.stateDigest) {
-          failures.push(
-            'run.effects diverged from the last checkpoint effects without a trade window ' +
-              '(last block stateDigest does not recompute over the stored facts)',
-          );
-        }
-      } catch (error) {
-        failures.push(`state digest recomputation failed: ${errorMessage(error)}`);
+      if (digestFailure !== null) {
+        failures.push(digestFailure);
+      } else if (recomputedDigest !== last.stateDigest) {
+        failures.push(
+          'run.effects diverged from the last checkpoint effects without a trade window ' +
+            '(last block stateDigest does not recompute over the stored facts)',
+        );
       }
     }
   }
-  try {
-    const recomputed = seam.seasonRunStateDigest({
-      stateRevision: stored.stateRevision,
-      checkpointState: stored.checkpointState,
-      health: stored.health,
-      influence: stored.influence,
-      transactions: stored.transactions,
-      trade: stored.trade,
-      objectives: stored.objectives,
-      rosters: stored.run.rosters,
-      ownership: stored.run.ownership,
-      rotations: stored.run.rotations,
-      effects: stored.effects,
-    });
-    if (recomputed !== stored.stateDigest) {
-      failures.push('stored stateDigest does not recompute over the stored mutable state');
-    }
-  } catch (error) {
-    failures.push(`state digest recomputation failed: ${errorMessage(error)}`);
+  if (digestFailure !== null) {
+    failures.push(digestFailure);
+  } else if (recomputedDigest !== stored.stateDigest) {
+    failures.push('stored stateDigest does not recompute over the stored mutable state');
   }
 
   // M2.5 trade state validity.

@@ -185,24 +185,15 @@ describe('ClassicRollReel', () => {
   });
 
   it('settles early when spinDurationMs shortens the spin', async () => {
-    vi.useRealTimers();
     const { container, onSettled } = renderReel({ spinKey: 1, spinDurationMs: 100 });
 
     // With a 100 ms spin the reels settle well before the default 900 ms.
-    await vi.waitFor(
-      () => {
-        expect(container.querySelector(RESULT)).not.toBeNull();
-      },
-      { timeout: 700 },
-    );
+    await vi.advanceTimersByTimeAsync(300);
+    expect(container.querySelector(RESULT)).not.toBeNull();
     expect(onSettled).not.toHaveBeenCalled();
 
-    await vi.waitFor(
-      () => {
-        expect(onSettled).toHaveBeenCalledTimes(1);
-      },
-      { timeout: 2000 },
-    );
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(onSettled).toHaveBeenCalledTimes(1);
   });
 
   it('closes immediately when the settled overlay is clicked', async () => {

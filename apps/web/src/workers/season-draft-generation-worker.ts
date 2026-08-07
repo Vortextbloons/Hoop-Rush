@@ -1,9 +1,9 @@
-import type {
-  SeasonAiGenerationInput,
-  SeasonLeagueGenerationResult,
-  SeasonRosterTargets,
-} from '@hoop-rush/data-contracts';
-import { SeasonAiGenerationError, generateAiLeague } from '@hoop-rush/engine';
+import type { SeasonLeagueGenerationResult, SeasonRosterTargets } from '@hoop-rush/data-contracts';
+import {
+  SeasonAiGenerationError,
+  generateAiLeague,
+  type SeasonAiGenerationInput,
+} from '@hoop-rush/engine';
 
 /**
  * Season Run AI league generation worker (M2.3.5). Runs the bounded
@@ -31,7 +31,9 @@ type GenerationWorkerResponse =
     };
 
 self.addEventListener('message', (event: MessageEvent<GenerationWorkerRequest>) => {
-  const request = event.data;
+  // The declared envelope type narrows the union; at runtime the port may
+  // carry anything, so treat the payload as nullable before guarding.
+  const request = event.data as GenerationWorkerRequest | null;
   if (request?.type !== 'generate') return;
 
   const respond = (response: GenerationWorkerResponse): void => {

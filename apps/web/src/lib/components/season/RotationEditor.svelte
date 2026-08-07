@@ -46,6 +46,9 @@
     void revision;
     return editor.rows();
   });
+  const rowByVersion = $derived(
+    new Map(rows.map((row) => [row.member.playerVersionId, row] as const)),
+  );
   const minutesTotal = $derived(rows.reduce((sum, row) => sum + row.minutes, 0));
   const failures = $derived.by(() => {
     void revision;
@@ -226,7 +229,7 @@
     {#if mobileSection === 'starters'}
       <ul class="mt-2 flex flex-col gap-2">
         {#each editor.rotation.starters as playerVersionId, slotIndex (slotIndex)}
-          {@const row = rows.find((r) => r.member.playerVersionId === playerVersionId)}
+          {@const row = rowByVersion.get(playerVersionId)}
           {@const slotFailures = failureIndex.byPlayer.get(playerVersionId) ?? null}
           <li class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
@@ -285,7 +288,7 @@
     {:else if mobileSection === 'closing'}
       <ul class="mt-2 flex flex-col gap-2">
         {#each editor.rotation.closingFive as playerVersionId, slotIndex (slotIndex)}
-          {@const row = rows.find((r) => r.member.playerVersionId === playerVersionId)}
+          {@const row = rowByVersion.get(playerVersionId)}
           {@const slotFailures = failureIndex.byPlayer.get(playerVersionId) ?? null}
           <li class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
@@ -343,7 +346,7 @@
     {:else}
       <ul class="mt-2 flex flex-col divide-y divide-border/60">
         {#each editor.rotation.benchOrder as playerVersionId, benchIndex (playerVersionId)}
-          {@const row = rows.find((r) => r.member.playerVersionId === playerVersionId)}
+          {@const row = rowByVersion.get(playerVersionId)}
           {#if row !== undefined}
             {@const rowFailures = failureIndex.byPlayer.get(row.member.playerVersionId) ?? null}
             <li class="py-3">
@@ -449,7 +452,7 @@
       </h3>
       <ul class="mt-2 flex flex-col gap-2">
         {#each editor.rotation.starters as playerVersionId, slotIndex (slotIndex)}
-          {@const row = rows.find((r) => r.member.playerVersionId === playerVersionId)}
+          {@const row = rowByVersion.get(playerVersionId)}
           {@const slotFailures = failureIndex.byPlayer.get(playerVersionId) ?? null}
           <li class="flex flex-col gap-1">
             <div class="flex items-center gap-2">
@@ -512,7 +515,7 @@
       </h3>
       <ul class="mt-2 flex flex-col gap-2">
         {#each editor.rotation.benchOrder as playerVersionId, benchIndex (benchIndex)}
-          {@const row = rows.find((r) => r.member.playerVersionId === playerVersionId)}
+          {@const row = rowByVersion.get(playerVersionId)}
           <li class="flex items-center gap-2">
             <span
               class="w-7 shrink-0 font-mono text-[10px] font-bold uppercase text-muted-foreground"
@@ -544,7 +547,7 @@
     </h3>
     <ul class="mt-2 flex flex-col gap-2">
       {#each editor.rotation.closingFive as playerVersionId, slotIndex (slotIndex)}
-        {@const row = rows.find((r) => r.member.playerVersionId === playerVersionId)}
+        {@const row = rowByVersion.get(playerVersionId)}
         {@const slotFailures = failureIndex.byPlayer.get(playerVersionId) ?? null}
         <li class="flex flex-col gap-1">
           <div class="flex items-center gap-2">

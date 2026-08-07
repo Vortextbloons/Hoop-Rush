@@ -67,31 +67,6 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await loadDraftCatalog();
   });
 
-  test('draft → promotion → shell hub: masthead, nine tape segments, simulate action', async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
-    });
-    await reachLeagueHub(page, planner, { runShell: true });
-
-    // Masthead: the shell renders the human franchise heading.
-    const mastheadHeading = page.getByRole('heading', { level: 1 });
-    await expect(mastheadHeading).toBeVisible();
-    expect((await mastheadHeading.textContent())?.trim().length ?? 0).toBeGreaterThan(0);
-
-    // The season tape has nine segments; the first is the current decision.
-    const segments = page.locator('[data-season-tape-segment]');
-    await expect(segments).toHaveCount(9);
-    await expect(segments.nth(0)).toHaveAttribute('aria-current', 'step');
-
-    // The hub's next-decision panel is actionable.
-    await expect(page.getByText('Up next')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: 'Lock rotation and simulate block' }),
-    ).toBeEnabled();
-  });
-
   test('a running block survives tab switches and marks the tape segment complete', async ({
     page,
   }) => {

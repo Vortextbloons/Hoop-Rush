@@ -2,24 +2,19 @@ import {
   humanFranchiseIdOf,
   SEASON_RUN_SCHEMA_VERSION,
   seasonSubmitBlockCommandSchema,
-  type SeasonAcceptTradeOfferResult,
   type SeasonActiveRunIndex,
-  type SeasonDeclineTradeOfferResult,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
-  type SeasonForfeitInterruptedGameResult,
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
   type SeasonObjectiveId,
   type SeasonPendingBlockCandidate,
-  type SeasonResumeSeasonBlockResult,
   type SeasonRetainedGameDetail,
   type SeasonRun,
   type SeasonRunCommand,
   type SeasonRunCommandRejection,
-  type SeasonSelectBlockObjectiveResult,
+  type SeasonScoreline,
   type SeasonSpendInfluenceCommand,
-  type SeasonSpendInfluenceResult,
   type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from '@hoop-rush/engine';
@@ -74,7 +69,7 @@ export interface BlockRunState {
   gamesCompleted: number;
   gamesTotal: number;
   latestGameId: string | null;
-  latestResult: SeasonGameSummary | null;
+  latestResult: SeasonScoreline | null;
   error: { code: string; message: string; seed: string | null; gameId: string | null } | null;
   /** The submitted command (retry re-issues the same idempotent command). */
   command: SeasonSubmitBlockCommand | null;
@@ -515,9 +510,20 @@ export class SeasonHubState {
   }
 
   /** Re-issues the same idempotent command after cancel/failure. */
-  retry(): void {
+  async retry(): Promise<void> {
     if (this.block.command === null || this.block.startInput === null) return;
     if (this.block.phase !== 'cancelled' && this.block.phase !== 'failed') return;
+    clearCachedSeasonSnapshot();
+    await this.refresh();
+    const revision = this.snapshot?.acceptedBlocks.length;
+    if (revision === undefined || this.block.command.expectedRevision !== revision) {
+      // The envelope targeted a block that is no longer current (for example
+      // the hub refreshed after a successful commit while retry still held the
+      // old command). Clear the stale failure so the user can submit fresh.
+      this.block = { ...IDLE_BLOCK };
+      this.emit();
+      return;
+    }
     this.startBlock({
       command: this.block.command,
       start: this.block.startInput,
@@ -632,17 +638,21 @@ export class SeasonHubState {
         break;
       case 'complete': {
         if (this.block.blockIndex !== event.checkpoint.blockIndex) break;
-        this.block.phase = 'complete';
         this.block.latestGameId = null;
         this.block.latestResult = null;
         this.block.error = null;
         // The runner committed atomically (deleting any pending row in the
         // same transaction); re-read the accepted snapshot and clear the
-        // interrupted state.
+        // interrupted state before the UI can submit the next block.
         this.pending = null;
         this.interruption = null;
-        void this.refresh();
-        break;
+        clearCachedSeasonSnapshot();
+        void (async () => {
+          await this.refresh();
+          this.block = { ...IDLE_BLOCK };
+          this.emit();
+        })();
+        return;
       }
       case 'interrupted':
         if (this.block.blockIndex !== event.blockIndex) break;
@@ -692,8 +702,8 @@ export function describeCommandRejection(
     case 'duplicate-command':
       return 'This command was already applied.';
     case 'not-at-boundary':
-      return `Objective selection must target the next unselected block (block ${String(
-        rejection.nextUnselectedBlockIndex,
+      return `Objective selection must target the current block (block ${String(
+        rejection.nextUnselectedBlockIndex + 1,
       )}).`;
     case 'objective-not-offered':
       return 'That objective is not in the block’s offered set.';

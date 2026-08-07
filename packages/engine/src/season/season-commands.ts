@@ -43,6 +43,7 @@ import type {
   SeasonWindowNotOpenRejection,
 } from '@hoop-rush/data-contracts';
 import { advancePendingAfterForfeit, seasonForfeitSummaryForGame } from './health.ts';
+import { seasonNextBlockIndex } from './block.ts';
 import { applyRiskyRehabOutcome, rollSeasonRehabOutcome } from './injuries.ts';
 import { applySeasonInfluenceSpend, SEASON_INFLUENCE_FLOOR } from './influence.ts';
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
@@ -271,17 +272,16 @@ function handleSelectBlockObjective(
   if (base !== null) return base;
   const run = economyRunOf(context);
 
-  const nextUnselectedBlockIndex = (() => {
-    for (let blockIndex = 0; blockIndex < 8; blockIndex += 1) {
-      if (run.objectives.selections[blockIndex] === undefined) return blockIndex;
-    }
-    return 7;
-  })();
-  if (command.blockIndex !== nextUnselectedBlockIndex) {
+  const currentBlockIndex = seasonNextBlockIndex(run.cursor.completedRounds);
+  if (
+    currentBlockIndex === null ||
+    currentBlockIndex >= 8 ||
+    command.blockIndex !== currentBlockIndex
+  ) {
     const rejection: SeasonNotAtBoundaryRejection = {
       code: 'not-at-boundary',
       blockIndex: command.blockIndex,
-      nextUnselectedBlockIndex,
+      nextUnselectedBlockIndex: currentBlockIndex ?? 7,
     };
     return rejectedSelect(command, rejection, run);
   }

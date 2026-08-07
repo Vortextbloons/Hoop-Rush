@@ -21,6 +21,193 @@ import {
 } from './index.ts';
 import type { Lineup, LineupAssignment, PeakPlayerSeason } from './index.ts';
 
+/**
+ * One minimal valid simulation player with the frozen ratings/tendencies
+ * literal (19 ratings, 23 tendencies). Shared by the run, simulation, and
+ * worker-message fixtures so the literal lives in exactly one place.
+ */
+function makeSimulationPlayer(playerId: string, positions: string[]) {
+  return {
+    playerId,
+    displayName: `Player ${playerId}`,
+    positions,
+    heightInches: 76,
+    weightLbs: 200,
+    ratings: {
+      insideScoring: 80,
+      closeShot: 70,
+      midrange: 70,
+      threePoint: 70,
+      freeThrow: 75,
+      ballHandling: 75,
+      passing: 75,
+      offensiveIq: 75,
+      offensiveRebound: 60,
+      defensiveRebound: 60,
+      perimeterDefense: 65,
+      interiorDefense: 65,
+      steal: 60,
+      block: 60,
+      defensiveIq: 65,
+      speed: 75,
+      strength: 65,
+      vertical: 70,
+    },
+    tendencies: {
+      usageRate: 20,
+      passRate: 30,
+      shotRate: 25,
+      driveRate: 20,
+      postUpRate: 5,
+      rimFrequency: 30,
+      shortMidFrequency: 20,
+      longMidFrequency: 15,
+      cornerThreeFrequency: 8,
+      aboveBreakThreeFrequency: 12,
+      threePointRate: 25,
+      freeThrowRate: 20,
+      turnoverRate: 12,
+      isolationRate: 10,
+      pickAndRollBallHandlerRate: 25,
+      pickAndRollRollManRate: 10,
+      spotUpRate: 20,
+      transitionRate: 15,
+      cutRate: 10,
+      foulRate: 2,
+      stealAttemptRate: 8,
+      blockAttemptRate: 10,
+      crashOffensiveGlassRate: 12,
+    },
+  };
+}
+
+/** The five roster slots in structure order (G, G, F, F, C). */
+const SLOT_POSITIONS: string[][] = [['PG', 'SG'], ['PG', 'SG'], ['SF', 'PF'], ['SF', 'PF'], ['C']];
+
+/** One minimal valid sandbox run: five players, 30 opponents, 82-game schedule. */
+function makeRun() {
+  const five = ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'];
+  const fivePlayers = five.map((playerId, slotIndex) =>
+    makeSimulationPlayer(playerId, SLOT_POSITIONS[slotIndex] ?? ['PG', 'SG']),
+  );
+  const opponents = Array.from({ length: 30 }, (_, index) => ({
+    schemaVersion: 2,
+    opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String(index)}`,
+    bracketVersion: 'bracket-v1',
+    difficultyBand: 'medium',
+    teamId: `team-${String(index)}`,
+    displayName: `Opponent ${String(index)}`,
+    seasonKey: '1995-96',
+    lineup: {
+      structure: ['G', 'G', 'F', 'F', 'C'],
+      assignments: fivePlayers.map((player, slotIndex) => ({
+        slotIndex,
+        playerId: player.playerId,
+        positions: player.positions,
+      })),
+    },
+    players: fivePlayers.map((player) => ({
+      ...player,
+      playerId: `p-opp-${String(index)}-${player.playerId}`,
+    })),
+    strength: {
+      evaluationVersion: 'gen-v1',
+      benchmarkVersion: 'benchmark-v1',
+      sampleCount: 1,
+      winRate: 0.5,
+      percentile: 0.5,
+    },
+  }));
+  const schedule = (opponentIds: string[]) =>
+    Array.from({ length: 82 }, (_, index) => {
+      const opponentId = opponentIds[index % 30];
+      if (opponentId === undefined) {
+        throw new Error('schedule requires at least 30 opponent ids');
+      }
+      return { gameNumber: index + 1, opponentId };
+    });
+  const zero = () => ({ made: 0, attempted: 0 });
+  const zeroAggregates = {
+    team: {
+      wins: 0,
+      losses: 0,
+      gamesPlayed: 0,
+      points: 0,
+      fieldGoals: zero(),
+      threes: zero(),
+      freeThrows: zero(),
+      rebounds: { total: 0, offensive: 0, defensive: 0, team: 0 },
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+      possessions: 0,
+    },
+    players: fivePlayers.map((player) => ({
+      playerId: player.playerId,
+      gamesPlayed: 0,
+      minutes: 0,
+      points: 0,
+      fieldGoals: zero(),
+      threes: zero(),
+      freeThrows: zero(),
+      rebounds: { total: 0, offensive: 0, defensive: 0 },
+      assists: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      fouls: 0,
+    })),
+  };
+  return {
+    schemaVersion: 2,
+    runId: 'run-1',
+    mode: 'sandbox',
+    franchiseId: 'lakers',
+    eraId: '1990s',
+    homeDisplayName: 'Los Angeles Lakers',
+    playerIds: five,
+    lineup: {
+      structure: ['G', 'G', 'F', 'F', 'C'],
+      assignments: fivePlayers.map((player, slotIndex) => ({
+        slotIndex,
+        playerId: player.playerId,
+        positions: player.positions,
+      })),
+    },
+    players: fivePlayers,
+    runSeed: 'abcd1234abcd1234abcd1234abcd1234',
+    versions: {
+      saveSchemaVersion: 2,
+      dataVersion: 'data-v1',
+      ratingVersion: 'ratings-v1',
+      positionNormalizationVersion: 'position-v3',
+      engineVersion: 'engine-v1',
+      bracketVersion: 'bracket-v1',
+      scheduleVersion: 'schedule-v1',
+      seedDerivationVersion: 'seed-v1',
+    },
+    eraProfileVersion: 'profile-v1',
+    difficulty: {
+      profileVersion: 'medium-v1',
+      name: 'medium',
+      leagueMedianPercentileBand: [0.4, 0.55],
+      teamPercentileBand: [0.25, 0.65],
+    },
+    bracket: {
+      bracketVersion: 'bracket-v1',
+      scheduleVersion: 'schedule-v1',
+      opponents,
+      schedule: schedule(opponents.map((o) => o.opponentId)),
+    },
+    status: 'active',
+    firstLossGameNumber: null,
+    games: [],
+    aggregates: zeroAggregates,
+  };
+}
+
 const validPlayer: PeakPlayerSeason = {
   schemaVersion: 3,
   playerId: 'p-1',
@@ -216,7 +403,7 @@ describe('player-season contracts', () => {
     expect(peakPlayerSeasonSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it('rejects a duplicate player id inside a pool', () => {
+  it('accepts duplicate player ids inside a pool (uniqueness is a command concern)', () => {
     const duplicate = [validPlayer, { ...validPlayer, seasonKey: '1997-98', selectionScore: 96 }];
     const parsed = franchiseEraPoolSchema.safeParse({
       schemaVersion: 3,
@@ -237,7 +424,11 @@ describe('player-season contracts', () => {
     });
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
+    // The packaged-data contract permits repeated playerIds (a player can
+    // appear across seasons); deduplication is enforced by the draft and
+    // selection commands, not by this schema.
     expect(new Set(parsed.data.players.map((p) => p.playerId)).size).toBe(1);
+    expect(new Set(parsed.data.players.map((p) => p.seasonKey)).size).toBe(2);
   });
 });
 
@@ -275,7 +466,7 @@ describe('lineup contracts', () => {
     expect(lineupSchema.safeParse(lineup).success).toBe(false);
   });
 
-  it('rejects a wrong structure', () => {
+  it('allows a center-positioned player in a guard slot (positions are advisory)', () => {
     const lineup: Lineup = {
       structure: ['G', 'G', 'F', 'F', 'C'],
       assignments: [
@@ -291,185 +482,7 @@ describe('lineup contracts', () => {
 });
 
 describe('run contracts', () => {
-  const simPlayer = (id: string, positions: string[]) => ({
-    playerId: id,
-    displayName: `Player ${id}`,
-    positions,
-    heightInches: 76,
-    weightLbs: 200,
-    ratings: {
-      insideScoring: 80,
-      closeShot: 70,
-      midrange: 70,
-      threePoint: 70,
-      freeThrow: 75,
-      ballHandling: 75,
-      passing: 75,
-      offensiveIq: 75,
-      offensiveRebound: 60,
-      defensiveRebound: 60,
-      perimeterDefense: 65,
-      interiorDefense: 65,
-      steal: 60,
-      block: 60,
-      defensiveIq: 65,
-      speed: 75,
-      strength: 65,
-      vertical: 70,
-    },
-    tendencies: {
-      usageRate: 20,
-      passRate: 30,
-      shotRate: 25,
-      driveRate: 20,
-      postUpRate: 5,
-      rimFrequency: 30,
-      shortMidFrequency: 20,
-      longMidFrequency: 15,
-      cornerThreeFrequency: 8,
-      aboveBreakThreeFrequency: 12,
-      threePointRate: 25,
-      freeThrowRate: 20,
-      turnoverRate: 12,
-      isolationRate: 10,
-      pickAndRollBallHandlerRate: 25,
-      pickAndRollRollManRate: 10,
-      spotUpRate: 20,
-      transitionRate: 15,
-      cutRate: 10,
-      foulRate: 2,
-      stealAttemptRate: 8,
-      blockAttemptRate: 10,
-      crashOffensiveGlassRate: 12,
-    },
-  });
-
-  const fivePlayers = [
-    simPlayer('p-1', ['PG', 'SG']),
-    simPlayer('p-2', ['PG', 'SG']),
-    simPlayer('p-3', ['SF', 'PF']),
-    simPlayer('p-4', ['SF', 'PF']),
-    simPlayer('p-5', ['C']),
-  ];
-
-  const opponents = Array.from({ length: 30 }, (_, index) => ({
-    schemaVersion: 2,
-    opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String(index)}`,
-    bracketVersion: 'bracket-v1',
-    difficultyBand: 'medium',
-    teamId: `team-${String(index)}`,
-    displayName: `Opponent ${String(index)}`,
-    seasonKey: '1995-96',
-    lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
-      assignments: fivePlayers.map((player, slotIndex) => ({
-        slotIndex,
-        playerId: player.playerId,
-        positions: player.positions,
-      })),
-    },
-    players: fivePlayers.map((player) => ({
-      ...player,
-      playerId: `p-opp-${String(index)}-${player.playerId}`,
-    })),
-    strength: {
-      evaluationVersion: 'gen-v1',
-      benchmarkVersion: 'benchmark-v1',
-      sampleCount: 1,
-      winRate: 0.5,
-      percentile: 0.5,
-    },
-  }));
-
-  const schedule = (opponentIds: string[]) =>
-    Array.from({ length: 82 }, (_, index) => {
-      const opponentId = opponentIds[index % 30];
-      if (opponentId === undefined) {
-        throw new Error('schedule requires at least 30 opponent ids');
-      }
-      return { gameNumber: index + 1, opponentId };
-    });
-
-  const zeroAggregates = {
-    team: {
-      wins: 0,
-      losses: 0,
-      gamesPlayed: 0,
-      points: 0,
-      fieldGoals: { made: 0, attempted: 0 },
-      threes: { made: 0, attempted: 0 },
-      freeThrows: { made: 0, attempted: 0 },
-      rebounds: { total: 0, offensive: 0, defensive: 0, team: 0 },
-      assists: 0,
-      steals: 0,
-      blocks: 0,
-      turnovers: 0,
-      fouls: 0,
-      possessions: 0,
-    },
-    players: fivePlayers.map((player) => ({
-      playerId: player.playerId,
-      gamesPlayed: 0,
-      minutes: 0,
-      points: 0,
-      fieldGoals: { made: 0, attempted: 0 },
-      threes: { made: 0, attempted: 0 },
-      freeThrows: { made: 0, attempted: 0 },
-      rebounds: { total: 0, offensive: 0, defensive: 0 },
-      assists: 0,
-      steals: 0,
-      blocks: 0,
-      turnovers: 0,
-      fouls: 0,
-    })),
-  };
-
-  const baseRun = {
-    schemaVersion: 2,
-    runId: 'run-1',
-    mode: 'sandbox',
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    homeDisplayName: 'Los Angeles Lakers',
-    playerIds: ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'],
-    lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
-      assignments: fivePlayers.map((player, slotIndex) => ({
-        slotIndex,
-        playerId: player.playerId,
-        positions: player.positions,
-      })),
-    },
-    players: fivePlayers,
-    runSeed: 'abcd1234abcd1234abcd1234abcd1234',
-    versions: {
-      saveSchemaVersion: 2,
-      dataVersion: 'data-v1',
-      ratingVersion: 'ratings-v1',
-      positionNormalizationVersion: 'position-v3',
-      engineVersion: 'engine-v1',
-      bracketVersion: 'bracket-v1',
-      scheduleVersion: 'schedule-v1',
-      seedDerivationVersion: 'seed-v1',
-    },
-    eraProfileVersion: 'profile-v1',
-    difficulty: {
-      profileVersion: 'medium-v1',
-      name: 'medium',
-      leagueMedianPercentileBand: [0.4, 0.55],
-      teamPercentileBand: [0.25, 0.65],
-    },
-    bracket: {
-      bracketVersion: 'bracket-v1',
-      scheduleVersion: 'schedule-v1',
-      opponents,
-      schedule: schedule(opponents.map((o) => o.opponentId)),
-    },
-    status: 'active',
-    firstLossGameNumber: null,
-    games: [],
-    aggregates: zeroAggregates,
-  };
+  const baseRun = makeRun();
 
   it('accepts an active sandbox run with a legal seed', () => {
     expect(challengeRunSchema.safeParse(baseRun).success).toBe(true);
@@ -584,58 +597,7 @@ describe('manifest contracts', () => {
 });
 
 describe('simulation contracts', () => {
-  const player = {
-    playerId: 'p-1',
-    displayName: 'Test Player',
-    positions: ['PG', 'SG'],
-    heightInches: 76,
-    weightLbs: 200,
-    ratings: {
-      insideScoring: 80,
-      closeShot: 70,
-      midrange: 70,
-      threePoint: 70,
-      freeThrow: 75,
-      ballHandling: 75,
-      passing: 75,
-      offensiveIq: 75,
-      offensiveRebound: 60,
-      defensiveRebound: 60,
-      perimeterDefense: 65,
-      interiorDefense: 65,
-      steal: 60,
-      block: 60,
-      defensiveIq: 65,
-      speed: 75,
-      strength: 65,
-      vertical: 70,
-    },
-    tendencies: {
-      usageRate: 20,
-      passRate: 30,
-      shotRate: 25,
-      driveRate: 20,
-      postUpRate: 5,
-      rimFrequency: 30,
-      shortMidFrequency: 20,
-      longMidFrequency: 15,
-      cornerThreeFrequency: 8,
-      aboveBreakThreeFrequency: 12,
-      threePointRate: 25,
-      freeThrowRate: 20,
-      turnoverRate: 12,
-      isolationRate: 10,
-      pickAndRollBallHandlerRate: 25,
-      pickAndRollRollManRate: 10,
-      spotUpRate: 20,
-      transitionRate: 15,
-      cutRate: 10,
-      foulRate: 2,
-      stealAttemptRate: 8,
-      blockAttemptRate: 10,
-      crashOffensiveGlassRate: 12,
-    },
-  } as const;
+  const player = makeSimulationPlayer('p-1', ['PG', 'SG']);
 
   it('accepts a valid simulation player', () => {
     expect(simulationPlayerSchema.safeParse(player).success).toBe(true);
@@ -913,217 +875,7 @@ function gameResultFixture(gameNumber: number) {
 
 /** Minimal valid challenge run for worker request fixtures. */
 function buildMinimalRun() {
-  const five = ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'];
-  const slotPositions = [['PG', 'SG'], ['PG', 'SG'], ['SF', 'PF'], ['SF', 'PF'], ['C']];
-  const zero = () => ({ made: 0, attempted: 0 });
-  return {
-    schemaVersion: 2,
-    runId: 'run-1',
-    mode: 'sandbox',
-    franchiseId: 'lakers',
-    eraId: '1990s',
-    homeDisplayName: 'Los Angeles Lakers',
-    playerIds: five,
-    lineup: {
-      structure: ['G', 'G', 'F', 'F', 'C'],
-      assignments: five.map((playerId, slotIndex) => ({
-        slotIndex,
-        playerId,
-        positions: slotPositions[slotIndex],
-      })),
-    },
-    players: five.map((playerId, slotIndex) => ({
-      playerId,
-      displayName: `Player ${playerId}`,
-      positions: slotPositions[slotIndex],
-      heightInches: 76,
-      weightLbs: 200,
-      ratings: {
-        insideScoring: 80,
-        closeShot: 70,
-        midrange: 70,
-        threePoint: 70,
-        freeThrow: 75,
-        ballHandling: 75,
-        passing: 75,
-        offensiveIq: 75,
-        offensiveRebound: 60,
-        defensiveRebound: 60,
-        perimeterDefense: 65,
-        interiorDefense: 65,
-        steal: 60,
-        block: 60,
-        defensiveIq: 65,
-        speed: 75,
-        strength: 65,
-        vertical: 70,
-      },
-      tendencies: {
-        usageRate: 20,
-        passRate: 30,
-        shotRate: 25,
-        driveRate: 20,
-        postUpRate: 5,
-        rimFrequency: 30,
-        shortMidFrequency: 20,
-        longMidFrequency: 15,
-        cornerThreeFrequency: 8,
-        aboveBreakThreeFrequency: 12,
-        threePointRate: 25,
-        freeThrowRate: 20,
-        turnoverRate: 12,
-        isolationRate: 10,
-        pickAndRollBallHandlerRate: 25,
-        pickAndRollRollManRate: 10,
-        spotUpRate: 20,
-        transitionRate: 15,
-        cutRate: 10,
-        foulRate: 2,
-        stealAttemptRate: 8,
-        blockAttemptRate: 10,
-        crashOffensiveGlassRate: 12,
-      },
-    })),
-    runSeed: 'abcd1234abcd1234abcd1234abcd1234',
-    versions: {
-      saveSchemaVersion: 2,
-      dataVersion: 'data-v1',
-      ratingVersion: 'ratings-v1',
-      positionNormalizationVersion: 'position-v3',
-      engineVersion: 'engine-v1',
-      bracketVersion: 'bracket-v1',
-      scheduleVersion: 'schedule-v1',
-      seedDerivationVersion: 'seed-v1',
-    },
-    eraProfileVersion: 'profile-v1',
-    difficulty: {
-      profileVersion: 'medium-v1',
-      name: 'medium',
-      leagueMedianPercentileBand: [0.4, 0.55],
-      teamPercentileBand: [0.25, 0.65],
-    },
-    bracket: {
-      bracketVersion: 'bracket-v1',
-      scheduleVersion: 'schedule-v1',
-      opponents: Array.from({ length: 30 }, (_, index) => ({
-        schemaVersion: 2,
-        opponentId: index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String(index)}`,
-        bracketVersion: 'bracket-v1',
-        difficultyBand: 'medium' as const,
-        teamId: `team-${String(index)}`,
-        displayName: `Opponent ${String(index)}`,
-        seasonKey: '1995-96',
-        lineup: {
-          structure: ['G', 'G', 'F', 'F', 'C'],
-          assignments: five.map((playerId, slotIndex) => ({
-            slotIndex,
-            playerId: `p-opp-${String(index)}-${playerId}`,
-            positions: slotPositions[slotIndex],
-          })),
-        },
-        players: five.map((playerId, slotIndex) => ({
-          playerId: `p-opp-${String(index)}-${playerId}`,
-          displayName: `Opp ${String(index)} ${String(slotIndex)}`,
-          positions: slotPositions[slotIndex],
-          heightInches: 76,
-          weightLbs: 200,
-          ratings: {
-            insideScoring: 80,
-            closeShot: 70,
-            midrange: 70,
-            threePoint: 70,
-            freeThrow: 75,
-            ballHandling: 75,
-            passing: 75,
-            offensiveIq: 75,
-            offensiveRebound: 60,
-            defensiveRebound: 60,
-            perimeterDefense: 65,
-            interiorDefense: 65,
-            steal: 60,
-            block: 60,
-            defensiveIq: 65,
-            speed: 75,
-            strength: 65,
-            vertical: 70,
-          },
-          tendencies: {
-            usageRate: 20,
-            passRate: 30,
-            shotRate: 25,
-            driveRate: 20,
-            postUpRate: 5,
-            rimFrequency: 30,
-            shortMidFrequency: 20,
-            longMidFrequency: 15,
-            cornerThreeFrequency: 8,
-            aboveBreakThreeFrequency: 12,
-            threePointRate: 25,
-            freeThrowRate: 20,
-            turnoverRate: 12,
-            isolationRate: 10,
-            pickAndRollBallHandlerRate: 25,
-            pickAndRollRollManRate: 10,
-            spotUpRate: 20,
-            transitionRate: 15,
-            cutRate: 10,
-            foulRate: 2,
-            stealAttemptRate: 8,
-            blockAttemptRate: 10,
-            crashOffensiveGlassRate: 12,
-          },
-        })),
-        strength: {
-          evaluationVersion: 'gen-v1',
-          benchmarkVersion: 'benchmark-v1',
-          sampleCount: 1,
-          winRate: 0.5,
-          percentile: 0.5,
-        },
-      })),
-      schedule: Array.from({ length: 82 }, (_, index) => ({
-        gameNumber: index + 1,
-        opponentId:
-          index === 0 ? 'lakers-1990s-opening' : `bracket-team-${String((index % 29) + 1)}`,
-      })),
-    },
-    status: 'active',
-    firstLossGameNumber: null,
-    games: [],
-    aggregates: {
-      team: {
-        wins: 0,
-        losses: 0,
-        gamesPlayed: 0,
-        points: 0,
-        fieldGoals: zero(),
-        threes: zero(),
-        freeThrows: zero(),
-        rebounds: { total: 0, offensive: 0, defensive: 0, team: 0 },
-        assists: 0,
-        steals: 0,
-        blocks: 0,
-        turnovers: 0,
-        fouls: 0,
-        possessions: 0,
-      },
-      players: five.map((playerId) => ({
-        playerId,
-        gamesPlayed: 0,
-        minutes: 0,
-        points: 0,
-        fieldGoals: zero(),
-        threes: zero(),
-        freeThrows: zero(),
-        rebounds: { total: 0, offensive: 0, defensive: 0 },
-        assists: 0,
-        steals: 0,
-        blocks: 0,
-        turnovers: 0,
-        fouls: 0,
-      })),
-    },
-  };
+  return makeRun();
 }
 
 describe('classic draft contracts (M4)', () => {

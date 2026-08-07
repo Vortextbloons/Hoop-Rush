@@ -229,7 +229,7 @@
   }
 
   shell.cancelBlock = () => shell.hub?.cancel();
-  shell.retryBlock = () => shell.hub?.retry();
+  shell.retryBlock = () => void shell.hub?.retry();
   shell.refresh = async () => {
     await shell.hub?.refresh();
     mirrorHub();

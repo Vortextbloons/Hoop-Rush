@@ -12,7 +12,7 @@ vi.mock('$lib/data', async () => {
   const { buildManifest, buildPool } = await import('@hoop-rush/test-fixtures');
   const entries: PlayersIndexEntry[] = [];
   const positions = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-  for (let i = 0; i < 240; i += 1) {
+  for (let i = 0; i < 60; i += 1) {
     const position = positions[i % 5] as (typeof positions)[number];
     entries.push({
       playerId: `player-${String(i).padStart(3, '0')}`,
@@ -75,7 +75,7 @@ describe('sandbox teardown', () => {
       () => {
         expect(container.querySelectorAll('li button')).not.toHaveLength(0);
       },
-      { timeout: 5000 },
+      { timeout: 2000 },
     );
 
     const cards = container.querySelectorAll('li button');

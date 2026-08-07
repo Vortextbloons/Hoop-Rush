@@ -13,26 +13,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
+  quick:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.11.0
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       - name: Typecheck
         run: pnpm check
@@ -40,16 +25,20 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Unit and integration tests
+      - name: Quick unit and integration tests
+        run: pnpm test:quick
+
+  # The full suite (block determinism, property tests, CLI integration)
+  # runs on push to main and nightly; per-commit gates stay fast.
+  tests:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: ./.github/actions/setup
+
+      - name: Full unit and integration tests
         run: pnpm test:run
-
-      - name: Validate packaged data
-        run: pnpm hoop-rush data validate
-
-      - name: Production build
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}
-        run: pnpm build
 
       - name: Upload test results
         if: failure()
@@ -62,27 +51,41 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  data:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: ./.github/actions/setup
+
+      - name: Validate packaged data
+        run: pnpm hoop-rush data validate
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: ./.github/actions/setup
+
+      - name: Production build
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+        run: pnpm build
+
+      - name: Upload static build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: apps/web/build
+          if-no-files-found: error
+          retention-days: 7
+
   e2e-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: quality
+    needs: [quick, build]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.11.0
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -93,8 +96,11 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --filter @hoop-rush/web exec playwright install --with-deps chromium
 
-      - name: Build static site
-        run: pnpm build
+      - name: Download static build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: apps/web/build
 
       - name: Run Playwright smoke tests
         run: pnpm e2e:smoke

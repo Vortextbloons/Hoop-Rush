@@ -4,7 +4,7 @@
   import { resolve } from '$app/paths';
   import type { HoopRushManifest, SeasonLeague, SeasonSchedule } from '@hoop-rush/data-contracts';
   import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
-  import { SeasonDraftFlow, type SeasonDraftFlowState } from '$lib/season/season-draft-flow';
+  import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
   import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
   import {
     loadSeasonDraftCatalog,
@@ -75,6 +75,7 @@
             displayName: candidate.displayName,
           })),
         );
+        const { SeasonDraftFlow } = await import('$lib/season/season-draft-flow');
         flow = new SeasonDraftFlow(new DexieSeasonDraftRepository(), catalog, rosterTargets);
         flow.onPhaseChange = () => {
           if (flow !== null) board = flow.state();

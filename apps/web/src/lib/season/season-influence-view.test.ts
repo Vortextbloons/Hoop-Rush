@@ -10,8 +10,8 @@ vi.mock('@hoop-rush/engine', () => ({
 
 import {
   canAffordSpend,
+  currentObjectiveBlock,
   influenceViewModel,
-  nextObjectiveBlock,
   objectiveChoicesViewModel,
 } from './season-influence-view';
 
@@ -207,7 +207,7 @@ describe('influenceViewModel', () => {
   });
 });
 
-describe('objectiveChoicesViewModel / nextObjectiveBlock', () => {
+describe('objectiveChoicesViewModel / currentObjectiveBlock', () => {
   it('offers the mocked three-choice set with the catalog names', () => {
     const vm = objectiveChoicesViewModel(runWithObjectives({}));
     expect(vm.blockIndex).toBe(0);
@@ -224,23 +224,26 @@ describe('objectiveChoicesViewModel / nextObjectiveBlock', () => {
     expect(vm.success).toBeNull();
   });
 
-  it('marks the recorded selection and moves to the next unselected block', () => {
+  it('keeps the current block after a selection until that block is simulated', () => {
     const run = runWithObjectives({
       '0': { objectiveId: 'win-six', selectedByCommandId: 'obj-1', success: null },
     });
-    expect(nextObjectiveBlock(run)).toBe(1);
+    expect(currentObjectiveBlock(run)).toBe(0);
     const vm = objectiveChoicesViewModel(run);
-    expect(vm.blockIndex).toBe(1);
-    expect(vm.choices[0]?.selected).toBe(false);
-    expect(vm.selectedObjectiveId).toBeNull();
+    expect(vm.blockIndex).toBe(0);
+    expect(vm.selectedObjectiveId).toBe('win-six');
+    expect(vm.choices.find((choice) => choice.objectiveId === 'win-six')?.selected).toBe(true);
   });
 
-  it('reports the most recent evaluated selection', () => {
+  it('advances to the next block after the cursor moves', () => {
     const run = runWithObjectives({
       '0': { objectiveId: 'win-six', selectedByCommandId: 'obj-1', success: true },
     });
+    run.cursor.completedRounds = 10;
+    expect(currentObjectiveBlock(run)).toBe(1);
     const vm = objectiveChoicesViewModel(run);
     expect(vm.blockIndex).toBe(1);
+    expect(vm.selectedObjectiveId).toBeNull();
     expect(vm.lastEvaluation).toMatchObject({
       blockIndex: 0,
       objectiveId: 'win-six',
@@ -249,20 +252,13 @@ describe('objectiveChoicesViewModel / nextObjectiveBlock', () => {
     });
   });
 
-  it('returns no block when every selection is made or the season is complete', () => {
-    const selections = Object.fromEntries(
-      Array.from({ length: 8 }, (_, blockIndex) => [
-        String(blockIndex),
-        {
-          objectiveId: 'win-six' as const,
-          selectedByCommandId: `obj-${String(blockIndex)}`,
-          success: null,
-        },
-      ]),
-    );
-    expect(nextObjectiveBlock(runWithObjectives(selections))).toBeNull();
+  it('returns no block on the final two-game block or when the season is complete', () => {
+    const blockEight = runWithObjectives({});
+    blockEight.cursor.completedRounds = 80;
+    expect(currentObjectiveBlock(blockEight)).toBeNull();
+
     const complete = runWithObjectives({});
     complete.cursor.completedRounds = 82;
-    expect(nextObjectiveBlock(complete)).toBeNull();
+    expect(currentObjectiveBlock(complete)).toBeNull();
   });
 });

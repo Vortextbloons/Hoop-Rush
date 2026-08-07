@@ -24,22 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.11.0
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup
 
       - name: Typecheck
         run: pnpm check
@@ -47,8 +32,19 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # ci.yml already runs the full suite on the same push; this step is the
+      # nightly-only full run (golden regeneration included).
       - name: Full test suite (including golden regeneration)
+        if: github.event_name == 'schedule'
         run: pnpm test:run
+
+      # The M2.5 integration-run calibration suites are skipped by default
+      # (they freeze the packaged targets artifacts); the nightly forces them
+      # so they run exactly once per day.
+      - name: M2.5 integration-run calibration (forced)
+        env:
+          HOOP_RUSH_INTEGRATION_RUNS: '1'
+        run: pnpm --filter @hoop-rush/cli test:run src/cli-season-m25-calibrate.test.ts
 
       - name: Validate packaged data
         run: pnpm hoop-rush data validate
@@ -69,3 +65,38 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}
         run: pnpm build
+
+  # The full Playwright suite (including the real-worker block journeys that
+  # take minutes) runs only at night; PR CI keeps the @smoke subset fast.
+  e2e-full:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: ./.github/actions/setup
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @hoop-rush/web exec playwright install --with-deps chromium
+
+      - name: Build static site
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+        run: pnpm build
+
+      - name: Run full Playwright suite
+        run: pnpm e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-full
+          path: apps/web/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7

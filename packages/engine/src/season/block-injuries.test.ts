@@ -377,6 +377,7 @@ describe('M2.5 block pipeline with injuries', () => {
     });
     expect(stateFacts.checkpointState.runId).toBe(run.runId);
     expect(stateFacts.checkpointState.blockIndex).toBe(0);
+    expect(stateFacts.checkpointState.revision).toBe(1);
     expect(stateFacts.checkpointState.checkpointDigest).toBe(checkpoint.digest);
     expect(stateFacts.stateRevision).toBe(1);
     expect(stateFacts.stateDigest).toMatch(/^[0-9a-f]{32}$/);

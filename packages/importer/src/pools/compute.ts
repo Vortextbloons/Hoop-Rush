@@ -72,8 +72,15 @@ import {
  * Python num()/nullable() helpers would produce for it.
  */
 function readJsonLoose(path: string): unknown {
-  const text = readFileSync(path, 'utf8').replace(/\bNaN\b(?=\s*[,}\]])/g, 'null');
-  return JSON.parse(text) as unknown;
+  const text = readFileSync(path, 'utf8');
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return JSON.parse(text.replace(/\bNaN\b(?=\s*[,}\]])/g, 'null')) as unknown;
+    }
+    throw error;
+  }
 }
 
 /** Python str(value): string/number/boolean as-is; anything else as ''. */
@@ -1090,7 +1097,6 @@ export function computePool(
   console.log(`[${franchiseId} ${eraId}] scanning ${String(seasons.length)} seasons`);
   const careerLabelsMap = careerLabels ?? loadCareerPositionLabels();
   const existingAssetAltIds = loadExistingAssetAltIds(franchiseId, eraId);
-  const fallbackRosterPlayers = loadFallbackRosterPlayers();
 
   const eligible = new Map<string, Candidate[]>();
   const missingStints: string[] = [];
@@ -1113,7 +1119,10 @@ export function computePool(
         continue;
       }
       const pid = str(stint.playerExternalId);
-      const sourcePlayer = rosterByExtId[pid] ?? fallbackRosterPlayers.get(pid);
+      // The fallback roster map (all packaged pools, memoized) is only
+      // loaded on a source miss — targets with complete rosters never pay
+      // the ~135 MB pooled scan.
+      const sourcePlayer = rosterByExtId[pid] ?? loadFallbackRosterPlayers().get(pid);
       if (sourcePlayer === undefined) {
         continue;
       }
@@ -1594,7 +1603,9 @@ export async function run(
     results = [];
     for (const [franchiseId, eraId] of targets) {
       results.push(
-        buildPoolForTarget(franchiseId, eraId, manifest, bbrefIds, withAssets, careerLabels),
+        // Keep the season JSON cache warm across the whole sequential pass
+        // (each season parses once, not once per target).
+        buildPoolForTarget(franchiseId, eraId, manifest, bbrefIds, withAssets, careerLabels, true),
       );
     }
   } else {

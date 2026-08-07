@@ -62,71 +62,55 @@ describe('data asset loading with a stale manifest', () => {
     vi.clearAllMocks();
   });
 
-  it('recovers when a pool file was regenerated after the manifest was loaded', async () => {
-    const player = buildPlayerSeason({ playerId: 'pacers-2000s-a' });
-    const poolV1 = buildPool([player], { franchiseId: 'pacers', eraId: '2000s' });
-    const poolV2 = buildPool([player], {
-      franchiseId: 'pacers',
-      eraId: '2000s',
-      dataVersion: 'data-v2',
-    });
-    const staleEntry: PoolIndexEntry = {
+  it.each([
+    {
+      playerId: 'pacers-2000s-a',
       franchiseId: 'pacers',
       eraId: '2000s',
       url: 'pools/pacers-2000s.json',
-      contentHash: sha256(JSON.stringify(poolV1)),
-    };
-    const freshHash = sha256(JSON.stringify(poolV2));
-    const staleManifest: HoopRushManifest = buildManifest({
-      pools: [staleEntry],
-    });
-    const freshManifest: HoopRushManifest = buildManifest({
-      dataVersion: 'data-v2',
-      pools: [{ ...staleEntry, contentHash: freshHash }],
-    });
-
-    routes.set('/data/pools/pacers-2000s.json', JSON.stringify(poolV2));
-    routes.set('/data/manifest.json', JSON.stringify(staleManifest));
-    await getManifest();
-
-    routes.set('/data/manifest.json', JSON.stringify(freshManifest));
-
-    const pool = await getPool(staleEntry);
-
-    expect(pool.dataVersion).toBe('data-v2');
-    expect(writeCachedPool).toHaveBeenCalledWith('pacers/2000s', freshHash, poolV2);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-  });
-
-  it('recovers when the manifest fetch is still cached but the pool bytes changed', async () => {
-    const player = buildPlayerSeason({ playerId: 'bulls-1990s-a' });
-    const poolV1 = buildPool([player], { franchiseId: 'bulls', eraId: '1990s' });
-    const poolV2 = buildPool([player], {
-      franchiseId: 'bulls',
-      eraId: '1990s',
-      dataVersion: 'data-v2',
-    });
-    const staleEntry: PoolIndexEntry = {
+      staleManifestRefresh: true,
+    },
+    {
+      playerId: 'bulls-1990s-a',
       franchiseId: 'bulls',
       eraId: '1990s',
       url: 'pools/bulls-1990s.json',
-      contentHash: sha256(JSON.stringify(poolV1)),
-    };
-    const freshHash = sha256(JSON.stringify(poolV2));
-    const staleManifest: HoopRushManifest = buildManifest({
-      pools: [staleEntry],
-    });
+      staleManifestRefresh: false,
+    },
+  ])(
+    'recovers a stale pool hash ($playerId, manifest refreshed: $staleManifestRefresh)',
+    async ({ playerId, franchiseId, eraId, url, staleManifestRefresh }) => {
+      const player = buildPlayerSeason({ playerId });
+      const poolV1 = buildPool([player], { franchiseId, eraId });
+      const poolV2 = buildPool([player], { franchiseId, eraId, dataVersion: 'data-v2' });
+      const staleEntry: PoolIndexEntry = {
+        franchiseId,
+        eraId,
+        url,
+        contentHash: sha256(JSON.stringify(poolV1)),
+      };
+      const freshHash = sha256(JSON.stringify(poolV2));
+      const staleManifest: HoopRushManifest = buildManifest({ pools: [staleEntry] });
+      const freshManifest: HoopRushManifest = buildManifest({
+        dataVersion: 'data-v2',
+        pools: [{ ...staleEntry, contentHash: freshHash }],
+      });
 
-    routes.set('/data/pools/bulls-1990s.json', JSON.stringify(poolV2));
-    routes.set('/data/manifest.json', JSON.stringify(staleManifest));
-    await getManifest();
+      routes.set(`/data/${url}`, JSON.stringify(poolV2));
+      routes.set('/data/manifest.json', JSON.stringify(staleManifest));
+      await getManifest();
 
-    const pool = await getPool(staleEntry);
+      if (staleManifestRefresh) {
+        routes.set('/data/manifest.json', JSON.stringify(freshManifest));
+      }
 
-    expect(pool.dataVersion).toBe('data-v2');
-    expect(writeCachedPool).toHaveBeenCalledWith('bulls/1990s', freshHash, poolV2);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-  });
+      const pool = await getPool(staleEntry);
+
+      expect(pool.dataVersion).toBe('data-v2');
+      expect(writeCachedPool).toHaveBeenCalledWith(`${franchiseId}/${eraId}`, freshHash, poolV2);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    },
+  );
 
   it('does not retry when a pool load fails for a non-hash reason', async () => {
     const player = buildPlayerSeason({ playerId: 'lakers-1990s-a' });

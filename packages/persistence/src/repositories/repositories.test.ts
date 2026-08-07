@@ -278,33 +278,39 @@ describe('challenge repository (dexie)', () => {
     expect(history[0]?.outcome).toBe('perfect');
   });
 
-  it('promotes and lists a completed run with its selected franchise', async () => {
-    const { repo } = makeAdapter();
-    const record = {
-      ...finishedRecord('run-free'),
-      run: buildChallengeRun({
-        runId: 'run-free',
-        status: 'finished',
-        outcome: 'perfect',
-        firstLossGameNumber: null,
-        franchiseId: 'thunder',
-        eraId: '1980s',
-      }),
-    };
-    await repo.saveActiveRun(record);
-    await repo.promoteActiveToCompleted(record, {
-      ...indexFor('run-free'),
-      franchiseId: 'thunder',
-      eraId: '1980s',
-    });
-    const loaded = await repo.loadCompletedRun('run-free');
-    expect(loaded?.run.franchiseId).toBe('thunder');
-    expect(loaded?.run.eraId).toBe('1980s');
-    const history = await repo.listCompletedRuns();
-    expect(history).toHaveLength(1);
-    expect(history[0]?.franchiseId).toBe('thunder');
-    expect(history[0]?.eraId).toBe('1980s');
-  });
+  it.each([
+    { franchiseId: 'thunder', eraId: '1980s' },
+    { franchiseId: 'celtics', eraId: '1960s' },
+  ])(
+    'promotes and lists a completed run with its selected franchise ($franchiseId/$eraId)',
+    async ({ franchiseId, eraId }) => {
+      const { repo } = makeAdapter();
+      const record = {
+        ...finishedRecord('run-free'),
+        run: buildChallengeRun({
+          runId: 'run-free',
+          status: 'finished',
+          outcome: 'perfect',
+          firstLossGameNumber: null,
+          franchiseId,
+          eraId,
+        }),
+      };
+      await repo.saveActiveRun(record);
+      await repo.promoteActiveToCompleted(record, {
+        ...indexFor('run-free'),
+        franchiseId,
+        eraId,
+      });
+      const loaded = await repo.loadCompletedRun('run-free');
+      expect(loaded?.run.franchiseId).toBe(franchiseId);
+      expect(loaded?.run.eraId).toBe(eraId);
+      const history = await repo.listCompletedRuns();
+      expect(history).toHaveLength(1);
+      expect(history[0]?.franchiseId).toBe(franchiseId);
+      expect(history[0]?.eraId).toBe(eraId);
+    },
+  );
 
   it('promotion removes the checkpoint and game rows', async () => {
     const { repo, db } = makeAdapter();

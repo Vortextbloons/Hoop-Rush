@@ -292,9 +292,13 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     const failures: string[] = [];
     const runId = stored.run.runId;
 
-    const summaryRows = await this.db.seasonRunSummaries.where('runId').equals(runId).toArray();
-    const detailRows = await this.db.seasonRunDetails.where('runId').equals(runId).toArray();
-    const blockRows = await this.db.seasonRunBlocks.where('runId').equals(runId).toArray();
+    const [summaryRows, detailRows, blockRows, indexRow, pendingRow] = await Promise.all([
+      this.db.seasonRunSummaries.where('runId').equals(runId).toArray(),
+      this.db.seasonRunDetails.where('runId').equals(runId).toArray(),
+      this.db.seasonRunBlocks.where('runId').equals(runId).toArray(),
+      this.db.seasonRunIndex.get(SEASON_RUN_RECORD_ID),
+      this.db.seasonPendingBlocks.get(runId),
+    ]);
 
     const summaries: SeasonGameSummary[] = [];
     for (const row of summaryRows) {
@@ -345,7 +349,6 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       }
     }
 
-    const indexRow = await this.db.seasonRunIndex.get(SEASON_RUN_RECORD_ID);
     let activeIndex: SeasonActiveRunIndex | null = null;
     if (indexRow === undefined) {
       failures.push('active-run index row is missing');
@@ -365,7 +368,6 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     // M2.5: the interrupted-block pending row participates in the reload
     // audit (a pending row for a committed blockIndex is an error).
     let pending: SeasonPendingBlockCandidate | null = null;
-    const pendingRow = await this.db.seasonPendingBlocks.get(runId);
     if (pendingRow !== undefined) {
       try {
         const parsed = storedSeasonPendingBlockRowSchema.parse(pendingRow);

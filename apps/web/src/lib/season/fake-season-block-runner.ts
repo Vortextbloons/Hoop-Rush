@@ -31,6 +31,7 @@ import {
   type SeasonInvalidRosterInterruption,
   type SeasonPendingBlockCandidate,
   type SeasonPlayerAggregate,
+  type SeasonScoreline,
   type SeasonStandings,
   type SeasonTeamAggregate,
   type SeasonTransactionEntry,
@@ -182,13 +183,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         const done = Math.min(completed + GAMES_PER_STEP, gamesTotal);
         const latest = blockGames[done - 1];
         const latestResult = latest
-          ? this.summaryFor(
-              input,
-              latest.gameId,
-              latest.round,
-              latest.homeFranchiseId,
-              latest.awayFranchiseId,
-            )
+          ? this.scorelineFor(latest.gameId, latest.homeFranchiseId, latest.awayFranchiseId)
           : null;
         completed = done;
         this.emit({
@@ -406,6 +401,15 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       ),
       rotationDigest: input.rotationDigest,
     };
+  }
+
+  private scorelineFor(
+    gameId: string,
+    homeFranchiseId: string,
+    awayFranchiseId: string,
+  ): SeasonScoreline {
+    const { homeScore, awayScore } = deterministicScores(gameId);
+    return { gameId, homeFranchiseId, homeScore, awayScore, awayFranchiseId };
   }
 
   private summaryFor(

@@ -244,7 +244,7 @@ function pendingOf(
 }
 
 describe('select-block-objective command', () => {
-  it('accepts a selection for the next unselected block and advances the state chain', () => {
+  it('accepts a selection for the current playable block and advances the state chain', () => {
     const { run, context } = windowedFixture();
     const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0);
     const command = commandOf(run, {
@@ -418,35 +418,46 @@ describe('select-block-objective command', () => {
     expect(notOffered.result.result.rejection.code).toBe('objective-not-offered');
   });
 
-  it('rejects objective-already-selected when every block is selected', () => {
+  it('rejects objective-already-selected and not-at-boundary for future blocks', () => {
     const { run, context } = windowedFixture();
-    let current = run;
-    for (let blockIndex = 0; blockIndex < 8; blockIndex += 1) {
-      const offered = seasonObjectiveChoicesForBlock(current.rootSeed, blockIndex)[0] ?? 'win-six';
-      const output = handleSeasonRunCommand(
-        commandOf(current, {
-          command: 'select-block-objective',
-          commandId: `select-all-${String(blockIndex)}`,
-          blockIndex,
-          objectiveId: offered,
-        }),
-        { ...context, run: current },
-      );
-      if (output.result.result.status !== 'accepted') throw new Error('expected acceptance');
-      current = output.run;
-    }
+    const offered = seasonObjectiveChoicesForBlock(run.rootSeed, 0)[0] ?? 'win-six';
+    const first = handleSeasonRunCommand(
+      commandOf(run, {
+        command: 'select-block-objective',
+        commandId: 'select-obj-0',
+        blockIndex: 0,
+        objectiveId: offered,
+      }),
+      context,
+    );
+    if (first.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const current = first.run;
+
     const again = handleSeasonRunCommand(
       commandOf(current, {
         command: 'select-block-objective',
-        commandId: 'select-all-last',
-        blockIndex: 7,
-        objectiveId: seasonObjectiveChoicesForBlock(current.rootSeed, 7)[0] ?? 'win-six',
+        commandId: 'select-obj-0-again',
+        blockIndex: 0,
+        objectiveId: offered,
       }),
       { ...context, run: current },
     );
     expect(again.result.result.status).toBe('rejected');
     if (again.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(again.result.result.rejection.code).toBe('objective-already-selected');
+
+    const futureBlock = handleSeasonRunCommand(
+      commandOf(current, {
+        command: 'select-block-objective',
+        commandId: 'select-obj-1',
+        blockIndex: 1,
+        objectiveId: seasonObjectiveChoicesForBlock(current.rootSeed, 1)[0] ?? 'win-six',
+      }),
+      { ...context, run: current },
+    );
+    expect(futureBlock.result.result.status).toBe('rejected');
+    if (futureBlock.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(futureBlock.result.result.rejection.code).toBe('not-at-boundary');
   });
 });
 

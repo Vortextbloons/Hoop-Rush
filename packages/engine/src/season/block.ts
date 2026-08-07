@@ -672,7 +672,7 @@ export function simulateSeasonBlockGame(
   }
   const homeLegal = seasonFranchiseLegalFiveFacts(run, game.homeFranchiseId, health, positions);
   const awayLegal = seasonFranchiseLegalFiveFacts(run, game.awayFranchiseId, health, positions);
-  const forfeitPending = !homeLegal || !awayLegal;
+  const forfeitPending = !homeLegal.legal || !awayLegal.legal;
 
   // M2.5: the health seam — pregame availability for all 20 players, the
   // seeded injury rolls for this game, and the same-game return clocks.
@@ -1158,6 +1158,26 @@ export function handleSubmitSeasonBlockCommand(
 }
 
 /**
+ * Folds the block's evaluated objective success into the run's objective
+ * selections (the persisted post-commit facts).
+ */
+function objectivesWithBlockSuccess(
+  objectives: SeasonObjectiveState,
+  candidate: SeasonCandidateCheckpoint,
+): SeasonObjectiveState {
+  if (candidate.blockIndex === 8) return objectives;
+  const selection = objectives.selections[candidate.blockIndex];
+  if (selection === undefined) return objectives;
+  return {
+    ...objectives,
+    selections: {
+      ...objectives.selections,
+      [candidate.blockIndex]: { ...selection, success: candidate.objective.success },
+    },
+  };
+}
+
+/**
  * M2.5: derives the post-block run state chain facts from the submitted run
  * and the accepted candidate (LEAD DECISION §20.4): the checkpoint state
  * (the accepted block's identity facts), `stateRevision = run.stateRevision
@@ -1173,11 +1193,12 @@ export function deriveSeasonPostBlockState(input: {
   commandId: string;
   rotationDigest: string;
 }): { checkpointState: SeasonCheckpointState; stateRevision: number; stateDigest: string } {
+  const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
   const checkpointState: SeasonCheckpointState = {
     runId: input.run.runId,
     blockIndex: input.candidate.blockIndex,
     completedRounds: input.candidate.completedRounds,
-    revision: input.candidate.revision,
+    revision: input.candidate.revision + 1,
     commandId: input.commandId,
     rotationDigest: input.rotationDigest,
     checkpointDigest: input.candidate.digest,
@@ -1190,7 +1211,7 @@ export function deriveSeasonPostBlockState(input: {
     influence: input.candidate.influence,
     transactions: input.candidate.transactions,
     trade: input.run.trade,
-    objectives: input.run.objectives,
+    objectives,
     rosters: input.run.rosters,
     ownership: input.run.ownership,
     rotations: input.run.rotations,
@@ -1225,8 +1246,9 @@ export function completeSeasonBlockCommit(input: {
   stateDigest: string;
   window: SeasonWindowOpenResult | null;
 } {
+  const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
   const derived = deriveSeasonPostBlockState({
-    run: input.run,
+    run: { ...input.run, objectives },
     candidate: input.candidate,
     commandId: input.commandId,
     rotationDigest: input.rotationDigest,
@@ -1238,6 +1260,7 @@ export function completeSeasonBlockCommit(input: {
     health: input.candidate.health,
     influence: input.candidate.influence,
     transactions: input.candidate.transactions,
+    objectives,
     checkpointState: derived.checkpointState,
     stateRevision: derived.stateRevision,
     stateDigest: derived.stateDigest,

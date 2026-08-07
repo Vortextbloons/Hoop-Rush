@@ -6,6 +6,9 @@ export default defineConfig({
   fullyParallel: true,
   timeout: 30_000,
   retries: process.env.CI ? 2 : 0,
+  // Cap workers on CI so the shared runner does not oversubscribe small
+  // machines; locally Playwright picks its default.
+  workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: process.env.HOOP_RUSH_E2E_BASE_URL ?? 'http://localhost:4173',

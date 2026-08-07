@@ -70,16 +70,19 @@ describe('cli: season benchmark persistence', () => {
       '--format',
       'json',
     ]);
-    // The harness lives in the sibling persistence package. When it is
-    // runnable under the CLI's runtime, the command exits 0 with the
-    // harness budgets; an import failure is reported as a typed exit-1
-    // failure instead of a crash.
+    // The harness lives in the sibling persistence package. A runnable
+    // harness exits 0 with the budgets; a harness failure must surface as a
+    // typed exit-1 report naming the failure — never a crash or a vacuous
+    // pass.
     expect([0, 1]).toContain(code);
     const payload = seasonBenchmarkReportSchema.parse(jsonPayload(stdout, stderr));
     expect(payload.command).toBe('season benchmark persistence');
+    expect(payload.pass).toBe(code === 0);
     if (code === 0) {
-      expect(payload.pass).toBe(true);
       expect(payload.persistence).not.toBeNull();
+    } else {
+      expect(payload.persistence).toBeNull();
+      expect(stdout + stderr).toContain('persistence benchmark harness unavailable');
     }
   }, 300_000);
 });

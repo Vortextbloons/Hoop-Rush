@@ -172,16 +172,15 @@
       : '',
   );
 
+  /** O(1) drafted-pick lookup: one index scan instead of one linear scan per pick. */
+  const rowByPickKey = $derived(
+    index
+      ? new Map(index.players.map((p) => [`${p.playerId}|${p.franchiseId}|${p.eraId}`, p] as const))
+      : null,
+  );
+
   function rowForPick(pick: ClassicPick): IndexRow | null {
-    if (!index) return null;
-    return (
-      index.players.find(
-        (p) =>
-          p.playerId === pick.playerId &&
-          p.franchiseId === pick.franchiseId &&
-          p.eraId === pick.eraId,
-      ) ?? null
-    );
+    return rowByPickKey?.get(`${pick.playerId}|${pick.franchiseId}|${pick.eraId}`) ?? null;
   }
 
   /** Drafted players in slot order, as index rows for the shared court. */

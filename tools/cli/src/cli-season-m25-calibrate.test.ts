@@ -5,24 +5,19 @@ import { describe, expect, it } from 'vitest';
  *
  * These tests run the three full calibration commands (season health /
  * trade / influence calibrate) over the committed run fixture. They are
- * SKIPPED during the implementation window by design: the engine's M2.5
- * seams (`rollSeasonInjuryForPlayer`, `openSeasonTradeWindow`,
- * `deriveSeasonPostBlockState`, `seasonRunStateDigest`, ...) land at lead
- * integration, the committed fixture regenerates under schema 7, and the
+ * skipped unless `HOOP_RUSH_INTEGRATION_RUNS=1`: the commands freeze the
  * packaged targets artifacts (`injury-targets.json`, `trade-targets.json`,
- * `influence-targets.json`) freeze after the first measured run. Remove the
- * `it.skip` guards when the lead confirms integration.
- *
- * Note: these files import the awaiting-engine seams, so they fail
- * typecheck until integration (reported as awaiting-engine, not CLI-owned
- * errors).
+ * `influence-targets.json`) after the first measured run, so the nightly
+ * workflow forces them exactly once per day (the same guard the skips were
+ * introduced with).
  */
+const INTEGRATION_RUNS = process.env.HOOP_RUSH_INTEGRATION_RUNS === '1';
 
-describe.skip('season health calibrate (integration-run)', () => {
+describe.skipIf(!INTEGRATION_RUNS)('season health calibrate (integration-run)', () => {
   it('freezes injury-targets-v1 with all gates passing', async () => {
     const { seasonHealthCalibrate, seasonInjuryTargetsSchema, DEFAULT_INJURY_TARGETS } =
       await import('./commands/season-health.ts');
-    const report = await seasonHealthCalibrate({
+    const report = seasonHealthCalibrate({
       input: null,
       'seed-from': '0',
       'seed-to': '1',
@@ -56,11 +51,11 @@ describe.skip('season health calibrate (integration-run)', () => {
   });
 });
 
-describe.skip('season trade calibrate (integration-run)', () => {
+describe.skipIf(!INTEGRATION_RUNS)('season trade calibrate (integration-run)', () => {
   it('freezes trade-targets-v1 with all gates passing', async () => {
     const { seasonTradeCalibrate, seasonTradeTargetsSchema, DEFAULT_TRADE_TARGETS } =
       await import('./commands/season-trade.ts');
-    const report = await seasonTradeCalibrate({
+    const report = seasonTradeCalibrate({
       input: null,
       'seed-from': '0',
       'seed-to': '1',
@@ -76,11 +71,11 @@ describe.skip('season trade calibrate (integration-run)', () => {
   }, 1_200_000);
 });
 
-describe.skip('season influence calibrate (integration-run)', () => {
+describe.skipIf(!INTEGRATION_RUNS)('season influence calibrate (integration-run)', () => {
   it('freezes influence-targets-v1 with all gates passing', async () => {
     const { seasonInfluenceCalibrate, seasonInfluenceTargetsSchema, DEFAULT_INFLUENCE_TARGETS } =
       await import('./commands/season-influence.ts');
-    const report = await seasonInfluenceCalibrate({
+    const report = seasonInfluenceCalibrate({
       input: null,
       'seed-from': '0',
       'seed-to': '1',

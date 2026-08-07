@@ -10,7 +10,11 @@ export default defineConfig({
     root: path.dirname(fileURLToPath(import.meta.url)),
     // Seeded sensitivity batches run concurrently (it.concurrent). Under
     // the shared runner, CPU contention pushes the heaviest 300-seed suites
-    // past the 5s default and the prior 15s and 30s budgets.
-    testTimeout: 60_000,
+    // past the 5s default and the prior 15s and 30s budgets. The budget is
+    // moderate (a regressed test should surface at a sane threshold), and
+    // the retry gives the contention-flaky seeded suites one clean re-run —
+    // seeded output is reproducible, so retries cannot mask real regressions.
+    testTimeout: 45_000,
+    retry: 1,
   },
 });

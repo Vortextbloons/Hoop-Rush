@@ -732,15 +732,42 @@ async function runOrderInvarianceChunk(args: {
   });
 }
 
-export async function seasonRostersCalibrate(args: {
-  workers?: string;
-  'calibration-seeds'?: string;
-  'validation-seeds'?: string;
-  out?: string;
-  manifest?: string;
-  targets?: string;
-  validate?: boolean;
-}): Promise<CliReport> {
+export interface SeasonRostersCalibrateDeps {
+  /**
+   * Injectable cohort runner. Tests substitute deterministic doubles for the
+   * worker-thread chunks; the default runs the authoritative
+   * `rosters-calibration-worker` with the same chunking.
+   */
+  runCohort?: (args: {
+    seeds: string[];
+    catalogPath: string;
+    leaguePath: string;
+    humanRosters: Array<{ franchiseId: string; playerVersionIds: string[] }>;
+    workers: number;
+    targets: SeasonRosterTargets;
+  }) => Promise<RosterCalibrationWorkerRun[]>;
+  /** Injectable order-invariance probe (same rationale as runCohort). */
+  runOrderInvariance?: (args: {
+    seeds: string[];
+    catalogPath: string;
+    leaguePath: string;
+    humanRosters: Array<{ franchiseId: string; playerVersionIds: string[] }>;
+    targets: SeasonRosterTargets;
+  }) => Promise<Array<{ seed: string; digests: string[] }>>;
+}
+
+export async function seasonRostersCalibrate(
+  args: {
+    workers?: string;
+    'calibration-seeds'?: string;
+    'validation-seeds'?: string;
+    out?: string;
+    manifest?: string;
+    targets?: string;
+    validate?: boolean;
+  },
+  deps: SeasonRostersCalibrateDeps = {},
+): Promise<CliReport> {
   const calibrationCount = parseCount(args['calibration-seeds'], '--calibration-seeds', 256);
   const validationCount = parseCount(args['validation-seeds'], '--validation-seeds', 64);
   const workers = Math.max(1, parseCount(args.workers, '--workers', 4));
@@ -782,17 +809,19 @@ export async function seasonRostersCalibrate(args: {
     humanRosters,
     targets,
   };
-  const calibrationRuns = await runCalibrationChunks({
+  const runCohort = deps.runCohort ?? runCalibrationChunks;
+  const runOrderInvariance = deps.runOrderInvariance ?? runOrderInvarianceChunk;
+  const calibrationRuns = await runCohort({
     ...chunkInput,
     seeds: calibrationSeeds,
     workers,
   });
-  const validationRuns = await runCalibrationChunks({
+  const validationRuns = await runCohort({
     ...chunkInput,
     seeds: validationSeeds,
     workers,
   });
-  const orderInvariance = await runOrderInvarianceChunk({
+  const orderInvariance = await runOrderInvariance({
     ...chunkInput,
     seeds: orderInvarianceSeeds,
   });

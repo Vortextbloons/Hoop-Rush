@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   SeasonCandidateCheckpoint,
   SeasonDraftCatalog,
   SeasonEffectsState,
@@ -14,10 +14,12 @@ import type {
   SeasonRun,
 } from '@hoop-rush/data-contracts';
 import {
-  seasonCandidateCheckpointSchema,
   seasonWorkerCancelRequestSchema,
+  seasonWorkerContinueRequestSchema,
   seasonWorkerMessageSchema,
   seasonWorkerStartRequestSchema,
+  type SeasonScoreline,
+  type SeasonWorkerContinueRequest,
   type SeasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
 import {
@@ -41,7 +43,7 @@ import type { SeasonArtifactUrls } from './season-assets';
  * the implementation lives in `season-block-runner.ts` and speaks to the
  * `season-block-worker.ts` entry point through the frozen worker envelopes.
  *
- * M2.5: the complete message is a union — `committed` carries the candidate
+ * M2.5: the complete message is a union â€” `committed` carries the candidate
  * checkpoint, `interrupted` carries the uncommitted pending candidate of an
  * `invalid-roster` interruption. The runner persists interrupted work
  * through `savePendingBlock` and emits a typed `interrupted` event;
@@ -54,10 +56,10 @@ import type { SeasonArtifactUrls } from './season-assets';
  * ## M2.5 SEAMS awaiting the engine workstreams
  *
  * - `completeSeasonBlockCommit({ run, candidate, commandId, rotationDigest,
- *   humanFranchiseId })` — engine-owned (health workstream; the lead wires
+ *   humanFranchiseId })` â€” engine-owned (health workstream; the lead wires
  *   the export). Produces the post-block `checkpointState`, `stateRevision`,
  *   `stateDigest`, and the optional trade-window open.
- * - `seasonFranchiseLegalFiveFacts(run, franchiseId, health)` — engine-owned
+ * - `seasonFranchiseLegalFiveFacts(run, franchiseId, health)` â€” engine-owned
  *   (health workstream). The runner reconstructs the typed interruption's
  *   `unavailablePlayerVersionIds` from the pending health at save time.
  */
@@ -71,7 +73,7 @@ export type SeasonRunnerEvent =
       gamesCompleted: number;
       gamesTotal: number;
       latestGameId: string | null;
-      latestResult: SeasonGameSummary | null;
+      latestResult: SeasonScoreline | null;
     }
   | { type: 'complete'; requestId: string; checkpoint: SeasonCandidateCheckpoint }
   | {
@@ -377,26 +379,24 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     const state = current;
     if (requestId === null || state === null) return;
     const failures: string[] = [];
-    const parsed = seasonCandidateCheckpointSchema.safeParse(checkpoint);
-    if (!parsed.success) failures.push('candidate fails the frozen checkpoint schema');
-    if (parsed.success) {
-      if (seasonCheckpointDigest(checkpoint) !== checkpoint.digest) {
-        failures.push('candidate digest does not verify');
-      }
-      if (checkpoint.runId !== state.input.run.runId) failures.push('candidate runId mismatch');
-      if (checkpoint.blockIndex !== state.blockIndex)
-        failures.push('candidate blockIndex mismatch');
-      if (checkpoint.revision !== state.expectedRevision) {
-        failures.push('candidate revision does not match expectedRevision');
-      }
-      if (checkpoint.rotationDigest !== state.rotationDigest) {
-        failures.push('candidate rotationDigest mismatch');
-      }
-      // M2.5: the candidate asserted the pre-block run state facts; they
-      // must match the authoritative submitted run (the worker sources them
-      // from a seam, so mismatches are rejected here, never committed).
-      assertExpectedState(checkpoint, state.input, failures);
+    // The candidate was already validated against the frozen checkpoint
+    // schema as part of the wire message at the boundary; the gates below
+    // are the real acceptance checks (digest, identity, expected facts).
+    if (seasonCheckpointDigest(checkpoint) !== checkpoint.digest) {
+      failures.push('candidate digest does not verify');
     }
+    if (checkpoint.runId !== state.input.run.runId) failures.push('candidate runId mismatch');
+    if (checkpoint.blockIndex !== state.blockIndex) failures.push('candidate blockIndex mismatch');
+    if (checkpoint.revision !== state.expectedRevision) {
+      failures.push('candidate revision does not match expectedRevision');
+    }
+    if (checkpoint.rotationDigest !== state.rotationDigest) {
+      failures.push('candidate rotationDigest mismatch');
+    }
+    // M2.5: the candidate asserted the pre-block run state facts; they
+    // must match the authoritative submitted run (the worker sources them
+    // from a seam, so mismatches are rejected here, never committed).
+    assertExpectedState(checkpoint, state.input, failures);
     if (failures.length > 0) {
       emit({
         type: 'error',
@@ -508,7 +508,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
   }
 
-  /** M2.5: an invalid-roster interruption — persist the pending candidate. */
+  /** M2.5: an invalid-roster interruption â€” persist the pending candidate. */
   async function acceptInterruption(pending: SeasonPendingBlockCandidate): Promise<void> {
     const requestId = currentRequestId;
     const state = current;
@@ -575,22 +575,22 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
   }
 
   /** Shared request builder for fresh starts and resumes. */
-  function buildStartRequest(
+  function buildRequest(
     requestId: string,
     state: NonNullable<typeof current>,
     schedule: SeasonSchedule,
     artifacts: SeasonArtifactUrls,
-  ): SeasonWorkerStartRequest {
+  ): SeasonWorkerStartRequest | SeasonWorkerContinueRequest {
     const summaries = runState?.runId === state.input.run.runId ? runState.summaries : [];
     // Exactly one of priorSummaries/newSummaries is sent (the frozen wire
-    // refine); the arrays may be empty (block 0) — only undefined is omitted.
+    // refine); the arrays may be empty (block 0) â€” only undefined is omitted.
     let priorSummaries: SeasonGameSummary[] | undefined;
     let newSummaries: SeasonGameSummary[] | undefined;
     if (state.resumePending !== null) {
       // Resume: the partial block summaries ship as the accumulator seed.
       // A persistent worker appends them; a fresh worker (terminated
       // between interruption and resume) receives them inside the full
-      // prior set — the worker re-seeds its block list from the
+      // prior set â€” the worker re-seeds its block list from the
       // accumulator, so both paths assemble the full block.
       const partial = state.resumePending.summaries;
       if (workerSummaryRunId === state.input.run.runId && workerSummaryCount <= summaries.length) {
@@ -611,9 +611,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     } else {
       priorSummaries = summaries;
     }
-    const start: SeasonWorkerStartRequest = {
-      schemaVersion: 4,
-      type: 'season-block-start',
+    const common = {
       requestId,
       runId: state.input.run.runId,
       rootSeed: state.input.run.rootSeed,
@@ -621,23 +619,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       expectedRevision: state.expectedRevision,
       rotationDigest: state.rotationDigest,
       commandId: state.commandId,
-      // The worker simulates with the LOCKED rotation set; the wire carries
-      // only the run context the block pipeline reads (the scheduled games,
-      // standings, draft, and other persisted facts never cross the worker
-      // boundary).
-      run: {
-        schemaVersion: state.input.run.schemaVersion,
-        runId: state.input.run.runId,
-        rootSeed: state.input.run.rootSeed,
-        versions: state.input.run.versions,
-        league: state.input.run.league,
-        rosters: state.input.run.rosters,
-        rotations: state.rotations,
-        cursor: state.input.run.cursor,
-      },
-      schedule,
-      homeCourt: state.input.homeCourt,
-      humanFranchiseId: state.input.humanFranchiseId,
       catalogUrl: artifacts.catalogUrl,
       catalogHash: artifacts.catalogHash,
       profileUrl: artifacts.profileUrl,
@@ -673,8 +654,41 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       priorTransactions: state.input.run.transactions,
       expectedStateRevision: state.input.run.stateRevision,
       expectedStateDigest: state.input.run.stateDigest,
+      humanFranchiseId: state.input.humanFranchiseId,
     };
-    return seasonWorkerStartRequestSchema.parse(start);
+    // Wire v5: when the persistent worker already holds the run context
+    // (the delta path), only the per-block deltas travel. A priorSummaries
+    // reset implies a worker without state for this run, which receives the
+    // full context again.
+    if (newSummaries !== undefined) {
+      return seasonWorkerContinueRequestSchema.parse({
+        schemaVersion: 5,
+        type: 'season-block-continue',
+        rotations: state.rotations,
+        ...common,
+      });
+    }
+    return seasonWorkerStartRequestSchema.parse({
+      schemaVersion: 5,
+      type: 'season-block-start',
+      // The worker simulates with the LOCKED rotation set; the wire carries
+      // only the run context the block pipeline reads (the scheduled games,
+      // standings, draft, and other persisted facts never cross the worker
+      // boundary).
+      run: {
+        schemaVersion: state.input.run.schemaVersion,
+        runId: state.input.run.runId,
+        rootSeed: state.input.run.rootSeed,
+        versions: state.input.run.versions,
+        league: state.input.run.league,
+        rosters: state.input.run.rosters,
+        rotations: state.rotations,
+        cursor: state.input.run.cursor,
+      },
+      schedule,
+      homeCourt: state.input.homeCourt,
+      ...common,
+    });
   }
 
   return {
@@ -703,15 +717,29 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               : import('./season-assets').then((module) => module.seasonArtifactUrls()),
           ]);
           if (currentRequestId !== requestId) return;
-          if (runState === null || runState.runId !== input.run.runId) {
+          if (
+            runState === null ||
+            runState.runId !== input.run.runId ||
+            input.expectedRevision !== runState.revision
+          ) {
             const snapshot = await repository.loadActiveRun();
             if (snapshot === null) throw new Error('no active season run to advance');
             if (snapshot.run.runId !== input.run.runId) {
               throw new Error('the active run does not match the submitted run');
             }
+            const persistedRevision = snapshot.acceptedBlocks.length;
+            if (
+              runState !== null &&
+              runState.runId === input.run.runId &&
+              input.expectedRevision !== persistedRevision
+            ) {
+              throw new Error(
+                `stale cursor: the run is at revision ${String(persistedRevision)}, command expects ${String(input.expectedRevision)}`,
+              );
+            }
             runState = {
               runId: snapshot.run.runId,
-              revision: snapshot.acceptedBlocks.length,
+              revision: persistedRevision,
               completedRounds: snapshot.run.cursor.completedRounds,
               commandIds: new Set(snapshot.acceptedBlocks.map((block) => block.commandId)),
               summaries: snapshot.summaries,
@@ -740,7 +768,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             throw new Error('rotation digest does not match the submitted rotations');
           }
           if (currentRequestId !== requestId) return;
-          const plainStart = buildStartRequest(requestId, current, schedule, artifacts);
+          const plainStart = buildRequest(requestId, current, schedule, artifacts);
           const target = createWorker();
           target.postMessage(plainStart);
           emit({ type: 'started', requestId, blockIndex: input.blockIndex });
@@ -841,7 +869,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             input: startInput,
             resumePending: pending,
           };
-          const plainStart = buildStartRequest(requestId, current, schedule, artifacts);
+          const plainStart = buildRequest(requestId, current, schedule, artifacts);
           const target = createWorker();
           target.postMessage(plainStart);
           emit({ type: 'started', requestId, blockIndex: input.blockIndex });
@@ -867,7 +895,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (worker === null || requestId !== currentRequestId) return;
       worker.postMessage(
         seasonWorkerCancelRequestSchema.parse({
-          schemaVersion: 4,
+          schemaVersion: 5,
           type: 'season-block-cancel',
           requestId,
         }),

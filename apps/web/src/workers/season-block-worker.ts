@@ -3,24 +3,27 @@ import {
   blockRoundRange,
   loadEraSimulationProfile,
   loadSeasonDraftCatalog,
-  parseSeasonDraftCatalog,
   seasonWorkerMessageSchema,
   seasonWorkerRequestSchema,
   SEASON_HEALTH_VERSION,
+  type EraSimulationProfile,
   type SeasonBlockRunContext,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
+  type SeasonGamePlayerInput,
   type SeasonGameSummary,
   type SeasonHealthState,
+  type SeasonHomeCourtProfile,
   type SeasonInfluenceState,
   type SeasonInvalidRosterInterruption,
   type SeasonRetainedGameDetail,
+  type SeasonSchedule,
   type SeasonWorkerCompleteMessage,
+  type SeasonWorkerContinueRequest,
   type SeasonWorkerErrorMessage,
   type SeasonWorkerProgressMessage,
   type SeasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
-import { readCachedAsset, writeCachedAsset } from '../lib/pool-cache';
 import {
   assembleSeasonBlockCandidate,
   assembleSeasonPendingBlock,
@@ -46,8 +49,9 @@ import {
  * runs the authoritative block pipeline game by game through the engine's
  * exported pieces — the same code the CLI runs through `simulateSeasonBlock`.
  *
- * The worker never touches the save database; it only reads the shared
- * content-addressed asset cache for the draft catalog. It yields to the
+ * The worker never touches IndexedDB or the save database; it fetches the
+ * content-addressed draft catalog and era profile itself (hash-verified) and
+ * memoizes them for its lifetime. It yields to the
  * event loop between games so cancellation is observed and progress
  * streams; progress posts are throttled to at most four per second and carry
  * fixed-size counters plus the latest game id and compact summary. Invariant
@@ -107,12 +111,40 @@ let accumulatedEffects: SeasonEffectsState | null = null;
 /** M2.5: the authoritative health state carried across blocks in this worker. */
 let accumulatedHealth: SeasonHealthState | null = null;
 
+/**
+ * Wire v5 continuation context: the run-static inputs (schedule, league,
+ * rosters, home-court profile) are cached per runId so continuation blocks
+ * travel as deltas. A terminated worker loses the cache and the runner falls
+ * back to a full start request.
+ */
+interface WorkerRunContext {
+  run: SeasonBlockRunContext;
+  schedule: SeasonSchedule;
+  homeCourt: SeasonHomeCourtProfile;
+  humanFranchiseId: string | null;
+}
+const contextByRunId = new Map<string, WorkerRunContext>();
+
+/** Rebuilds a full start request from a continuation + the cached run context. */
+function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStartRequest | null {
+  const context = contextByRunId.get(request.runId);
+  if (context === undefined) return null;
+  return {
+    ...request,
+    type: 'season-block-start',
+    run: context.run,
+    schedule: context.schedule,
+    homeCourt: context.homeCourt,
+    humanFranchiseId: context.humanFranchiseId,
+  };
+}
+
 function post(
   message: SeasonWorkerProgressMessage | SeasonWorkerCompleteMessage | SeasonWorkerErrorMessage,
 ): void {
-  // The pinned wire contract is enforced at its only emission point; the
-  // main thread also parses every message at its boundary.
-  seasonWorkerMessageSchema.parse(message);
+  // The main thread parses every message at its boundary (the runner drops
+  // anything that fails the frozen wire schema), so the worker does not
+  // re-parse the ≤ 2 MB complete message it just assembled.
   self.postMessage(message);
 }
 
@@ -123,7 +155,7 @@ function postError(
   diagnostics: { seed?: string | null; gameId?: string | null; blockIndex?: number | null } = {},
 ): void {
   const payload: SeasonWorkerErrorMessage = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     type: 'season-block-error',
     requestId,
     code,
@@ -139,16 +171,53 @@ function postError(
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * The packaged draft catalog is immutable and content-addressed; a validated
- * copy in IndexedDB (shared with the main thread) spares a ~10.2 MB
- * re-download + hash verify + Zod parse on every block of a season.
+ * The packaged draft catalog is immutable and content-addressed; the module
+ * cache makes the fetch + hash verify + Zod parse one-time per worker
+ * lifetime (~1 MB brotli with precompress). The worker intentionally does not
+ * bundle dexie/IndexedDB for this cache — a direct fetch keeps the worker
+ * bundle self-contained.
  */
+const catalogCache = new Map<string, SeasonDraftCatalog>();
 async function loadCatalogCached(url: string, contentHash: string): Promise<SeasonDraftCatalog> {
-  const cached = await readCachedAsset(contentHash, parseSeasonDraftCatalog);
-  if (cached !== null) return cached;
+  const memo = catalogCache.get(contentHash);
+  if (memo !== undefined) return memo;
   const catalog = await loadSeasonDraftCatalog(url, contentHash);
-  void writeCachedAsset(contentHash, catalog);
+  catalogCache.set(contentHash, catalog);
   return catalog;
+}
+
+/** The era profile is immutable and content-addressed; fetch + sha256 + parse once per worker. */
+const profileCache = new Map<string, EraSimulationProfile>();
+async function loadProfileCached(url: string, contentHash: string): Promise<EraSimulationProfile> {
+  const memo = profileCache.get(contentHash);
+  if (memo !== undefined) return memo;
+  const profile = await loadEraSimulationProfile(url, contentHash);
+  profileCache.set(contentHash, profile);
+  return profile;
+}
+
+/** Trade-window rosters change mid-run, so the expansion cache keys on content. */
+function rosterFingerprint(run: SeasonBlockRunContext): string {
+  return run.rosters
+    .map(
+      (roster) =>
+        `${roster.franchiseId}:${roster.players.map((player) => player.playerVersionId).join(',')}`,
+    )
+    .join('|');
+}
+
+/** Rosters are static between trade windows; reuse the expanded map across blocks. */
+const expandedCache = new Map<string, Map<string, SeasonGamePlayerInput>>();
+function expandRostersCached(
+  run: SeasonBlockRunContext,
+  catalog: SeasonDraftCatalog,
+): Map<string, SeasonGamePlayerInput> {
+  const key = rosterFingerprint(run);
+  const memo = expandedCache.get(key);
+  if (memo !== undefined) return memo;
+  const expanded = expandSeasonRunRosters(run, catalog);
+  expandedCache.set(key, expanded);
+  return expanded;
 }
 
 /** Yields to the event loop so cancel messages and progress posts interleave. */
@@ -195,6 +264,13 @@ function isInterruption(
 
 async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const run: SeasonBlockRunContext = request.run;
+  // Cache the run-static context so wire-v5 continuations can skip it.
+  contextByRunId.set(request.runId, {
+    run: request.run,
+    schedule: request.schedule,
+    homeCourt: request.homeCourt,
+    humanFranchiseId: request.humanFranchiseId,
+  });
 
   if (request.priorSummaries !== undefined) {
     accumulatedRunId = request.runId;
@@ -238,7 +314,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   try {
     [catalog, profile] = await Promise.all([
       loadCatalogCached(request.catalogUrl, request.catalogHash),
-      loadEraSimulationProfile(request.profileUrl, request.profileHash),
+      loadProfileCached(request.profileUrl, request.profileHash),
     ]);
   } catch (error) {
     postError(request.requestId, 'internal', errorMessage(error));
@@ -252,7 +328,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const expectedStateRevision = request.expectedStateRevision;
   const expectedStateDigest = request.expectedStateDigest;
 
-  const expanded = expandSeasonRunRosters(run, catalog);
+  const expanded = expandRostersCached(run, catalog);
   const input: SeasonBlockSimulationInput = {
     command: {
       schemaVersion: 7,
@@ -340,6 +416,19 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   let latestSummary: SeasonGameSummary | null = null;
   let interruption: SeasonInvalidRosterInterruption | null = null;
 
+  // Run-constant lookup maps: pure functions of the block input, built once
+  // here and threaded through every game instead of being rebuilt per game
+  // by the engine's per-game fallback (mirror of the whole-block CLI path).
+  const gameNumberById = new Map(
+    input.schedule.games.map((game, index) => [game.gameId, index + 1]),
+  );
+  const rotationByFranchise = new Map(
+    input.run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
+  );
+  const rosterByFranchise = new Map(
+    input.run.rosters.map((roster) => [roster.franchiseId, roster]),
+  );
+
   for (const game of remainingGames) {
     if (cancelled) {
       throw new SeasonWorkerCancelled();
@@ -350,6 +439,9 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     // state and returns either the game facts or the typed interruption.
     const outcome = simulateSeasonBlockGame(input, game, effects, health, {
       skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
+      gameNumberById,
+      rotationByFranchise,
+      rosterByFranchise,
     });
     if (isInterruption(outcome)) {
       interruption = outcome.interruption;
@@ -367,14 +459,22 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     if (isLast || now - lastProgressAt >= PROGRESS_MIN_INTERVAL_MS) {
       lastProgressAt = now;
       post({
-        schemaVersion: 4,
+        schemaVersion: 5,
         type: 'season-block-progress',
         requestId: request.requestId,
         blockIndex: request.blockIndex,
         gamesCompleted: summaries.length,
         gamesTotal: games.length,
         latestGameId: latestSummary.gameId,
-        latestResult: latestSummary,
+        // Wire version 5: progress carries only the rendered scoreline; the
+        // full compact summary ships inside the complete message.
+        latestResult: {
+          gameId: latestSummary.gameId,
+          homeFranchiseId: latestSummary.homeFranchiseId,
+          homeScore: latestSummary.homeScore,
+          awayScore: latestSummary.awayScore,
+          awayFranchiseId: latestSummary.awayFranchiseId,
+        },
       });
     }
   }
@@ -399,7 +499,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
       rotationDigest: request.rotationDigest,
     });
     post({
-      schemaVersion: 4,
+      schemaVersion: 5,
       type: 'season-block-complete',
       requestId: request.requestId,
       result: { status: 'interrupted', pending },
@@ -421,7 +521,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     throw new EngineInvariantFailure(auditFailures.join('; '));
   }
   post({
-    schemaVersion: 4,
+    schemaVersion: 5,
     type: 'season-block-complete',
     requestId: request.requestId,
     result: { status: 'committed', checkpoint: candidate },
@@ -471,7 +571,20 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   // A new start supersedes any stale work (the main thread never starts two).
   currentRequestId = request.requestId;
   cancelled = false;
-  void runBlock(request).catch((error: unknown) => {
+  // Wire v5 continuation: rebuild the full start request from the cached run
+  // context; a worker without context rejects it and the runner re-sends the
+  // full start.
+  const startRequest =
+    request.type === 'season-block-continue' ? synthesizeStart(request) : request;
+  if (startRequest === null) {
+    postError(
+      request.requestId,
+      'internal',
+      'continuation for a run the worker has no context for',
+    );
+    return;
+  }
+  void runBlock(startRequest).catch((error: unknown) => {
     if (error instanceof SeasonWorkerCancelled) {
       postError(request.requestId, 'cancelled', 'block cancelled between games');
       return;

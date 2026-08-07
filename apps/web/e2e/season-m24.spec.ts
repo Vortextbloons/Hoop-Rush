@@ -195,23 +195,17 @@ test.describe('season M2.4: legacy recovery, fatigue and chemistry surfaces', ()
     });
     await page.getByRole('button', { name: 'Lock rotation and simulate block' }).click();
     await expect(page.getByRole('progressbar')).toBeVisible();
-    // Poll the progress panel so a worker failure message is visible before
-    // the test timeout closes the page.
-    const deadline = Date.now() + 150_000;
-    for (;;) {
-      const body = await page.locator('body').innerText();
-      if (body.includes('Block complete.') || body.includes('failed')) {
-        const events = await page.evaluate(() =>
-          JSON.stringify((window as { __M24_EVENTS__?: unknown[] }).__M24_EVENTS__ ?? []),
-        );
-        console.log('DEBUG RUNNER EVENTS:', events.slice(0, 2000));
-        break;
+    // The real worker simulates the block; wait deterministically for the
+    // runner's terminal event (complete or error) inside a single budget.
+    // A failure carries the captured event stream in the assertion message.
+    await expect(async () => {
+      const events = await page.evaluate(() =>
+        JSON.stringify((window as { __M24_EVENTS__?: unknown[] }).__M24_EVENTS__ ?? []),
+      );
+      if (!events.includes('"complete"') && !events.includes('"error"')) {
+        throw new Error(`worker still running; latest events: ${events.slice(-200)}`);
       }
-      if (Date.now() > deadline) {
-        throw new Error('real block neither completed nor failed in time');
-      }
-      await page.waitForTimeout(5000);
-    }
+    }).toPass({ timeout: 150_000 });
     await expect(page.getByText('Block complete.')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText('1 of 9 checkpoints accepted.')).toBeVisible({
       timeout: 15_000,

@@ -9,10 +9,10 @@
  * every run: pools index, availability matrix (from the persisted coverage
  * report), and era simulation profiles.
  */
-import { readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PUBLIC_DATA } from '../config.ts';
-import { fileExists, readJson, sha256File, writeJsonRetry } from '../json.ts';
+import { fileExists, readJson, sha256File, sha256Hex, writeJsonRetry } from '../json.ts';
 import {
   LINEAGE_RULE_VERSION,
   MANIFEST_SCHEMA_VERSION,
@@ -82,16 +82,20 @@ function sortedJsonFiles(dir: string): string[] {
  * Rebuilds players-index.json (compact draft rows) from schema-valid packaged
  * pools and returns the manifest index entry (url + content hash). Skips
  * invalid pool files with a warning instead of failing the whole build.
+ * `preloaded` maps file name -> raw parsed pool; when present, pools are not
+ * re-read from disk.
  */
 export function rebuildPlayersIndex(
   dataDir = PUBLIC_DATA,
+  preloaded?: ReadonlyMap<string, unknown>,
 ): { url: string; contentHash: string } | null {
   const poolsDir = join(dataDir, 'pools');
   const poolFiles = sortedJsonFiles(poolsDir);
   const indexPlayers: ReturnType<typeof peakPlayerToDraftEntry>[] = [];
   for (const name of poolFiles) {
     try {
-      const validated = parsePool(readJson(join(poolsDir, name)));
+      const raw = preloaded?.get(name) ?? readJson(join(poolsDir, name));
+      const validated = parsePool(raw);
       for (const player of validated.players) {
         indexPlayers.push(peakPlayerToDraftEntry(player));
       }
@@ -117,16 +121,20 @@ export function rebuildPlayersIndex(
  * Rebuilds roster-details.json (season statistics and height/weight behind
  * every draft row) and returns the manifest index entry. Only the Roster
  * screen loads this asset, so sandbox and classic never parse it.
+ * `preloaded` maps file name -> raw parsed pool; when present, pools are not
+ * re-read from disk.
  */
 export function rebuildRosterDetails(
   dataDir = PUBLIC_DATA,
+  preloaded?: ReadonlyMap<string, unknown>,
 ): { url: string; contentHash: string } | null {
   const poolsDir = join(dataDir, 'pools');
   const poolFiles = sortedJsonFiles(poolsDir);
   const detailPlayers: ReturnType<typeof peakPlayerToRosterDetails>[] = [];
   for (const name of poolFiles) {
     try {
-      const validated = parsePool(readJson(join(poolsDir, name)));
+      const raw = preloaded?.get(name) ?? readJson(join(poolsDir, name));
+      const validated = parsePool(raw);
       for (const player of validated.players) {
         detailPlayers.push(peakPlayerToRosterDetails(player));
       }
@@ -200,10 +208,13 @@ export function run(dataDir = PUBLIC_DATA): void {
     },
   };
 
-  // Pools index + availability matrix from packaged pool assets.
+  // Pools index + availability matrix from packaged pool assets. Each pool is
+  // read once: the raw text feeds the content hash and the parsed value feeds
+  // the index/availability passes (previously re-read ~3x per pool).
   const poolsDir = join(dataDir, 'pools');
   const poolFiles = sortedJsonFiles(poolsDir);
   const poolByKey = new Map<string, Pool>();
+  const poolTextByKey = new Map<string, string>();
   const poolEntries: unknown[] = [];
   for (const name of poolFiles) {
     const [franchiseId, eraId] = name.slice(0, -5).split('-', 2);
@@ -211,26 +222,29 @@ export function run(dataDir = PUBLIC_DATA): void {
       throw new Error(`cannot derive pool ids from filename: ${name}`);
     }
     let pool: Pool;
+    let poolText: string;
     try {
-      pool = readJson(join(poolsDir, name)) as Pool;
+      poolText = readFileSync(join(poolsDir, name), 'utf8');
+      pool = JSON.parse(poolText) as Pool;
     } catch (error) {
       throw new Error(`unreadable pool ${name}: ${(error as Error).message}`);
     }
     poolByKey.set(`${franchiseId}/${eraId}`, pool);
+    poolTextByKey.set(`${franchiseId}/${eraId}`, poolText);
     poolEntries.push({
       franchiseId,
       eraId,
       url: `pools/${name}`,
-      contentHash: sha256File(join(poolsDir, name)),
+      contentHash: sha256Hex(poolText),
     });
   }
   manifest['pools'] = poolEntries;
 
-  const playersIndexEntry = rebuildPlayersIndex(dataDir);
+  const playersIndexEntry = rebuildPlayersIndex(dataDir, poolByKey);
   if (playersIndexEntry !== null) {
     manifest['playersIndex'] = playersIndexEntry;
   }
-  const rosterDetailsEntry = rebuildRosterDetails(dataDir);
+  const rosterDetailsEntry = rebuildRosterDetails(dataDir, poolByKey);
   if (rosterDetailsEntry !== null) {
     manifest['rosterDetails'] = rosterDetailsEntry;
   }
@@ -253,7 +267,7 @@ export function run(dataDir = PUBLIC_DATA): void {
           eraId: era.eraId,
           status: 'available',
           url: `pools/${slot.franchiseId}-${era.eraId}.json`,
-          contentHash: sha256File(join(poolsDir, `${slot.franchiseId}-${era.eraId}.json`)),
+          contentHash: sha256Hex(poolTextByKey.get(key) ?? ''),
           playerCount: pool.players.length,
           coverageSummary: pool.coverageSummary,
         });

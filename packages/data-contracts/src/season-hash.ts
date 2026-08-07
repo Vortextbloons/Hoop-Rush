@@ -29,6 +29,11 @@ export function hex32(value: number): string {
   return value.toString(16).padStart(8, '0');
 }
 
+/** Deterministic 32-hex seed from any string (canonical FNV-1a form). */
+export function seedFromString(value: string): string {
+  return fnv1a32(value).toString(16).padStart(8, '0').repeat(4);
+}
+
 const HASH_OFFSETS = [FNV_OFFSET_32, 0x9e3779b9, 0x85ebca6b, 0xc2b2ae35];
 
 /**

@@ -49,6 +49,15 @@ function sampleRow(overrides: Partial<ReconstructionRow> = {}): ReconstructionRo
   };
 }
 
+/**
+ * Shared real-data cohort and one fitted artifact. Fitting the full early-era
+ * model takes seconds, so the expensive work runs once at module scope and
+ * every test derives from these; determinism is still asserted by refitting
+ * in the gates test below.
+ */
+const COHORT = loadCohortRows();
+const RECONSTRUCTION = fitThreePointReconstruction(COHORT);
+
 describe('reconstruction math primitives', () => {
   it('sigmoid is bounded and monotone', () => {
     expect(sigmoid(0)).toBeCloseTo(0.5, 10);
@@ -181,7 +190,7 @@ describe('reconstruction rows and features', () => {
   });
 
   it('loads the real early-era cohort from raw data', () => {
-    const rows = loadCohortRows();
+    const rows = COHORT;
     expect(rows.length).toBeGreaterThan(1400);
     expect(new Set(rows.map((row) => row.season))).toEqual(new Set([...RECONSTRUCTION_SEASONS]));
     const attempters = rows.filter((row) => (row.tpa ?? 0) > 0);
@@ -192,7 +201,7 @@ describe('reconstruction rows and features', () => {
 
 describe('posterior quantiles and profile assembly', () => {
   it('conservative posterior quantile is below the mean', () => {
-    const { artifact } = fitThreePointReconstruction(loadCohortRows());
+    const artifact = RECONSTRUCTION.artifact;
     const result = predictReconstructedProfile(artifact, sampleRow());
     expect(result.profile.accuracyConservative).toBeLessThan(result.profile.accuracyMean);
     expect(result.profile.attemptRateConservative).toBeLessThan(result.profile.attemptRateMean);
@@ -206,7 +215,7 @@ describe('posterior quantiles and profile assembly', () => {
   });
 
   it('maps conservative accuracy to three-point ratings via the artifact mapping', () => {
-    const { artifact } = fitThreePointReconstruction(loadCohortRows());
+    const { artifact } = RECONSTRUCTION;
     const points = artifact.ratingMapping.points;
     const low = ratingFromAccuracy(artifact, points[0]?.accuracy ?? 0.2);
     const high = ratingFromAccuracy(artifact, points[points.length - 1]?.accuracy ?? 0.4);
@@ -222,18 +231,18 @@ describe('posterior quantiles and profile assembly', () => {
     expect(ratingFromAccuracy(artifact, 0.9)).toBeLessThanOrEqual(artifact.ratingMapping.clampMax);
   });
 
-  it('low-confidence profiles result from missing evidence', () => {
-    const { artifact } = fitThreePointReconstruction(loadCohortRows());
+  it('missing evidence produces low-confidence profiles, never exploded shooting', () => {
     const missing = predictReconstructedProfile(
-      artifact,
+      RECONSTRUCTION.artifact,
       sampleRow({ heightInches: null, weightLbs: null }),
     );
-    const complete = predictReconstructedProfile(artifact, sampleRow());
-    if (missing.profile.confidence === 'high') {
-      // Missing physicals must never produce high confidence.
-      expect(complete.profile.confidence).toBe('high');
-    }
+    const complete = predictReconstructedProfile(RECONSTRUCTION.artifact, sampleRow());
     expect(missing.profile.evidence.missingFeatures).toBe(2);
+    expect(complete.profile.evidence.missingFeatures).toBe(0);
+    expect(missing.profile.attemptRateConservative).toBeLessThan(0.5);
+    expect(missing.profile.accuracyConservative).toBeLessThan(0.6);
+    // Missing physicals can never raise confidence to the high band.
+    expect(missing.profile.confidence).not.toBe('high');
   });
 });
 
@@ -288,26 +297,24 @@ describe('grouped holdout and gates', () => {
   });
 
   it('the fitted artifact passes every acceptance gate and is deterministic', () => {
-    const rows = loadCohortRows();
-    const first = fitThreePointReconstruction(rows);
-    const second = fitThreePointReconstruction(rows);
-    expect(first.artifact).toEqual(second.artifact);
-    expect(first.gates.meanBiasNonPositiveAccuracy).toBe(true);
-    expect(first.gates.meanBiasNonPositiveTranslatedAttemptRate).toBe(true);
-    expect(first.gates.floorBelowEstablished).toBe(true);
-    expect(first.artifact.floors.floor).toBeLessThan(0.32);
-    expect(first.artifact.floors.zoneFloors.cornerThree).toBeLessThan(0.34);
-    expect(first.artifact.holdout.foldCount).toBeGreaterThanOrEqual(3);
-    expect(first.holdout.accuracy.bias).toBeLessThanOrEqual(0);
+    const second = fitThreePointReconstruction(COHORT);
+    expect(RECONSTRUCTION.artifact).toEqual(second.artifact);
+    expect(RECONSTRUCTION.gates.meanBiasNonPositiveAccuracy).toBe(true);
+    expect(RECONSTRUCTION.gates.meanBiasNonPositiveTranslatedAttemptRate).toBe(true);
+    expect(RECONSTRUCTION.gates.floorBelowEstablished).toBe(true);
+    expect(RECONSTRUCTION.artifact.floors.floor).toBeLessThan(0.32);
+    expect(RECONSTRUCTION.artifact.floors.zoneFloors.cornerThree).toBeLessThan(0.34);
+    expect(RECONSTRUCTION.artifact.holdout.foldCount).toBeGreaterThanOrEqual(3);
+    expect(RECONSTRUCTION.holdout.accuracy.bias).toBeLessThanOrEqual(0);
     // The attempt gate is the modern-translated bias (the translation
     // intentionally predicts above early-era volume).
-    expect(first.holdout.translatedAttemptRateModern.bias).toBeLessThanOrEqual(0);
-    expect(first.holdout.accuracy.mae).toBeGreaterThan(0);
-    expect(first.holdout.attemptRate.mae).toBeGreaterThan(0);
-  });
+    expect(RECONSTRUCTION.holdout.translatedAttemptRateModern.bias).toBeLessThanOrEqual(0);
+    expect(RECONSTRUCTION.holdout.accuracy.mae).toBeGreaterThan(0);
+    expect(RECONSTRUCTION.holdout.attemptRate.mae).toBeGreaterThan(0);
+  }, 30_000);
 
   it('the attempt translation scales volume and caps per position', () => {
-    const { artifact } = fitThreePointReconstruction(loadCohortRows());
+    const artifact = RECONSTRUCTION.artifact;
     const translation = artifact.attemptRateTranslation;
     expect(translation.factor).toBe(2.5);
     expect(translation.caps).toEqual({ G: 0.15, F: 0.08, C: 0.02 });
@@ -351,53 +358,36 @@ describe('grouped holdout and gates', () => {
   });
 
   it('reports position and evidence bands on the real holdout', () => {
-    const { artifact } = fitThreePointReconstruction(loadCohortRows());
-    const accuracy = artifact.holdout.accuracy;
+    const accuracy = RECONSTRUCTION.artifact.holdout.accuracy;
     for (const group of ['G', 'F', 'C'] as const) {
       expect(accuracy.positionBands[group].count).toBeGreaterThan(0);
     }
     expect(accuracy.evidenceBands.length).toBeGreaterThanOrEqual(2);
-    expect(artifact.generatedBy).toContain('calibrate three-point');
+    expect(RECONSTRUCTION.artifact.generatedBy).toContain('calibrate three-point');
   });
 
   it('holdout predictions stay below the observed rate on average (no overprediction gate)', () => {
-    const { artifact } = fitThreePointReconstruction(loadCohortRows());
-    expect(artifact.holdout.accuracy.overpredictionShare).toBeLessThan(0.9);
-    expect(artifact.holdout.attemptRate.overpredictionShare).toBeLessThan(0.9);
+    expect(RECONSTRUCTION.artifact.holdout.accuracy.overpredictionShare).toBeLessThan(0.9);
+    expect(RECONSTRUCTION.artifact.holdout.attemptRate.overpredictionShare).toBeLessThan(0.9);
   });
 
   it('deterministic lambda selection returns grid values', () => {
-    const rows = loadCohortRows();
-    const context = buildFeatureContext(rows);
-    const priors = cohortPriors(rows);
-    const lambdas = pickLambda(rows, context, priors);
+    const context = buildFeatureContext(COHORT);
+    const priors = cohortPriors(COHORT);
+    const lambdas = pickLambda(COHORT, context, priors);
     expect([0.5, 1, 2, 4]).toContain(lambdas.accuracyLambda);
     expect([0.5, 1, 2, 4]).toContain(lambdas.attemptRateLambda);
-  });
-
-  it('missing evidence produces low-confidence profiles, never exploded shooting', () => {
-    const { artifact } = fitThreePointReconstruction(loadCohortRows());
-    const missing = predictReconstructedProfile(
-      artifact,
-      sampleRow({ heightInches: null, weightLbs: null }),
-    );
-    expect(missing.profile.evidence.missingFeatures).toBe(2);
-    expect(missing.profile.attemptRateConservative).toBeLessThan(0.5);
-    expect(missing.profile.accuracyConservative).toBeLessThan(0.6);
-    // Missing physicals can never raise confidence to the high band.
-    expect(missing.profile.confidence).not.toBe('high');
-  });
+  }, 30_000);
 
   it('fitModel and runGroupedHoldout agree on the trained model shape', () => {
-    const rows = loadCohortRows();
-    const context = buildFeatureContext(rows);
-    const priors = cohortPriors(rows);
-    const model = fitModel(rows, context, 'accuracy', 1, priors);
+    const context = buildFeatureContext(COHORT);
+    const priors = cohortPriors(COHORT);
+    const model = fitModel(COHORT, context, 'accuracy', 1, priors);
     expect(model.fitted.coefficients.length).toBe(RECONSTRUCTION_FEATURE_NAMES.length + 1);
     expect(model.fitted.covariance.length).toBe(RECONSTRUCTION_FEATURE_NAMES.length + 1);
     const raw = extractRawFeatures(sampleRow(), context);
     const predicted = predictConservative(model, Object.values(raw), 0.25);
     expect(predicted).toBeGreaterThan(0);
     expect(predicted).toBeLessThan(1);
-  });
+  }, 30_000);
 });

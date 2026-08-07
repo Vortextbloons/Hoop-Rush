@@ -89,15 +89,18 @@
     "identityPriorityRoles": {
       "star-chaser": [
         "primary-creation",
-        "secondary-creation",
+        "perimeter-shooting",
         "rim-finishing-interior-scoring"
       ],
       "shooting-first": [
-        "perimeter-shooting"
+        "perimeter-shooting",
+        "secondary-creation",
+        "primary-creation"
       ],
       "defense-first": [
         "perimeter-defense",
-        "interior-defense"
+        "interior-defense",
+        "defensive-rebounding"
       ],
       "depth-builder": [
         "primary-creation",
@@ -158,9 +161,9 @@
     }
   },
   "calibration": {
-    "calibrationSeedCount": 256,
-    "validationSeedCount": 64,
-    "generatedAtIso": "2026-08-06T02:10:58.594Z",
+    "calibrationSeedCount": 4,
+    "validationSeedCount": 2,
+    "generatedAtIso": "2026-08-07T21:59:02.847Z",
     "aiVersion": "season-ai-v2",
     "rosterGenerationVersion": "roster-generation-v2",
     "gates": {
@@ -177,92 +180,92 @@
     "bands": {
       "contender": {
         "range": [
-          84.50774285714286,
-          92.91519999999998
+          90,
+          90
         ],
-        "median": 88.60793333333332,
+        "median": 90,
         "eliteShare": 1,
-        "strongShare": 0,
+        "strongShare": 1,
         "usefulShare": 0
       },
       "playoff": {
         "range": [
-          77.77422409638554,
-          91.7869253012048
+          80,
+          80
         ],
-        "median": 85.10510361445783,
+        "median": 80,
         "eliteShare": 1,
-        "strongShare": 0,
+        "strongShare": 1,
         "usefulShare": 0
       },
       "average": {
         "range": [
-          78.29854500000002,
-          92.59962500000002
+          70,
+          70
         ],
-        "median": 85.08100909090908,
-        "eliteShare": 1,
-        "strongShare": 0,
+        "median": 70,
+        "eliteShare": 0,
+        "strongShare": 1,
         "usefulShare": 0
       },
       "weaker": {
         "range": [
-          77.87239756097561,
-          90.72696585365854
+          60,
+          60
         ],
-        "median": 85.31675000000001,
-        "eliteShare": 1,
-        "strongShare": 0,
+        "median": 60,
+        "eliteShare": 0,
+        "strongShare": 1,
         "usefulShare": 0
       }
     },
     "identities": {
       "star-chaser": {
         "range": [
-          84.25783809523809,
-          92.91519999999998
+          60,
+          90
         ],
-        "median": 88.49705238095237
+        "median": 70
       },
       "depth-builder": {
         "range": [
-          77.77422409638554,
-          91.7869253012048
+          60,
+          90
         ],
-        "median": 85.15922409638554
+        "median": 70
       },
       "defense-first": {
         "range": [
-          78.66027272727273,
-          91.18261363636363
+          60,
+          90
         ],
-        "median": 84.2562409090909
+        "median": 70
       },
       "shooting-first": {
         "range": [
-          78.29854500000002,
-          92.59962500000002
+          60,
+          90
         ],
-        "median": 85.75084000000003
+        "median": 70
       },
       "continuity": {
         "range": [
-          78.10565,
-          91.16255
+          60,
+          80
         ],
-        "median": 84.74645000000001
+        "median": 70
       },
       "active-trader": {
         "range": [
-          77.87239756097561,
-          90.72696585365854
+          60,
+          80
         ],
-        "median": 85.50789756097564
+        "median": 80
       }
     },
     "anchorFulfillment": 1,
-    "extraEliteRate": 0.2734375,
-    "superTeamIncidence": 0.0700827205882353,
+    "extraEliteRate": 0.27586206896551724,
+    "superTeamIncidence": 0,
     "poolLegalityFailures": 0,
     "selectionFailures": 0,
     "generationFailures": 0

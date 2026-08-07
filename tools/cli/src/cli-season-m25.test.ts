@@ -109,8 +109,8 @@ describe('season m25 durability derivation (durability-v1)', () => {
 });
 
 describe('season m25 report schema round-trips', () => {
-  it('parses a complete health calibrate report payload', () => {
-    const payload = seasonHealthCalibrateReportSchema.parse({
+  it('parses a complete health calibrate report payload and preserves every field', () => {
+    const input = {
       schemaVersion: 1,
       command: 'season health calibrate',
       targetsVersion: 'injury-targets-v1',
@@ -158,12 +158,12 @@ describe('season m25 report schema round-trips', () => {
       targetsWritten: true,
       targetsPath: 'apps/web/static/data/season/injury-targets.json',
       durationMs: 900_000,
-    });
-    expect(payload.command).toBe('season health calibrate');
+    };
+    expect(seasonHealthCalibrateReportSchema.parse(input)).toEqual(input);
   });
 
-  it('parses a complete trade calibrate report payload', () => {
-    const payload = seasonTradeCalibrateReportSchema.parse({
+  it('parses a complete trade calibrate report payload and preserves every field', () => {
+    const input = {
       schemaVersion: 1,
       command: 'season trade calibrate',
       targetsVersion: 'trade-targets-v1',
@@ -195,12 +195,12 @@ describe('season m25 report schema round-trips', () => {
       targetsWritten: true,
       targetsPath: 'apps/web/static/data/season/trade-targets.json',
       durationMs: 600_000,
-    });
-    expect(payload.aiTradesMean).toBe(11.25);
+    };
+    expect(seasonTradeCalibrateReportSchema.parse(input)).toEqual(input);
   });
 
-  it('parses a complete influence calibrate report payload', () => {
-    const payload = seasonInfluenceCalibrateReportSchema.parse({
+  it('parses a complete influence calibrate report payload and preserves every field', () => {
+    const input = {
       schemaVersion: 1,
       command: 'season influence calibrate',
       targetsVersion: 'influence-targets-v1',
@@ -234,13 +234,12 @@ describe('season m25 report schema round-trips', () => {
       targetsWritten: true,
       targetsPath: 'apps/web/static/data/season/influence-targets.json',
       durationMs: 700_000,
-    });
-    expect(payload.debtFrequency).toBe(0.02);
-    expect(payload.objectiveSuccessRate).toBe(0.55);
+    };
+    expect(seasonInfluenceCalibrateReportSchema.parse(input)).toEqual(input);
   });
 
-  it('parses the M2.5-extended block and full-simulate report payloads', () => {
-    const block = seasonBlockSimulateReportSchema.parse({
+  it('parses the M2.5-extended block and full-simulate report payloads and preserves every field', () => {
+    const blockInput = {
       schemaVersion: 1,
       command: 'season block simulate',
       runId: 'fixture-season-run-1',
@@ -258,10 +257,10 @@ describe('season m25 report schema round-trips', () => {
       auditFailures: [],
       rejection: null,
       pass: true,
-    });
-    expect(block.stateRevision).toBe(1);
+    };
+    expect(seasonBlockSimulateReportSchema.parse(blockInput)).toEqual(blockInput);
 
-    const full = seasonFullSimulateReportSchema.parse({
+    const fullInput = {
       schemaVersion: 1,
       command: 'season full simulate',
       runId: 'fixture-season-run-1',
@@ -281,7 +280,7 @@ describe('season m25 report schema round-trips', () => {
       tradeWindowsOpened: 0,
       auditFailures: [],
       pass: true,
-    });
-    expect(full.stateChainContinuity).toBe(true);
+    };
+    expect(seasonFullSimulateReportSchema.parse(fullInput)).toEqual(fullInput);
   });
 });

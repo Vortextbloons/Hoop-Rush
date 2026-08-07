@@ -10,7 +10,6 @@
   import { variantLabel } from '$lib/draft-presentation';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
   import type { ActiveRunCheckpoint, CompletedRunIndex } from '@hoop-rush/persistence';
-  import { getSeasonRunRepository } from '$lib/season/season-repo';
 
   const sandboxHref = resolve('/sandbox');
   const historyHref = resolve('/sandbox/history');
@@ -87,7 +86,8 @@
     );
     // Season Run resume is additive and best-effort; a missing repository
     // (not yet wired) must never break the rest of the start page.
-    getSeasonRunRepository()
+    import('$lib/season/season-repo')
+      .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
       .then((repo) => repo.loadActiveRunIndex())
       .then((index) => {
         if (!cancelled) seasonRun = index;

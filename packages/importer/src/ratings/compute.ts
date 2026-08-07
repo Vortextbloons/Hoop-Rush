@@ -53,7 +53,14 @@ export interface RosterPlayer extends Record<string, unknown> {
  * (equivalent behavior for the fields we consume).
  */
 export function parseJsonLoose(text: string): unknown {
-  return JSON.parse(text.replace(/\bNaN\b/g, 'null')) as unknown;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return JSON.parse(text.replace(/\bNaN\b/g, 'null')) as unknown;
+    }
+    throw error;
+  }
 }
 
 export function readJsonLoose(path: string): unknown {
@@ -150,7 +157,21 @@ export function computeForSeason(season: string, force = false): void {
     return;
   }
 
-  const roster = readJsonLoose(rosterPath) as RosterPlayer[];
+  // Fast skip gate: the compute loop below writes the same importMeta onto
+  // every player, so a serialized statsSource marker means ratings are done.
+  // This avoids the full-buffer regex + parse on incremental runs; the parsed
+  // meta check below stays as the authoritative fallback for unusual files.
+  const rosterText = readFileSync(rosterPath, 'utf8');
+  if (
+    !force &&
+    (rosterText.includes('"statsSource": "nba_api"') ||
+      rosterText.includes('"statsSource": "stints-derived"'))
+  ) {
+    console.log(`  [SKIP] ${season}: ratings already computed (use --force to recompute)`);
+    return;
+  }
+
+  const roster = parseJsonLoose(rosterText) as RosterPlayer[];
   const statsList = readJson(statsPath) as StatsRow[];
 
   if (!Array.isArray(roster) || roster.length === 0) {

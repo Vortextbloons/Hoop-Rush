@@ -38,6 +38,7 @@ import {
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
   PLAYER_VERSION_ID_VERSION,
+  buildEmptyHealth,
   seasonEffectsStateSchema,
   seasonGameSimulationResultSchema,
   seasonHealthStateSchema,
@@ -72,6 +73,7 @@ import {
   type SeasonTeamBox,
   fnv1a32,
   seasonDigestHex,
+  seedFromString,
 } from '@hoop-rush/data-contracts';
 import { reduceSeasonStandings, seasonRunStateDigest } from '@hoop-rush/engine';
 import type { SeasonRunStateDigestFacts } from '@hoop-rush/engine';
@@ -82,12 +84,15 @@ import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/seaso
 /**
  * Synthetic-but-schema-valid Season Run fixtures for the persistence tests
  * and the `benchmarkSeasonRunPersistence` harness (spec/2.0/10 M2.3, M2.4,
- * M2.5). The builders are self-contained (no @hoop-rush/test-fixtures
- * dependency) so the persistence package never depends on fixture package
- * state. All values derive deterministically from integer arithmetic — no
- * Math.random, no clocks — and the fold helpers mirror the documented engine
- * semantics (season-aggregates-v1: every aggregate is a pure fold over
- * compact completed-game summaries), so the reload reconciliation audit
+ * M2.5). The builders stay in the persistence package because the benchmark
+ * harness is production code (the CLI's `season benchmark` command binds it)
+ * and `@hoop-rush/test-fixtures` is a devDependency; the M2.5 leaf shapes
+ * that the schema contract freezes (health, influence, objectives) bind the
+ * canonical data-contracts builders where the outputs are identical, and
+ * everything else derives deterministically from integer arithmetic — no
+ * Math.random, no clocks — with fold helpers that mirror the documented
+ * engine semantics (season-aggregates-v1: every aggregate is a pure fold
+ * over compact completed-game summaries), so the reload reconciliation audit
  * passes exactly whether the production engine seam or the stub seam is
  * used. Fixture runs are schema-7 (M2.5) with the seven new M2.5 material
  * versions frozen, recorded synthetic AI pools, a valid zero
@@ -106,11 +111,10 @@ const ALIGNMENT = SEASON_ALIGNMENT;
 
 const FRANCHISE_ORDER = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
 
-/** Deterministic 32-hex seed from any string. Canonical FNV-1a primitive
- * lives in `@hoop-rush/data-contracts`; fixture randomness only (not domain
- * logic). */
+/** Deterministic 32-hex seed from any string. Canonical primitive lives in
+ * `@hoop-rush/data-contracts`; fixture randomness only (not domain logic). */
 export function fixtureSeedFromString(value: string): string {
-  return fnv1a32(value).toString(16).padStart(8, '0').repeat(4);
+  return seedFromString(value);
 }
 
 /** The frozen league manifest: 30 teams, one human franchise (default lakers). */
@@ -127,13 +131,9 @@ export function buildFixtureLeague(humanFranchiseId = 'lakers'): SeasonLeague {
   };
 }
 
-/** M2.5 empty health state: no injury records yet (schema-valid). */
+/** M2.5 empty health state: no injury records yet (canonical binding). */
 export function buildFixtureHealthState(): SeasonHealthState {
-  return seasonHealthStateSchema.parse({
-    schemaVersion: 1,
-    healthVersion: SEASON_HEALTH_VERSION,
-    injuries: [],
-  });
+  return seasonHealthStateSchema.parse(buildEmptyHealth());
 }
 
 /**
