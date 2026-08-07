@@ -42,6 +42,22 @@
  */
 export const SEASON_RUN_SCHEMA_VERSION = 7;
 
+/**
+ * Stored Season Run draft record save-schema version (v3, M2.4): the single
+ * current storage wrapper around a `season-draft-v2` state and the schema-2
+ * generation result. The v1/v2 development wrappers are never read or
+ * migrated; persistence auto-clears a row whose value differs.
+ */
+export const SEASON_DRAFT_SAVE_SCHEMA_VERSION = 3;
+
+/**
+ * Stored Season Run checkpoint row save-schema version (v4, M2.5): the
+ * current storage wrapper around a schema-7 run snapshot plus the row-level
+ * mutable state. v1-v3 development rows surface through the typed
+ * incompatibility flow; they are never read or migrated.
+ */
+export const SEASON_RUN_SAVE_SCHEMA_VERSION = 4;
+
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
 
@@ -287,6 +303,14 @@ export const SEASON_DRAFT_CATALOG_VERSION = 'season-draft-catalog-v4';
  * packaged pool aggregates; the engine never recomputes or tunes it.
  */
 export const PROJECTION_MODEL_VERSION = 'projection-model-v1';
+
+/**
+ * Frozen base projection calibration cohort and envelope artifact
+ * (projection-targets-v1): cohort definitions, error envelopes, rank and
+ * ordering gates, monotonic sanity gates, and measured facts for base-five
+ * projections validated against the authoritative fixed-five simulator.
+ */
+export const PROJECTION_TARGETS_VERSION = 'projection-targets-v1';
 
 /**
  * Projection normalization and digest contract (projection-schema-v1): the

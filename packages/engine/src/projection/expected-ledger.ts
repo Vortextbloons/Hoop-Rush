@@ -19,10 +19,7 @@ import { assistProbabilityPure } from '../sim/possession.ts';
 import type { TeamPrep } from '../sim/prepare.ts';
 import { sameGroupMatchWeight } from '../sim/position-responsibilities.ts';
 import { offensiveReboundProbability } from '../sim/rebounding.ts';
-import {
-  eraPossEstimatePerTrip,
-  turnoverProbability,
-} from '../sim/security.ts';
+import { eraPossEstimatePerTrip, turnoverProbability } from '../sim/security.ts';
 import {
   blockProbability,
   contestPenalty,
@@ -57,9 +54,6 @@ import {
  */
 
 const ZONES: readonly ShotZone[] = SHOT_ZONES;
-
-/** How many non-shooting foul checks the engine performs per trip. */
-const NON_SHOOTING_FOUL_CHECKS = 4;
 
 /** Regulation period seconds used for the make-probability late-clock term (no penalty). */
 const REGULATION_START_SECONDS = 720;
@@ -133,17 +127,14 @@ interface LedgerInternal {
   defensiveReboundChances: number;
 }
 
-/** One (initiator, action, shooter, zone, defender) shot cell. */
-interface ShotCell {
-  initiatorIndex: number;
-  shooterIndex: number;
-  defenderIndex: number;
-  zone: ShotZone;
-  action: ActionType;
-  /** Per-100-possession mass of the cell. */
-  mass: number;
-  /** Whether the shot came from a passed possession. */
-  passed: boolean;
+/** Per-player accumulated expectation, aligned with `players` by index. */
+interface PlayerAgg {
+  shots: number;
+  makes: number;
+  points: number;
+  turnovers: number;
+  rebounds: number;
+  fouls: number;
 }
 
 /**
@@ -215,8 +206,6 @@ function computeSide(input: {
 }): LedgerSide {
   const { side, prep, opponentPrep, profile, eraPoss, passingAnchorFactor } = input;
   const players = side.players;
-  const nsfPerTrip =
-    1 - Math.pow(1 - nonShootingFoulProbability(profile), NON_SHOOTING_FOUL_CHECKS);
 
   // --- Turnover mass per initiator ---
   const initiatorShares = normalizedWeights(prep.initiatorWeights);
@@ -230,16 +219,43 @@ function computeSide(input: {
   const turnoverRate = Math.min(1, Math.max(0, turnoverMass));
 
   // --- Shot mass after turnovers and non-shooting fouls ---
+  // The engine checks for a non-shooting foul up to four times per trip and
+  // continues the trip after non-bonus fouls (the neutral assumption here is
+  // "never in the bonus", so a non-shooting foul never ends a trip). The
+  // expected number of non-shooting fouls per trip is the truncated geometric
+  // expectation p + p² + p³ + p⁴; the trip still ends in a shot unless it
+  // turned over. All masses below are per 100 possessions.
   const noTurnover = 1 - turnoverRate;
-  const nonShootingFoulRate = noTurnover * nsfPerTrip;
-  const shotMass = noTurnover * (1 - nsfPerTrip);
+  const nsfPerTrip = nonShootingFoulProbability(profile);
+  const expectedNsfPerTrip =
+    nsfPerTrip * (1 + nsfPerTrip + nsfPerTrip * nsfPerTrip + nsfPerTrip * nsfPerTrip * nsfPerTrip);
+  const nonShootingFoulRate = noTurnover * expectedNsfPerTrip;
+  const shotMass = noTurnover * 100;
 
-  // --- Shot cells ---
-  const cells: ShotCell[] = [];
+  // --- Shot mass ---
+  // Aggregated per distinct (shooter, zone, action, defender) key with cached
+  // zone shares, defender distributions, and per-key shot probabilities, so
+  // the expensive probability functions run at most once per key instead of
+  // once per initiator path.
+  const shotMassByKey = new Map<
+    string,
+    {
+      shooterIndex: number;
+      defenderIndex: number;
+      zone: ShotZone;
+      action: ActionType;
+      mass: number;
+      passedMass: number;
+      /** Passed mass per initiator (for the initiator-weighted assister expectation). */
+      passedByInitiator: number[];
+    }
+  >();
   const actionTotals: Record<string, number> = {};
   const zoneTotals: Record<string, number> = {};
   const shooterTotals = new Array<number>(players.length).fill(0);
   let passOpportunity = 0;
+  const zoneShareCache = new Map<string, number[]>();
+  const defenderCache = new Map<string, number[]>();
 
   for (let initiatorIndex = 0; initiatorIndex < players.length; initiatorIndex += 1) {
     const initiator = players[initiatorIndex];
@@ -257,43 +273,65 @@ function computeSide(input: {
       const actionShare = actionShares[actionIndex] ?? 0;
       if (actionShare <= 0) continue;
       const passP = passProbability(initiator, action);
-      const shooterShares = shooterSharesFor(
-        players,
-        initiatorIndex,
-        action,
-        teammateShots,
-        passP,
-      );
+      const shooterShares = shooterSharesFor(players, initiatorIndex, action, teammateShots, passP);
       for (let shooterIndex = 0; shooterIndex < players.length; shooterIndex += 1) {
         const shooterShare = shooterShares[shooterIndex] ?? 0;
         if (shooterShare <= 0) continue;
         const shooter = players[shooterIndex];
         if (shooter === undefined) continue;
-        const zonePrep = prep.zonePrep.get(engineKey(shooter));
-        if (zonePrep === undefined) continue;
-        const zoneShares = normalizedWeights(applyZonePulls(action, zonePrep.base, zonePrep.driveRate));
+        const zoneShareKey = `${String(shooterIndex)}|${action}`;
+        let zoneShares = zoneShareCache.get(zoneShareKey);
+        if (zoneShares === undefined) {
+          const zonePrep = prep.zonePrep.get(engineKey(shooter));
+          if (zonePrep === undefined) continue;
+          zoneShares = normalizedWeights(applyZonePulls(action, zonePrep.base, zonePrep.driveRate));
+          zoneShareCache.set(zoneShareKey, zoneShares);
+        }
 
         for (let zoneIndex = 0; zoneIndex < ZONES.length; zoneIndex += 1) {
           const zone = ZONES[zoneIndex];
           if (zone === undefined) continue;
           const zoneShare = zoneShares[zoneIndex] ?? 0;
           if (zoneShare <= 0) continue;
-          const defenderProbs = defenderDistribution(opponentPrep, zone, shooterIndex);
+          const defenderKey = `${String(shooterIndex)}|${zone}`;
+          let defenderProbs = defenderCache.get(defenderKey);
+          if (defenderProbs === undefined) {
+            defenderProbs = defenderDistribution(opponentPrep, zone, shooterIndex);
+            defenderCache.set(defenderKey, defenderProbs);
+          }
           for (let defenderIndex = 0; defenderIndex < players.length; defenderIndex += 1) {
             const defenderShare = defenderProbs[defenderIndex] ?? 0;
             if (defenderShare <= 0) continue;
             const mass =
               shotMass * initiatorShare * actionShare * shooterShare * zoneShare * defenderShare;
             if (mass <= 0) continue;
-            cells.push({
-              initiatorIndex,
-              shooterIndex,
-              defenderIndex,
-              zone,
-              action,
-              mass,
-              passed: shooterIndex !== initiatorIndex,
-            });
+            const key = `${String(shooterIndex)}|${String(defenderIndex)}|${zone}|${action}`;
+            const entry = shotMassByKey.get(key);
+            if (entry === undefined) {
+              shotMassByKey.set(key, {
+                shooterIndex,
+                defenderIndex,
+                zone,
+                action,
+                mass,
+                passedMass: shooterIndex !== initiatorIndex ? mass : 0,
+                passedByInitiator:
+                  initiatorIndex === shooterIndex
+                    ? new Array<number>(players.length).fill(0)
+                    : (() => {
+                        const byInitiator = new Array<number>(players.length).fill(0);
+                        byInitiator[initiatorIndex] = mass;
+                        return byInitiator;
+                      })(),
+              });
+            } else {
+              entry.mass += mass;
+              if (shooterIndex !== initiatorIndex) {
+                entry.passedMass += mass;
+                entry.passedByInitiator[initiatorIndex] =
+                  (entry.passedByInitiator[initiatorIndex] ?? 0) + mass;
+              }
+            }
             actionTotals[action] = (actionTotals[action] ?? 0) + mass;
             zoneTotals[zone] = (zoneTotals[zone] ?? 0) + mass;
             shooterTotals[shooterIndex] = (shooterTotals[shooterIndex] ?? 0) + mass;
@@ -328,49 +366,63 @@ function computeSide(input: {
     defensiveReboundChances: 0,
   };
 
-  const playerAgg = players.map(
-    (): {
-      shots: number;
-      makes: number;
-      points: number;
-      turnovers: number;
-      rebounds: number;
-      fouls: number;
-    } => ({ shots: 0, makes: 0, points: 0, turnovers: 0, rebounds: 0, fouls: 0 }),
-  );
+  const playerAgg = players.map((): PlayerAgg => ({
+    shots: 0,
+    makes: 0,
+    points: 0,
+    turnovers: 0,
+    rebounds: 0,
+    fouls: 0,
+  }));
   const playerAssists = new Array<number>(players.length).fill(0);
+
+  const playerAggAt = (index: number): PlayerAgg => {
+    const agg = playerAgg[index];
+    if (!agg) throw new Error(`projection: missing player aggregate at slot ${String(index)}`);
+    return agg;
+  };
 
   let qualityLiftTotal = 0;
   let contestTotal = 0;
 
   const offensiveRebounderShare = normalizedWeights(prep.rebounderWeights[0]);
   const defensiveRebounderShare = normalizedWeights(opponentPrep.rebounderWeights[1]);
+  const orebPByZone = new Map<ShotZone, number>();
+  const rimOrebP = offensiveReboundProbability(
+    prep.offensiveReboundMean,
+    opponentPrep.defensiveReboundMean,
+    'rim',
+    profile,
+  );
+  const shotPrepByShooter = new Map<string, ShotPrep>();
+  const assistProbabilityCache = new Map<string, number>();
+  const assisterShareCache = new Map<string, number[]>();
 
-  for (const cell of cells) {
-    const shooter = players[cell.shooterIndex];
-    const defender = players[cell.defenderIndex];
+  for (const entry of shotMassByKey.values()) {
+    const shooter = players[entry.shooterIndex];
+    const defender = players[entry.defenderIndex];
     if (shooter === undefined || defender === undefined) continue;
     const makeP = makeProbability(
       shooter,
       defender,
       profile,
-      cell.zone,
-      cell.action,
+      entry.zone,
+      entry.action,
       REGULATION_START_SECONDS,
-      shotPrepFor(prep, shooter),
+      shotPrepForCached(shotPrepByShooter, prep, shooter),
     );
-    const foulP = shootingFoulProbability(shooter, defender, cell.zone, profile);
-    const blockP = blockProbability(defender, cell.zone, cell.action);
+    const foulP = shootingFoulProbability(shooter, defender, entry.zone, profile);
+    const blockP = blockProbability(defender, entry.zone, entry.action);
     const ftP = freeThrowProbability(shooter, profile);
-    const ftCount = freeThrowsForZone(cell.zone);
+    const ftCount = freeThrowsForZone(entry.zone);
     const makeGivenFoul = makeP * ENGINE_CONSTANTS.fouledShotMakeScale;
     const makeProb = foulP * makeGivenFoul + (1 - foulP) * (1 - blockP) * makeP;
     const missProb = 1 - makeProb;
     const blockProb = (1 - foulP) * blockP;
     const madeWithFoulProb = foulP * makeGivenFoul;
     const missedWithFoulProb = foulP * (1 - makeGivenFoul);
-    const mass = cell.mass;
-    const three = cell.zone === 'cornerThree' || cell.zone === 'aboveBreakThree';
+    const mass = entry.mass;
+    const three = entry.zone === 'cornerThree' || entry.zone === 'aboveBreakThree';
 
     // Field goals and points.
     internal.fieldGoalAttempts += mass;
@@ -398,12 +450,16 @@ function computeSide(input: {
     internal.points += ftmMass;
 
     // Rebounds on missed field goals (live).
-    const orebP = offensiveReboundProbability(
-      prep.offensiveReboundMean,
-      opponentPrep.defensiveReboundMean,
-      cell.zone,
-      profile,
-    );
+    let orebP = orebPByZone.get(entry.zone);
+    if (orebP === undefined) {
+      orebP = offensiveReboundProbability(
+        prep.offensiveReboundMean,
+        opponentPrep.defensiveReboundMean,
+        entry.zone,
+        profile,
+      );
+      orebPByZone.set(entry.zone, orebP);
+    }
     const missMass = mass * missProb;
     internal.offensiveReboundChances += missMass;
     internal.defensiveReboundChances += missMass;
@@ -414,12 +470,6 @@ function computeSide(input: {
     // Rebounds on missed free throws: the last attempt (and the and-one) are
     // live rim rebounds; non-final attempts are dead-ball defensive team
     // rebounds folded into defensive rebounds.
-    const rimOrebP = offensiveReboundProbability(
-      prep.offensiveReboundMean,
-      opponentPrep.defensiveReboundMean,
-      'rim',
-      profile,
-    );
     const liveFtMiss = mass * (missedWithFoulProb + madeWithFoulProb) * (1 - ftP);
     internal.offensiveReboundChances += liveFtMiss;
     internal.defensiveReboundChances += liveFtMiss;
@@ -427,71 +477,97 @@ function computeSide(input: {
     internal.defensiveRebounds += liveFtMiss * (1 - rimOrebP);
     internal.defensiveRebounds += mass * missedWithFoulProb * (ftCount - 1) * (1 - ftP);
 
-    // Assists on made passed shots: expectation over the assister distribution.
-    if (cell.passed) {
-      const initiator = players[cell.initiatorIndex];
-      const assisterProbs = assisterDistribution(side, shooter, initiator);
+    // Assists on made passed shots: expectation over the initiator-weighted
+    // assister distribution (the passed mass per initiator is recorded).
+    if (entry.passedMass > 0) {
+      const totalPassed = entry.passedMass;
+      const assisterProbKey = `${String(entry.shooterIndex)}|${entry.action}|${entry.zone}`;
+      let assisterProbs = assisterShareCache.get(assisterProbKey);
+      if (assisterProbs === undefined) {
+        assisterProbs = initiatorWeightedAssisterDistribution(
+          side,
+          shooter,
+          players,
+          entry.passedByInitiator,
+          totalPassed,
+        );
+        assisterShareCache.set(assisterProbKey, assisterProbs);
+      }
       let expectedAssists = 0;
       for (let passerIndex = 0; passerIndex < players.length; passerIndex += 1) {
         const passer = players[passerIndex];
-        if (passer === undefined || passerIndex === cell.shooterIndex) continue;
-        expectedAssists +=
-          (assisterProbs[passerIndex] ?? 0) *
-          assistProbabilityPure(
+        if (passer === undefined || passerIndex === entry.shooterIndex) continue;
+        const probKey = `${String(passerIndex)}|${entry.action}|${entry.zone}|${String(entry.shooterIndex)}`;
+        let assistP = assistProbabilityCache.get(probKey);
+        if (assistP === undefined) {
+          assistP = assistProbabilityPure(
             profile,
             passingAnchorFactor,
             passer,
-            cell.action,
-            cell.zone,
+            entry.action,
+            entry.zone,
             shooter,
           );
+          assistProbabilityCache.set(probKey, assistP);
+        }
+        expectedAssists += (assisterProbs[passerIndex] ?? 0) * assistP;
       }
-      const assists = mass * makeProb * expectedAssists;
+      const assists = entry.passedMass * makeProb * expectedAssists;
       internal.assists += assists;
       for (let passerIndex = 0; passerIndex < players.length; passerIndex += 1) {
-        if (passerIndex === cell.shooterIndex) continue;
+        if (passerIndex === entry.shooterIndex) continue;
         playerAssists[passerIndex] =
-          (playerAssists[passerIndex] ?? 0) + mass * makeProb * (assisterProbs[passerIndex] ?? 0);
+          (playerAssists[passerIndex] ?? 0) +
+          entry.passedMass * makeProb * (assisterProbs[passerIndex] ?? 0);
       }
     }
 
     // Per-player aggregation.
-    const agg = playerAgg[cell.shooterIndex];
+    const agg = playerAgg[entry.shooterIndex];
     if (agg === undefined) continue;
     agg.shots += mass;
     agg.makes += mass * makeProb;
     agg.points += mass * (three ? 3 : 2) * makeProb + ftmMass;
     agg.fouls += mass * foulP;
-    agg.rebounds += liveOreb * (offensiveRebounderShare[cell.shooterIndex] ?? 0);
+    agg.rebounds += liveOreb * (offensiveRebounderShare[entry.shooterIndex] ?? 0);
+    agg.rebounds += missMass * (1 - orebP) * (defensiveRebounderShare[entry.shooterIndex] ?? 0);
+    agg.rebounds += liveFtMiss * rimOrebP * (offensiveRebounderShare[entry.shooterIndex] ?? 0);
     agg.rebounds +=
-      missMass * (1 - orebP) * (defensiveRebounderShare[cell.shooterIndex] ?? 0);
-    agg.rebounds +=
-      liveFtMiss * rimOrebP * (offensiveRebounderShare[cell.shooterIndex] ?? 0);
-    agg.rebounds +=
-      liveFtMiss * (1 - rimOrebP) * (defensiveRebounderShare[cell.shooterIndex] ?? 0);
+      liveFtMiss * (1 - rimOrebP) * (defensiveRebounderShare[entry.shooterIndex] ?? 0);
 
-    qualityLiftTotal += mass * (three ? 0 : shotQualityBonus(cell.action, cell.zone));
-    contestTotal += mass * -contestPenalty(defender, cell.zone);
+    qualityLiftTotal += mass * (three ? 0 : shotQualityBonus(entry.action, entry.zone));
+    contestTotal += mass * -contestPenalty(defender, entry.zone);
   }
 
-  // Per-player turnover attribution by initiator share.
+  /** Per-player turnover attribution by initiator share. */
   for (let index = 0; index < players.length; index += 1) {
-    playerAgg[index]!.turnovers = (initiatorShares[index] ?? 0) * (turnoverRates[index] ?? 0) * 100;
+    playerAggAt(index).turnovers =
+      (initiatorShares[index] ?? 0) * (turnoverRates[index] ?? 0) * 100;
   }
+
+  // Bounded analytic continuation: a continuation only follows a miss that is
+  // offensive-rebounded, so the geometric series ratio is q x (1 - makeAvg)
+  // (the engine's continuation path skips security/foul checks; turnovers
+  // stay base while shots, makes, free throws, and rebounds scale).
+  const makeAvg =
+    internal.fieldGoalAttempts > 0 ? internal.fieldGoalMakes / internal.fieldGoalAttempts : 0.45;
+  const averageOrebRate =
+    internal.offensiveRebounds / Math.max(1e-9, internal.offensiveReboundChances);
+  const scale = Math.min(1 / Math.max(1e-9, 1 - averageOrebRate * (1 - makeAvg)), 4);
 
   const ledger: ProjectionLedger = {
     possessions: 100,
     turnoverRate,
     nonShootingFoulRate,
-    shotRate: shotMass,
-    fieldGoalAttempts: internal.fieldGoalAttempts,
-    fieldGoalMakes: internal.fieldGoalMakes,
-    twoPointAttempts: internal.twoPointAttempts,
-    twoPointMakes: internal.twoPointMakes,
-    threePointAttempts: internal.threePointAttempts,
-    threePointMakes: internal.threePointMakes,
-    freeThrowAttempts: internal.freeThrowAttempts,
-    freeThrowMakes: internal.freeThrowMakes,
+    shotRate: (shotMass * scale) / 100,
+    fieldGoalAttempts: internal.fieldGoalAttempts * scale,
+    fieldGoalMakes: internal.fieldGoalMakes * scale,
+    twoPointAttempts: internal.twoPointAttempts * scale,
+    twoPointMakes: internal.twoPointMakes * scale,
+    threePointAttempts: internal.threePointAttempts * scale,
+    threePointMakes: internal.threePointMakes * scale,
+    freeThrowAttempts: internal.freeThrowAttempts * scale,
+    freeThrowMakes: internal.freeThrowMakes * scale,
     fieldGoalPct: internal.fieldGoalMakes / Math.max(1e-9, internal.fieldGoalAttempts),
     twoPointPct: internal.twoPointMakes / Math.max(1e-9, internal.twoPointAttempts),
     threePointPct: internal.threePointMakes / Math.max(1e-9, internal.threePointAttempts),
@@ -502,20 +578,20 @@ function computeSide(input: {
       internal.points /
       Math.max(1e-9, 2 * (internal.fieldGoalAttempts + 0.44 * internal.freeThrowAttempts)),
     freeThrowRate: internal.freeThrowAttempts / Math.max(1e-9, internal.fieldGoalAttempts),
-    points: internal.points,
-    offensiveReboundRate: internal.offensiveRebounds / Math.max(1e-9, internal.offensiveReboundChances),
+    points: internal.points * scale,
+    offensiveReboundRate:
+      internal.offensiveRebounds / Math.max(1e-9, internal.offensiveReboundChances),
     defensiveReboundRate:
       internal.defensiveRebounds / Math.max(1e-9, internal.defensiveReboundChances),
-    offensiveRebounds: internal.offensiveRebounds,
-    defensiveRebounds: internal.defensiveRebounds,
+    offensiveRebounds: internal.offensiveRebounds * scale,
+    defensiveRebounds: internal.defensiveRebounds * scale,
     turnovers: internal.turnovers,
-    assists: internal.assists,
+    assists: internal.assists * scale,
     steals: internal.steals,
-    blocks: internal.blocks,
-    fouls: internal.fouls,
-    secondChancePoints:
-      internal.points *
-      (Math.min(1 / Math.max(1e-9, 1 - ledgerOrebRate(internal)), 4) - 1),
+    blocks: internal.blocks * scale,
+    // Shooting fouls drawn plus expected non-shooting fouls, per 100.
+    fouls: internal.fouls * scale + nonShootingFoulRate,
+    secondChancePoints: internal.points * (scale - 1),
   };
 
   const stealShare = expectedStealShare(opponentPrep.stealAbility, profile);
@@ -530,7 +606,10 @@ function computeSide(input: {
     ledger,
     turnoverCauses,
     actions: Object.fromEntries(
-      ACTION_TYPES.map((action) => [action, (actionTotals[action] ?? 0) / Math.max(1e-9, shotMass)]),
+      ACTION_TYPES.map((action) => [
+        action,
+        (actionTotals[action] ?? 0) / Math.max(1e-9, shotMass),
+      ]),
     ) as Record<ActionType, number>,
     zones: Object.fromEntries(
       ZONES.map((zone) => [zone, (zoneTotals[zone] ?? 0) / Math.max(1e-9, shotMass)]),
@@ -543,13 +622,13 @@ function computeSide(input: {
       initiatorShare: initiatorShares[index] ?? 0,
       creationShare: creationScore(player) * 100,
       spacingContribution: spacingScore(player) * 100,
-      expectedShots: playerAgg[index]!.shots,
-      expectedMakes: playerAgg[index]!.makes,
-      expectedPoints: playerAgg[index]!.points,
-      expectedAssists: playerAssists[index] ?? 0,
-      expectedTurnovers: playerAgg[index]!.turnovers,
-      expectedRebounds: playerAgg[index]!.rebounds,
-      expectedFouls: playerAgg[index]!.fouls,
+      expectedShots: playerAggAt(index).shots * scale,
+      expectedMakes: playerAggAt(index).makes * scale,
+      expectedPoints: playerAggAt(index).points * scale,
+      expectedAssists: (playerAssists[index] ?? 0) * scale,
+      expectedTurnovers: playerAggAt(index).turnovers,
+      expectedRebounds: playerAggAt(index).rebounds * scale,
+      expectedFouls: playerAggAt(index).fouls * scale,
       defensiveContribution: defensiveContributionOf(player),
     })),
     aggregateMakePct:
@@ -558,10 +637,6 @@ function computeSide(input: {
     shotQualityLift: qualityLiftTotal / Math.max(1e-9, shotMass),
     expectedContest: contestTotal / Math.max(1e-9, shotMass),
   };
-}
-
-function ledgerOrebRate(internal: LedgerInternal): number {
-  return internal.offensiveRebounds / Math.max(1e-9, internal.offensiveReboundChances);
 }
 
 function engineKey(player: SimulationPlayer): string {
@@ -573,6 +648,21 @@ function shotPrepFor(prep: TeamPrep, shooter: SimulationPlayer): ShotPrep {
     spacing: prep.spacing,
     twoPointAnchor: prep.twoPointAnchor.get(engineKey(shooter)) ?? null,
   };
+}
+
+/** Cached per-shooter shot prep (pure per (prep, shooter)). */
+function shotPrepForCached(
+  cache: Map<string, ShotPrep>,
+  prep: TeamPrep,
+  shooter: SimulationPlayer,
+): ShotPrep {
+  const key = engineKey(shooter);
+  let cached = cache.get(key);
+  if (cached === undefined) {
+    cached = shotPrepFor(prep, shooter);
+    cache.set(key, cached);
+  }
+  return cached;
 }
 
 /**
@@ -609,7 +699,12 @@ function shooterSharesFor(
   players: readonly SimulationPlayer[],
   initiatorIndex: number,
   action: ActionType,
-  teammateShots: { roll: { teammates: SimulationPlayer[]; weights: number[] }; pass: { teammates: SimulationPlayer[]; weights: number[] } } | undefined,
+  teammateShots:
+    | {
+        roll: { teammates: SimulationPlayer[]; weights: number[] };
+        pass: { teammates: SimulationPlayer[]; weights: number[] };
+      }
+    | undefined,
   passP: number,
 ): number[] {
   const shares = new Array<number>(players.length).fill(0);
@@ -628,22 +723,33 @@ function shooterSharesFor(
 }
 
 /**
- * Assister probability per team index for one made basket: the `pickAssister`
- * weight formula normalized over the four non-shooter candidates.
+ * Initiator-weighted assister probability per team index: the `pickAssister`
+ * weight formula normalized over the four non-shooter candidates, averaged
+ * over the passed-mass share each initiator led (the initiator earns a 1.35
+ * bonus in the sampled pipeline, so the expectation must weight it the same
+ * way).
  */
-function assisterDistribution(
+function initiatorWeightedAssisterDistribution(
   team: SimulationTeam,
   shooter: SimulationPlayer,
-  initiator: SimulationPlayer | undefined,
+  players: readonly SimulationPlayer[],
+  passedByInitiator: readonly number[],
+  totalPassed: number,
 ): number[] {
-  const weights = assisterWeights(team, shooter, initiator ?? shooter);
-  const normalized = normalizedWeights(weights);
   const perIndex = new Array<number>(team.players.length).fill(0);
-  let candidateIndex = 0;
-  for (let index = 0; index < team.players.length; index += 1) {
-    if (team.players[index]?.playerId === shooter.playerId) continue;
-    perIndex[index] = normalized[candidateIndex] ?? 0;
-    candidateIndex += 1;
+  for (let initiatorIndex = 0; initiatorIndex < players.length; initiatorIndex += 1) {
+    const share = (passedByInitiator[initiatorIndex] ?? 0) / Math.max(1e-9, totalPassed);
+    if (share <= 0) continue;
+    const initiator = players[initiatorIndex];
+    if (initiator === undefined) continue;
+    const weights = assisterWeights(team, shooter, initiator);
+    const normalized = normalizedWeights(weights);
+    let candidateIndex = 0;
+    for (let index = 0; index < team.players.length; index += 1) {
+      if (team.players[index]?.playerId === shooter.playerId) continue;
+      perIndex[index] = (perIndex[index] ?? 0) + share * (normalized[candidateIndex] ?? 0);
+      candidateIndex += 1;
+    }
   }
   return perIndex;
 }

@@ -32,6 +32,14 @@ export const RUN_SCHEMA_VERSION = 2;
  */
 export const SAVE_SCHEMA_VERSION = 2;
 
+/**
+ * Active-run checkpoint storage split (save schema 3): the append-only
+ * checkpoint row holds every run field except the games array, which is
+ * reconstructed from active game rows on load. A storage detail, not a run
+ * field; see `activeRunCheckpointSchema` in `packages/persistence`.
+ */
+export const CHECKPOINT_SAVE_SCHEMA_VERSION = 3;
+
 /** Franchise lineage rule set (spec/12): NBA-valid ranges and slot ownership. */
 export const LINEAGE_RULE_VERSION = 'lineage-v1';
 

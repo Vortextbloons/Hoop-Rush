@@ -23,6 +23,7 @@ import {
   seasonTradeStateSchema,
   seasonTransactionEntrySchema,
   seasonOwnershipSchema,
+  SEASON_RUN_SAVE_SCHEMA_VERSION,
   SEASON_TEAM_COUNT,
 } from '@hoop-rush/data-contracts';
 
@@ -90,7 +91,7 @@ export const SEASON_RUN_RECORD_ID = 'season-run';
  */
 export const seasonRunRecordFieldsSchema = z.object({
   recordId: z.literal(SEASON_RUN_RECORD_ID),
-  saveSchemaVersion: z.literal(4),
+  saveSchemaVersion: z.literal(SEASON_RUN_SAVE_SCHEMA_VERSION),
   /** Promotion-time snapshot; the 1,230 scheduled game records are omitted. */
   run: seasonRunSchema.omit({ games: true }),
   /** Rounds completed at the last accepted boundary. */

@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
+import { CHECKPOINT_SAVE_SCHEMA_VERSION, SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import {
   classicDraftRecordSchema,
   type StoredClassicDraft,
@@ -90,7 +91,7 @@ export class HoopRushDatabase extends Dexie {
         const { games: _games, schemaVersion: _schemaVersion, ...run } = validated.run;
         await tx.table('active').put({
           recordId: ACTIVE_RECORD_ID,
-          saveSchemaVersion: 3,
+          saveSchemaVersion: CHECKPOINT_SAVE_SCHEMA_VERSION,
           ...run,
           updatedAtIso: validated.updatedAtIso,
         });
@@ -184,7 +185,7 @@ export class DexieChallengeRepository implements ChallengeRepository {
     const results = rows.map((row) => activeGameRowSchema.parse(row).result);
     return storedRunRecordSchema.parse({
       recordId: ACTIVE_RECORD_ID,
-      saveSchemaVersion: 2,
+      saveSchemaVersion: SAVE_SCHEMA_VERSION,
       run: runFromCheckpoint(validatedCheckpoint, results),
       updatedAtIso: validatedCheckpoint.updatedAtIso,
     });

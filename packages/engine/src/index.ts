@@ -106,10 +106,10 @@ export {
 export {
   simulateSeasonGame,
   simulateSeasonGameWithEffects,
-  checkSeasonGameResult,
   type SeasonGameAvailabilitySeam,
   type SeasonGameEffectsMode,
 } from './season/season-game.ts';
+export { checkSeasonGameResult } from './season/season-game-audit.ts';
 export { seasonGenerationDigest, type SeasonGenerationDigestInput } from './season/digest.ts';
 export {
   seasonDraftStateDigest,
@@ -315,5 +315,8 @@ export {
   identifyWeaknesses,
   weaknessPenalty,
   ProjectionCache,
+  projectSeasonRoster,
+  traceRotationNormal,
+  traceRotationClose,
   type ProjectionCacheStats,
 } from './projection/index.ts';

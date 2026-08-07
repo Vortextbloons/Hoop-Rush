@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { classicDraftStateSchema } from '@hoop-rush/data-contracts';
+import { CLASSIC_DRAFT_SCHEMA_VERSION, classicDraftStateSchema } from '@hoop-rush/data-contracts';
 
 /**
  * Stored-record schema for the active Classic draft (spec/01 Classic game
@@ -13,7 +13,7 @@ import { classicDraftStateSchema } from '@hoop-rush/data-contracts';
 export const classicDraftRecordSchema = z.object({
   /** Single active Classic draft slot; at most one row may exist. */
   recordId: z.literal('classic-draft'),
-  saveSchemaVersion: z.literal(1),
+  saveSchemaVersion: z.literal(CLASSIC_DRAFT_SCHEMA_VERSION),
   draft: classicDraftStateSchema,
   /** Written by the adapter, never by domain logic. */
   updatedAtIso: z.iso.datetime().optional(),

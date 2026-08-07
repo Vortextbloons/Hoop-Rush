@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   seasonDraftStateSchema,
   seasonLeagueGenerationResultSchema,
+  SEASON_DRAFT_SAVE_SCHEMA_VERSION,
   type SeasonDraftState,
   type SeasonLeagueGenerationResult,
 } from '@hoop-rush/data-contracts';
@@ -35,7 +36,7 @@ export const SEASON_DRAFT_RECORD_ID = 'season-draft';
 export const storedSeasonDraftSchema = z.object({
   recordId: z.literal(SEASON_DRAFT_RECORD_ID),
   /** Current save-schema family for Season Run drafts (M2.4). */
-  saveSchemaVersion: z.literal(3),
+  saveSchemaVersion: z.literal(SEASON_DRAFT_SAVE_SCHEMA_VERSION),
   /** Full revisioned season-draft-v2 snapshot including the command log. */
   draft: seasonDraftStateSchema,
   /** Completed generation result when generate-ai-league was accepted; else null. */
@@ -73,7 +74,7 @@ export function recordFromState(
 ): StoredSeasonDraft {
   return {
     recordId: SEASON_DRAFT_RECORD_ID,
-    saveSchemaVersion: 3,
+    saveSchemaVersion: SEASON_DRAFT_SAVE_SCHEMA_VERSION,
     draft,
     generation,
   };

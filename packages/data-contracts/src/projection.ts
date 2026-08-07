@@ -2,7 +2,11 @@ import { z } from 'zod';
 import type { EraSimulationProfile } from './era-sim-profile.ts';
 import { contentHashSchema, eraIdSchema, playerIdSchema, seedSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { PROJECTION_MODEL_VERSION, PROJECTION_SCHEMA_VERSION } from './season-versions.ts';
+import {
+  PROJECTION_MODEL_VERSION,
+  PROJECTION_SCHEMA_VERSION,
+  PROJECTION_TARGETS_VERSION,
+} from './season-versions.ts';
 import type { SimulationPlayer } from './simulation.ts';
 import { simulationPlayerSchema } from './simulation.ts';
 
@@ -151,6 +155,61 @@ export const projectionMonotonicGateSchema = z.object({
 });
 export type ProjectionMonotonicGate = z.infer<typeof projectionMonotonicGateSchema>;
 
+/**
+ * Frozen base projection calibration targets (projection-targets-v1):
+ * cohort definitions and verification gates for base-five projections
+ * measured against the authoritative fixed-five simulator. Calibration may
+ * tune only the calibration cohort; validation selects a frozen model
+ * release; the held-out cohort is read-only and never rewrites `measured`.
+ */
+export const projectionTargetsSchema = z.object({
+  schemaVersion: z.literal(1),
+  targetsVersion: z.literal(PROJECTION_TARGETS_VERSION),
+  cohorts: z.object({
+    calibrationLineups: z.number().int().positive(),
+    validationLineups: z.number().int().positive(),
+    heldOutLineups: z.number().int().positive(),
+    /** Paired games per lineup (home/away mirrored sides count as two). */
+    gamesPerLineup: z.number().int().positive(),
+    calibrationSeedFrom: seedSchema,
+    calibrationSeedTo: seedSchema,
+    validationSeedFrom: seedSchema,
+    validationSeedTo: seedSchema,
+    heldOutSeedFrom: seedSchema,
+    heldOutSeedTo: seedSchema,
+  }),
+  gates: z.object({
+    /** Max mean absolute offensive-rating error. */
+    offensiveRatingMaeMax: z.number().positive(),
+    /** Max mean absolute defensive-rating error. */
+    defensiveRatingMaeMax: z.number().positive(),
+    /** Max mean absolute net-rating error. */
+    netRatingMaeMax: z.number().positive(),
+    /** Max absolute net-rating bias. */
+    netRatingBiasMax: z.number().positive(),
+    /** Minimum Spearman correlation between projected and simulated ratings. */
+    rankCorrelationMin: z.number().min(-1).max(1),
+    /** Minimum share of pair orderings the projection must get right. */
+    pairwiseOrderingAccuracyMin: z.number().min(0).max(1),
+    /** Monotonic sanity gates: all must pass. */
+    monotonicPassShareMin: z.number().min(0).max(1),
+    /** Share of held-out lineups whose errors must stay inside envelopes. */
+    heldOutPassShare: z.number().min(0).max(1),
+  }),
+  /** Calibration writes these; validation never rewrites them. */
+  measured: z.object({
+    offensiveRatingMae: z.number().nonnegative(),
+    defensiveRatingMae: z.number().nonnegative(),
+    netRatingMae: z.number().nonnegative(),
+    netRatingBias: z.number(),
+    rankCorrelation: z.number().min(-1).max(1),
+    pairwiseOrderingAccuracy: z.number().min(0).max(1),
+    monotonicFailures: z.number().int().nonnegative(),
+    heldOutPassRate: z.number().min(0).max(1),
+  }),
+});
+export type ProjectionTargets = z.infer<typeof projectionTargetsSchema>;
+
 /** Frozen calibration cohort definitions inside the model artifact. */
 export const projectionCohortPolicySchema = z.object({
   calibrationGames: z.number().int().positive(),
@@ -221,14 +280,15 @@ export const projectionLedgerSchema = z.object({
   possessions: z.literal(100),
   turnoverRate: z.number().min(0).max(1),
   nonShootingFoulRate: z.number().min(0).max(1),
-  /** Share of possessions ending in a shot attempt. */
-  shotRate: z.number().min(0).max(1),
-  fieldGoalAttempts: z.number().min(0).max(100),
-  fieldGoalMakes: z.number().min(0).max(100),
-  twoPointAttempts: z.number().min(0).max(100),
-  twoPointMakes: z.number().min(0).max(100),
-  threePointAttempts: z.number().min(0).max(100),
-  threePointMakes: z.number().min(0).max(100),
+  /** Expected field-goal attempts per possession (may exceed 1 with
+   * second-chance continuations). */
+  shotRate: z.number().min(0).max(2),
+  fieldGoalAttempts: z.number().min(0).max(200),
+  fieldGoalMakes: z.number().min(0).max(200),
+  twoPointAttempts: z.number().min(0).max(200),
+  twoPointMakes: z.number().min(0).max(200),
+  threePointAttempts: z.number().min(0).max(200),
+  threePointMakes: z.number().min(0).max(200),
   freeThrowAttempts: z.number().min(0).max(300),
   freeThrowMakes: z.number().min(0).max(300),
   fieldGoalPct: z.number().min(0).max(1),
@@ -242,8 +302,8 @@ export const projectionLedgerSchema = z.object({
   points: z.number().min(0).max(200),
   offensiveReboundRate: z.number().min(0).max(1),
   defensiveReboundRate: z.number().min(0).max(1),
-  offensiveRebounds: z.number().min(0).max(100),
-  defensiveRebounds: z.number().min(0).max(100),
+  offensiveRebounds: z.number().min(0).max(200),
+  defensiveRebounds: z.number().min(0).max(200),
   turnovers: z.number().min(0).max(100),
   assists: z.number().min(0).max(100),
   steals: z.number().min(0).max(100),

@@ -66,7 +66,7 @@
 </script>
 
 <span
-  class="inline-flex shrink-0 items-center justify-center overflow-hidden bg-surface-2 text-muted-foreground {boxClass}"
+  class="inline-flex shrink-0 items-center justify-center overflow-hidden text-muted-foreground {boxClass}"
   role={alt === '' ? undefined : 'img'}
   aria-label={alt === '' ? undefined : alt}
   aria-hidden={alt === '' ? 'true' : undefined}

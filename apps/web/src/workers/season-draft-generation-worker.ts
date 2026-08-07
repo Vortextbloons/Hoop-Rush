@@ -1,34 +1,15 @@
-import type { SeasonLeagueGenerationResult, SeasonRosterTargets } from '@hoop-rush/data-contracts';
-import {
-  SeasonAiGenerationError,
-  generateAiLeague,
-  type SeasonAiGenerationInput,
-} from '@hoop-rush/engine';
+import { SeasonAiGenerationError, generateAiLeague } from '@hoop-rush/engine';
+import type {
+  GenerationWorkerRequest,
+  GenerationWorkerResponse,
+} from '../lib/season/season-generation-wire.ts';
 
 /**
  * Season Run AI league generation worker (M2.3.5). Runs the bounded
  * `generateAiLeague` seam off the main thread so the draft board stays
- * responsive while up to ~660k roster-selection nodes execute.
+ * responsive while up to ~660k roster-selection nodes execute. Envelope
+ * types live in `season-generation-wire.ts`, shared with the draft flow.
  */
-
-interface GenerationWorkerRequest {
-  type: 'generate';
-  requestId: string;
-  input: Omit<SeasonAiGenerationInput, 'targets'>;
-  targets: SeasonRosterTargets;
-}
-
-type GenerationWorkerResponse =
-  | {
-      type: 'complete';
-      requestId: string;
-      generation: SeasonLeagueGenerationResult;
-    }
-  | {
-      type: 'error';
-      requestId: string;
-      message: string;
-    };
 
 self.addEventListener('message', (event: MessageEvent<GenerationWorkerRequest>) => {
   // The declared envelope type narrows the union; at runtime the port may

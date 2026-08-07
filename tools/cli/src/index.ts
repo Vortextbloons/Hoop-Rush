@@ -664,6 +664,108 @@ const COMMANDS: Record<string, CommandEntry> = {
         }),
     };
   }),
+  'projection base': command(async () => {
+    const { projectionBase, PROJECTION_BASE_OPTIONS } = await import('./commands/projection.ts');
+    return {
+      options: PROJECTION_BASE_OPTIONS,
+      run: (args) =>
+        projectionBase({
+          fixture: getOptionString(args, 'fixture'),
+          manifest: getOptionString(args, 'manifest'),
+          model: getOptionString(args, 'model'),
+          era: getOptionString(args, 'era'),
+          reference: getOptionString(args, 'reference'),
+          verbose: hasOption(args, 'verbose'),
+        }),
+    };
+  }),
+  'projection season': command(async () => {
+    const { projectionSeason, PROJECTION_SEASON_OPTIONS } =
+      await import('./commands/projection.ts');
+    return {
+      options: PROJECTION_SEASON_OPTIONS,
+      run: (args) =>
+        projectionSeason({
+          fixture: getOptionString(args, 'fixture'),
+          manifest: getOptionString(args, 'manifest'),
+          model: getOptionString(args, 'model'),
+          era: getOptionString(args, 'era'),
+          verbose: hasOption(args, 'verbose'),
+        }),
+    };
+  }),
+  'projection build': command(async () => {
+    const { projectionBuild, PROJECTION_BUILD_OPTIONS } = await import('./commands/projection.ts');
+    return {
+      options: PROJECTION_BUILD_OPTIONS,
+      run: (args) =>
+        projectionBuild({
+          manifest: getOptionString(args, 'manifest'),
+          out: getOptionString(args, 'out'),
+          write: hasOption(args, 'write'),
+          verbose: hasOption(args, 'verbose'),
+        }),
+    };
+  }),
+  'projection calibrate-base': command(async () => {
+    const { projectionCalibrateBase, PROJECTION_CALIBRATE_OPTIONS } =
+      await import('./commands/projection.ts');
+    return {
+      options: PROJECTION_CALIBRATE_OPTIONS,
+      run: (args) =>
+        projectionCalibrateBase({
+          manifest: getOptionString(args, 'manifest'),
+          model: getOptionString(args, 'model'),
+          targets: getOptionString(args, 'targets'),
+          'seed-from': getOptionString(args, 'seed-from'),
+          'seed-to': getOptionString(args, 'seed-to'),
+          samples: getOptionString(args, 'samples'),
+          workers: getOptionString(args, 'workers'),
+          era: getOptionString(args, 'era'),
+          out: getOptionString(args, 'out'),
+          validate: hasOption(args, 'validate'),
+          'write-model': hasOption(args, 'write-model'),
+          verbose: hasOption(args, 'verbose'),
+        }),
+    };
+  }),
+  'projection validate': command(async () => {
+    const { projectionCalibrateBase, PROJECTION_CALIBRATE_OPTIONS } =
+      await import('./commands/projection.ts');
+    return {
+      options: PROJECTION_CALIBRATE_OPTIONS,
+      run: (args) =>
+        projectionCalibrateBase({
+          manifest: getOptionString(args, 'manifest'),
+          model: getOptionString(args, 'model'),
+          targets: getOptionString(args, 'targets'),
+          'seed-from': getOptionString(args, 'seed-from'),
+          'seed-to': getOptionString(args, 'seed-to'),
+          samples: getOptionString(args, 'samples'),
+          workers: getOptionString(args, 'workers'),
+          era: getOptionString(args, 'era'),
+          out: getOptionString(args, 'out'),
+          validate: true,
+          'write-model': false,
+          verbose: hasOption(args, 'verbose'),
+        }),
+    };
+  }),
+  'projection benchmark': command(async () => {
+    const { projectionBenchmark, PROJECTION_BENCHMARK_OPTIONS } =
+      await import('./commands/projection.ts');
+    return {
+      options: PROJECTION_BENCHMARK_OPTIONS,
+      run: (args) =>
+        projectionBenchmark({
+          manifest: getOptionString(args, 'manifest'),
+          model: getOptionString(args, 'model'),
+          era: getOptionString(args, 'era'),
+          samples: getOptionString(args, 'samples'),
+          verbose: hasOption(args, 'verbose'),
+        }),
+    };
+  }),
   'import ratings': command(async () => {
     const { importRatings, IMPORT_RATINGS_OPTIONS } = await import('./commands/import.ts');
     return {

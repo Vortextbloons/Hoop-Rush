@@ -87,10 +87,10 @@ export const seasonProjectionMetricsSchema = z.object({
   foulResilience: z.number().min(0).max(100),
   /** Contingency depth after every single-player removal (0-100). */
   contingencyDepth: z.number().min(0).max(100),
-  /** Mean matchup robustness across archetype references (0-100). */
-  matchupMean: z.number().min(0).max(100),
-  /** Worst-case matchup robustness (0-100). */
-  matchupWorstCase: z.number().min(0).max(100),
+  /** Mean matchup robustness across archetype references (net-rating terms). */
+  matchupMean: z.number(),
+  /** Worst-case matchup robustness (net-rating terms). */
+  matchupWorstCase: z.number(),
   /** Role redundancy using second-best player and unit per role (0-100). */
   redundancy: z.number().min(0).max(100),
 });

@@ -18,7 +18,8 @@ import {
   seedFromString,
 } from '@hoop-rush/test-fixtures';
 import { createEngineContext } from '../sim/context.ts';
-import { checkSeasonGameResult, simulateSeasonGame } from './season-game.ts';
+import { checkSeasonGameResult } from './season-game-audit.ts';
+import { simulateSeasonGame } from './season-game.ts';
 
 const ctx = createEngineContext();
 

@@ -18,6 +18,10 @@ import {
 } from '@hoop-rush/engine';
 import { recordFromState, type SeasonDraftRepository } from '@hoop-rush/persistence';
 import { newSeasonId } from './season-ids';
+import type {
+  GenerationWorkerRequest,
+  GenerationWorkerResponse,
+} from './season-generation-wire.ts';
 
 /**
  * Season Run solo draft flow (spec/2.0/03, M2.3.5, season-draft-v2): the
@@ -72,17 +76,6 @@ export function coverageNeeds(
   }
   return { guards, forwards, centers };
 }
-
-interface GenerationWorkerRequest {
-  type: 'generate';
-  requestId: string;
-  input: Omit<SeasonAiGenerationInput, 'targets'>;
-  targets: SeasonRosterTargets;
-}
-
-type GenerationWorkerResponse =
-  | { type: 'complete'; requestId: string; generation: SeasonLeagueGenerationResult }
-  | { type: 'error'; requestId: string; message: string };
 
 function isGenerationDeps(
   value: SeasonAiGenerationDeps | SeasonRosterTargets,

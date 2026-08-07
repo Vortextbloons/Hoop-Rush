@@ -143,7 +143,7 @@ Commands:
                          (rotations, stints, deviations).
                          --input <fixture-id> --seed <hex> --profile <eraId>
   season game calibrate  Calibrate the game cohort and freeze
-                         season-game-targets-v1.
+                          season-game-targets-v4.
                          --fixture <ids> --seed-from N --seed-to N --workers N
                          --out <path> --manifest <path>
   season block simulate  Run one ten-game block through the authoritative

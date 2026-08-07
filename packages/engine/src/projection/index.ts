@@ -16,3 +16,11 @@ export {
 } from './reference-lineups.ts';
 export { identifyWeaknesses, weaknessPenalty } from './weaknesses.ts';
 export { ProjectionCache, type ProjectionCacheStats } from './cache.ts';
+export {
+  traceRotationNormal,
+  traceRotationClose,
+  traceContext,
+  type RotationTraceResult,
+  type RotationTraceUnit,
+} from './rotation-trace.ts';
+export { projectSeasonRoster, type SeasonProjectionOptions } from './season.ts';

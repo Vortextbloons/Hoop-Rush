@@ -1,10 +1,15 @@
 import { z } from 'zod';
 import {
   challengeRunSchema,
+  CHECKPOINT_SAVE_SCHEMA_VERSION,
   classicVariantSchema,
   gameResultSchema,
   playerIdSchema,
+  runModeSchema,
+  runOutcomeSchema,
   runPlayerSelectionSchema,
+  RUN_SCHEMA_VERSION,
+  SAVE_SCHEMA_VERSION,
   seedSchema,
   type ChallengeRun,
   type GameResult,
@@ -27,7 +32,7 @@ import type { StoredClassicDraft } from './classic-draft-record.ts';
 export const storedRunRecordSchema = z.object({
   /** 'active' for the single active run, otherwise the run id. */
   recordId: z.string().min(1).max(64),
-  saveSchemaVersion: z.literal(2),
+  saveSchemaVersion: z.literal(SAVE_SCHEMA_VERSION),
   run: challengeRunSchema,
   /** Written by the adapter, never by domain logic. */
   updatedAtIso: z.iso.datetime().optional(),
@@ -43,7 +48,7 @@ export const activeRunCheckpointSchema = challengeRunSchema
   .omit({ schemaVersion: true, games: true, outcome: true })
   .extend({
     recordId: z.literal('active'),
-    saveSchemaVersion: z.literal(3),
+    saveSchemaVersion: z.literal(CHECKPOINT_SAVE_SCHEMA_VERSION),
     /** Narrowed: an abandoned run is never stored as the active checkpoint. */
     status: z.enum(['active', 'finished']),
     /**
@@ -89,7 +94,7 @@ export function checkpointFromRun(record: StoredRunRecord): ActiveRunCheckpoint 
   }
   return {
     recordId: 'active',
-    saveSchemaVersion: 3,
+    saveSchemaVersion: CHECKPOINT_SAVE_SCHEMA_VERSION,
     runId: run.runId,
     mode: run.mode,
     variant: run.variant,
@@ -124,7 +129,7 @@ export function runFromCheckpoint(
   results: GameResult[],
 ): ChallengeRun {
   return {
-    schemaVersion: 2,
+    schemaVersion: RUN_SCHEMA_VERSION,
     runId: checkpoint.runId,
     mode: checkpoint.mode,
     variant: checkpoint.variant,
@@ -152,7 +157,7 @@ export function runFromCheckpoint(
 export const completedRunIndexSchema = z.object({
   recordId: z.string().min(1).max(64),
   runId: z.string().min(1).max(64),
-  mode: z.enum(['sandbox', 'classic']),
+  mode: runModeSchema,
   /** Immutable; present only for classic runs. */
   variant: classicVariantSchema.optional(),
   /** Null for free-form sandbox lineups drawn from any franchise/era pool. */
@@ -166,7 +171,7 @@ export const completedRunIndexSchema = z.object({
   wins: z.number().int().nonnegative(),
   losses: z.number().int().nonnegative(),
   gamesPlayed: z.number().int().positive(),
-  outcome: z.enum(['perfect', 'eliminated']),
+  outcome: runOutcomeSchema,
   completedAtIso: z.iso.datetime(),
 });
 export type CompletedRunIndex = z.infer<typeof completedRunIndexSchema>;

@@ -64,7 +64,10 @@ function mean(values: readonly number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
 }
 
-function ratingMean(players: readonly SimulationPlayer[], key: keyof SimulationPlayer['ratings']): number {
+function ratingMean(
+  players: readonly SimulationPlayer[],
+  key: keyof SimulationPlayer['ratings'],
+): number {
   return mean(players.map((player) => player.ratings[key]));
 }
 
@@ -78,7 +81,10 @@ function tendencyMean(
 /** Creation ability from possession inputs (0-1, mirrors the archetype blend). */
 function creationAbility(player: SimulationPlayer): number {
   return (
-    (player.ratings.ballHandling * 0.4 + player.ratings.passing * 0.35 + player.ratings.offensiveIq * 0.25) / 100
+    (player.ratings.ballHandling * 0.4 +
+      player.ratings.passing * 0.35 +
+      player.ratings.offensiveIq * 0.25) /
+    100
   );
 }
 
@@ -154,7 +160,7 @@ function creationOf(input: {
   }
   const diversity = entropy / Math.log(Math.max(2, actionShares.length));
   const raw =
-    creationMass * 0.6 + diversity * 0.2 + Math.min(1, facts.passOpportunity / 60) * 0.2;
+    creationMass * 0.75 + diversity * 0.15 + Math.min(1, facts.passOpportunity / 60) * 0.1;
   const sortedShares = [...initiatorShares].sort((a, b) => b - a);
   return {
     score: normalize(raw, 'creation', scale),
