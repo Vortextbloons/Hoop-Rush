@@ -49,7 +49,7 @@ export function weaknessPenalty(
   for (const weakness of weaknesses) {
     const policy = model.weaknesses.find((entry) => entry.code === weakness.code);
     const weight = policy?.weight ?? 1;
-    const level = severityWeight[weakness.severity] ?? 1;
+    const level = severityWeight[weakness.severity];
     penalty += weight * level * level;
   }
   return penalty;
