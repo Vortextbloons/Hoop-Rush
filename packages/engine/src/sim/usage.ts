@@ -507,7 +507,11 @@ export function twoPointZoneSharesFromBlend(weights: readonly number[]): [number
  * `pickZone` and the projection layer so expected zone shares use the exact
  * sampled weight vector).
  */
-export function applyZonePulls(action: ActionType, base: readonly number[], driveRate: number): number[] {
+export function applyZonePulls(
+  action: ActionType,
+  base: readonly number[],
+  driveRate: number,
+): number[] {
   const weights = base.slice();
   weights[0] = (weights[0] ?? 0) * (action === 'transition' ? 1.1 : action === 'postUp' ? 1.02 : 1);
   if (action === 'isolation' || action === 'pickAndRoll') {
