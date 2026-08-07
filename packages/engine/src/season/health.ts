@@ -106,6 +106,22 @@ export function seasonFranchiseLegalFiveFacts(
 }
 
 /**
+ * The pregame availability map for a set of rostered versions, derived from
+ * health only (no rolls): used when a game is forfeit-pending (no player is
+ * exposed, so no injuries roll) and by the runner-side reconstruction.
+ */
+export function seasonPregameAvailabilityOf(
+  health: SeasonHealthState,
+  players: readonly { playerVersionId: string }[],
+): ReadonlyMap<string, boolean> {
+  const map = new Map<string, boolean>();
+  for (const player of players) {
+    map.set(player.playerVersionId, seasonPlayerAvailable(health, player.playerVersionId));
+  }
+  return map;
+}
+
+/**
  * One game's availability/removal/return seam facts, derived from health
  * plus the seeded injury rolls for that game (engine-side seam builder the
  * block pipeline consumes). `pregame` covers all 20 rostered versions of
@@ -173,10 +189,7 @@ export function seasonGameHealthSeam(
   }[] = [];
   const newInjuries: SeasonInjuryRecord[] = [];
 
-  for (const [franchiseId, side] of [
-    [input.homeFranchiseId, 'home'],
-    [input.awayFranchiseId, 'away'],
-  ] as const) {
+  for (const franchiseId of [input.homeFranchiseId, input.awayFranchiseId]) {
     const roster = rosterByFranchise.get(franchiseId);
     if (roster === undefined) {
       throw new Error(`season health: game ${input.gameId} references roster ${franchiseId}`);

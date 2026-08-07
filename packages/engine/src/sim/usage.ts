@@ -436,18 +436,6 @@ export function twoPointZoneSharesFromBlend(weights: readonly number[]): [number
 }
 
 /**
- * Normalized two-point share of the player's blended zone mix (the
- * un-mutated mix pickZone shoots; twoPointZoneSharesFromBlend keeps the
- * share math identical for cached blends).
- */
-export function twoPointZoneShares(
-  shooter: SimulationPlayer,
-  profile: EraSimulationProfile,
-): [number, number, number] {
-  return twoPointZoneSharesFromBlend(blendedZoneWeights(shooter, profile));
-}
-
-/**
  * Selects the shot zone from the precomputed era-blended mix, rescaled to the
  * three-point target and modulated by the play type. The cached blend is
  * copied so the per-game cache stays pristine across trips.

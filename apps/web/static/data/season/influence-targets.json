@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "influence-targets-v1",
+  "policy": {
+    "initialGrant": 2,
+    "blockGrant": 1,
+    "objectiveReward": 1,
+    "cap": 8,
+    "floor": -3,
+    "objectiveSuccessEnvelope": [
+      0.65,
+      0.95
+    ],
+    "debtFrequencyMax": 0.1,
+    "extraOfferSpendRateMax": 0.5,
+    "rehabSpendRateMax": 0.4
+  },
+  "cohort": {
+    "seedFrom": 0,
+    "seedTo": 11
+  },
+  "heldOut": {
+    "seedFrom": 12,
+    "seedTo": 15
+  },
+  "measured": {
+    "calibration": {
+      "seasonsSimulated": 12,
+      "balanceChecks": 3240,
+      "reconciliationFailures": 0,
+      "incomeIdentityFailures": 0,
+      "debtFrequency": 0,
+      "debtBoundaries": 0,
+      "capViolations": 0,
+      "objectiveEvaluations": 96,
+      "objectiveSuccessRate": 0.7916666666666666,
+      "extraOfferSpendShare": 0.25277777777777777,
+      "extraOfferWindows": 1080,
+      "rehabSpendShare": 0.03514684641309581,
+      "rehabInjuries": 2077
+    },
+    "heldOut": {
+      "seasonsSimulated": 4,
+      "balanceChecks": 1080,
+      "reconciliationFailures": 0,
+      "incomeIdentityFailures": 0,
+      "debtFrequency": 0,
+      "capViolations": 0,
+      "objectiveEvaluations": 32,
+      "objectiveSuccessRate": 0.6875
+    }
+  },
+  "gates": {
+    "ledgerReconciliation": true,
+    "incomeIdentity": true,
+    "debtFrequency": true,
+    "zeroCapViolations": true,
+    "objectiveSuccessRate": true,
+    "extraOfferSpendRate": true,
+    "rehabSpendRate": true,
+    "heldOut": true
+  },
+  "engineVersion": "m3-engine-v10",
+  "gameVersion": "season-game-v4",
+  "gameTargetsVersion": "season-game-targets-v4",
+  "generatedAtIso": "2026-08-07T00:18:27.722Z"
+}

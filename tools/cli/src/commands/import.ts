@@ -236,8 +236,14 @@ export async function importRunAll(args: {
   const seasons = splitList(args.seasons ?? null) ?? DEFAULT_SEASONS;
   const workers = Math.max(1, Math.min(Number(args.workers ?? 6) || 6, seasons.length));
   const rawTargets = splitList(args.pools ?? null);
-  const targets: Array<[string, string]> | null =
-    rawTargets === null ? null : pools.parsePoolTargets(rawTargets);
+  let targets: Array<[string, string]> | null = null;
+  if (rawTargets !== null) {
+    try {
+      targets = pools.parsePoolTargets(rawTargets);
+    } catch (error) {
+      return usageFailure('import run-all', { pools: rawTargets }, (error as Error).message);
+    }
+  }
 
   const fetchArgs: string[] = ['--seasons', ...seasons, '--workers', String(workers)];
   if (args.includeSchedule) fetchArgs.push('--include-schedule');

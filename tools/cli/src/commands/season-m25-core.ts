@@ -238,6 +238,25 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
     checkpoints.push(checkpoint);
     postBlock.push({ stateRevision: state.stateRevision, stateDigest: state.stateDigest });
     balanceSnapshots.push({ ...checkpoint.influence.balances });
+    // M2.5: record the locked objective selection with its evaluated success
+    // (the candidate evaluated it at assembly; the run's selections record
+    // is the objective-history source the influence gates measure).
+    if (state.objectiveId !== null && checkpoint.objective.objectiveId !== null) {
+      state.run = {
+        ...state.run,
+        objectives: {
+          ...state.run.objectives,
+          selections: {
+            ...state.run.objectives.selections,
+            [blockIndex]: {
+              objectiveId: state.objectiveId,
+              selectedByCommandId: `season-block-${String(blockIndex)}-${String(state.acceptedCommandIds.length)}`,
+              success: checkpoint.objective.success,
+            },
+          },
+        },
+      };
+    }
     if (
       options.driveWindows &&
       (M25_TRADE_WINDOW_BLOCKS as readonly number[]).includes(blockIndex)
@@ -247,6 +266,12 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
         blockIndex,
         rootSeed: options.rootSeed,
         humanFranchiseId: state.humanFranchiseId,
+        // M2.5: window generation needs the packaged catalog (positions +
+        // ratings for legality, value bands, and rotation repair); without
+        // it the engine throws SeasonTradeFactsError rather than recording
+        // an unvalidated window.
+        catalog: state.catalog,
+        effects: state.effects,
       };
       const result = openSeasonTradeWindow(windowInput);
       windows.push({ blockIndex, result });

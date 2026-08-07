@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "injury-targets-v1",
+  "profile": {
+    "baseRiskBasisPoints": 80,
+    "riskClamp": [
+      20,
+      220
+    ],
+    "severityShares": {
+      "minor": 0.6,
+      "moderate": 0.28,
+      "major": 0.1,
+      "seasonEnding": 0.02
+    },
+    "recoveryRanges": {
+      "minor": [
+        1,
+        2
+      ],
+      "moderate": [
+        3,
+        6
+      ],
+      "major": [
+        7,
+        18
+      ]
+    },
+    "sameGameReturnRate": 0.35,
+    "recurrenceBonusBasisPoints": 40,
+    "recurrenceWindowTeamGames": 10
+  },
+  "cohort": {
+    "seedFrom": 0,
+    "seedTo": 15
+  },
+  "heldOut": {
+    "seedFrom": 16,
+    "seedTo": 19
+  },
+  "measured": {
+    "calibration": {
+      "seasonsSimulated": 16,
+      "exposures": 393600,
+      "injuries": 2800,
+      "meanRiskBasisPoints": 71.13821138211382,
+      "severityShares": {
+        "minor": 0.6085714285714285,
+        "moderate": 0.2814285714285714,
+        "major": 0.08785714285714286,
+        "seasonEnding": 0.02214285714285714
+      },
+      "durationMeans": {
+        "minor": 1.506779661016949,
+        "moderate": 4.48984771573604,
+        "major": 12.792682926829269
+      },
+      "sameGameReturnRate": 0.35501355013550134,
+      "recurrence": {
+        "windowIncidenceBp": 127.49999999999999,
+        "nonWindowIncidenceBp": 91.75000000000001,
+        "gapBp": 35.74999999999997,
+        "ratio": 1.3896457765667571
+      },
+      "seasonEndingRate": 0.02214285714285714,
+      "standings": {
+        "strongTeamIncidenceBp": 72.21798780487805,
+        "weakTeamIncidenceBp": 70.41836043360433,
+        "gapBp": 1.799627371273715
+      }
+    },
+    "monotonicity": {
+      "minutes": {
+        "lowIncidenceBp": 84.44999999999999,
+        "highIncidenceBp": 98.2
+      },
+      "fatigue": {
+        "lowIncidenceBp": 84.44999999999999,
+        "highIncidenceBp": 107.89999999999999
+      },
+      "durability": {
+        "highIncidenceBp": 82,
+        "lowIncidenceBp": 103.05
+      }
+    },
+    "heldOut": {
+      "seasonsSimulated": 4,
+      "exposures": 98400,
+      "injuries": 710,
+      "meanRiskBasisPoints": 72.15447154471545,
+      "severityShares": {
+        "minor": 0.604225352112676,
+        "moderate": 0.2647887323943662,
+        "major": 0.1056338028169014,
+        "seasonEnding": 0.02535211267605634
+      }
+    }
+  },
+  "gates": {
+    "incidence": true,
+    "severityDistribution": true,
+    "durationMeans": true,
+    "sameGameReturn": true,
+    "recurrenceLift": true,
+    "seasonEndingRate": true,
+    "monotonicMinutes": true,
+    "monotonicFatigue": true,
+    "monotonicDurability": true,
+    "standingsIndependent": true,
+    "heldOut": true
+  },
+  "engineVersion": "m3-engine-v10",
+  "gameVersion": "season-game-v4",
+  "gameTargetsVersion": "season-game-targets-v4",
+  "generatedAtIso": "2026-08-07T18:09:45.893Z"
+}

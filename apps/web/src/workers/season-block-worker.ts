@@ -3,6 +3,7 @@ import {
   blockRoundRange,
   loadEraSimulationProfile,
   loadSeasonDraftCatalog,
+  parseSeasonDraftCatalog,
   seasonWorkerMessageSchema,
   seasonWorkerRequestSchema,
   SEASON_HEALTH_VERSION,
@@ -11,9 +12,9 @@ import {
   type SeasonEffectsState,
   type SeasonGameSummary,
   type SeasonHealthState,
+  type SeasonInfluenceState,
   type SeasonInvalidRosterInterruption,
   type SeasonRetainedGameDetail,
-  type SeasonRun,
   type SeasonWorkerCompleteMessage,
   type SeasonWorkerErrorMessage,
   type SeasonWorkerProgressMessage,
@@ -24,6 +25,7 @@ import {
   assembleSeasonBlockCandidate,
   assembleSeasonPendingBlock,
   auditSeasonBlock,
+  createInitialSeasonInfluenceState,
   createSeasonEffectsState,
   expandSeasonRunRosters,
   rosterPlayerIdsOf,
@@ -142,7 +144,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  * re-download + hash verify + Zod parse on every block of a season.
  */
 async function loadCatalogCached(url: string, contentHash: string): Promise<SeasonDraftCatalog> {
-  const cached = await readCachedAsset<SeasonDraftCatalog>(contentHash);
+  const cached = await readCachedAsset(contentHash, parseSeasonDraftCatalog);
   if (cached !== null) return cached;
   const catalog = await loadSeasonDraftCatalog(url, contentHash);
   void writeCachedAsset(contentHash, catalog);
@@ -168,6 +170,11 @@ function initialHealth(): SeasonHealthState {
     healthVersion: SEASON_HEALTH_VERSION,
     injuries: [],
   };
+}
+
+/** M2.5: the league-wide initial Influence state (defensive fallback). */
+function initialInfluence(run: SeasonBlockRunContext): SeasonInfluenceState {
+  return createInitialSeasonInfluenceState(run.league.teams.map((team) => team.franchiseId));
 }
 
 /**
@@ -238,17 +245,12 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     return;
   }
 
-  // M2.5 SEAM: the candidate's expected pre-block run state facts are not
-  // carried by the frozen wire; the runner includes them on the run context
-  // and validates the assembled candidate against the authoritative run at
-  // acceptance (mismatches are rejected, so an unavailable seam value can
-  // never be committed).
-  const stateFacts = request.run as SeasonBlockRunContext & {
-    stateRevision?: number;
-    stateDigest?: string;
-  };
-  const expectedStateRevision = stateFacts.stateRevision ?? 0;
-  const expectedStateDigest = stateFacts.stateDigest ?? '0'.repeat(32);
+  // M2.5: the candidate's expected pre-block run state facts ride the wire
+  // (required fields); the runner validates the assembled candidate against
+  // the authoritative submitted run at acceptance, so a wrong seam value can
+  // never be committed.
+  const expectedStateRevision = request.expectedStateRevision;
+  const expectedStateDigest = request.expectedStateDigest;
 
   const expanded = expandSeasonRunRosters(run, catalog);
   const input: SeasonBlockSimulationInput = {
@@ -274,8 +276,11 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     rosterPlayerIds: rosterPlayerIdsOf(run),
     priorSummaries: accumulatedSummaries,
     effects: accumulatedEffects ?? initialEffects(expanded),
-    // M2.5: the pre-block health state and the locked block objective.
+    // M2.5: the pre-block health state, the pre-block Influence economy, the
+    // authoritative run-scoped transaction log, and the locked objective.
     health: accumulatedHealth,
+    influence: request.priorInfluence ?? initialInfluence(run),
+    transactions: request.priorTransactions ?? [],
     objectiveId: request.objectiveId,
   };
 
@@ -320,9 +325,15 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   }
   const remainingGames = games.slice(startIndex);
   // M2.4 recovery cadence mirrors the CLI pipeline: one between-round tick
-  // per player, never before the season's first game.
+  // per player, never before the season's first game. M2.5 resume: the tick
+  // fires only when the first resumed game crosses a round boundary, so the
+  // resume cadence matches the uninterrupted path (the pending's partial
+  // summaries already carried their ticks). The engine skips the tick when
+  // `skipRecoveryTick` is true (no round advance).
   const { fromRound } = blockRoundRange(request.blockIndex);
-  let previousRound = fromRound - 1;
+  const precedingRound =
+    startIndex > 0 ? (games[startIndex - 1]?.round ?? fromRound) : fromRound - 1;
+  let previousRound = precedingRound;
   let effects = accumulatedEffects ?? initialEffects(expanded);
   let health = accumulatedHealth;
   let lastProgressAt = 0;
@@ -373,7 +384,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   // cursor never advances; the runner persists it and resumes later).
   if (interruption !== null) {
     const pending = assembleSeasonPendingBlock({
-      run: run as unknown as SeasonRun,
+      run,
       commandId: request.commandId,
       blockIndex: request.blockIndex,
       expectedRevision: request.expectedRevision,

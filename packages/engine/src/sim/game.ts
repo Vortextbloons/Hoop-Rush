@@ -1,5 +1,11 @@
 import type { GameResult, GameSimulationInput, SimulationTeam } from '@hoop-rush/data-contracts';
 import type { EngineContext } from './context.ts';
+import {
+  MAX_PERIODS,
+  OVERTIME_PERIOD_SECONDS,
+  REGULATION_PERIOD_SECONDS,
+  resolveGameWinner,
+} from './periods.ts';
 import { GameRecorder, type SideIndex } from './recorder.ts';
 import { createGameState, createTripContext, resolveTrip } from './possession.ts';
 import { buildFacts } from './facts.ts';
@@ -17,10 +23,6 @@ import { buildFacts } from './facts.ts';
  * possession order, RNG call sequence, result schema, and digest are
  * byte-identical to the pre-M2.2 engine.
  */
-
-const REGULATION_PERIOD_SECONDS = 720;
-const OVERTIME_PERIOD_SECONDS = 300;
-const MAX_PERIODS = 12;
 
 /**
  * Neutral fixed-five adapter (spec/03): immutable lineups, no foul-outs, no
@@ -69,15 +71,7 @@ export function playFixedFivePeriods(
 
   const homeScore = recorder.sides[0].points;
   const awayScore = recorder.sides[1].points;
-  // A tie after the period cap is a pathological guard; the seeded draw decides.
-  const winner: 'home' | 'away' =
-    homeScore > awayScore
-      ? 'home'
-      : awayScore > homeScore
-        ? 'away'
-        : rng.chance(0.5)
-          ? 'home'
-          : 'away';
+  const winner = resolveGameWinner(homeScore, awayScore, rng);
 
   return { overtimePeriods, winner };
 }

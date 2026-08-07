@@ -4,11 +4,7 @@
   import { resolve } from '$app/paths';
   import type { HoopRushManifest, SeasonLeague, SeasonSchedule } from '@hoop-rush/data-contracts';
   import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
-  import {
-    engineGenerationDeps,
-    SeasonDraftFlow,
-    type SeasonDraftFlowState,
-  } from '$lib/season/season-draft-flow';
+  import { SeasonDraftFlow, type SeasonDraftFlowState } from '$lib/season/season-draft-flow';
   import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
   import {
     loadSeasonDraftCatalog,
@@ -79,11 +75,10 @@
             displayName: candidate.displayName,
           })),
         );
-        flow = new SeasonDraftFlow(
-          new DexieSeasonDraftRepository(),
-          catalog,
-          engineGenerationDeps(rosterTargets),
-        );
+        flow = new SeasonDraftFlow(new DexieSeasonDraftRepository(), catalog, rosterTargets);
+        flow.onPhaseChange = () => {
+          if (flow !== null) board = flow.state();
+        };
         board = flow.state();
         hasDraft = await flow.load();
         board = flow.state();
@@ -169,9 +164,12 @@
     actionError = null;
     generationError = null;
     try {
-      await flow.generate();
+      const generation = await flow.generate();
+      if (generation === null && flow.error !== null) {
+        generationError = flow.error;
+      }
     } catch (error) {
-      generationError = error instanceof Error ? error.message : String(error);
+      generationError = flow.error ?? (error instanceof Error ? error.message : String(error));
     } finally {
       board = flow.state();
       busy = false;
@@ -206,9 +204,10 @@
         generation: flow.generation,
       });
       await repo.promoteSeasonDraftToRun(stored, run);
-      void goto(resolve('/season/run'));
+      await goto(resolve('/season/run'));
     } catch (error) {
       promoteError = error instanceof Error ? error.message : String(error);
+    } finally {
       promoting = false;
     }
   }
@@ -397,7 +396,8 @@
           </button>
           {#if board.phase === 'generating'}
             <p class="mt-3 font-mono text-xs text-muted-foreground">
-              Bounded deterministic generation — the board stays responsive.
+              Bounded deterministic generation — running off the main thread so the board stays
+              responsive.
             </p>
           {/if}
           {#if generationError}

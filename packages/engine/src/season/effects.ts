@@ -351,7 +351,6 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
     defender: string | undefined,
     reboundContests: number,
   ): void {
-    const member = new Set(unit);
     for (const version of unit) {
       const state = this.game.get(version);
       if (state === undefined) continue;
@@ -363,7 +362,6 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
         state.fatigue = Math.min(BP_SCALE, state.fatigue + bonus);
       }
     }
-    void member;
   }
 
   private fatigueOf(version: string): number {

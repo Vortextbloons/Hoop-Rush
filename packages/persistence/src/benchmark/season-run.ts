@@ -1,4 +1,5 @@
 import {
+  humanFranchiseIdOf,
   type SeasonBlockRecap,
   type SeasonCheckpointState,
   type SeasonEffectsState,
@@ -171,8 +172,7 @@ export function buildFullSeasonDataset(input: {
   const schedule = buildFixtureSchedule(seed);
   const run = buildFixtureRun({ seed, runId, schedule });
   const { league, rosters } = run;
-  const humanFranchiseId =
-    league.teams.find((team) => team.control === 'human')?.franchiseId ?? 'lakers';
+  const humanFranchiseId = humanFranchiseIdOf(league) ?? 'lakers';
   const allSummaries = buildFixtureFullSeasonSummaries({ runId, schedule, rosters });
   const allDetails = allSummaries
     .filter(

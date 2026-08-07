@@ -1,9 +1,12 @@
 import {
+  humanFranchiseIdOf,
   SEASON_RUN_SCHEMA_VERSION,
   seasonSubmitBlockCommandSchema,
   type SeasonAcceptTradeOfferResult,
   type SeasonActiveRunIndex,
   type SeasonDeclineTradeOfferResult,
+  type SeasonDraftCatalog,
+  type SeasonEffectsState,
   type SeasonForfeitInterruptedGameResult,
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
@@ -19,7 +22,7 @@ import {
   type SeasonSpendInfluenceResult,
   type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
-import { handleSeasonRunCommand } from '@hoop-rush/engine';
+import { handleSeasonRunCommand, type SeasonRunCommandContext } from '@hoop-rush/engine';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -34,6 +37,7 @@ import {
 import { newSeasonId } from './season-ids';
 import {
   cachedSeasonSnapshotMatches,
+  clearCachedSeasonSnapshot,
   getCachedSeasonSnapshot,
   setCachedSeasonSnapshot,
 } from './season-state-cache';
@@ -93,33 +97,13 @@ export interface SeasonRunCommandError {
 /** The two M2.5 Influence spend purposes (data-contracts keeps them inline). */
 export type SeasonSpendInfluencePurpose = SeasonSpendInfluenceCommand['purpose'];
 
-/**
- * The frozen engine handler contract (lead-owned `@hoop-rush/engine` export
- * lands at integration; the hub types the call against the frozen shape
- * through this cast until then).
- */
-type SeasonRunCommandContext = {
-  run: SeasonRun;
-  pending: SeasonPendingBlockCandidate | null;
-  humanFranchiseId: string | null;
-};
+/** The post-command effects state when the engine attached it to the run output. */
+function postCommandEffects(run: SeasonRun, prior: SeasonEffectsState): SeasonEffectsState {
+  const withEffects = run as SeasonRun & { effects?: SeasonEffectsState };
+  return withEffects.effects ?? prior;
+}
 
-type SeasonRunCommandOutput = {
-  result:
-    | SeasonSelectBlockObjectiveResult
-    | SeasonSpendInfluenceResult
-    | SeasonAcceptTradeOfferResult
-    | SeasonDeclineTradeOfferResult
-    | SeasonResumeSeasonBlockResult
-    | SeasonForfeitInterruptedGameResult;
-  run: SeasonRun;
-  pending: SeasonPendingBlockCandidate | null;
-};
-
-const handleRunCommand = handleSeasonRunCommand as unknown as (
-  command: SeasonRunCommand,
-  context: SeasonRunCommandContext,
-) => SeasonRunCommandOutput;
+const handleRunCommand = handleSeasonRunCommand;
 
 const IDLE_BLOCK: BlockRunState = {
   requestId: null,
@@ -163,6 +147,11 @@ export class SeasonHubState {
   interruption: SeasonInvalidRosterInterruption | null = null;
   /** M2.5: the last rejected between-block command, surfaced as a typed alert. */
   commandError: SeasonRunCommandError | null = null;
+  /**
+   * Packaged draft catalog for trade commands (positions + ratings). Set by
+   * the run layout after assets load.
+   */
+  catalog: SeasonDraftCatalog | null = null;
 
   constructor(repo: SeasonRunRepository, runner: SeasonBlockRunner) {
     this.repo = repo;
@@ -362,8 +351,7 @@ export class SeasonHubState {
         rotationDigest: pending.rotationDigest,
         commandId: pending.commandId,
         rotations: run.rotations,
-        humanFranchiseId:
-          run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null,
+        humanFranchiseId: humanFranchiseIdOf(run.league),
         homeCourt,
         catalogUrl: urls.catalogUrl,
         catalogHash: urls.catalogHash,
@@ -558,12 +546,15 @@ export class SeasonHubState {
         run: snapshot.run,
         pending: this.pending,
         humanFranchiseId: this.humanFranchiseId(),
-      });
-      if (output.result.status === 'rejected') {
+        effects: snapshot.effects,
+        catalog: this.catalog ?? undefined,
+      } satisfies SeasonRunCommandContext);
+      const envelope = output.result;
+      if (envelope.result.status === 'rejected') {
         this.commandError = {
           command: command.command,
-          rejection: output.result.rejection,
-          message: describeCommandRejection(command.command, output.result.rejection),
+          rejection: envelope.result.rejection,
+          message: describeCommandRejection(command.command, envelope.result.rejection),
         };
         this.emit();
         return;
@@ -572,9 +563,23 @@ export class SeasonHubState {
         runId: snapshot.run.runId,
         command,
         run: output.run,
+        effects: postCommandEffects(output.run, snapshot.effects),
         pending: output.pending,
       });
       this.commandError = null;
+      // Apply the engine mutation immediately so the hub reflects the
+      // selection before the repository round-trip (and so a stale session
+      // snapshot cache cannot flash the pre-command state back into the UI).
+      if (this.snapshot !== null) {
+        const effects = postCommandEffects(output.run, this.snapshot.effects);
+        this.snapshot = { ...this.snapshot, run: output.run, effects };
+        this.emit();
+      }
+      // Between-block commands mutate the run without changing the
+      // accepted-block count, so the session snapshot cache (keyed by runId
+      // + revision) would serve the stale pre-command state on refresh.
+      // Clear it so the full validated load picks up the persisted state.
+      clearCachedSeasonSnapshot();
       await this.refresh();
     } catch (error) {
       this.commandError = {
@@ -602,15 +607,13 @@ export class SeasonHubState {
 
   private requiredHumanFranchiseId(): string {
     const franchiseId =
-      this.snapshot?.run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
+      this.snapshot === null ? null : humanFranchiseIdOf(this.snapshot.run.league);
     if (franchiseId === null) throw new Error('the active run has no human franchise');
     return franchiseId;
   }
 
   private humanFranchiseId(): string | null {
-    return (
-      this.snapshot?.run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null
-    );
+    return this.snapshot === null ? null : humanFranchiseIdOf(this.snapshot.run.league);
   }
 
   private onRunnerEvent(event: SeasonRunnerEvent): void {

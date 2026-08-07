@@ -20,7 +20,7 @@ import {
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
-import { parseCount } from '../args.ts';
+import { parseSeedRange, parseWorkers } from '../args.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
 import {
   gateValue,
@@ -161,24 +161,37 @@ export const seasonTradeTargetsSchema = z.object({
 });
 export type SeasonTradeTargets = z.infer<typeof seasonTradeTargetsSchema>;
 
-/** Accepted AI trades per season: accepted offers in the recorded windows. */
+/**
+ * Accepted AI trades per season: the accepted offers of the window each
+ * `SeasonM25WindowOpen` result opened. Each window result's `trade.windows`
+ * ACCUMULATES every earlier window (the driver folds the trade state
+ * forward), so only the last window of each result is counted — counting
+ * all windows would triple-count window 0's offers.
+ */
 export function aiTradesOf(season: SeasonM25SeasonFacts): number {
   let accepted = 0;
   for (const window of season.windows) {
     if (window.result === null) continue;
-    for (const offer of window.result.trade.windows.flatMap((entry) => entry.offers)) {
+    const opened = window.result.trade.windows.at(-1);
+    if (opened === undefined) continue;
+    for (const offer of opened.offers) {
       if (offer.status === 'accepted') accepted += 1;
     }
   }
   return accepted;
 }
 
-/** Value-band failures among the accepted offers of one season. */
+/**
+ * Value-band failures among the accepted offers of one season: only the
+ * window each result opened is counted (see `aiTradesOf`).
+ */
 export function valueBandFailuresOf(season: SeasonM25SeasonFacts): number {
   let failures = 0;
   for (const window of season.windows) {
     if (window.result === null) continue;
-    for (const offer of window.result.trade.windows.flatMap((entry) => entry.offers)) {
+    const opened = window.result.trade.windows.at(-1);
+    if (opened === undefined) continue;
+    for (const offer of opened.offers) {
       if (offer.status !== 'accepted') continue;
       if (!offer.valueBand.qualified) {
         failures += 1;
@@ -443,12 +456,7 @@ export function validateSeasonTradeTargets(args: SeasonTradeArgs, outPath: strin
 /** `season trade calibrate`: runs the gates and freezes trade-targets-v1. */
 export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
   const started = Date.now();
-  const from = parseCount(args['seed-from'] ?? undefined, '--seed-from', 0);
-  const to = parseCount(
-    args['seed-to'] ?? undefined,
-    '--seed-to',
-    SEASON_TRADE_CALIBRATION_SEED_COUNT - 1,
-  );
+  const { from, to } = parseSeedRange(args, SEASON_TRADE_CALIBRATION_SEED_COUNT - 1);
   const outPath = args.out ?? DEFAULT_TRADE_TARGETS;
   const validateOnly = args['validate'] !== null;
 
@@ -456,7 +464,7 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
     return validateSeasonTradeTargets(args, resolve(args.validate ?? outPath));
   }
 
-  const workers = parseCount(args.workers ?? undefined, '--workers', 1);
+  const workers = parseWorkers(args, 1);
   const calibrationIndices = seedIndexRange(from, to);
   const validationIndices = seedIndexRange(to + 1, to + SEASON_TRADE_VALIDATION_SEED_COUNT);
 

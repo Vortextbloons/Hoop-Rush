@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
+import { franchiseEraPoolSchema, type FranchiseEraPool } from '@hoop-rush/data-contracts';
 
 /**
  * Best-effort IndexedDB cache for franchise-era pools and large validated
@@ -11,7 +11,10 @@ import type { FranchiseEraPool } from '@hoop-rush/data-contracts';
  * manifest hash, so a data repack naturally invalidates stale cache entries.
  *
  * Cache failures (unavailable storage, quota, corrupt records) never break
- * loading: every read fallback drops through to the network path.
+ * loading: every read fallback drops through to the network path. A present
+ * but corrupt record is detected on read by re-validating the payload
+ * through its schema (pools) or the caller's parser (assets), so corrupt
+ * rows can never enter app state.
  */
 
 interface CachedPoolRecord {
@@ -55,9 +58,10 @@ export async function readCachedPool(
   try {
     const record = await db.pools.get(key);
     // The pool was schema-validated before caching and is trusted only when
-    // the content hash still matches the manifest, so no re-parse is needed.
+    // the content hash still matches the manifest; the payload is re-parsed
+    // so a corrupt-but-present record falls back to the network path.
     if (!record || record.contentHash !== expectedHash) return null;
-    return record.pool;
+    return franchiseEraPoolSchema.parse(record.pool);
   } catch {
     return null;
   }
@@ -76,12 +80,20 @@ export async function writeCachedPool(
   }
 }
 
-/** Read a previously cached validated asset when its hash still matches. */
-export async function readCachedAsset<T>(contentHash: string): Promise<T | null> {
+/**
+ * Read a previously cached validated asset when its hash still matches. When
+ * `parse` is supplied, the stored payload is re-validated through it on
+ * every read; a corrupt-but-present record returns null so the caller's
+ * network fallback engages.
+ */
+export async function readCachedAsset<T>(
+  contentHash: string,
+  parse?: (value: unknown) => T,
+): Promise<T | null> {
   try {
     const record = await db.assets.get(contentHash);
     if (!record) return null;
-    return record.value as T;
+    return parse === undefined ? (record.value as T) : parse(record.value);
   } catch {
     return null;
   }

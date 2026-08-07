@@ -1,5 +1,5 @@
 import { playersIndexSchema, type PlayersIndex } from '../player-season.ts';
-import { sha256Hex } from './verify-hash.ts';
+import { loadJsonAsset } from './load-json.ts';
 
 /** Validate an unknown draft-index value at a runtime boundary. */
 export function parsePlayersIndex(value: unknown): PlayersIndex {
@@ -13,26 +13,15 @@ export function parsePlayersIndex(value: unknown): PlayersIndex {
  * match before the index is parsed (verification is skipped when WebCrypto is
  * unavailable).
  */
-export async function loadPlayersIndex(
+export function loadPlayersIndex(
   url: string,
   expectedHash?: string,
   init?: RequestInit,
 ): Promise<PlayersIndex> {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    throw new Error(
-      `players index request failed: ${String(response.status)} ${response.statusText}`,
-    );
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (expectedHash !== undefined) {
-    const digest = await sha256Hex(bytes);
-    if (digest !== null && digest !== expectedHash) {
-      throw new Error(
-        `players index content hash mismatch: expected ${expectedHash}, got ${digest}`,
-      );
-    }
-  }
-  const text = new TextDecoder().decode(bytes);
-  return parsePlayersIndex(JSON.parse(text) as unknown);
+  return loadJsonAsset(url, {
+    label: 'players index',
+    expectedHash,
+    parse: parsePlayersIndex,
+    init,
+  });
 }

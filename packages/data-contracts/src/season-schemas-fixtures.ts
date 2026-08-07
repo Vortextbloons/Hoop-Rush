@@ -17,6 +17,7 @@ import type {
   SeasonPlayerAggregate,
 } from './index.ts';
 import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
+import { SEASON_ALIGNMENT } from './season-alignment.ts';
 
 /**
  * Self-contained Season Run contract fixtures shared by the data-contracts
@@ -25,74 +26,17 @@ import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
  */
 
 export const CONFERENCE_TEAMS: Record<'east' | 'west', string[]> = {
-  east: [
-    'hawks',
-    'celtics',
-    'nets',
-    'hornets',
-    'bulls',
-    'cavaliers',
-    'pistons',
-    'pacers',
-    'heat',
-    'bucks',
-    'knicks',
-    'magic',
-    'sixers',
-    'raptors',
-    'wizards',
-  ],
-  west: [
-    'mavericks',
-    'nuggets',
-    'warriors',
-    'rockets',
-    'clippers',
-    'lakers',
-    'grizzlies',
-    'timberwolves',
-    'pelicans',
-    'thunder',
-    'suns',
-    'blazers',
-    'kings',
-    'spurs',
-    'jazz',
-  ],
+  east: SEASON_ALIGNMENT.filter((entry) => entry.conference === 'east').map(
+    (entry) => entry.franchiseId,
+  ),
+  west: SEASON_ALIGNMENT.filter((entry) => entry.conference === 'west').map(
+    (entry) => entry.franchiseId,
+  ),
 };
 
-export const DIVISION_OF: Record<string, string> = {
-  hawks: 'southeast',
-  celtics: 'atlantic',
-  nets: 'atlantic',
-  hornets: 'southeast',
-  bulls: 'central',
-  cavaliers: 'central',
-  pistons: 'central',
-  pacers: 'central',
-  heat: 'southeast',
-  bucks: 'central',
-  knicks: 'atlantic',
-  magic: 'southeast',
-  sixers: 'atlantic',
-  raptors: 'atlantic',
-  wizards: 'southeast',
-  mavericks: 'southwest',
-  nuggets: 'northwest',
-  warriors: 'pacific',
-  rockets: 'southwest',
-  clippers: 'pacific',
-  lakers: 'pacific',
-  grizzlies: 'southwest',
-  timberwolves: 'northwest',
-  pelicans: 'southwest',
-  thunder: 'northwest',
-  suns: 'pacific',
-  blazers: 'northwest',
-  kings: 'pacific',
-  spurs: 'southwest',
-  jazz: 'northwest',
-};
+export const DIVISION_OF: Record<string, string> = Object.fromEntries(
+  SEASON_ALIGNMENT.map((entry) => [entry.franchiseId, entry.division]),
+);
 
 export const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 

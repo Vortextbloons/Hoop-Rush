@@ -17,16 +17,16 @@ import {
   createEngineContext,
   simulateSeasonGame,
 } from '@hoop-rush/engine';
-import { parseCount } from '../args.ts';
+import { parseSeedRange, parseWorkers } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonHomeCourtCalibrateReportSchema } from '../report-schemas.ts';
 import { seasonGameFixtureSchema } from '../fixture-schema.ts';
 import {
-  seasonGameCalibrationSeed,
   loadSeasonGameFixture,
   resolveSeasonGameFixturePath,
   type SeasonGameEngineDeps,
 } from './season-game.ts';
+import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
 
 /**
@@ -222,7 +222,7 @@ export function runSeasonHomeCourtCohortInProcess(
       throw new Error(`season game fixture ${fixture.fixtureId} fails validation`);
     }
     for (const index of request.seedIndices) {
-      const seed = seasonGameCalibrationSeed(index);
+      const seed = seasonCalibrationSeed(index);
       const input = seasonGameSimulationInputSchema.parse({ ...parsed.data.input, seed });
       facts.push(
         simulateSeasonHomeCourtFacts(fixture.fixtureId, index, input, request.profile, deps),
@@ -230,12 +230,6 @@ export function runSeasonHomeCourtCohortInProcess(
     }
   }
   return Promise.resolve(facts);
-}
-
-function seedIndexRange(from: number, to: number): number[] {
-  const indices: number[] = [];
-  for (let i = from; i <= to; i += 1) indices.push(i);
-  return indices;
 }
 
 /** Aggregates home win rates over one cohort. */
@@ -351,16 +345,11 @@ export async function seasonHomeCourtCalibrate(
   if (fixtureIds.length === 0) {
     throw new Error('--fixture needs at least one fixture id');
   }
-  const seedFrom = parseCount(args['seed-from'] ?? undefined, '--seed-from', 0);
-  const seedTo = parseCount(
-    args['seed-to'] ?? undefined,
-    '--seed-to',
-    SEASON_HOME_COURT_SEED_TOTAL - 1,
-  );
-  if (seedTo < seedFrom) {
-    throw new Error('--seed-to must be >= --seed-from');
-  }
-  const workers = Math.max(1, parseCount(args.workers ?? undefined, '--workers', 4));
+  const { from: seedFrom, to: seedTo } = parseSeedRange(args, SEASON_HOME_COURT_SEED_TOTAL - 1, {
+    requireOrder: true,
+    error: Error,
+  });
+  const workers = parseWorkers(args, 4, { clampToAtLeastOne: true });
   const profile = profileOfConstants(args.constants);
   const fixtures = fixtureIds.map((id) => {
     const fixture = loadSeasonGameFixture(id);

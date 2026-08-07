@@ -7,7 +7,7 @@
     SeasonDraftCatalog,
     SeasonGameSummary,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { franchiseAbbreviation, humanFranchiseIdOf } from '@hoop-rush/data-contracts';
   import BoxScore from '$lib/components/season/BoxScore.svelte';
   import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
   import {
@@ -100,9 +100,7 @@
   });
 
   const run = $derived(snapshot?.run ?? null);
-  const humanFranchiseId = $derived(
-    run ? (run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null) : null,
-  );
+  const humanFranchiseId = $derived(run ? humanFranchiseIdOf(run.league) : null);
   const lastBlock = $derived(
     snapshot && snapshot.acceptedBlocks.length > 0
       ? snapshot.acceptedBlocks[snapshot.acceptedBlocks.length - 1]!

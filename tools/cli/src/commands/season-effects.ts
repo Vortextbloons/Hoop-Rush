@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+﻿import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { z } from 'zod';
@@ -29,7 +29,7 @@ import {
   simulateSeasonGameWithEffects,
   unitChemistryBasisPoints,
 } from '@hoop-rush/engine';
-import { UsageError } from '../args.ts';
+import { parseCount, UsageError } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import {
   seasonEffectsCalibrateReportSchema,
@@ -45,6 +45,7 @@ import {
   type SeasonGameEngineDeps,
 } from './season-game.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
+import { seedIndexRange } from './season-calibration.ts';
 
 /**
  * M2.4 `season effects` commands (spec/2.0/05, season-effect-targets-v1).
@@ -86,16 +87,6 @@ export type SeasonEffectsArgs = Record<string, string | null>;
 /** Option reader: value or fallback (options registered but absent are null). */
 function opt(args: SeasonEffectsArgs, key: string, fallback: string): string {
   return args[key] ?? fallback;
-}
-
-function parseCountOpt(args: SeasonEffectsArgs, key: string, fallback: number): number {
-  const raw = args[key];
-  if (raw === undefined || raw === null) return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new UsageError(`${key} must be a nonnegative integer (got "${raw}")`);
-  }
-  return parsed;
 }
 
 export const DEFAULT_EFFECT_TARGETS = resolve(DEFAULT_SEASON_DIR, 'effect-targets.json');
@@ -448,12 +439,6 @@ export function runSeasonEffectsCohortInProcess(
   return Promise.resolve(facts);
 }
 
-function seedIndexRange(from: number, to: number): number[] {
-  const indices: number[] = [];
-  for (let i = from; i <= to; i += 1) indices.push(i);
-  return indices;
-}
-
 function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -634,7 +619,7 @@ export function seasonEffectsSensitivity(
   });
   const details = rows.map(
     (row) =>
-      `fatigue ${String(row.fatigueBp).padStart(5)}bp · shooter ${String(row.shooterDelta)} · handler ${String(row.handlerDelta)} · defense ${String(row.defenseDelta)} · security ${String(row.securityDelta)} · assist ${String(row.assistDelta)} · help ${String(row.helpDelta)} (millionths)`,
+      `fatigue ${String(row.fatigueBp).padStart(5)}bp Â· shooter ${String(row.shooterDelta)} Â· handler ${String(row.handlerDelta)} Â· defense ${String(row.defenseDelta)} Â· security ${String(row.securityDelta)} Â· assist ${String(row.assistDelta)} Â· help ${String(row.helpDelta)} (millionths)`,
   );
   return makeReport('season effects sensitivity', { fixture: fixtureId }, { details, payload });
 }
@@ -645,9 +630,13 @@ export async function seasonEffectsDistribution(
   runner: SeasonEffectsCohortRunner = runSeasonEffectsCohort,
 ): Promise<CliReport> {
   const started = Date.now();
-  const from = parseCountOpt(args, 'seed-from', 0);
-  const to = parseCountOpt(args, 'seed-to', SEASON_EFFECTS_CALIBRATION_SEED_COUNT - 1);
-  const workers = parseCountOpt(args, 'workers', 4);
+  const from = parseCount(args['seed-from'] ?? undefined, '--seed-from', 0);
+  const to = parseCount(
+    args['seed-to'] ?? undefined,
+    '--seed-to',
+    SEASON_EFFECTS_CALIBRATION_SEED_COUNT - 1,
+  );
+  const workers = parseCount(args['workers'] ?? undefined, '--workers', 4);
   const fixtureRefs = opt(args, 'fixture', SEASON_EFFECTS_PRESET_FIXTURES.join(','));
   const fixtureIds = fixtureRefs.split(',').map((ref) => ref.trim());
   const fixtures = fixtureIds.map((fixtureId) => ({
@@ -689,9 +678,9 @@ export async function seasonEffectsDistribution(
   });
   const details = [
     `${String(facts.length)} games (${String(completed.length)} completed) in ${String(Date.now() - started)}ms`,
-    `scoring delta median ${payload.scoringDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_SCORING_ENVELOPE * 100)}%)`,
-    `turnover delta median ${payload.turnoverDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_TURNOVER_ENVELOPE * 100)}%)`,
-    `assist delta median ${payload.assistDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_ASSIST_ENVELOPE * 100)}%)`,
+    `scoring delta median ${payload.scoringDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_SCORING_ENVELOPE * 100)}%)`,
+    `turnover delta median ${payload.turnoverDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_TURNOVER_ENVELOPE * 100)}%)`,
+    `assist delta median ${payload.assistDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_ASSIST_ENVELOPE * 100)}%)`,
   ];
   const failuresList: string[] = [];
   if (failures.length > 0)
@@ -759,7 +748,7 @@ export function seasonEffectsRoles(
   });
   const details = rows.map(
     (row) =>
-      `${row.fixtureId}: starter median ${String(row.starterMedianFatigue)}bp · bench median ${String(row.benchMedianFatigue)}bp`,
+      `${row.fixtureId}: starter median ${String(row.starterMedianFatigue)}bp Â· bench median ${String(row.benchMedianFatigue)}bp`,
   );
   const failuresList: string[] = [];
   if (!starterOrdering)
@@ -809,7 +798,7 @@ export async function seasonEffectsCalibrate(
   runner: SeasonEffectsCohortRunner = runSeasonEffectsCohort,
 ): Promise<CliReport> {
   const started = Date.now();
-  const workers = parseCountOpt(args, 'workers', 4);
+  const workers = parseCount(args['workers'] ?? undefined, '--workers', 4);
   const outPath = args.out ?? DEFAULT_EFFECT_TARGETS;
   const validateOnly = args['validate'] !== undefined && args['validate'] !== null;
   const fixtureRefs = opt(args, 'fixture', SEASON_EFFECTS_PRESET_FIXTURES.join(','));
@@ -1045,11 +1034,11 @@ export async function seasonEffectsCalibrate(
   });
 
   const details = [
-    `calibration ${String(calibration.games)} games · held-out ${String(heldOut.games)} games (${String(workers)} workers)`,
-    `scoring delta ${calibration.scoringMedian.toFixed(3)}% · turnover ${calibration.turnoverMedian.toFixed(3)}% · assist ${calibration.assistMedian.toFixed(3)}%`,
-    `held-out envelope share ${(heldOutWithinEnvelopeShare * 100).toFixed(1)}% (gate ≥ ${String(SEASON_EFFECTS_HELD_OUT_PASS_SHARE * 100)}%)`,
-    `rotation ordering ${rolesPayload.starterOrderingPass ? 'pass' : 'fail'} · bench ${rolesPayload.benchOrderingPass ? 'pass' : 'fail'}`,
-    `chemistry separation ${String(chemistry.separationBp)}bp (gate ≥ ${String(SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP)}bp)`,
+    `calibration ${String(calibration.games)} games Â· held-out ${String(heldOut.games)} games (${String(workers)} workers)`,
+    `scoring delta ${calibration.scoringMedian.toFixed(3)}% Â· turnover ${calibration.turnoverMedian.toFixed(3)}% Â· assist ${calibration.assistMedian.toFixed(3)}%`,
+    `held-out envelope share ${(heldOutWithinEnvelopeShare * 100).toFixed(1)}% (gate â‰¥ ${String(SEASON_EFFECTS_HELD_OUT_PASS_SHARE * 100)}%)`,
+    `rotation ordering ${rolesPayload.starterOrderingPass ? 'pass' : 'fail'} Â· bench ${rolesPayload.benchOrderingPass ? 'pass' : 'fail'}`,
+    `chemistry separation ${String(chemistry.separationBp)}bp (gate â‰¥ ${String(SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP)}bp)`,
     `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
   ];
   if (!zeroFailures) gateFailures.push('accounting/invariant failures in the cohort');

@@ -1,19 +1,16 @@
 import { opponentBracketSchema } from '../bracket.ts';
-import { verifySha256 } from './verify-hash.ts';
+import { loadJsonAsset } from './load-json.ts';
 
 /** Fetches and hash-verifies the OpponentBracket artifact. */
-export async function loadOpponentBracket(
+export function loadOpponentBracket(
   url: string,
   expectedHash?: string,
   init?: RequestInit,
 ): Promise<import('../bracket.ts').OpponentBracket> {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    throw new Error(`failed to load opponent bracket from ${url}: HTTP ${String(response.status)}`);
-  }
-  const bytes = await response.arrayBuffer();
-  if (expectedHash !== undefined) {
-    await verifySha256(bytes, expectedHash);
-  }
-  return opponentBracketSchema.parse(JSON.parse(new TextDecoder().decode(bytes)));
+  return loadJsonAsset(url, {
+    label: 'opponent bracket',
+    expectedHash,
+    parse: (value: unknown) => opponentBracketSchema.parse(value),
+    init,
+  });
 }

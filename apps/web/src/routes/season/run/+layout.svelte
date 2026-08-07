@@ -15,14 +15,16 @@
     X,
   } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
-  import { franchiseAbbreviation, type PlayersIndexEntry } from '@hoop-rush/data-contracts';
+  import {
+    franchiseAbbreviation,
+    humanTeamOf,
+    type PlayersIndexEntry,
+  } from '@hoop-rush/data-contracts';
   import { ordinal, provisionalRanking, recordLabel } from '$lib/season/season-presentation';
   import {
     loadSeasonDraftCatalog,
-    loadSeasonHomeCourtProfile,
     loadSeasonLeague,
     loadSeasonSchedule,
-    seasonArtifactUrls,
   } from '$lib/season/season-assets';
   import { getManifest, getPlayersIndex } from '$lib/data';
   import { getSeasonBlockRunner, getSeasonRunRepository } from '$lib/season/season-repo';
@@ -66,11 +68,16 @@
 
   let playersIndex: PlayersIndexEntry[] = [];
 
+  /** Identity key of the face index: run id + every roster's version list.
+   * Rosters never change during a block run, so the full-index rebuild only
+   * fires on an actual roster change (draft promotion or a trade). */
+  let faceIndexKey = '';
+
   function recomputeRunFacts(): void {
     const snapshot = shell.snapshot;
     const run = snapshot?.run ?? null;
     shell.run = run;
-    const humanTeam = run?.league.teams.find((team) => team.control === 'human') ?? null;
+    const humanTeam = run === null ? null : humanTeamOf(run.league);
     shell.humanTeam = humanTeam;
     shell.humanFranchiseId = humanTeam?.franchiseId ?? null;
     shell.nextBlockIndex = snapshot === null ? null : snapshot.acceptedBlocks.length;
@@ -82,22 +89,32 @@
     shell.objectives = run?.objectives ?? null;
 
     if (run !== null) {
-      const tuples: SeasonVersionTuple[] = run.rosters.flatMap((roster) =>
-        roster.players.map((entry) => ({
-          playerVersionId: entry.playerVersionId,
-          playerId: entry.playerId,
-          franchiseId: entry.franchiseId,
-          eraId: entry.eraId,
-          seasonKey: entry.seasonKey,
-          displayName: entry.displayName,
-        })),
-      );
-      shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
+      const key = `${run.runId}:${run.rosters
+        .map(
+          (roster) =>
+            `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`,
+        )
+        .join('|')}`;
+      if (key !== faceIndexKey) {
+        const tuples: SeasonVersionTuple[] = run.rosters.flatMap((roster) =>
+          roster.players.map((entry) => ({
+            playerVersionId: entry.playerVersionId,
+            playerId: entry.playerId,
+            franchiseId: entry.franchiseId,
+            eraId: entry.eraId,
+            seasonKey: entry.seasonKey,
+            displayName: entry.displayName,
+          })),
+        );
+        shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
+        faceIndexKey = key;
+      }
       const rebuilt = rebuildRotationEditor(run);
       shell.editor = rebuilt.editor;
       shell.editorKey = rebuilt.key;
     } else {
       shell.facesByVersion = new Map();
+      faceIndexKey = '';
       shell.editor = null;
       shell.editorKey = null;
     }
@@ -183,17 +200,13 @@
 
   async function initShell(): Promise<void> {
     try {
-      const [manifest, league, catalog, schedule, index, homeCourt, urls] = await Promise.all([
+      const [manifest, league, catalog, schedule, index] = await Promise.all([
         getManifest(),
         loadSeasonLeague(),
         loadSeasonDraftCatalog(),
         loadSeasonSchedule(),
         getPlayersIndex(),
-        loadSeasonHomeCourtProfile(),
-        seasonArtifactUrls(),
       ]);
-      void homeCourt;
-      void urls;
       shell.manifest = manifest;
       shell.league = league;
       shell.catalog = catalog;
@@ -203,6 +216,7 @@
       const repo = await getSeasonRunRepository(schedule);
       const runner = await getSeasonBlockRunner();
       const hub = new SeasonHubState(repo, runner);
+      hub.catalog = catalog;
       shell.hub = hub;
       unsubscribeHub = hub.subscribe(() => mirrorHub());
       await hub.refresh();

@@ -120,10 +120,15 @@ export function foldSeasonTeamAggregates(
 
 /**
  * Folds one player aggregate per drafted player-version over completed
- * summaries. The owning franchise is derived from the side box the player
- * played for (ownership is exclusive; a version never plays for two
- * franchises). Returns rows sorted by playerVersionId ascending; forfeits
- * contribute nothing.
+ * summaries. The owning franchise is the franchise of the player's FIRST
+ * completed game in the summaries (M2.5: a traded player legitimately plays
+ * for two franchises across the season; the season aggregate row stays
+ * keyed by playerVersionId and keeps the first franchise it recorded —
+ * deterministic and stable across block folds, since summaries always
+ * arrive in stable game order). Per-game exclusivity still holds
+ * (`checkSeasonGameResult` never sees a version on both sides of one game).
+ * Returns rows sorted by playerVersionId ascending; forfeits contribute
+ * nothing.
  */
 export function foldSeasonPlayerAggregates(
   summaries: readonly SeasonGameSummary[],
@@ -143,11 +148,6 @@ export function foldSeasonPlayerAggregates(
             ...ZERO_PLAYER,
           };
           rows.set(line.playerVersionId, row);
-        }
-        if (row.franchiseId !== box.franchiseId) {
-          throw new Error(
-            `player ${line.playerVersionId} played for ${row.franchiseId} and ${box.franchiseId}; ownership must be exclusive`,
-          );
         }
         row.gamesPlayed += 1;
         row.seconds += line.seconds;

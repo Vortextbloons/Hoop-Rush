@@ -1,6 +1,4 @@
 import {
-  SEASON_LEADER_DEPTH,
-  SEASON_LEADER_MIN_GAME_SHARE,
   SEASON_RECAP_VERSION,
   SEASON_ROUND_COUNT,
   blockRoundRange,
@@ -10,7 +8,6 @@ import {
   type SeasonGame,
   type SeasonGameSummary,
   type SeasonLeaderCategory,
-  type SeasonLeaderEntry,
   type SeasonLeague,
   type SeasonNotablePerformance,
   type SeasonPlayerAggregate,
@@ -161,66 +158,6 @@ export function finalizeGameRecords(
     };
   }
   return result;
-}
-
-/** Leader tables derived from the aggregate fold, mirroring the frozen
- * eligibility (>= 0.7 share of the owner team's games) and depth (5). */
-export function leaderTables(
-  playerAggregates: readonly SeasonPlayerAggregate[],
-  teamAggregates: readonly SeasonTeamAggregate[],
-): Record<SeasonLeaderCategory, SeasonLeaderEntry[]> {
-  const teamGames = new Map(teamAggregates.map((team) => [team.franchiseId, team.gamesPlayed]));
-  const build = (category: SeasonLeaderCategory): SeasonLeaderEntry[] => {
-    const entries = playerAggregates
-      .map((player) => {
-        const teamPlayed = teamGames.get(player.franchiseId) ?? 0;
-        const value =
-          category === 'points'
-            ? player.points
-            : category === 'rebounds'
-              ? player.offensiveRebounds + player.defensiveRebounds
-              : category === 'assists'
-                ? player.assists
-                : category === 'steals'
-                  ? player.steals
-                  : category === 'blocks'
-                    ? player.blocks
-                    : player.threePointersMade;
-        return {
-          playerVersionId: player.playerVersionId,
-          franchiseId: player.franchiseId,
-          gamesPlayed: player.gamesPlayed,
-          value,
-          perGame: player.gamesPlayed > 0 ? value / player.gamesPlayed : 0,
-          eligible:
-            teamPlayed > 0 && player.gamesPlayed >= SEASON_LEADER_MIN_GAME_SHARE * teamPlayed,
-        };
-      })
-      .filter((entry) => entry.eligible && entry.gamesPlayed > 0)
-      .sort(
-        (a, b) =>
-          b.value - a.value ||
-          b.perGame - a.perGame ||
-          a.playerVersionId.localeCompare(b.playerVersionId),
-      )
-      .slice(0, SEASON_LEADER_DEPTH)
-      .map(({ playerVersionId, franchiseId, gamesPlayed, value, perGame }) => ({
-        playerVersionId,
-        franchiseId,
-        gamesPlayed,
-        value,
-        perGame,
-      }));
-    return entries;
-  };
-  return {
-    points: build('points'),
-    rebounds: build('rebounds'),
-    assists: build('assists'),
-    steals: build('steals'),
-    blocks: build('blocks'),
-    threePointersMade: build('threePointersMade'),
-  };
 }
 
 export const LEADER_CATEGORY_LABELS: Record<SeasonLeaderCategory, string> = {

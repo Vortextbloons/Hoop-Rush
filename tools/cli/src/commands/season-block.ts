@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import {
+  humanFranchiseIdOf,
   SEASON_BLOCK_COUNT,
   SEASON_BLOCK_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
@@ -149,8 +150,7 @@ export function createSeasonBlockRunner(
   const profile = new PackagedData(packaged.manifest, packaged.dir).eraProfile(
     options.profileEra ?? '1990s',
   );
-  const humanFranchiseId =
-    run.league.teams.find((team) => team.control === 'human')?.franchiseId ?? null;
+  const humanFranchiseId = humanFranchiseIdOf(run.league);
   const expanded = expandSeasonRunRosters(run, catalog);
   return {
     run,
@@ -471,9 +471,12 @@ export function seasonFullSimulate(args: {
         `block ${String(blockIndex)} expected state facts do not match the previous post-block facts (expected r${String(checkpoint.expectedStateRevision)}/d${checkpoint.expectedStateDigest}, previous r${String(previousPostState.stateRevision)}/d${previousPostState.stateDigest})`,
       );
     }
+    // The candidate's own stateRevision/stateDigest are commit-side
+    // placeholders (zeros) by design — the authoritative post-block facts
+    // are the runner state's, derived by `runBlockThroughHandler`.
     previousPostState = {
-      stateRevision: checkpoint.stateRevision,
-      stateDigest: checkpoint.stateDigest,
+      stateRevision: state.stateRevision,
+      stateDigest: state.stateDigest,
     };
     auditFailures.push(...auditSeasonBlock(checkpoint, input));
     blockDigests.push({

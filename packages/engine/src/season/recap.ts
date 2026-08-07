@@ -16,7 +16,6 @@ import {
   type SeasonSchedule,
   type SeasonStandings,
   type SeasonStreak,
-  type SeasonTradeState,
   type SeasonTransactionEntry,
   type SeasonUpcomingHumanGame,
   type SeasonVersionSpotlight,

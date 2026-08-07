@@ -20,7 +20,7 @@ import {
   type SeasonGameTargets,
   type SeasonRotationPreset,
 } from '@hoop-rush/data-contracts';
-import { parseCount, UsageError } from '../args.ts';
+import { parseSeedRange, parseWorkers, UsageError } from '../args.ts';
 import { seasonGameFixtureSchema, type SeasonGameFixture } from '../fixture-schema.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import {
@@ -29,6 +29,7 @@ import {
   type SeasonGameSimulateReport,
 } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
+import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
 
 /**
  * M2.2 `season game` commands (spec/2.0/04): single-game simulation with
@@ -76,13 +77,9 @@ const FIXTURES_DIR = new URL('../fixtures/', import.meta.url).pathname
   .replace(/^\/([A-Za-z]:)/, '$1')
   .replace(/%20/g, ' ');
 
-/** Calibration seed i: the fixed 32-hex-digit sequential cohort (M2.2). */
-export function seasonGameCalibrationSeed(index: number): string {
-  if (!Number.isInteger(index) || index < 0) {
-    throw new Error(`calibration seed index must be a nonnegative integer (got ${String(index)})`);
-  }
-  return index.toString(16).padStart(32, '0');
-}
+/** Calibration seed i: the fixed 32-hex-digit sequential cohort (M2.2).
+ * Canonical implementation in `season-calibration.ts`. */
+export const seasonGameCalibrationSeed = seasonCalibrationSeed;
 
 /** Resolves a fixture reference: a path (or `*.json`) is read as-is, an id
  * resolves against the committed fixtures directory. */
@@ -563,12 +560,6 @@ function aggregateFixture(
   };
 }
 
-function seedIndexRange(from: number, to: number): number[] {
-  const indices: number[] = [];
-  for (let i = from; i <= to; i += 1) indices.push(i);
-  return indices;
-}
-
 export interface SeasonGameCalibrateDeps extends Partial<SeasonGameEngineDeps> {
   /** Cohort runner; defaults to worker threads (real engine) or, when engine
    * doubles are injected, the in-process runner. */
@@ -596,16 +587,14 @@ export async function seasonGameCalibrate(
   if (fixtureIds.length === 0) {
     throw new UsageError('--fixture needs at least one fixture id');
   }
-  const seedFrom = parseCount(args['seed-from'] ?? undefined, '--seed-from', 0);
-  const seedTo = parseCount(
-    args['seed-to'] ?? undefined,
-    '--seed-to',
+  const { from: seedFrom, to: seedTo } = parseSeedRange(
+    args,
     SEASON_GAME_CALIBRATION_SEED_TOTAL - 1,
+    {
+      requireOrder: true,
+    },
   );
-  if (seedTo < seedFrom) {
-    throw new UsageError('--seed-to must be >= --seed-from');
-  }
-  const workers = Math.max(1, parseCount(args.workers ?? undefined, '--workers', 4));
+  const workers = parseWorkers(args, 4, { clampToAtLeastOne: true });
   const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
 
   const fixtures = fixtureIds.map((id) => {

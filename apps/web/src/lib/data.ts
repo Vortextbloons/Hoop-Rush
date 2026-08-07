@@ -5,6 +5,8 @@ import {
   loadOpponentBracket,
   loadPlayersIndex,
   loadRosterDetails,
+  parsePlayersIndex,
+  parseRosterDetails,
   type HoopRushManifest,
   type FranchiseEraPool,
   type PoolIndexEntry,
@@ -243,7 +245,7 @@ async function loadPlayersIndexFor(): Promise<PlayersIndex> {
   }
   // The index is immutable and content-addressed; a validated copy in
   // IndexedDB spares a ~4.7 MB re-download and re-parse on every reload.
-  const cached = await readCachedAsset<PlayersIndex>(entry.contentHash);
+  const cached = await readCachedAsset(entry.contentHash, parsePlayersIndex);
   if (cached !== null) return cached;
   const load = (url: string, contentHash: string, bustCache = false) =>
     loadPlayersIndex(
@@ -286,7 +288,7 @@ async function loadRosterDetailsFor(): Promise<RosterDetails> {
   }
   // The roster-details asset is immutable and content-addressed; a validated
   // copy in IndexedDB spares a ~6.5 MB re-download and re-parse per reload.
-  const cached = await readCachedAsset<RosterDetails>(entry.contentHash);
+  const cached = await readCachedAsset(entry.contentHash, parseRosterDetails);
   if (cached !== null) return cached;
   const load = (url: string, contentHash: string, bustCache = false) =>
     loadRosterDetails(

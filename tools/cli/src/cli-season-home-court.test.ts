@@ -168,7 +168,7 @@ describe('cli: season home-court calibrate (injected doubles)', () => {
         homeDefensiveCommunication: 0.55,
         awayTurnoverPressure: 0.5,
       });
-      expect(artifact.gameVersion).toBe('season-game-v3');
+      expect(artifact.gameVersion).toBe('season-game-v4');
       expect(artifact.engineVersion.length).toBeGreaterThan(0);
     });
   }, 60_000);

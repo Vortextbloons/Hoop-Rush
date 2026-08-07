@@ -1,19 +1,21 @@
 /**
- * Internal FNV-1a hash helper shared by Season Run identity and seed
- * derivation. It intentionally mirrors the constants and algorithm of the
- * engine's `sim/rng.ts` so Season Run derivation vectors behave like the
- * rest of the seeded simulation, but it lives at the contract boundary where
- * the engine cannot be imported (dependency direction: engine -> contracts).
+ * Canonical FNV-1a 32-bit hash helpers (FNV-1a 32-bit offset basis
+ * 0x811c9dc5, prime 0x01000193). This module is the single source of the
+ * hash primitive and its 8-hex-digit form: the engine's `sim/rng.ts`
+ * re-exports them, the importer's reconstruction fold assignment uses them,
+ * and the fixture packages derive seeds from them, so every derivation
+ * vector behaves identically across the repo.
  *
- * Not exported from the package index; use `playerVersionId` and
- * `seasonNamespaceSeed` instead.
+ * `seasonDigestHex` (128-bit, four offset bases) is the Season Run identity
+ * and seed derivation digest; `fnv1a32` alone is the classic game/RNG hash.
  */
 
-const FNV_OFFSET_32 = 0x811c9dc5;
+/** FNV-1a 32-bit offset basis. */
+export const FNV_OFFSET_32 = 0x811c9dc5;
 const FNV_PRIME_32 = 0x01000193;
 
-/** FNV-1a 32-bit hash of a string from a custom offset basis. */
-function fnv1a32(material: string, offset: number): number {
+/** FNV-1a 32-bit hash of a string from an optional offset basis. */
+export function fnv1a32(material: string, offset = FNV_OFFSET_32): number {
   let hash = offset | 0;
   for (let i = 0; i < material.length; i += 1) {
     hash ^= material.charCodeAt(i);
@@ -23,7 +25,7 @@ function fnv1a32(material: string, offset: number): number {
 }
 
 /** 8-hex-digit form of a 32-bit value. */
-function hex32(value: number): string {
+export function hex32(value: number): string {
   return value.toString(16).padStart(8, '0');
 }
 

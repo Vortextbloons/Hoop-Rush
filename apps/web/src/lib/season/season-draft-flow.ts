@@ -1,5 +1,6 @@
 import type {
   PlayerVersionId,
+  SeasonAiGenerationInput,
   SeasonDraftCatalog,
   SeasonDraftCommandPayload,
   SeasonDraftCommandRecord,
@@ -31,11 +32,8 @@ import { newSeasonId } from './season-ids';
  * saves) is cleared automatically by the repository on load, so the flow
  * always resumes from a current record or null.
  *
- * The AI league generation is synchronous and bounded by
- * `AI_GENERATION_NODE_BUDGET`; `generate()` yields to the event loop first so
- * the "Generating league…" state can paint before the (bounded) computation
- * runs on the main thread. Moving generation into the worker is a noted
- * integration option for the lead.
+ * AI league generation runs in a dedicated web worker so the draft board
+ * stays responsive while the bounded roster-selection search executes.
  */
 
 /** Solo Season Run participant id (one human franchise). */
@@ -76,25 +74,56 @@ export function coverageNeeds(
   return { guards, forwards, centers };
 }
 
+interface GenerationWorkerRequest {
+  type: 'generate';
+  requestId: string;
+  input: Omit<SeasonAiGenerationInput, 'targets'>;
+  targets: SeasonRosterTargets;
+}
+
+type GenerationWorkerResponse =
+  | { type: 'complete'; requestId: string; generation: SeasonLeagueGenerationResult }
+  | { type: 'error'; requestId: string; message: string };
+
+function isGenerationDeps(
+  value: SeasonAiGenerationDeps | SeasonRosterTargets,
+): value is SeasonAiGenerationDeps {
+  return typeof (value as SeasonAiGenerationDeps).generate === 'function';
+}
+
 export class SeasonDraftFlow {
   private readonly repo: SeasonDraftRepository;
   private readonly catalogRef: SeasonDraftCatalog;
   private readonly deps: SeasonAiGenerationDeps;
+  private readonly targets: SeasonRosterTargets | null;
+  private readonly useWorker: boolean;
+  private readonly generationBridge: { precomputed: SeasonLeagueGenerationResult | null };
 
   draft: SeasonDraftState | null = null;
   generation: SeasonLeagueGenerationResult | null = null;
   lastRecord: SeasonDraftCommandRecord | null = null;
   phase: SeasonDraftFlowPhase = 'idle';
   error: string | null = null;
+  /** Optional hook so the UI can mirror phase changes before long work finishes. */
+  onPhaseChange: (() => void) | null = null;
 
   constructor(
     repo: SeasonDraftRepository,
     catalog: SeasonDraftCatalog,
-    deps: SeasonAiGenerationDeps,
+    targetsOrDeps: SeasonRosterTargets | SeasonAiGenerationDeps,
   ) {
     this.repo = repo;
     this.catalogRef = catalog;
-    this.deps = deps;
+    this.generationBridge = { precomputed: null };
+    if (isGenerationDeps(targetsOrDeps)) {
+      this.deps = targetsOrDeps;
+      this.targets = null;
+      this.useWorker = false;
+    } else {
+      this.targets = targetsOrDeps;
+      this.deps = engineGenerationDeps(targetsOrDeps, this.generationBridge);
+      this.useWorker = true;
+    }
   }
 
   /** The packaged catalog the flow validates commands against. */
@@ -182,20 +211,98 @@ export class SeasonDraftFlow {
   }
 
   /**
-   * Runs the bounded AI league generation. Yields to the event loop first so
-   * the pending state paints, then runs the synchronous engine generator and
-   * persists the stored record atomically.
+   * Runs the bounded AI league generation in a worker when roster targets
+   * were supplied at construction. Yields to the event loop first so the
+   * pending state paints, then persists the stored record atomically.
    */
   async generate(): Promise<SeasonLeagueGenerationResult | null> {
     if (this.draft?.status !== 'finalized') {
       throw new Error('generate requires finalized human rosters');
     }
     this.error = null;
-    this.phase = 'generating';
+    this.setPhase('generating');
     await new Promise((resolve) => setTimeout(resolve, 0));
-    const record = await this.apply({ kind: 'generate-ai-league' }, this.revision());
-    this.phase = record.status === 'accepted' ? 'complete' : 'generating';
-    return this.generation;
+    try {
+      if (this.useWorker && this.targets !== null) {
+        this.generationBridge.precomputed = await this.runGenerationInWorker(
+          this.buildGenerationInput(this.draft),
+        );
+      }
+      const record = await this.apply({ kind: 'generate-ai-league' }, this.revision());
+      if (record.status === 'rejected') {
+        this.error = record.message;
+        this.setPhase('finalized');
+        return null;
+      }
+      this.setPhase('complete');
+      return this.generation;
+    } catch (error) {
+      this.setPhase('finalized');
+      this.error = error instanceof Error ? error.message : String(error);
+      throw error;
+    } finally {
+      this.generationBridge.precomputed = null;
+    }
+  }
+
+  private setPhase(phase: SeasonDraftFlowPhase): void {
+    this.phase = phase;
+    this.onPhaseChange?.();
+  }
+
+  private buildGenerationInput(state: SeasonDraftState): Omit<SeasonAiGenerationInput, 'targets'> {
+    return {
+      seed: state.rootSeed,
+      catalog: this.catalogRef,
+      league: state.league,
+      humanFranchiseIds: state.participants.map((participant) => participant.franchiseId),
+      humanRosters: state.participants.map((participant) => ({
+        franchiseId: participant.franchiseId,
+        playerVersionIds: state.picks
+          .filter((pick) => pick.participantId === participant.participantId)
+          .map((pick) => pick.playerVersionId),
+      })),
+    };
+  }
+
+  private runGenerationInWorker(
+    input: Omit<SeasonAiGenerationInput, 'targets'>,
+  ): Promise<SeasonLeagueGenerationResult> {
+    const targets = this.targets;
+    if (targets === null) {
+      throw new Error('worker generation requires roster targets');
+    }
+    const worker = new Worker(
+      new URL('../../workers/season-draft-generation-worker.ts', import.meta.url),
+      { type: 'module' },
+    );
+    const requestId = newSeasonId('gen');
+    return new Promise((resolve, reject) => {
+      const onMessage = (event: MessageEvent<GenerationWorkerResponse>): void => {
+        const message = event.data;
+        if (message.requestId !== requestId) return;
+        worker.removeEventListener('message', onMessage);
+        worker.terminate();
+        if (message.type === 'complete') {
+          resolve(message.generation);
+          return;
+        }
+        reject(new Error(message.message));
+      };
+      worker.addEventListener('message', onMessage);
+      worker.addEventListener('error', (event) => {
+        worker.removeEventListener('message', onMessage);
+        worker.terminate();
+        reject(new Error(event.message || 'AI league generation worker failed'));
+      });
+      const request: GenerationWorkerRequest = {
+        type: 'generate',
+        requestId,
+        input,
+        targets,
+      };
+      worker.postMessage(request);
+    });
   }
 
   private revision(): number {
@@ -236,12 +343,20 @@ export class SeasonDraftFlow {
  * manifest-verified roster-targets artifact injected. Generation rejects
  * targets that do not match the AI/generator versions.
  */
-export function engineGenerationDeps(targets: SeasonRosterTargets): SeasonAiGenerationDeps {
+export function engineGenerationDeps(
+  targets: SeasonRosterTargets,
+  bridge?: { precomputed: SeasonLeagueGenerationResult | null },
+): SeasonAiGenerationDeps {
   return {
-    generate: (input) =>
-      generateAiLeague({
+    generate: (input) => {
+      const precomputed = bridge?.precomputed;
+      if (precomputed !== null && precomputed !== undefined) {
+        return precomputed;
+      }
+      return generateAiLeague({
         ...input,
         targets,
-      }),
+      });
+    },
   };
 }

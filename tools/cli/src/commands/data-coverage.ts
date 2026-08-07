@@ -66,7 +66,20 @@ export async function dataCoverage(args: {
       },
     );
   }
-  const parsed = hoopRushManifestSchema.safeParse(JSON.parse(raw) as unknown);
+  let value: unknown;
+  try {
+    value = JSON.parse(raw) as unknown;
+  } catch {
+    return makeReport(
+      'data coverage',
+      { input: inputPath },
+      {
+        failures: [`manifest is not valid JSON: ${inputPath}`],
+        exitCode: EXIT_USAGE_OR_DATA_ERROR,
+      },
+    );
+  }
+  const parsed = hoopRushManifestSchema.safeParse(value);
   if (!parsed.success) {
     return makeReport(
       'data coverage',

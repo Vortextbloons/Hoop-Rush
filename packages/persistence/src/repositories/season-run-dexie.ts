@@ -1,5 +1,6 @@
 import {
   blockIndexForRound,
+  humanTeamOf,
   seasonAcceptedBlockSchema,
   seasonRunSchema,
   seasonScheduleSchema,
@@ -10,7 +11,6 @@ import {
   seasonHealthStateSchema,
   type SeasonAcceptedBlock,
   type SeasonActiveRunIndex,
-  type SeasonEffectsState,
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
   type SeasonPendingBlockCandidate,
@@ -380,9 +380,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     }
 
     if (failures.length === 0) {
-      const humanFranchiseId = stored.run.league.teams.find(
-        (team) => team.control === 'human',
-      )?.franchiseId;
+      const humanFranchiseId = humanTeamOf(stored.run.league)?.franchiseId;
       if (humanFranchiseId === undefined) {
         failures.push('the run league contains no human-controlled franchise');
       } else {
@@ -623,9 +621,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
           updatedAtIso,
         });
 
-        const humanFranchiseId = cursor.run.league.teams.find(
-          (team) => team.control === 'human',
-        )?.franchiseId;
+        const humanFranchiseId = humanTeamOf(cursor.run.league)?.franchiseId;
         if (humanFranchiseId === undefined) {
           throw new Error('commitSeasonBlock: the run league has no human franchise');
         }
@@ -827,26 +823,17 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       // players); the row-level mutable columns take the engine's run.
       // Standings/aggregates/recap never change between blocks; the
       // current row values are preserved through the delta parse.
-      const storedFacts = checkpoint as unknown as {
-        standings: SeasonRun['standings'];
-        teamAggregates: StoredSeasonRunRecord['teamAggregates'];
-        playerAggregates: StoredSeasonRunRecord['playerAggregates'];
-        recap: StoredSeasonRunRecord['recap'];
-        lastRotationDigest: StoredSeasonRunRecord['lastRotationDigest'];
-        lastCheckpointDigest: StoredSeasonRunRecord['lastCheckpointDigest'];
-        effects: SeasonEffectsState;
-      };
       const delta = seasonRunCheckpointDeltaSchema.parse({
         completedRounds: cursor.completedRounds,
         revision: cursor.revision,
         lastCommandId: cursor.lastCommandId,
-        lastRotationDigest: storedFacts.lastRotationDigest,
-        lastCheckpointDigest: storedFacts.lastCheckpointDigest,
-        standings: storedFacts.standings,
-        teamAggregates: storedFacts.teamAggregates,
-        playerAggregates: storedFacts.playerAggregates,
-        recap: storedFacts.recap,
-        effects: input.effects ?? storedFacts.effects,
+        lastRotationDigest: checkpoint.lastRotationDigest,
+        lastCheckpointDigest: checkpoint.lastCheckpointDigest,
+        standings: checkpoint.standings,
+        teamAggregates: checkpoint.teamAggregates,
+        playerAggregates: checkpoint.playerAggregates,
+        recap: checkpoint.recap,
+        effects: input.effects ?? checkpoint.effects,
         updatedAtIso: new Date().toISOString(),
         health: input.run.health,
         transactions: input.run.transactions,
@@ -956,9 +943,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       stateRevision: 0,
       stateDigest,
     });
-    const humanFranchiseId = validatedRun.league.teams.find(
-      (team) => team.control === 'human',
-    )?.franchiseId;
+    const humanFranchiseId = humanTeamOf(validatedRun.league)?.franchiseId;
     if (humanFranchiseId === undefined) {
       throw new Error('promoteSeasonDraftToRun: the run league has no human franchise');
     }

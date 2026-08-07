@@ -1,5 +1,5 @@
 import { franchiseEraPoolSchema, type FranchiseEraPool } from '../player-season.ts';
-import { sha256Hex } from './verify-hash.ts';
+import { loadJsonAsset } from './load-json.ts';
 
 /** Validate an unknown pool value at a runtime boundary. */
 export function parsePool(value: unknown): FranchiseEraPool {
@@ -11,22 +11,10 @@ export function parsePool(value: unknown): FranchiseEraPool {
  * `expectedHash` is provided (manifest content hash), the response bytes must
  * match before the pool is parsed.
  */
-export async function loadPool(
+export function loadPool(
   url: string,
   expectedHash?: string,
   init?: RequestInit,
 ): Promise<FranchiseEraPool> {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    throw new Error(`pool request failed: ${String(response.status)} ${response.statusText}`);
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (expectedHash !== undefined) {
-    const digest = await sha256Hex(bytes);
-    if (digest !== null && digest !== expectedHash) {
-      throw new Error(`pool content hash mismatch: expected ${expectedHash}, got ${digest}`);
-    }
-  }
-  const text = new TextDecoder().decode(bytes);
-  return parsePool(JSON.parse(text) as unknown);
+  return loadJsonAsset(url, { label: 'pool', expectedHash, parse: parsePool, init });
 }

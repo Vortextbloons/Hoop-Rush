@@ -1,10 +1,11 @@
 import {
   loadEraSimulationProfile,
+  loadJsonAsset,
   loadSeasonDraftCatalog as loadPackagedSeasonDraftCatalog,
+  parseSeasonDraftCatalog,
   seasonLeagueSchema,
   seasonRosterTargetsSchema,
   seasonScheduleSchema,
-  sha256Hex,
   type EraSimulationProfile,
   type SeasonDraftCatalog,
   type SeasonHomeCourtProfile,
@@ -57,19 +58,12 @@ async function fetchVerified<T>(
   contentHash: string,
   parse: (value: unknown) => T,
 ): Promise<T> {
-  const response = await fetch(url, { cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(
-      `season asset request failed: ${String(response.status)} ${response.statusText}`,
-    );
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  const digest = await sha256Hex(bytes);
-  if (digest !== null && digest !== contentHash) {
-    throw new Error(`season asset content hash mismatch: expected ${contentHash}, got ${digest}`);
-  }
-  const text = new TextDecoder().decode(bytes);
-  return parse(JSON.parse(text) as unknown);
+  return loadJsonAsset(url, {
+    label: 'season asset',
+    expectedHash: contentHash,
+    parse,
+    init: { cache: 'no-store' },
+  });
 }
 
 const cache = new Map<string, Promise<unknown>>();
@@ -112,7 +106,7 @@ export function loadSeasonDraftCatalog(): Promise<SeasonDraftCatalog> {
     if (!entry) throw new Error('The season draft catalog artifact is unavailable.');
     // The catalog is immutable and content-addressed; a validated copy in
     // IndexedDB spares a ~10.2 MB re-download and re-parse per reload.
-    const cached = await readCachedAsset<SeasonDraftCatalog>(entry.contentHash);
+    const cached = await readCachedAsset(entry.contentHash, parseSeasonDraftCatalog);
     if (cached !== null) return cached;
     const catalog = await loadPackagedSeasonDraftCatalog(
       resolveAssetUrl(entry.url),

@@ -254,8 +254,9 @@ describe('M2.5 block pipeline with injuries', () => {
       startEffects: SeasonBlockSimulationInput['effects'],
       startHealth: SeasonHealthState,
       stopIndex?: number,
+      initialPreviousRound?: number,
     ) => {
-      let previousRound = fromRound - 1;
+      let previousRound = initialPreviousRound ?? fromRound - 1;
       let effects = startEffects;
       let health = startHealth;
       const summaries: SeasonGameSummary[] = [];
@@ -315,7 +316,21 @@ describe('M2.5 block pipeline with injuries', () => {
     const legalBefore = loop(legalInput, 0, legalInput.effects, legalInput.health, humanIndex);
     const legalFull = loop(legalInput, 0, legalInput.effects, legalInput.health);
     expect(JSON.stringify(pending.effects)).toBe(JSON.stringify(legalBefore.effects));
-    const resumed = loop(legalInput, humanIndex, legalBefore.effects, legalBefore.health);
+    // The resumed loop continues the recovery-tick cadence from the last
+    // simulated round (the engine's whole-block cadence: one tick per round
+    // advance), so the resumed segment reproduces the uninterrupted games.
+    const lastSimulatedRound =
+      pending.summaries.length > 0
+        ? pending.summaries[pending.summaries.length - 1]?.round
+        : fromRound - 1;
+    const resumed = loop(
+      legalInput,
+      humanIndex,
+      legalBefore.effects,
+      legalBefore.health,
+      undefined,
+      lastSimulatedRound,
+    );
     const union = [...pending.summaries, ...resumed.summaries];
     const unionIds = union.map((summary) => summary.gameId);
     expect(new Set(unionIds).size).toBe(unionIds.length);

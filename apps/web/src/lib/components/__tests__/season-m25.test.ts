@@ -96,20 +96,6 @@ function roster() {
   };
 }
 
-function rotation(): import('@hoop-rush/data-contracts').SeasonRotation {
-  return {
-    franchiseId: 'lakers',
-    rotationVersion: 'season-rotation-v2',
-    starters: [PLAYER_A, PLAYER_B, PLAYER_C],
-    benchOrder: [],
-    closingFive: [PLAYER_A, PLAYER_B, PLAYER_C],
-    targetMinutes: [PLAYER_A, PLAYER_B, PLAYER_C].map((playerVersionId, index) => ({
-      playerVersionId,
-      minutes: index === 0 ? 32 : 20,
-    })),
-  };
-}
-
 function influenceState(balance: number): SeasonInfluenceState {
   return {
     schemaVersion: 1,
@@ -224,16 +210,11 @@ function pending(): SeasonPendingBlockCandidate {
 
 describe('HealthStrip', () => {
   it('renders statuses, return range, recurrence chip, and consequences', () => {
-    const rows = availabilityStripRows(
-      healthState(),
-      roster(),
-      [rotation()],
-      [
-        { gameId: 's000001', round: 1 },
-        { gameId: 's000101', round: 11 },
-        { gameId: 's000102', round: 12 },
-      ],
-    );
+    const rows = availabilityStripRows(healthState(), roster(), [
+      { gameId: 's000001', round: 1 },
+      { gameId: 's000101', round: 11 },
+      { gameId: 's000102', round: 12 },
+    ]);
     const { container } = render(HealthStrip, { props: { rows } });
     const text = container.textContent;
     expect(text).toContain('Player 1');
@@ -512,7 +493,7 @@ describe('CheckpointRecap (M2.5)', () => {
       tradeEvidence: { tradesAccepted: 1, influenceDelta: 1 },
       influenceBalance: { humanBalance: 4 },
     };
-    const rows = availabilityStripRows(healthState(), roster(), [rotation()]);
+    const rows = availabilityStripRows(healthState(), roster());
     const { container } = render(CheckpointRecap, {
       props: {
         recap,

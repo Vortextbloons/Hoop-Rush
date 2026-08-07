@@ -13,6 +13,7 @@ import { seasonObjectiveIdSchema } from './season-objective.ts';
 import { seasonPendingBlockCandidateSchema } from './season-pending-block.ts';
 import { seasonBlockRunContextSchema } from './season-run.ts';
 import { seasonScheduleSchema } from './season-schedule.ts';
+import { seasonTransactionEntrySchema } from './season-transactions.ts';
 
 /**
  * Season Run block worker envelopes (spec/2.0/07 background execution, M2.3;
@@ -125,6 +126,14 @@ export const seasonWorkerStartRequestSchema = z
      * (null only as a defensive guard).
      */
     priorInfluence: seasonInfluenceStateSchema.nullable(),
+    /**
+     * M2.5: the authoritative run-scoped transaction log entering the
+     * block (empty for block 0). The worker appends this block's grant
+     * entries so the candidate's `transactions` is always the FULL
+     * append-only log — identical to the CLI path, so worker and CLI
+     * candidates digest identically for the same block.
+     */
+    priorTransactions: z.array(seasonTransactionEntrySchema).max(2000).optional(),
     /**
      * M2.5: the run state facts this submission asserts (the typed
      * command's expectedStateRevision/expectedStateDigest). The worker

@@ -1,6 +1,6 @@
 import type {
-  SeasonBlockRunContext,
   SeasonCandidateCheckpoint,
+  SeasonDraftCatalog,
   SeasonEffectsState,
   SeasonGameSummary,
   SeasonHealthState,
@@ -239,6 +239,30 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     for (const listener of [...listeners]) listener(event);
   }
 
+  /**
+   * M2.5: the packaged draft catalog the commit path needs to open trade
+   * windows (value bands, legality). The worker fetches its own copy; the
+   * runner caches one per asset url/hash.
+   */
+  let catalogCache: { url: string; hash: string; catalog: SeasonDraftCatalog } | null = null;
+  async function resolveCatalog(input: SeasonBlockStartInput): Promise<SeasonDraftCatalog | null> {
+    if (
+      catalogCache !== null &&
+      catalogCache.url === input.catalogUrl &&
+      catalogCache.hash === input.catalogHash
+    ) {
+      return catalogCache.catalog;
+    }
+    try {
+      const { loadSeasonDraftCatalog } = await import('@hoop-rush/data-contracts');
+      const catalog = await loadSeasonDraftCatalog(input.catalogUrl, input.catalogHash);
+      catalogCache = { url: input.catalogUrl, hash: input.catalogHash, catalog };
+      return catalog;
+    } catch {
+      return null;
+    }
+  }
+
   function createWorker(): Worker {
     if (worker !== null) return worker;
     // Vite bundles `new Worker(new URL(...))` only when the URL literal is
@@ -391,13 +415,19 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       const repository = await resolveRepository();
       // M2.5: the engine derives the post-block run state facts (checkpoint
       // state, state chain, and the optional trade-window open) from the
-      // submitted run and the accepted candidate.
+      // submitted run and the accepted candidate. Window blocks (2/4/5)
+      // need the packaged catalog for the deterministic offer generation;
+      // a failed catalog load surfaces as an internal error rather than
+      // silently skipping a trade window.
+      const catalog = await resolveCatalog(state.input);
       const committed = completeSeasonBlockCommit({
         run: state.input.run,
         candidate: checkpoint,
         commandId: state.commandId,
         rotationDigest: state.rotationDigest,
         humanFranchiseId: state.input.humanFranchiseId,
+        catalog: catalog ?? undefined,
+        effects: checkpoint.effects,
       });
       const window: SeasonWindowOpenResult | null = committed.window;
       // M2.5: a resumed block's pending retained details (games completed
@@ -591,13 +621,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       expectedRevision: state.expectedRevision,
       rotationDigest: state.rotationDigest,
       commandId: state.commandId,
-      // The worker simulates with the LOCKED rotation set; the wire
-      // carries only the run context the block pipeline reads (the
-      // scheduled games, standings, draft, and other persisted facts
-      // never cross the worker boundary). The M2.5 state facts ride the
-      // context for the worker's candidate assembly (the runner validates
-      // them at acceptance; the frozen wire schema strips unknown keys
-      // until the health workstream threads them explicitly).
+      // The worker simulates with the LOCKED rotation set; the wire carries
+      // only the run context the block pipeline reads (the scheduled games,
+      // standings, draft, and other persisted facts never cross the worker
+      // boundary).
       run: {
         schemaVersion: state.input.run.schemaVersion,
         runId: state.input.run.runId,
@@ -607,9 +634,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         rosters: state.input.run.rosters,
         rotations: state.rotations,
         cursor: state.input.run.cursor,
-        stateRevision: state.input.run.stateRevision,
-        stateDigest: state.input.run.stateDigest,
-      } as SeasonBlockRunContext & { stateRevision: number; stateDigest: string },
+      },
       schedule,
       homeCourt: state.input.homeCourt,
       humanFranchiseId: state.input.humanFranchiseId,
@@ -621,10 +646,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       ...(newSummaries !== undefined ? { newSummaries } : {}),
       // M2.4: the authoritative pre-block effects state rides the full
       // reset (fresh worker or resume); the delta path keeps the worker's
-      // accumulated effects state.
-      ...(priorSummaries !== undefined && runState !== null && runState.effects !== null
-        ? { priorEffects: runState.effects }
-        : {}),
+      // accumulated effects state. A resume ships the pending candidate's
+      // mid-block effects as the reset (the worker's accumulated state is
+      // the pre-block state for interrupted work, which would be stale).
+      ...(state.resumePending !== null
+        ? { priorEffects: state.resumePending.effects }
+        : priorSummaries !== undefined && runState !== null && runState.effects !== null
+          ? { priorEffects: runState.effects }
+          : {}),
       // M2.5: the health state follows the same convention; a resume ships
       // the pending candidate's mid-block health as the reset.
       ...(state.resumePending !== null
@@ -636,6 +665,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       startGameId: state.resumePending?.nextGameId ?? null,
       // M2.5: the locked block objective.
       objectiveId: state.input.objectiveId,
+      // M2.5: the authoritative pre-block Influence economy, run-scoped
+      // transaction log, and the asserted run state chain facts (the worker
+      // folds the block's grants on top of the economy and emits the full
+      // append-only log inside the candidate).
+      priorInfluence: state.input.run.influence,
+      priorTransactions: state.input.run.transactions,
+      expectedStateRevision: state.input.run.stateRevision,
+      expectedStateDigest: state.input.run.stateDigest,
     };
     return seasonWorkerStartRequestSchema.parse(start);
   }

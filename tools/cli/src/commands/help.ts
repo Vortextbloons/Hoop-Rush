@@ -91,7 +91,10 @@ Commands:
   calibrate sensitivity  A/B the single-dimension sensitivity fixtures.
                          --samples N (default 200)   --profile <path>  --era <eraId>
   calibrate ratings      Generate the deterministic paired-simulation Ratings v3 artifact.
-                         --samples N (default 256) --workers N --output <path>
+                          --samples N (default 256) --workers N --output <path>
+  calibrate three-point  Fit the conservative three-point reconstruction model and freeze
+                         the versioned three-point-targets artifact.
+                          --samples N --workers N --out <path> --validate <path>
   combine docs           Combine every markdown file under the docs directory
                          into one file in the docs root (outside subfolders).
                          --input <dir>        Docs directory (default Docs/)
@@ -113,6 +116,35 @@ Commands:
                          --schedule <path>    Schedule artifact (default packaged)
                          --league <path>      League artifact (default packaged)
                          --manifest <path>    Manifest for hash cross-check
+  season draft reproduce
+                         Reproduce the committed Season Run draft from a frozen
+                         seed and fixture facts, asserting the committed audit.
+                         --input <draft.json> --seed <hex> --manifest <path>
+  season draft calibrate
+                         Calibrate the roster-generation targets from a draft
+                         cohort and freeze roster-targets-v2.
+                         --input <run.json> --calibration-seeds N
+                         --validation-seeds N --out <path> --manifest <path>
+  season rosters generate
+                         Generate the deterministic AI league from verified
+                         roster targets and audit the result.
+                         --input <draft.json> --targets <path> --manifest <path>
+  season rosters audit   Audit a generated league: versions, quotas, tier
+                         thresholds, pools, anchors, exclusivity, legality,
+                         and the generation digest.
+                         --input <run.json> --targets <path> --manifest <path>
+  season rosters calibrate
+                         Calibrate the roster-targets cohort and freeze the
+                         measured facts into roster-targets-v2.
+                         --calibration-seeds N --validation-seeds N
+                         --out <path> --targets <path> --manifest <path>
+  season game simulate   Simulate one Season Run game with exact-seconds facts
+                         (rotations, stints, deviations).
+                         --input <fixture-id> --seed <hex> --profile <eraId>
+  season game calibrate  Calibrate the game cohort and freeze
+                         season-game-targets-v1.
+                         --fixture <ids> --seed-from N --seed-to N --workers N
+                         --out <path> --manifest <path>
   season block simulate  Run one ten-game block through the authoritative
                          block pipeline over a committed run fixture.
                          --input <run.json> (default fixtures/season-run.json)
@@ -144,6 +176,22 @@ Commands:
                           objective success, spend rates).
                           --input <run.json> --seed-from N --seed-to N
                           --out <path> --validate <path> --manifest <path>
+  season effects sensitivity
+                          A/B the effects mechanism caps across the fixture
+                          cohort (sensitivity report, no artifact write).
+                          --fixture <ids> --seed-from N --seed-to N --workers N
+  season effects distribution
+                          Aggregate the mechanism-role distributions of the
+                          calibration cohort (distribution report).
+                          --fixture <ids> --seed-from N --seed-to N --workers N
+  season effects roles   Measure role separation across the cohort (roles
+                          report: usage share, shot mix, chemistry effects).
+                          --fixture <ids> --seed-from N --seed-to N --workers N
+  season effects calibrate
+                          Freeze season-effect-targets-v1 from the cohort
+                          gates (envelopes, separation, held-out checks).
+                          --fixture <ids> --seed-from N --seed-to N --workers N
+                          --out <path> --validate <path>
   season home-court calibrate
                          Measure the tuned home-court profile against the
                          frozen 0.575 held-out target and write the evidence
@@ -172,8 +220,8 @@ Commands:
                          manifest pool index.
                          --pools lakers/1990s,celtics/1980s  Targets (comma-sep)
                          --all                 Every available (franchise, era)
-                         --no-assets           Skip headshot/photo annotation
-                         (annotation itself stays in Python: reannotate_assets.py)
+                          --no-assets           Skip headshot/photo annotation
+                          (annotation stays in scripts/annotate-markers.mjs)
   import era-profile     Derive era simulation profiles from packaged stints +
                          Lakers pool anchors. --era 1990s,1980s (default all)
   import manifest        Refresh manifest content hashes for pools, era profiles,

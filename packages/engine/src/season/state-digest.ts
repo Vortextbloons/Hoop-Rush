@@ -52,12 +52,12 @@ export interface SeasonRunStateDigestFacts {
   checkpointState: SeasonCheckpointState | null;
   health: SeasonHealthState;
   influence: SeasonInfluenceState;
-  transactions: SeasonTransactionEntry[];
+  transactions: readonly SeasonTransactionEntry[];
   trade: SeasonTradeState | null;
   objectives: SeasonObjectiveState;
-  rosters: SeasonRoster[];
-  ownership: SeasonOwnership[];
-  rotations: SeasonRotation[];
+  rosters: readonly SeasonRoster[];
+  ownership: readonly SeasonOwnership[];
+  rotations: readonly SeasonRotation[];
   effects: SeasonEffectsState;
 }
 

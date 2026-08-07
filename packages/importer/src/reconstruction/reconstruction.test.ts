@@ -311,8 +311,6 @@ describe('grouped holdout and gates', () => {
     const translation = artifact.attemptRateTranslation;
     expect(translation.factor).toBe(2.5);
     expect(translation.caps).toEqual({ G: 0.15, F: 0.08, C: 0.02 });
-    const rows = loadCohortRows();
-    const context = buildFeatureContext(rows);
     const guard = predictReconstructedProfile(
       artifact,
       sampleRow({

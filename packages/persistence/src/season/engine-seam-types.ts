@@ -85,8 +85,10 @@ export interface SeasonRunEngineSeam {
    * `rotations`, `effects`; the stored `stateDigest` is excluded from its
    * own computation). The reload audit recomputes the stored digest through
    * this binding, so corrupt or half-applied mutable state is detected.
+   * Declared as a value property (not a method) because the binding is the
+   * engine's pure function passed by reference.
    */
-  seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string;
+  seasonRunStateDigest: (facts: SeasonRunStateDigestFacts) => string;
   /**
    * M2.5: the initial run-creation Influence state — every franchise at +2
    * with its recorded `initial-grant` ledger entry (blockIndex/commandId

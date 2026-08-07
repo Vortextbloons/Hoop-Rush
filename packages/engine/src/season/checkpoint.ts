@@ -149,7 +149,7 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
         a.playerVersionId < b.playerVersionId ? -1 : 1,
       ),
       pairStates: [...candidate.effects.pairStates].sort((a, b) =>
-        a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : 1,
+        a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : a.b > b.b ? 1 : 0,
       ),
     }),
     // M2.5: the authoritative post-block health/influence/transactions

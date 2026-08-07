@@ -29,6 +29,8 @@ import {
   type SeasonResumeSeasonBlockResult,
   type SeasonRetainedGameDetail,
   type SeasonReturnEvent,
+  type SeasonRoster,
+  type SeasonRotation,
   type SeasonRun,
   type SeasonSchedule,
   type SeasonScheduleGame,
@@ -56,7 +58,11 @@ import { simulateSeasonGameWithEffects } from './season-game.ts';
 import { applySeasonGameEffectsTransition } from './effects.ts';
 import { applySeasonRecoveryTick } from './stamina.ts';
 import { auditSeasonStandings, reduceSeasonStandings } from './standings.ts';
-import { seasonFranchiseLegalFiveFacts, seasonGameHealthSeam } from './health.ts';
+import {
+  seasonFranchiseLegalFiveFacts,
+  seasonGameHealthSeam,
+  seasonPregameAvailabilityOf,
+} from './health.ts';
 import { applySeasonGameHealthTransition } from './injuries.ts';
 import { evaluateSeasonBlockObjective, seasonObjectiveChoicesForBlock } from './objectives.ts';
 import { applySeasonBlockInfluenceGrants, createInitialSeasonInfluenceState } from './influence.ts';
@@ -253,6 +259,29 @@ export interface SeasonBlockSimulationOptions {
    * how the games were executed.
    */
   cancelAfterGames?: number;
+}
+
+/**
+ * Per-game simulation options. The block loop precomputes the run-constant
+ * lookup maps once per block and threads them through so a 10-game block
+ * never rebuilds them per game; direct callers (tests) may omit them and the
+ * per-game fallbacks compute the same maps.
+ */
+export interface SeasonBlockGameSimulationOptions {
+  /** Skip the between-round recovery tick (first game of the season). */
+  skipRecoveryTick?: boolean;
+  /** gameId -> 1-based game number across the schedule (1,230 entries). */
+  gameNumberById?: Map<string, number>;
+  /** franchiseId -> locked rotation (30 entries). */
+  rotationByFranchise?: Map<string, SeasonRotation>;
+  /** franchiseId -> roster (30 entries). */
+  rosterByFranchise?: Map<string, SeasonRoster>;
+  /** playerVersionId -> stamina rating (300 entries). */
+  staminaByVersion?: Map<string, number>;
+  /** playerVersionId -> catalog durability rating (300 entries). */
+  durabilityByVersion?: Map<string, number>;
+  /** playerVersionId -> playable positions (300 entries). */
+  positions?: Map<string, readonly Position[]>;
 }
 
 /**
@@ -474,12 +503,25 @@ export function simulateSeasonBlock(
   let previousRound = fromRound - 1;
   let effects = input.effects;
   let health = input.health;
+  // Run-constant lookup maps: pure functions of the block input, computed
+  // once and threaded through every game (never rebuilt per game).
+  const shared: SeasonBlockGameSimulationOptions = {
+    gameNumberById: new Map(input.schedule.games.map((game, index) => [game.gameId, index + 1])),
+    rotationByFranchise: new Map(
+      input.run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
+    ),
+    rosterByFranchise: new Map(input.run.rosters.map((roster) => [roster.franchiseId, roster])),
+    staminaByVersion: staminaByVersionOf(input),
+    durabilityByVersion: durabilityByVersionOf(input),
+    positions: positionsOf(input),
+  };
   for (const game of seasonBlockGamesOf(input.schedule, input.command.blockIndex)) {
     if (options.cancelAfterGames !== undefined && summaries.length >= options.cancelAfterGames) {
       throw new SeasonBlockCancelledError(input.command.blockIndex, summaries.length);
     }
     const outcome = simulateSeasonBlockGame(input, game, effects, health, {
       skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
+      ...shared,
     });
     if ('interruption' in outcome) {
       // The whole-block path (CLI/fixture runs) never expects an invalid-
@@ -556,17 +598,18 @@ export function simulateSeasonBlockGame(
   game: SeasonScheduleGame,
   effects: SeasonEffectsState,
   health: SeasonHealthState,
-  options: { skipRecoveryTick?: boolean } = {},
+  options: SeasonBlockGameSimulationOptions = {},
 ): SeasonBlockGameOutcome {
   const command = input.command;
   const run = input.run;
-  const gameNumberById = new Map(
-    input.schedule.games.map((game, index) => [game.gameId, index + 1]),
-  );
-  const rotationByFranchise = new Map(
-    run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
-  );
-  const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
+  const gameNumberById =
+    options.gameNumberById ??
+    new Map(input.schedule.games.map((game, index) => [game.gameId, index + 1]));
+  const rotationByFranchise =
+    options.rotationByFranchise ??
+    new Map(run.rotations.map((rotation) => [rotation.franchiseId, rotation]));
+  const rosterByFranchise =
+    options.rosterByFranchise ?? new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
 
   const homeRoster = rosterByFranchise.get(game.homeFranchiseId);
   const awayRoster = rosterByFranchise.get(game.awayFranchiseId);
@@ -596,39 +639,24 @@ export function simulateSeasonBlockGame(
   // seam reads the pregame effects state (fatigue/recent load at this game).
   let pregame = effects;
   if (!(options.skipRecoveryTick ?? false)) {
-    pregame = applySeasonRecoveryTick(pregame, staminaByVersionOf(input));
+    pregame = applySeasonRecoveryTick(
+      pregame,
+      options.staminaByVersion ?? staminaByVersionOf(input),
+    );
   }
 
-  // M2.5: the health seam — pregame availability for all 20 players, the
-  // seeded injury rolls for this game, and the same-game return clocks.
-  const targetMinutesByPlayer = targetMinutesOf(input, game);
-  const seam = seasonGameHealthSeam(run, health, {
-    rootSeed: run.rootSeed,
-    gameId: game.gameId,
-    round: game.round,
-    homeFranchiseId: game.homeFranchiseId,
-    awayFranchiseId: game.awayFranchiseId,
-    targetMinutesByPlayer,
-    durabilityByPlayer: durabilityByVersionOf(input),
-    effects: pregame,
-  });
-
-  // M2.5: the human franchise must field a legal five from health
-  // availability at every tipoff; otherwise the block stops with the typed
-  // interruption (AI teams without a legal five forfeit through the game
-  // path). The objective's availability measure collects the human team's
-  // tip availability count per human game.
-  if (
-    input.humanFranchiseId !== null &&
-    (game.homeFranchiseId === input.humanFranchiseId ||
-      game.awayFranchiseId === input.humanFranchiseId)
-  ) {
-    const facts = seasonFranchiseLegalFiveFacts(
-      run,
-      input.humanFranchiseId,
-      health,
-      positionsOf(input),
-    );
+  // M2.5: tipoff availability is decided BEFORE any injury rolls. A game
+  // where either team cannot field a legal five from health availability is
+  // a forfeit (or, for the human, the typed interruption) — no player is
+  // exposed, so no injuries roll for it (exposure means actually playing;
+  // rolling for a forfeited game would fabricate records without events).
+  const positions = options.positions ?? positionsOf(input);
+  const humanFranchiseId = input.humanFranchiseId;
+  const humanPlays =
+    humanFranchiseId !== null &&
+    (game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId);
+  if (humanPlays) {
+    const facts = seasonFranchiseLegalFiveFacts(run, humanFranchiseId, health, positions);
     if (!facts.legal) {
       const interruption: SeasonInvalidRosterInterruption = {
         code: 'invalid-roster',
@@ -636,12 +664,39 @@ export function simulateSeasonBlockGame(
         blockIndex: command.blockIndex,
         commandId: command.commandId,
         nextGameId: game.gameId,
-        humanFranchiseId: input.humanFranchiseId,
+        humanFranchiseId,
         unavailablePlayerVersionIds: facts.unavailablePlayerVersionIds,
       };
       return { interruption };
     }
-    const humanRoster = rosterByFranchise.get(input.humanFranchiseId);
+  }
+  const homeLegal = seasonFranchiseLegalFiveFacts(run, game.homeFranchiseId, health, positions);
+  const awayLegal = seasonFranchiseLegalFiveFacts(run, game.awayFranchiseId, health, positions);
+  const forfeitPending = !homeLegal || !awayLegal;
+
+  // M2.5: the health seam — pregame availability for all 20 players, the
+  // seeded injury rolls for this game, and the same-game return clocks.
+  const targetMinutesByPlayer = targetMinutesOf(input, game, rotationByFranchise);
+  const seam = forfeitPending
+    ? {
+        pregame: seasonPregameAvailabilityOf(health, [...homePlayers, ...awayPlayers]),
+        removals: [],
+        returns: [],
+        newInjuries: [],
+      }
+    : seasonGameHealthSeam(run, health, {
+        rootSeed: run.rootSeed,
+        gameId: game.gameId,
+        round: game.round,
+        homeFranchiseId: game.homeFranchiseId,
+        awayFranchiseId: game.awayFranchiseId,
+        targetMinutesByPlayer,
+        durabilityByPlayer: options.durabilityByVersion ?? durabilityByVersionOf(input),
+        effects: pregame,
+      });
+
+  if (humanPlays) {
+    const humanRoster = rosterByFranchise.get(humanFranchiseId);
     const availableCount =
       humanRoster === undefined
         ? 0
@@ -676,14 +731,14 @@ export function simulateSeasonBlockGame(
       available: seam.pregame.get(player.playerVersionId) ?? true,
     })),
     removals: seam.removals.map((removal) => ({
-      side: sideOfPlayer(game, removal.playerVersionId, run),
+      side: sideOfPlayer(game, removal.playerVersionId, rosterByFranchise),
       playerVersionId: removal.playerVersionId,
       period: removal.clock.period,
       secondsRemaining: removal.clock.seconds,
       reason: 'injury',
     })),
     returns: seam.returns.map((ret) => ({
-      side: sideOfPlayer(game, ret.playerVersionId, run),
+      side: sideOfPlayer(game, ret.playerVersionId, rosterByFranchise),
       playerVersionId: ret.playerVersionId,
       period: ret.clock.period,
       secondsRemaining: ret.clock.seconds,
@@ -721,7 +776,7 @@ export function simulateSeasonBlockGame(
     newInjuries: seam.newInjuries,
     sameGameReturned,
   });
-  const injuryEvents = compactInjuryEventsOf(game, run, seam, result);
+  const injuryEvents = compactInjuryEventsOf(game, rosterByFranchise, seam, result);
   const summary = seasonGameSummaryFromResult(result, game, transition, injuryEvents);
   const summaryFailures = auditSeasonGameSummary(summary);
   if (summaryFailures.length > 0) {
@@ -769,10 +824,8 @@ function staminaByVersionOf(input: SeasonBlockSimulationInput): Map<string, numb
 function targetMinutesOf(
   input: SeasonBlockSimulationInput,
   game: SeasonScheduleGame,
+  rotationByFranchise: ReadonlyMap<string, SeasonRotation>,
 ): Map<string, number> {
-  const rotationByFranchise = new Map(
-    input.run.rotations.map((rotation) => [rotation.franchiseId, rotation]),
-  );
   const targets = new Map<string, number>();
   for (const franchiseId of [game.homeFranchiseId, game.awayFranchiseId]) {
     const rotation = rotationByFranchise.get(franchiseId);
@@ -811,9 +864,8 @@ function positionsOf(input: SeasonBlockSimulationInput): Map<string, readonly Po
 function sideOfPlayer(
   game: SeasonScheduleGame,
   playerVersionId: string,
-  run: SeasonBlockRunContext,
+  rosterByFranchise: ReadonlyMap<string, SeasonRoster>,
 ): 'home' | 'away' {
-  const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
   const homeRoster = rosterByFranchise.get(game.homeFranchiseId);
   if (homeRoster?.players.some((player) => player.playerVersionId === playerVersionId)) {
     return 'home';
@@ -855,7 +907,7 @@ function sameGameReturnResolutionsOf(
  */
 function compactInjuryEventsOf(
   game: SeasonScheduleGame,
-  run: SeasonBlockRunContext,
+  rosterByFranchise: ReadonlyMap<string, SeasonRoster>,
   seam: ReturnType<typeof seasonGameHealthSeam>,
   result: ReturnType<typeof simulateSeasonGameWithEffects>['result'],
 ): SeasonCompactInjuryEvent[] {
@@ -885,7 +937,7 @@ function compactInjuryEventsOf(
     const appliedReturn = appliedReturnByPlayer.get(record.playerVersionId);
     return {
       playerVersionId: record.playerVersionId,
-      side: sideOfPlayer(game, record.playerVersionId, run),
+      side: sideOfPlayer(game, record.playerVersionId, rosterByFranchise),
       type: record.type,
       severity: record.severity,
       removedClock,
@@ -950,7 +1002,15 @@ export function assembleSeasonBlockCandidate(
   // M2.5: the post-block Influence state (this block's grants + objective
   // reward over the pre-block state) and the block's transaction entries.
   const franchiseIds = run.league.teams.map((team) => team.franchiseId);
-  const preBlockInfluence = input.influence ?? createInitialSeasonInfluenceState(franchiseIds);
+  // M2.5: the pre-block Influence state. `input.influence` is the explicit
+  // carrier (the worker threads it from the wire); CLI and test callers
+  // pass the full run snapshot, whose `influence` field is authoritative;
+  // the initial state is the last-resort fallback so an empty carrier can
+  // never fabricate grants over a stale economy.
+  const preBlockInfluence =
+    input.influence ??
+    (input.run as Partial<SeasonRun>).influence ??
+    createInitialSeasonInfluenceState(franchiseIds);
   const grantResult = applySeasonBlockInfluenceGrants({
     influence: preBlockInfluence,
     blockIndex: command.blockIndex,
@@ -1227,13 +1287,6 @@ export function resumeSeasonBlockFromPending(input: {
       rejection: { code: 'run-mismatch', expectedRunId: run.runId },
     };
   }
-  if (pending === null) {
-    return {
-      status: 'rejected',
-      commandId: command.commandId,
-      rejection: { code: 'no-pending-block', blockIndex: command.blockIndex },
-    };
-  }
   if (pending.blockIndex !== command.blockIndex) {
     return {
       status: 'rejected',
@@ -1340,15 +1393,23 @@ export function auditSeasonBlock(
     );
   }
 
-  // Ownership: exactly 300 distinct player aggregates.
-  if (candidate.playerAggregates.length !== SEASON_TEAM_COUNT * 10) {
+  // Ownership: player aggregates fold the players who actually played (a
+  // franchise that forfeits every game contributes no lines, so the row
+  // count can dip below 300); every row must be a rostered version and
+  // distinct.
+  if (candidate.playerAggregates.length > SEASON_TEAM_COUNT * 10) {
     failures.push(
-      `candidate must carry 300 player aggregates (got ${String(candidate.playerAggregates.length)})`,
+      `candidate must carry at most 300 player aggregates (got ${String(candidate.playerAggregates.length)})`,
     );
   }
   const aggregateIds = candidate.playerAggregates.map((player) => player.playerVersionId);
   if (new Set(aggregateIds).size !== aggregateIds.length) {
     failures.push('candidate player aggregates contain duplicate versions');
+  }
+  for (const player of candidate.playerAggregates) {
+    if (!input.expanded.has(player.playerVersionId)) {
+      failures.push(`player aggregate references an unrostered version ${player.playerVersionId}`);
+    }
   }
   if (candidate.teamAggregates.length !== SEASON_TEAM_COUNT) {
     failures.push(

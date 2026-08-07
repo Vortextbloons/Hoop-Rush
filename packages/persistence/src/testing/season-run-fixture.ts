@@ -1,5 +1,6 @@
 import {
   playerVersionId,
+  SEASON_ALIGNMENT,
   SEASON_AI_VERSION,
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
@@ -69,10 +70,11 @@ import {
   type SeasonStandings,
   type SeasonTeamAggregate,
   type SeasonTeamBox,
+  fnv1a32,
   seasonDigestHex,
 } from '@hoop-rush/data-contracts';
-import { reduceSeasonStandings } from '@hoop-rush/engine';
-import { seasonRunStateDigest as seasonRunStateDigestLocal } from '../season/state-digest.ts';
+import { reduceSeasonStandings, seasonRunStateDigest } from '@hoop-rush/engine';
+import type { SeasonRunStateDigestFacts } from '@hoop-rush/engine';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { SEASON_RUN_RECORD_ID, type StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/season-draft-record.ts';
@@ -93,62 +95,20 @@ import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/seaso
  * available for any roster set through `buildFixtureEffectsState`, and the
  * M2.5 mutable run state (empty health, initial Influence, empty transaction
  * log, null trade, empty objective selections, null checkpoint state, state
- * revision 0) with the REAL state digest computed through the canonical
- * state-digest mirror (`seasonRunStateDigestFixture`), so promotion and
- * reload audits reconcile exactly.
+ * revision 0) with the REAL state digest computed through the engine's
+ * canonical `seasonRunStateDigest` (`seasonRunStateDigestFixture`), so
+ * promotion and reload audits reconcile exactly.
  */
 
-/** Accepted 30-franchise alignment; conference/division follow league-v1. */
-const ALIGNMENT: ReadonlyArray<{
-  franchiseId: string;
-  conference: 'east' | 'west';
-  division: 'atlantic' | 'central' | 'southeast' | 'northwest' | 'pacific' | 'southwest';
-}> = [
-  { franchiseId: 'hawks', conference: 'east', division: 'southeast' },
-  { franchiseId: 'celtics', conference: 'east', division: 'atlantic' },
-  { franchiseId: 'nets', conference: 'east', division: 'atlantic' },
-  { franchiseId: 'hornets', conference: 'east', division: 'southeast' },
-  { franchiseId: 'bulls', conference: 'east', division: 'central' },
-  { franchiseId: 'cavaliers', conference: 'east', division: 'central' },
-  { franchiseId: 'mavericks', conference: 'west', division: 'southwest' },
-  { franchiseId: 'nuggets', conference: 'west', division: 'northwest' },
-  { franchiseId: 'pistons', conference: 'east', division: 'central' },
-  { franchiseId: 'warriors', conference: 'west', division: 'pacific' },
-  { franchiseId: 'rockets', conference: 'west', division: 'southwest' },
-  { franchiseId: 'pacers', conference: 'east', division: 'central' },
-  { franchiseId: 'clippers', conference: 'west', division: 'pacific' },
-  { franchiseId: 'lakers', conference: 'west', division: 'pacific' },
-  { franchiseId: 'grizzlies', conference: 'west', division: 'southwest' },
-  { franchiseId: 'heat', conference: 'east', division: 'southeast' },
-  { franchiseId: 'bucks', conference: 'east', division: 'central' },
-  { franchiseId: 'timberwolves', conference: 'west', division: 'northwest' },
-  { franchiseId: 'pelicans', conference: 'west', division: 'southwest' },
-  { franchiseId: 'knicks', conference: 'east', division: 'atlantic' },
-  { franchiseId: 'thunder', conference: 'west', division: 'northwest' },
-  { franchiseId: 'magic', conference: 'east', division: 'southeast' },
-  { franchiseId: 'sixers', conference: 'east', division: 'atlantic' },
-  { franchiseId: 'suns', conference: 'west', division: 'pacific' },
-  { franchiseId: 'blazers', conference: 'west', division: 'northwest' },
-  { franchiseId: 'kings', conference: 'west', division: 'pacific' },
-  { franchiseId: 'spurs', conference: 'west', division: 'southwest' },
-  { franchiseId: 'raptors', conference: 'east', division: 'atlantic' },
-  { franchiseId: 'jazz', conference: 'west', division: 'northwest' },
-  { franchiseId: 'wizards', conference: 'east', division: 'southeast' },
-];
+/** Accepted 30-franchise alignment; conference/division follow league-v1
+ * (canonical constant in `@hoop-rush/data-contracts`). */
+const ALIGNMENT = SEASON_ALIGNMENT;
 
-const FRANCHISE_ORDER = ALIGNMENT.map((entry) => entry.franchiseId);
+const FRANCHISE_ORDER = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
 
-/** Deterministic 32-bit FNV-1a; fixture randomness only (not domain logic). */
-function fnv1a32(input: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
-
-/** Deterministic 32-hex seed from any string. */
+/** Deterministic 32-hex seed from any string. Canonical FNV-1a primitive
+ * lives in `@hoop-rush/data-contracts`; fixture randomness only (not domain
+ * logic). */
 export function fixtureSeedFromString(value: string): string {
   return fnv1a32(value).toString(16).padStart(8, '0').repeat(4);
 }
@@ -652,15 +612,13 @@ export function buildFixtureRun(input: {
 }
 
 /**
- * M2.5 canonical state digest for fixture runs: binds the canonical mirror
- * in `season/state-digest.ts` (same pure implementation the production seam
- * uses until the engine export lands), so digests computed in fixtures, the
- * stub seam, and the production seam agree byte-for-byte.
+ * M2.5 canonical state digest for fixture runs: binds the engine's
+ * authoritative `seasonRunStateDigest` (the same pure implementation the
+ * production seam binds), so digests computed in fixtures, the stub seam,
+ * and the production seam agree byte-for-byte.
  */
-export function seasonRunStateDigestFixture(
-  facts: import('../season/state-digest.ts').SeasonRunStateDigestFacts,
-): string {
-  return seasonRunStateDigestLocal(facts);
+export function seasonRunStateDigestFixture(facts: SeasonRunStateDigestFacts): string {
+  return seasonRunStateDigest(facts);
 }
 
 function zeroStandings(league: SeasonLeague): SeasonStandings {
@@ -1237,7 +1195,7 @@ export function seasonRotationSetDigestFixture(rotations: readonly SeasonRotatio
  */
 export function buildFixtureStateDigest(
   run: SeasonRun,
-  overrides: Partial<import('../season/state-digest.ts').SeasonRunStateDigestFacts> = {},
+  overrides: Partial<SeasonRunStateDigestFacts> = {},
 ): string {
   return seasonRunStateDigestFixture({
     stateRevision: overrides.stateRevision ?? run.stateRevision,

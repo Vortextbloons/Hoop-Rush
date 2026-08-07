@@ -7,7 +7,6 @@ import {
   type SeasonInjurySeverity,
   type SeasonInjuryType,
   type SeasonRoster,
-  type SeasonRotation,
 } from '@hoop-rush/data-contracts';
 
 /**
@@ -107,11 +106,9 @@ export interface AvailabilityStripRow {
 export function availabilityStripRows(
   health: SeasonHealthState,
   roster: SeasonRoster,
-  rotations: readonly SeasonRotation[],
   franchiseGames?: readonly { gameId: string; round: number }[],
   names?: ReadonlyMap<string, string>,
 ): AvailabilityStripRow[] {
-  void rotations;
   const gamesByFranchise =
     franchiseGames === undefined
       ? null

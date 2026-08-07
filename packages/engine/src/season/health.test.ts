@@ -5,13 +5,7 @@ import {
   type SeasonHealthState,
   type SeasonInjuryRecord,
 } from '@hoop-rush/data-contracts';
-import {
-  blockCommand,
-  buildTestRun,
-  emptyHealthState,
-  pipelineInput,
-  scheduleOf,
-} from './block-test-support.ts';
+import { buildTestRun, emptyHealthState, pipelineInput, scheduleOf } from './block-test-support.ts';
 import {
   advancePendingAfterForfeit,
   assembleSeasonPendingBlock,
@@ -87,6 +81,7 @@ function runGameLoop(
   startEffects: SeasonBlockSimulationInput['effects'],
   startHealth: SeasonHealthState,
   stopIndex?: number,
+  initialPreviousRound?: number,
 ): {
   summaries: SeasonGameSummary[];
   effects: SeasonBlockSimulationInput['effects'];
@@ -94,7 +89,7 @@ function runGameLoop(
   interruption: { nextGameId: string } | null;
 } {
   const games = seasonBlockGamesOf(input.schedule, input.command.blockIndex);
-  let previousRound = fromRoundOf(input) - 1;
+  let previousRound = initialPreviousRound ?? fromRoundOf(input) - 1;
   let effects = startEffects;
   let health = startHealth;
   const summaries: SeasonGameSummary[] = [];
@@ -418,11 +413,20 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
     // the pending's health additionally carries the injected blocking
     // records, which the resume replaces through the heal flow.
     expect(JSON.stringify(pending.effects)).toBe(JSON.stringify(legalBefore.effects));
+    // The resumed loop continues the recovery-tick cadence from the last
+    // simulated round (the engine's whole-block cadence: one tick per round
+    // advance), so the resumed segment reproduces the uninterrupted games.
+    const lastSimulatedRound =
+      pending.summaries.length > 0
+        ? pending.summaries[pending.summaries.length - 1]?.round
+        : fromRoundOf(legalInput) - 1;
     const resumed = runGameLoop(
       legalInput,
       interruptionIndex,
       legalBefore.effects,
       legalBefore.health,
+      undefined,
+      lastSimulatedRound,
     );
     const union = [...pending.summaries, ...resumed.summaries];
     const unionIds = union.map((summary) => summary.gameId);
@@ -520,9 +524,12 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
       const humanGameCount = games.filter(
         (game) => game.homeFranchiseId === 'lakers' || game.awayFranchiseId === 'lakers',
       ).length;
-      expect(summaries.filter((summary) => summary.status === 'forfeit')).toHaveLength(
-        humanGameCount,
-      );
+      // The human's blocked games forfeit 2-0 with the human as the loser;
+      // AI games may ALSO forfeit through the ordinary game path (no legal
+      // five after injuries/foul-outs), so count only the human-loss ones.
+      expect(
+        summaries.filter((summary) => summary.forfeitLoserFranchiseId === 'lakers'),
+      ).toHaveLength(humanGameCount);
       const ids = summaries.map((summary) => summary.gameId);
       expect(new Set(ids).size).toBe(ids.length);
       return candidate.digest;

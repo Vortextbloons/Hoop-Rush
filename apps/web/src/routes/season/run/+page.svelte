@@ -309,6 +309,14 @@
 
         <!-- M2.5: objective picker (blocks 0-7) -->
         {#if objectiveVm !== null}
+          {#if commandError !== null && commandError.command === 'select-block-objective'}
+            <p
+              role="alert"
+              class="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+            >
+              {commandError.message}
+            </p>
+          {/if}
           <ObjectivePicker
             blockIndex={objectiveVm.blockIndex}
             choices={objectiveVm.choices}

@@ -3,7 +3,6 @@ import type {
   SeasonHealthState,
   SeasonInjuryRecord,
   SeasonRoster,
-  SeasonRotation,
 } from '@hoop-rush/data-contracts';
 import {
   activeInjuriesOf,
@@ -63,20 +62,6 @@ function roster(ids: string[]): SeasonRoster {
       eraId: '1990s',
       seasonKey: '1995-96',
       displayName: `Player ${String(index + 1)}`,
-    })),
-  };
-}
-
-function rotation(playerVersionIds: string[]): SeasonRotation {
-  return {
-    franchiseId: 'lakers',
-    rotationVersion: 'season-rotation-v2',
-    starters: playerVersionIds.slice(0, 5),
-    benchOrder: playerVersionIds.slice(5),
-    closingFive: playerVersionIds.slice(0, 5),
-    targetMinutes: playerVersionIds.map((playerVersionId, index) => ({
-      playerVersionId,
-      minutes: index < 5 ? 32 : 16,
     })),
   };
 }
@@ -183,7 +168,7 @@ describe('availabilityStripRows', () => {
         recurrenceWindowRoundsRemaining: 6,
       }),
     ]);
-    const rows = availabilityStripRows(state, roster(ids), [rotation(ids)], teamGames);
+    const rows = availabilityStripRows(state, roster(ids), teamGames);
     expect(rows).toHaveLength(6);
     const first = rows[0];
     expect(first?.status).toBe('active');
@@ -209,7 +194,7 @@ describe('availabilityStripRows', () => {
         seasonEnding: true,
       }),
     ]);
-    const rows = availabilityStripRows(state, roster(ids), [rotation(ids)]);
+    const rows = availabilityStripRows(state, roster(ids));
     expect(rows[0]?.status).toBe('active');
     expect(rows[0]?.nextGameConsequence).toBe('Out for the rest of the season');
   });

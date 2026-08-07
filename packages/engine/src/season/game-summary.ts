@@ -168,7 +168,11 @@ export function seasonGameSummaryFromResult(
       awayBox: zeroTeamBox(game.awayFranchiseId),
       homePlayers: [],
       awayPlayers: [],
-      injuryEvents: [],
+      // M2.5: a forfeit-after-removal game's injury rolls are real facts
+      // (the removals happened mid-game before the forfeit); the compact
+      // events ride the summary so records and events stay 1:1. Tipoff
+      // forfeits roll nothing (no exposure), so they carry no events.
+      injuryEvents: [...injuryEvents],
     };
   }
   return {
@@ -363,8 +367,24 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
     if (summary.overtimePeriods !== 0) {
       failures.push('forfeit carries no overtime');
     }
-    if (summary.injuryEvents.length !== 0) {
-      failures.push('forfeit summary must carry no injury events');
+    // M2.5: a forfeit-after-removal game's compact injury events are real
+    // facts (uniqueness + return-clock consistency; side/membership checks
+    // need rosters the summary audit cannot see — the block audit covers
+    // them against the expanded set).
+    const seenForfeit = new Set<string>();
+    for (const event of summary.injuryEvents) {
+      if (seenForfeit.has(event.playerVersionId)) {
+        failures.push(`duplicate injury event for ${event.playerVersionId}`);
+      }
+      seenForfeit.add(event.playerVersionId);
+      if (event.returned && event.returnClock === null) {
+        failures.push(`returned injury event for ${event.playerVersionId} carries no return clock`);
+      }
+      if (!event.returned && event.returnClock !== null) {
+        failures.push(
+          `injury event for ${event.playerVersionId} carries a return clock without returning`,
+        );
+      }
     }
     return failures;
   }

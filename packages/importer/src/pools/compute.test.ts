@@ -974,13 +974,13 @@ describe('computePool error and skip paths', () => {
     expect(pool.reason).toBe('insufficient-players');
   });
 
-  it('logs a warning instead of annotating assets (stays in Python)', () => {
+  it('logs a warning instead of annotating assets (stays in annotate-markers.mjs)', () => {
     buildStandardFixture('assets');
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, true);
     expect(
       messages(log).some((m) =>
-        m.includes('headshot/photo asset annotation stays in the Python layer'),
+        m.includes('headshot/photo asset annotation stays in scripts/annotate-markers.mjs'),
       ),
     ).toBe(true);
   });
@@ -1119,9 +1119,9 @@ describe('defaultPoolWorkers', () => {
 describe('asset altIds preservation', () => {
   it('backfills nbaHeadshotAvailable and photoUrl from the previous pool build', () => {
     const root = buildStandardFixture('altids');
-    // Simulate a previous build annotated by reannotate_assets.py: bbref id on
-    // record, stale bbref in the file, markers present, and one player whose
-    // photoUrl is legitimately null.
+    // Simulate a previous build annotated by scripts/annotate-markers.mjs:
+    // bbref id on record, stale bbref in the file, markers present, and one
+    // player whose photoUrl is legitimately null.
     const previous = {
       schemaVersion: SCHEMA_VERSION,
       dataVersion: DATA_VERSION,

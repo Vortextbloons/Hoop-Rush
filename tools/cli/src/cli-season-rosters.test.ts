@@ -452,7 +452,7 @@ describe('cli: season draft reproduce', () => {
     const payload = seasonDraftReproduceReportSchema.parse(jsonPayload(stdout));
     expect(payload.pass).toBe(true);
     expect(payload.identical).toBe(true);
-    expect(payload.finalDigest).toBe('d3439ffe629a113a96a6bc68f32e49ae');
+    expect(payload.finalDigest).toBe('95396ddde716fe01829f4d2fcb6b8e8d');
     expect(payload.acceptedCount).toBe(payload.commandCount);
     expect(payload.rejectedCount).toBe(0);
     expect(payload.offers).toHaveLength(10);

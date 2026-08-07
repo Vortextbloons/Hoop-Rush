@@ -785,12 +785,6 @@ async function main(argv: string[]): Promise<{ report: CliReport; format: 'text'
       if (candidate === undefined) {
         return { report: usageError('missing command'), format: 'text' };
       }
-      if (COMMANDS[candidate]) {
-        return {
-          report: usageError(`unknown command "${commandKey}" (did you mean "${candidate}"?)`),
-          format: 'text',
-        };
-      }
       return { report: usageError(`unknown command "${candidate}"`), format: 'text' };
     }
     def = await entry.load();

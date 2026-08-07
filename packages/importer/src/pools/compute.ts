@@ -792,7 +792,7 @@ export function loadBbrefIds(): Record<string, string> {
 
 /**
  * Asset altIds from the previously packaged pool (playerExternalId -> altIds).
- * Only the reannotate_assets.py markers (nbaHeadshotAvailable, photoUrl) are
+ * Only the annotate-markers.mjs markers (nbaHeadshotAvailable, photoUrl) are
  * backfilled; a missing or unreadable pool file yields an empty map.
  */
 export function loadExistingAssetAltIds(
@@ -1264,9 +1264,10 @@ export function computePool(
     if (Object.hasOwn(bbrefIds, pid)) {
       altIds.bbref = bbrefIds[pid];
     }
-    // Preserve the asset markers reannotate_assets.py wrote into the previous
-    // build; regenerating a pool must never wipe nbaHeadshotAvailable/photoUrl
-    // (the UI then regresses to CDN silhouettes). bbref stays cache-authoritative.
+    // Preserve the asset markers scripts/annotate-markers.mjs wrote into the
+    // previous build; regenerating a pool must never wipe
+    // nbaHeadshotAvailable/photoUrl (the UI then regresses to CDN
+    // silhouettes). bbref stays cache-authoritative.
     const previous = existingAssetAltIds.get(pid);
     if (previous !== undefined) {
       if (typeof previous.nbaHeadshotAvailable === 'boolean') {
@@ -1372,10 +1373,11 @@ export function computePool(
   }
 
   if (withAssets) {
-    // Headshot/photo annotation stays in the Python layer (reannotate_assets.py);
-    // network asset resolution is intentionally not ported.
+    // Headshot/photo annotation is a separate script
+    // (scripts/annotate-markers.mjs); network asset resolution is
+    // intentionally not ported into the pool build.
     console.log(
-      '  [WARN] headshot/photo asset annotation stays in the Python layer (reannotate_assets.py); skipping',
+      '  [WARN] headshot/photo asset annotation stays in scripts/annotate-markers.mjs; skipping',
     );
   }
 

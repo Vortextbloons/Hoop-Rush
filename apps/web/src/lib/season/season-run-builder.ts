@@ -46,14 +46,6 @@ import {
 import { createInitialSeasonInfluenceState } from '@hoop-rush/engine';
 
 /**
- * The frozen engine export lands at integration (lead-owned engine index);
- * the builder types the call against the frozen signature until then.
- */
-const initialInfluenceState = createInitialSeasonInfluenceState as unknown as (
-  franchiseIds: readonly string[],
-) => SeasonRun['influence'];
-
-/**
  * Assembles the initial schema-7 Season Run snapshot from a completed draft
  * and its AI league generation (spec/2.0/07 persistence, M2.1 -> M2.5).
  *
@@ -286,7 +278,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       injuries: [],
     },
     transactions: [],
-    influence: initialInfluenceState(league.teams.map((team) => team.franchiseId)),
+    influence: createInitialSeasonInfluenceState(league.teams.map((team) => team.franchiseId)),
     checkpointState: null,
     stateRevision: 0,
     stateDigest,

@@ -15,7 +15,7 @@ import {
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonHealthCalibrateReportSchema } from '../report-schemas.ts';
-import { parseCount } from '../args.ts';
+import { parseSeedRange, parseWorkers } from '../args.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
 import {
   m25ToleranceGate,
@@ -732,12 +732,7 @@ export function validateSeasonInjuryTargets(args: SeasonHealthArgs, outPath: str
 /** `season health calibrate`: runs the gates and freezes injury-targets-v1. */
 export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
   const started = Date.now();
-  const from = parseCount(args['seed-from'] ?? undefined, '--seed-from', 0);
-  const to = parseCount(
-    args['seed-to'] ?? undefined,
-    '--seed-to',
-    SEASON_HEALTH_CALIBRATION_SEED_COUNT - 1,
-  );
+  const { from, to } = parseSeedRange(args, SEASON_HEALTH_CALIBRATION_SEED_COUNT - 1);
   const outPath = args.out ?? DEFAULT_INJURY_TARGETS;
   const validateOnly = args['validate'] !== null;
   const probeRootSeed = seasonCalibrationSeed(
@@ -748,7 +743,7 @@ export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
     return validateSeasonInjuryTargets(args, resolve(args.validate ?? outPath));
   }
 
-  const workers = parseCount(args.workers ?? undefined, '--workers', 1);
+  const workers = parseWorkers(args, 1);
   const calibrationIndices = seedIndexRange(from, to);
   const validationIndices = seedIndexRange(to + 1, to + SEASON_HEALTH_VALIDATION_SEED_COUNT);
 

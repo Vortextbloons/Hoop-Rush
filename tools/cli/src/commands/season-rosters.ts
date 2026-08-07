@@ -31,6 +31,7 @@ import {
   seasonRostersGenerateReportSchema,
 } from '../report-schemas.ts';
 import { parseCount } from '../args.ts';
+import { seasonCalibrationSeed } from './season-calibration.ts';
 import {
   DEFAULT_MANIFEST,
   DEFAULT_ROSTER_TARGETS,
@@ -80,13 +81,9 @@ export const SEASON_ROSTERS_CALIBRATE_OPTIONS: Record<string, boolean> = {
   format: true,
 };
 
-/** Calibration seed i: the fixed 32-hex-digit sequential cohort (M2.1). */
-export function rosterCalibrationSeed(index: number): string {
-  if (!Number.isInteger(index) || index < 0) {
-    throw new Error(`calibration seed index must be a nonnegative integer (got ${String(index)})`);
-  }
-  return index.toString(16).padStart(32, '0');
-}
+/** Calibration seed i: the fixed 32-hex-digit sequential cohort (M2.1).
+ * Canonical implementation in `season-calibration.ts`. */
+export const rosterCalibrationSeed = seasonCalibrationSeed;
 
 /** Order-invariance probe seeds: a small reversed/shuffled-input cohort. */
 export const ORDER_INVARIANCE_SEED_COUNT = 2;

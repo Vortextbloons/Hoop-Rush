@@ -15,6 +15,50 @@ export function parseCount(value: string | undefined, option: string, fallback: 
   return parsed;
 }
 
+/** The seed-range/workers options shared by the season calibration commands. */
+export interface SeedRangeOptionBag {
+  'seed-from'?: string | null;
+  'seed-to'?: string | null;
+  workers?: string | null;
+}
+
+/**
+ * Parses the inclusive `--seed-from`/`--seed-to` cohort pair. `defaultTo` is
+ * the command's frozen cohort upper bound. With `requireOrder`, a `to < from`
+ * range throws (the shared fragile guard across the season calibration
+ * commands).
+ */
+export function parseSeedRange(
+  args: SeedRangeOptionBag,
+  defaultTo: number,
+  options: {
+    requireOrder?: boolean;
+    /** Error class for the range guard; defaults to UsageError. */
+    error?: new (message: string) => Error;
+  } = {},
+): { from: number; to: number } {
+  const from = parseCount(args['seed-from'] ?? undefined, '--seed-from', 0);
+  const to = parseCount(args['seed-to'] ?? undefined, '--seed-to', defaultTo);
+  if (options.requireOrder === true && to < from) {
+    const ErrorType = options.error ?? UsageError;
+    throw new ErrorType('--seed-to must be >= --seed-from');
+  }
+  return { from, to };
+}
+
+/**
+ * Parses the `--workers` count; `clampToAtLeastOne` mirrors the commands
+ * that never run with zero workers.
+ */
+export function parseWorkers(
+  args: Pick<SeedRangeOptionBag, 'workers'>,
+  fallback: number,
+  options: { clampToAtLeastOne?: boolean } = {},
+): number {
+  const workers = parseCount(args.workers ?? undefined, '--workers', fallback);
+  return options.clampToAtLeastOne === true ? Math.max(1, workers) : workers;
+}
+
 export interface ParsedArgs {
   /** Command words, e.g. ["data", "validate"]. */
   command: string[];

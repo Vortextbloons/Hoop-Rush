@@ -249,6 +249,12 @@ describe('season injury occurrence lifecycle (M2.5 §5)', () => {
         expect(record.missedGamesRemaining).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
         expect(record.missedGamesTotal).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
         expect(record.seasonEnding).toBe(true);
+      } else if (record.sameGameReturn) {
+        // A same-game return resolves within the occurrence game: the
+        // record carries zero missed games by design.
+        expect(record.missedGamesTotal).toBe(0);
+        expect(record.missedGamesRemaining).toBe(0);
+        expect(record.seasonEnding).toBe(false);
       } else {
         const ranges: Record<string, readonly [number, number]> = {
           minor: [1, 2],
@@ -433,7 +439,10 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
   });
 
   it('appends new injuries with their game facts and resolves same-game returns', () => {
-    const rolled = forcedRoll('root-r', 's000003', 'pv-3');
+    let rolled = forcedRoll('root-r', 's000003', 'pv-3');
+    for (let attempt = 0; attempt < 200 && !rolled.occurred; attempt += 1) {
+      rolled = forcedRoll(`root-r-${String(attempt)}`, 's000003', `pv-3-${String(attempt)}`);
+    }
     if (!rolled.occurred || rolled.injury === null) throw new Error('expected an occurrence');
     const injury = {
       ...rolled.injury,
@@ -468,13 +477,11 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
 
   it('records risky-rehab outcomes deterministically (60/40) and applies them', () => {
     let successes = 0;
-    let failures = 0;
     const outcomes: string[] = [];
     for (let i = 0; i < 2000; i += 1) {
       const outcome = rollSeasonRehabOutcome('rehab-root', `inj-${String(i).padStart(32, '0')}`);
       outcomes.push(outcome);
       if (outcome === 'success') successes += 1;
-      else failures += 1;
     }
     const successShare = successes / outcomes.length;
     expect(successShare).toBeGreaterThan(0.5);

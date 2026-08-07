@@ -246,14 +246,58 @@ export {
   seasonBlockRejection,
   auditSeasonBlock,
   handleSubmitSeasonBlockCommand,
+  completeSeasonBlockCommit,
+  deriveSeasonPostBlockState,
+  resumeSeasonBlockFromPending,
   SeasonBlockValidationError,
   SeasonBlockInvariantError,
   SeasonBlockCancelledError,
   type SeasonBlockSimulationInput,
   type SeasonBlockSimulationOptions,
   type SeasonSubmitBlockCommandInput,
+  type SeasonBlockGameOutcome,
 } from './season/block.ts';
 export { seasonRotationSetDigest } from './season/rotation.ts';
+// Season Run (2.0 M2.5) health, influence, objectives, trades, command
+// dispatch, and state digests consumed by the web app, persistence seam, and
+// CLI calibration commands.
+export { seasonFranchiseLegalFiveFacts, assembleSeasonPendingBlock } from './season/health.ts';
+export {
+  seasonGameHealthSeam,
+  seasonForfeitSummaryForGame,
+  advancePendingAfterForfeit,
+  type HealthRunView,
+} from './season/health.ts';
+export {
+  rollSeasonInjuryForPlayer,
+  seasonInjuryRiskBasisPoints,
+  seasonInjuryIdOf,
+  applySeasonGameHealthTransition,
+  seasonPlayerAvailable,
+  rollSeasonRehabOutcome,
+  applyRiskyRehabOutcome,
+  SEASON_INJURY_BASE_RISK_BP,
+  SEASON_INJURY_RISK_MIN_BP,
+  SEASON_INJURY_RISK_MAX_BP,
+  SEASON_INJURY_RECURRENCE_BONUS_BP,
+  SEASON_INJURY_RECURRENCE_WINDOW_GAMES,
+  SEASON_INJURY_SAME_GAME_RETURN_BP,
+  SEASON_INJURY_REHAB_SUCCESS_BP,
+  SEASON_INJURY_RECOVERY_RANGES,
+  type SeasonInjuryRollInput,
+  type SeasonInjuryRollResult,
+} from './season/injuries.ts';
+export { createInitialSeasonInfluenceState } from './season/influence.ts';
+export { seasonObjectiveChoicesForBlock } from './season/objectives.ts';
+export {
+  handleSeasonRunCommand,
+  SeasonRunCommandNotImplementedError,
+  type SeasonRunCommandContext,
+  type SeasonRunCommandResult,
+  type SeasonRunCommandOutput,
+} from './season/season-commands.ts';
+export { seasonRunStateDigest, type SeasonRunStateDigestFacts } from './season/state-digest.ts';
+export { openSeasonTradeWindow, type SeasonWindowOpenResult } from './season/trades.ts';
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
 export * as classic from './modes/classic/draft.ts';

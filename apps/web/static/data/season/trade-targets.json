@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "trade-targets-v1",
+  "policy": {
+    "aiTradesPerSeason": {
+      "min": 8,
+      "max": 15
+    },
+    "windows": [
+      2,
+      4,
+      5
+    ],
+    "valueBands": {
+      "1-for-1": [
+        850,
+        1150
+      ],
+      "2-for-2": [
+        800,
+        1200
+      ]
+    },
+    "chemistryPairsPerRoster": 45,
+    "chemistryPairsTotal": 1350
+  },
+  "cohort": {
+    "seedFrom": 0,
+    "seedTo": 7
+  },
+  "heldOut": {
+    "seedFrom": 8,
+    "seedTo": 11
+  },
+  "measured": {
+    "calibration": {
+      "seasonsSimulated": 8,
+      "aiTradesMean": 13.5,
+      "aiTradesMin": 0,
+      "aiTradesMax": 15,
+      "acceptedTrades": 108,
+      "illegalRosterFailures": 0,
+      "duplicateOwnershipFailures": 0,
+      "valueBandFailures": 0,
+      "chemistryPairs": 10800,
+      "chemistryPairFailures": 0,
+      "zeroStateNewPairFailures": 0,
+      "deterministicOffers": true
+    },
+    "heldOut": {
+      "seasonsSimulated": 4,
+      "aiTradesMean": 13,
+      "illegalRosterFailures": 0,
+      "duplicateOwnershipFailures": 0,
+      "valueBandFailures": 0
+    }
+  },
+  "gates": {
+    "aiTradesPerSeason": true,
+    "zeroIllegal": true,
+    "zeroDuplicateOwnership": true,
+    "valueBands": true,
+    "deterministicOffers": true,
+    "chemistryInvariants": true,
+    "heldOut": true
+  },
+  "engineVersion": "m3-engine-v10",
+  "gameVersion": "season-game-v4",
+  "gameTargetsVersion": "season-game-targets-v4",
+  "generatedAtIso": "2026-08-07T00:05:07.279Z"
+}

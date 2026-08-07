@@ -13,15 +13,6 @@ import {
 import { seasonObjectiveChoicesForBlock } from '@hoop-rush/engine';
 
 /**
- * The frozen engine export lands at integration (lead-owned engine index);
- * the module types the call against the frozen signature until then.
- */
-const choicesForBlock = seasonObjectiveChoicesForBlock as unknown as (
-  rootSeed: string,
-  blockIndex: number,
-) => SeasonObjectiveId[];
-
-/**
  * M2.5 Influence + objective presentation (season-influence-v1,
  * season-objective-v1). Pure display derivations: the human balance with
  * cap/floor facts, the recent ledger entries (authoritative reconciliation
@@ -202,7 +193,7 @@ export function objectiveChoicesViewModel(run: SeasonRun): ObjectiveChoicesViewM
       lastEvaluation: lastEvaluatedSelection(run, definitions),
     };
   }
-  const offered: SeasonObjectiveId[] = choicesForBlock(run.rootSeed, blockIndex);
+  const offered: SeasonObjectiveId[] = seasonObjectiveChoicesForBlock(run.rootSeed, blockIndex);
   const selection = run.objectives.selections[blockIndex] ?? null;
   const choices = offered.map((objectiveId) => {
     const definition = definitions.get(objectiveId);

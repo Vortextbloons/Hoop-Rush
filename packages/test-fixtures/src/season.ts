@@ -1,4 +1,5 @@
 import {
+  SEASON_ALIGNMENT,
   SEASON_AI_VERSION,
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
@@ -59,46 +60,22 @@ import {
  * M2.1 draft facts, AI assignments, rotations, evaluations, and audit fields.
  */
 
-interface AlignmentEntry {
-  conference: 'east' | 'west';
-  division: 'atlantic' | 'central' | 'southeast' | 'northwest' | 'pacific' | 'southwest';
-}
+/** Accepted NBA conference/division alignment (league-v1, canonical in
+ * `@hoop-rush/data-contracts`). The record keeps the canonical team order. */
+const ALIGNMENT: Record<
+  string,
+  {
+    conference: 'east' | 'west';
+    division: 'atlantic' | 'central' | 'southeast' | 'northwest' | 'pacific' | 'southwest';
+  }
+> = Object.fromEntries(
+  SEASON_ALIGNMENT.map((entry) => [
+    entry.franchiseId,
+    { conference: entry.conference, division: entry.division },
+  ]),
+);
 
-/** Accepted NBA conference/division alignment (league-v1). */
-const ALIGNMENT: Record<string, AlignmentEntry> = {
-  hawks: { conference: 'east', division: 'southeast' },
-  celtics: { conference: 'east', division: 'atlantic' },
-  nets: { conference: 'east', division: 'atlantic' },
-  hornets: { conference: 'east', division: 'southeast' },
-  bulls: { conference: 'east', division: 'central' },
-  cavaliers: { conference: 'east', division: 'central' },
-  pistons: { conference: 'east', division: 'central' },
-  pacers: { conference: 'east', division: 'central' },
-  heat: { conference: 'east', division: 'southeast' },
-  bucks: { conference: 'east', division: 'central' },
-  knicks: { conference: 'east', division: 'atlantic' },
-  magic: { conference: 'east', division: 'southeast' },
-  sixers: { conference: 'east', division: 'atlantic' },
-  raptors: { conference: 'east', division: 'atlantic' },
-  wizards: { conference: 'east', division: 'southeast' },
-  mavericks: { conference: 'west', division: 'southwest' },
-  nuggets: { conference: 'west', division: 'northwest' },
-  warriors: { conference: 'west', division: 'pacific' },
-  rockets: { conference: 'west', division: 'southwest' },
-  clippers: { conference: 'west', division: 'pacific' },
-  lakers: { conference: 'west', division: 'pacific' },
-  grizzlies: { conference: 'west', division: 'southwest' },
-  timberwolves: { conference: 'west', division: 'northwest' },
-  pelicans: { conference: 'west', division: 'southwest' },
-  thunder: { conference: 'west', division: 'northwest' },
-  suns: { conference: 'west', division: 'pacific' },
-  blazers: { conference: 'west', division: 'northwest' },
-  kings: { conference: 'west', division: 'pacific' },
-  spurs: { conference: 'west', division: 'southwest' },
-  jazz: { conference: 'west', division: 'northwest' },
-};
-
-const FRANCHISE_ORDER = Object.keys(ALIGNMENT);
+const FRANCHISE_ORDER = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
 
 /** M2.5 empty health state: no injury records yet (schema-valid). */
 function emptyHealth(): SeasonHealthState {

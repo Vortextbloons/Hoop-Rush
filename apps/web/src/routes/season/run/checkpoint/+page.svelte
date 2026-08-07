@@ -173,7 +173,7 @@
       (game) =>
         game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId,
     );
-    return availabilityStripRows(run.health, roster, run.rotations, humanGames, playerNames);
+    return availabilityStripRows(run.health, roster, humanGames, playerNames);
   });
 
   function boxFor(summary: SeasonGameSummary) {

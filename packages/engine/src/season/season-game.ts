@@ -24,6 +24,13 @@
 import type { Position, SimulationPlayer, SimulationTeam } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.ts';
 import { createEngineContext } from '../sim/context.ts';
+import {
+  MAX_PERIODS,
+  OVERTIME_PERIOD_SECONDS,
+  REGULATION_PERIOD_SECONDS,
+  overtimePeriodsOf,
+  resolveGameWinner,
+} from '../sim/periods.ts';
 import { GameRecorder, type SideIndex } from '../sim/recorder.ts';
 import {
   createGameState,
@@ -97,9 +104,6 @@ import { createSeasonEffectsBuffer, type SeasonEffectsBuffer } from './effects.t
  *   RNG, and no presentation randomness exists in M2.2.
  */
 
-const REGULATION_PERIOD_SECONDS = 720;
-const OVERTIME_PERIOD_SECONDS = 300;
-const MAX_PERIODS = 12;
 const REGULATION_TOTAL_SECONDS = 5 * 2880;
 const OVERTIME_TOTAL_SECONDS = 5 * 300;
 
@@ -205,7 +209,21 @@ export function simulateSeasonGameWithEffects(
 export interface SeasonGameEffectsMode {
   buffer: SeasonEffectsBuffer;
   pregamePlayerStates: readonly SeasonPlayerLoadState[];
-} /** Per-side controller state: roster, rotation facts, unit, events, stints. */
+}
+
+/** Stable removal/return queue order: period, then clock, then side. */
+function compareQueueEntries(
+  a: { period: number; secondsRemaining: number; side: 'home' | 'away' },
+  b: { period: number; secondsRemaining: number; side: 'home' | 'away' },
+): number {
+  const byPeriod = a.period - b.period;
+  if (byPeriod !== 0) return byPeriod;
+  const byClock = a.secondsRemaining - b.secondsRemaining;
+  if (byClock !== 0) return byClock;
+  return a.side === b.side ? 0 : a.side === 'home' ? -1 : 1;
+}
+
+/** Per-side controller state: roster, rotation facts, unit, events, stints. */
 class SideState {
   readonly side: 'home' | 'away';
   readonly sideIndex: SideIndex;
@@ -357,20 +375,8 @@ class SeasonGameController {
       seasonHomeCourtMechanisms(input.homeCourt),
       effectsMode?.buffer.hook,
     );
-    this.removalQueue = [...seam.removals].sort((a, b) => {
-      const byPeriod = a.period - b.period;
-      if (byPeriod !== 0) return byPeriod;
-      const byClock = a.secondsRemaining - b.secondsRemaining;
-      if (byClock !== 0) return byClock;
-      return a.side === b.side ? 0 : a.side === 'home' ? -1 : 1;
-    });
-    this.returnQueue = [...seam.returns].sort((a, b) => {
-      const byPeriod = a.period - b.period;
-      if (byPeriod !== 0) return byPeriod;
-      const byClock = a.secondsRemaining - b.secondsRemaining;
-      if (byClock !== 0) return byClock;
-      return a.side === b.side ? 0 : a.side === 'home' ? -1 : 1;
-    });
+    this.removalQueue = [...seam.removals].sort(compareQueueEntries);
+    this.returnQueue = [...seam.returns].sort(compareQueueEntries);
   }
 
   run(): SeasonGameSimulationResult {
@@ -548,27 +554,26 @@ class SeasonGameController {
     boundaryClock: number,
     periodEnded: boolean,
   ): void {
-    while (this.removalQueue.length > 0) {
-      const removal = this.removalQueue[0];
-      if (removal === undefined) break;
-      if (removal.period > period) break;
-      if (!periodEnded && removal.period === period && floatClock > removal.secondsRemaining) {
-        break;
-      }
-      this.removalQueue.shift();
-      const side = removal.side === 'home' ? this.home : this.away;
-      side.removed.add(removal.playerVersionId);
-      side.unavailable.add(removal.playerVersionId);
-      side.causesFor(removal.playerVersionId).add('injected-injury-removal');
-      side.removalEvents.push({
-        side: removal.side,
-        playerVersionId: removal.playerVersionId,
-        period,
-        secondsRemaining: boundaryClock,
-        reason: removal.reason,
-      });
-      side.boundaryEvents.removals += 1;
-    }
+    this.drainQueue(
+      this.removalQueue,
+      period,
+      floatClock,
+      boundaryClock,
+      periodEnded,
+      (removal, side) => {
+        side.removed.add(removal.playerVersionId);
+        side.unavailable.add(removal.playerVersionId);
+        side.causesFor(removal.playerVersionId).add('injected-injury-removal');
+        side.removalEvents.push({
+          side: removal.side,
+          playerVersionId: removal.playerVersionId,
+          period,
+          secondsRemaining: boundaryClock,
+          reason: removal.reason,
+        });
+        side.boundaryEvents.removals += 1;
+      },
+    );
   }
 
   /**
@@ -583,29 +588,55 @@ class SeasonGameController {
     boundaryClock: number,
     periodEnded: boolean,
   ): void {
-    while (this.returnQueue.length > 0) {
-      const ret = this.returnQueue[0];
-      if (ret === undefined) break;
-      if (ret.period > period) break;
-      if (!periodEnded && ret.period === period && floatClock > ret.secondsRemaining) {
+    this.drainQueue(
+      this.returnQueue,
+      period,
+      floatClock,
+      boundaryClock,
+      periodEnded,
+      (ret, side) => {
+        // A return never re-enables a fouled-out player (the seeded seam
+        // only returns injury-removed players; the guard keeps the
+        // invariant).
+        if (side.fouledOut.has(ret.playerVersionId)) return;
+        side.removed.delete(ret.playerVersionId);
+        side.unavailable.delete(ret.playerVersionId);
+        side.causesFor(ret.playerVersionId).add('injury-return');
+        side.returnEvents.push({
+          side: ret.side,
+          playerVersionId: ret.playerVersionId,
+          period,
+          secondsRemaining: boundaryClock,
+          reason: ret.reason,
+        });
+        side.boundaryEvents.returns += 1;
+      },
+    );
+  }
+
+  /**
+   * Drains every queue entry due at or before the boundary, applying the
+   * per-entry mutation in stable sorted order. Shared by removals and
+   * returns so the due-at-or-before clock/period guard lives in one place.
+   */
+  private drainQueue<T extends { period: number; secondsRemaining: number; side: 'home' | 'away' }>(
+    queue: T[],
+    period: number,
+    floatClock: number,
+    boundaryClock: number,
+    periodEnded: boolean,
+    apply: (entry: T, side: SideState) => void,
+  ): void {
+    while (queue.length > 0) {
+      const entry = queue[0];
+      if (entry === undefined) break;
+      if (entry.period > period) break;
+      if (!periodEnded && entry.period === period && floatClock > entry.secondsRemaining) {
         break;
       }
-      this.returnQueue.shift();
-      const side = ret.side === 'home' ? this.home : this.away;
-      // A return never re-enables a fouled-out player (the seeded seam only
-      // returns injury-removed players; the guard keeps the invariant).
-      if (side.fouledOut.has(ret.playerVersionId)) continue;
-      side.removed.delete(ret.playerVersionId);
-      side.unavailable.delete(ret.playerVersionId);
-      side.causesFor(ret.playerVersionId).add('injury-return');
-      side.returnEvents.push({
-        side: ret.side,
-        playerVersionId: ret.playerVersionId,
-        period,
-        secondsRemaining: boundaryClock,
-        reason: ret.reason,
-      });
-      side.boundaryEvents.returns += 1;
+      queue.shift();
+      const side = entry.side === 'home' ? this.home : this.away;
+      apply(entry, side);
     }
   }
 
@@ -769,6 +800,7 @@ class SeasonGameController {
   private activateUnit(side: SideState): void {
     const team = this.buildUnitTeam(side);
     this.tripContext.teams[side.sideIndex] = team;
+    this.tripContext.teamUnits[side.sideIndex] = [...side.unit];
     this.tripContext.preps[side.sideIndex] = prepareTeam(team, this.profile);
     const rosterIndices: number[] = [];
     for (const playerVersionId of side.unit) {
@@ -927,18 +959,10 @@ class SeasonGameController {
   }
 
   private buildResult(): SeasonGameSimulationResult {
-    const overtimePeriods = Math.max(0, this.recorder.sides[0].periodPoints.length - 4);
+    const overtimePeriods = overtimePeriodsOf(this.recorder.sides[0].periodPoints.length);
     const homeScore = this.recorder.sides[0].points;
     const awayScore = this.recorder.sides[1].points;
-    // A tie after the period cap is a pathological guard; the seeded draw decides.
-    const winner: 'home' | 'away' =
-      homeScore > awayScore
-        ? 'home'
-        : awayScore > homeScore
-          ? 'away'
-          : this.rng.chance(0.5)
-            ? 'home'
-            : 'away';
+    const winner = resolveGameWinner(homeScore, awayScore, this.rng);
 
     return {
       schemaVersion: 1,

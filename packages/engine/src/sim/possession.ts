@@ -93,6 +93,13 @@ export interface TripContext {
   state: GameState;
   profile: EraSimulationProfile;
   teams: [SimulationTeam, SimulationTeam];
+  /**
+   * Per-side playerVersionId arrays mirroring `teams` (the current on-court
+   * five for Season Run, the full roster for Classic). Hoisted so the
+   * effects hook never rebuilds them per trip; the Season controller keeps
+   * them in sync when a substitution replaces `teams[side]`.
+   */
+  teamUnits: [readonly string[], readonly string[]];
   /** Per-team per-game weight and lookup tables, in side order. */
   preps: [TeamPrep, TeamPrep];
   /** Hoisted game scalars (pure functions of the profile). */
@@ -132,6 +139,7 @@ export function createTripContext(
     state,
     profile,
     teams,
+    teamUnits: [unitVersionIdsOf(teams[0]), unitVersionIdsOf(teams[1])],
     preps: [prepareTeam(teams[0], profile), prepareTeam(teams[1], profile)],
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
@@ -382,10 +390,9 @@ export class PossessionStepper {
     if (this.handlerVersion === undefined) {
       throw new Error('possession: effects trip facts require a recorded handler');
     }
-    const versionOf = (player: SimulationPlayer): string => simulationPlayerVersion(player);
     effects.recordTrip({
-      homeUnit: this.ctx.teams[0].players.map(versionOf),
-      awayUnit: this.ctx.teams[1].players.map(versionOf),
+      homeUnit: this.ctx.teamUnits[0],
+      awayUnit: this.ctx.teamUnits[1],
       handler: this.handlerVersion,
       ...(this.shooterVersion !== undefined ? { shooter: this.shooterVersion } : {}),
       ...(this.defenderVersion !== undefined ? { defender: this.defenderVersion } : {}),
@@ -442,6 +449,16 @@ function simulationPlayerVersion(player: SimulationPlayer): string {
     throw new Error('possession: effects facts require a playerVersionId');
   }
   return version;
+}
+
+/**
+ * playerVersionId array of a side's players (hoisted per game/unit). The
+ * arrays are consumed only by the effects hook (Season Run, where every
+ * player carries a version id); Classic players without an id map to the
+ * empty string and are never read.
+ */
+function unitVersionIdsOf(team: SimulationTeam): readonly string[] {
+  return team.players.map((player) => player.playerVersionId ?? '');
 }
 
 /**

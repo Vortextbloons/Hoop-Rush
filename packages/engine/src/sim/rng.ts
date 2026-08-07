@@ -3,7 +3,15 @@
  * and `src/game/sim/rng.ts`, ported after cleanup). The mulberry32 stream is
  * retained; the seed hash switches from the legacy Java-style string hash to
  * FNV-1a so seeds produced by `seedFromString` behave consistently.
+ *
+ * The FNV-1a primitive itself is canonical in `@hoop-rush/data-contracts`
+ * (`season-hash.ts`); this module re-exports it so the seeded simulation and
+ * the challenge seed derivation share the single implementation.
  */
+
+import { FNV_OFFSET_32, fnv1a32, hex32 } from '@hoop-rush/data-contracts';
+
+export { FNV_OFFSET_32, fnv1a32, hex32 };
 
 export interface Rng {
   /** Uniform float in [0, 1). */
@@ -16,25 +24,6 @@ export interface Rng {
   pick<T>(items: readonly T[]): T;
   /** Element selected by relative weights (nonpositive weights contribute 0). */
   weightedPick<T>(items: readonly T[], weights: readonly number[]): T;
-}
-
-/** FNV-1a 32-bit offset basis. */
-export const FNV_OFFSET_32 = 0x811c9dc5;
-const FNV_PRIME_32 = 0x01000193;
-
-/** FNV-1a 32-bit hash of a string; unsigned 32-bit result. */
-export function fnv1a32(material: string, offset = FNV_OFFSET_32): number {
-  let hash = offset | 0;
-  for (let i = 0; i < material.length; i += 1) {
-    hash ^= material.charCodeAt(i);
-    hash = Math.imul(hash, FNV_PRIME_32);
-  }
-  return hash >>> 0;
-}
-
-/** 8-hex-digit form of a 32-bit value. */
-export function hex32(value: number): string {
-  return value.toString(16).padStart(8, '0');
 }
 
 /** Swaps two positions of an array; throws when an index is out of bounds. */

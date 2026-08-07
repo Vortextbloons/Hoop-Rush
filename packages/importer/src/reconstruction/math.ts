@@ -54,15 +54,9 @@ export function normalQuantile(p: number): number {
   return (num(a, inner) * r) / den(b, inner);
 }
 
-/** FNV-1a 32-bit hash of a string (deterministic fold assignment). */
-export function fnv1a32(value: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return hash >>> 0;
-}
+/** FNV-1a 32-bit hash of a string (deterministic fold assignment). Canonical
+ * implementation lives in `@hoop-rush/data-contracts` (`season-hash.ts`). */
+export { fnv1a32 } from '@hoop-rush/data-contracts';
 
 /** Adds the intercept column (1.0) to a design matrix. */
 export function withIntercept(rows: readonly (readonly number[])[]): number[][] {
