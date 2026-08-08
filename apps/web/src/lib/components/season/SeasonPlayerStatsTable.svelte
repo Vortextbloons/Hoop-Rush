@@ -7,6 +7,7 @@
     SeasonPlayerStatsRow,
     SeasonPlayerStatsSortKey,
   } from '$lib/season/season-player-stats-view';
+  import { formatPositions } from '$lib/player-positions';
 
   /**
    * Full Season Run player stats table: sortable column headers (buttons +
@@ -164,7 +165,7 @@
               <p class="truncate font-mono text-[9px] text-muted-foreground">
                 {row.seasonKey}
                 {#if row.positions.length > 0}
-                  · {row.positions.join('/')}
+                  · {formatPositions(row.positions)}
                 {/if}
                 {#if eraLabel}
                   · {eraLabel}

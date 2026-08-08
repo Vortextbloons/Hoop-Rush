@@ -3,6 +3,7 @@ import {
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_RECAP_VERSION,
   SEASON_BLOCK_VERSION,
+  SEASON_RUN_SAVE_SCHEMA_VERSION,
   type SeasonPendingBlockCandidate,
 } from '@hoop-rush/data-contracts';
 import {
@@ -29,7 +30,8 @@ import { SEASON_DRAFT_RECORD_ID } from './season-draft-record.ts';
  * the checkpoint row is the frozen snapshot minus the 1,230 scheduled game
  * records plus cursor facts, the M2.4 effects state, and the M2.5 mutable
  * run state; summary/detail/block/index/pending rows wrap the frozen
- * contracts. The record schema is the single save-schema-v4 row (M2.5) —
+ * contracts. The record schema is the single save-schema-v5 row (projection
+ * milestone) —
  * the v1-v3 development families are never read (the repository surfaces
  * them through the typed incompatibility flow), and this schema rejects
  * them. Every row validates at the storage boundary, so corrupt rows throw
@@ -45,7 +47,7 @@ describe('storedSeasonRunRecordSchema', () => {
   it('accepts a promotion-time checkpoint row without the scheduled games', () => {
     const row = checkpointRowFixture();
     const parsed = storedSeasonRunRecordSchema.parse(row);
-    expect(parsed.saveSchemaVersion).toBe(4);
+    expect(parsed.saveSchemaVersion).toBe(SEASON_RUN_SAVE_SCHEMA_VERSION);
     expect(parsed.run.runId).toBe('fixture-season-run-1');
     expect('games' in parsed.run).toBe(false);
     expect(parsed.completedRounds).toBe(0);
@@ -115,7 +117,7 @@ describe('storedSeasonRunRecordSchema', () => {
       },
     };
     const parsed = storedSeasonRunRecordSchema.parse(row);
-    expect(parsed.saveSchemaVersion).toBe(4);
+    expect(parsed.saveSchemaVersion).toBe(SEASON_RUN_SAVE_SCHEMA_VERSION);
     expect(parsed.lastCommandId).toBe('command-8');
     expect(parsed.recap?.blockIndex).toBe(8);
     expect(parsed.effects.playerStates[0]?.fatigueBasisPoints).toBe(4000);

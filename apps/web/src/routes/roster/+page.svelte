@@ -12,6 +12,7 @@
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import { clearDataLoaderCaches, getManifest, getPlayersIndex, getRosterDetails } from '$lib/data';
+  import { DETAILED_POSITIONS } from '$lib/player-positions';
   import {
     defaultDirection,
     filterRoster,
@@ -45,7 +46,7 @@
     { id: 'position', label: 'Position' },
   ];
 
-  const POSITION_OPTIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
+  const POSITION_OPTIONS = DETAILED_POSITIONS;
   const PAGE_SIZE = 120;
 
   /** Typing delay before the filter/sort pipeline re-runs on the full index. */

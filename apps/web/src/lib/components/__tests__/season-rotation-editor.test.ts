@@ -1,8 +1,13 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, within } from '@testing-library/svelte';
-import type { SeasonRotation } from '@hoop-rush/data-contracts';
+import { fireEvent, render, waitFor, within } from '@testing-library/svelte';
+import {
+  SEASON_MINUTE_POLICY_VERSION,
+  type SeasonMinutePolicyStrategy,
+  type SeasonRotation,
+} from '@hoop-rush/data-contracts';
+import type { MinutePlanOptimizationResult, OptimizedMinutePlan } from '@hoop-rush/engine';
 import RotationEditor from '$lib/components/season/RotationEditor.svelte';
 import { createRotationEditor, type RotationMember } from '$lib/season/season-rotation-editor';
 import {
@@ -21,6 +26,8 @@ mockSvelteKitApp();
  * toggles, bench move-up/down controls, the invalid-rotation alert, and
  * per-player failure placement. The editor's engine-validated commits are
  * unit-tested in season-rotation-editor.test.ts; here we verify the wiring.
+ * The optimize-with-projection tests cover the page-owned hook: busy state,
+ * the three plan cards, and explicit apply only.
  */
 
 function members(): RotationMember[] {
@@ -56,6 +63,46 @@ function minutesList(container: HTMLElement) {
   const section = container.querySelector('section[aria-labelledby="minutes-heading"]');
   if (section === null) throw new Error('minutes section missing');
   return within(section as HTMLElement);
+}
+
+/** A three-plan optimize fixture: legal rotations over the fixture roster,
+ * distinct per-strategy policies, and one heavy-strain plan. */
+function fixturePlanResult(): MinutePlanOptimizationResult {
+  const base = legalRotation();
+  const plan = (
+    strategy: SeasonMinutePolicyStrategy,
+    overrides: Partial<OptimizedMinutePlan> = {},
+  ): OptimizedMinutePlan => ({
+    strategy,
+    rotation: {
+      ...base,
+      minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy },
+    },
+    quality: 0.6,
+    maxStarterStrainBasisPoints: 1200,
+    strainBand: 'ready',
+    relief: 0.25,
+    fatigueBands: { fresh: 2, ready: 6, tired: 2, heavy: 0 },
+    riskScore: 0.7,
+    heavyStrain: false,
+    projectedNetRating: 3.2,
+    unitQuality: { starting: 2.5, closing: 2.2, bench: 1.1 },
+    ...overrides,
+  });
+  return {
+    plans: [
+      plan('starter-heavy', { projectedNetRating: 3.42, riskScore: 0.72, relief: 0.25 }),
+      plan('balanced', { projectedNetRating: 3.31, riskScore: 0.68, relief: 0.3 }),
+      plan('bench-heavy', {
+        projectedNetRating: 3.05,
+        riskScore: 0.6,
+        strainBand: 'tired',
+        heavyStrain: true,
+        relief: 0.4,
+      }),
+    ],
+    recommended: 'starter-heavy',
+  };
 }
 
 describe('RotationEditor component', () => {
@@ -348,5 +395,120 @@ describe('RotationEditor component', () => {
     for (const button of getAllByRole('button', { name: /closing five/i })) {
       expect((button as HTMLButtonElement).disabled).toBe(true);
     }
+  });
+
+  it('optimizes through the page hook: busy state, three plan cards, explicit apply', async () => {
+    const result = fixturePlanResult();
+    const released: Array<(value: MinutePlanOptimizationResult) => void> = [];
+    const run = vi.fn(
+      () =>
+        new Promise<MinutePlanOptimizationResult>((resolve) => {
+          released.push(resolve);
+        }),
+    );
+    const onchange = vi.fn();
+    const editor = createRotationEditor(legalRotation(), members());
+    const { container, getByRole, queryAllByRole } = render(RotationEditor, {
+      props: {
+        editor,
+        disabled: false,
+        onchange,
+        optimize: { run, busy: false, error: null },
+      },
+    });
+    await fireEvent.click(getByRole('button', { name: 'Optimize with Projection' }));
+    expect(run).toHaveBeenCalledTimes(1);
+    // Busy while the page's promise is pending.
+    const busyButton = getByRole('button', { name: 'Optimizing…' }) as HTMLButtonElement;
+    expect(busyButton.disabled).toBe(true);
+    released[0]?.(result);
+    await waitFor(() => {
+      expect(queryAllByRole('button', { name: 'Apply' }).length).toBeGreaterThan(0);
+    });
+    // Three plan cards with the documented facts; the heavy-strain warning
+    // only on the bench-heavy plan and Recommended on starter-heavy.
+    const panel = container.querySelector('section[aria-label="Minute optimization plans"]');
+    if (panel === null) throw new Error('plan panel missing');
+    const plans = within(panel as HTMLElement);
+    expect(plans.getAllByRole('article')).toHaveLength(3);
+    expect(plans.getByText('Starter-Heavy')).not.toBeNull();
+    expect(plans.getByText('Balanced')).not.toBeNull();
+    expect(plans.getByText('Bench-Heavy')).not.toBeNull();
+    expect(plans.getByText('3.42')).not.toBeNull();
+    expect(plans.getByText('0.72')).not.toBeNull();
+    expect(plans.getByText('25%')).not.toBeNull();
+    expect(plans.getByText('Recommended')).not.toBeNull();
+    expect(plans.getByText('Heavy strain')).not.toBeNull();
+    expect(plans.getAllByText('Ready')).toHaveLength(2);
+    expect(plans.getByText('Tired')).not.toBeNull();
+    // Explicit apply: the recommended plan commits through the editor audit.
+    await fireEvent.click(plans.getAllByRole('button', { name: 'Apply' })[0] as HTMLButtonElement);
+    expect(onchange).toHaveBeenCalledTimes(1);
+    const [rotation] = onchange.mock.calls[0] as [SeasonRotation, string[]];
+    expect(rotation.minutePolicy.strategy).toBe('starter-heavy');
+    expect(editor.rotation.minutePolicy.strategy).toBe('starter-heavy');
+    expect(editor.validate()).toEqual([]);
+    expect(queryAllByRole('button', { name: 'Apply' })).toHaveLength(0);
+  });
+
+  it('cancel closes the plan panel without changing the rotation', async () => {
+    const result = fixturePlanResult();
+    const run = vi.fn(() => Promise.resolve(result));
+    const onchange = vi.fn();
+    const editor = createRotationEditor(legalRotation(), members());
+    const { getByRole, queryAllByRole } = render(RotationEditor, {
+      props: {
+        editor,
+        disabled: false,
+        onchange,
+        optimize: { run, busy: false, error: null },
+      },
+    });
+    await fireEvent.click(getByRole('button', { name: 'Optimize with Projection' }));
+    await waitFor(() => {
+      expect(queryAllByRole('button', { name: 'Apply' }).length).toBeGreaterThan(0);
+    });
+    const before = editor.rotation;
+    await fireEvent.click(getByRole('button', { name: 'Cancel' }));
+    expect(queryAllByRole('button', { name: 'Apply' })).toHaveLength(0);
+    expect(editor.rotation).toBe(before);
+    expect(onchange).not.toHaveBeenCalled();
+  });
+
+  it('a failed optimization leaves the rotation untouched and shows the page error', async () => {
+    const run = vi.fn(() => Promise.reject(new Error('boom')));
+    const editor = createRotationEditor(legalRotation(), members());
+    const before = editor.rotation;
+    const props = {
+      editor,
+      disabled: false,
+      onchange: vi.fn(),
+      optimize: { run, busy: false, error: null },
+    };
+    const { getByRole, queryByRole, rerender } = render(RotationEditor, { props });
+    await fireEvent.click(getByRole('button', { name: 'Optimize with Projection' }));
+    await waitFor(() => {
+      expect(queryByRole('button', { name: 'Optimize with Projection' })).not.toBeNull();
+    });
+    // The page records the failure and pushes it through the hook's error prop.
+    await rerender({ ...props, optimize: { run, busy: false, error: 'boom' } });
+    const alert = getByRole('alert');
+    expect(alert.textContent).toMatch(/Optimization failed: boom/);
+    expect(editor.rotation).toBe(before);
+    expect(queryByRole('button', { name: 'Apply' })).toBeNull();
+    expect(queryByRole('article')).toBeNull();
+  });
+
+  it('disables the optimize button while the whole editor is disabled', () => {
+    const { getByRole } = render(RotationEditor, {
+      props: {
+        editor: createRotationEditor(legalRotation(), members()),
+        disabled: true,
+        onchange: vi.fn(),
+        optimize: { run: vi.fn(), busy: false, error: null },
+      },
+    });
+    const button = getByRole('button', { name: 'Optimize with Projection' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
   });
 });

@@ -62,6 +62,9 @@ jobs:
       - name: Benchmark
         run: pnpm hoop-rush benchmark --format json
 
+      - name: Projection benchmark
+        run: pnpm hoop-rush projection benchmark --format json
+
       - name: Production build
         env:
           BASE_PATH: /${{ github.event.repository.name }}

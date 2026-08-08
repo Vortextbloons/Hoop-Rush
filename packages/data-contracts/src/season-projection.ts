@@ -3,10 +3,12 @@ import { eraIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   PROJECTION_MODEL_VERSION,
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_PROJECTION_TARGETS_VERSION,
   SEASON_PROJECTION_VERSION,
 } from './season-versions.ts';
 import { baseFiveProjectionSchema, projectionWeaknessSchema } from './projection.ts';
+import { seasonMinutePolicyStrategySchema } from './season-rotation.ts';
 import type { EraSimulationProfile } from './era-sim-profile.ts';
 import type { ProjectionModelArtifact } from './projection.ts';
 import type { SeasonRotation } from './season-rotation.ts';
@@ -96,6 +98,52 @@ export const seasonProjectionMetricsSchema = z.object({
 });
 export type SeasonProjectionMetrics = z.infer<typeof seasonProjectionMetricsSchema>;
 
+/** Fatigue band of a plan's worst starter strain (minute-policy-v1). */
+export const seasonProjectionFatigueBandSchema = z.enum(['fresh', 'ready', 'tired', 'heavy']);
+export type SeasonProjectionFatigueBand = z.infer<typeof seasonProjectionFatigueBandSchema>;
+
+/**
+ * Minute-policy plan facts (minute-policy-v1) attached to a Season
+ * projection when the caller supplies minute-plan load input: the frozen
+ * policy that produced the rotation's target minutes, its projected quality
+ * and net rating, the block-end starter strain facts, bench relief, fatigue
+ * band counts over the ten rostered players, and the risk-adjusted score.
+ */
+export const seasonProjectionPlanFactsSchema = z.object({
+  /** The frozen minute-policy contract that produced the target minutes. */
+  policyVersion: z.literal(SEASON_MINUTE_POLICY_VERSION),
+  /** The strategy recorded on the rotation's minute policy. */
+  strategy: seasonMinutePolicyStrategySchema,
+  /** The projection's weighted net rating (metrics.netRating). */
+  projectedNetRating: z.number(),
+  /** Quality of the named unit groups (metrics terms). */
+  unitQuality: z.object({
+    starting: z.number(),
+    closing: z.number(),
+    bench: z.number(),
+  }),
+  /** Worst starter end-of-block fatigue (basis points, 0..10,000). */
+  starterStrainAfterBlock: z.number().min(0).max(10000),
+  /** Band of the worst starter strain. */
+  starterStrainBand: seasonProjectionFatigueBandSchema,
+  /** Bench relief share of projected quality (0..1). */
+  benchRelief: z.number().min(0).max(1),
+  /** Fatigue band counts over the ten rostered players after the block. */
+  fatigueBands: z.object({
+    fresh: z.number().int().nonnegative(),
+    ready: z.number().int().nonnegative(),
+    tired: z.number().int().nonnegative(),
+    heavy: z.number().int().nonnegative(),
+  }),
+  /** Risk-adjusted score in 0..1 (neutral single-rotation normalization). */
+  riskAdjustedScore: z.number().min(0).max(1),
+  /** Horizon over which the fatigue facts were projected (games). */
+  horizonGames: z.number().int().positive(),
+  /** True when any rostered player projects to the Heavy band. */
+  heavyStrain: z.boolean(),
+});
+export type SeasonProjectionPlanFacts = z.infer<typeof seasonProjectionPlanFactsSchema>;
+
 /** The complete Season projection output. */
 export const seasonProjectionSchema = z
   .object({
@@ -114,6 +162,11 @@ export const seasonProjectionSchema = z
     minutes: z.array(seasonProjectionMinuteRowSchema).length(10),
     metrics: seasonProjectionMetricsSchema,
     weaknesses: z.array(projectionWeaknessSchema),
+    /**
+     * Minute-policy plan facts, present only when the caller supplied
+     * minute-plan load input (minute-policy-v1).
+     */
+    planFacts: seasonProjectionPlanFactsSchema.optional(),
   })
   .superRefine((projection, ctx) => {
     const weighted = projection.units.filter((unit) => unit.weight > 0);
@@ -164,12 +217,35 @@ export interface SeasonProjectionPlayerInput {
   player: import('./simulation.ts').SimulationPlayer;
 }
 
+/** Per-player minute-plan load facts for the plan facts computation. */
+export interface SeasonProjectionMinutePlanPlayerInput {
+  playerVersionId: string;
+  /** 45..95 stamina rating (season-stamina-v1). */
+  staminaRating: number;
+  /** 45..95 durability rating (durability-v1). */
+  durability: number;
+  /** 0..10,000 current fatigue basis points. */
+  fatigueBasisPoints: number;
+  /** 0..10,000 current recent-load basis points. */
+  recentLoadBasisPoints: number;
+}
+
 export interface SeasonProjectionInput {
   /** Exactly ten players. */
   roster: readonly SeasonProjectionPlayerInput[];
   rotation: SeasonRotation;
   eraProfile: EraSimulationProfile;
   model: ProjectionModelArtifact;
+  /**
+   * Optional minute-plan load input (minute-policy-v1): when present, the
+   * projection attaches `planFacts` computed from the rotation's own target
+   * minutes and this load. Inputs stay plain interfaces; no Zod schema.
+   */
+  minutePlan?: {
+    players: ReadonlyArray<SeasonProjectionMinutePlanPlayerInput>;
+    /** Upcoming-block horizon in games (1..10). */
+    horizonGames: number;
+  };
 }
 
 /**

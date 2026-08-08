@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
@@ -106,6 +107,7 @@ function buildRotation(team: SeasonGameTeamInput): SeasonRotation {
       if (id === undefined) throw new Error('fixture closing five missing player');
       return id;
     }),
+    minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
     rotationVersion: SEASON_ROTATION_VERSION,
   };
 }

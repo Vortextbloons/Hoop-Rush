@@ -177,7 +177,7 @@ describe('buildLockPreview', () => {
       throw new Error(`expected a change for ${benchPlayer}`);
     }
     expect(change.roleBefore).toBe('Bench 1');
-    expect(change.roleAfter).toBe('Starter G');
+    expect(change.roleAfter).toBe('Starter PG');
   });
 });
 

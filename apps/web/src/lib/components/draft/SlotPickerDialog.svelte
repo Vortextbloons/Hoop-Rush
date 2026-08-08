@@ -14,6 +14,7 @@
     canFillSlot,
     displacementTargetFor,
   } from '$lib/draft-slots';
+  import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
 
   type IndexRow = PlayersIndexEntry;
@@ -151,7 +152,7 @@
                 {subject.displayName}
               </Dialog.Title>
               <p class="font-mono text-[10px] text-muted-foreground">
-                {subject.seasonKey} · {subject.positionsPlayable.join('/')}
+                {subject.seasonKey} · {formatPositions(subject.positionsPlayable)}
                 {#each ratingBadges(subject, presentation) as badge (badge.label)}
                   <span
                     class="rounded bg-surface-3 px-1.5 py-0.5"
@@ -204,7 +205,7 @@
                     {opt.incumbent.displayName}
                   </span>
                   <span class="block font-mono text-[10px] text-muted-foreground">
-                    {opt.incumbent.seasonKey} · {opt.incumbent.positionsPlayable.join('/')}
+                    {opt.incumbent.seasonKey} · {formatPositions(opt.incumbent.positionsPlayable)}
                   </span>
                 {:else}
                   <span class="block truncate text-sm font-semibold">Open {label} slot</span>

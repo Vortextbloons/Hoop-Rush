@@ -12,6 +12,7 @@
     loadStateOf,
   } from '$lib/season/season-effects-view';
   import type { SeasonEffectsState, SeasonGameSummary } from '@hoop-rush/data-contracts';
+  import { formatPositions } from '$lib/player-positions';
 
   /**
    * Human franchise roster cards (M2.4): ten player-season versions with
@@ -105,7 +106,7 @@
             <p class="truncate font-mono text-[10px] text-muted-foreground">
               {entry.seasonKey}
               {#if shell.playablePositions(entry.playerVersionId).length > 0}
-                · {shell.playablePositions(entry.playerVersionId).join('/')}
+                · {formatPositions(shell.playablePositions(entry.playerVersionId))}
               {/if}
             </p>
             {#if eraIdentity?.displayLabel}

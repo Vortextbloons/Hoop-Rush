@@ -4,15 +4,8 @@
 >
   import type { HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
   import PlayerFace from './PlayerFace.svelte';
+  import { SLOT_LABELS, SLOT_INDEXES } from '$lib/player-positions';
 
-  const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-  const SLOT_NAMES = [
-    'Point Guard',
-    'Shooting Guard',
-    'Small Forward',
-    'Power Forward',
-    'Center',
-  ] as const;
   const SLOT_POSITIONS = [
     { left: 50, top: 77 },
     { left: 22, top: 55 },
@@ -20,7 +13,6 @@
     { left: 34, top: 29 },
     { left: 66, top: 29 },
   ] as const;
-  const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
 
   let {
     slots,

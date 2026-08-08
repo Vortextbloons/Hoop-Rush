@@ -243,8 +243,8 @@
       {#if !(started && board?.draft)}
         <p class="mt-3 max-w-xl text-sm text-muted-foreground">
           Your franchise is rolled from the run seed. Each round draws eight global player-season
-          cards; safe picks keep the 4G/4F/3C completion targets reachable, and disabled cards say
-          why.
+          cards; safe picks keep the 4 PG/SG / 4 SF/PF / 3 C coverage targets reachable, and
+          disabled cards say why.
         </p>
       {/if}
     </div>

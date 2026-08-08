@@ -5,14 +5,25 @@ import type {
   SeasonProjection,
   SeasonProjectionInput,
   SeasonProjectionMetrics,
+  SeasonProjectionPlanFacts,
   SeasonProjectionUnit,
   SimulationPlayer,
 } from '@hoop-rush/data-contracts';
-import { seasonDigestHex } from '@hoop-rush/data-contracts';
+import { SEASON_MINUTE_POLICY_VERSION, seasonDigestHex } from '@hoop-rush/data-contracts';
 import { applySeasonRotationPreset, validateSeasonRotation } from '../season/rotation.ts';
 import { chooseInitialUnit, type PlannerMember } from '../season/rotation-planner.ts';
+import {
+  benchReliefOf,
+  fatigueBandOf,
+  MINUTE_PLAN_HEAVY_THRESHOLD_BP,
+  projectFatigueAfterBlock,
+  riskScoreOf,
+  type FatigueBand,
+  type MinutePlanPlayerInput,
+} from '../season/minute-plan.ts';
 import { ProjectionCache } from './cache.ts';
 import { projectBaseFive } from './base.ts';
+import { projectedQualityWeights } from './minute-plan-quality.ts';
 import { archetypeReferences } from './reference-lineups.ts';
 import {
   traceContext,
@@ -50,7 +61,7 @@ function unitKeyOf(players: readonly string[]): string {
 }
 
 /** Maps a planner five (ordered legal G,G,F,F,C) to the base projection input. */
-function projectUnit(input: {
+export function projectUnit(input: {
   players: readonly string[];
   byVersion: ReadonlyMap<string, SimulationPlayer>;
   profile: SeasonProjectionInput['eraProfile'];
@@ -114,6 +125,92 @@ function blendedTrace(
   accumulate(normal, 1 - closeWeight);
   accumulate(close, closeWeight);
   return blended;
+}
+
+/**
+ * Minute-policy plan facts (minute-policy-v1) for one projection: the
+ * rotation's own target minutes projected forward over the upcoming-block
+ * horizon against the supplied per-player load. The risk-adjusted score uses
+ * the neutral quality 0.5 because these facts describe a SINGLE rotation,
+ * not three competing plans — relative quality normalization needs a plan
+ * set, and the three-card comparisons in the optimizer flow
+ * (optimizeSeasonRotation) override per-plan scores with projected net
+ * ratings.
+ */
+function planFactsOf(input: {
+  rotation: SeasonProjectionInput['rotation'];
+  allVersions: readonly string[];
+  players: readonly SimulationPlayer[];
+  byVersion: ReadonlyMap<string, SimulationPlayer>;
+  minutePlan: NonNullable<SeasonProjectionInput['minutePlan']>;
+  profile: SeasonProjectionInput['eraProfile'];
+  model: ProjectionModelArtifact;
+  cache: ProjectionCache;
+  metrics: SeasonProjectionMetrics;
+}): SeasonProjectionPlanFacts {
+  const { rotation, allVersions, players, byVersion, minutePlan, profile, model, cache, metrics } =
+    input;
+  const loadByVersion = new Map(minutePlan.players.map((row) => [row.playerVersionId, row]));
+  const qualityByVersion = projectedQualityWeights({
+    players,
+    byVersion,
+    rotation,
+    eraProfile: profile,
+    model,
+    cache,
+  });
+  const minutePlanPlayers: MinutePlanPlayerInput[] = allVersions.map((versionId) => {
+    const load = loadByVersion.get(versionId);
+    return {
+      playerVersionId: versionId,
+      quality: qualityByVersion.get(versionId) ?? 0.5,
+      staminaRating: load?.staminaRating ?? 70,
+      durability: load?.durability ?? 70,
+      fatigueBasisPoints: load?.fatigueBasisPoints ?? 0,
+      recentLoadBasisPoints: load?.recentLoadBasisPoints ?? 0,
+    };
+  });
+  const minutesByVersion = new Map(
+    rotation.targetMinutes.map((row) => [row.playerVersionId, row.minutes]),
+  );
+  const fatigue = projectFatigueAfterBlock(
+    minutePlanPlayers,
+    minutesByVersion,
+    minutePlan.horizonGames,
+  );
+  const maxStarterStrainBasisPoints = Math.max(
+    0,
+    ...rotation.starters.map((versionId) => fatigue.get(versionId)?.fatigueBasisPoints ?? 0),
+  );
+  const fatigueBands: Record<FatigueBand, number> = { fresh: 0, ready: 0, tired: 0, heavy: 0 };
+  for (const versionId of allVersions) {
+    fatigueBands[fatigue.get(versionId)?.band ?? 'fresh'] += 1;
+  }
+  const relief = benchReliefOf(rotation.targetMinutes, rotation.benchOrder, qualityByVersion);
+  const heavyStrain =
+    fatigueBands.heavy > 0 ||
+    [...fatigue.values()].some((facts) => facts.peakBasisPoints >= MINUTE_PLAN_HEAVY_THRESHOLD_BP);
+  return {
+    policyVersion: SEASON_MINUTE_POLICY_VERSION,
+    strategy: rotation.minutePolicy.strategy,
+    projectedNetRating: metrics.netRating,
+    unitQuality: {
+      starting: metrics.startingQuality,
+      closing: metrics.closingQuality,
+      bench: metrics.benchQuality,
+    },
+    starterStrainAfterBlock: maxStarterStrainBasisPoints,
+    starterStrainBand: fatigueBandOf(maxStarterStrainBasisPoints),
+    benchRelief: relief,
+    fatigueBands,
+    riskAdjustedScore: riskScoreOf({
+      quality: 0.5,
+      maxStarterStrainBasisPoints,
+      relief,
+    }),
+    horizonGames: minutePlan.horizonGames,
+    heavyStrain,
+  };
 }
 
 /**
@@ -435,6 +532,21 @@ export function projectSeasonRoster(
   };
   const weaknesses = identifyWeaknesses(input.model, weaknessValues);
 
+  const planFacts =
+    input.minutePlan === undefined
+      ? undefined
+      : planFactsOf({
+          rotation: input.rotation,
+          allVersions,
+          players,
+          byVersion,
+          minutePlan: input.minutePlan,
+          profile: input.eraProfile,
+          model: input.model,
+          cache,
+          metrics,
+        });
+
   const rosterMaterial = players
     .map((player) => ({
       playerVersionId: player.playerVersionId,
@@ -450,6 +562,7 @@ export function projectSeasonRoster(
         closingFive: input.rotation.closingFive,
         benchOrder: input.rotation.benchOrder,
         targetMinutes: input.rotation.targetMinutes,
+        minutePolicy: input.rotation.minutePolicy,
       },
       roster: rosterMaterial,
     }),
@@ -465,6 +578,7 @@ export function projectSeasonRoster(
           net: unit.base.ratings.netRating,
         })),
         weaknesses,
+        ...(planFacts === undefined ? {} : { planFacts }),
       }),
   );
 
@@ -481,5 +595,6 @@ export function projectSeasonRoster(
     minutes,
     metrics,
     weaknesses,
+    ...(planFacts === undefined ? {} : { planFacts }),
   };
 }

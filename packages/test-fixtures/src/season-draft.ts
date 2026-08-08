@@ -3,6 +3,7 @@ import {
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_DURABILITY_VERSION,
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
@@ -269,6 +270,7 @@ export function buildSeasonRotation(
       ...bench.map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
     ],
     closingFive: starters,
+    minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
     rotationVersion: SEASON_ROTATION_VERSION,
   };
 }
@@ -587,6 +589,7 @@ export function buildFixtureGenerationAudit(seed: string): SeasonRun['generation
     aiVersion: SEASON_AI_VERSION,
     rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
     rotationVersion: SEASON_ROTATION_VERSION,
+    minutePolicyVersion: SEASON_MINUTE_POLICY_VERSION,
     rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
     digest: fixtureGenerationDigest(`fixture-${seed}`),
     diagnostics: {

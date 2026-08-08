@@ -10,6 +10,7 @@
     SOLO_PARTICIPANT_ID,
     type SeasonDraftFlowState,
   } from '$lib/season/season-draft-flow';
+  import { formatPositions } from '$lib/player-positions';
 
   /**
    * The Season Run ten-round draft board (spec/2.0/11 live draft board,
@@ -147,7 +148,7 @@
               <dt
                 class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
               >
-                Guards
+                PG/SG
               </dt>
               <dd
                 class="font-display text-xl font-extrabold"
@@ -160,7 +161,7 @@
               <dt
                 class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
               >
-                Forwards
+                SF/PF
               </dt>
               <dd
                 class="font-display text-xl font-extrabold"
@@ -175,7 +176,7 @@
               <dt
                 class="font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground sm:text-[10px] sm:tracking-[0.12em]"
               >
-                Centers
+                C
               </dt>
               <dd
                 class="font-display text-xl font-extrabold"
@@ -187,7 +188,7 @@
             </div>
           </dl>
           <p class="mt-2 text-xs text-muted-foreground">
-            Ten picks must stay able to complete the 4 guard / 4 forward / 3 center targets; cards
+            Ten picks must stay able to complete the 4 PG/SG / 4 SF/PF / 3 C coverage targets; cards
             that would make completion impossible stay visible but are disabled.
           </p>
         </section>
@@ -247,7 +248,9 @@
                   {candidate?.displayName ?? card.playerVersionId}
                 </p>
                 <p class="truncate font-mono text-[10px] text-muted-foreground">
-                  {candidate?.seasonKey ?? ''} · {candidate?.positions.playable.join('/') ?? ''}
+                  {candidate?.seasonKey ?? ''} · {formatPositions(
+                    candidate?.positions.playable ?? [],
+                  )}
                 </p>
                 <p class="truncate font-mono text-[10px] text-muted-foreground">
                   {identity.displayLabel ??
@@ -349,7 +352,7 @@
               <span
                 class="truncate pl-[calc(2.5rem+0.75rem)] font-mono text-[10px] text-muted-foreground sm:shrink-0 sm:pl-0"
               >
-                {candidate?.positions.playable.join('/') ?? ''} ·
+                {formatPositions(candidate?.positions.playable ?? [])} ·
                 {identity.displayLabel ?? franchiseAbbreviation(pick.franchiseId)} ·
                 {eraLabel(pick.eraId)}
               </span>

@@ -21,6 +21,7 @@ import type {
   SeasonTradeState,
   SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
+import { SEASON_RUN_SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 import type { SeasonWindowOpenResult } from '../season/engine-seam-types.ts';
 
@@ -154,14 +155,14 @@ export interface SeasonRunSnapshot {
 }
 
 /**
- * Typed marker for a stored pre-M2.5 run (save-schema v1-v3 family). The
- * discard screen consumes this to show the discard-and-restart affordance;
- * the legacy row stays untouched in IndexedDB until the user confirms
- * `clearSeasonRun(runId)`.
+ * Typed marker for a stored pre-minute-policy run (save-schema v1-v4
+ * family). The discard screen consumes this to show the discard-and-restart
+ * affordance; the legacy row stays untouched in IndexedDB until the user
+ * confirms `clearSeasonRun(runId)`.
  */
 export interface SeasonRunIncompatibleInfo {
-  /** Stored save-schema family; 4 = the current M2.5 schema family. */
-  storedSaveSchemaVersion: 4;
+  /** The current save-schema family (v5 since the minute-policy contract). */
+  storedSaveSchemaVersion: typeof SEASON_RUN_SAVE_SCHEMA_VERSION;
   /** Run snapshot schema version recorded in the stored row. */
   storedRunSchemaVersion: number;
   /** Run id the discard screen passes to `clearSeasonRun(runId)`. */

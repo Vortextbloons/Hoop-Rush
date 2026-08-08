@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { SeasonRotation } from '@hoop-rush/data-contracts';
+import {
+  SEASON_MINUTE_POLICY_VERSION,
+  SEASON_ROTATION_VERSION,
+  type SeasonRotation,
+} from '@hoop-rush/data-contracts';
 import {
   evaluateSeasonBlockObjective,
   seasonObjectiveCatalog,
@@ -34,7 +38,8 @@ const ROTATION: SeasonRotation = {
     { playerVersionId: 'pv-j', minutes: 9 },
   ],
   closingFive: ['pv-a', 'pv-b', 'pv-c', 'pv-d', 'pv-e'],
-  rotationVersion: 'season-rotation-v2',
+  minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
+  rotationVersion: SEASON_ROTATION_VERSION,
 };
 
 /** A human player line with exact seconds/turnovers (all other stats zero). */

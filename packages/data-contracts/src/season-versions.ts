@@ -38,9 +38,13 @@
  * `season-draft-v1`) and new runs (global eight-card offer facts,
  * `season-draft-v2`) both validated as schema 5. The M2.3.5 change recorded
  * itself through the draft versions, never through a snapshot layout bump.
- * Schema 7 continues to accept both draft-fact variants.
+ * Schema 7 continues to accept both draft-fact variants. Bumped to 8 by the
+ * projection milestone minute-policy contract: every rotation freezes its
+ * versioned `minutePolicy` (season-rotation-v3) and the run freezes the
+ * minute-policy material version; schema 7 runs cannot continue (their
+ * rotations carry no policy).
  */
-export const SEASON_RUN_SCHEMA_VERSION = 7;
+export const SEASON_RUN_SCHEMA_VERSION = 8;
 
 /**
  * Stored Season Run draft record save-schema version (v3, M2.4): the single
@@ -51,12 +55,13 @@ export const SEASON_RUN_SCHEMA_VERSION = 7;
 export const SEASON_DRAFT_SAVE_SCHEMA_VERSION = 3;
 
 /**
- * Stored Season Run checkpoint row save-schema version (v4, M2.5): the
- * current storage wrapper around a schema-7 run snapshot plus the row-level
- * mutable state. v1-v3 development rows surface through the typed
- * incompatibility flow; they are never read or migrated.
+ * Stored Season Run checkpoint row save-schema version (v5, projection
+ * milestone): the current storage wrapper around a schema-8 run snapshot
+ * (rotations carry the versioned minute policy) plus the row-level mutable
+ * state. v1-v4 development rows surface through the typed incompatibility
+ * flow; they are never read or migrated.
  */
-export const SEASON_RUN_SAVE_SCHEMA_VERSION = 4;
+export const SEASON_RUN_SAVE_SCHEMA_VERSION = 5;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -167,8 +172,31 @@ export const SEASON_AI_VERSION = 'season-ai-v3';
  * (G, G, F, F, C) that may include bench players and may differ from the
  * starters, and validation requires both the starter and closing lineups to
  * be individually legal against the roster.
+ *
+ * season-rotation-v3 (projection milestone) adds the versioned per-rotation
+ * `minutePolicy` (minute-policy-v1). The policy records which strategy
+ * produced the target minutes (`starter-heavy`, `balanced`, `bench-heavy`);
+ * the preset value `tight` is preserved for compatibility and labeled
+ * Starter-Heavy. v2 rotations cannot continue (no policy exists for them).
  */
-export const SEASON_ROTATION_VERSION = 'season-rotation-v2';
+export const SEASON_ROTATION_VERSION = 'season-rotation-v3';
+
+/**
+ * Legacy M2.2-M2.5 rotation contract value (`season-rotation-v2`), accepted
+ * only where a frozen calibration cohort records the version it was measured
+ * under. Live rotation state never accepts it.
+ */
+export const SEASON_ROTATION_V2 = 'season-rotation-v2';
+
+/**
+ * Versioned minute-policy contract (projection milestone, minute-policy-v1):
+ * the risk-adjusted minute-plan optimizer allocates per-player integer
+ * target minutes from player projection, stamina, durability, and current
+ * fatigue, under the Starter-Heavy / Balanced / Bench-Heavy strategy
+ * envelopes. Every rotation freezes the policy that produced its minutes;
+ * saved runs stay frozen under their recorded policy.
+ */
+export const SEASON_MINUTE_POLICY_VERSION = 'minute-policy-v1';
 
 /**
  * Deterministic substitution planner rules (spec/2.0/04, rotation-planner-v1,

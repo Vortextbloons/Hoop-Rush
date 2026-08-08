@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Dexie from 'dexie';
-import type {
-  SeasonEffectsState,
-  SeasonPendingBlockCandidate,
-  SeasonRun,
-  SeasonRunCommand,
+import {
+  SEASON_RUN_SAVE_SCHEMA_VERSION,
+  type SeasonEffectsState,
+  type SeasonPendingBlockCandidate,
+  type SeasonRun,
+  type SeasonRunCommand,
 } from '@hoop-rush/data-contracts';
 import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
 import { storedSeasonActiveRunIndexSchema } from '../schemas/season-run-record.ts';
@@ -366,8 +367,11 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
-      throw new Error('expected a current v4 checkpoint row');
+    if (
+      row === undefined ||
+      (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== SEASON_RUN_SAVE_SCHEMA_VERSION
+    ) {
+      throw new Error('expected a current v5 checkpoint row');
     }
     await db.seasonRuns.put({ ...row, revision: 5 });
     await expect(repo.loadActiveRun()).rejects.toThrow(/revision/);
@@ -379,8 +383,11 @@ describe('season run repository (dexie)', () => {
     await promote(adapters);
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     const row = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
-      throw new Error('expected a current v4 checkpoint row');
+    if (
+      row === undefined ||
+      (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== SEASON_RUN_SAVE_SCHEMA_VERSION
+    ) {
+      throw new Error('expected a current v5 checkpoint row');
     }
     await db.seasonRuns.put({
       ...row,
@@ -529,8 +536,11 @@ describe('season run development-row auto-clear (M2.4)', () => {
     adapters: Adapters,
   ): Promise<import('../schemas/season-run-record.ts').StoredSeasonRunRecord> {
     const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
-      throw new Error('expected a current v4 checkpoint row');
+    if (
+      row === undefined ||
+      (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== SEASON_RUN_SAVE_SCHEMA_VERSION
+    ) {
+      throw new Error('expected a current v5 checkpoint row');
     }
     return row;
   }
@@ -555,7 +565,7 @@ describe('season run development-row auto-clear (M2.4)', () => {
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
       name: 'SeasonRunIncompatibleError',
       info: {
-        storedSaveSchemaVersion: 4,
+        storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
         storedRunSchemaVersion: 4,
         runId: run.runId,
       },
@@ -677,12 +687,12 @@ describe('season run development-row auto-clear (M2.4)', () => {
     expect(await repo.loadActiveRun()).toBeNull();
   });
 
-  it('a fresh v4 row round-trips the effects state through promotion, commit, and reload', async () => {
+  it('a fresh v5 row round-trips the effects state through promotion, commit, and reload', async () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
     await promote(adapters);
     let row = await currentCheckpoint(adapters);
-    expect(row.saveSchemaVersion).toBe(4);
+    expect(row.saveSchemaVersion).toBe(SEASON_RUN_SAVE_SCHEMA_VERSION);
     expect(row.effects).toEqual(buildFixtureEffectsState(run.rosters));
 
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
@@ -851,7 +861,7 @@ describe('season run migration', () => {
   });
 });
 
-describe('season run M2.5 pending blocks (v4)', () => {
+describe('season run M2.5 pending blocks (v5)', () => {
   function pendingFor(
     adapters: Adapters,
     blockIndex = 0,
@@ -1072,7 +1082,7 @@ describe('season run M2.5 pending blocks (v4)', () => {
   });
 });
 
-describe('season run M2.5 command application (v4)', () => {
+describe('season run M2.5 command application (v5)', () => {
   function selectObjectiveCommand(
     adapters: Adapters,
     overrides: Partial<SeasonRunCommand> = {},
@@ -1239,13 +1249,16 @@ describe('season run M2.5 command application (v4)', () => {
   });
 });
 
-describe('season run M2.5 reload audit (v4)', () => {
+describe('season run M2.5 reload audit (v5)', () => {
   async function currentRow(
     adapters: Adapters,
   ): Promise<import('../schemas/season-run-record.ts').StoredSeasonRunRecord> {
     const row = await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-    if (row === undefined || (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
-      throw new Error('expected a current v4 checkpoint row');
+    if (
+      row === undefined ||
+      (row as { saveSchemaVersion?: unknown }).saveSchemaVersion !== SEASON_RUN_SAVE_SCHEMA_VERSION
+    ) {
+      throw new Error('expected a current v5 checkpoint row');
     }
     return row;
   }
@@ -1416,10 +1429,17 @@ describe('season run M2.5 reload audit (v4)', () => {
     const { db, repo, run } = adapters;
     const fixture = buildFixtureRun({ runId: run.runId });
     const { games: _games, ...runWithoutGames } = fixture;
+    // The fixture run now carries the schema-8 minute-policy shape; a
+    // genuine M2.4-era row stores a schema-7 run under save schema 3.
+    const legacyRun = {
+      ...runWithoutGames,
+      schemaVersion: 7,
+      versions: { ...runWithoutGames.versions, runSchemaVersion: 7 },
+    };
     const row = {
       recordId: SEASON_RUN_RECORD_ID,
       saveSchemaVersion: 3,
-      run: runWithoutGames,
+      run: legacyRun,
       completedRounds: 0,
       revision: 0,
       lastCommandId: null,
@@ -1434,7 +1454,10 @@ describe('season run M2.5 reload audit (v4)', () => {
     await db.seasonRuns.put(row as never);
     await expect(repo.loadActiveRun()).rejects.toMatchObject({
       name: 'SeasonRunIncompatibleError',
-      info: { storedSaveSchemaVersion: 4, storedRunSchemaVersion: 7 },
+      info: {
+        storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
+        storedRunSchemaVersion: 7,
+      },
     });
     expect(await db.seasonRuns.count()).toBe(1);
   });

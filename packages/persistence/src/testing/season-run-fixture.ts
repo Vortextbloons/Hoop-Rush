@@ -19,6 +19,7 @@ import {
   SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEADERS_VERSION,
   SEASON_LEAGUE_VERSION,
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_OBJECTIVE_CATALOG,
   SEASON_OBJECTIVE_VERSION,
   SEASON_POSTSEASON_VERSION,
@@ -29,6 +30,7 @@ import {
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
+  SEASON_RUN_SAVE_SCHEMA_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_SCHEDULE_FORMULA_VERSION,
   SEASON_SCHEDULE_VERSION,
@@ -330,6 +332,7 @@ function fixtureRotation(roster: SeasonRoster): SeasonRotation {
       { playerVersionId: ids[9] as string, minutes: 16 },
     ],
     closingFive: starters,
+    minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
     rotationVersion: SEASON_ROTATION_VERSION,
   };
 }
@@ -481,6 +484,7 @@ export function buildFixtureRun(input: {
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       aiVersion: SEASON_AI_VERSION,
       rotationVersion: SEASON_ROTATION_VERSION,
+      minutePolicyVersion: SEASON_MINUTE_POLICY_VERSION,
       rotationPlannerVersion: SEASON_ROTATION_PLANNER_VERSION,
       gameVersion: SEASON_GAME_VERSION,
       gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
@@ -531,6 +535,7 @@ export function buildFixtureRun(input: {
       aiVersion: SEASON_AI_VERSION,
       rosterGenerationVersion: SEASON_ROSTER_GENERATION_VERSION,
       rotationVersion: SEASON_ROTATION_VERSION,
+      minutePolicyVersion: SEASON_MINUTE_POLICY_VERSION,
       rosterTargetsVersion: SEASON_ROSTER_TARGETS_VERSION,
       digest: fnv1a32(`generation-${seed}`).toString(16).padStart(8, '0').repeat(4),
       diagnostics: {
@@ -1310,7 +1315,7 @@ export function buildFixtureCheckpointRow(
   const { games: _games, ...runWithoutGames } = run;
   return {
     recordId: SEASON_RUN_RECORD_ID,
-    saveSchemaVersion: 4,
+    saveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
     run: runWithoutGames,
     completedRounds: 0,
     revision: 0,

@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
   playerVersionId,
@@ -16,6 +17,7 @@ import {
   type SimulationRatings,
 } from '@hoop-rush/data-contracts';
 import { buildEraSimulationProfile, buildSimulationPlayer } from '@hoop-rush/test-fixtures';
+import { minuteStrategyOfPreset } from '@hoop-rush/engine';
 
 /**
  * M2.2 season-game scenario fixture generator (spec/2.0/04). Regenerates the
@@ -125,6 +127,10 @@ function buildRotation(
       })),
     ],
     closingFive: ids.slice(0, 5),
+    minutePolicy: {
+      policyVersion: SEASON_MINUTE_POLICY_VERSION,
+      strategy: minuteStrategyOfPreset(preset ?? 'balanced'),
+    },
     rotationVersion: SEASON_ROTATION_VERSION,
   };
 }

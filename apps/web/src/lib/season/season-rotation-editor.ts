@@ -2,6 +2,7 @@ import {
   SEASON_ROTATION_PRESET_TARGETS,
   canPlay,
   type Position,
+  type SeasonMinutePolicyStrategy,
   type SeasonRotation,
   type SeasonRotationPreset,
   type SlotGroup,
@@ -53,14 +54,26 @@ export const ROTATION_PRESETS: readonly SeasonRotationPreset[] = [
   'bench-heavy',
 ] as const;
 
-const STARTER_ROLE_LABELS = ['Starter G', 'Starter G', 'Starter F', 'Starter F', 'Starter C'];
+const STARTER_ROLE_LABELS = ['Starter PG', 'Starter SG', 'Starter SF', 'Starter PF', 'Starter C'];
 
 export function presetLabel(preset: SeasonRotationPreset): string {
   switch (preset) {
     case 'balanced':
       return 'Balanced';
     case 'tight':
-      return 'Tight';
+      return 'Starter-Heavy';
+    case 'bench-heavy':
+      return 'Bench-Heavy';
+  }
+}
+
+/** Minute-policy strategy label for the optimize-with-projection plan cards. */
+export function strategyLabel(strategy: SeasonMinutePolicyStrategy): string {
+  switch (strategy) {
+    case 'starter-heavy':
+      return 'Starter-Heavy';
+    case 'balanced':
+      return 'Balanced';
     case 'bench-heavy':
       return 'Bench-Heavy';
   }
@@ -310,6 +323,22 @@ export class RotationEditor {
   applyPreset(preset: SeasonRotationPreset): string[] {
     this.rotation = applySeasonRotationPreset(this.rotation, preset);
     return this.validate();
+  }
+
+  /**
+   * Commits an externally produced candidate rotation (e.g. an applied
+   * minute plan) through the same engine audit as every other mutation.
+   * Returns the committed rotation; throws when the audit rejects the
+   * candidate. Explicit apply only — the editor never adopts a rotation the
+   * engine would reject.
+   */
+  applyRotation(candidate: SeasonRotation): SeasonRotation {
+    const failures = auditSeasonRotation(candidate, this.memberPlayable);
+    if (failures.length > 0) {
+      throw new Error(`rotation plan rejected: ${failures[0] ?? 'invalid rotation'}`);
+    }
+    this.rotation = candidate;
+    return this.rotation;
   }
 
   /**

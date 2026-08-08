@@ -16,6 +16,7 @@ import {
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
   SEASON_ROTATION_PLANNER_VERSION,
+  SEASON_ROTATION_V2,
   SEASON_ROTATION_VERSION,
 } from './season-versions.ts';
 
@@ -559,7 +560,12 @@ export const seasonGameTargetsSchema = z.object({
   targetsVersion: z.literal(SEASON_GAME_TARGETS_VERSION),
   gameVersion: z.literal(SEASON_GAME_VERSION),
   plannerVersion: z.literal(SEASON_ROTATION_PLANNER_VERSION),
-  rotationVersion: z.literal(SEASON_ROTATION_VERSION),
+  /**
+   * The rotation contract the frozen cohort was measured under. Accepts the
+   * legacy v2 value: the committed cohort predates the minute-policy
+   * contract and its observed game behavior is unchanged by it.
+   */
+  rotationVersion: z.union([z.literal(SEASON_ROTATION_VERSION), z.literal(SEASON_ROTATION_V2)]),
   calibration: z.object({
     calibrationSeedCount: z.number().int().positive(),
     validationSeedCount: z.number().int().positive(),

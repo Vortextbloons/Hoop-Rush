@@ -2,6 +2,7 @@
   import type { HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import type { RosterDetailRow } from '$lib/roster-browser';
+  import { formatPositions } from '$lib/player-positions';
   import { X } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import PlayerFace from './PlayerFace.svelte';
@@ -266,7 +267,7 @@
               </div>
               <div class="flex justify-between gap-2">
                 <dt class="text-muted-foreground">Positions</dt>
-                <dd class="font-mono font-semibold">{player.positionsPlayable.join('/')}</dd>
+                <dd class="font-mono font-semibold">{formatPositions(player.positionsPlayable)}</dd>
               </div>
             </dl>
           </section>

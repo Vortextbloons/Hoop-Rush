@@ -1,5 +1,6 @@
 import {
   SEASON_AI_VERSION,
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
@@ -17,6 +18,7 @@ import {
   type SeasonGenerationDiagnostics,
   type SeasonLeague,
   type SeasonLeagueGenerationResult,
+  type SeasonMinutePlanSummary,
   type SeasonRosterCalibrationRun,
   type SeasonRosterEvaluation,
   type SeasonRosterRole,
@@ -32,6 +34,11 @@ import {
   searchRosterRotationCandidates,
 } from '../projection/index.ts';
 import { validateDraftCatalog } from './catalog-validation.ts';
+import {
+  buildMinutePlanCandidates,
+  minutePlanHorizonGames,
+  type MinutePlanPlayerInput,
+} from './minute-plan.ts';
 import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
 import { seasonGenerationDigest } from './digest.ts';
 import {
@@ -2640,6 +2647,35 @@ function toSeasonAiPool(state: GenerationState, team: PoolTeam): SeasonAiPool {
   };
 }
 
+/**
+ * Roster-relative quality weights (0..1) for the minute-policy optimizer.
+ * Uses exactly the talent authority of the rotation `order` comparator:
+ * mean of the candidate's detailed ratings, normalized within the roster
+ * (`q = mean / maxMeanAcrossRoster`; 0.5 when the roster has no ratings).
+ * Ratings-derived only — generation has no era profile or projection model.
+ */
+function qualityWeightsFromRatings(
+  members: readonly { playerVersionId: string; detailedRatings: Record<string, number> }[],
+): ReadonlyMap<string, number> {
+  const means = new Map<string, number>();
+  let maxMean = 0;
+  for (const member of members) {
+    const ratings = Object.values(member.detailedRatings);
+    const mean = ratings.reduce((sum, value) => sum + value, 0) / Math.max(1, ratings.length);
+    means.set(member.playerVersionId, mean);
+    maxMean = Math.max(maxMean, mean);
+  }
+  if (maxMean <= 0) {
+    return new Map(members.map((member) => [member.playerVersionId, 0.5]));
+  }
+  return new Map(
+    members.map((member) => [
+      member.playerVersionId,
+      Math.min(1, Math.max(0, (means.get(member.playerVersionId) ?? 0) / maxMean)),
+    ]),
+  );
+}
+
 function finalizeResult(
   state: GenerationState,
   league: SeasonLeague,
@@ -2695,6 +2731,75 @@ function finalizeResult(
       },
     });
   });
+  // Projection milestone (minute-policy-v1): every rotation's target minutes
+  // come from the risk-adjusted minute-plan optimizer — quality weights from
+  // roster-relative mean detailed ratings, stamina/durability from the
+  // candidate profiles, zero current fatigue at initial generation, and the
+  // 10-game block horizon. Starters, bench order, and closing five stay
+  // byte-identical to the talent-ordered base; a malformed roster falls back
+  // to its base rotation without a minute-plan summary.
+  const rotationByFranchise = new Map(
+    rotations.map((rotation) => [rotation.franchiseId, rotation]),
+  );
+  const minutePlanByFranchise = new Map<string, SeasonMinutePlanSummary>();
+  const plannedRotations = rosters.map((roster) => {
+    const base = rotationByFranchise.get(roster.franchiseId);
+    if (base === undefined) throw new Error(`missing rotation for ${roster.franchiseId}`);
+    const members = roster.players.map((player) => {
+      const candidate = state.byId.get(player.playerVersionId);
+      if (!candidate) throw new Error(`missing candidate ${player.playerVersionId}`);
+      return {
+        playerVersionId: player.playerVersionId,
+        playable: candidate.positions.playable,
+        detailedRatings: candidate.detailedRatings,
+        staminaRating: candidate.stamina.rating,
+        durability: candidate.durability.rating,
+      };
+    });
+    try {
+      const quality = qualityWeightsFromRatings(members);
+      const horizon = minutePlanHorizonGames(82);
+      const players = new Map<string, MinutePlanPlayerInput>(
+        members.map((member) => [
+          member.playerVersionId,
+          {
+            playerVersionId: member.playerVersionId,
+            quality: quality.get(member.playerVersionId) ?? 0.5,
+            staminaRating: member.staminaRating,
+            durability: member.durability,
+            fatigueBasisPoints: 0,
+            recentLoadBasisPoints: 0,
+          },
+        ]),
+      );
+      const { plans, recommended } = buildMinutePlanCandidates({
+        structure: {
+          starters: base.starters,
+          benchOrder: base.benchOrder,
+          closingFive: base.closingFive,
+        },
+        players,
+        horizon,
+      });
+      const plan = plans.find((candidate) => candidate.strategy === recommended);
+      if (plan === undefined) throw new Error('no recommended minute plan');
+      minutePlanByFranchise.set(roster.franchiseId, {
+        policyVersion: SEASON_MINUTE_POLICY_VERSION,
+        strategy: plan.strategy,
+        riskAdjustedScore: plan.riskScore,
+        quality: plan.quality,
+        maxStarterStrainBasisPoints: plan.maxStarterStrainBasisPoints,
+        starterStrainBand: plan.strainBand,
+        benchRelief: plan.relief,
+        fatigueBands: plan.fatigueBands,
+        horizonGames: horizon,
+        heavyStrain: plan.heavyStrain,
+      });
+      return { ...plan.rotation, franchiseId: roster.franchiseId };
+    } catch {
+      return base;
+    }
+  });
   const aiAssignments = [...state.assignments.values()];
   const evaluations = rosters.map((roster) => {
     const assignment = state.assignments.get(roster.franchiseId);
@@ -2708,12 +2813,16 @@ function finalizeResult(
         overall: candidate.summaryRatings.overallRating,
       };
     });
-    return evaluateSeasonRoster({
-      franchiseId: roster.franchiseId,
-      band: assignment?.band ?? 'average',
-      identity: assignment?.identity ?? 'continuity',
-      members,
-    });
+    const minutePlanSummary = minutePlanByFranchise.get(roster.franchiseId);
+    return {
+      ...evaluateSeasonRoster({
+        franchiseId: roster.franchiseId,
+        band: assignment?.band ?? 'average',
+        identity: assignment?.identity ?? 'continuity',
+        members,
+      }),
+      ...(minutePlanSummary !== undefined ? { minutePlanSummary } : {}),
+    };
   });
   const aiPools = state.teamOrder.map((teamId) => {
     const team = state.teams.get(teamId);
@@ -2739,7 +2848,7 @@ function finalizeResult(
     rotationVersion: SEASON_ROTATION_VERSION,
     rosters,
     ownership,
-    rotations,
+    rotations: plannedRotations,
     aiAssignments,
     targetsVersion: SEASON_ROSTER_TARGETS_VERSION,
     aiPools,
@@ -2753,7 +2862,7 @@ function finalizeResult(
     rotationVersion: SEASON_ROTATION_VERSION,
     rosters,
     ownership,
-    rotations,
+    rotations: plannedRotations,
     aiAssignments,
     evaluations,
     aiPools,

@@ -336,7 +336,7 @@ describe('season game simulate (unit, injected doubles)', () => {
     expect(payload.pass).toBe(true);
     expect(payload.playerMinutes).toHaveLength(20);
     expect(payload.gameVersion).toBe('season-game-v4');
-    expect(payload.rotationVersion).toBe('season-rotation-v2');
+    expect(payload.rotationVersion).toBe('season-rotation-v3');
     // The double received the overridden seed, not the fixture placeholder.
     expect(simulate.mock.calls[0]?.[0].seed).toBe('ab'.repeat(16));
     expect(report.details[0]).toContain('Home Team 100 - 95 Away Team');

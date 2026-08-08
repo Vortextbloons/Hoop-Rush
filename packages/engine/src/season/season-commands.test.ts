@@ -187,7 +187,7 @@ type SeasonRunCommandFragment = {
 
 function commandOf(run: SeasonRun, command: SeasonRunCommandFragment): SeasonRunCommand {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,

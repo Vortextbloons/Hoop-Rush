@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { Position, SeasonRotation } from '@hoop-rush/data-contracts';
-import { SEASON_ROTATION_VERSION } from '@hoop-rush/data-contracts';
+import { SEASON_MINUTE_POLICY_VERSION, SEASON_ROTATION_VERSION } from '@hoop-rush/data-contracts';
 import { canPlay } from '../domain/positions.ts';
 import {
   chooseInitialUnit,
@@ -49,6 +49,7 @@ function buildRotation(overrides: Partial<SeasonRotation> = {}): SeasonRotation 
       ...BENCH.map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
     ],
     closingFive: [...STARTERS],
+    minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
     rotationVersion: SEASON_ROTATION_VERSION,
     ...overrides,
   };

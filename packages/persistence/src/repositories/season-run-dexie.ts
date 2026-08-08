@@ -9,6 +9,8 @@ import {
   seasonObjectiveStateSchema,
   SEASON_HEALTH_VERSION,
   seasonHealthStateSchema,
+  SEASON_RUN_SAVE_SCHEMA_VERSION,
+  SEASON_RUN_SCHEMA_VERSION,
   type SeasonAcceptedBlock,
   type SeasonActiveRunIndex,
   type SeasonGameSummary,
@@ -122,7 +124,7 @@ export class SeasonRunLoadError extends Error {
 function isDevelopmentRow(row: unknown): boolean {
   if (typeof row !== 'object' || row === null) return false;
   const version = (row as { saveSchemaVersion?: unknown }).saveSchemaVersion;
-  return typeof version === 'number' && version !== 4;
+  return typeof version === 'number' && version !== SEASON_RUN_SAVE_SCHEMA_VERSION;
 }
 
 /**
@@ -157,13 +159,15 @@ function incompatibleInfoOf(row: unknown): SeasonRunIncompatibleInfo | null {
     run?: { runId?: unknown; versions?: { runSchemaVersion?: unknown } };
   };
   const saveVersion = record.saveSchemaVersion;
-  if (typeof saveVersion !== 'number' || saveVersion === 4) return null;
+  if (typeof saveVersion !== 'number' || saveVersion === SEASON_RUN_SAVE_SCHEMA_VERSION) {
+    return null;
+  }
   const runSchemaVersion =
     typeof record.run?.versions?.runSchemaVersion === 'number'
       ? record.run.versions.runSchemaVersion
-      : 7;
+      : SEASON_RUN_SCHEMA_VERSION - 1;
   return {
-    storedSaveSchemaVersion: 4,
+    storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
     storedRunSchemaVersion: runSchemaVersion,
     runId: typeof record.run?.runId === 'string' ? record.run.runId : 'unknown-legacy-run',
   };
@@ -495,17 +499,17 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         `commitSeasonBlock: revision ${String(input.revision)} is not a valid block boundary`,
       );
     }
-    // Legacy rows (save schema v1-v3) are never migrated or auto-cleared: a
+    // Legacy rows (save schema v1-v4) are never migrated or auto-cleared: a
     // commit against one must fail rather than silently rewrite old rules.
     // Dexie types the row as the current schema, so the raw value is read
-    // as unknown and probed at runtime (legacy rows predate the v4 literal).
+    // as unknown and probed at runtime (legacy rows predate the v5 literal).
     const preflight: unknown = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (preflight !== undefined && isDevelopmentRow(preflight)) {
       const info = incompatibleInfoOf(preflight);
       throw new SeasonRunIncompatibleError(
         info ?? {
-          storedSaveSchemaVersion: 4,
-          storedRunSchemaVersion: 7,
+          storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
+          storedRunSchemaVersion: SEASON_RUN_SCHEMA_VERSION - 1,
           runId: 'unknown-legacy-run',
         },
       );
@@ -525,7 +529,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         if (checkpoint === undefined) {
           throw new Error('commitSeasonBlock: no active run checkpoint to advance');
         }
-        if ((checkpoint as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
+        if (
+          (checkpoint as { saveSchemaVersion?: unknown }).saveSchemaVersion !==
+          SEASON_RUN_SAVE_SCHEMA_VERSION
+        ) {
           // Unreachable after the preflight auto-clear; defensive.
           throw new Error('commitSeasonBlock: no active run checkpoint to advance');
         }
@@ -714,7 +721,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       if (checkpoint === undefined) {
         throw new SeasonPendingBlockRejectedError('no active run checkpoint exists');
       }
-      if ((checkpoint as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
+      if (
+        (checkpoint as { saveSchemaVersion?: unknown }).saveSchemaVersion !==
+        SEASON_RUN_SAVE_SCHEMA_VERSION
+      ) {
         throw new SeasonPendingBlockRejectedError('the active checkpoint is not current');
       }
       const cursor = seasonRunCursorSchema.parse(checkpoint);
@@ -774,7 +784,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       if (checkpoint === undefined) {
         throw new SeasonRunCommandRunMismatchError(input.runId);
       }
-      if ((checkpoint as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 4) {
+      if (
+        (checkpoint as { saveSchemaVersion?: unknown }).saveSchemaVersion !==
+        SEASON_RUN_SAVE_SCHEMA_VERSION
+      ) {
         throw new SeasonRunCommandRunMismatchError(input.runId);
       }
       const cursor = seasonRunCursorSchema.parse(checkpoint);
@@ -924,7 +937,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     });
     const checkpointRow = storedSeasonRunRecordSchema.parse({
       recordId: SEASON_RUN_RECORD_ID,
-      saveSchemaVersion: 4,
+      saveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
       run: runWithoutGames,
       completedRounds: 0,
       revision: 0,
@@ -980,14 +993,14 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         }
         const existing = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
         if (existing !== undefined) {
-          // Legacy rows (save schema v1-v3) are never overwritten or
+          // Legacy rows (save schema v1-v4) are never overwritten or
           // migrated by a promotion: they can only be discarded explicitly.
           if (isDevelopmentRow(existing)) {
             const info = incompatibleInfoOf(existing);
             throw new SeasonRunIncompatibleError(
               info ?? {
-                storedSaveSchemaVersion: 4,
-                storedRunSchemaVersion: 7,
+                storedSaveSchemaVersion: SEASON_RUN_SAVE_SCHEMA_VERSION,
+                storedRunSchemaVersion: SEASON_RUN_SCHEMA_VERSION - 1,
                 runId: 'unknown-legacy-run',
               },
             );

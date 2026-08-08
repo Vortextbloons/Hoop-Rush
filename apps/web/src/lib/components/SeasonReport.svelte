@@ -18,6 +18,7 @@
   import GameStrip from '$lib/components/GameStrip.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
+  import { SLOT_LABELS } from '$lib/player-positions';
 
   /**
    * Challenge result (spec/08): final record and 82-0 outcome with a League
@@ -28,8 +29,6 @@
    */
 
   type PeakPlayer = PeakPlayerSeason;
-
-  const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 
   let {
     manifest,

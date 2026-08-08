@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
   seasonRotationCommandResultSchema,
@@ -66,6 +67,7 @@ function buildRotation(overrides: Partial<SeasonRotation> = {}): SeasonRotation 
       ...BENCH.map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
     ],
     closingFive: [...STARTERS],
+    minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
     rotationVersion: SEASON_ROTATION_VERSION,
     ...overrides,
   };

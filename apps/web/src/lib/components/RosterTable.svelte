@@ -12,6 +12,7 @@
     type RosterSortDirection,
     type RosterSortId,
   } from '$lib/roster-browser';
+  import { formatPositions } from '$lib/player-positions';
   import PlayerFace from './PlayerFace.svelte';
 
   /**
@@ -113,7 +114,7 @@
   function cellValue(player: RosterDetailRow, key: string): string {
     switch (key) {
       case 'pos':
-        return player.positionsPlayable.join('/');
+        return formatPositions(player.positionsPlayable);
       case 'decade':
         return eraLabel.get(player.eraId) ?? player.eraId;
       case 'season':
@@ -316,7 +317,7 @@
                 <span class="block truncate text-base font-bold">{player.displayName}</span>
                 <span class="mt-0.5 block text-xs leading-snug text-muted-foreground">
                   {teamLabelFor(player)} · {eraLabel.get(player.eraId) ?? player.eraId} · {player.seasonKey}
-                  · {player.positionsPlayable.join('/')}
+                  · {formatPositions(player.positionsPlayable)}
                 </span>
               </span>
             </div>

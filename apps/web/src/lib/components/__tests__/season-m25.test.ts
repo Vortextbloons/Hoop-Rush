@@ -25,6 +25,14 @@ import { tradeOfferViewModel } from '$lib/season/season-trade-view';
 
 vi.mock('@hoop-rush/engine', () => ({
   seasonObjectiveChoicesForBlock: () => ['win-six', 'defense-108', 'turnover-130'] as const,
+  // Mirrors the engine's fatigueBandOf (1500/3500/6000 thresholds); the
+  // season-effects-view re-exports it under `fatigueBand`.
+  fatigueBandOf: (fatigueBasisPoints: number) => {
+    if (fatigueBasisPoints < 1500) return 'fresh';
+    if (fatigueBasisPoints < 3500) return 'ready';
+    if (fatigueBasisPoints < 6000) return 'tired';
+    return 'heavy';
+  },
 }));
 
 mockSvelteKitApp();

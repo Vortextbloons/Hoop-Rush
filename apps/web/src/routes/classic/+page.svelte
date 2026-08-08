@@ -32,6 +32,7 @@
   import { randomUUID } from '$lib/random-id';
   import { resolvePlayerRefs } from '$lib/player-refs';
   import { poolSortLabel, presentationForVariant, variantLabel } from '$lib/draft-presentation';
+  import { formatPositions } from '$lib/player-positions';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import LineupCourt from '$lib/components/LineupCourt.svelte';
@@ -693,7 +694,7 @@
                       {row.displayName}
                     </span>
                     <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                      {row.seasonKey} · {row.positionsPlayable.join('/')} ·
+                      {row.seasonKey} · {formatPositions(row.positionsPlayable)} ·
                       {resolveEraTeamIdentity(manifest!, row.franchiseId, row.eraId)
                         .abbreviationLabel ?? franchiseAbbreviation(row.franchiseId)}
                     </span>

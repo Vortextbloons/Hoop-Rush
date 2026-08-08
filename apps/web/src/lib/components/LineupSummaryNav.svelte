@@ -1,12 +1,5 @@
 <script lang="ts">
-  const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-  const SLOT_NAMES = [
-    'Point Guard',
-    'Shooting Guard',
-    'Small Forward',
-    'Power Forward',
-    'Center',
-  ] as const;
+  import { SLOT_LABELS, SLOT_NAMES } from '$lib/player-positions';
 
   let {
     slots,

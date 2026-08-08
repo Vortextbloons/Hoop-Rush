@@ -218,11 +218,11 @@ export function buildRun(): SeasonRun {
                 : ('active-trader' as const),
   }));
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     runId: 'fixture-run-1',
     rootSeed: SEED,
     versions: {
-      runSchemaVersion: 7,
+      runSchemaVersion: 8,
       leagueVersion: 'league-v1',
       scheduleVersion: 'schedule-v1',
       scheduleFormulaVersion: 'schedule-formula-v1',
@@ -234,7 +234,8 @@ export function buildRun(): SeasonRun {
       rosterRulesVersion: 'season-roster-v1',
       rosterGenerationVersion: 'roster-generation-v2',
       aiVersion: 'season-ai-v2',
-      rotationVersion: 'season-rotation-v2',
+      rotationVersion: 'season-rotation-v3',
+      minutePolicyVersion: 'minute-policy-v1',
       rotationPlannerVersion: 'rotation-planner-v1',
       gameVersion: 'season-game-v4',
       gameTargetsVersion: 'season-game-targets-v4',
@@ -354,14 +355,16 @@ export function buildRun(): SeasonRun {
           ...ids.slice(5).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
         ],
         closingFive: ids.slice(0, 5),
-        rotationVersion: 'season-rotation-v2',
+        minutePolicy: { policyVersion: 'minute-policy-v1', strategy: 'balanced' },
+        rotationVersion: 'season-rotation-v3',
       };
     }),
     generationAudit: {
       seed: SEED,
       aiVersion: 'season-ai-v2',
       rosterGenerationVersion: 'roster-generation-v2',
-      rotationVersion: 'season-rotation-v2',
+      rotationVersion: 'season-rotation-v3',
+      minutePolicyVersion: 'minute-policy-v1',
       rosterTargetsVersion: 'roster-targets-v2',
       digest: '0'.repeat(32),
       diagnostics: {

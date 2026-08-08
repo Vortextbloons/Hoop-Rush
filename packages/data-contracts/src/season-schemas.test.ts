@@ -55,6 +55,7 @@ import {
   seasonCompactInjuryEventSchema,
   seasonBlockRecapSchema,
   SEASON_NEUTRAL_HOME_COURT,
+  seasonMinutePolicySchema,
 } from './index.ts';
 import {
   buildEmptyHealth,
@@ -1202,7 +1203,8 @@ describe('season rotation schema (M2.1)', () => {
       ...ids.slice(5).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
     ],
     closingFive: ids.slice(0, 5),
-    rotationVersion: 'season-rotation-v2',
+    minutePolicy: { policyVersion: 'minute-policy-v1', strategy: 'balanced' },
+    rotationVersion: 'season-rotation-v3',
   };
 
   it('round-trips a legal rotation', () => {
@@ -1228,6 +1230,35 @@ describe('season rotation schema (M2.1)', () => {
         })),
       }),
     ).not.toThrow();
+  });
+
+  it('round-trips the minute policy and rejects bad strategies or versions', () => {
+    const parsed = roundTrip(seasonMinutePolicySchema, {
+      policyVersion: 'minute-policy-v1',
+      strategy: 'starter-heavy',
+    });
+    expect(parsed.strategy).toBe('starter-heavy');
+    expect(() =>
+      seasonMinutePolicySchema.parse({
+        policyVersion: 'minute-policy-v1',
+        strategy: 'tight',
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonMinutePolicySchema.parse({
+        policyVersion: 'minute-policy-v2',
+        strategy: 'balanced',
+      }),
+    ).toThrow();
+  });
+
+  it('requires a minute policy on every rotation', () => {
+    const withoutPolicy = { ...rotation } as Record<string, unknown>;
+    delete withoutPolicy.minutePolicy;
+    expect(() => seasonRotationSchema.parse(withoutPolicy)).toThrow();
+    expect(() =>
+      seasonRotationSchema.parse({ ...rotation, rotationVersion: 'season-rotation-v2' }),
+    ).toThrow();
   });
 });
 
@@ -1345,7 +1376,7 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
       seed: SEED,
       aiVersion: 'season-ai-v2',
       rosterGenerationVersion: 'roster-generation-v2',
-      rotationVersion: 'season-rotation-v2',
+      rotationVersion: 'season-rotation-v3',
       rosters,
       ownership,
       rotations,
@@ -1576,13 +1607,15 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     expect(seasonRosterTargetsSchema.safeParse(undefined).success).toBe(false);
   });
 
-  it('round-trips a schema-7 run with its aiPools and M2.5 state', () => {
+  it('round-trips a schema-8 run with its aiPools and M2.5 state', () => {
     const run = roundTrip(seasonRunSchema, buildRun());
-    expect(run.schemaVersion).toBe(7);
-    expect(run.versions.runSchemaVersion).toBe(7);
+    expect(run.schemaVersion).toBe(8);
+    expect(run.versions.runSchemaVersion).toBe(8);
     expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
     expect(run.versions.aiVersion).toBe('season-ai-v2');
     expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
+    expect(run.versions.rotationVersion).toBe('season-rotation-v3');
+    expect(run.versions.minutePolicyVersion).toBe('minute-policy-v1');
     expect(run.aiPools).toHaveLength(29);
     expect(run.aiPools.every((pool) => pool.selections.length === 10)).toBe(true);
     expect(() =>
@@ -1596,16 +1629,28 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
         versions: { ...run.versions, aiVersion: 'season-ai-v1' },
       }),
     ).toThrow();
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, rotationVersion: 'season-rotation-v2' },
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunSchema.parse({
+        ...run,
+        versions: { ...run.versions, minutePolicyVersion: 'minute-policy-v2' },
+      }),
+    ).toThrow();
   });
 
-  it('rejects a schema-6 snapshot (M2.5: schema 6 runs cannot continue)', () => {
+  it('rejects a schema-7 snapshot (schema 7 runs cannot continue)', () => {
     const run = buildRun();
-    const schema6 = {
+    const schema7 = {
       ...run,
-      schemaVersion: 6,
-      versions: { ...run.versions, runSchemaVersion: 6 },
+      schemaVersion: 7,
+      versions: { ...run.versions, runSchemaVersion: 7 },
     };
-    expect(() => seasonRunSchema.parse(schema6)).toThrow();
+    expect(() => seasonRunSchema.parse(schema7)).toThrow();
   });
 });
 
@@ -2001,9 +2046,9 @@ describe('season pending block family (M2.5)', () => {
   });
 });
 
-describe('season commands (M2.5, schema 7)', () => {
+describe('season commands (M2.5, schema 8)', () => {
   const base = {
-    schemaVersion: 7,
+    schemaVersion: 8,
     commandId: 'cmd-1',
     runId: 'fixture-run-1',
     expectedStateRevision: 3,
@@ -2243,7 +2288,7 @@ describe('season commands (M2.5, schema 7)', () => {
 
   it('parses submit-season-block with the M2.5 objective and state fields', () => {
     const command = {
-      schemaVersion: 7,
+      schemaVersion: 8,
       blockVersion: 'season-block-v3',
       command: 'submit-season-block',
       commandId: 'cmd-submit-1',

@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { ChevronDown, ChevronUp, Star } from '@lucide/svelte';
+  import { ChevronDown, ChevronUp, Star, Wand2, X } from '@lucide/svelte';
   import type {
     HoopRushManifest,
     SeasonEffectsState,
     SeasonGameSummary,
+    SeasonRotation,
   } from '@hoop-rush/data-contracts';
+  import type { MinutePlanOptimizationResult, OptimizedMinutePlan } from '@hoop-rush/engine';
   import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
   import { eraIdentityOf } from '$lib/season/season-branding';
@@ -19,9 +21,11 @@
     indexRotationFailures,
     ROTATION_PRESETS,
     presetLabel,
+    strategyLabel,
     type MinuteAdjustment,
     type RotationEditor,
   } from '$lib/season/season-rotation-editor';
+  import { formatPositions, SLOT_LABELS } from '$lib/player-positions';
 
   /**
    * Season Run rotation editor (spec/2.0/04 M2.2 contract, M2.3.5 team
@@ -44,6 +48,7 @@
     overallByVersion = null,
     effects = null,
     summaries = [],
+    optimize = null,
   }: {
     editor: RotationEditor;
     disabled: boolean;
@@ -57,6 +62,17 @@
     effects?: SeasonEffectsState | null;
     /** Accepted summaries of the last block (last-game minutes; optional). */
     summaries?: SeasonGameSummary[];
+    /**
+     * Optimize-with-projection hook (the page owns runner invocation:
+     * shell/catalog/effects access). `run` resolves with the three minute
+     * plans or rejects; `busy`/`error` mirror the page's async state. Plans
+     * are applied explicitly only — a failure leaves the rotation untouched.
+     */
+    optimize?: {
+      run: (rotation: SeasonRotation) => Promise<MinutePlanOptimizationResult>;
+      busy: boolean;
+      error: string | null;
+    } | null;
   } = $props();
 
   const rows = $derived.by(() => {
@@ -116,6 +132,10 @@
    * editor through `$state`, so this is a harmless extra invalidation.
    */
   let revision = $state(0);
+
+  /** Optimize-with-projection state (explicit apply only). */
+  let planResult: MinutePlanOptimizationResult | null = $state(null);
+  let optimizingLocally = $state(false);
 
   const minutesProgress = $derived(Math.min(100, Math.round((minutesTotal / 240) * 100)));
 
@@ -256,8 +276,39 @@
     commit(editor.applyPreset(preset));
   }
 
-  function slotLabel(slotIndex: number): string {
-    return slotIndex === 0 || slotIndex === 1 ? 'G' : slotIndex === 4 ? 'C' : 'F';
+  /** Runs the page-owned projection optimization; plans apply explicitly. */
+  async function optimizeRotation() {
+    if (disabled || optimize === null || optimize.busy || optimizingLocally) return;
+    rejection = null;
+    planResult = null;
+    optimizingLocally = true;
+    try {
+      planResult = await optimize.run(editor.rotation);
+    } catch {
+      // The page owns the error state (`optimize.error`); the rotation is
+      // untouched — plans apply only through the explicit Apply button.
+      planResult = null;
+    } finally {
+      optimizingLocally = false;
+    }
+  }
+
+  function applyPlan(plan: OptimizedMinutePlan) {
+    if (disabled) return;
+    try {
+      editor.applyRotation(plan.rotation);
+    } catch (error) {
+      rejection = `That plan is rejected: ${error instanceof Error ? error.message : String(error)}`;
+      return;
+    }
+    rejection = null;
+    planResult = null;
+    revision += 1;
+    emit();
+  }
+
+  function cancelPlans() {
+    planResult = null;
   }
 
   function faceOf(playerVersionId: string): SeasonFaceRef | null {
@@ -312,7 +363,108 @@
         </button>
       {/each}
     </div>
+    {#if optimize !== null}
+      <button
+        type="button"
+        onclick={() => void optimizeRotation()}
+        disabled={disabled || optimize.busy || optimizingLocally}
+        aria-busy={optimize.busy || optimizingLocally ? 'true' : undefined}
+        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
+      >
+        <Wand2 class="h-4 w-4 shrink-0" />
+        {optimize.busy || optimizingLocally ? 'Optimizing…' : 'Optimize with Projection'}
+      </button>
+      {#if optimize.error !== null}
+        <p
+          role="alert"
+          class="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive"
+        >
+          Optimization failed: {optimize.error}
+        </p>
+      {/if}
+    {/if}
   </div>
+
+  {#if planResult !== null}
+    <section
+      aria-label="Minute optimization plans"
+      class="rounded-none bg-surface-1 p-3 sm:rounded-xl"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <h3
+          class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+        >
+          Minute plans
+        </h3>
+        <button
+          type="button"
+          onclick={cancelPlans}
+          class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+        >
+          <X class="h-3.5 w-3.5" />
+          Cancel
+        </button>
+      </div>
+      <p class="mt-1 text-xs text-muted-foreground">
+        Projected for the upcoming block against the current rotation structure. Applying a plan
+        replaces only the target minutes and the recorded strategy.
+      </p>
+      <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {#each planResult.plans as plan (plan.strategy)}
+          {@const recommended = plan.strategy === planResult.recommended}
+          <article
+            class="flex flex-col gap-2 rounded-lg border p-3 {recommended
+              ? 'border-primary/50 bg-primary/5'
+              : 'border-border bg-surface-2'}"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-sm font-bold">{strategyLabel(plan.strategy)}</p>
+              {#if recommended}
+                <span
+                  class="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold text-primary"
+                >
+                  Recommended
+                </span>
+              {/if}
+            </div>
+            <dl class="grid grid-cols-2 gap-x-2 gap-y-1 font-mono text-xs">
+              <div class="flex items-center justify-between gap-1">
+                <dt class="text-muted-foreground">Net</dt>
+                <dd class="font-bold tabular-nums">{plan.projectedNetRating.toFixed(2)}</dd>
+              </div>
+              <div class="flex items-center justify-between gap-1">
+                <dt class="text-muted-foreground">Strain</dt>
+                <dd class="font-bold tabular-nums">{FATIGUE_BAND_LABEL[plan.strainBand]}</dd>
+              </div>
+              <div class="flex items-center justify-between gap-1">
+                <dt class="text-muted-foreground">Relief</dt>
+                <dd class="font-bold tabular-nums">{Math.round(plan.relief * 100)}%</dd>
+              </div>
+              <div class="flex items-center justify-between gap-1">
+                <dt class="text-muted-foreground">Risk</dt>
+                <dd class="font-bold tabular-nums">{plan.riskScore.toFixed(2)}</dd>
+              </div>
+            </dl>
+            {#if plan.heavyStrain}
+              <span
+                class="self-start rounded-full bg-destructive/15 px-2 py-0.5 font-mono text-[10px] font-bold text-destructive"
+              >
+                Heavy strain
+              </span>
+            {/if}
+            <button
+              type="button"
+              onclick={() => applyPlan(plan)}
+              {disabled}
+              class="mt-auto min-h-9 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Apply
+            </button>
+          </article>
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   <div class="flex flex-col gap-2">
     <p class="text-sm break-words text-muted-foreground">
@@ -325,7 +477,7 @@
         <span class="text-positive">· complete</span>
       {/if}
       <span class="hidden sm:inline">
-        · Starters are ordered G, G, F, F, C; the closing five is an independent legal five.
+        · Starters are ordered PG, SG, SF, PF, C; the closing five is an independent legal five.
       </span>
     </p>
     <div
@@ -395,7 +547,7 @@
               <p class="font-mono text-xs text-muted-foreground">
                 {row.role}
                 {#if row.member.seasonKey !== undefined}· {row.member.seasonKey}{/if}
-                {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
+                {#if row.member.playable.length > 0}· {formatPositions(row.member.playable)}{/if}
                 {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
               </p>
               {#if eraLabel !== null}
@@ -465,7 +617,7 @@
           {#if manifest !== null && faceOf(playerVersionId) !== null}
             <SeasonPlayerFace face={faceOf(playerVersionId)!} {manifest} size="sm" />
           {/if}
-          <span class="text-muted-foreground">{slotLabel(slotIndex)}{slotIndex + 1}</span>
+          <span class="text-muted-foreground">{SLOT_LABELS[slotIndex]}{slotIndex + 1}</span>
           <span class="max-w-40 truncate">{row?.member.displayName ?? playerVersionId}</span>
         </li>
       {/each}
@@ -501,7 +653,7 @@
               <span
                 class="w-7 shrink-0 font-mono text-[10px] font-bold uppercase text-muted-foreground"
               >
-                {slotLabel(slotIndex)}{slotIndex + 1}
+                {SLOT_LABELS[slotIndex]}{slotIndex + 1}
               </span>
               {#if manifest !== null && faceOf(playerVersionId) !== null}
                 <SeasonPlayerFace
@@ -532,7 +684,7 @@
                 </div>
                 <p class="font-mono text-xs text-muted-foreground">
                   {row.member.seasonKey ?? ''}
-                  {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
+                  {#if row.member.playable.length > 0}· {formatPositions(row.member.playable)}{/if}
                   {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
                 </p>
                 {#if eraLabel !== null}
@@ -648,7 +800,7 @@
                 </div>
                 <p class="font-mono text-xs text-muted-foreground">
                   {row.role}
-                  {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
+                  {#if row.member.playable.length > 0}· {formatPositions(row.member.playable)}{/if}
                   {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
                 </p>
                 {#if eraLabel !== null}

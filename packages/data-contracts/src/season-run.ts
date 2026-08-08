@@ -34,6 +34,7 @@ import {
   SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEAGUE_VERSION,
   SEASON_LEADERS_VERSION,
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_OBJECTIVE_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
@@ -187,6 +188,8 @@ export const seasonGenerationAuditSchema = z.object({
     z.literal(SEASON_ROSTER_GENERATION_VERSION),
   ]),
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
+  /** Projection milestone: versioned minute-policy contract. */
+  minutePolicyVersion: z.literal(SEASON_MINUTE_POLICY_VERSION),
   rosterTargetsVersion: z.union([
     z.literal(SEASON_ROSTER_TARGETS_V2),
     z.literal(SEASON_ROSTER_TARGETS_VERSION),
@@ -229,6 +232,8 @@ export const seasonRunVersionsSchema = z.object({
   ]),
   aiVersion: z.union([z.literal(SEASON_AI_V2), z.literal(SEASON_AI_VERSION)]),
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
+  /** Projection milestone: versioned minute-policy contract. */
+  minutePolicyVersion: z.literal(SEASON_MINUTE_POLICY_VERSION),
   /** M2.2: substitution planner rules. */
   rotationPlannerVersion: z.literal(SEASON_ROTATION_PLANNER_VERSION),
   /** M2.2->M2.3: Season game controller rules (v2 adds the home-court seam). */

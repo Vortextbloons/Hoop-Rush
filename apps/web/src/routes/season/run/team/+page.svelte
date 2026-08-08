@@ -1,7 +1,13 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
-  import type { SeasonGameSummary } from '@hoop-rush/data-contracts';
+  import {
+    SEASON_BLOCK_COUNT,
+    seasonDigestHex,
+    type SeasonGameSummary,
+    type SeasonRotation,
+  } from '@hoop-rush/data-contracts';
+  import { minutePlanHorizonGames } from '@hoop-rush/engine';
   import InjuryTimeline from '$lib/components/season/InjuryTimeline.svelte';
   import RotationEditor from '$lib/components/season/RotationEditor.svelte';
   import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
@@ -11,6 +17,8 @@
     blockPhaseAllowsSubmit,
     buildSubmitBlockEnvelope,
   } from '$lib/season/season-block-submit';
+  import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
+  import { createProjectionRunner } from '$lib/season/season-projection-runner';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
@@ -31,6 +39,16 @@
    */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
+
+  /** Team games remaining from the run cursor: the upcoming block's lock
+   * plus every later block (blocks 0-7 lock 10 games, block 8 locks 2). */
+  function seasonGamesRemaining(nextBlockIndex: number): number {
+    let remaining = 0;
+    for (let block = nextBlockIndex; block < SEASON_BLOCK_COUNT; block += 1) {
+      remaining += gamesToLockForBlock(block);
+    }
+    return remaining;
+  }
 
   const manifest = $derived(shell.manifest);
   const run = $derived(shell.run);
@@ -64,6 +82,80 @@
       ? (run.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null)
       : null,
   );
+
+  /** Optimize-with-projection inputs: ten load rows from catalog stamina/
+   * durability and the recorded effects state, and the upcoming-block
+   * horizon from the run cursor. */
+  const optimizeLoad = $derived.by(() => {
+    const catalog = shell.catalog;
+    const editor = shell.editor;
+    if (catalog === null || editor === null) return null;
+    const candidateByVersion = new Map(
+      catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
+    );
+    const loadByVersion = new Map(
+      (shell.snapshot?.effects?.playerStates ?? []).map((state) => [state.playerVersionId, state]),
+    );
+    return [...editor.rotation.starters, ...editor.rotation.benchOrder].map((playerVersionId) => {
+      const candidate = candidateByVersion.get(playerVersionId);
+      const load = loadByVersion.get(playerVersionId);
+      return {
+        playerVersionId,
+        staminaRating: candidate?.stamina.rating ?? 70,
+        durability: candidate?.durability.rating ?? 70,
+        fatigueBasisPoints: load?.fatigueBasisPoints ?? 0,
+        recentLoadBasisPoints: load?.recentLoadBasisPoints ?? 0,
+      };
+    });
+  });
+
+  const optimizeHorizon = $derived(
+    shell.nextBlockIndex === null
+      ? 0
+      : minutePlanHorizonGames(seasonGamesRemaining(shell.nextBlockIndex)),
+  );
+
+  const optimizeSeed = $derived(
+    shell.snapshot === null || shell.nextBlockIndex === null
+      ? null
+      : seasonDigestHex(
+          `${shell.snapshot.run.runId}\u0000optimize-rotation\u0000${String(shell.nextBlockIndex)}`,
+        ),
+  );
+
+  let optimizing = $state(false);
+  let optimizeError: string | null = $state(null);
+
+  /** The RotationEditor `optimize` hook: the page owns runner invocation. */
+  const optimize = $derived.by(() => {
+    const editor = shell.editor;
+    if (editor === null || optimizeLoad === null || optimizeHorizon <= 0 || optimizeSeed === null) {
+      return null;
+    }
+    return {
+      busy: optimizing,
+      error: optimizeError,
+      run: async (rotation: SeasonRotation) => {
+        if (optimizing) throw new Error('an optimization is already running');
+        optimizing = true;
+        optimizeError = null;
+        try {
+          return await createProjectionRunner().optimizeRotation({
+            roster: [...rotation.starters, ...rotation.benchOrder],
+            structure: rotation,
+            load: optimizeLoad,
+            horizon: optimizeHorizon,
+            seed: optimizeSeed,
+          });
+        } catch (error) {
+          optimizeError = error instanceof Error ? error.message : String(error);
+          throw error;
+        } finally {
+          optimizing = false;
+        }
+      },
+    };
+  });
 
   /** Accepted summaries of the last block (last-game minutes per player). */
   let summaries: SeasonGameSummary[] = $state([]);
@@ -165,6 +257,7 @@
         {effects}
         {summaries}
         {overallByVersion}
+        {optimize}
         onchange={() => {
           // The editor is shell-owned; reactive deriveds above already
           // mirror its state. Submission happens at block time.

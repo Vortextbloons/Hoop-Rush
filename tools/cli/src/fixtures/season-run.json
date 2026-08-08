@@ -1,9 +1,9 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "runId": "fixture-season-run-1",
   "rootSeed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
   "versions": {
-    "runSchemaVersion": 7,
+    "runSchemaVersion": 8,
     "leagueVersion": "league-v1",
     "scheduleVersion": "schedule-v1",
     "scheduleFormulaVersion": "schedule-formula-v1",
@@ -15,7 +15,8 @@
     "rosterRulesVersion": "season-roster-v1",
     "rosterGenerationVersion": "roster-generation-v3",
     "aiVersion": "season-ai-v3",
-    "rotationVersion": "season-rotation-v2",
+    "rotationVersion": "season-rotation-v3",
+    "minutePolicyVersion": "minute-policy-v1",
     "rotationPlannerVersion": "rotation-planner-v1",
     "gameVersion": "season-game-v4",
     "gameTargetsVersion": "season-game-targets-v4",
@@ -23734,43 +23735,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-73874dc4ffd9a3e04b028406517d5ff4",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-c17720318a162975f8d804df80576bc1",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-902091ceb4333e1ada2bb5107ad6669e",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-53819493f6d5cdcf6b0615d1130802e3",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-f101026789b5f0b3f69ac38190cdce37",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-a577343872d6fdfc37e9050a48239ac8",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-fe9bf83dd1a1c3414f5e85477a2bf6ad",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-d4ea5cb1666aa71534cf0ddb6709bde1",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-b3b8f2b81ae51df4eef29486abba3668",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-549218ac19ee0390a948f18697e1a51c",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -23780,7 +23781,11 @@
         "pv-53819493f6d5cdcf6b0615d1130802e3",
         "pv-f101026789b5f0b3f69ac38190cdce37"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "celtics",
@@ -23801,43 +23806,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-102a3dd1608e96d5871275efb3ab8d01",
-          "minutes": 32
+          "minutes": 43
         },
         {
           "playerVersionId": "pv-b7e0f0194b5d7b050985d7cbb6e3f769",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-07dda5fb97d543572bde183dedcbe08b",
-          "minutes": 32
+          "minutes": 31
         },
         {
           "playerVersionId": "pv-3e7e0d01d11a6a15fce9223797078c71",
-          "minutes": 32
+          "minutes": 30
         },
         {
           "playerVersionId": "pv-a07ee1580a7e29e447019366ef61c068",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-746438ecbfde05b044c97386c787cffc",
-          "minutes": 16
+          "minutes": 14
         },
         {
           "playerVersionId": "pv-243bf8729c7e8186811b7d6c52434fc2",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-af4da98877df58740c8fde261f5a4a38",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-6ec24bf26fee41263d24a830dc8dfa82",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-51c2aa629afee86e482e4430aa381b92",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -23847,7 +23852,11 @@
         "pv-3e7e0d01d11a6a15fce9223797078c71",
         "pv-a07ee1580a7e29e447019366ef61c068"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "nets",
@@ -23868,43 +23877,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-a80c67ef9469f5735df1f551e37a9b9f",
-          "minutes": 32
+          "minutes": 33
         },
         {
           "playerVersionId": "pv-f3a3748f8afd03138863aa55533786bf",
-          "minutes": 32
+          "minutes": 31
         },
         {
           "playerVersionId": "pv-96829b982a600fd451ae731680cf0fa8",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-71a4508f6819bae388d9d0b1c9ce8d1f",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-ef466b516c1eb0454305eadbb522e341",
-          "minutes": 32
+          "minutes": 45
         },
         {
           "playerVersionId": "pv-8dc6922186471addb21913ff95be0851",
-          "minutes": 16
+          "minutes": 14
         },
         {
           "playerVersionId": "pv-d37c1a600c326e8c993a7f268adfe570",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-36a3fe05bd566a5182a3a243a74d2195",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-0637ac763287e50a85d1236c926bd566",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-00211b5624b19f923d2cf850133ba5a6",
-          "minutes": 16
+          "minutes": 9
         }
       ],
       "closingFive": [
@@ -23914,7 +23923,11 @@
         "pv-71a4508f6819bae388d9d0b1c9ce8d1f",
         "pv-ef466b516c1eb0454305eadbb522e341"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "hornets",
@@ -23935,43 +23948,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-84b814fb2e05e4f7c285f8bd6e1b5b6b",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-d0326c14ea342d0052d1575ef4ba88e4",
-          "minutes": 32
+          "minutes": 34
         },
         {
           "playerVersionId": "pv-0a5550995c6dc57d4edcdf236b9e1689",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-56eb793338eef0f77d797795f7714063",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-94c39c930ef4f367f798b0d56d017f83",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-4833fcce08830a92f114a420ed24a35e",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-5c4e41946865c528872e599aa8bd6d24",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-86387b89ebe0ee7506aaa6834697d159",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-6f82d69111e9a7656b0693e7fdee68c1",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-c073273eed224ae2ca5555483a541cce",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -23981,7 +23994,11 @@
         "pv-56eb793338eef0f77d797795f7714063",
         "pv-94c39c930ef4f367f798b0d56d017f83"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "bulls",
@@ -24002,43 +24019,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-2bd897b7b8e07583bfcde3e1ff250d47",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-271e3f291b89bbf58dfe8f274e027439",
-          "minutes": 32
+          "minutes": 28
         },
         {
           "playerVersionId": "pv-3761119d38a63381b71ddd1f069c6ccd",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-f554e34a73df42863739c36035edf55a",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-f8cffdfa461802eeeac53868b02eeaea",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-1669c3e7e8c4e493c1fa1efddb6be217",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-29b31ed86317438cf11997fa040055a8",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-9e9f5df14d41c84587edfd0b37ffaa01",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-31db0e5cdc8f07a0fc680c6ab361928c",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-728db6fdce94871949024cbfdb949b4d",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -24048,7 +24065,11 @@
         "pv-f554e34a73df42863739c36035edf55a",
         "pv-f8cffdfa461802eeeac53868b02eeaea"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "cavaliers",
@@ -24069,43 +24090,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-d6f09fada4f8f7c1d26258b3b045611d",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-cd80b46d697f56b959869843737d4f7d",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-33067fe45f74fbb877b98b26a7666e54",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-8b216df95bd65edd2f842c1b63c24ae9",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-ccec4afc96d218988ae04edeccfa3a8c",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-151014e07501fd8456a177f2a0068970",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-d844f5b6cb197da25770be2c3aa35946",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-f0ee262be369ee076acc3d41552a3e5b",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-8ff2d3f36fdbe187f283d2ed828f98a3",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-9845158abd127796b7f79220a6d4c3da",
-          "minutes": 16
+          "minutes": 12
         }
       ],
       "closingFive": [
@@ -24115,7 +24136,11 @@
         "pv-8b216df95bd65edd2f842c1b63c24ae9",
         "pv-ccec4afc96d218988ae04edeccfa3a8c"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "pistons",
@@ -24136,15 +24161,15 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-aad06b9272abbd96e2a25bc4fbed9d02",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-3d09c0c94a2910cdfb5387c3983801d9",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-526e5dd86a3029e48e164c9e5318ca08",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-bb585757fe1101a3372148cd596e4a27",
@@ -24152,27 +24177,27 @@
         },
         {
           "playerVersionId": "pv-10a1bf5732a16bbbed54183166683567",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-7f7b5124824ac2d8dd78dc3e8aa7db54",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-2e2d7f26462a46325de89d2853e276b6",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-dff4ab7e9ee727faf3e53f90e0ad2fae",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-aeb3d252e51bb5866ff5532495135a02",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-3865605e152822e2be61de6c5967d46e",
-          "minutes": 16
+          "minutes": 9
         }
       ],
       "closingFive": [
@@ -24182,7 +24207,11 @@
         "pv-bb585757fe1101a3372148cd596e4a27",
         "pv-10a1bf5732a16bbbed54183166683567"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "pacers",
@@ -24203,43 +24232,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-97f9066c90316b9087d2f23eafd9955c",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-d1ac3e2283c17f06acfac14c9d3e1fd2",
-          "minutes": 32
+          "minutes": 31
         },
         {
           "playerVersionId": "pv-01feecb9f5674ce544e8378b98f7a9c9",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-02257927485418f345ad3ea15ee82ef7",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-aa16e2d27f3442f668997c10c9233d82",
-          "minutes": 32
+          "minutes": 44
         },
         {
           "playerVersionId": "pv-d694843b013fd0f793852c8df0089f6b",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-48a5214775f70533720a774155a65b57",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-41c9ac49376e3b55c5db72ffc870c2f9",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-ef6c2a9b79f07307d2ee839ddbf6e78b",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-a42c621ce7fb663875888bb6a9c8718c",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -24249,7 +24278,11 @@
         "pv-02257927485418f345ad3ea15ee82ef7",
         "pv-aa16e2d27f3442f668997c10c9233d82"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "heat",
@@ -24270,15 +24303,15 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-bcd9a64a7b4f896e9a97b72cdeaf84da",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-f2bd80e67e3acde27bec28106a991b16",
-          "minutes": 32
+          "minutes": 33
         },
         {
           "playerVersionId": "pv-619fd351b2970745bb2d6cbb0ee2b021",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-879a6985bad44bf10df95c1fe6442555",
@@ -24286,27 +24319,27 @@
         },
         {
           "playerVersionId": "pv-2ce7ba08994e9fc45d7c8322f416e878",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-425471fd80c9e2697661e743524794ed",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-8a00a7cb4e1fce675f4919e95308d63b",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-030637cdf553211959ebaea34a6d5abd",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-85ea7d5f6579150bae1a3115f5139baf",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-e5950b5ad546049e6c5fc508266bb7ca",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -24316,7 +24349,11 @@
         "pv-879a6985bad44bf10df95c1fe6442555",
         "pv-2ce7ba08994e9fc45d7c8322f416e878"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "bucks",
@@ -24337,43 +24374,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-3899792cb92e88285d8cf4767ddfd73c",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-bb163fabb6f111d72f7278559786e05b",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-78cdfec7099c198344e48f4132cae077",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-e7760bd30ae057378106b059f8bc1a43",
-          "minutes": 32
+          "minutes": 33
         },
         {
           "playerVersionId": "pv-55eb6c4591788509645c55fb06ef2c35",
-          "minutes": 32
+          "minutes": 42
         },
         {
           "playerVersionId": "pv-7db8506555029aa9b3dab4bb5f6a67d5",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-4437a01f6ba3509b07263f2598c4588f",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-3578a70ebf25fb02063658348613f7fe",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-e21b19e67726ec4aa66b15a0e6245a56",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-4971b22d25b13949fd15a03bb6dd1c5d",
-          "minutes": 16
+          "minutes": 9
         }
       ],
       "closingFive": [
@@ -24383,7 +24420,11 @@
         "pv-e7760bd30ae057378106b059f8bc1a43",
         "pv-55eb6c4591788509645c55fb06ef2c35"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "knicks",
@@ -24404,11 +24445,11 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-342ce81658b7ea22c7b932ac06191106",
-          "minutes": 32
+          "minutes": 42
         },
         {
           "playerVersionId": "pv-a7554bf8e633848c3fa7e51ea207abe8",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-c261437404c1fec86a70ae7e79ccd044",
@@ -24416,31 +24457,31 @@
         },
         {
           "playerVersionId": "pv-903d6bd6985237aad944e3f8a0717ee6",
-          "minutes": 32
+          "minutes": 31
         },
         {
           "playerVersionId": "pv-f75cf352b35a891e323317b8e5184c22",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-488c51b152bd94b520b4794b9a583da1",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-94425404b04204188eb0956e44cf9754",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-9a6018c10f60d1ed62511f437d056c11",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-cba3e30f4ab05c2375863e5dd4456ebf",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-1de0939178c705152631ffbb5eed6e61",
-          "minutes": 16
+          "minutes": 9
         }
       ],
       "closingFive": [
@@ -24450,7 +24491,11 @@
         "pv-903d6bd6985237aad944e3f8a0717ee6",
         "pv-f75cf352b35a891e323317b8e5184c22"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "magic",
@@ -24471,43 +24516,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-5adc1263592bb287aeb5fca5430454b3",
-          "minutes": 32
+          "minutes": 45
         },
         {
           "playerVersionId": "pv-bdf1c6cf55e04b5bd0edee45eb8a979f",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-0af2a61d7c035e918c1fe5e76c7992ed",
-          "minutes": 32
+          "minutes": 34
         },
         {
           "playerVersionId": "pv-94b5497748a0c93347bde5411e11f607",
-          "minutes": 32
+          "minutes": 31
         },
         {
           "playerVersionId": "pv-2b0aeecdf6171539c45de7bbc1a5cabd",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-dd3422c26704c276b91039e4ed52fe92",
-          "minutes": 16
+          "minutes": 14
         },
         {
           "playerVersionId": "pv-317f0f6bb71db8e7e2a376fd47935efb",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-140e3a9c810811b022b11fe685203a2c",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-85c24e4e8a23a542e9170c247af8a27e",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-283ed5369a4a6452ff25637c87bc9286",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -24517,7 +24562,11 @@
         "pv-94b5497748a0c93347bde5411e11f607",
         "pv-2b0aeecdf6171539c45de7bbc1a5cabd"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "sixers",
@@ -24538,43 +24587,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-ff3b51a08a845c6c40f55aca6e8068b0",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-9a24e248e7a69c64072fb92eeba499b8",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-a0ae590569a19379a21189bf082ea9d5",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-de81cd82d45ae59e0a72d31c90888112",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-54a58cd73773f68b3f53fecd319333a7",
-          "minutes": 32
+          "minutes": 31
         },
         {
           "playerVersionId": "pv-098cf17ba028734760b236c584bc2d2b",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-823e085b518157970ce08ee12849d7ab",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-0f6d0ea169f00695f3fda27baacfd251",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-b4fd2bbfb2944073756c1fd18cd52e6f",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-29edab49af99ad1df980d46b2abe6459",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -24584,7 +24633,11 @@
         "pv-de81cd82d45ae59e0a72d31c90888112",
         "pv-54a58cd73773f68b3f53fecd319333a7"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "raptors",
@@ -24605,43 +24658,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-f5361b3dd2b5aa793604586bb788fb2d",
-          "minutes": 32
+          "minutes": 30
         },
         {
           "playerVersionId": "pv-6538496e4b0de15a7704fb9ca32f9a7e",
-          "minutes": 32
+          "minutes": 30
         },
         {
           "playerVersionId": "pv-f4d00dd58ebad5097f4e5ba3307a9085",
-          "minutes": 32
+          "minutes": 43
         },
         {
           "playerVersionId": "pv-d153ea4fe59879ab6f21cbf5e590145f",
-          "minutes": 32
+          "minutes": 42
         },
         {
           "playerVersionId": "pv-23626e34320628903ccd2e8e5bf9ba64",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-98925c40aa8334b4f6bbbc8a35730090",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-cf19009abf5438566dab256cd96f4a2a",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-00749c8411b4dcb08922a18eb19f6514",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-1f866abd155f5259641476470624a92d",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-b252b192088db796e99af6e8a29692a2",
-          "minutes": 16
+          "minutes": 9
         }
       ],
       "closingFive": [
@@ -24651,7 +24704,11 @@
         "pv-d153ea4fe59879ab6f21cbf5e590145f",
         "pv-23626e34320628903ccd2e8e5bf9ba64"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "wizards",
@@ -24672,43 +24729,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-721532fa03ca27169b2b5d60b5a739ca",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-d2f3c83e9377551233907c2878f668ae",
-          "minutes": 32
+          "minutes": 33
         },
         {
           "playerVersionId": "pv-4a3f0cc28e40497e01aab31808b16092",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-a696e35b7419fb37efbb85cd3671f90b",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-99b1f1283538d3749dfa23fa27002078",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-76456198de22c1a4b18dcf4616914948",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-236006ad3ba7d71165f1e583488fae5d",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-361320440f5c8020d337c9328d2982d4",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-5e187f44ffd717a8aef4480a04103a74",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-bd0de656282b41fa7343ed54d086c0e6",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -24718,7 +24775,11 @@
         "pv-a696e35b7419fb37efbb85cd3671f90b",
         "pv-99b1f1283538d3749dfa23fa27002078"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "mavericks",
@@ -24739,7 +24800,7 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-a16de3b614e2208264b74d4c5ba4c846",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-becbc844bc9a29d8e3ac0102fc8b2ed4",
@@ -24747,35 +24808,35 @@
         },
         {
           "playerVersionId": "pv-e32ccf80a6c24204cabd4a46ddb163b0",
-          "minutes": 32
+          "minutes": 43
         },
         {
           "playerVersionId": "pv-55b56fae7ec9ee6a2fa562dc814a191e",
-          "minutes": 32
+          "minutes": 34
         },
         {
           "playerVersionId": "pv-363f840066f049b4eca50206d97dc8b0",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-796576b47e03f26011fba8e64dce3824",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-f3ef780ab630f8a60369150cf0eb963a",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-07f380ed14b87a41e307aadf65fdef1d",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-e16560f356cfdc5f4e347ba5d5481683",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-a276119124c5da3d644db59fcb1e2e21",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -24785,7 +24846,11 @@
         "pv-55b56fae7ec9ee6a2fa562dc814a191e",
         "pv-363f840066f049b4eca50206d97dc8b0"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "nuggets",
@@ -24806,43 +24871,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-ebe65debbd5da7d7b41696c5122a8d5b",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-3040d381be7188bdacba79df6aa6b211",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-8964e089ffdd6fa5620476a398df5a99",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-61f09ce3e4e1ed6f16e3778592178533",
-          "minutes": 32
+          "minutes": 34
         },
         {
           "playerVersionId": "pv-30d3e54fd72e8243c8455eb51bd10a3f",
-          "minutes": 32
+          "minutes": 45
         },
         {
           "playerVersionId": "pv-a7ea7c500fd1a78c32e87556ede9c0c0",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-59ae7937983ae873e7f1278db46277a7",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-87dbacc46de631d8608cc8fa8f54d774",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-523c26c4eff31108cda72b2eea18cff4",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-75f38ad8534e7b0c871b747e4a26ca08",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -24852,7 +24917,11 @@
         "pv-61f09ce3e4e1ed6f16e3778592178533",
         "pv-30d3e54fd72e8243c8455eb51bd10a3f"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "warriors",
@@ -24873,43 +24942,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-05566ef67aa3d2c2e95cfaa4e030e826",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-f486e1294da5870dca500487660a6739",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-880a3d0485ae0cb838498cbe25d79834",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-eba08db75ddd49a3eba7a2b13df4c887",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-ca0d8171715aea9d846e0dcfa77417e1",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-73fad6eb0d57108fe29ef5ad30f10a1b",
-          "minutes": 16
+          "minutes": 14
         },
         {
           "playerVersionId": "pv-a2431b807237abf4e5e9c12aab8bb530",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-c0791d542401e780bc08172ac0b6a984",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-222d4bfc3c4a1aa0156866f23194ef0c",
-          "minutes": 16
+          "minutes": 9
         },
         {
           "playerVersionId": "pv-a76b1f09874be6a5fdba39cb559ce759",
-          "minutes": 16
+          "minutes": 8
         }
       ],
       "closingFive": [
@@ -24919,7 +24988,11 @@
         "pv-eba08db75ddd49a3eba7a2b13df4c887",
         "pv-ca0d8171715aea9d846e0dcfa77417e1"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "rockets",
@@ -24940,43 +25013,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-6e3acf70d16dfebc4a1d64226c0c2ee0",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-dcac21435e96cdb7d25789f907dc7a13",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-ecf48b419bb9efa55dc93a0bf021ffd1",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-556ef8c562b426c1960441d38f996d95",
-          "minutes": 32
+          "minutes": 28
         },
         {
           "playerVersionId": "pv-d46f46b9e094854d2cbe728fd2989209",
-          "minutes": 32
+          "minutes": 42
         },
         {
           "playerVersionId": "pv-ff6a7c0cf5a364d816bd10f2b1cdd99c",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-761c67d2de057e2e4b9ef5ccd1bb0082",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-76f321f4156f85e889b5bfaa34b9ca64",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-09cc62788ec0f9dc10e8876e6907ebc8",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-51f2dfa9a6c4cc6dbb784ca3c063bf19",
-          "minutes": 16
+          "minutes": 9
         }
       ],
       "closingFive": [
@@ -24986,7 +25059,11 @@
         "pv-556ef8c562b426c1960441d38f996d95",
         "pv-d46f46b9e094854d2cbe728fd2989209"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "clippers",
@@ -25007,43 +25084,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-bc6fa1949eecac781b23793a9383e6c4",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-e0972264733fe348b2dfa236cc732894",
-          "minutes": 32
+          "minutes": 29
         },
         {
           "playerVersionId": "pv-39d51d469bee62aadb9c0e2c0daa4176",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-13b0a5f6ebab61020f0a101ceeb346c6",
-          "minutes": 32
+          "minutes": 42
         },
         {
           "playerVersionId": "pv-b178b59607463f32d94a17585d737da6",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-fd724d3c79b55df87060d47a3ae137cc",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-42979688727b31bcb587f89a9f28da38",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-bcd3478570b9f8491c65dc437cb4bd95",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-59dc36765ea73182870ef03cd63836e6",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-75d7bf8b79deab97fa6e9419ec48813b",
-          "minutes": 16
+          "minutes": 11
         }
       ],
       "closingFive": [
@@ -25053,7 +25130,11 @@
         "pv-13b0a5f6ebab61020f0a101ceeb346c6",
         "pv-b178b59607463f32d94a17585d737da6"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "lakers",
@@ -25074,43 +25155,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-e552e00aac2557deeaa2e3b85db0d3fa",
-          "minutes": 32
+          "minutes": 43
         },
         {
           "playerVersionId": "pv-e29208972c658c13a8a985b519f6f947",
-          "minutes": 32
+          "minutes": 31
         },
         {
           "playerVersionId": "pv-1c269d559859cd294021373778594ec5",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-9f4976f7515adc53d90caf1d15920a67",
-          "minutes": 32
+          "minutes": 30
         },
         {
           "playerVersionId": "pv-db8b533d91c1ea810afd880b371e5e2d",
-          "minutes": 32
+          "minutes": 46
         },
         {
           "playerVersionId": "pv-3fdd685aae06a68e0a538d007e1d70ca",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-7e65c715182d59f1deaf00cb8c828fe5",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-f624f46d71c6e23984520edfadf55c3d",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-f42755a45319d5581a90dadafe56a274",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-fb20b1ab3cd58af76124394d11daedfb",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25120,7 +25201,11 @@
         "pv-9f4976f7515adc53d90caf1d15920a67",
         "pv-db8b533d91c1ea810afd880b371e5e2d"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "grizzlies",
@@ -25141,43 +25226,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-b1ea0fc379982caf201e5ecde1170853",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-ec4b5a7015874ae4c2329a9e7fe5bca0",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-388261d5ab430739e3bc4133301b1ac5",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-6dd4d79be1daafa78574f3fd11b0d98b",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-f927e411c36203edc154968b0b762341",
-          "minutes": 32
+          "minutes": 33
         },
         {
           "playerVersionId": "pv-0051259de6185089a281de7784141f2d",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-8431f8c3dbcd92373499d221aba9fc93",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-f82aa2143d2c29608c58d196358d6584",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-f3134a1d27e2892119ba7edb26d350ad",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-68e2c6dbc05cacafb5a45f7147dbabeb",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25187,7 +25272,11 @@
         "pv-6dd4d79be1daafa78574f3fd11b0d98b",
         "pv-f927e411c36203edc154968b0b762341"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "timberwolves",
@@ -25208,43 +25297,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-e2105361106994a5046e7027ed8018d1",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-539d960f0acca8eb7cf5acb113b866ff",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-816fe152b4877216adea1be4e710af22",
-          "minutes": 32
+          "minutes": 34
         },
         {
           "playerVersionId": "pv-06fea73da1646c890a9e9f771c0185cd",
-          "minutes": 32
+          "minutes": 33
         },
         {
           "playerVersionId": "pv-4cd592baad407c06249e1d607d4c400a",
-          "minutes": 32
+          "minutes": 43
         },
         {
           "playerVersionId": "pv-65fca6bd3f5833a9339803133565c7ed",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-823bc27fa7f97feba5a05109f247d3cf",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-599d577df0e87c11d0873cdb5b71012d",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-5a4825ac2fd82b407c00a01a99cfac7c",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-a29a52d2d7eb457ee019acc4c0c54da2",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25254,7 +25343,11 @@
         "pv-06fea73da1646c890a9e9f771c0185cd",
         "pv-4cd592baad407c06249e1d607d4c400a"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "pelicans",
@@ -25275,43 +25368,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-b825f1fb2fde5cd77ca67e25ecfc7f8b",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-86a8bbcc285736d8d49a955a4bde349c",
-          "minutes": 32
+          "minutes": 29
         },
         {
           "playerVersionId": "pv-be3ee869efec893db08bb2b7f0f6f599",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-9863ec7b5f091077be08c28176dbfd6b",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-e712cab442896ab0104986f6a3523ce4",
-          "minutes": 32
+          "minutes": 46
         },
         {
           "playerVersionId": "pv-5457037e9d37e8a2d69b11204e5a092e",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-9c3f234d62c17dc98e101483de513b3d",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-93028e81bf7c210d7cd7679fe073fb71",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-cb0f5e3e650152f22272518029d9000e",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-c50a9c4003265ae49a76e3b29a0ecdd0",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25321,7 +25414,11 @@
         "pv-9863ec7b5f091077be08c28176dbfd6b",
         "pv-e712cab442896ab0104986f6a3523ce4"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "thunder",
@@ -25342,19 +25439,19 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-c31504f4f04dfba0598c71c2dce14324",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-614500160beaeab2e19d8b5c45afef06",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-ad7940b5e32744d1dccc5373ecbdc5e5",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-77f55b03d5c2981f6d8b29a161488533",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-8e89e63b81f0ec376ad1aad170e100ab",
@@ -25362,23 +25459,23 @@
         },
         {
           "playerVersionId": "pv-a9139f6be5ca98af758bb725dcf293db",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-45418bc98faa66f584ccb5872d3cf479",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-8f85db3890b78d6c080acf121c66b988",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-14bc083b52f8eb1f3c21c2d94d74fceb",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-d7e3d519f5b6d6cdde2a6f1fbef98949",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25388,7 +25485,11 @@
         "pv-77f55b03d5c2981f6d8b29a161488533",
         "pv-8e89e63b81f0ec376ad1aad170e100ab"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "suns",
@@ -25409,43 +25510,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-23a7fcd70d121adb6efbf9819cfb8307",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-d7ecb250f92ea34c7abb84a2a2165fe0",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-fd6a3500dbbc3d34ddfe9faefc64c150",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-3d3d9e9a256aef66d53af85ca4cb5b0a",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-ee89d7eec736690ae7270c88169091fe",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-3b7ca2f90bd0f27586ec7c1f5ab7f489",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-836dde70fd0f9f3cc24245ce7f345600",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-b3627661da4f2a35857b5113d8b97a51",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-984a869c07841aa0f9b2174a7a39988c",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-b2e6270f380dd53b0da02805d4c5ddbf",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25455,7 +25556,11 @@
         "pv-3d3d9e9a256aef66d53af85ca4cb5b0a",
         "pv-ee89d7eec736690ae7270c88169091fe"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "blazers",
@@ -25476,43 +25581,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-c999d594eb8c1e0056cb8ef686309d04",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-1667b7453b19bd71d646cf032adf3655",
-          "minutes": 32
+          "minutes": 29
         },
         {
           "playerVersionId": "pv-d0dd74cf939e97bb0b290bc95220c5ff",
-          "minutes": 32
+          "minutes": 42
         },
         {
           "playerVersionId": "pv-806418ce4a614892ebf945f891458b9e",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-3fdbb5d64baeb5720aa62164900eee66",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-750941a1fed4832d7f7cc2fb851f3051",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-e9f6182c96b11ce8f08db7421b1cb95c",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-b3691ed4cce42b8817d028daac3294c4",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-69b9fa7224abad16890ef98ce8e52182",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-e457ac4602a013badc1d980cd5ed9c96",
-          "minutes": 16
+          "minutes": 12
         }
       ],
       "closingFive": [
@@ -25522,7 +25627,11 @@
         "pv-806418ce4a614892ebf945f891458b9e",
         "pv-3fdbb5d64baeb5720aa62164900eee66"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "kings",
@@ -25543,43 +25652,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-9e4dc7ccf0c8da680411fd76c2fbacfc",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-3cfe71180bceb0ccaaeb485639e35ec8",
-          "minutes": 32
+          "minutes": 34
         },
         {
           "playerVersionId": "pv-b3f0e5533c206447c95dbd4d1de80b43",
-          "minutes": 32
+          "minutes": 39
         },
         {
           "playerVersionId": "pv-2ce7a0aa32b35b0645724eb40240ff1a",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-498fd33e1fd8bfea600c7db43c8ec2ae",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-6c4b717e5699c8fa3f5d3e3cdb19ee4e",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-29f4b0768f090b52712c2c6cd17fbe06",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-01e5e841fbb2e56d0397092fafd38571",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-864cb936a919f3329d293108a9c621a6",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-c4fa694a34ca260692b9d388baaa9a9a",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25589,7 +25698,11 @@
         "pv-2ce7a0aa32b35b0645724eb40240ff1a",
         "pv-498fd33e1fd8bfea600c7db43c8ec2ae"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "spurs",
@@ -25610,43 +25723,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-08ce84afe73b3ccb4d09b77d498752df",
-          "minutes": 32
+          "minutes": 41
         },
         {
           "playerVersionId": "pv-6b5ca71e391cc41adebb14b484e73cae",
-          "minutes": 32
+          "minutes": 29
         },
         {
           "playerVersionId": "pv-5c95e44f2df9d1232c25e2fd80e61dbf",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-c86418e0067b492c4980d8fad3076870",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-bc2ae899cf0367e53e211eebcecab529",
-          "minutes": 32
+          "minutes": 37
         },
         {
           "playerVersionId": "pv-7f07a6c803e047ec85c1e84687068cb8",
-          "minutes": 16
+          "minutes": 13
         },
         {
           "playerVersionId": "pv-f3188e4dab3126c9b42879ab1b6a2dbd",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-3ad4f513b89c1367d54bdd417bc061a3",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-f256ca477d63d1b379e2e2455e566d57",
-          "minutes": 16
+          "minutes": 10
         },
         {
           "playerVersionId": "pv-5b580b7a067e61c6991a36584070556a",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25656,7 +25769,11 @@
         "pv-c86418e0067b492c4980d8fad3076870",
         "pv-bc2ae899cf0367e53e211eebcecab529"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     },
     {
       "franchiseId": "jazz",
@@ -25677,43 +25794,43 @@
       "targetMinutes": [
         {
           "playerVersionId": "pv-1cf4be981c538ffc7ecf922a4ad47bc8",
-          "minutes": 32
+          "minutes": 40
         },
         {
           "playerVersionId": "pv-48a15b647406bba875f5bc6e0740d134",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-687de8e198e71585de58468bbea1bd91",
-          "minutes": 32
+          "minutes": 38
         },
         {
           "playerVersionId": "pv-6af50cfe009a348aca5ff86822c90a8e",
-          "minutes": 32
+          "minutes": 36
         },
         {
           "playerVersionId": "pv-c63d46d1cedc181550ab271fddcb38e1",
-          "minutes": 32
+          "minutes": 35
         },
         {
           "playerVersionId": "pv-cccbc9e5fcdcd54192b1b25f2542cdf5",
-          "minutes": 16
+          "minutes": 12
         },
         {
           "playerVersionId": "pv-b418f0dd314aa9d91c6dc2bbb31eac4d",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-d8edc2e760aa2ce354d03c957870f837",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-ed5cbc247d2b23a0fe1a5bb22317d994",
-          "minutes": 16
+          "minutes": 11
         },
         {
           "playerVersionId": "pv-72094731bfca055d391cc5abcca8db81",
-          "minutes": 16
+          "minutes": 10
         }
       ],
       "closingFive": [
@@ -25723,16 +25840,21 @@
         "pv-6af50cfe009a348aca5ff86822c90a8e",
         "pv-c63d46d1cedc181550ab271fddcb38e1"
       ],
-      "rotationVersion": "season-rotation-v2"
+      "minutePolicy": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy"
+      },
+      "rotationVersion": "season-rotation-v3"
     }
   ],
   "generationAudit": {
     "seed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
     "aiVersion": "season-ai-v3",
     "rosterGenerationVersion": "roster-generation-v3",
-    "rotationVersion": "season-rotation-v2",
+    "rotationVersion": "season-rotation-v3",
+    "minutePolicyVersion": "minute-policy-v1",
     "rosterTargetsVersion": "roster-targets-v3",
-    "digest": "f768a4a4b2297c2045699402676ab174",
+    "digest": "8b47670405937c6094d53ab27ad37b94",
     "diagnostics": {
       "seed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
       "aiVersion": "season-ai-v3",
@@ -25772,7 +25894,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 85.6
+      "overallReport": 85.6,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8295299481996126,
+        "quality": 0.9106844589687727,
+        "maxStarterStrainBasisPoints": 380,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20464974099806288,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "celtics",
@@ -25799,7 +25938,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 84.5
+      "overallReport": 84.5,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8265005188007155,
+        "quality": 0.9135801329394386,
+        "maxStarterStrainBasisPoints": 508,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.2087025940035772,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "nets",
@@ -25826,7 +25982,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 83.6
+      "overallReport": 83.6,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8293216947413012,
+        "quality": 0.8876161653215943,
+        "maxStarterStrainBasisPoints": 508,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.2228084737065062,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "hornets",
@@ -25853,7 +26026,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 86.5
+      "overallReport": 86.5,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8268659785211475,
+        "quality": 0.931262218963832,
+        "maxStarterStrainBasisPoints": 448,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20152989260573775,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "bulls",
@@ -25880,7 +26070,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 82.4
+      "overallReport": 82.4,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8241500060337756,
+        "quality": 0.9375985252987541,
+        "maxStarterStrainBasisPoints": 574,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20685003016887796,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "cavaliers",
@@ -25907,7 +26114,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 86.2
+      "overallReport": 86.2,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8292260212820328,
+        "quality": 0.9189366570327553,
+        "maxStarterStrainBasisPoints": 381,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20328010641016403,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "pistons",
@@ -25934,7 +26158,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 84.9
+      "overallReport": 84.9,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8299623335228182,
+        "quality": 0.9245310926485396,
+        "maxStarterStrainBasisPoints": 426,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21371166761409088,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "pacers",
@@ -25961,7 +26202,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 83.4
+      "overallReport": 83.4,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8279988904620579,
+        "quality": 0.873828217939567,
+        "maxStarterStrainBasisPoints": 475,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21124445231028943,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "heat",
@@ -25988,7 +26246,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 85.2
+      "overallReport": 85.2,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8293455240245082,
+        "quality": 0.9113886847905953,
+        "maxStarterStrainBasisPoints": 426,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21062762012254102,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "bucks",
@@ -26015,7 +26290,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 90.3
+      "overallReport": 90.3,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8317884010714469,
+        "quality": 0.9114084507042256,
+        "maxStarterStrainBasisPoints": 393,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.2178920053572348,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "knicks",
@@ -26042,7 +26334,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 85
+      "overallReport": 85,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8299129974554879,
+        "quality": 0.917444816468254,
+        "maxStarterStrainBasisPoints": 475,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.22081498727743964,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "magic",
@@ -26069,7 +26378,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 83.5
+      "overallReport": 83.5,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8286025127692349,
+        "quality": 0.8791399382276076,
+        "maxStarterStrainBasisPoints": 458,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21171256384617462,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "sixers",
@@ -26096,7 +26422,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 87
+      "overallReport": 87,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.828771001206666,
+        "quality": 0.9132416011436741,
+        "maxStarterStrainBasisPoints": 411,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20550500603333002,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "raptors",
@@ -26123,7 +26466,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 83.5
+      "overallReport": 83.5,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8262064070402589,
+        "quality": 0.8974219317356573,
+        "maxStarterStrainBasisPoints": 537,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21158203520129473,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "wizards",
@@ -26150,7 +26510,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 89.4
+      "overallReport": 89.4,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8295094325833898,
+        "quality": 0.9227842003853565,
+        "maxStarterStrainBasisPoints": 430,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21204716291694944,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "mavericks",
@@ -26177,7 +26554,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 84.3
+      "overallReport": 84.3,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8267472858020648,
+        "quality": 0.8672932771140781,
+        "maxStarterStrainBasisPoints": 476,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.2051364290103242,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "nuggets",
@@ -26204,7 +26598,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 81.2
+      "overallReport": 81.2,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8280508142535552,
+        "quality": 0.8710186513629844,
+        "maxStarterStrainBasisPoints": 468,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21045407126777574,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "warriors",
@@ -26231,7 +26642,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 89
+      "overallReport": 89,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8266143546208452,
+        "quality": 0.9421089049338147,
+        "maxStarterStrainBasisPoints": 505,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20882177310422567,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "rockets",
@@ -26258,7 +26686,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 86.2
+      "overallReport": 86.2,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.826355274141955,
+        "quality": 0.9391338045634919,
+        "maxStarterStrainBasisPoints": 527,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21082637070977495,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "clippers",
@@ -26285,7 +26730,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 86.9
+      "overallReport": 86.9,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.828097262438973,
+        "quality": 0.9157748855145819,
+        "maxStarterStrainBasisPoints": 441,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20663631219486517,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "lakers",
@@ -26312,7 +26774,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 83.3
+      "overallReport": 83.3,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8269859285219653,
+        "quality": 0.8748079196217494,
+        "maxStarterStrainBasisPoints": 553,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21787964260982656,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "grizzlies",
@@ -26339,7 +26818,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 84.4
+      "overallReport": 84.4,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8247312206479607,
+        "quality": 0.9325314581791265,
+        "maxStarterStrainBasisPoints": 510,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.2001561032398037,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "timberwolves",
@@ -26366,7 +26862,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 85
+      "overallReport": 85,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8291263459211404,
+        "quality": 0.872755078485688,
+        "maxStarterStrainBasisPoints": 406,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.2065317296057025,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "pelicans",
@@ -26393,7 +26906,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 81.1
+      "overallReport": 81.1,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8266642761692651,
+        "quality": 0.8521945432977461,
+        "maxStarterStrainBasisPoints": 517,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21087138084632517,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "thunder",
@@ -26420,7 +26950,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 88.1
+      "overallReport": 88.1,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8301570617850934,
+        "quality": 0.9389684014869888,
+        "maxStarterStrainBasisPoints": 409,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.2121353089254666,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "suns",
@@ -26447,7 +26994,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 85.6
+      "overallReport": 85.6,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8299465691946007,
+        "quality": 0.9502259036144579,
+        "maxStarterStrainBasisPoints": 363,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20418284597300368,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "blazers",
@@ -26474,7 +27038,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 83.3
+      "overallReport": 83.3,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8277754889980432,
+        "quality": 0.9085994194484761,
+        "maxStarterStrainBasisPoints": 426,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20277744499021605,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "kings",
@@ -26501,7 +27082,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 86.6
+      "overallReport": 86.6,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8297324940512333,
+        "quality": 0.9206097413584724,
+        "maxStarterStrainBasisPoints": 391,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20731247025616617,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "spurs",
@@ -26528,7 +27126,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 83.4
+      "overallReport": 83.4,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.8280850796580761,
+        "quality": 0.9035692624939348,
+        "maxStarterStrainBasisPoints": 426,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.20432539829038035,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     },
     {
       "franchiseId": "jazz",
@@ -26555,7 +27170,24 @@
         "offensive-rebounding",
         "defensive-rebounding"
       ],
-      "overallReport": 88.7
+      "overallReport": 88.7,
+      "minutePlanSummary": {
+        "policyVersion": "minute-policy-v1",
+        "strategy": "starter-heavy",
+        "riskAdjustedScore": 0.830599067735841,
+        "quality": 0.9575087785302231,
+        "maxStarterStrainBasisPoints": 412,
+        "starterStrainBand": "fresh",
+        "benchRelief": 0.21479533867920517,
+        "fatigueBands": {
+          "fresh": 10,
+          "ready": 0,
+          "tired": 0,
+          "heavy": 0
+        },
+        "horizonGames": 10,
+        "heavyStrain": false
+      }
     }
   ],
   "trade": null,
@@ -27011,5 +27643,5 @@
   },
   "checkpointState": null,
   "stateRevision": 0,
-  "stateDigest": "13eff10c0fee14403284b89e7a906adc"
+  "stateDigest": "340372a5bf076da979fe8c7704878ef5"
 }

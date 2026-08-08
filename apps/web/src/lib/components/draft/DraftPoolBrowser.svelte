@@ -16,6 +16,7 @@
     canFillSlot,
     displacementTargetFor,
   } from '$lib/draft-slots';
+  import { formatPositions } from '$lib/player-positions';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
 
   type IndexRow = PlayersIndexEntry;
@@ -267,7 +268,7 @@
               <span class="block truncate text-sm font-bold">{player.displayName}</span>
               <span class="block font-mono text-[10px] text-muted-foreground">
                 {player.seasonKey} · {teamLabelFor(player)} · {eraLabel.get(player.eraId) ??
-                  player.eraId} · {player.positionsPlayable.join('/')}
+                  player.eraId} · {formatPositions(player.positionsPlayable)}
               </span>
             </span>
             <span class="flex shrink-0 gap-1 font-mono text-[10px]">

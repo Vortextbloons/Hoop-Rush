@@ -261,3 +261,117 @@ describe('projectSeasonRoster', () => {
     expect(validateSeasonRotation(rotation, memberPlayable)).toEqual([]);
   });
 });
+
+describe('projectSeasonRoster plan facts', () => {
+  function minutePlanLoad(fatigueBasisPoints: number, horizonGames = 10) {
+    const { players } = buildInput();
+    return {
+      players: players.map((player) => ({
+        playerVersionId: player.playerVersionId ?? '',
+        staminaRating: 80,
+        durability: 80,
+        fatigueBasisPoints,
+        recentLoadBasisPoints: 0,
+      })),
+      horizonGames,
+    };
+  }
+
+  it('attaches plan facts mirroring the rotation minute policy', () => {
+    const { players, rotation } = buildInput();
+    const roster = players.map((player) => ({ player }));
+    const projection = projectSeasonRoster({
+      roster,
+      rotation,
+      eraProfile: DEFAULT_ERA_SIM_PROFILE,
+      model: buildModel(),
+      minutePlan: minutePlanLoad(0),
+    });
+    const facts = projection.planFacts;
+    expect(facts).toBeDefined();
+    expect(facts?.policyVersion).toBe('minute-policy-v1');
+    expect(facts?.strategy).toBe(rotation.minutePolicy.strategy);
+    expect(facts?.horizonGames).toBe(10);
+    expect(facts?.projectedNetRating).toBe(projection.metrics.netRating);
+    expect(facts?.unitQuality).toEqual({
+      starting: projection.metrics.startingQuality,
+      closing: projection.metrics.closingQuality,
+      bench: projection.metrics.benchQuality,
+    });
+    expect(facts?.starterStrainAfterBlock).toBeGreaterThan(0);
+    expect(facts?.benchRelief).toBeGreaterThanOrEqual(0);
+    expect(facts?.benchRelief).toBeLessThanOrEqual(1);
+    expect(facts?.riskAdjustedScore).toBeGreaterThanOrEqual(0);
+    expect(facts?.riskAdjustedScore).toBeLessThanOrEqual(1);
+    const bandTotal =
+      (facts?.fatigueBands.fresh ?? 0) +
+      (facts?.fatigueBands.ready ?? 0) +
+      (facts?.fatigueBands.tired ?? 0) +
+      (facts?.fatigueBands.heavy ?? 0);
+    expect(bandTotal).toBe(10);
+    // The output stays schema-valid with planFacts attached.
+    expect(seasonProjectionSchema.parse(projection).planFacts).toEqual(facts);
+  });
+
+  it('orders starter strain by the rotation target minutes', () => {
+    const { players, rotation } = buildInput();
+    const roster = players.map((player) => ({ player }));
+    const withMinutes = (starterMinutes: number, benchMinutes: number) => ({
+      ...rotation,
+      targetMinutes: [
+        ...rotation.starters.map((playerVersionId) => ({
+          playerVersionId,
+          minutes: starterMinutes,
+        })),
+        ...rotation.benchOrder.map((playerVersionId) => ({
+          playerVersionId,
+          minutes: benchMinutes,
+        })),
+      ],
+    });
+    const light = projectSeasonRoster({
+      roster,
+      rotation: withMinutes(24, 24),
+      eraProfile: DEFAULT_ERA_SIM_PROFILE,
+      model: buildModel(),
+      minutePlan: minutePlanLoad(0),
+    });
+    const heavy = projectSeasonRoster({
+      roster,
+      rotation: withMinutes(38, 10),
+      eraProfile: DEFAULT_ERA_SIM_PROFILE,
+      model: buildModel(),
+      minutePlan: minutePlanLoad(0),
+    });
+    expect(heavy.planFacts?.starterStrainAfterBlock).toBeGreaterThan(
+      light.planFacts?.starterStrainAfterBlock ?? 0,
+    );
+  });
+
+  it('changes the digest when plan facts differ but not the input digest', () => {
+    const { players, rotation } = buildInput();
+    const roster = players.map((player) => ({ player }));
+    const base = {
+      roster,
+      rotation,
+      eraProfile: DEFAULT_ERA_SIM_PROFILE,
+      model: buildModel(),
+    };
+    // A one-game horizon keeps the initial-load difference visible: the
+    // between-game recovery tick would otherwise drive both end-of-block
+    // fatigues to the same minutes-insensitive equilibrium.
+    const without = projectSeasonRoster(base);
+    const fresh = projectSeasonRoster({ ...base, minutePlan: minutePlanLoad(0, 1) });
+    const loaded = projectSeasonRoster({ ...base, minutePlan: minutePlanLoad(4_000, 1) });
+    expect(fresh.planFacts).toBeDefined();
+    expect(loaded.planFacts).toBeDefined();
+    // Different load rows change the plan facts but not the roster+rotation.
+    expect(loaded.inputDigest).toBe(fresh.inputDigest);
+    expect(loaded.planFacts?.starterStrainAfterBlock).toBeGreaterThan(
+      fresh.planFacts?.starterStrainAfterBlock ?? 0,
+    );
+    expect(loaded.digest).not.toBe(fresh.digest);
+    expect(without.planFacts).toBeUndefined();
+    expect(fresh.digest).not.toBe(without.digest);
+  });
+});

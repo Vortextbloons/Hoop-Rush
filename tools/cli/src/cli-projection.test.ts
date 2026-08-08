@@ -226,7 +226,7 @@ describe('projection season', () => {
 });
 
 describe('projection benchmark', () => {
-  it('reports base-projection timings', async () => {
+  it('reports base-projection timings within the release gates', async () => {
     const { code, stdout } = await runCli([
       'projection',
       'benchmark',
@@ -239,8 +239,18 @@ describe('projection benchmark', () => {
       ...JSON_FLAG,
     ]);
     expect(code).toBe(0);
-    const payload = payloadOf(stdout) as { payload?: { median: number; p95: number } };
+    const payload = payloadOf(stdout) as {
+      details?: string[];
+      failures?: string[];
+      payload?: { median: number; p95: number };
+    };
+    expect(payload.failures ?? []).toEqual([]);
     expect(payload.payload?.median).toBeGreaterThan(0);
     expect(payload.payload?.p95).toBeGreaterThanOrEqual(payload.payload?.median ?? 0);
+    expect(
+      payload.details?.some((line) =>
+        line.includes('release gates: base median < 40 ms / p95 < 200 ms: PASS'),
+      ),
+    ).toBe(true);
   });
 });

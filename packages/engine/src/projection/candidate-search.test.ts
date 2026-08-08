@@ -8,7 +8,7 @@ import {
   searchRosterRotationCandidates,
 } from '../projection/index.ts';
 import { buildInput } from './season.test-helpers.ts';
-import { validateSeasonRotation } from '../season/rotation.ts';
+import { auditSeasonRotation, validateSeasonRotation } from '../season/rotation.ts';
 
 function smallModel(): ProjectionModelArtifact {
   return {
@@ -275,6 +275,25 @@ describe('rankCandidates', () => {
 });
 
 describe('searchRosterRotationCandidates', () => {
+  function searchInput(
+    overrides: {
+      locked?: string[];
+      load?: ReadonlyMap<string, { staminaRating: number; durability: number }>;
+    } = {},
+  ) {
+    const catalog = buildInput().catalog;
+    const versions = catalog.candidates.map((candidate) => candidate.playerVersionId);
+    return {
+      catalog,
+      locked: overrides.locked ?? ([] as string[]),
+      available: versions,
+      seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a',
+      eraProfile: DEFAULT_ERA_SIM_PROFILE,
+      model: smallModel(),
+      ...(overrides.load === undefined ? {} : { load: overrides.load }),
+    };
+  }
+
   it('finds complete legal candidates and is deterministic', () => {
     const catalog = buildInput().catalog;
     const model = smallModel();
@@ -333,6 +352,49 @@ describe('searchRosterRotationCandidates', () => {
     });
     expect(result.feasibilityFailure?.code).toBe('NO_FEASIBLE_COMPLETION');
   });
+
+  it('produces optimizer rotations carrying minutePolicy and plan facts', () => {
+    const result = searchRosterRotationCandidates(searchInput());
+    expect(result.ranked.length).toBeGreaterThan(0);
+    for (const candidate of result.ranked) {
+      expect(candidate.rotation.minutePolicy.policyVersion).toBe('minute-policy-v1');
+      expect(['starter-heavy', 'balanced', 'bench-heavy']).toContain(
+        candidate.rotation.minutePolicy.strategy,
+      );
+      expect(candidate.rotation.rotationVersion).toBe('season-rotation-v3');
+      // Candidate projections carry minute-policy plan facts with the same
+      // strategy as the rotation that produced the minutes.
+      const facts = candidate.projection.planFacts;
+      expect(facts).toBeDefined();
+      expect(facts?.policyVersion).toBe('minute-policy-v1');
+      expect(facts?.strategy).toBe(candidate.rotation.minutePolicy.strategy);
+      expect(facts?.horizonGames).toBe(10);
+    }
+  });
+
+  it('produces dynamic (quality/stamina-driven) minute allocations', () => {
+    // A locked pair with opposite capacities: the healthy player must be
+    // asked for more minutes than the fragile one in the ranked rotation.
+    const catalog = buildInput().catalog;
+    const versions = catalog.candidates.map((candidate) => candidate.playerVersionId);
+    const locked = [versions[0] ?? '', versions[3] ?? ''];
+    const load = new Map<string, { staminaRating: number; durability: number }>([
+      [locked[0] as string, { staminaRating: 95, durability: 95 }],
+      [locked[1] as string, { staminaRating: 45, durability: 45 }],
+    ]);
+    const result = buildHumanSeasonRoster(searchInput({ locked, load }));
+    expect(result.ok).toBe(true);
+    const rotation = result.rotation;
+    expect(rotation).not.toBeNull();
+    const minutesOf = new Map(
+      (rotation?.targetMinutes ?? []).map((row) => [row.playerVersionId, row.minutes]),
+    );
+    expect(minutesOf.get(locked[0] as string) ?? 0).not.toBe(
+      minutesOf.get(locked[1] as string) ?? 0,
+    );
+    // The rotation is a plan: integer minutes totaling exactly 240.
+    expect((rotation?.targetMinutes ?? []).reduce((sum, row) => sum + row.minutes, 0)).toBe(240);
+  });
 });
 
 function candidateVersionIdsOf(candidate: {
@@ -364,6 +426,18 @@ describe('buildHumanSeasonRoster', () => {
     expect(result.rotation).not.toBeNull();
     expect(result.projection).not.toBeNull();
     expect(result.audit.selectedCandidateId).not.toBeNull();
+    // The ranked-best rotation is an optimizer plan that passes the audit.
+    const auditRoster = result.roster as string[];
+    const memberPlayable = new Map(
+      auditRoster.map((id) => {
+        const member = catalog.candidates.find((candidate) => candidate.playerVersionId === id);
+        return [id, member?.positions.playable ?? []];
+      }),
+    );
+    expect(
+      auditSeasonRotation(result.rotation as NonNullable<typeof result.rotation>, memberPlayable),
+    ).toEqual([]);
+    expect(result.rotation?.minutePolicy.policyVersion).toBe('minute-policy-v1');
   });
 
   it('fails with the typed feasibility error on impossible locks', () => {

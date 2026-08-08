@@ -236,28 +236,34 @@ function computeSide(input: {
   // Aggregated per distinct (shooter, zone, action, defender) key with cached
   // zone shares, defender distributions, and per-key shot probabilities, so
   // the expensive probability functions run at most once per key instead of
-  // once per initiator path.
-  const shotMassByKey = new Map<
-    string,
-    {
-      shooterIndex: number;
-      defenderIndex: number;
-      zone: ShotZone;
-      action: ActionType;
-      mass: number;
-      passedMass: number;
-      /** Passed mass per initiator (for the initiator-weighted assister expectation). */
-      passedByInitiator: number[];
-    }
-  >();
+  // once per initiator path. Caches are flat typed arrays over the small
+  // (player x zone x action) domains; `keyOrder` preserves first-seen key
+  // order so the aggregation pass accumulates exactly as the Map did.
+  const playerCount = players.length;
+  const actionCount = ACTION_TYPES.length;
+  const zoneCount = ZONES.length;
+  const totalKeys = playerCount * playerCount * zoneCount * actionCount;
+  const massByKey = new Float64Array(totalKeys);
+  const passedMassByKey = new Float64Array(totalKeys);
+  const passedByInitiatorByKey = new Float64Array(totalKeys * playerCount);
+  const seenByKey = new Uint8Array(totalKeys);
+  const keyOrder: number[] = [];
   const actionTotals: Record<string, number> = {};
   const zoneTotals: Record<string, number> = {};
-  const shooterTotals = new Array<number>(players.length).fill(0);
+  const shooterTotals = new Array<number>(playerCount).fill(0);
   let passOpportunity = 0;
-  const zoneShareCache = new Map<string, number[]>();
-  const defenderCache = new Map<string, number[]>();
+  const zoneShareFlat = new Float64Array(playerCount * actionCount * zoneCount);
+  const zoneShareSeen = new Uint8Array(playerCount * actionCount);
+  const defenderFlat = new Float64Array(playerCount * zoneCount * playerCount);
+  const defenderSeen = new Uint8Array(playerCount * zoneCount);
+  const playerIdToIndex = new Map<string, number>();
+  for (let index = 0; index < playerCount; index += 1) {
+    const player = players[index];
+    if (player === undefined) continue;
+    if (!playerIdToIndex.has(player.playerId)) playerIdToIndex.set(player.playerId, index);
+  }
 
-  for (let initiatorIndex = 0; initiatorIndex < players.length; initiatorIndex += 1) {
+  for (let initiatorIndex = 0; initiatorIndex < playerCount; initiatorIndex += 1) {
     const initiator = players[initiatorIndex];
     if (initiator === undefined) continue;
     const initiatorKey = engineKey(initiator);
@@ -266,70 +272,83 @@ function computeSide(input: {
     if (actionTable === undefined) continue;
     const actionShares = normalizedWeights(actionTable);
     const teammateShots = prep.teammateShots.get(initiatorKey);
+    // The roll/pass teammate weights are per initiator, not per action;
+    // normalize each variant once and reuse it across actions.
+    const normalizedRollShots =
+      teammateShots === undefined
+        ? undefined
+        : normalizeTeammateShots(teammateShots.roll, playerIdToIndex);
+    const normalizedPassShots =
+      teammateShots === undefined
+        ? undefined
+        : normalizeTeammateShots(teammateShots.pass, playerIdToIndex);
 
-    for (let actionIndex = 0; actionIndex < ACTION_TYPES.length; actionIndex += 1) {
+    for (let actionIndex = 0; actionIndex < actionCount; actionIndex += 1) {
       const action = ACTION_TYPES[actionIndex];
       if (action === undefined) continue;
       const actionShare = actionShares[actionIndex] ?? 0;
       if (actionShare <= 0) continue;
       const passP = passProbability(initiator, action);
-      const shooterShares = shooterSharesFor(players, initiatorIndex, action, teammateShots, passP);
-      for (let shooterIndex = 0; shooterIndex < players.length; shooterIndex += 1) {
+      const selectedShots =
+        action === 'pickAndRollRoll' ? normalizedRollShots : normalizedPassShots;
+      const shooterShares = shooterSharesFor(players, initiatorIndex, passP, selectedShots);
+      for (let shooterIndex = 0; shooterIndex < playerCount; shooterIndex += 1) {
         const shooterShare = shooterShares[shooterIndex] ?? 0;
         if (shooterShare <= 0) continue;
         const shooter = players[shooterIndex];
         if (shooter === undefined) continue;
-        const zoneShareKey = `${String(shooterIndex)}|${action}`;
-        let zoneShares = zoneShareCache.get(zoneShareKey);
-        if (zoneShares === undefined) {
-          const zonePrep = prep.zonePrep.get(engineKey(shooter));
-          if (zonePrep === undefined) continue;
-          zoneShares = normalizedWeights(applyZonePulls(action, zonePrep.base, zonePrep.driveRate));
-          zoneShareCache.set(zoneShareKey, zoneShares);
+        const zoneShareSlot = shooterIndex * actionCount + actionIndex;
+        if (zoneShareSeen[zoneShareSlot] === 0) {
+          const shooterZonePrep = prep.zonePrep.get(engineKey(shooter));
+          if (shooterZonePrep === undefined) continue;
+          const shares = normalizedWeights(
+            applyZonePulls(action, shooterZonePrep.base, shooterZonePrep.driveRate),
+          );
+          for (let z = 0; z < zoneCount; z += 1) {
+            zoneShareFlat[zoneShareSlot * zoneCount + z] = shares[z] ?? 0;
+          }
+          zoneShareSeen[zoneShareSlot] = 1;
         }
 
-        for (let zoneIndex = 0; zoneIndex < ZONES.length; zoneIndex += 1) {
+        for (let zoneIndex = 0; zoneIndex < zoneCount; zoneIndex += 1) {
           const zone = ZONES[zoneIndex];
           if (zone === undefined) continue;
-          const zoneShare = zoneShares[zoneIndex] ?? 0;
+          const zoneShare = zoneShareFlat[zoneShareSlot * zoneCount + zoneIndex] ?? 0;
           if (zoneShare <= 0) continue;
-          const defenderKey = `${String(shooterIndex)}|${zone}`;
-          let defenderProbs = defenderCache.get(defenderKey);
-          if (defenderProbs === undefined) {
-            defenderProbs = defenderDistribution(opponentPrep, zone, shooterIndex);
-            defenderCache.set(defenderKey, defenderProbs);
+          const defenderSlot = shooterIndex * zoneCount + zoneIndex;
+          if (defenderSeen[defenderSlot] === 0) {
+            const probs = defenderDistribution(opponentPrep, zone, shooterIndex);
+            for (let d = 0; d < playerCount; d += 1) {
+              defenderFlat[defenderSlot * playerCount + d] = probs[d] ?? 0;
+            }
+            defenderSeen[defenderSlot] = 1;
           }
-          for (let defenderIndex = 0; defenderIndex < players.length; defenderIndex += 1) {
-            const defenderShare = defenderProbs[defenderIndex] ?? 0;
+          // Prefix shared by every defender: same left-associative multiply
+          // order as the sampled pipeline, so the values are unchanged.
+          const keyBase =
+            (shooterIndex * playerCount * zoneCount + zoneIndex) * actionCount + actionIndex;
+          const keyStride = zoneCount * actionCount;
+          const massPrefix = shotMass * initiatorShare * actionShare * shooterShare * zoneShare;
+          for (let defenderIndex = 0; defenderIndex < playerCount; defenderIndex += 1) {
+            const defenderShare = defenderFlat[defenderSlot * playerCount + defenderIndex] ?? 0;
             if (defenderShare <= 0) continue;
-            const mass =
-              shotMass * initiatorShare * actionShare * shooterShare * zoneShare * defenderShare;
+            const mass = massPrefix * defenderShare;
             if (mass <= 0) continue;
-            const key = `${String(shooterIndex)}|${String(defenderIndex)}|${zone}|${action}`;
-            const entry = shotMassByKey.get(key);
-            if (entry === undefined) {
-              shotMassByKey.set(key, {
-                shooterIndex,
-                defenderIndex,
-                zone,
-                action,
-                mass,
-                passedMass: shooterIndex !== initiatorIndex ? mass : 0,
-                passedByInitiator:
-                  initiatorIndex === shooterIndex
-                    ? new Array<number>(players.length).fill(0)
-                    : (() => {
-                        const byInitiator = new Array<number>(players.length).fill(0);
-                        byInitiator[initiatorIndex] = mass;
-                        return byInitiator;
-                      })(),
-              });
-            } else {
-              entry.mass += mass;
+            const keyIndex = keyBase + defenderIndex * keyStride;
+            if (seenByKey[keyIndex] === 0) {
+              seenByKey[keyIndex] = 1;
+              keyOrder.push(keyIndex);
+              massByKey[keyIndex] = mass;
+              passedMassByKey[keyIndex] = shooterIndex !== initiatorIndex ? mass : 0;
               if (shooterIndex !== initiatorIndex) {
-                entry.passedMass += mass;
-                entry.passedByInitiator[initiatorIndex] =
-                  (entry.passedByInitiator[initiatorIndex] ?? 0) + mass;
+                passedByInitiatorByKey[keyIndex * playerCount + initiatorIndex] = mass;
+              }
+            } else {
+              massByKey[keyIndex] = (massByKey[keyIndex] ?? 0) + mass;
+              if (shooterIndex !== initiatorIndex) {
+                passedMassByKey[keyIndex] = (passedMassByKey[keyIndex] ?? 0) + mass;
+                passedByInitiatorByKey[keyIndex * playerCount + initiatorIndex] =
+                  (passedByInitiatorByKey[keyIndex * playerCount + initiatorIndex] ?? 0) + mass;
               }
             }
             actionTotals[action] = (actionTotals[action] ?? 0) + mass;
@@ -387,42 +406,87 @@ function computeSide(input: {
 
   const offensiveRebounderShare = normalizedWeights(prep.rebounderWeights[0]);
   const defensiveRebounderShare = normalizedWeights(opponentPrep.rebounderWeights[1]);
-  const orebPByZone = new Map<ShotZone, number>();
+  const orebPFlat = new Float64Array(zoneCount);
+  const orebPSeen = new Uint8Array(zoneCount);
   const rimOrebP = offensiveReboundProbability(
     prep.offensiveReboundMean,
     opponentPrep.defensiveReboundMean,
     'rim',
     profile,
   );
-  const shotPrepByShooter = new Map<string, ShotPrep>();
-  const assistProbabilityCache = new Map<string, number>();
-  const assisterShareCache = new Map<string, number[]>();
+  const shotPrepByIndex: Array<ShotPrep | undefined> = new Array<ShotPrep | undefined>(playerCount);
+  // Pure per-key probability functions are memoized over the subset of their
+  // inputs that actually vary across keys: shootingFoulProbability does not
+  // depend on the action, blockProbability not on the shooter, and so on.
+  const foulPFlat = new Float64Array(playerCount * playerCount * zoneCount);
+  const foulPSeen = new Uint8Array(playerCount * playerCount * zoneCount);
+  const blockPFlat = new Float64Array(playerCount * zoneCount * actionCount);
+  const blockPSeen = new Uint8Array(playerCount * zoneCount * actionCount);
+  const ftPFlat = new Float64Array(playerCount);
+  const ftPSeen = new Uint8Array(playerCount);
+  const contestFlat = new Float64Array(playerCount * zoneCount);
+  const contestSeen = new Uint8Array(playerCount * zoneCount);
+  const shotQualityFlat = new Float64Array(actionCount * zoneCount);
+  const shotQualitySeen = new Uint8Array(actionCount * zoneCount);
+  const assistPFlat = new Float64Array(playerCount * actionCount * zoneCount * playerCount);
+  const assistPSeen = new Uint8Array(playerCount * actionCount * zoneCount * playerCount);
+  const assisterFlat = new Float64Array(playerCount * actionCount * zoneCount * playerCount);
+  const assisterSeen = new Uint8Array(playerCount * actionCount * zoneCount);
+  // Normalized assister weights depend only on the (shooter, initiator) pair,
+  // so each pair is computed at most once per side instead of once per key.
+  const assisterWeightByPair: Array<number[] | undefined> = new Array<number[] | undefined>(
+    playerCount * playerCount,
+  );
 
-  for (const entry of shotMassByKey.values()) {
-    const shooter = players[entry.shooterIndex];
-    const defender = players[entry.defenderIndex];
+  for (const keyIndex of keyOrder) {
+    const actionIndex = keyIndex % actionCount;
+    const zoneIndex = Math.floor(keyIndex / actionCount) % zoneCount;
+    const defenderIndex = Math.floor(keyIndex / (actionCount * zoneCount)) % playerCount;
+    const shooterIndex = Math.floor(keyIndex / (actionCount * zoneCount * playerCount));
+    const shooter = players[shooterIndex];
+    const defender = players[defenderIndex];
     if (shooter === undefined || defender === undefined) continue;
+    const zone = ZONES[zoneIndex];
+    const action = ACTION_TYPES[actionIndex];
+    if (zone === undefined || action === undefined) continue;
     const makeP = makeProbability(
       shooter,
       defender,
       profile,
-      entry.zone,
-      entry.action,
+      zone,
+      action,
       REGULATION_START_SECONDS,
-      shotPrepForCached(shotPrepByShooter, prep, shooter),
+      shotPrepAt(shotPrepByIndex, prep, shooter, shooterIndex),
     );
-    const foulP = shootingFoulProbability(shooter, defender, entry.zone, profile);
-    const blockP = blockProbability(defender, entry.zone, entry.action);
-    const ftP = freeThrowProbability(shooter, profile);
-    const ftCount = freeThrowsForZone(entry.zone);
+    const foulPKey = (shooterIndex * playerCount + defenderIndex) * zoneCount + zoneIndex;
+    let foulP = foulPSeen[foulPKey] === 1 ? foulPFlat[foulPKey] : undefined;
+    if (foulP === undefined) {
+      foulP = shootingFoulProbability(shooter, defender, zone, profile);
+      foulPFlat[foulPKey] = foulP;
+      foulPSeen[foulPKey] = 1;
+    }
+    const blockPKey = (defenderIndex * zoneCount + zoneIndex) * actionCount + actionIndex;
+    let blockP = blockPSeen[blockPKey] === 1 ? blockPFlat[blockPKey] : undefined;
+    if (blockP === undefined) {
+      blockP = blockProbability(defender, zone, action);
+      blockPFlat[blockPKey] = blockP;
+      blockPSeen[blockPKey] = 1;
+    }
+    let ftP = ftPSeen[shooterIndex] === 1 ? ftPFlat[shooterIndex] : undefined;
+    if (ftP === undefined) {
+      ftP = freeThrowProbability(shooter, profile);
+      ftPFlat[shooterIndex] = ftP;
+      ftPSeen[shooterIndex] = 1;
+    }
+    const ftCount = freeThrowsForZone(zone);
     const makeGivenFoul = makeP * ENGINE_CONSTANTS.fouledShotMakeScale;
     const makeProb = foulP * makeGivenFoul + (1 - foulP) * (1 - blockP) * makeP;
     const missProb = 1 - makeProb;
     const blockProb = (1 - foulP) * blockP;
     const madeWithFoulProb = foulP * makeGivenFoul;
     const missedWithFoulProb = foulP * (1 - makeGivenFoul);
-    const mass = entry.mass;
-    const three = entry.zone === 'cornerThree' || entry.zone === 'aboveBreakThree';
+    const mass = massByKey[keyIndex] ?? 0;
+    const three = zone === 'cornerThree' || zone === 'aboveBreakThree';
 
     // Field goals and points.
     internal.fieldGoalAttempts += mass;
@@ -450,15 +514,16 @@ function computeSide(input: {
     internal.points += ftmMass;
 
     // Rebounds on missed field goals (live).
-    let orebP = orebPByZone.get(entry.zone);
+    let orebP = orebPSeen[zoneIndex] === 1 ? orebPFlat[zoneIndex] : undefined;
     if (orebP === undefined) {
       orebP = offensiveReboundProbability(
         prep.offensiveReboundMean,
         opponentPrep.defensiveReboundMean,
-        entry.zone,
+        zone,
         profile,
       );
-      orebPByZone.set(entry.zone, orebP);
+      orebPFlat[zoneIndex] = orebP;
+      orebPSeen[zoneIndex] = 1;
     }
     const missMass = mass * missProb;
     internal.offensiveReboundChances += missMass;
@@ -479,64 +544,76 @@ function computeSide(input: {
 
     // Assists on made passed shots: expectation over the initiator-weighted
     // assister distribution (the passed mass per initiator is recorded).
-    if (entry.passedMass > 0) {
-      const totalPassed = entry.passedMass;
-      const assisterProbKey = `${String(entry.shooterIndex)}|${entry.action}|${entry.zone}`;
-      let assisterProbs = assisterShareCache.get(assisterProbKey);
-      if (assisterProbs === undefined) {
-        assisterProbs = initiatorWeightedAssisterDistribution(
+    const passedMass = passedMassByKey[keyIndex] ?? 0;
+    if (passedMass > 0) {
+      const totalPassed = passedMass;
+      const assisterSlot =
+        ((shooterIndex * actionCount + actionIndex) * zoneCount + zoneIndex) * playerCount;
+      if (assisterSeen[assisterSlot / playerCount] === 0) {
+        const distribution = initiatorWeightedAssisterDistribution(
           side,
           shooter,
           players,
-          entry.passedByInitiator,
+          passedByInitiatorByKey.subarray(keyIndex * playerCount, (keyIndex + 1) * playerCount),
           totalPassed,
+          assisterWeightByPair,
         );
-        assisterShareCache.set(assisterProbKey, assisterProbs);
+        for (let passerIndex = 0; passerIndex < playerCount; passerIndex += 1) {
+          assisterFlat[assisterSlot + passerIndex] = distribution[passerIndex] ?? 0;
+        }
+        assisterSeen[assisterSlot / playerCount] = 1;
       }
       let expectedAssists = 0;
-      for (let passerIndex = 0; passerIndex < players.length; passerIndex += 1) {
+      for (let passerIndex = 0; passerIndex < playerCount; passerIndex += 1) {
         const passer = players[passerIndex];
-        if (passer === undefined || passerIndex === entry.shooterIndex) continue;
-        const probKey = `${String(passerIndex)}|${entry.action}|${entry.zone}|${String(entry.shooterIndex)}`;
-        let assistP = assistProbabilityCache.get(probKey);
+        if (passer === undefined || passerIndex === shooterIndex) continue;
+        const probKey =
+          ((passerIndex * actionCount + actionIndex) * zoneCount + zoneIndex) * playerCount +
+          shooterIndex;
+        let assistP = assistPSeen[probKey] === 1 ? assistPFlat[probKey] : undefined;
         if (assistP === undefined) {
           assistP = assistProbabilityPure(
             profile,
             passingAnchorFactor,
             passer,
-            entry.action,
-            entry.zone,
+            action,
+            zone,
             shooter,
           );
-          assistProbabilityCache.set(probKey, assistP);
+          assistPFlat[probKey] = assistP;
+          assistPSeen[probKey] = 1;
         }
-        expectedAssists += (assisterProbs[passerIndex] ?? 0) * assistP;
+        expectedAssists += (assisterFlat[assisterSlot + passerIndex] ?? 0) * assistP;
       }
-      const assists = entry.passedMass * makeProb * expectedAssists;
+      const assists = passedMass * makeProb * expectedAssists;
       internal.assists += assists;
-      for (let passerIndex = 0; passerIndex < players.length; passerIndex += 1) {
-        if (passerIndex === entry.shooterIndex) continue;
+      for (let passerIndex = 0; passerIndex < playerCount; passerIndex += 1) {
+        if (passerIndex === shooterIndex) continue;
         playerAssists[passerIndex] =
           (playerAssists[passerIndex] ?? 0) +
-          entry.passedMass * makeProb * (assisterProbs[passerIndex] ?? 0);
+          passedMass * makeProb * (assisterFlat[assisterSlot + passerIndex] ?? 0);
       }
     }
 
     // Per-player aggregation.
-    const agg = playerAgg[entry.shooterIndex];
+    const agg = playerAgg[shooterIndex];
     if (agg === undefined) continue;
     agg.shots += mass;
     agg.makes += mass * makeProb;
     agg.points += mass * (three ? 3 : 2) * makeProb + ftmMass;
     agg.fouls += mass * foulP;
-    agg.rebounds += liveOreb * (offensiveRebounderShare[entry.shooterIndex] ?? 0);
-    agg.rebounds += missMass * (1 - orebP) * (defensiveRebounderShare[entry.shooterIndex] ?? 0);
-    agg.rebounds += liveFtMiss * rimOrebP * (offensiveRebounderShare[entry.shooterIndex] ?? 0);
-    agg.rebounds +=
-      liveFtMiss * (1 - rimOrebP) * (defensiveRebounderShare[entry.shooterIndex] ?? 0);
+    agg.rebounds += liveOreb * (offensiveRebounderShare[shooterIndex] ?? 0);
+    agg.rebounds += missMass * (1 - orebP) * (defensiveRebounderShare[shooterIndex] ?? 0);
+    agg.rebounds += liveFtMiss * rimOrebP * (offensiveRebounderShare[shooterIndex] ?? 0);
+    agg.rebounds += liveFtMiss * (1 - rimOrebP) * (defensiveRebounderShare[shooterIndex] ?? 0);
 
-    qualityLiftTotal += mass * (three ? 0 : shotQualityBonus(entry.action, entry.zone));
-    contestTotal += mass * -contestPenalty(defender, entry.zone);
+    qualityLiftTotal +=
+      mass *
+      (three
+        ? 0
+        : shotQualityAt(shotQualityFlat, shotQualitySeen, action, actionIndex, zone, zoneIndex));
+    contestTotal +=
+      mass * -contestAt(contestFlat, contestSeen, defender, defenderIndex, zone, zoneIndex);
   }
 
   /** Per-player turnover attribution by initiator share. */
@@ -650,19 +727,53 @@ function shotPrepFor(prep: TeamPrep, shooter: SimulationPlayer): ShotPrep {
   };
 }
 
-/** Cached per-shooter shot prep (pure per (prep, shooter)). */
-function shotPrepForCached(
-  cache: Map<string, ShotPrep>,
+/** Cached per-shooter shot prep, indexed by team index (pure per (prep, shooter)). */
+function shotPrepAt(
+  cache: Array<ShotPrep | undefined>,
   prep: TeamPrep,
   shooter: SimulationPlayer,
+  shooterIndex: number,
 ): ShotPrep {
-  const key = engineKey(shooter);
-  let cached = cache.get(key);
+  let cached = cache[shooterIndex];
   if (cached === undefined) {
     cached = shotPrepFor(prep, shooter);
-    cache.set(key, cached);
+    cache[shooterIndex] = cached;
   }
   return cached;
+}
+
+/** Memoized play-type conversion bonus (pure per (action, zone)). */
+function shotQualityAt(
+  flat: Float64Array,
+  seen: Uint8Array,
+  action: ActionType,
+  actionIndex: number,
+  zone: ShotZone,
+  zoneIndex: number,
+): number {
+  const key = actionIndex * SHOT_ZONES.length + zoneIndex;
+  if (seen[key] === 1) return flat[key] ?? 0;
+  const value = shotQualityBonus(action, zone);
+  flat[key] = value;
+  seen[key] = 1;
+  return value;
+}
+
+/** Memoized defensive contest adjustment (pure per (defender, zone)). */
+function contestAt(
+  flat: Float64Array,
+  seen: Uint8Array,
+  defender: SimulationPlayer,
+  defenderIndex: number,
+  zone: ShotZone,
+  zoneIndex: number,
+): number {
+  const key = defenderIndex * SHOT_ZONES.length + zoneIndex;
+  if (seen[key] === 1) return flat[key] ?? 0;
+  const value = contestPenalty(defender, zone);
+  flat[key] = value;
+  seen[key] = 1;
+  return value;
 }
 
 /**
@@ -690,34 +801,45 @@ function normalizedWeights(weights: readonly number[]): number[] {
 }
 
 /**
+ * Normalized teammate shot shares mapped to team indices, for one variant
+ * (roll or pass). Pure per (teammate weights, team); computed once per
+ * initiator and reused across every action that shares the variant.
+ */
+function normalizeTeammateShots(
+  shots: { teammates: SimulationPlayer[]; weights: number[] },
+  playerIdToIndex: ReadonlyMap<string, number>,
+): { teammates: SimulationPlayer[]; shares: number[] } | undefined {
+  if (shots.teammates.length === 0) return undefined;
+  const probs = normalizedWeights(shots.weights);
+  const shares = new Array<number>(probs.length).fill(0);
+  for (let index = 0; index < shots.teammates.length; index += 1) {
+    const teammate = shots.teammates[index];
+    if (teammate === undefined) continue;
+    const teamIndex = playerIdToIndex.get(teammate.playerId);
+    if (teamIndex === undefined) continue;
+    shares[teamIndex] = (shares[teamIndex] ?? 0) + (probs[index] ?? 0);
+  }
+  return { teammates: shots.teammates, shares };
+}
+
+/**
  * Shooter probability per team index for one (initiator, action): the
  * initiator keeps the shot with `1 - passProbability`; passed possessions
- * distribute through the engine's teammate shot weights (roll variant for
- * roll actions, pass variant otherwise).
+ * distribute through the pre-normalized teammate shot shares.
  */
 function shooterSharesFor(
   players: readonly SimulationPlayer[],
   initiatorIndex: number,
-  action: ActionType,
-  teammateShots:
-    | {
-        roll: { teammates: SimulationPlayer[]; weights: number[] };
-        pass: { teammates: SimulationPlayer[]; weights: number[] };
-      }
-    | undefined,
   passP: number,
+  selectedShots: { teammates: SimulationPlayer[]; shares: number[] } | undefined,
 ): number[] {
   const shares = new Array<number>(players.length).fill(0);
   shares[initiatorIndex] = 1 - passP;
-  if (passP <= 0 || teammateShots === undefined) return shares;
-  const selected = action === 'pickAndRollRoll' ? teammateShots.roll : teammateShots.pass;
-  const probs = normalizedWeights(selected.weights);
-  for (let index = 0; index < selected.teammates.length; index += 1) {
-    const teammate = selected.teammates[index];
-    if (teammate === undefined) continue;
-    const teamIndex = players.findIndex((player) => player.playerId === teammate.playerId);
-    if (teamIndex < 0) continue;
-    shares[teamIndex] = (shares[teamIndex] ?? 0) + passP * (probs[index] ?? 0);
+  if (passP <= 0 || selectedShots === undefined) return shares;
+  for (let index = 0; index < players.length; index += 1) {
+    const share = selectedShots.shares[index] ?? 0;
+    if (share <= 0) continue;
+    shares[index] = (shares[index] ?? 0) + passP * share;
   }
   return shares;
 }
@@ -733,17 +855,23 @@ function initiatorWeightedAssisterDistribution(
   team: SimulationTeam,
   shooter: SimulationPlayer,
   players: readonly SimulationPlayer[],
-  passedByInitiator: readonly number[],
+  passedByInitiator: Float64Array,
   totalPassed: number,
+  assisterWeightByPair: Array<number[] | undefined>,
 ): number[] {
   const perIndex = new Array<number>(team.players.length).fill(0);
+  const shooterIndex = players.findIndex((player) => player.playerId === shooter.playerId);
   for (let initiatorIndex = 0; initiatorIndex < players.length; initiatorIndex += 1) {
     const share = (passedByInitiator[initiatorIndex] ?? 0) / Math.max(1e-9, totalPassed);
     if (share <= 0) continue;
     const initiator = players[initiatorIndex];
     if (initiator === undefined) continue;
-    const weights = assisterWeights(team, shooter, initiator);
-    const normalized = normalizedWeights(weights);
+    const pairKey = shooterIndex * players.length + initiatorIndex;
+    let normalized = assisterWeightByPair[pairKey];
+    if (normalized === undefined) {
+      normalized = normalizedWeights(assisterWeights(team, shooter, initiator));
+      assisterWeightByPair[pairKey] = normalized;
+    }
     let candidateIndex = 0;
     for (let index = 0; index < team.players.length; index += 1) {
       if (team.players[index]?.playerId === shooter.playerId) continue;

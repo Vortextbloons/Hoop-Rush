@@ -25,6 +25,12 @@ export {
 } from './rotation-trace.ts';
 export { projectSeasonRoster, type SeasonProjectionOptions } from './season.ts';
 export {
+  projectedQualityWeights,
+  optimizeSeasonRotation,
+  type MinutePlanOptimizationResult,
+  type OptimizedMinutePlan,
+} from './minute-plan-quality.ts';
+export {
   rankCandidates,
   rankingVectorOf,
   normalizeComponent,

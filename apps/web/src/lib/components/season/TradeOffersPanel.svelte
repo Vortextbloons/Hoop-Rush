@@ -3,6 +3,7 @@
   import { X } from '@lucide/svelte';
   import { tradeResolvedAt } from '$lib/season/season-trade-view';
   import type { TradeOfferViewModel } from '$lib/season/season-trade-view';
+  import { formatPositions } from '$lib/player-positions';
 
   /**
    * Trade offers panel (M2.5): while a trade window is open the hub shows
@@ -49,7 +50,7 @@
     return players
       .map(
         (player) =>
-          `${player.displayName}${player.playable.length > 0 ? ` (${player.playable.join('/')})` : ''}${
+          `${player.displayName}${player.playable.length > 0 ? ` (${formatPositions(player.playable)})` : ''}${
             player.available ? '' : ' — out'
           }`,
       )

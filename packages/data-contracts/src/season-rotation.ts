@@ -1,17 +1,35 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_ROTATION_VERSION } from './season-versions.ts';
+import { SEASON_MINUTE_POLICY_VERSION, SEASON_ROTATION_VERSION } from './season-versions.ts';
 
 /**
- * Season Run rotation contracts (spec/2.0/04, M2.2, season-rotation-v2). A
+ * Season Run rotation contracts (spec/2.0/04, M2.2, season-rotation-v3). A
  * persisted rotation keeps the v1 structural shape: five slot-assigned
  * starters (G, G, F, F, C), a five-player bench order that doubles as the
  * deterministic contingency hierarchy, per-player regulation target minutes
  * totaling exactly 240, and an ordered closing five. Under v2 the closing
  * five is an independent legal five that may include bench players and may
- * differ from the starters; validation semantics changed accordingly.
+ * differ from the starters. Under v3 (projection milestone) every rotation
+ * additionally freezes the versioned minute policy that produced its target
+ * minutes; the preset value `tight` is preserved for compatibility and
+ * labeled Starter-Heavy.
  */
+
+/** Minute-policy strategies (Starter-Heavy / Balanced / Bench-Heavy). */
+export const seasonMinutePolicyStrategySchema = z.enum([
+  'starter-heavy',
+  'balanced',
+  'bench-heavy',
+]);
+export type SeasonMinutePolicyStrategy = z.infer<typeof seasonMinutePolicyStrategySchema>;
+
+/** Versioned minute-policy record frozen on every rotation (minute-policy-v1). */
+export const seasonMinutePolicySchema = z.object({
+  policyVersion: z.literal(SEASON_MINUTE_POLICY_VERSION),
+  strategy: seasonMinutePolicyStrategySchema,
+});
+export type SeasonMinutePolicy = z.infer<typeof seasonMinutePolicySchema>;
 
 export const seasonRotationTargetMinutesSchema = z.object({
   playerVersionId: playerVersionIdSchema,
@@ -32,6 +50,11 @@ export const seasonRotationSchema = z.object({
    * window and at every overtime tip (season-rotation-v2).
    */
   closingFive: z.array(playerVersionIdSchema).length(5),
+  /**
+   * Versioned minute policy that produced the target minutes
+   * (season-rotation-v3, minute-policy-v1).
+   */
+  minutePolicy: seasonMinutePolicySchema,
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
 });
 export type SeasonRotation = z.infer<typeof seasonRotationSchema>;

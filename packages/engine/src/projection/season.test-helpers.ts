@@ -1,5 +1,11 @@
 import { buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
-import type { SeasonDraftCandidate, SimulationPlayer } from '@hoop-rush/data-contracts';
+import {
+  SEASON_MINUTE_POLICY_VERSION,
+  SEASON_ROTATION_VERSION,
+  type SeasonDraftCandidate,
+  type SeasonRotation,
+  type SimulationPlayer,
+} from '@hoop-rush/data-contracts';
 
 /**
  * Shared projection test fixtures: a slot-legal ten-player roster and
@@ -62,7 +68,7 @@ export function buildInput() {
     pick(guards, 3),
     pick(forwards, 3),
   ];
-  const rotation = {
+  const rotation: SeasonRotation = {
     franchiseId: 'lakers',
     starters: starters.map((player) => player.playerVersionId ?? ''),
     benchOrder: bench.map((player) => player.playerVersionId ?? ''),
@@ -71,7 +77,8 @@ export function buildInput() {
       ...bench.map((player) => ({ playerVersionId: player.playerVersionId ?? '', minutes: 16 })),
     ],
     closingFive: starters.map((player) => player.playerVersionId ?? ''),
-    rotationVersion: 'season-rotation-v2' as const,
+    minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
+    rotationVersion: SEASON_ROTATION_VERSION,
   };
   const ten = [...starters, ...bench];
   return { catalog, players: ten, rotation };

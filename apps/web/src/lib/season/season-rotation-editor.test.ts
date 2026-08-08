@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { canPlay, SEASON_ROTATION_VERSION, type Position } from '@hoop-rush/data-contracts';
+import {
+  canPlay,
+  SEASON_MINUTE_POLICY_VERSION,
+  SEASON_ROTATION_VERSION,
+  type Position,
+  type SeasonRotation,
+} from '@hoop-rush/data-contracts';
 import {
   ROTATION_PRESETS,
   createRotationEditor,
@@ -7,6 +13,7 @@ import {
   indexRotationFailures,
   presetLabel,
   rotationRoleOf,
+  strategyLabel,
   SLOT_GROUPS,
   type RotationMember,
 } from './season-rotation-editor';
@@ -122,10 +129,30 @@ describe('RotationEditor', () => {
     }
   });
 
+  it('records the matching minute-policy strategy when a preset applies', () => {
+    const e = editor();
+    const expected: Record<(typeof ROTATION_PRESETS)[number], string> = {
+      balanced: 'balanced',
+      tight: 'starter-heavy',
+      'bench-heavy': 'bench-heavy',
+    };
+    for (const preset of ROTATION_PRESETS) {
+      expect(e.applyPreset(preset)).toEqual([]);
+      expect(e.rotation.minutePolicy.policyVersion).toBe('minute-policy-v1');
+      expect(e.rotation.minutePolicy.strategy).toBe(expected[preset]);
+    }
+  });
+
   it('labels presets for the UI', () => {
     expect(presetLabel('balanced')).toBe('Balanced');
-    expect(presetLabel('tight')).toBe('Tight');
+    expect(presetLabel('tight')).toBe('Starter-Heavy');
     expect(presetLabel('bench-heavy')).toBe('Bench-Heavy');
+  });
+
+  it('labels minute-policy strategies for the plan cards', () => {
+    expect(strategyLabel('starter-heavy')).toBe('Starter-Heavy');
+    expect(strategyLabel('balanced')).toBe('Balanced');
+    expect(strategyLabel('bench-heavy')).toBe('Bench-Heavy');
   });
 
   it('promotes a guard-capable bench player into a starter slot, demoting the incumbent', () => {
@@ -343,6 +370,10 @@ describe('RotationEditor.toggleClosing', () => {
         benchOrder: ['g3', 'g4', 'f3', 'f4', 'c2'],
         targetMinutes: players.map((p) => ({ playerVersionId: p.playerVersionId, minutes: 24 })),
         closingFive: ['g1', 'g2', 'g3', 'g4', 'c1'],
+        minutePolicy: {
+          policyVersion: SEASON_MINUTE_POLICY_VERSION,
+          strategy: 'balanced',
+        },
         rotationVersion: SEASON_ROTATION_VERSION,
       },
       players,
@@ -377,6 +408,41 @@ describe('RotationEditor.moveBench', () => {
     expect(e.moveBench(0, -1)).toEqual([]);
     expect(e.moveBench(4, 1)).toEqual([]);
     expect(e.rotation.benchOrder).toEqual(before);
+  });
+});
+
+describe('RotationEditor.applyRotation', () => {
+  it('commits a valid external candidate and returns the committed rotation', () => {
+    const e = editor();
+    const candidate: SeasonRotation = {
+      ...e.rotation,
+      targetMinutes: e.rotation.targetMinutes.map((entry, index) =>
+        index === 0
+          ? { ...entry, minutes: entry.minutes + 4 }
+          : index === 1
+            ? { ...entry, minutes: entry.minutes - 4 }
+            : entry,
+      ),
+    };
+    const committed = e.applyRotation(candidate);
+    expect(committed).toBe(candidate);
+    expect(e.rotation).toBe(candidate);
+    expect(e.validate()).toEqual([]);
+    expect(e.minutesFor(e.rotation.starters[0] ?? '')).toBe(36);
+  });
+
+  it('rejects an invalid external candidate and leaves the rotation unchanged', () => {
+    const e = editor();
+    const before = e.rotation;
+    const invalid: SeasonRotation = {
+      ...e.rotation,
+      targetMinutes: e.rotation.targetMinutes.map((entry, index) =>
+        index === 0 ? { ...entry, minutes: entry.minutes + 1 } : entry,
+      ),
+    };
+    expect(() => e.applyRotation(invalid)).toThrow(/rotation plan rejected/);
+    expect(e.rotation).toBe(before);
+    expect(e.validate()).toEqual([]);
   });
 });
 

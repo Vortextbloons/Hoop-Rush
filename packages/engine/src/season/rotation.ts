@@ -1,4 +1,5 @@
 import {
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
   seasonDigestHex,
@@ -11,6 +12,7 @@ import {
 import type { Position } from '@hoop-rush/data-contracts';
 import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts';
 import { canPlay } from '../domain/positions.ts';
+import { minuteStrategyOfPreset } from './minute-plan.ts';
 
 /**
  * Minimal M2.1 rotation builder (spec/2.0/04, season-rotation-v1). Five
@@ -106,6 +108,7 @@ export function buildMinimalRotation(input: {
       ...benchOrder.map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
     ],
     closingFive: starterOrder,
+    minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
     rotationVersion: SEASON_ROTATION_VERSION,
   };
 }
@@ -118,10 +121,10 @@ export function rotationTargetMinutes(rotation: SeasonRotation): number {
 /**
  * Canonical digest of the locked 30-rotation set (spec/2.0/07 M2.3). Sort by
  * franchiseId; include starters, bench order, target minutes sorted by
- * playerVersionId, the closing five, and the rotation version; hash with
- * `seasonDigestHex`. Identical sets hash identically regardless of input
- * order, so a stale or tampered block lock is rejected before any simulation
- * runs.
+ * playerVersionId, the closing five, the minute policy, and the rotation
+ * version; hash with `seasonDigestHex`. Identical sets hash identically
+ * regardless of input order, so a stale or tampered block lock is rejected
+ * before any simulation runs.
  */
 export function seasonRotationSetDigest(rotations: readonly SeasonRotation[]): string {
   const canonical = [...rotations]
@@ -134,6 +137,7 @@ export function seasonRotationSetDigest(rotations: readonly SeasonRotation[]): s
         a.playerVersionId < b.playerVersionId ? -1 : 1,
       ),
       closingFive: rotation.closingFive,
+      minutePolicy: rotation.minutePolicy,
       rotationVersion: rotation.rotationVersion,
     }));
   return seasonDigestHex(JSON.stringify(canonical));
@@ -264,7 +268,9 @@ export function validateSeasonRotation(
  * preset tables (SEASON_ROTATION_PRESET_TARGETS: Balanced 33 each starter /
  * bench 21,18,15,12,9; Tight 37 / 20,14,9,7,5; Bench-Heavy 29 /
  * 23,21,19,17,15). The current starter order, bench hierarchy, and closing
- * five are preserved exactly. Returns a new rotation; the input is untouched.
+ * five are preserved exactly. The rotation's minute policy is rewritten to
+ * the strategy that matches the applied preset (`tight` maps to
+ * Starter-Heavy). Returns a new rotation; the input is untouched.
  */
 export function applySeasonRotationPreset(
   rotation: SeasonRotation,
@@ -286,6 +292,10 @@ export function applySeasonRotationPreset(
         return { playerVersionId, minutes: benchMinutes };
       }),
     ],
+    minutePolicy: {
+      policyVersion: rotation.minutePolicy.policyVersion,
+      strategy: minuteStrategyOfPreset(preset),
+    },
   };
 }
 

@@ -6,9 +6,17 @@ import type {
   SeasonRotation,
   SimulationPlayer,
 } from '@hoop-rush/data-contracts';
-import { seasonDigestHex } from '@hoop-rush/data-contracts';
+import {
+  SEASON_MINUTE_POLICY_VERSION,
+  SEASON_ROTATION_VERSION,
+  seasonDigestHex,
+} from '@hoop-rush/data-contracts';
 import { enumerateLegalFives, type PlannerMember } from '../season/rotation-planner.ts';
-import { applySeasonRotationPreset, buildMinimalRotation } from '../season/rotation.ts';
+import {
+  buildMinutePlanCandidates,
+  minutePlanHorizonGames,
+  type MinutePlanPlayerInput,
+} from '../season/minute-plan.ts';
 import {
   completionTargetsMet,
   legalFiveAfterAnyRemoval,
@@ -18,6 +26,7 @@ import {
   type SeasonRosterMemberInput,
 } from '../season/roster-rules.ts';
 import { ProjectionCache } from './cache.ts';
+import { projectedQualityWeights } from './minute-plan-quality.ts';
 import { projectSeasonRoster } from './season.ts';
 import {
   rankCandidates,
@@ -79,6 +88,14 @@ export interface RosterRotationSearchInput {
     completeCandidates?: number;
     rotationsPerRoster?: number;
   };
+  /**
+   * Optional per-player minute-plan load for autofill (minute-policy-v1):
+   * stamina/durability ratings for the optimizer plans. Absent players fall
+   * back to the catalog member's build-time profile, then the neutral 70.
+   * Fatigue and recent-load are always zero: autofill evaluates fresh
+   * rosters.
+   */
+  load?: ReadonlyMap<string, { staminaRating: number; durability: number }>;
 }
 
 export interface SearchAudit {
@@ -132,6 +149,10 @@ interface CatalogMember {
   playerVersionId: string;
   playable: readonly Position[];
   player: SimulationPlayer;
+  /** Build-time stamina rating (neutral 70 when the candidate lacks a profile). */
+  staminaRating: number;
+  /** Build-time durability rating (neutral 70 when the candidate lacks a profile). */
+  durability: number;
 }
 
 /** Seeded deterministic ordering rank for one version id (FNV-1a based). */
@@ -191,6 +212,8 @@ function catalogMembers(catalog: SeasonDraftCatalog): Map<string, CatalogMember>
       playerVersionId: candidate.playerVersionId,
       playable: candidate.positions.playable,
       player,
+      staminaRating: candidate.stamina.rating,
+      durability: candidate.durability.rating,
     });
   }
   return members;
@@ -253,6 +276,8 @@ function benchMember(versionId: string): CatalogMember {
   return {
     playerVersionId: versionId,
     playable: [],
+    staminaRating: 70,
+    durability: 70,
     player: {
       playerId: versionId,
       displayName: versionId,
@@ -308,39 +333,14 @@ function benchMember(versionId: string): CatalogMember {
   };
 }
 
-/** Additional minute templates beyond the three official presets (v1). */
-const ADDITIONAL_MINUTE_TEMPLATES: Array<{ name: string; minutes: number[] }> = [
-  { name: 'spread', minutes: [30, 30, 30, 30, 30, 18, 18, 18, 18, 18] },
-  { name: 'star-load', minutes: [34, 34, 34, 34, 34, 14, 14, 14, 14, 14] },
-  { name: 'two-platoon', minutes: [24, 24, 24, 24, 24, 24, 24, 24, 24, 24] },
-  { name: 'closer-load', minutes: [33, 33, 33, 33, 33, 15, 15, 15, 15, 15] },
-];
-
-/** Applies a minute template to an ordered roster (versioned v1 templates). */
-function rotationWithMinutes(
-  orderedRoster: readonly string[],
-  template: readonly number[],
-): { playerVersionId: string; minutes: number }[] {
-  const targets = orderedRoster.map((playerVersionId, index) => ({
-    playerVersionId,
-    minutes: template[index] ?? 16,
-  }));
-  const total = targets.reduce((sum, row) => sum + row.minutes, 0);
-  const adjusted = targets.map((row) => ({
-    ...row,
-    minutes: Math.round((row.minutes / Math.max(1, total)) * 240),
-  }));
-  // Reconcile rounding to exactly 240.
-  const remainder = 240 - adjusted.reduce((sum, row) => sum + row.minutes, 0);
-  for (let index = 0; index < Math.abs(remainder) && index < adjusted.length; index += 1) {
-    const row = adjusted[index];
-    if (row === undefined) continue;
-    row.minutes += remainder > 0 ? 1 : -1;
-  }
-  return adjusted;
-}
-
-/** Generates the bounded rotation set for one complete roster. */
+/** Generates the bounded rotation set for one complete roster: for each
+ * starter/closing/bench-order structure, the minute-policy optimizer builds
+ * one plan per strategy (capped by `minuteTemplatesCap`), so rotations are
+ * dynamic — driven by projected quality, stamina, and durability — instead
+ * of fixed templates. The per-player load comes from the caller's optional
+ * `load` map, the catalog member's build-time profile, or the neutral 70;
+ * fatigue and recent-load are always zero (autofill evaluates fresh
+ * rosters). */
 function rotationsFor(input: {
   roster: readonly string[];
   members: ReadonlyMap<string, CatalogMember>;
@@ -350,6 +350,10 @@ function rotationsFor(input: {
   benchHierarchiesCap: number;
   minuteTemplatesCap: number;
   rotationsCap: number;
+  eraProfile: EraSimulationProfile;
+  model: ProjectionModelArtifact;
+  cache: ProjectionCache;
+  load?: ReadonlyMap<string, { staminaRating: number; durability: number }>;
 }): SeasonRotation[] {
   const { roster, members, lens, rotationsCap } = input;
   const plannerMembers: PlannerMember[] = [...roster]
@@ -368,54 +372,70 @@ function rotationsFor(input: {
   });
   if (benchOrders.length === 0) return [];
 
-  const presets = ['balanced', 'tight', 'bench-heavy'] as const;
-  const templates: number[][] = [
-    ...presets.map((preset) => {
-      const base = buildMinimalRotation({
-        franchiseId: 'roster',
-        members: roster.map((id) => ({
-          playerVersionId: id,
-          playable: members.get(id)?.playable ?? [],
-        })),
-      });
-      return applySeasonRotationPreset(base, preset).targetMinutes.map((row) => row.minutes);
-    }),
-    ...ADDITIONAL_MINUTE_TEMPLATES.slice(0, Math.max(0, input.minuteTemplatesCap - 3)).map(
-      (template) => template.minutes,
-    ),
-  ];
-
+  // One optimizer plan per strategy; `minuteTemplatesCap` caps the set.
+  const planCount = Math.min(3, input.minuteTemplatesCap);
+  const playerOf = (id: string) => members.get(id)?.player ?? benchMember(id).player;
   const rotations: SeasonRotation[] = [];
   const seen = new Set<string>();
+  const structureBound = input.startingFivesCap * input.closingFivesCap * input.benchHierarchiesCap;
   for (const starter of starters) {
     for (const closer of closers) {
       for (const benchOrder of benchOrders) {
-        for (const template of templates) {
-          if (
-            rotations.length >=
-            input.startingFivesCap * input.closingFivesCap * input.benchHierarchiesCap
-          ) {
-            break;
-          }
-          const base: SeasonRotation = {
-            franchiseId: 'roster',
-            starters: starter,
-            benchOrder,
-            targetMinutes: [],
-            closingFive: closer,
-            rotationVersion: 'season-rotation-v2',
-          };
-          // targetMinutes must reference exactly the ten rostered players in
-          // starter-then-bench canonical order with the template distribution.
-          const orderedRoster = [...starter, ...benchOrder];
-          const withMinutes: SeasonRotation = {
-            ...base,
-            targetMinutes: rotationWithMinutes(orderedRoster, template),
-          };
-          const key = JSON.stringify([starter, closer, benchOrder, withMinutes.targetMinutes]);
+        if (rotations.length >= structureBound) break;
+        // The bench order derives from the FIRST starter five, so later
+        // starter fives can overlap it: skip structures whose partition does
+        // not cover the ten rostered players (their plans could not be legal).
+        if (new Set([...starter, ...benchOrder]).size !== roster.length) continue;
+        const orderedRoster = [...starter, ...benchOrder];
+        // Structure-only rotation for the quality weights: the placeholder
+        // target minutes are never used (projectedQualityWeights reads only
+        // starters/closingFive/benchOrder and rewrites the bench-heavy
+        // preset before tracing); the optimizer produces real minutes.
+        const structureRotation: SeasonRotation = {
+          franchiseId: 'roster',
+          starters: starter,
+          benchOrder,
+          targetMinutes: orderedRoster.map((playerVersionId) => ({
+            playerVersionId,
+            minutes: 24,
+          })),
+          closingFive: closer,
+          minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
+          rotationVersion: SEASON_ROTATION_VERSION,
+        };
+        const players = orderedRoster.map((id) => playerOf(id));
+        const qualityByVersion = projectedQualityWeights({
+          players,
+          byVersion: new Map(orderedRoster.map((id) => [id, playerOf(id)])),
+          rotation: structureRotation,
+          eraProfile: input.eraProfile,
+          model: input.model,
+          cache: input.cache,
+        });
+        const minutePlanPlayers = new Map<string, MinutePlanPlayerInput>();
+        for (const id of orderedRoster) {
+          const member = members.get(id) ?? benchMember(id);
+          const load = input.load?.get(id);
+          minutePlanPlayers.set(id, {
+            playerVersionId: id,
+            quality: qualityByVersion.get(id) ?? 0.5,
+            staminaRating: load?.staminaRating ?? member.staminaRating,
+            durability: load?.durability ?? member.durability,
+            fatigueBasisPoints: 0,
+            recentLoadBasisPoints: 0,
+          });
+        }
+        const plans = buildMinutePlanCandidates({
+          structure: { starters: starter, benchOrder, closingFive: closer },
+          players: minutePlanPlayers,
+          horizon: minutePlanHorizonGames(82),
+        }).plans.slice(0, planCount);
+        for (const plan of plans) {
+          const rotation = plan.rotation;
+          const key = JSON.stringify([starter, closer, benchOrder, rotation.targetMinutes]);
           if (seen.has(key)) continue;
           seen.add(key);
-          rotations.push(withMinutes);
+          rotations.push(rotation);
           if (rotations.length >= rotationsCap) break;
         }
         if (rotations.length >= rotationsCap) break;
@@ -549,8 +569,25 @@ export function searchRosterRotationCandidates(
       startingFivesCap: input.model.search.startingFives,
       closingFivesCap: input.model.search.closingFives,
       benchHierarchiesCap: input.model.search.benchHierarchies,
-      minuteTemplatesCap: input.model.search.minuteTemplates + 3,
+      minuteTemplatesCap: input.model.search.minuteTemplates,
       rotationsCap: rotationsPerRoster,
+      eraProfile: input.eraProfile,
+      model: input.model,
+      cache,
+      load: input.load,
+    });
+    // Minute-plan load rows for the candidate projections: fatigue and
+    // recent-load are always zero because autofill evaluates fresh rosters.
+    const minutePlanLoad = roster.map((id) => {
+      const member = members.get(id) ?? benchMember(id);
+      const load = input.load?.get(id);
+      return {
+        playerVersionId: id,
+        staminaRating: load?.staminaRating ?? member.staminaRating,
+        durability: load?.durability ?? member.durability,
+        fatigueBasisPoints: 0,
+        recentLoadBasisPoints: 0,
+      };
     });
     for (const rotation of rotations) {
       if (rotationsEvaluated >= rotationBudget) break;
@@ -565,6 +602,10 @@ export function searchRosterRotationCandidates(
             rotation,
             eraProfile: input.eraProfile,
             model: input.model,
+            minutePlan: {
+              players: minutePlanLoad,
+              horizonGames: minutePlanHorizonGames(82),
+            },
           },
           { cache },
         );

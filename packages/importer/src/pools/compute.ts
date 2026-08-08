@@ -431,7 +431,7 @@ function runPoolChunk(
   withAssets: boolean,
 ): Promise<PoolWorkerResult> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./pool-worker.js', import.meta.url), {
+    const worker = new Worker(new URL('./pool-worker.ts', import.meta.url), {
       workerData: {
         targets: chunk,
         manifest,

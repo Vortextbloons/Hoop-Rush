@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_NEUTRAL_HOME_COURT,
+  SEASON_ROTATION_VERSION,
   playerVersionId,
   seasonGameSummarySchema,
   seasonRetainedGameDetailSchema,
@@ -70,7 +72,8 @@ function rotationOf(team: SeasonGameTeamInput): SeasonRotation {
         .map((id, index) => ({ playerVersionId: id, minutes: [21, 18, 15, 12, 9][index] ?? 0 })),
     ],
     closingFive: [ids[1], ids[5], ids[6], ids[7], ids[8]].map((id) => id ?? ''),
-    rotationVersion: 'season-rotation-v2',
+    minutePolicy: { policyVersion: SEASON_MINUTE_POLICY_VERSION, strategy: 'balanced' },
+    rotationVersion: SEASON_ROTATION_VERSION,
   };
 }
 

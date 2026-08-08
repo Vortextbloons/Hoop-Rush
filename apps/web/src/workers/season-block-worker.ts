@@ -6,6 +6,7 @@ import {
   seasonWorkerMessageSchema,
   seasonWorkerRequestSchema,
   SEASON_HEALTH_VERSION,
+  SEASON_RUN_SCHEMA_VERSION,
   type EraSimulationProfile,
   type SeasonBlockRunContext,
   type SeasonDraftCatalog,
@@ -331,7 +332,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const expanded = expandRostersCached(run, catalog);
   const input: SeasonBlockSimulationInput = {
     command: {
-      schemaVersion: 7,
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       blockVersion: run.versions.blockVersion,
       command: 'submit-season-block',
       commandId: request.commandId,

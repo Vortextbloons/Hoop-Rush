@@ -330,7 +330,7 @@ function chunkList<T>(items: readonly T[], workers: number): T[][] {
 /** Runs one season chunk in a worker thread; resolves when it finishes. */
 function runRatingsChunk(seasons: readonly string[], force: boolean): Promise<void> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL('./ratings-worker.js', import.meta.url), {
+    const worker = new Worker(new URL('./ratings-worker.ts', import.meta.url), {
       workerData: { seasons: [...seasons], force },
     });
     let settled = false;

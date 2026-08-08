@@ -1,4 +1,9 @@
-import type { HumanRosterBuildResult, SearchLens } from '@hoop-rush/engine';
+import type { SeasonRotation } from '@hoop-rush/data-contracts';
+import type {
+  HumanRosterBuildResult,
+  MinutePlanOptimizationResult,
+  SearchLens,
+} from '@hoop-rush/engine';
 
 /**
  * Shared message envelope for the Season Run projection worker
@@ -25,6 +30,39 @@ export interface ProjectionRosterBuildRequest {
   lens?: SearchLens;
 }
 
+/** One rostered player's recorded load inputs for minute planning. */
+export interface ProjectionRotationLoadRow {
+  playerVersionId: string;
+  /** 45..95 stamina rating (season-stamina-v1). */
+  staminaRating: number;
+  /** 45..95 durability rating (durability-v1). */
+  durability: number;
+  /** 0..10,000 current fatigue basis points. */
+  fatigueBasisPoints: number;
+  /** 0..10,000 current recent-load basis points. */
+  recentLoadBasisPoints: number;
+}
+
+export interface ProjectionRotationOptimizeRequest {
+  type: 'optimize-rotation';
+  requestId: string;
+  catalogUrl: string;
+  catalogHash: string;
+  modelUrl: string;
+  modelHash: string;
+  eraProfileUrl: string;
+  eraProfileHash: string;
+  /** Exactly the ten rostered playerVersionIds (the current ten). */
+  roster: readonly string[];
+  /** The current editor rotation (franchiseId/starters/benchOrder/closingFive). */
+  structure: SeasonRotation;
+  /** Ten load rows, one per rostered playerVersionId. */
+  load: readonly ProjectionRotationLoadRow[];
+  /** Upcoming-block horizon in team games (engine-clamped). */
+  horizon: number;
+  seed: string;
+}
+
 export type ProjectionRosterBuildResponse =
   | {
       type: 'complete';
@@ -36,3 +74,23 @@ export type ProjectionRosterBuildResponse =
       requestId: string;
       message: string;
     };
+
+export type ProjectionRotationOptimizeResponse =
+  | {
+      type: 'complete';
+      requestId: string;
+      result: MinutePlanOptimizationResult;
+    }
+  | {
+      type: 'error';
+      requestId: string;
+      message: string;
+    };
+
+/** The full request envelope the worker accepts. */
+export type ProjectionWorkerRequest =
+  ProjectionRosterBuildRequest | ProjectionRotationOptimizeRequest;
+
+/** The full response envelope the worker posts back. */
+export type ProjectionWorkerResponse =
+  ProjectionRosterBuildResponse | ProjectionRotationOptimizeResponse;

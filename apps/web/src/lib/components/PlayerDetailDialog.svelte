@@ -11,6 +11,7 @@
     shotPct,
     type RosterDetailRow,
   } from '$lib/roster-browser';
+  import { formatPositions } from '$lib/player-positions';
   import PlayerFace from './PlayerFace.svelte';
 
   /**
@@ -164,7 +165,7 @@
 
         <div class="mt-3 flex flex-wrap items-center gap-1.5 font-mono text-[10px]">
           <span class="rounded bg-surface-3 px-1.5 py-0.5">
-            {subject.positionsPlayable.join('/')}
+            {formatPositions(subject.positionsPlayable)}
           </span>
           <span class="rounded bg-primary/10 px-1.5 py-0.5 font-bold text-primary" title="Overall">
             O {subject.overall}

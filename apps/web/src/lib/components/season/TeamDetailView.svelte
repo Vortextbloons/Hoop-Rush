@@ -4,6 +4,7 @@
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
   import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
   import type { SeasonRunShellData } from '$lib/season/season-shell-context';
+  import { formatPositions } from '$lib/player-positions';
   import type {
     SeasonTeamDetail,
     SeasonTeamPlayerRow,
@@ -100,7 +101,7 @@
     <p class="text-label uppercase text-muted-foreground">Locked rotation</p>
     <div class="mt-3 grid gap-4 sm:grid-cols-2">
       <div>
-        <p class="font-mono text-[10px] text-muted-foreground">Starters · G-G-F-F-C</p>
+        <p class="font-mono text-[10px] text-muted-foreground">Starters · PG-SG-SF-PF-C</p>
         <ol class="mt-1 space-y-1">
           {#each detail.starters as row (row.playerVersionId)}
             <li class="flex items-center justify-between gap-2 font-mono text-[10px]">
@@ -179,7 +180,7 @@
               <p class="truncate font-mono text-[10px] text-muted-foreground">
                 {row.seasonKey}
                 {#if row.positions.length > 0}
-                  · {row.positions.join('/')}
+                  · {formatPositions(row.positions)}
                 {/if}
               </p>
               {#if eraLabel}

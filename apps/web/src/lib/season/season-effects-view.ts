@@ -1,4 +1,8 @@
-import { pairChemistryBasisPoints, unitChemistryBasisPoints } from '@hoop-rush/engine';
+import {
+  fatigueBandOf,
+  pairChemistryBasisPoints,
+  unitChemistryBasisPoints,
+} from '@hoop-rush/engine';
 import type {
   SeasonEffectsState,
   SeasonMechanismEvidence,
@@ -10,23 +14,14 @@ import type {
  * Fatigue bands and chemistry facts derived from the recorded effects state
  * frozen in the accepted checkpoint. The UI presents projections as
  * projections and shared possessions as evidence, never as a precise future
- * outcome.
+ * outcome. The fatigue-band thresholds live in the engine
+ * (`fatigueBandOf`); the web keeps only the presentation labels.
  */
-
-/** Fatigue band thresholds (basis points). */
-export const FATIGUE_BAND_FRESH_MAX = 1500;
-export const FATIGUE_BAND_READY_MAX = 3500;
-export const FATIGUE_BAND_TIRED_MAX = 6000;
 
 export type FatigueBand = 'fresh' | 'ready' | 'tired' | 'heavy';
 
-/** Fatigue band of a basis-point fatigue value. */
-export function fatigueBand(fatigueBasisPoints: number): FatigueBand {
-  if (fatigueBasisPoints < FATIGUE_BAND_FRESH_MAX) return 'fresh';
-  if (fatigueBasisPoints < FATIGUE_BAND_READY_MAX) return 'ready';
-  if (fatigueBasisPoints < FATIGUE_BAND_TIRED_MAX) return 'tired';
-  return 'heavy';
-}
+/** Fatigue band of a basis-point fatigue value (engine-authoritative). */
+export const fatigueBand = fatigueBandOf;
 
 export const FATIGUE_BAND_LABEL: Record<FatigueBand, string> = {
   fresh: 'Fresh',

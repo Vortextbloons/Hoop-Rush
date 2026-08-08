@@ -2,10 +2,11 @@ import { z } from 'zod';
 import { franchiseIdSchema, seedSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
-import { seasonRotationSchema } from './season-rotation.ts';
+import { seasonMinutePolicyStrategySchema, seasonRotationSchema } from './season-rotation.ts';
 import {
   SEASON_AI_V2,
   SEASON_AI_VERSION,
+  SEASON_MINUTE_POLICY_VERSION,
   SEASON_ROSTER_GENERATION_V2,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_V2,
@@ -99,6 +100,41 @@ export const seasonRosterProjectionSummarySchema = z.object({
   searchDigest: z.string().regex(/^[0-9a-f]{32}$/),
 });
 
+/**
+ * Compact minute-plan summary (projection milestone, optional): the
+ * risk-adjusted minute-policy facts recorded for a generated roster when the
+ * per-team minute-plan optimizer runs (minute-policy-v1). Persisted on the
+ * evaluation so a saved run identifies the strategy, risk score, starter
+ * strain, bench relief, fatigue projection, and horizon that produced the
+ * rotation's target minutes.
+ */
+export const seasonMinutePlanSummarySchema = z.object({
+  policyVersion: z.literal(SEASON_MINUTE_POLICY_VERSION),
+  strategy: seasonMinutePolicyStrategySchema,
+  /** Risk-adjusted score in 0..1 (quality, then strain, then relief). */
+  riskAdjustedScore: z.number().min(0).max(1),
+  /** Minute-weighted projected quality in 0..1 (ratings-derived). */
+  quality: z.number().min(0).max(1),
+  /** Worst-case starter fatigue after the block (basis points). */
+  maxStarterStrainBasisPoints: z.number().min(0).max(10000),
+  /** Band of the worst starter strain. */
+  starterStrainBand: z.enum(['fresh', 'ready', 'tired', 'heavy']),
+  /** Bench relief share in 0..1. */
+  benchRelief: z.number().min(0).max(1),
+  /** Fatigue band counts over the ten rostered players after the block. */
+  fatigueBands: z.object({
+    fresh: z.number().int().nonnegative(),
+    ready: z.number().int().nonnegative(),
+    tired: z.number().int().nonnegative(),
+    heavy: z.number().int().nonnegative(),
+  }),
+  /** The horizon (games) the plan projected over. */
+  horizonGames: z.number().int().positive(),
+  /** True when any rostered player projects to the Heavy band. */
+  heavyStrain: z.boolean(),
+});
+export type SeasonMinutePlanSummary = z.infer<typeof seasonMinutePlanSummarySchema>;
+
 /** Per-roster strength evaluation from possession inputs. */
 export const seasonRosterEvaluationSchema = z.object({
   franchiseId: franchiseIdSchema,
@@ -112,6 +148,8 @@ export const seasonRosterEvaluationSchema = z.object({
   overallReport: z.number().min(0).max(100).nullable(),
   /** Projection milestone (optional): compact shadow-mode projection facts. */
   projectionSummary: seasonRosterProjectionSummarySchema.optional(),
+  /** Projection milestone (optional): compact minute-plan facts. */
+  minutePlanSummary: seasonMinutePlanSummarySchema.optional(),
 });
 export type SeasonRosterEvaluation = z.infer<typeof seasonRosterEvaluationSchema>;
 

@@ -1,21 +1,15 @@
 import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
 import { canPlay, slotRequirement } from '@hoop-rush/engine';
+import { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES } from './player-positions';
 
 /**
- * Draft-slot presentation and displacement rules shared by the sandbox page,
- * the pool browser, and the slot picker so slot labels and eligibility never
- * drift between the three surfaces.
+ * Draft-slot eligibility and displacement rules shared by the sandbox page,
+ * the pool browser, and the slot picker. Slot labels and names live in the
+ * shared player-position presentation module and are re-exported here so the
+ * three surfaces keep one vocabulary.
  */
 
-export const SLOT_LABELS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
-export const SLOT_NAMES = [
-  'Point Guard',
-  'Shooting Guard',
-  'Small Forward',
-  'Power Forward',
-  'Center',
-] as const;
-export const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
+export { SLOT_INDEXES, SLOT_LABELS, SLOT_NAMES };
 
 /** Whether a player's career-wide playable positions fill the slot. */
 export function canFillSlot(player: PlayersIndexEntry, slotIndex: number): boolean {

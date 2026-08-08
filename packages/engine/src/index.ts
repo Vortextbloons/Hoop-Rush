@@ -259,6 +259,25 @@ export {
   type SeasonBlockGameOutcome,
 } from './season/block.ts';
 export { seasonRotationSetDigest } from './season/rotation.ts';
+// Projection milestone minute-policy contract (minute-policy-v1): the
+// risk-adjusted minute-plan optimizer, its facts, and the engine-authoritative
+// fatigue bands consumed by the web app's projection worker and effects view.
+export {
+  buildMinutePlanCandidates,
+  fatigueBandOf,
+  minutePlanHorizonGames,
+  minuteStrategyOfPreset,
+  STRATEGY_TO_PRESET,
+  MINUTE_PLAN_HEAVY_THRESHOLD_BP,
+  FATIGUE_BAND_FRESH_MAX,
+  FATIGUE_BAND_READY_MAX,
+  FATIGUE_BAND_TIRED_MAX,
+  type FatigueBand,
+  type MinutePlanCandidate,
+  type MinutePlanCandidates,
+  type MinutePlanPlayerInput,
+  type MinutePlanStructure,
+} from './season/minute-plan.ts';
 // Season Run (2.0 M2.5) health, influence, objectives, trades, command
 // dispatch, and state digests consumed by the web app, persistence seam, and
 // CLI calibration commands.
@@ -317,6 +336,8 @@ export {
   weaknessPenalty,
   ProjectionCache,
   projectSeasonRoster,
+  projectedQualityWeights,
+  optimizeSeasonRotation,
   traceRotationNormal,
   traceRotationClose,
   rankCandidates,
@@ -330,4 +351,6 @@ export {
   type RosterRotationSearchResult,
   type HumanRosterBuildInput,
   type HumanRosterBuildResult,
+  type MinutePlanOptimizationResult,
+  type OptimizedMinutePlan,
 } from './projection/index.ts';

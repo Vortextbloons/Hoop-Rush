@@ -123,10 +123,10 @@ describe('seasonTeamDetail', () => {
   it('describes starter slots and bench order from the rotation', () => {
     const detail = detailOf(input);
     expect(detail.starters.map((row) => row.role)).toEqual([
-      'Starter G',
-      'Starter G',
-      'Starter F',
-      'Starter F',
+      'Starter PG',
+      'Starter SG',
+      'Starter SF',
+      'Starter PF',
       'Starter C',
     ]);
     expect(detail.bench.map((row) => row.role)).toEqual([
