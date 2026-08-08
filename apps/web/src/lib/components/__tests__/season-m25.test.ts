@@ -357,6 +357,8 @@ function tradePanelProps(
     windowIndex: 0,
     offers,
     manifest: buildManifest(),
+    catalog: null,
+    summaries: [],
     faceOf: () => null,
     ...handlers,
   };
@@ -372,8 +374,6 @@ describe('TradeOffersPanel', () => {
     expect(text).toContain('Boston Celtics');
     expect(text).toContain('Player 1');
     expect(text).toContain('96%');
-    expect(text).toContain('Positions');
-    expect(text).toContain('Chemistry');
     await fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
     await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onAccept).toHaveBeenCalledWith('off-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');

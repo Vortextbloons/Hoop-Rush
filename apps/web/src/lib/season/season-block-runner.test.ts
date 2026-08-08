@@ -194,6 +194,7 @@ function startInput(
 ): SeasonBlockStartInput {
   return {
     run,
+    effects: buildZeroEffects(run),
     rotations: run.rotations,
     blockIndex: 0,
     expectedRevision: 0,
@@ -821,6 +822,56 @@ describe('season block runner (M2.5 wire)', () => {
     expect(continuation.humanFranchiseId).toBe('lakers');
     expect('schedule' in continuation).toBe(false);
     expect('run' in continuation).toBe(false);
+  });
+
+  it('sends authoritative effects and health on a full reset after roster context changes', async () => {
+    const run = makeRun();
+    const repository = makeRepository(run);
+    const runner = createSeasonBlockRunner({
+      repository,
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: Array<{ type: string; requestId?: string }> = [];
+    runner.subscribe((event) => events.push(event));
+    runner.startBlock(startInput(run));
+    await flush();
+    const worker = FakeWorker.instances[0];
+    const requestId = events.find((event) => event.type === 'started')?.requestId ?? 'sb-1';
+    worker?.emit({
+      schemaVersion: 5,
+      type: 'season-block-complete',
+      requestId,
+      result: { status: 'committed', checkpoint: makeCandidate(run) },
+    });
+    await flush();
+
+    const changedRun: SeasonRun = {
+      ...run,
+      rosters: [...run.rosters].reverse(),
+      cursor: { schemaVersion: 1, completedRounds: 10 },
+    };
+    const changedEffects = buildZeroEffects(changedRun);
+    const firstPair = changedEffects.pairStates[0];
+    if (firstPair === undefined) throw new Error('fixture has no chemistry pair');
+    changedEffects.pairStates[0] = { ...firstPair, sharedPossessions: 77 };
+
+    runner.startBlock(
+      startInput(changedRun, {
+        effects: changedEffects,
+        blockIndex: 1,
+        expectedRevision: 1,
+        commandId: 'cmd-2',
+      }),
+    );
+    await flush();
+
+    const reset = seasonWorkerStartRequestSchema.parse(worker?.posted[1]);
+    expect(reset.type).toBe('season-block-start');
+    expect(reset.priorEffects).toEqual(changedEffects);
+    expect(reset.priorHealth).toEqual(changedRun.health);
+    expect(reset.priorSummaries).toBeDefined();
   });
 
   it('rejects a candidate whose expected state facts do not match the run', async () => {

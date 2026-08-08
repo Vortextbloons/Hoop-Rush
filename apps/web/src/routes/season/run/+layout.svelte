@@ -77,6 +77,16 @@
   let rostersRef: unknown = null;
   let faceRunId = '';
 
+  function cloneTradeState(trade: NonNullable<SeasonRunShellData['trade']>) {
+    return {
+      ...trade,
+      windows: trade.windows.map((window) => ({
+        ...window,
+        offers: window.offers.map((offer) => ({ ...offer })),
+      })),
+    };
+  }
+
   function recomputeRunFacts(): void {
     const snapshot = shell.snapshot;
     const run = snapshot?.run ?? null;
@@ -89,7 +99,8 @@
     // M2.5 run-state mirrors for the hub panels.
     shell.health = run?.health ?? null;
     shell.influence = run?.influence ?? null;
-    shell.trade = run?.trade ?? null;
+    shell.trade =
+      run?.trade !== null && run?.trade !== undefined ? cloneTradeState(run.trade) : null;
     shell.objectives = run?.objectives ?? null;
 
     if (run !== null) {

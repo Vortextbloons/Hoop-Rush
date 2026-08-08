@@ -6,6 +6,7 @@ import type {
   SeasonTradeWindowState,
 } from '@hoop-rush/data-contracts';
 import { formatPositions } from '$lib/player-positions';
+import { candidateOf } from '$lib/season/season-catalog-index';
 
 /**
  * M2.5 trade presentation (season-trade-v1). Pure derivation of display
@@ -22,6 +23,12 @@ export interface TradePlayerViewModel {
   playable: readonly string[];
   available: boolean;
   activeInjuryIds: string[];
+  franchiseId: string;
+  eraId: string;
+  seasonKey: string;
+  overallRating: number | null;
+  offenseRating: number | null;
+  defenseRating: number | null;
   /** Current rotation minutes per game (outgoing players only). */
   rotationMinutes: number | null;
   /** Projected minutes after the trade (incoming players only). */
@@ -245,12 +252,19 @@ export function tradeOfferViewModel(
     options: { rotationMinutes?: number | null; projectedMinutes?: number | null },
   ): TradePlayerViewModel => {
     const entry = rosterEntry(playerVersionId);
+    const candidate = candidateOf(catalog, playerVersionId);
     return {
       playerVersionId,
       displayName: entry?.displayName ?? playerVersionId,
       playable: playableOf(playerVersionId),
       available: health.available,
       activeInjuryIds: health.activeInjuryIds,
+      franchiseId: entry?.franchiseId ?? '',
+      eraId: entry?.eraId ?? '',
+      seasonKey: entry?.seasonKey ?? '',
+      overallRating: candidate?.summaryRatings.overallRating ?? null,
+      offenseRating: candidate?.summaryRatings.offenseRating ?? null,
+      defenseRating: candidate?.summaryRatings.defenseRating ?? null,
       rotationMinutes: options.rotationMinutes ?? null,
       projectedMinutes: options.projectedMinutes ?? null,
     };
@@ -305,6 +319,16 @@ export function tradeOfferViewModel(
 /** The first open trade window (the one the human can act on), or null. */
 export function openWindowOf(trade: SeasonTradeState | null): SeasonTradeWindowState | null {
   return trade?.windows.find((window) => window.status === 'open') ?? null;
+}
+
+/** Human-facing offers in the currently open trade window. */
+export function humanTradeOffersOf(
+  trade: SeasonTradeState | null,
+  humanFranchiseId: string | null,
+): SeasonTradeOffer[] {
+  const window = openWindowOf(trade);
+  if (window === null || humanFranchiseId === null) return [];
+  return window.offers.filter((offer) => offer.toFranchiseId === humanFranchiseId);
 }
 
 export interface TradeResolution {

@@ -1416,6 +1416,55 @@ describe('season run M2.5 reload audit (v5)', () => {
     expect(snapshot?.run.rotations).toEqual(locked);
   });
 
+  it('accepts post-lock rotation repairs when a trade window exists', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    for (let blockIndex = 0; blockIndex <= 2; blockIndex += 1) {
+      await repo.commitSeasonBlock(commitInputFor(adapters, blockIndex));
+    }
+
+    const stored = await currentRow(adapters);
+    const rotations = lockedRotationSet(adapters);
+    const trade = {
+      schemaVersion: 1 as const,
+      tradeVersion: stored.run.versions.tradeVersion,
+      windows: [
+        {
+          windowIndex: 0,
+          blockIndex: 2,
+          status: 'open' as const,
+          offers: [],
+        },
+      ],
+    };
+    const stateDigest = adapters.seam.seasonRunStateDigest({
+      stateRevision: stored.stateRevision,
+      checkpointState: stored.checkpointState,
+      health: stored.health,
+      influence: stored.influence,
+      transactions: stored.transactions,
+      trade,
+      objectives: stored.objectives,
+      rosters: stored.run.rosters,
+      ownership: stored.run.ownership,
+      rotations,
+      effects: stored.effects,
+    });
+    await db.seasonRuns.put({
+      ...stored,
+      trade,
+      stateDigest,
+      run: { ...stored.run, rotations },
+    });
+
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot?.run.rotations).toEqual(rotations);
+    expect(snapshot?.acceptedBlocks.at(-1)?.rotationDigest).not.toBe(
+      adapters.seam.seasonRotationSetDigest(rotations),
+    );
+  });
+
   it('rejects a stateRevision regression behind the last accepted block', async () => {
     const adapters = makeAdapters();
     const { db, repo } = adapters;

@@ -4,7 +4,7 @@ import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import { generateSeasonSchedule, seasonObjectiveChoicesForBlock } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { SeasonHubState, type BlockRunState } from './season-hub-state';
-import { clearCachedSeasonSnapshot, setCachedSeasonSnapshot } from './season-state-cache';
+import { clearCachedSeasonSnapshot, getCachedSeasonSnapshot, setCachedSeasonSnapshot } from './season-state-cache';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -206,7 +206,7 @@ describe('SeasonHubState between-block commands', () => {
     clearCachedSeasonSnapshot();
   });
 
-  it('reloads the persisted state after an accepted objective selection (stale snapshot cache regression)', async () => {
+  it('keeps the post-command snapshot in the session cache (stale snapshot cache regression)', async () => {
     // A real engine-valid run: after the accepted command the hub must
     // re-read the persisted run instead of serving the session snapshot
     // cache (keyed by runId + accepted-block count, neither of which
@@ -272,7 +272,8 @@ describe('SeasonHubState between-block commands', () => {
 
     expect(hub.commandError).toBeNull();
     expect(hub.snapshot?.run.objectives.selections[0]?.objectiveId).toBe(offered[0]);
-    expect(repo.loadActiveRun).toHaveBeenCalledTimes(1);
+    expect(getCachedSeasonSnapshot()?.run.objectives.selections[0]?.objectiveId).toBe(offered[0]);
+    expect(repo.loadActiveRun).not.toHaveBeenCalled();
     hub.destroy();
   });
 });

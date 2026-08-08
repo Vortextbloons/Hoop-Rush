@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SeasonRun, SeasonTradeOffer, SeasonTradeState } from '@hoop-rush/data-contracts';
 import {
+  humanTradeOffersOf,
   openWindowOf,
   tradeOfferViewModel,
   tradeResolvedAt,
@@ -170,6 +171,34 @@ describe('tradeOfferViewModel', () => {
     expect(vm.tradeSizeLabel).toBe('2-for-2');
     expect(vm.valueInsight.tone).toBe('caution');
     expect(vm.valueInsight.body).toContain('unusual');
+  });
+});
+
+describe('humanTradeOffersOf', () => {
+  it('returns only human-targeted offers in the open window', () => {
+    const trade: SeasonTradeState = {
+      schemaVersion: 1,
+      tradeVersion: 'season-trade-v1',
+      windows: [
+        {
+          windowIndex: 0,
+          blockIndex: 2,
+          status: 'open',
+          offers: [
+            offer({ offerId: 'off-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }),
+            offer({
+              offerId: 'off-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+              toFranchiseId: 'celtics',
+              fromFranchiseId: 'lakers',
+              status: 'accepted',
+            }),
+          ],
+        },
+      ],
+    };
+    const human = humanTradeOffersOf(trade, 'lakers');
+    expect(human).toHaveLength(1);
+    expect(human[0]?.offerId).toBe('off-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
   });
 });
 

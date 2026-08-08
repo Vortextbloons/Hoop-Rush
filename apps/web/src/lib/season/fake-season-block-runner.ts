@@ -256,6 +256,12 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         if (run === undefined) throw new Error('no active run to resume');
         const startInput: SeasonBlockStartInput = {
           run,
+          effects: snapshot?.effects ??
+            this.lastStartInput?.effects ?? {
+              schemaVersion: 1,
+              playerStates: [],
+              pairStates: [],
+            },
           rotations: input.rotations,
           blockIndex: input.blockIndex,
           expectedRevision: input.expectedRevision,

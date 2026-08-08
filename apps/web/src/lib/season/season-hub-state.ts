@@ -580,13 +580,13 @@ export class SeasonHubState {
       if (this.snapshot !== null) {
         const effects = postCommandEffects(output.run, this.snapshot.effects);
         this.snapshot = { ...this.snapshot, run: output.run, effects };
+        // Between-block commands mutate the run without changing the
+        // accepted-block count. Replace the session cache with the
+        // post-command snapshot so refresh() cannot resurrect the
+        // pre-command trade/roster state keyed to the same revision.
+        setCachedSeasonSnapshot(this.snapshot);
         this.emit();
       }
-      // Between-block commands mutate the run without changing the
-      // accepted-block count, so the session snapshot cache (keyed by runId
-      // + revision) would serve the stale pre-command state on refresh.
-      // Clear it so the full validated load picks up the persisted state.
-      clearCachedSeasonSnapshot();
       await this.refresh();
     } catch (error) {
       this.commandError = {

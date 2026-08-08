@@ -533,6 +533,18 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   if (auditFailures.length > 0) {
     throw new EngineInvariantFailure(auditFailures.join('; '));
   }
+  // Keep the persistent worker's summary accumulator aligned with the
+  // finalized checkpoint. `summaries` is block-scoped, while the accumulator
+  // contains prior accepted blocks (and may already contain partial games
+  // from an interrupted attempt). Replace this block's slice so the next
+  // continuation folds standings and aggregates from every accepted game
+  // exactly once.
+  accumulatedSummaries = [
+    ...accumulatedSummaries.filter(
+      (summary) => blockIndexForRound(summary.round) !== request.blockIndex,
+    ),
+    ...summaries,
+  ];
   post({
     schemaVersion: 5,
     type: 'season-block-complete',

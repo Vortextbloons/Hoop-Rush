@@ -143,6 +143,7 @@ export async function buildSubmitBlockEnvelope(
 
   const start: SeasonBlockStartInput = {
     run,
+    effects: snapshot.effects,
     rotations,
     blockIndex,
     expectedRevision: blockIndex,

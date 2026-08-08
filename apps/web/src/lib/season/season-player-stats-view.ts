@@ -143,3 +143,36 @@ export function humanSeasonPlayerStats(input: {
 
   return { franchiseId: roster.franchiseId, rows, hasStats: summaries.length > 0 };
 }
+
+/** Folded season stats for one rostered player (null when they have not played). */
+export function playerSeasonStatsRow(input: {
+  playerVersionId: string;
+  displayName: string;
+  seasonKey: string;
+  eraId: string;
+  franchiseId: string;
+  summaries: readonly SeasonGameSummary[];
+  overallRatingOf: (playerVersionId: string) => number | null;
+  playablePositions: (playerVersionId: string) => readonly string[];
+}): SeasonPlayerStatsRow | null {
+  const view = humanSeasonPlayerStats({
+    roster: {
+      franchiseId: input.franchiseId,
+      players: [
+        {
+          playerVersionId: input.playerVersionId,
+          playerId: 'p-trade-detail',
+          franchiseId: input.franchiseId,
+          eraId: input.eraId,
+          seasonKey: input.seasonKey,
+          displayName: input.displayName,
+        },
+      ],
+    },
+    summaries: input.summaries,
+    overallRatingOf: input.overallRatingOf,
+    playablePositions: input.playablePositions,
+  });
+  const row = view.rows[0];
+  return row !== undefined && row.gamesPlayed > 0 ? row : null;
+}

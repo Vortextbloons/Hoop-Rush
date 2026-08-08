@@ -35,7 +35,7 @@
     objectiveChoicesViewModel,
     type InfluenceSpendAffordance,
   } from '$lib/season/season-influence-view';
-  import { openWindowOf, tradeOfferViewModel } from '$lib/season/season-trade-view';
+  import { openWindowOf, tradeOfferViewModel, humanTradeOffersOf } from '$lib/season/season-trade-view';
   import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
 
   /**
@@ -71,16 +71,23 @@
   const blockPaused = $derived(pending !== null || interruption !== null);
 
   // M2.5 Influence + objective + trade panel facts.
-  const openWindow = $derived(shell.trade !== null ? openWindowOf(shell.trade) : null);
+  const openWindow = $derived(
+    run?.trade !== null && run?.trade !== undefined ? openWindowOf(run.trade) : null,
+  );
   const influenceVm = $derived(
     shell.influence !== null && humanFranchiseId !== null
       ? influenceViewModel(shell.influence, humanFranchiseId, shell.health, openWindow)
       : null,
   );
   const tradeOffers = $derived.by(() => {
-    if (openWindow === null || run === null) return [];
-    return openWindow.offers.map((offer) =>
-      tradeOfferViewModel(offer, run, shell.catalog, shell.franchiseName),
+    const currentRun = shell.run;
+    const franchiseId = shell.humanFranchiseId;
+    if (currentRun === null || franchiseId === null) return [];
+    // stateRevision bumps on every between-block command (trades included).
+    void currentRun.stateRevision;
+    const offers = humanTradeOffersOf(currentRun.trade, franchiseId);
+    return offers.map((offer) =>
+      tradeOfferViewModel(offer, currentRun, shell.catalog, shell.franchiseName),
     );
   });
   const objectiveVm = $derived(run !== null ? objectiveChoicesViewModel(run) : null);
@@ -581,7 +588,16 @@
         windowIndex={openWindow.windowIndex}
         offers={tradeOffers}
         manifest={shell.manifest}
+        catalog={shell.catalog}
+        summaries={snapshot?.summaries ?? []}
         faceOf={(playerVersionId) => shell.facesByVersion.get(playerVersionId) ?? null}
+        commandError={
+          commandError !== null &&
+          (commandError.command === 'accept-trade-offer' ||
+            commandError.command === 'decline-trade-offer')
+            ? commandError.message
+            : null
+        }
         busy={block.phase === 'running'}
         onAccept={(offerId) =>
           shell.acceptTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}

@@ -29,10 +29,11 @@
   let attempt = $state(0);
   let imgEl = $state<HTMLImageElement | null>(null);
 
-  let lastPlayerId = '';
+  const candidateKey = $derived(`${player.playerId}\0${urls.join('\0')}`);
+  let lastCandidateKey = '';
   $effect(() => {
-    if (player.playerId !== lastPlayerId) {
-      lastPlayerId = player.playerId;
+    if (candidateKey !== lastCandidateKey) {
+      lastCandidateKey = candidateKey;
       attempt = 0;
     }
   });
@@ -49,7 +50,11 @@
    */
   $effect(() => {
     const current = src;
-    if (!current || !applyStallTimeout) return;
+    // A lazy image may intentionally remain unrequested while offscreen.
+    // Starting the stall clock here would exhaust valid candidates before
+    // the browser ever tries them. Lazy requests still advance on `error`;
+    // reserve the timeout recovery for eager, immediately requested faces.
+    if (!eager || !current || !applyStallTimeout) return;
     const timer = setTimeout(() => {
       if (imgEl && !imgEl.complete && imgEl.naturalWidth === 0) {
         onError();

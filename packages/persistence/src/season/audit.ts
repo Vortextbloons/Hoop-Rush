@@ -322,9 +322,13 @@ export function auditSeasonRunState(
     if (stored.lastCheckpointDigest !== last.checkpointDigest) {
       failures.push('checkpoint lastCheckpointDigest does not match the last accepted block');
     }
-    // The snapshot's locked rotations must match the last lock digest.
+    // Without a trade window, the snapshot's rotations are exactly the last
+    // submitted lock. Once a window exists, AI activity or an accepted human
+    // trade can legitimately repair rotations after that lock; the accepted
+    // block retains the historical lock digest while the run stores the
+    // authoritative post-trade rotations (covered by stateDigest below).
     const lockedDigest = seam.seasonRotationSetDigest(stored.run.rotations);
-    if (lockedDigest !== last.rotationDigest) {
+    if (stored.trade === null && lockedDigest !== last.rotationDigest) {
       failures.push(
         `stored rotations digest ${lockedDigest} does not match the last accepted lock ${last.rotationDigest}`,
       );

@@ -99,6 +99,8 @@ export type SeasonRunnerEvent =
 export interface SeasonBlockStartInput {
   /** Validated run snapshot (league, rosters, schedule reference, seeds). */
   run: SeasonRun;
+  /** Authoritative effects state, including chemistry changes from trades. */
+  effects: SeasonEffectsState;
   /** The 30 rotations locked for this block (pending, not yet committed). */
   rotations: SeasonRotation[];
   blockIndex: number;
@@ -640,15 +642,15 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       // the pre-block state for interrupted work, which would be stale).
       ...(state.resumePending !== null
         ? { priorEffects: state.resumePending.effects }
-        : priorSummaries !== undefined && runState !== null && runState.effects !== null
-          ? { priorEffects: runState.effects }
+        : priorSummaries !== undefined
+          ? { priorEffects: state.input.effects }
           : {}),
       // M2.5: the health state follows the same convention; a resume ships
       // the pending candidate's mid-block health as the reset.
       ...(state.resumePending !== null
         ? { priorHealth: state.resumePending.health }
-        : priorSummaries !== undefined && runState !== null && runState.health !== null
-          ? { priorHealth: runState.health }
+        : priorSummaries !== undefined
+          ? { priorHealth: state.input.run.health }
           : {}),
       // M2.5: resume mid-block from the pending candidate's next game.
       startGameId: state.resumePending?.nextGameId ?? null,
@@ -871,6 +873,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           // the run context comes from the reloaded snapshot.
           const startInput: SeasonBlockStartInput = {
             run: snapshot.run,
+            effects: snapshot.effects,
             rotations: input.rotations,
             blockIndex: input.blockIndex,
             expectedRevision: input.expectedRevision,
