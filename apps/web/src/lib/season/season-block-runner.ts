@@ -221,6 +221,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
   /** The compact summaries the live worker already holds (per run). */
   let workerSummaryRunId: string | null = null;
   let workerSummaryCount = 0;
+  /** Roster context cached by the live worker; a trade requires a full reset. */
+  let workerRosterKey: string | null = null;
 
   const repositoryPromise = deps.repository !== undefined ? Promise.resolve(deps.repository) : null;
   const schedulePromise = deps.schedule !== undefined ? Promise.resolve(deps.schedule) : null;
@@ -496,6 +498,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       runState.stateDigest = committed.stateDigest;
       workerSummaryRunId = checkpoint.runId;
       workerSummaryCount = runState.summaries.length;
+      workerRosterKey = JSON.stringify(state.input.run.rosters);
       emit({ type: 'complete', requestId, checkpoint });
     } catch (error) {
       emit({
@@ -587,6 +590,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     artifacts: SeasonArtifactUrls,
   ): SeasonWorkerStartRequest | SeasonWorkerContinueRequest {
     const summaries = runState?.runId === state.input.run.runId ? runState.summaries : [];
+    const rosterKey = JSON.stringify(state.input.run.rosters);
+    const workerContextMatches =
+      workerSummaryRunId === state.input.run.runId && workerRosterKey === rosterKey;
     // Exactly one of priorSummaries/newSummaries is sent (the frozen wire
     // refine); the arrays may be empty (block 0) â€” only undefined is omitted.
     let priorSummaries: SeasonGameSummary[] | undefined;
@@ -598,15 +604,12 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       // prior set â€” the worker re-seeds its block list from the
       // accumulator, so both paths assemble the full block.
       const partial = state.resumePending.summaries;
-      if (workerSummaryRunId === state.input.run.runId && workerSummaryCount <= summaries.length) {
+      if (workerContextMatches && workerSummaryCount <= summaries.length) {
         newSummaries = partial;
       } else {
         priorSummaries = [...summaries, ...partial];
       }
-    } else if (
-      workerSummaryRunId === state.input.run.runId &&
-      workerSummaryCount <= summaries.length
-    ) {
+    } else if (workerContextMatches && workerSummaryCount <= summaries.length) {
       const delta = summaries.slice(workerSummaryCount);
       if (delta.length <= 150) {
         newSummaries = delta;
@@ -934,6 +937,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       // runId) so resumed blocks still avoid a repository load.
       workerSummaryRunId = null;
       workerSummaryCount = 0;
+      workerRosterKey = null;
     },
 
     subscribe(listener: (event: SeasonRunnerEvent) => void): () => void {

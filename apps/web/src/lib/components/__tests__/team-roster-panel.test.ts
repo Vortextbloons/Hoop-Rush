@@ -6,6 +6,7 @@ import { buildManifest, buildSeasonLeague, buildSeasonRosters } from '@hoop-rush
 import type { HoopRushManifest, SeasonRoster } from '@hoop-rush/data-contracts';
 import TeamRosterPanel from '$lib/components/season/TeamRosterPanel.svelte';
 import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
+import { initialSeasonRunShellData } from '$lib/season/season-shell-context';
 import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
@@ -19,29 +20,11 @@ const ROSTER: SeasonRoster = buildSeasonRosters(
 
 function minimalShell(): SeasonRunShellData {
   return {
+    ...initialSeasonRunShellData(),
     ready: true,
-    error: null,
-    hub: null,
-    snapshot: null,
-    index: null,
-    block: { phase: 'idle' } as never,
     manifest: MANIFEST,
-    league: null,
-    catalog: null,
-    schedule: null,
-    facesByVersion: new Map(),
-    run: null,
     humanFranchiseId: 'lakers',
-    humanTeam: null,
     nextBlockIndex: 0,
-    seasonComplete: false,
-    editor: null,
-    editorKey: null,
-    health: null,
-    influence: null,
-    trade: null,
-    objectives: null,
-    playablePositions: () => [],
   };
 }
 

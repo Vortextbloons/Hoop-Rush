@@ -131,10 +131,23 @@ const contextByRunId = new Map<string, WorkerRunContext>();
 function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStartRequest | null {
   const context = contextByRunId.get(request.runId);
   if (context === undefined) return null;
+  const { fromRound } = blockRoundRange(request.blockIndex);
   return {
     ...request,
     type: 'season-block-start',
-    run: context.run,
+    // The cached context comes from the first block handled by this
+    // persistent worker. Cursor and rotations are block-boundary state, not
+    // run-static state: reconstruct them from the continuation or the engine
+    // will reject every later block as a stale cursor (and would simulate an
+    // old rotation even when the user edited it between blocks).
+    run: {
+      ...context.run,
+      rotations: request.rotations,
+      cursor: {
+        ...context.run.cursor,
+        completedRounds: fromRound - 1,
+      },
+    },
     schedule: context.schedule,
     homeCourt: context.homeCourt,
     humanFranchiseId: context.humanFranchiseId,
