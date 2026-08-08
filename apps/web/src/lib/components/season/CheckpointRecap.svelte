@@ -343,7 +343,6 @@
               {game.humanIsHome ? 'vs' : 'at'}
               {franchiseName(game.opponentFranchiseId)}
             </span>
-            <span class="shrink-0 font-mono text-[10px] text-muted-foreground">{game.gameId}</span>
           </li>
         {/each}
       </ol>
@@ -362,12 +361,10 @@
         Stamina and chemistry
       </h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        Recorded effects from your {effectsEvidence.length === 1 ? 'game' : 'games'} this block — every
-        figure comes from the saved mechanism evidence, not a simulation estimate.
+        How your {effectsEvidence.length === 1 ? 'game' : 'games'} this block went for stamina and chemistry.
       </p>
       <ul class="mt-3 flex flex-col gap-2">
         {#each effectsEvidence as row (row.mechanism + row.side)}
-          {@const avgPct = Math.round(row.avgInputFraction * 100)}
           <li class="flex flex-col gap-0.5 rounded-lg bg-surface-2 p-3">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <p class="text-sm font-semibold">{MECHANISM_LABEL[row.mechanism]}</p>
@@ -376,17 +373,14 @@
               </p>
             </div>
             <p class="font-mono text-[10px] text-muted-foreground">
-              Average state {avgPct}% ·
               {#if row.mechanism === 'assist-conversion' || row.mechanism === 'turnover-security' || row.mechanism === 'help-defense'}
-                unit chemistry
+                Unit chemistry
               {:else}
-                fatigue
+                Fatigue
               {/if}
-              · aggregate probability movement
+              · swing
               {deltaToPp(row.deltaTotals) >= 0 ? '+' : ''}
-              {deltaToPp(row.deltaTotals).toFixed(2)}pp (per-opportunity {deltaToPp(
-                row.deltaMin,
-              ).toFixed(2)} to {deltaToPp(row.deltaMax).toFixed(2)}pp)
+              {deltaToPp(row.deltaTotals).toFixed(2)}pp
             </p>
           </li>
         {/each}

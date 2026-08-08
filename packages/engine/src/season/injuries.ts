@@ -8,6 +8,12 @@ import {
   type SeasonInjurySeverity,
   type SeasonInjuryType,
 } from '@hoop-rush/data-contracts';
+import {
+  HALFTIME_SECOND,
+  REGULATION_PERIOD_SECONDS,
+  REGULATION_TOTAL_SECONDS,
+} from '../sim/periods.ts';
+import { drawHexInt } from './season-seeds.ts';
 
 /**
  * M2.5 seeded injury generation (season-health-v1, engine side). The frozen
@@ -76,10 +82,6 @@ const INJURY_TYPES: readonly SeasonInjuryType[] = [
   'illness',
 ];
 
-/** Regulation clock span (seconds) and the halftime boundary. */
-const REGULATION_SECONDS = 2880;
-const HALFTIME_SECOND = 1440;
-
 /** Named injury-namespace seed for one event stream. */
 function injurySeed(rootSeed: string, ...keys: string[]): string {
   return seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.injuries, ...keys);
@@ -87,7 +89,7 @@ function injurySeed(rootSeed: string, ...keys: string[]): string {
 
 /** Deterministic 32-bit draw from a 32-hex seed. */
 function u32Of(seed: string): number {
-  return Number.parseInt(seed.slice(0, 8), 16) >>> 0;
+  return drawHexInt(seed) >>> 0;
 }
 
 /** Deterministic percentage roll against a basis-point threshold (0..10,000). */
@@ -101,13 +103,16 @@ function uniformInt(seed: string, min: number, max: number): number {
 }
 
 /** Maps seconds-from-tipoff to the game clock (period, seconds remaining). */
-function clockFromTipoffSeconds(secondsFromTipoff: number): {
+export function clockFromTipoffSeconds(secondsFromTipoff: number): {
   period: number;
   seconds: number;
 } {
-  const clamped = Math.max(0, Math.min(REGULATION_SECONDS, secondsFromTipoff));
-  const period = Math.floor(clamped / 720) + 1;
-  const seconds = 720 - (clamped % 720);
+  const clamped = Math.max(0, Math.min(REGULATION_TOTAL_SECONDS, secondsFromTipoff));
+  if (clamped >= REGULATION_TOTAL_SECONDS) {
+    return { period: 4, seconds: 0 };
+  }
+  const period = Math.floor(clamped / REGULATION_PERIOD_SECONDS) + 1;
+  const seconds = REGULATION_PERIOD_SECONDS - (clamped % REGULATION_PERIOD_SECONDS);
   return { period, seconds };
 }
 
@@ -214,7 +219,7 @@ export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonI
   const exposureSeconds = uniformInt(
     clockSeed,
     0,
-    Math.min(Math.max(0, input.targetMinutes) * 60, REGULATION_SECONDS),
+    Math.min(Math.max(0, input.targetMinutes) * 60, REGULATION_TOTAL_SECONDS),
   );
   const removalClock = clockFromTipoffSeconds(exposureSeconds);
   const occurredBeforeHalftime = exposureSeconds < HALFTIME_SECOND;
@@ -236,7 +241,7 @@ export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonI
   let missedGamesTotal = 0;
   if (sameGameReturn) {
     returnClock = clockFromTipoffSeconds(
-      uniformInt(returnSeed, HALFTIME_SECOND, REGULATION_SECONDS),
+      uniformInt(returnSeed, HALFTIME_SECOND, REGULATION_TOTAL_SECONDS),
     );
   } else if (severity === 'season-ending') {
     missedGamesTotal = SEASON_ENDING_MISSED_GAMES_SENTINEL;

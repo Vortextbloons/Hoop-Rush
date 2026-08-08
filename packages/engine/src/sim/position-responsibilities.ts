@@ -1,4 +1,5 @@
 import { LINEUP_STRUCTURE, type SlotGroup } from '@hoop-rush/data-contracts';
+import { clamp } from '../domain/math.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 
 /**
@@ -47,14 +48,14 @@ export function boundResponsibilityModifiers(
   modifiers: PositionResponsibilityModifiers,
   bound: number,
 ): PositionResponsibilityModifiers {
-  const clamp = (value: number) => Math.min(1 + bound, Math.max(1 - bound, value));
+  const clamped = (value: number): number => clamp(value, 1 - bound, 1 + bound);
   return {
-    initiation: clamp(modifiers.initiation),
-    pnrHandler: clamp(modifiers.pnrHandler),
-    rollMan: clamp(modifiers.rollMan),
-    postUp: clamp(modifiers.postUp),
-    rebounding: clamp(modifiers.rebounding),
-    rimProtection: clamp(modifiers.rimProtection),
+    initiation: clamped(modifiers.initiation),
+    pnrHandler: clamped(modifiers.pnrHandler),
+    rollMan: clamped(modifiers.rollMan),
+    postUp: clamped(modifiers.postUp),
+    rebounding: clamped(modifiers.rebounding),
+    rimProtection: clamped(modifiers.rimProtection),
   };
 }
 

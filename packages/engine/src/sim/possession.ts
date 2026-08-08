@@ -17,6 +17,7 @@ import {
   isThreePointZone,
   zoneSkillRating,
   type ActionType,
+  type PossessionStartType,
 } from './usage.ts';
 import { eraPossEstimatePerTrip, isSteal, pickStealer, turnoverProbability } from './security.ts';
 import { blockProbability, makeProbability, type ShotPrep } from './shooting.ts';
@@ -106,6 +107,8 @@ export interface TripContext {
   meanTripSeconds: number;
   eraPossEstimatePerTrip: number;
   passingAnchorFactor: number;
+  /** How the current offense obtained the ball; updated at every trip end. */
+  possessionStart: PossessionStartType;
   /**
    * M2.3 home-court mechanisms (season-home-court-v1). Absent for Classic
    * and neutral Season games: both adjustments are zero and every draw and
@@ -144,6 +147,7 @@ export function createTripContext(
     meanTripSeconds: meanTripSeconds(profile),
     eraPossEstimatePerTrip: eraPossEstimatePerTrip(profile) ?? 1,
     passingAnchorFactor: 0.5 + (profile.parameters.assistAnchorRating - 50) / 100,
+    possessionStart: 'neutral',
     ...(homeCourt !== undefined ? { homeCourt } : {}),
     ...(effects !== undefined ? { effects } : {}),
   };
@@ -284,6 +288,7 @@ export class PossessionStepper {
         const stealerSlot = defensePrep.slotByPlayerId.get(enginePlayerKey(stealer)) ?? -1;
         recorder.steal(defense, stealerSlot >= 0 ? stealerSlot : 0);
       }
+      this.ctx.possessionStart = 'liveTurnover';
       recorder.possession(offense);
       // A live turnover changes possession without a stoppage: no pause.
       return this.endedStep(false);
@@ -305,6 +310,18 @@ export class PossessionStepper {
       this.phase = 'shot';
       return { ended: false, pause: false, periodEnded: false, finished: false };
     }
+    if (rng.chance(ENGINE_CONSTANTS.offensiveFoulShare)) {
+      const offenseTeam = teams[offense];
+      const offensePrep = preps[offense];
+      const fouler = pickFouler(offenseTeam.players, offensePrep.foulerWeights, rng);
+      const foulerSlot = offensePrep.slotByPlayerId.get(enginePlayerKey(fouler)) ?? -1;
+      recorder.foul(offense, foulerSlot >= 0 ? foulerSlot : 0);
+      recorder.turnover(offense, foulerSlot >= 0 ? foulerSlot : 0);
+      state.periodFouls[offense] += 1;
+      recorder.possession(offense);
+      this.ctx.possessionStart = 'deadBall';
+      return this.endedStep(true);
+    }
     const defenseTeam = teams[defense];
     const defensePrep = preps[defense];
     const fouler = pickFouler(defenseTeam.players, defensePrep.foulerWeights, rng);
@@ -325,6 +342,7 @@ export class PossessionStepper {
         this.deadBall,
         this.tripRebounds,
       );
+      this.ctx.possessionStart = 'deadBall';
       recorder.possession(offense);
       // Completed free-throw sequence: legal dead-ball pause.
       return this.endedStep(true);
@@ -625,7 +643,7 @@ function reboundFromMissedFreeThrow(
 
 /**
  * Resolves free throws after a foul. The trip always ends after free throws;
- * each attempt consumes free-throw seconds from the clock.
+ * attempts are dead-ball events and therefore consume no game-clock time.
  */
 function resolveFreeThrows(
   ctx: TripContext,
@@ -647,10 +665,8 @@ function resolveFreeThrows(
       ctx.preps[offenseSide].freeThrowP[shooterSlot] ?? freeThrowProbability(shooter, ctx.profile);
     const made = rng.chance(p);
     recorder.freeThrow(offenseSide, shooterSlot, made);
-    consumeTime(ctx.state, 1);
     if (last && !made) {
       reboundFromMissedFreeThrow(ctx, offenseSide, defenseSide, deadBall, reboundCounter);
-      consumeTime(ctx.state, 2);
     } else if (!made) {
       // A missed non-final free throw is a declared dead-ball miss: the
       // defensive team takes the rebound before the next attempt.
@@ -696,7 +712,7 @@ function resolveShot(
   if (actionWeights === undefined) {
     throw new Error(`possession: no action weights for ${initiator.playerId}`);
   }
-  const action = pickAction(initiator, actionWeights, rng);
+  const action = pickAction(initiator, actionWeights, rng, ctx.possessionStart);
   const teammateShots = teamPrep.teammateShots.get(enginePlayerKey(initiator));
   if (teammateShots === undefined) {
     throw new Error(`possession: no teammate shot table for ${initiator.playerId}`);
@@ -740,6 +756,9 @@ function resolveShot(
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
   if (rng.chance(foulP)) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
+    // Every defensive foul counts toward the period team-foul limit. The
+    // former path counted only non-shooting fouls, delaying the bonus.
+    state.periodFouls[defenseSide] += 1;
     // M2.3 home defensive-communication mechanism: away shots against the
     // home defense convert at a small bounded lower rate (zero under the
     // neutral profile).
@@ -779,6 +798,7 @@ function resolveShot(
       );
     }
     // Free-throw trips always change possession at a dead-ball pause.
+    ctx.possessionStart = 'deadBall';
     return {
       continues: false,
       liveReboundEnd: false,
@@ -823,6 +843,7 @@ function resolveShot(
   if (made) {
     creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
     // A made basket is a dead-ball pause.
+    ctx.possessionStart = 'madeBasket';
     return {
       continues: false,
       liveReboundEnd: false,
@@ -866,6 +887,7 @@ function reboundAfterMiss(
   if (result.team) {
     // Dead-ball team rebound: legal pause, possession changes.
     recorder.teamRebound(defenseSide);
+    ctx.possessionStart = 'deadBall';
     return {
       continues: false,
       liveReboundEnd: false,
@@ -878,6 +900,7 @@ function reboundAfterMiss(
     const rebounder = pickRebounder(ctx.teams[offenseSide].players, prep.rebounderWeights[0], rng);
     const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
     recorder.offensiveRebound(offenseSide, slot >= 0 ? slot : 0);
+    ctx.possessionStart = 'offensiveRebound';
     return {
       continues: true,
       liveReboundEnd: false,
@@ -889,6 +912,7 @@ function reboundAfterMiss(
   const rebounder = pickRebounder(ctx.teams[defenseSide].players, prep.rebounderWeights[1], rng);
   const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
   recorder.defensiveRebound(defenseSide, slot >= 0 ? slot : 0);
+  ctx.possessionStart = 'defensiveRebound';
   // A live defensive player rebound changes possession without a stoppage.
   return {
     continues: false,

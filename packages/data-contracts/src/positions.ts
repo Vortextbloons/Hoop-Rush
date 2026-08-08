@@ -13,6 +13,9 @@ export type Position = z.infer<typeof positionSchema>;
 
 export const POSITIONS: readonly Position[] = ['PG', 'SG', 'SF', 'PF', 'C'];
 
+/** The canonical five position slots in lineup order. */
+export const POSITION_SLOTS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
+
 /** A player's playable positions: the sorted, deduplicated career-wide union of detailed positions. */
 export const positionUnionSchema = z
   .array(positionSchema)

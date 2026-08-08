@@ -1,4 +1,5 @@
 import type { Seed } from '@hoop-rush/data-contracts';
+import { randomHex } from '$lib/random-hex';
 
 /**
  * Season Run identity and seed generation at the UI boundary (spec/2.0/07).
@@ -17,15 +18,4 @@ export function newSeasonId(prefix: string): string {
 /** Fresh 32-hex Season Run root seed. */
 export function seasonRootSeed(): Seed {
   return randomHex(32);
-}
-
-/** 2*n hex chars from the platform CSPRNG, with a deterministic fallback. */
-function randomHex(bytes: number): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const buffer = new Uint8Array(bytes);
-    crypto.getRandomValues(buffer);
-    return [...buffer].map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  // SSR fallback; gameplay seeds are generated in client-side effects only.
-  return '0'.repeat(bytes * 2);
 }

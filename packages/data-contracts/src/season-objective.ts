@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { commandIdSchema } from './ids.ts';
 import { SEASON_OBJECTIVE_VERSION } from './season-versions.ts';
 
 /**
@@ -115,11 +116,7 @@ export type SeasonObjectiveEvaluation = z.infer<typeof seasonObjectiveEvaluation
  */
 export const seasonObjectiveSelectionSchema = z.object({
   objectiveId: seasonObjectiveIdSchema,
-  selectedByCommandId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
+  selectedByCommandId: commandIdSchema,
   success: z.boolean().nullable(),
 });
 export type SeasonObjectiveSelection = z.infer<typeof seasonObjectiveSelectionSchema>;

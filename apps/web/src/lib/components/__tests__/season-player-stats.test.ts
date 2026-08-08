@@ -15,8 +15,7 @@ mockSvelteKitApp();
 /**
  * Season Player stats section tests: the empty state before the first block,
  * the sortable full table defaulting to PPG desc, and the Per game/Totals
- * measurement toggle — jsdom renders both responsive variants, so the full
- * tables are always present.
+ * measurement toggle — jsdom renders the sortable stats table.
  */
 
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
@@ -178,14 +177,22 @@ function renderStats(summaries: SeasonGameSummary[]) {
 function firstRowName(container: HTMLElement, tableIndex: number): string | null {
   const row = container.querySelectorAll('table')[tableIndex]?.querySelector('tbody tr th');
   if (row === null || row === undefined) return null;
-  return row.textContent;
+  const name = row.querySelector('span.font-semibold');
+  return name?.textContent?.trim() ?? null;
 }
 describe('SeasonPlayerStats', () => {
   it('renders the empty state before any block is accepted', () => {
     const { getByText, queryByRole, container } = renderStats([]);
+    expect(getByText('No season stats yet')).toBeTruthy();
     expect(getByText('Accept a block to fold per-player season stats.')).toBeTruthy();
     expect(queryByRole('button', { name: 'Sort by PPG' })).toBeNull();
     expect(container.querySelectorAll('table')).toHaveLength(0);
+  });
+
+  it('renders a mobile card list without relying on horizontal scroll', () => {
+    const { container } = renderStats([playedGame()]);
+    expect(container.querySelector('[data-season-player-stats-mobile]')).toBeTruthy();
+    expect(container.querySelector('[data-season-player-stats-mobile] select')).toBeTruthy();
   });
 
   it('defaults to per-game rates sorted by PPG descending', () => {
@@ -194,7 +201,7 @@ describe('SeasonPlayerStats', () => {
     expect(tables.length).toBeGreaterThan(0);
     const topScorer = rosterOf('lakers').players[0]?.displayName;
     expect(firstRowName(container, 0)).toBe(topScorer);
-    expect(container.querySelectorAll('button[aria-label="Sort by PPG"]').length).toBe(2);
+    expect(container.querySelectorAll('button[aria-label="Sort by PPG"]').length).toBe(1);
   });
 
   it('sorts by another column when its header is clicked', async () => {
@@ -214,7 +221,7 @@ describe('SeasonPlayerStats', () => {
     if (totalsButton !== undefined) {
       await fireEvent.click(totalsButton);
     }
-    expect(getAllByRole('button', { name: 'Sort by PTS' })).toHaveLength(2);
+    expect(getAllByRole('button', { name: 'Sort by PTS' })).toHaveLength(1);
     expect(queryAllByRole('button', { name: 'Sort by PPG' })).toHaveLength(0);
     const topScorer = rosterOf('lakers').players[0]?.displayName;
     expect(firstRowName(container, 0)).toBe(topScorer);

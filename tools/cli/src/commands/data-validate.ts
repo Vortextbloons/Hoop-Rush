@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { validateBracketContent, scheduleInvariants } from '@hoop-rush/engine';
@@ -19,6 +18,7 @@ import {
   type HoopRushManifest,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { sha256Hex } from '../io.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
 
 /**
@@ -219,7 +219,7 @@ async function auditPools(
         continue;
       }
       const content = await readFile(assetPath);
-      const actualHash = createHash('sha256').update(content).digest('hex');
+      const actualHash = sha256Hex(content);
       if (actualHash !== pool.contentHash) {
         failures.push(`pools: ${key} content hash mismatch (${assetPath})`);
       } else if (verbose) {
@@ -474,7 +474,7 @@ async function auditEraSimulationProfiles(
         continue;
       }
       const content = await readFile(assetPath);
-      const actualHash = createHash('sha256').update(content).digest('hex');
+      const actualHash = sha256Hex(content);
       if (actualHash !== entry.contentHash) {
         failures.push(`era-sim: ${entry.eraId} content hash mismatch (${assetPath})`);
       } else if (verbose) {
@@ -524,7 +524,7 @@ async function auditBracket(
       return { ok: false, details, failures };
     }
     const content = await readFile(assetPath);
-    const actualHash = createHash('sha256').update(content).digest('hex');
+    const actualHash = sha256Hex(content);
     if (actualHash !== entry.contentHash) {
       failures.push(`bracket: content hash mismatch (${assetPath})`);
     } else if (verbose) {
@@ -624,7 +624,7 @@ async function auditGlobalAssets(
       failures.push(`${label}: asset missing (${assetPath})`);
       return null;
     }
-    const actualHash = createHash('sha256').update(content).digest('hex');
+    const actualHash = sha256Hex(content);
     if (actualHash !== entry.contentHash) {
       failures.push(`${label}: content hash mismatch (${assetPath})`);
       return null;

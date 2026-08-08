@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.ts';
+import { commandIdSchema, franchiseIdSchema, idSchema } from './ids.ts';
 import { injuryIdSchema } from './season-health.ts';
 import { SEASON_INFLUENCE_VERSION } from './season-versions.ts';
 
@@ -27,13 +27,6 @@ export const seasonInfluenceSourceSchema = z.enum([
 ]);
 export type SeasonInfluenceSource = z.infer<typeof seasonInfluenceSourceSchema>;
 
-/** The command id pattern ledger entries record (system-generated or human). */
-const influenceCommandId = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._:-]*$/);
-
 /**
  * One immutable ledger entry. `requestedDelta` is what the rule asked for
  * (e.g. +1 block grant, -1 extra-trade-offer spend); `appliedDelta` is what
@@ -42,13 +35,13 @@ const influenceCommandId = z
  * the run-creation initial grant.
  */
 export const seasonInfluenceLedgerEntrySchema = z.object({
-  entryId: influenceCommandId,
+  entryId: idSchema,
   franchiseId: franchiseIdSchema,
   source: seasonInfluenceSourceSchema,
   /** Null for the run-creation initial grant. */
   blockIndex: z.number().int().min(0).max(8).nullable(),
   /** Null for the run-creation initial grant; else the producing command. */
-  commandId: influenceCommandId.nullable(),
+  commandId: commandIdSchema.nullable(),
   requestedDelta: z.number().int(),
   appliedDelta: z.number().int(),
   balanceAfter: z.number().int(),
@@ -81,7 +74,7 @@ export type SeasonInfluenceRehabOutcome = z.infer<typeof seasonInfluenceRehabOut
 export const seasonInfluenceRehabStateSchema = z.object({
   franchiseId: franchiseIdSchema,
   outcome: seasonInfluenceRehabOutcomeSchema,
-  commandId: influenceCommandId,
+  commandId: commandIdSchema,
 });
 export type SeasonInfluenceRehabState = z.infer<typeof seasonInfluenceRehabStateSchema>;
 

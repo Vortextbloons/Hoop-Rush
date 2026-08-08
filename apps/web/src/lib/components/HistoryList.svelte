@@ -116,10 +116,9 @@
             </span>
             <span class="block font-mono text-[10px] text-muted-foreground">
               {#if isClassic}
-                five drafted players · seed {row.runSeed.slice(0, 8)}
+                five drafted players
               {:else}
-                {row.playerIds.length} players · {franchiseLabel(row.franchiseId)} · seed
-                {row.runSeed.slice(0, 8)}
+                {row.playerIds.length} players · {franchiseLabel(row.franchiseId)}
               {/if}
             </span>
           </span>

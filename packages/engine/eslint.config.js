@@ -1,19 +1,8 @@
 import tseslint from 'typescript-eslint';
+import { sharedEslintBase } from '../../eslint.base.config.js';
 
 export default tseslint.config(
-  { ignores: ['dist/'] },
-  {
-    files: ['**/*.ts'],
-    extends: [tseslint.configs.strictTypeChecked],
-    languageOptions: {
-      parserOptions: {
-        projectService: {
-          allowDefaultProject: ['vitest.config.ts'],
-        },
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
+  ...sharedEslintBase(import.meta.dirname),
   // Determinism is a hard contract: simulation state must never come from
   // platform randomness or wall clocks. Web UI ids may use them; the engine
   // may not (see AGENTS.md, "Design determinism intentionally").

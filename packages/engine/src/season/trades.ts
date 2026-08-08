@@ -23,7 +23,12 @@ import { canonicalRosterPairs } from './chemistry.ts';
 import { applyRiskyRehabOutcome, rollSeasonRehabOutcome } from './injuries.ts';
 import { applySeasonInfluenceSpend } from './influence.ts';
 import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
-import { validateSeasonRoster, type SeasonRosterMemberInput } from './roster-rules.ts';
+import {
+  SEASON_ROSTER_SIZE,
+  validateSeasonRoster,
+  type SeasonRosterMemberInput,
+} from './roster-rules.ts';
+import { drawHexInt } from './season-seeds.ts';
 import { seasonRunStateDigest } from './state-digest.ts';
 import { seasonTransactionEntry } from './transactions.ts';
 
@@ -148,8 +153,12 @@ import { seasonTransactionEntry } from './transactions.ts';
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */
 
-/** The windowIndex opened by an accepted block index (2, 4, 5). */
-const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
+/**
+ * The windowIndex opened by an accepted block index (2, 4, 5). The trade-
+ * injury window block→index map: block 2 opens window 0, block 4 opens
+ * window 1, block 5 opens window 2.
+ */
+export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
   2: 0,
   4: 1,
   5: 2,
@@ -461,7 +470,7 @@ function tradeSeed(rootSeed: string, ...keys: string[]): string {
 
 /** A deterministic 0..modulus-1 integer from a sub-seed. */
 function seedInt(seed: string, modulus: number): number {
-  return Number.parseInt(seed.slice(0, 8), 16) % modulus;
+  return drawHexInt(seed) % modulus;
 }
 
 /** Deterministic ranking: by sub-seed, ties broken by the canonical key. */
@@ -521,7 +530,9 @@ function swappedRosterIds(
 
 /** True when the roster keeps the full ten-player legality contract. */
 function rosterIsLegal(rosterIds: readonly string[], facts: SeasonTradeCatalogFacts): boolean {
-  if (rosterIds.length !== 10 || new Set(rosterIds).size !== 10) return false;
+  if (rosterIds.length !== SEASON_ROSTER_SIZE || new Set(rosterIds).size !== SEASON_ROSTER_SIZE) {
+    return false;
+  }
   const members: SeasonRosterMemberInput[] = rosterIds.map((playerVersionId) => ({
     playerVersionId,
     playable: facts.playable.get(playerVersionId) ?? [],

@@ -7,6 +7,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { seedSchema } from '@hoop-rush/data-contracts';
 import { validateLineup } from '@hoop-rush/engine';
+import { randomHex } from '$lib/random-hex';
 
 /**
  * Validated URL state shared by the sandbox draft (spec/08). The draft page
@@ -139,12 +140,5 @@ export function buildSandboxHref(slots: RunPlayerSelection[]): SandboxHref {
 
 /** Generates a fresh game seed at the UI boundary (never in domain logic). */
 export function generateSeed(): Seed {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const bytes = new Uint8Array(16);
-    crypto.getRandomValues(bytes);
-    return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-  }
-  // SSR fallback: deterministic placeholder is never used by gameplay because
-  // seed generation happens in a client-side effect.
-  return '00000000000000000000000000000000';
+  return randomHex(16);
 }

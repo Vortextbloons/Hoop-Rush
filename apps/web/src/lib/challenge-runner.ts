@@ -1,10 +1,11 @@
 import { acceptGameResult } from '@hoop-rush/engine';
 import {
+  workerMessageSchema,
   workerRequestSchema,
   type ChallengeRun,
   type EraSimulationProfile,
   type GameResult,
-  type Seed,
+  type WorkerMessage,
 } from '@hoop-rush/data-contracts';
 import {
   type ChallengeRepository,
@@ -12,6 +13,7 @@ import {
   type StoredRunRecord,
 } from '@hoop-rush/persistence';
 import { randomUUID } from '$lib/random-id';
+import { sleep } from '$lib/sleep';
 
 /**
  * Main-thread challenge orchestration (spec/04 state ownership). The worker
@@ -49,21 +51,6 @@ export interface RunnerOptions {
   reducedMotion: boolean;
 }
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-type WorkerMessageEnvelope =
-  | { requestId: string; type: 'results'; results: GameResult[] }
-  | { requestId: string; type: 'error'; message: string }
-  | { requestId: string; type: 'complete' }
-  | {
-      requestId: string;
-      type: 'start-result';
-      chosenRunSeed: Seed;
-      chosenWins: number;
-      chosenLosses: number;
-      chosenDifferential: number;
-    };
-
 /**
  * Cheap boundary shape check for worker messages. The engine's
  * acceptGameResult is the authoritative validator: it re-verifies the game
@@ -73,61 +60,6 @@ type WorkerMessageEnvelope =
  * request id, and a literal type), so a bad batch can never crash the pump or
  * skip the engine's checks.
  */
-function parseWorkerMessageEnvelope(raw: unknown): WorkerMessageEnvelope | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const message = raw as Record<string, unknown>;
-  if (message.schemaVersion !== 1) return null;
-  if (typeof message.requestId !== 'string' || message.requestId.length === 0) return null;
-  if (message.type === 'error') {
-    if (typeof message.message !== 'string' || message.message.length === 0) return null;
-    return { requestId: message.requestId, type: 'error', message: message.message };
-  }
-  if (message.type === 'complete') {
-    return { requestId: message.requestId, type: 'complete' };
-  }
-  if (message.type === 'start-result') {
-    const chosenRunSeed = message.chosenRunSeed;
-    if (typeof chosenRunSeed !== 'string' || !/^[0-9a-f]{16,64}$/.test(chosenRunSeed)) {
-      return null;
-    }
-    if (
-      typeof message.chosenWins !== 'number' ||
-      !Number.isInteger(message.chosenWins) ||
-      message.chosenWins < 0 ||
-      typeof message.chosenLosses !== 'number' ||
-      !Number.isInteger(message.chosenLosses) ||
-      message.chosenLosses < 0 ||
-      typeof message.chosenDifferential !== 'number' ||
-      !Number.isInteger(message.chosenDifferential)
-    ) {
-      return null;
-    }
-    return {
-      requestId: message.requestId,
-      type: 'start-result',
-      chosenRunSeed,
-      chosenWins: message.chosenWins,
-      chosenLosses: message.chosenLosses,
-      chosenDifferential: message.chosenDifferential,
-    };
-  }
-  if (message.type !== 'results') return null;
-  const rawResults: unknown = message.results;
-  const results: unknown[] = Array.isArray(rawResults) ? (rawResults as unknown[]) : [];
-  if (results.length === 0) return null;
-  for (const result of results) {
-    if (typeof result !== 'object' || result === null) return null;
-    const candidate = result as Record<string, unknown>;
-    if (typeof candidate.gameNumber !== 'number' || !Number.isInteger(candidate.gameNumber)) {
-      return null;
-    }
-  }
-  return {
-    requestId: message.requestId,
-    type: 'results',
-    results: results as GameResult[],
-  };
-}
 
 export class ChallengeRunner {
   private worker: Worker | null = null;
@@ -248,11 +180,12 @@ export class ChallengeRunner {
   }
 
   private handleMessage(raw: unknown): void {
-    const envelope = parseWorkerMessageEnvelope(raw);
-    if (!envelope) {
+    const parsed = workerMessageSchema.safeParse(raw);
+    if (!parsed.success) {
       this.fail('the simulation worker returned an invalid message');
       return;
     }
+    const envelope: WorkerMessage = parsed.data;
     if (this.requestId === null || envelope.requestId !== this.requestId) return; // stale
     switch (envelope.type) {
       case 'results':
@@ -277,7 +210,7 @@ export class ChallengeRunner {
    * the chosen seed is saved), then starts the paced reveal with that seed.
    */
   private async handleStartResult(
-    envelope: Extract<WorkerMessageEnvelope, { type: 'start-result' }>,
+    envelope: Extract<WorkerMessage, { type: 'start-result' }>,
   ): Promise<void> {
     if (this.disposed || this.phase !== 'starting') return;
     const run = this.run;

@@ -1,6 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { Worker } from 'node:worker_threads';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
   SEASON_HOME_COURT_VERSION,
@@ -27,7 +25,8 @@ import {
   type SeasonGameEngineDeps,
 } from './season-game.ts';
 import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
-import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
+import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
 
 /**
  * M2.3 `season home-court calibrate` (spec/2.0/02 home court). Measures the
@@ -176,35 +175,22 @@ export type SeasonHomeCourtCohortRunner = (
 export async function runSeasonHomeCourtCohort(
   request: SeasonHomeCourtCohortRequest,
 ): Promise<SeasonHomeCourtGameFacts[]> {
-  const chunkSize = Math.max(1, Math.ceil(request.seedIndices.length / request.workers));
   const promises: Array<Promise<SeasonHomeCourtGameFacts[]>> = [];
   for (const fixture of request.fixtures) {
-    for (let start = 0; start < request.seedIndices.length; start += chunkSize) {
-      const seedIndices = request.seedIndices.slice(start, start + chunkSize);
-      promises.push(
-        new Promise<SeasonHomeCourtGameFacts[]>((resolvePromise, rejectPromise) => {
-          const worker = new Worker(
-            new URL('./season-home-court-calibration-worker.ts', import.meta.url),
-            {
-              workerData: {
-                fixtureId: fixture.fixtureId,
-                fixturePath: fixture.path,
-                seedIndices,
-                profile: request.profile,
-              },
-            },
-          );
-          worker.on('message', (message: { facts: SeasonHomeCourtGameFacts[] }) => {
-            resolvePromise(message.facts);
-            void worker.terminate();
-          });
-          worker.on('error', rejectPromise);
-          worker.on('exit', (code) => {
-            if (code !== 0) rejectPromise(new Error(`worker exited ${String(code)}`));
-          });
+    promises.push(
+      runWorkerChunks<number, SeasonHomeCourtGameFacts>({
+        workerUrl: new URL('./season-home-court-calibration-worker.ts', import.meta.url),
+        workerData: (seedIndices) => ({
+          fixtureId: fixture.fixtureId,
+          fixturePath: fixture.path,
+          seedIndices,
+          profile: request.profile,
         }),
-      );
-    }
+        items: request.seedIndices,
+        workers: request.workers,
+        payloadKey: 'facts',
+      }),
+    );
   }
   const chunks = await Promise.all(promises);
   return chunks.flat();
@@ -467,28 +453,17 @@ export async function seasonHomeCourtCalibrate(
       generatedAtIso: new Date().toISOString(),
     };
     seasonHomeCourtTargetsSchema.parse(targets);
-    try {
-      const target = resolve(outPath);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, `${JSON.stringify(targets, null, 2)}\n`);
-      targetsWritten = true;
-      targetsPath = target;
-      if (resolve(outPath) === resolve(DEFAULT_HOME_COURT_TARGETS)) {
-        const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-          season?: Record<string, { url?: string; contentHash?: string }>;
-        };
-        if (manifest.season !== undefined) {
-          manifest.season.homeCourtTargets = {
-            url: 'season/home-court-targets.json',
-            contentHash: sha256Hex(readFileSync(target)),
-          };
-          writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-        }
-      }
-    } catch (error) {
-      gateFailures.push(`cannot write targets: ${(error as Error).message}`);
-    }
+    const commit = commitTargetsArtifact({
+      outPath,
+      defaultTargetsPath: DEFAULT_HOME_COURT_TARGETS,
+      manifestPath: args.manifest ?? DEFAULT_MANIFEST,
+      manifestKey: 'homeCourtTargets',
+      manifestUrl: 'season/home-court-targets.json',
+      content: targets,
+    });
+    targetsWritten = commit.written;
+    targetsPath = commit.path;
+    if (commit.error !== null) gateFailures.push(commit.error);
   }
 
   const payload = seasonHomeCourtCalibrateReportSchema.parse({

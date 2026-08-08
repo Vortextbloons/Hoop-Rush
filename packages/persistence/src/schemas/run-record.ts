@@ -44,21 +44,46 @@ export type StoredRunRecord = z.infer<typeof storedRunRecordSchema>;
  * games array, plus the progress-carrying fields kept current by every
  * append. The games array is reconstructed on load from active game rows.
  */
-export const activeRunCheckpointSchema = challengeRunSchema
-  .omit({ schemaVersion: true, games: true, outcome: true })
-  .extend({
-    recordId: z.literal('active'),
-    saveSchemaVersion: z.literal(CHECKPOINT_SAVE_SCHEMA_VERSION),
-    /** Narrowed: an abandoned run is never stored as the active checkpoint. */
-    status: z.enum(['active', 'finished']),
-    /**
-     * Number of accepted games, kept current by every append. Absent on legacy
-     * checkpoints; loaders fall back to counting game rows.
-     */
-    gamesPlayed: z.number().int().min(0).max(82).optional(),
-    updatedAtIso: z.iso.datetime().optional(),
-  });
+const activeRunCheckpointBaseSchema = challengeRunSchema.omit({
+  schemaVersion: true,
+  games: true,
+  outcome: true,
+});
+export const activeRunCheckpointSchema = activeRunCheckpointBaseSchema.extend({
+  recordId: z.literal('active'),
+  saveSchemaVersion: z.literal(CHECKPOINT_SAVE_SCHEMA_VERSION),
+  /** Narrowed: an abandoned run is never stored as the active checkpoint. */
+  status: z.enum(['active', 'finished']),
+  /**
+   * Number of accepted games, kept current by every append. Absent on legacy
+   * checkpoints; loaders fall back to counting game rows.
+   */
+  gamesPlayed: z.number().int().min(0).max(82).optional(),
+  updatedAtIso: z.iso.datetime().optional(),
+});
 export type ActiveRunCheckpoint = z.infer<typeof activeRunCheckpointSchema>;
+
+/** The run fields a checkpoint carries verbatim (see `activeRunCheckpointBaseSchema`). */
+type CheckpointCarriedRunFields = z.infer<typeof activeRunCheckpointBaseSchema>;
+
+/**
+ * Field names carried between the full run and the checkpoint, derived from
+ * the checkpoint base schema's own shape so the two directions can never
+ * drift apart: a rename or reshape of `challengeRunSchema` updates this list
+ * (and the omit above) automatically.
+ */
+const CHECKPOINT_CARRIED_FIELD_NAMES: readonly (keyof CheckpointCarriedRunFields)[] = Object.keys(
+  activeRunCheckpointBaseSchema.shape,
+) as readonly (keyof CheckpointCarriedRunFields)[];
+
+/** Copies the shared run fields from a source run (or checkpoint) object. */
+function carryCheckpointFields(source: CheckpointCarriedRunFields): CheckpointCarriedRunFields {
+  const carried = {} as Record<keyof CheckpointCarriedRunFields, unknown>;
+  for (const fieldName of CHECKPOINT_CARRIED_FIELD_NAMES) {
+    carried[fieldName] = source[fieldName];
+  }
+  return carried as CheckpointCarriedRunFields;
+}
 
 /** One accepted game in the active run, keyed by (runId, gameNumber). */
 export const activeGameRowSchema = z.object({
@@ -95,26 +120,9 @@ export function checkpointFromRun(record: StoredRunRecord): ActiveRunCheckpoint 
   return {
     recordId: 'active',
     saveSchemaVersion: CHECKPOINT_SAVE_SCHEMA_VERSION,
-    runId: run.runId,
-    mode: run.mode,
-    variant: run.variant,
-    classicDraft: run.classicDraft,
-    franchiseId: run.franchiseId,
-    eraId: run.eraId,
-    homeDisplayName: run.homeDisplayName,
-    playerIds: run.playerIds,
-    selections: run.selections,
-    lineup: run.lineup,
-    players: run.players,
-    runSeed: run.runSeed,
-    versions: run.versions,
-    eraProfileVersion: run.eraProfileVersion,
-    difficulty: run.difficulty,
-    bracket: run.bracket,
+    ...carryCheckpointFields(run),
     status: run.status,
-    firstLossGameNumber: run.firstLossGameNumber,
     gamesPlayed: run.games.length,
-    aggregates: run.aggregates,
     updatedAtIso: record.updatedAtIso,
   };
 }
@@ -130,26 +138,8 @@ export function runFromCheckpoint(
 ): ChallengeRun {
   return {
     schemaVersion: RUN_SCHEMA_VERSION,
-    runId: checkpoint.runId,
-    mode: checkpoint.mode,
-    variant: checkpoint.variant,
-    classicDraft: checkpoint.classicDraft,
-    franchiseId: checkpoint.franchiseId,
-    eraId: checkpoint.eraId,
-    homeDisplayName: checkpoint.homeDisplayName,
-    playerIds: checkpoint.playerIds,
-    selections: checkpoint.selections,
-    lineup: checkpoint.lineup,
-    players: checkpoint.players,
-    runSeed: checkpoint.runSeed,
-    versions: checkpoint.versions,
-    eraProfileVersion: checkpoint.eraProfileVersion,
-    difficulty: checkpoint.difficulty,
-    bracket: checkpoint.bracket,
-    status: checkpoint.status,
-    firstLossGameNumber: checkpoint.firstLossGameNumber,
+    ...carryCheckpointFields(checkpoint),
     games: results,
-    aggregates: checkpoint.aggregates,
   };
 }
 

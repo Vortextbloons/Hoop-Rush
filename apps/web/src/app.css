@@ -47,9 +47,17 @@
 
   --color-line-soft: hsl(222 14% 18%);
   --color-line-strong: hsl(222 14% 26%);
+  /* Strong-border alias (same value as line-strong) for component styles. */
+  --color-border-strong: hsl(222 14% 26%);
 
   --color-positive: hsl(150 60% 48%);
   --color-negative: hsl(0 72% 58%);
+  /* Bare-var alias for component styles that predate the color prefix. */
+  --destructive: hsl(0 72% 58%);
+
+  /* Court graphic (theme-independent arena floor colors) */
+  --color-court-wood: #c98c45;
+  --color-court-rim: #f04d22;
 
   /* Fonts (loaded via app.html <link>) */
   --font-display: 'Barlow Condensed', system-ui, sans-serif;
@@ -83,8 +91,10 @@
   --color-surface-3: hsl(40 14% 92%);
   --color-line-soft: hsl(40 14% 86%);
   --color-line-strong: hsl(40 14% 76%);
+  --color-border-strong: hsl(40 14% 76%);
   --color-positive: hsl(150 60% 36%);
   --color-negative: hsl(0 72% 50%);
+  --destructive: hsl(0 72% 50%);
 }
 
 @layer base {

@@ -216,7 +216,7 @@
 {:else if acceptedBlocks.length === 0}
   <div class="mt-10 flex flex-col gap-4">
     <p class="font-mono text-sm text-muted-foreground">
-      No block has been accepted yet — submit the first block from the Hub.
+      No checkpoint yet — submit the first block from the Hub.
     </p>
     <a
       href={hubHref}
@@ -227,9 +227,7 @@
   </div>
 {:else if requestedOutOfRange}
   <div class="mt-10 flex flex-col gap-4">
-    <p class="font-mono text-sm text-muted-foreground">
-      Block {requestedBlock} is out of range — checkpoints are blocks 0–8.
-    </p>
+    <p class="font-mono text-sm text-muted-foreground">That checkpoint doesn't exist.</p>
     <a
       href={hubHref}
       class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
@@ -239,9 +237,7 @@
   </div>
 {:else if requestedNotAccepted}
   <div class="mt-10 flex flex-col gap-4">
-    <p class="font-mono text-sm text-muted-foreground">
-      Block {requestedBlock} has not been accepted yet.
-    </p>
+    <p class="font-mono text-sm text-muted-foreground">That checkpoint hasn't been reached yet.</p>
     <a
       href={hubHref}
       class="inline-flex w-fit items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
@@ -268,7 +264,7 @@
         </h1>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
           {progressLabel(recap.completedRounds)} · {ordinal(recap.completedRounds)} rounds · recap of
-          the accepted block
+          this checkpoint
         </p>
       </div>
       <a
@@ -348,8 +344,7 @@
                     />
                     {#if retainedGameIds.includes(summary.gameId)}
                       <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-                        Detailed play-by-play facts (substitutions, unit stints) are retained for
-                        this game.
+                        Full game detail available.
                       </p>
                     {/if}
                   {:else}
@@ -360,13 +355,6 @@
             {/each}
           </div>
         </section>
-      {/if}
-
-      {#if acceptedBlock}
-        <p class="px-3 font-mono text-[10px] text-muted-foreground sm:px-0">
-          run {run.runId} · block {acceptedBlock.blockIndex} · revision {acceptedBlock.revision} · checkpoint
-          {acceptedBlock.checkpointDigest.slice(0, 10)}…
-        </p>
       {/if}
     </div>
   </section>

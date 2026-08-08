@@ -44,6 +44,34 @@ export const seasonTeamAggregateSchema = z.object({
 });
 export type SeasonTeamAggregate = z.infer<typeof seasonTeamAggregateSchema>;
 
+/**
+ * One zeroed team aggregate row for a franchise with no played games yet
+ * (every numeric fold field starts at 0). Passes `seasonTeamAggregateSchema`.
+ */
+export function emptySeasonTeamAggregate(franchiseId: string): SeasonTeamAggregate {
+  return {
+    franchiseId,
+    gamesPlayed: 0,
+    wins: 0,
+    losses: 0,
+    points: 0,
+    fieldGoalsMade: 0,
+    fieldGoalsAttempted: 0,
+    threePointersMade: 0,
+    threePointersAttempted: 0,
+    freeThrowsMade: 0,
+    freeThrowsAttempted: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0,
+    possessions: 0,
+  };
+}
+
 /** Folding totals for one drafted player-version over its played games. */
 export const seasonPlayerAggregateSchema = z.object({
   playerVersionId: playerVersionIdSchema,
@@ -67,6 +95,36 @@ export const seasonPlayerAggregateSchema = z.object({
   fouls: z.number().int().nonnegative(),
 });
 export type SeasonPlayerAggregate = z.infer<typeof seasonPlayerAggregateSchema>;
+
+/**
+ * One zeroed player aggregate row for a version with no played games yet
+ * (every numeric fold field starts at 0). Passes `seasonPlayerAggregateSchema`.
+ */
+export function emptySeasonPlayerAggregate(
+  playerVersionId: string,
+  franchiseId: string,
+): SeasonPlayerAggregate {
+  return {
+    playerVersionId,
+    franchiseId,
+    gamesPlayed: 0,
+    seconds: 0,
+    points: 0,
+    fieldGoalsMade: 0,
+    fieldGoalsAttempted: 0,
+    threePointersMade: 0,
+    threePointersAttempted: 0,
+    freeThrowsMade: 0,
+    freeThrowsAttempted: 0,
+    offensiveRebounds: 0,
+    defensiveRebounds: 0,
+    assists: 0,
+    steals: 0,
+    blocks: 0,
+    turnovers: 0,
+    fouls: 0,
+  };
+}
 
 /** Per-category leader tables (identity = playerVersionId). */
 export const seasonLeaderCategorySchema = z.enum([

@@ -1,4 +1,5 @@
 import {
+  POSITION_SLOTS,
   SIMULATION_RATINGS,
   SIMULATION_TENDENCIES,
   seedFromString,
@@ -482,7 +483,7 @@ function buildBracketOpponent(
   index: number,
   overrides: Partial<BracketOpponent> = {},
 ): BracketOpponent {
-  const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+  const positions: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [position]);
   const players = positions.map((position, slot) =>
     buildSimulationPlayer({
       playerId: `p-opp-${String(index)}-${String(slot)}`,
@@ -598,7 +599,7 @@ export function buildSimulationPlayer(overrides: Partial<SimulationPlayer> = {})
 
 /** Five players in legal G,G,F,F,C slot order; ids use the given prefix. */
 function legalFive(prefix: string, centerInteriorDefense?: number): SimulationPlayer[] {
-  const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+  const positions: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [position]);
   return positions.map((position, i) =>
     buildSimulationPlayer({
       playerId: `${prefix}${String(i + 1)}`,
@@ -894,7 +895,7 @@ function fixtureScale(targetCenter: number) {
         return [key, scaled];
       }),
     ) as SimulationRatings;
-    const positions: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+    const positions: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [position]);
     const position = positions[index];
     if (position === undefined) {
       throw new Error(`fixture positions missing at index ${String(index)}`);

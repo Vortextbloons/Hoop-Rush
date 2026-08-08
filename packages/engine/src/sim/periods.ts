@@ -11,6 +11,10 @@ import type { Rng } from './rng.ts';
 export const REGULATION_PERIOD_SECONDS = 720;
 /** Overtime period length in seconds (repeating five-minute periods). */
 export const OVERTIME_PERIOD_SECONDS = 300;
+/** Full regulation game length in seconds (four 12-minute periods). */
+export const REGULATION_TOTAL_SECONDS = 4 * REGULATION_PERIOD_SECONDS;
+/** Seconds from tipoff to the halftime boundary (two regulation periods). */
+export const HALFTIME_SECOND = 2 * REGULATION_PERIOD_SECONDS;
 /** Hard period cap: 4 regulation + up to 8 overtime. */
 export const MAX_PERIODS = 12;
 

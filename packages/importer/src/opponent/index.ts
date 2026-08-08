@@ -9,7 +9,7 @@
  *
  * Output: `apps/web/static/data/opponents/lakers-1990s-opening.json`
  */
-import { parseOpponentTeam } from '@hoop-rush/data-contracts';
+import { parseOpponentTeam, REQUIRED_RATING_KEYS } from '@hoop-rush/data-contracts';
 import { playableSlotGroups, type Position } from '@hoop-rush/data-contracts';
 import { join } from 'node:path';
 import { PUBLIC_DATA } from '../config.ts';
@@ -30,26 +30,7 @@ export const LINEUP = [
   { playerId: 'p-124', slotIndex: 4, position: 'C' },
 ] as const;
 
-export const RATING_KEYS = [
-  'insideScoring',
-  'closeShot',
-  'midrange',
-  'threePoint',
-  'freeThrow',
-  'ballHandling',
-  'passing',
-  'offensiveIq',
-  'offensiveRebound',
-  'defensiveRebound',
-  'perimeterDefense',
-  'interiorDefense',
-  'steal',
-  'block',
-  'defensiveIq',
-  'speed',
-  'strength',
-  'vertical',
-] as const;
+export const RATING_KEYS = REQUIRED_RATING_KEYS;
 
 export const TENDENCY_KEYS = [
   'usageRate',
@@ -180,11 +161,13 @@ export interface OpponentArtifact {
   players: SimPlayer[];
 }
 
-function ratio(numerator: number, denominator: number, fallback: number): number {
+/** Numerator/denominator ratio with a fallback for a zero denominator. */
+export function ratio(numerator: number, denominator: number, fallback: number): number {
   return denominator > 0 ? numerator / denominator : fallback;
 }
 
-function shrunkRatio(
+/** Ratio shrunk toward a prior for low sample sizes (Python's shrunk anchors). */
+export function shrunkRatio(
   numerator: number,
   denominator: number,
   prior: number,

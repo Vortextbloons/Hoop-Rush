@@ -45,6 +45,55 @@ export interface SeasonTeamPlayerRow {
   stats: SeasonTeamPlayerStats | null;
 }
 
+export interface SeasonSummaryRatings {
+  overallRating: number;
+  offenseRating: number;
+  defenseRating: number;
+}
+
+export interface SeasonTeamProjection {
+  /** Minute-weighted mean of the roster's player Overall ratings, 0-100. */
+  overall: number;
+  /** Minute-weighted mean of the roster's player Offense ratings, 0-100. */
+  offense: number;
+  /** Minute-weighted mean of the roster's player Defense ratings, 0-100. */
+  defense: number;
+}
+
+/**
+ * Team rating strip (0-100): the locked rotation's ten players weighted by
+ * their target minutes. Same packaged player ratings as the per-player OVR
+ * chips — never invented here. Returns null when no rostered player has
+ * catalog ratings or the rotation carries no minutes.
+ */
+export function seasonTeamRatings(input: {
+  roster: SeasonRoster;
+  rotation: SeasonRotation;
+  summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
+}): SeasonTeamProjection | null {
+  const minutes = new Map(
+    input.rotation.targetMinutes.map((target) => [target.playerVersionId, target.minutes]),
+  );
+  const acc = { overall: 0, offense: 0, defense: 0 };
+  let totalMinutes = 0;
+  for (const entry of input.roster.players) {
+    const rating = input.summaryRatingsOf(entry.playerVersionId);
+    const minutesPlayed = minutes.get(entry.playerVersionId) ?? 0;
+    if (rating === null || minutesPlayed <= 0) continue;
+    totalMinutes += minutesPlayed;
+    acc.overall += rating.overallRating * minutesPlayed;
+    acc.offense += rating.offenseRating * minutesPlayed;
+    acc.defense += rating.defenseRating * minutesPlayed;
+  }
+  if (totalMinutes <= 0) return null;
+  const weighted = (value: number): number => Math.round(value / totalMinutes);
+  return {
+    overall: weighted(acc.overall),
+    offense: weighted(acc.offense),
+    defense: weighted(acc.defense),
+  };
+}
+
 export interface SeasonTeamDetail {
   franchiseId: string;
   conference: 'east' | 'west';
@@ -61,6 +110,8 @@ export interface SeasonTeamDetail {
   /** Sum of the ten target minutes (always 240 for a legal rotation). */
   minutesTotal: number;
   hasStats: boolean;
+  /** 0-100 team strip from the locked rotation's player ratings. */
+  projection: SeasonTeamProjection | null;
 }
 
 export function seasonTeamDetail(input: {
@@ -70,6 +121,7 @@ export function seasonTeamDetail(input: {
   league: SeasonLeague;
   summaries: readonly SeasonGameSummary[];
   overallRatingOf: (playerVersionId: string) => number | null;
+  summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
   playablePositions: (playerVersionId: string) => readonly string[];
 }): SeasonTeamDetail | null {
   const { roster, rotation, standings, league, summaries } = input;
@@ -150,5 +202,10 @@ export function seasonTeamDetail(input: {
     closingFive,
     minutesTotal: rotation.targetMinutes.reduce((sum, target) => sum + target.minutes, 0),
     hasStats: summaries.length > 0,
+    projection: seasonTeamRatings({
+      roster,
+      rotation,
+      summaryRatingsOf: input.summaryRatingsOf,
+    }),
   };
 }

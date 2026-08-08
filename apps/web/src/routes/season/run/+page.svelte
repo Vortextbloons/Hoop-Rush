@@ -389,7 +389,7 @@
               <p class="mt-2 text-sm text-muted-foreground">Preparing the lock preview…</p>
             {:else if preview.unchangedSinceLastLock}
               <p class="mt-2 text-sm text-muted-foreground">
-                No rotation changes since the last accepted block.
+                No rotation changes since the last checkpoint.
               </p>
             {:else if preview.changes.length === 0}
               <p class="mt-2 text-sm text-muted-foreground">
@@ -562,8 +562,7 @@
                 : 'Lock rotation and simulate block'}
           </button>
           <p class="hidden font-mono text-[10px] text-muted-foreground sm:block">
-            Rejections are typed: stale cursor, duplicate command, invalid rotations, non-boundary
-            block, or run mismatch. Nothing is persisted until the checkpoint passes validation.
+            Nothing is saved until the block completes.
           </p>
         </div>
 

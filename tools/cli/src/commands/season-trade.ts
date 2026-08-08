@@ -1,5 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
   SEASON_GAME_TARGETS_VERSION,
@@ -21,7 +20,7 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
 import { parseSeedRange, parseWorkers } from '../args.ts';
-import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import {
   gateValue,
   gateSummary,
@@ -33,6 +32,7 @@ import {
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
+import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
 /**
  * `season trade calibrate` (spec/2.0 M2.5, contract §17): freezes
@@ -433,24 +433,17 @@ export function evaluateTradeGates(args: {
 
 /** Validates a committed trade-targets artifact (--validate mode). */
 export function validateSeasonTradeTargets(args: SeasonTradeArgs, outPath: string): CliReport {
-  const failuresList: string[] = [];
-  const details: string[] = [];
-  let parsed: SeasonTradeTargets | null = null;
-  try {
-    parsed = seasonTradeTargetsSchema.parse(readJsonFile(outPath));
-    details.push(`artifact ${outPath} validates against the schema`);
-  } catch (error) {
-    failuresList.push(`artifact fails validation: ${(error as Error).message}`);
-  }
-  if (parsed !== null) {
-    // The schema literal already pins the AI trade band to [8, 15].
-    details.push(`AI trade band matches the frozen [8, 15]`);
-    const gatePass = Object.values(parsed.gates).every(Boolean);
-    if (!gatePass) failuresList.push('artifact records failed calibration gates');
-    else details.push('artifact records all-passing gates');
-  }
   void args;
-  return makeReport('season trade calibrate --validate', {}, { details, failures: failuresList });
+  return validateTargetsArtifact({
+    outPath,
+    schema: seasonTradeTargetsSchema,
+    command: 'season trade calibrate --validate',
+    extraChecks: () => ({
+      // The schema literal already pins the AI trade band to [8, 15].
+      details: [`AI trade band matches the frozen [8, 15]`],
+      failures: [],
+    }),
+  });
 }
 
 /** `season trade calibrate`: runs the gates and freezes trade-targets-v1. */
@@ -577,28 +570,17 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
       generatedAtIso: new Date().toISOString(),
     };
     seasonTradeTargetsSchema.parse(targets);
-    try {
-      const target = resolve(outPath);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, `${JSON.stringify(targets, null, 2)}\n`);
-      targetsWritten = true;
-      targetsPath = target;
-      if (resolve(outPath) === resolve(DEFAULT_TRADE_TARGETS)) {
-        const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-          season?: Record<string, { url?: string; contentHash?: string }>;
-        };
-        if (manifest.season !== undefined) {
-          manifest.season.tradeTargets = {
-            url: 'season/trade-targets.json',
-            contentHash: sha256Hex(readFileSync(target)),
-          };
-          writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-        }
-      }
-    } catch (error) {
-      gateFailures.push(`cannot write targets: ${(error as Error).message}`);
-    }
+    const commit = commitTargetsArtifact({
+      outPath,
+      defaultTargetsPath: DEFAULT_TRADE_TARGETS,
+      manifestPath: args.manifest ?? DEFAULT_MANIFEST,
+      manifestKey: 'tradeTargets',
+      manifestUrl: 'season/trade-targets.json',
+      content: targets,
+    });
+    targetsWritten = commit.written;
+    targetsPath = commit.path;
+    if (commit.error !== null) gateFailures.push(commit.error);
   }
 
   const payload = seasonTradeCalibrateReportSchema.parse({

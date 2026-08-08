@@ -1,11 +1,10 @@
 import {
-  SEASON_LEADER_DEPTH,
-  SEASON_LEADER_MIN_GAME_SHARE,
   type SeasonLeaderCategory,
   type SeasonLeaderEntry,
   type SeasonPlayerAggregate,
   type SeasonTeamAggregate,
 } from '@hoop-rush/data-contracts';
+import { deriveSeasonLeaders } from '@hoop-rush/engine';
 
 /**
  * Leader tables in the ENGINE's authoritative order (M2.3.5 Leaders tab).
@@ -15,30 +14,9 @@ import {
  * playerVersionId ascending, with the same eligibility gate (>= 0.7 share of
  * the owning team's games played) and depth (5). The web-side `leaderTables`
  * helper in season-presentation.ts sorts value-first; it is frozen and
- * lead-owned, so the Leaders tab uses this corrected mirror instead. All
- * values still derive from the same aggregate fold.
+ * lead-owned, so the Leaders tab uses this engine-backed adapter instead.
+ * All values still derive from the same aggregate fold.
  */
-
-/** Value of one category from a player aggregate (mirror of the engine). */
-export function seasonLeaderCategoryValue(
-  player: SeasonPlayerAggregate,
-  category: SeasonLeaderCategory,
-): number {
-  switch (category) {
-    case 'points':
-      return player.points;
-    case 'rebounds':
-      return player.offensiveRebounds + player.defensiveRebounds;
-    case 'assists':
-      return player.assists;
-    case 'steals':
-      return player.steals;
-    case 'blocks':
-      return player.blocks;
-    case 'threePointersMade':
-      return player.threePointersMade;
-  }
-}
 
 /** All six leader categories in the display order of the Leaders tab. */
 export const LEADER_CATEGORIES: readonly SeasonLeaderCategory[] = [
@@ -52,49 +30,13 @@ export const LEADER_CATEGORIES: readonly SeasonLeaderCategory[] = [
 
 /**
  * Per-category leader tables sorted with the engine-authoritative tie-break:
- * perGame desc, value desc, playerVersionId asc. Eligibility and depth match
- * the frozen engine constants.
+ * perGame desc, value desc, playerVersionId asc. Delegates to the engine's
+ * `deriveSeasonLeaders`; eligibility and depth match the frozen engine
+ * constants.
  */
 export function engineOrderLeaderTables(
   playerAggregates: readonly SeasonPlayerAggregate[],
   teamAggregates: readonly SeasonTeamAggregate[],
 ): Record<SeasonLeaderCategory, SeasonLeaderEntry[]> {
-  const teamGames = new Map(teamAggregates.map((team) => [team.franchiseId, team.gamesPlayed]));
-  const build = (category: SeasonLeaderCategory): SeasonLeaderEntry[] =>
-    playerAggregates
-      .map((player) => {
-        const teamPlayed = teamGames.get(player.franchiseId) ?? 0;
-        const value = seasonLeaderCategoryValue(player, category);
-        return {
-          playerVersionId: player.playerVersionId,
-          franchiseId: player.franchiseId,
-          gamesPlayed: player.gamesPlayed,
-          value,
-          perGame: player.gamesPlayed > 0 ? value / player.gamesPlayed : 0,
-          eligible: player.gamesPlayed >= SEASON_LEADER_MIN_GAME_SHARE * teamPlayed,
-        };
-      })
-      .filter((entry) => entry.eligible)
-      .sort(
-        (a, b) =>
-          b.perGame - a.perGame ||
-          b.value - a.value ||
-          a.playerVersionId.localeCompare(b.playerVersionId),
-      )
-      .slice(0, SEASON_LEADER_DEPTH)
-      .map(({ playerVersionId, franchiseId, gamesPlayed, value, perGame }) => ({
-        playerVersionId,
-        franchiseId,
-        gamesPlayed,
-        value,
-        perGame,
-      }));
-  return {
-    points: build('points'),
-    rebounds: build('rebounds'),
-    assists: build('assists'),
-    steals: build('steals'),
-    blocks: build('blocks'),
-    threePointersMade: build('threePointersMade'),
-  };
+  return deriveSeasonLeaders(teamAggregates, playerAggregates).categories;
 }

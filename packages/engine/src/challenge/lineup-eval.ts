@@ -1,7 +1,7 @@
 import type { EraSimulationProfile, GameResult, SimulationTeam } from '@hoop-rush/data-contracts';
 import type { EngineContext } from '../sim/context.ts';
 import { simulateGame } from '../sim/game.ts';
-import { fnv1a32, hex32 } from '../sim/rng.ts';
+import { seedFromString } from './seeds.ts';
 import { BENCHMARK_WEIGHTS } from './benchmarks.ts';
 
 /**
@@ -150,6 +150,5 @@ export function evaluateLineupStrength(
 
 /** Deterministic seed for one measurement game (worker-count independent). */
 export function strengthSeed(seedBase: string, benchmarkId: string, index: number): string {
-  const value = `${seedBase}|${benchmarkId}|${String(index)}`;
-  return hex32(fnv1a32(value)).repeat(4);
+  return seedFromString(`${seedBase}|${benchmarkId}|${String(index)}`);
 }

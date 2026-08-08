@@ -245,7 +245,127 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         'stored Season Run checkpoint is unidentifiable',
       );
     }
-    return this.loadValidated(checkpoint, schedule);
+    try {
+      return await this.loadValidated(checkpoint, schedule);
+    } catch (error) {
+      if (
+        error instanceof SeasonRunLoadError &&
+        (await this.repairLegacyRotationLockDivergence(error.failures))
+      ) {
+        const repaired = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+        if (repaired === undefined) {
+          throw new SeasonRunLoadError(['the repaired Season Run checkpoint disappeared']);
+        }
+        // Recovery never bypasses validation: the complete schema parse and
+        // reconciliation audit must accept the atomically repaired rows.
+        return this.loadValidated(repaired, schedule);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Repairs one known pre-fix corruption signature from rotation edits:
+   * the commit stored the submitted rotation set but retained the previous
+   * accepted lock/checkpoint identity and a state digest over that old set.
+   *
+   * This is deliberately fail-closed. It runs only when the reload audit
+   * reports rotation-lock/state-digest divergence and no unrelated failure,
+   * there is no interrupted candidate, and all three old identity facts
+   * agree. The stored rotations are the only recoverable authoritative set
+   * (and the set the block simulator used), so recovery promotes their
+   * digest to the last accepted block and recomputes the state-chain digest.
+   */
+  private async repairLegacyRotationLockDivergence(failures: readonly string[]): Promise<boolean> {
+    const rotationFailure = failures.some((failure) =>
+      /^stored rotations digest [0-9a-f]{32} does not match the last accepted lock [0-9a-f]{32}$/.test(
+        failure,
+      ),
+    );
+    const stateDigestFailure = failures.includes(
+      'stored stateDigest does not recompute over the stored mutable state',
+    );
+    const allowed = failures.every(
+      (failure) =>
+        /^stored rotations digest [0-9a-f]{32} does not match the last accepted lock [0-9a-f]{32}$/.test(
+          failure,
+        ) ||
+        failure === 'stored stateDigest does not recompute over the stored mutable state' ||
+        failure ===
+          'run.effects diverged from the last checkpoint effects without a trade window ' +
+            '(last block stateDigest does not recompute over the stored facts)',
+    );
+    if (!rotationFailure || !stateDigestFailure || !allowed) return false;
+
+    return this.db.transaction(
+      'rw',
+      [this.db.seasonRuns, this.db.seasonRunBlocks, this.db.seasonPendingBlocks],
+      async () => {
+        const rawCheckpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+        if (rawCheckpoint === undefined) return false;
+        const parsedCheckpoint = storedSeasonRunRecordSchema.safeParse(rawCheckpoint);
+        if (!parsedCheckpoint.success) return false;
+        const stored = parsedCheckpoint.data;
+        if (stored.revision === 0 || stored.checkpointState === null) return false;
+        if ((await this.db.seasonPendingBlocks.get(stored.run.runId)) !== undefined) return false;
+
+        const rawBlock = await this.db.seasonRunBlocks.get([stored.run.runId, stored.revision - 1]);
+        if (rawBlock === undefined) return false;
+        const parsedBlock = storedSeasonAcceptedBlockRowSchema.safeParse(rawBlock);
+        if (!parsedBlock.success) return false;
+        const last = parsedBlock.data.block;
+        const oldDigest = last.rotationDigest;
+        const lockedDigest = this.seam.seasonRotationSetDigest(stored.run.rotations);
+        if (lockedDigest === oldDigest) return false;
+        if (
+          stored.lastRotationDigest !== oldDigest ||
+          stored.checkpointState.rotationDigest !== oldDigest ||
+          stored.checkpointState.commandId !== last.commandId ||
+          stored.checkpointState.checkpointDigest !== last.checkpointDigest
+        ) {
+          return false;
+        }
+
+        const checkpointState = {
+          ...stored.checkpointState,
+          rotationDigest: lockedDigest,
+        };
+        const stateDigest = this.seam.seasonRunStateDigest({
+          stateRevision: stored.stateRevision,
+          checkpointState,
+          health: stored.health,
+          influence: stored.influence,
+          transactions: stored.transactions,
+          trade: stored.trade,
+          objectives: stored.objectives,
+          rosters: stored.run.rosters,
+          ownership: stored.run.ownership,
+          rotations: stored.run.rotations,
+          effects: stored.effects,
+        });
+        const block = seasonAcceptedBlockSchema.parse({
+          ...last,
+          rotationDigest: lockedDigest,
+          ...(stored.stateRevision === last.stateRevision ? { stateDigest } : {}),
+        });
+        const updatedAtIso = new Date().toISOString();
+        const repairedCheckpoint = storedSeasonRunRecordSchema.parse({
+          ...stored,
+          lastRotationDigest: lockedDigest,
+          checkpointState,
+          stateDigest,
+          updatedAtIso,
+        });
+        const repairedBlock = storedSeasonAcceptedBlockRowSchema.parse({
+          ...parsedBlock.data,
+          block,
+          updatedAtIso,
+        });
+        await this.db.seasonRuns.put(repairedCheckpoint);
+        await this.db.seasonRunBlocks.put(repairedBlock);
+        return true;
+      },
+    );
   }
 
   /** Deletes the checkpoint row, the index row, and every run row of a development checkpoint. */

@@ -9,7 +9,12 @@ import {
   type SeasonDraftState,
 } from '@hoop-rush/data-contracts';
 import { createRng } from '../sim/rng.ts';
-import { groupMaskOf, rosterFeasible, type SeasonRosterMemberInput } from './roster-rules.ts';
+import {
+  SEASON_ROSTER_SIZE,
+  groupMaskOf,
+  rosterFeasible,
+  type SeasonRosterMemberInput,
+} from './roster-rules.ts';
 
 /**
  * M2.3.5 global eight-card offer generation (spec/2.0/03, season-draft-v2).
@@ -57,8 +62,6 @@ export const OFFER_SAMPLE_ORDER_KEY = 'sample-order';
 /** Stable reason shown beside disabled offer cards (null on selectable cards). */
 export const SEASON_DRAFT_COVERAGE_REASON =
   'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks';
-
-const ROSTER_SIZE = 10;
 
 /** Canonically sorted unowned candidates (by playerVersionId). */
 export function remainingCandidates(
@@ -120,7 +123,7 @@ export function selectionKeepsFeasibility(
   candidate: SeasonDraftCandidate,
 ): boolean {
   const owned = ownedMembers(state, catalog, participantId);
-  const remaining = ROSTER_SIZE - owned.length - 1;
+  const remaining = SEASON_ROSTER_SIZE - owned.length - 1;
   if (remaining < 0) return false;
   const probe: SeasonRosterMemberInput[] = [
     ...owned,

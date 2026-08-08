@@ -302,6 +302,12 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await expect(page.getByText('Starter G', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('Bench 1', { exact: false }).first()).toBeVisible();
 
+    // The 0-100 team strip shows the minute-weighted player ratings of the
+    // locked rotation (computed synchronously from the packaged catalog —
+    // no worker round-trip needed).
+    await expect(page.locator('[data-season-team-projection]')).toBeVisible();
+    await expect(page.getByText(/1–100 from the locked rotation/)).toBeVisible();
+
     // The League tab stays highlighted on the detail route.
     await expect(desktopRail(page).getByRole('link', { name: 'League' })).toHaveAttribute(
       'aria-current',

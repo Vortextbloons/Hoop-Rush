@@ -20,6 +20,7 @@ import {
   type RunPlayerSelection,
 } from '@hoop-rush/data-contracts';
 import { validateLineup } from '../domain/lineup.ts';
+import { auditScheduleEntries } from '../bracket/schedule.ts';
 import type { EngineContext } from '../sim/context.ts';
 import { simulateGame } from '../sim/game.ts';
 import { checkGameResult } from '../sim/invariants.ts';
@@ -138,43 +139,33 @@ export function validateBracketContent(bracket: OpponentBracket): string[] {
 export function validateSchedule(bracket: OpponentBracket): string[] {
   const failures: string[] = [];
   const opponentIds = new Set(bracket.opponents.map((o) => o.opponentId));
-  if (bracket.schedule.length !== 82) {
-    failures.push(`schedule must contain 82 games (got ${String(bracket.schedule.length)})`);
+  const facts = auditScheduleEntries(bracket.schedule, opponentIds);
+  if (facts.length !== 82) {
+    failures.push(`schedule must contain 82 games (got ${String(facts.length)})`);
     return failures;
   }
-  const counts = new Map<string, number>();
-  const seenNumbers = new Set<number>();
-  for (const entry of bracket.schedule) {
-    if (seenNumbers.has(entry.gameNumber)) {
+  for (const entry of facts.entries) {
+    if (entry.repeatedNumber) {
       failures.push(`schedule repeats gameNumber ${String(entry.gameNumber)}`);
     }
-    seenNumbers.add(entry.gameNumber);
-    if (entry.gameNumber < 1 || entry.gameNumber > 82) {
+    if (entry.outOfRange) {
       failures.push(`schedule gameNumber out of range: ${String(entry.gameNumber)}`);
     }
-    if (!opponentIds.has(entry.opponentId)) {
+    if (entry.unknownOpponent) {
       failures.push(`schedule references unknown opponentId ${entry.opponentId}`);
     }
-    counts.set(entry.opponentId, (counts.get(entry.opponentId) ?? 0) + 1);
-    if (
-      entry.gameNumber > 1 &&
-      entry.opponentId === bracket.schedule[entry.gameNumber - 2]?.opponentId
-    ) {
+    if (entry.repeatsPreviousByGameNumber) {
       failures.push(
         `schedule repeats opponent ${entry.opponentId} at games ${String(entry.gameNumber - 1)} and ${String(entry.gameNumber)}`,
       );
     }
   }
-  for (let n = 1; n <= 82; n += 1) {
-    if (!seenNumbers.has(n)) {
-      failures.push(`schedule is missing gameNumber ${String(n)}`);
-    }
+  for (const n of facts.missingNumbers) {
+    failures.push(`schedule is missing gameNumber ${String(n)}`);
   }
-  const threeCount = [...counts.values()].filter((c) => c === 3).length;
-  const twoCount = [...counts.values()].filter((c) => c === 2).length;
-  if (threeCount !== 22 || twoCount !== 8) {
+  if (facts.threeCount !== 22 || facts.twoCount !== 8) {
     failures.push(
-      `schedule counts must be 22 opponents x3 and 8 opponents x2 (got ${String(threeCount)}x3, ${String(twoCount)}x2)`,
+      `schedule counts must be 22 opponents x3 and 8 opponents x2 (got ${String(facts.threeCount)}x3, ${String(facts.twoCount)}x2)`,
     );
   }
   return failures;

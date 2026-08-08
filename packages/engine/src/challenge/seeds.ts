@@ -11,6 +11,9 @@ import { FNV_OFFSET_32, fnv1a32, hex32 } from '../sim/rng.ts';
  * material so no BigInt or platform API is needed and the engine stays pure.
  */
 
+/** Canonical deterministic 32-hex seed from any string (FNV-1a form). */
+export { seedFromString } from '@hoop-rush/data-contracts';
+
 export const SEED_DERIVATION_VERSION = 'seed-v1';
 
 /** Derives the seed of game `gameNumber` (1-based, 1..82) from the run seed. */

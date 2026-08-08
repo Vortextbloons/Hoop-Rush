@@ -93,8 +93,7 @@
           Cancel
         </button>
         <span class="font-mono text-[10px] text-muted-foreground">
-          Cancelled work is discarded; the accepted checkpoint is untouched and the block can be
-          re-run identically.
+          Nothing saved is lost — you can run the block again.
         </span>
       </div>
     {/if}
@@ -103,8 +102,7 @@
       <div class="mt-3 rounded-lg bg-surface-2 p-3 text-sm">
         <p class="font-semibold">Block cancelled between games.</p>
         <p class="mt-1 text-muted-foreground">
-          No partial block was accepted. Retry re-runs the same block deterministically from the
-          last accepted checkpoint.
+          The block didn't finish. Retry runs it again from your last checkpoint.
         </p>
         <button
           type="button"
@@ -123,12 +121,6 @@
       >
         <p class="font-semibold">The block failed ({block.error.code}).</p>
         <p class="mt-1 text-muted-foreground">{block.error.message}</p>
-        {#if block.error.seed || block.error.gameId}
-          <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-            seed {block.error.seed ?? 'unknown'}
-            {#if block.error.gameId}· game {block.error.gameId}{/if}
-          </p>
-        {/if}
         <button
           type="button"
           onclick={onRetry}
@@ -141,8 +133,7 @@
 
     {#if block.phase === 'complete'}
       <p class="mt-3 text-sm">
-        <span class="font-semibold text-primary">Block complete.</span> Standings and summaries refreshed
-        from the accepted checkpoint.
+        <span class="font-semibold text-primary">Block complete.</span> Standings and summaries are updated.
       </p>
     {/if}
 

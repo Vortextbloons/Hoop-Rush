@@ -1,5 +1,6 @@
 import type { SeasonEffectsState } from '@hoop-rush/data-contracts';
 import type { SeasonStaminaInput } from '@hoop-rush/data-contracts';
+import { REGULATION_TOTAL_SECONDS } from '../sim/periods.ts';
 
 /**
  * M2.4 stamina derivation and fixed-point fatigue transitions
@@ -145,7 +146,10 @@ export function halftimeRemovalBp(rating: number): number {
  */
 export function regulationShareBp(regulationSeconds: number): number {
   return Math.round(
-    Math.min(SEASON_STAMINA_BASIS_POINT_SCALE, (regulationSeconds / 2880) * 10_000),
+    Math.min(
+      SEASON_STAMINA_BASIS_POINT_SCALE,
+      (regulationSeconds / REGULATION_TOTAL_SECONDS) * 10_000,
+    ),
   );
 }
 

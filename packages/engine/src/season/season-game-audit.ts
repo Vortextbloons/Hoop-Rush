@@ -1,15 +1,20 @@
 import type {
-  SeasonGamePlayerResult,
   SeasonGameSimulationInput,
   SeasonGameSimulationResult,
 } from '@hoop-rush/data-contracts';
+import { auditSideAccounting } from '../sim/accounting-core.ts';
 import { createEngineContext } from '../sim/context.ts';
-import { REGULATION_PERIOD_SECONDS } from '../sim/periods.ts';
+import {
+  OVERTIME_PERIOD_SECONDS,
+  REGULATION_PERIOD_SECONDS,
+  REGULATION_TOTAL_SECONDS,
+} from '../sim/periods.ts';
+import { SEASON_ROSTER_SIZE } from './roster-rules.ts';
 import { chooseInitialUnit, type PlannerRotationContext } from './rotation-planner.ts';
 import { sameUnit, simulateSeasonGame } from './season-game.ts';
 
-const REGULATION_TOTAL_SECONDS = 5 * 2880;
-const OVERTIME_TOTAL_SECONDS = 5 * 300;
+const REGULATION_PLAYER_SECONDS = 5 * REGULATION_TOTAL_SECONDS;
+const OVERTIME_PLAYER_SECONDS = 5 * OVERTIME_PERIOD_SECONDS;
 
 /**
  * Audits a Season game result against its input: legality (no player plays
@@ -72,7 +77,7 @@ export function checkSeasonGameResult(
 
   // ---- completed game audit ----
   const ot = result.overtimePeriods;
-  const expectedTotalSeconds = REGULATION_TOTAL_SECONDS + OVERTIME_TOTAL_SECONDS * ot;
+  const expectedTotalSeconds = REGULATION_PLAYER_SECONDS + OVERTIME_PLAYER_SECONDS * ot;
 
   for (const sideKey of ['home', 'away'] as const) {
     const side = result[sideKey];
@@ -82,7 +87,7 @@ export function checkSeasonGameResult(
     const playerIds = players.map((p) => p.playerVersionId);
 
     // Rostered identity: ten distinct results matching the input roster.
-    if (players.length !== 10) {
+    if (players.length !== SEASON_ROSTER_SIZE) {
       failures.push(`${sideKey}: expected ten player results, got ${String(players.length)}`);
     }
     if (new Set(playerIds).size !== playerIds.length) {
@@ -112,73 +117,40 @@ export function checkSeasonGameResult(
       }
     }
 
-    // Scoring identities.
-    const sumOf = (select: (p: SeasonGamePlayerResult) => number): number =>
-      players.reduce((acc, p) => acc + select(p), 0);
-    if (sumOf((p) => p.points) !== box.points) {
+    // Scoring identities (shared scoring core).
+    const accounting = auditSideAccounting(players, box, side.shotZones, (p) => p.playerVersionId);
+    if (accounting.playerPointsTotal !== box.points) {
       failures.push(`${sideKey}: player points != team points`);
     }
-    const fgm = box.fieldGoals.made;
-    const fga = box.fieldGoals.attempted;
-    const tpm = box.threes.made;
-    const tpa = box.threes.attempted;
-    const ftm = box.freeThrows.made;
-    const fta = box.freeThrows.attempted;
-    if (box.points !== (fgm - tpm) * 2 + tpm * 3 + ftm) {
+    if (!accounting.pointsIdentityOk) {
       failures.push(`${sideKey}: team points != 2*2fg + 3*3fg + ft`);
     }
-    if (fgm > fga || tpm > tpa || ftm > fta) {
+    if (accounting.makesExceed.length > 0) {
       failures.push(`${sideKey}: makes exceed attempts`);
     }
-    if (box.assists > fgm) failures.push(`${sideKey}: assists exceed made field goals`);
-    if (
-      box.rebounds.offensive + box.rebounds.defensive + box.rebounds.team !==
-      box.rebounds.total
-    ) {
+    if (accounting.assistsExceedMade) failures.push(`${sideKey}: assists exceed made field goals`);
+    if (!accounting.reboundBucketsOk) {
       failures.push(`${sideKey}: rebound buckets do not sum to total`);
     }
-    const reconcile = (
-      label: string,
-      select: (p: SeasonGamePlayerResult) => number,
-      teamValue: number,
-    ): void => {
-      const total = sumOf(select);
-      if (total !== teamValue) {
+    for (const row of accounting.reconciliations) {
+      if (row.playerTotal !== row.teamValue) {
         failures.push(
-          `${sideKey}: player ${label} (${String(total)}) != team ${label} (${String(teamValue)})`,
+          `${sideKey}: player ${row.label} (${String(row.playerTotal)}) != team ${row.label} (${String(row.teamValue)})`,
         );
       }
-    };
-    reconcile('fieldGoalMakes', (p) => p.fieldGoals.made, fgm);
-    reconcile('fieldGoalAttempts', (p) => p.fieldGoals.attempted, fga);
-    reconcile('threeMakes', (p) => p.threes.made, tpm);
-    reconcile('threeAttempts', (p) => p.threes.attempted, tpa);
-    reconcile('freeThrowMakes', (p) => p.freeThrows.made, ftm);
-    reconcile('freeThrowAttempts', (p) => p.freeThrows.attempted, fta);
-    reconcile('assists', (p) => p.assists, box.assists);
-    reconcile('steals', (p) => p.steals, box.steals);
-    reconcile('blocks', (p) => p.blocks, box.blocks);
-    reconcile('turnovers', (p) => p.turnovers, box.turnovers);
-    reconcile('fouls', (p) => p.fouls, box.fouls);
-    reconcile('offensiveRebounds', (p) => p.rebounds.offensive, box.rebounds.offensive);
-    reconcile('defensiveRebounds', (p) => p.rebounds.defensive, box.rebounds.defensive);
+    }
 
     // Opportunity diagnostics (same invariants as checkGameResult).
-    const misses = fga - fgm + (fta - ftm);
-    const d = box.diagnostics;
-    if (d.reboundOpportunities !== misses) {
+    if (!accounting.reboundOpportunitiesOk) {
       failures.push(`${sideKey}: rebound opportunities != misses`);
     }
-    if (d.assistedFieldGoals + d.unassistedFieldGoals !== fgm) {
+    if (!accounting.assistedUnassistedOk) {
       failures.push(`${sideKey}: assisted + unassisted != made field goals`);
     }
-    const playerDiag = (
-      select: (dd: NonNullable<SeasonGamePlayerResult['diagnostics']>) => number,
-    ) => players.reduce((acc, p) => acc + select(p.diagnostics), 0);
-    if (playerDiag((p) => p.contestedShots) !== d.contestedShots) {
+    if (!accounting.contestedShotsOk) {
       failures.push(`${sideKey}: player contested shots != team contested shots`);
     }
-    if (playerDiag((p) => p.offensiveReboundChances) !== d.reboundOpportunities * 5) {
+    if (!accounting.offensiveReboundChancesOk) {
       failures.push(`${sideKey}: player offensive-rebound chances != 5 * rebound opportunities`);
     }
     const other = result[sideKey === 'home' ? 'away' : 'home'];
@@ -186,25 +158,29 @@ export function checkSeasonGameResult(
       other.box.fieldGoals.attempted -
       other.box.fieldGoals.made +
       (other.box.freeThrows.attempted - other.box.freeThrows.made);
-    if (playerDiag((p) => p.defensiveReboundChances) !== otherMisses * 5) {
+    if (
+      players.reduce((acc, p) => acc + p.diagnostics.defensiveReboundChances, 0) !==
+      otherMisses * 5
+    ) {
       failures.push(`${sideKey}: player defensive-rebound chances != 5 * opponent misses`);
     }
-    for (const zone of side.shotZones) {
-      const attempts = playerDiag(
-        (d) => d.shotZones.find((z) => z.zone === zone.zone)?.attempts ?? 0,
-      );
-      const makes = playerDiag((d) => d.shotZones.find((z) => z.zone === zone.zone)?.makes ?? 0);
-      if (attempts !== zone.attempts || makes !== zone.makes) {
+    for (const zone of accounting.zoneSplits) {
+      if (zone.playerAttempts !== zone.teamAttempts || zone.playerMakes !== zone.teamMakes) {
         failures.push(`${sideKey}: player zone splits (${zone.zone}) != team zone summary`);
       }
     }
-    for (const p of players) {
-      if (p.diagnostics.assistOpportunities < p.assists) {
-        failures.push(`${sideKey}: ${p.playerVersionId} assist opportunities < assists`);
+    const violationCount = Math.max(
+      accounting.assistOpportunityViolations.length,
+      accounting.usageViolations.length,
+    );
+    for (let i = 0; i < violationCount; i += 1) {
+      const assist = accounting.assistOpportunityViolations[i];
+      if (assist !== undefined) {
+        failures.push(`${sideKey}: ${assist.playerKey} assist opportunities < assists`);
       }
-      const usageIdentity = p.fieldGoals.attempted + p.freeThrows.attempted * 0.44 + p.turnovers;
-      if (Math.abs(p.diagnostics.usage - usageIdentity) > 0.6) {
-        failures.push(`${sideKey}: ${p.playerVersionId} usage identity broken`);
+      const usage = accounting.usageViolations[i];
+      if (usage !== undefined) {
+        failures.push(`${sideKey}: ${usage.playerKey} usage identity broken`);
       }
     }
 
@@ -262,7 +238,7 @@ function stintAudit(
   }
   const first = stints[0];
   if (first !== undefined) {
-    if (first.period !== 1 || first.startSecondsRemaining !== 720) {
+    if (first.period !== 1 || first.startSecondsRemaining !== REGULATION_PERIOD_SECONDS) {
       failures.push(`${sideKey}: first stint must open at (1, 720)`);
     }
     const initial = initialUnitAtTipoff(input, sideKey);
@@ -282,7 +258,7 @@ function stintAudit(
       if (prev.endSecondsRemaining !== 0) {
         failures.push(`${sideKey}: stint crossing period ${String(prev.period)} does not end at 0`);
       }
-      const expectedStart = cur.period <= 4 ? 720 : 300;
+      const expectedStart = cur.period <= 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS;
       if (cur.startSecondsRemaining !== expectedStart) {
         failures.push(
           `${sideKey}: stint opening period ${String(cur.period)} does not start at ${String(expectedStart)}`,
@@ -303,7 +279,8 @@ function stintAudit(
   const stintSeconds = stints.reduce((sum, stint) => sum + stint.durationSeconds, 0);
   // Stint durations cover the game clock once per side (five players share
   // the court), so they sum to the regulation + overtime game length.
-  const expectedGameSeconds = 2880 + 300 * result.overtimePeriods;
+  const expectedGameSeconds =
+    REGULATION_TOTAL_SECONDS + OVERTIME_PERIOD_SECONDS * result.overtimePeriods;
   if (stintSeconds !== expectedGameSeconds) {
     failures.push(
       `${sideKey}: stint seconds (${String(stintSeconds)}) != game length (${String(expectedGameSeconds)})`,
@@ -354,7 +331,7 @@ function substitutionAudit(
       sub.period > 12 ||
       !Number.isInteger(sub.secondsRemaining) ||
       sub.secondsRemaining < 0 ||
-      sub.secondsRemaining > 720
+      sub.secondsRemaining > REGULATION_PERIOD_SECONDS
     ) {
       failures.push(`${sideKey}: substitution outside legal clock bounds`);
     }
@@ -374,7 +351,8 @@ function substitutionAudit(
     const matchingStint = stints.find((stint) => {
       if (
         stint.period === sub.period + 1 &&
-        stint.startSecondsRemaining === (stint.period <= 4 ? 720 : 300) &&
+        stint.startSecondsRemaining ===
+          (stint.period <= 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS) &&
         sameUnit(stint.players, sub.unit)
       ) {
         return true;

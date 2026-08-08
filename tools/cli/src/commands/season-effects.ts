@@ -1,6 +1,4 @@
-﻿import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { Worker } from 'node:worker_threads';
+﻿import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
@@ -45,8 +43,10 @@ import {
   resolveSeasonGameFixturePath,
   type SeasonGameEngineDeps,
 } from './season-game.ts';
-import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import { seedIndexRange } from './season-calibration.ts';
+import { median } from '../stats.ts';
+import { commitTargetsArtifact, runWorkerChunks, validateTargetsArtifact } from '../artifact.ts';
 
 /**
  * M2.4 `season effects` commands (spec/2.0/05, season-effect-targets-v1).
@@ -391,30 +391,21 @@ export type SeasonEffectsCohortRunner = (
 export async function runSeasonEffectsCohort(
   request: SeasonEffectsCohortRequest,
 ): Promise<SeasonEffectsGameFacts[]> {
-  const chunkSize = Math.max(1, Math.ceil(request.seedIndices.length / request.workers));
   const promises: Array<Promise<SeasonEffectsGameFacts[]>> = [];
   for (const fixture of request.fixtures) {
-    for (let start = 0; start < request.seedIndices.length; start += chunkSize) {
-      const seedIndices = request.seedIndices.slice(start, start + chunkSize);
-      promises.push(
-        new Promise<SeasonEffectsGameFacts[]>((resolvePromise, rejectPromise) => {
-          const worker = new Worker(
-            new URL('./season-effects-calibration-worker.ts', import.meta.url),
-            {
-              workerData: { fixtureId: fixture.fixtureId, fixturePath: fixture.path, seedIndices },
-            },
-          );
-          worker.on('message', (message: { facts: SeasonEffectsGameFacts[] }) => {
-            resolvePromise(message.facts);
-            void worker.terminate();
-          });
-          worker.on('error', rejectPromise);
-          worker.on('exit', (code) => {
-            if (code !== 0) rejectPromise(new Error(`worker exited ${String(code)}`));
-          });
+    promises.push(
+      runWorkerChunks<number, SeasonEffectsGameFacts>({
+        workerUrl: new URL('./season-effects-calibration-worker.ts', import.meta.url),
+        workerData: (seedIndices) => ({
+          fixtureId: fixture.fixtureId,
+          fixturePath: fixture.path,
+          seedIndices,
         }),
-      );
-    }
+        items: request.seedIndices,
+        workers: request.workers,
+        payloadKey: 'facts',
+      }),
+    );
   }
   const chunks = await Promise.all(promises);
   return chunks.flat();
@@ -443,21 +434,16 @@ export function runSeasonEffectsCohortInProcess(
   return Promise.resolve(facts);
 }
 
-function median(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const value = sorted[mid];
-  if (value === undefined) return 0;
-  if (sorted.length % 2 === 1) return value;
-  const prev = sorted[mid - 1];
-  return (value + (prev ?? 0)) / 2;
-}
-
 function pct(delta: number, base: number): number {
   return base === 0 ? 0 : (delta / base) * 100;
 }
 
+/**
+ * Percentile with p as a percentage (1..99) and nearest-rank rounding; kept
+ * local because the frozen `effect-targets-v1` coverage envelopes were
+ * authored with it (the canonical `stats.percentile` takes a fraction and
+ * floors the index).
+ */
 function percentile(values: number[], p: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -992,28 +978,17 @@ export async function seasonEffectsCalibrate(
       generatedAtIso: new Date().toISOString(),
     };
     seasonEffectTargetsSchema.parse(targets);
-    try {
-      const target = resolve(outPath);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, `${JSON.stringify(targets, null, 2)}\n`);
-      targetsWritten = true;
-      targetsPath = target;
-      if (resolve(outPath) === resolve(DEFAULT_EFFECT_TARGETS)) {
-        const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-          season?: Record<string, { url?: string; contentHash?: string }>;
-        };
-        if (manifest.season !== undefined) {
-          manifest.season.effectTargets = {
-            url: 'season/effect-targets.json',
-            contentHash: sha256Hex(readFileSync(target)),
-          };
-          writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-        }
-      }
-    } catch (error) {
-      gateFailures.push(`cannot write targets: ${(error as Error).message}`);
-    }
+    const commit = commitTargetsArtifact({
+      outPath,
+      defaultTargetsPath: DEFAULT_EFFECT_TARGETS,
+      manifestPath: args.manifest ?? DEFAULT_MANIFEST,
+      manifestKey: 'effectTargets',
+      manifestUrl: 'season/effect-targets.json',
+      content: targets,
+    });
+    targetsWritten = commit.written;
+    targetsPath = commit.path;
+    if (commit.error !== null) gateFailures.push(commit.error);
   }
 
   const payload = seasonEffectsCalibrateReportSchema.parse({
@@ -1066,36 +1041,28 @@ export async function seasonEffectsCalibrate(
 
 /** Validates a committed effect-targets artifact against the engine. */
 export function validateSeasonEffectTargets(args: SeasonEffectsArgs, outPath: string): CliReport {
-  const failuresList: string[] = [];
-  const details: string[] = [];
-  let parsed: SeasonEffectTargets | null = null;
-  try {
-    const raw = readJsonFile(outPath);
-    parsed = seasonEffectTargetsSchema.parse(raw);
-    details.push(`artifact ${outPath} validates against the schema`);
-  } catch (error) {
-    failuresList.push(`artifact fails validation: ${(error as Error).message}`);
-  }
-  if (parsed !== null) {
-    const expectedCaps = {
-      shooterFatiguePp: SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP,
-      handlerFatiguePp: SEASON_EFFECTS_HANDLER_FATIGUE_MAX_PP,
-      defenseFatiguePp: SEASON_EFFECTS_DEFENSE_FATIGUE_MAX_PP,
-      turnoverSecurityPp: SEASON_EFFECTS_TURNOVER_SECURITY_MAX_PP,
-      assistConversionPp: SEASON_EFFECTS_ASSIST_CONVERSION_MAX_PP,
-      helpDefensePp: SEASON_EFFECTS_HELP_DEFENSE_MAX_PP,
-    };
-    const capsMatch = Object.entries(expectedCaps).every(
-      ([key, value]) => parsed.mechanismCaps[key as keyof typeof parsed.mechanismCaps] === value,
-    );
-    if (!capsMatch) failuresList.push('artifact mechanism caps do not match the engine constants');
-    else details.push('mechanism caps match the engine constants');
-    const gatePass = Object.values(parsed.gates).every(Boolean);
-    if (!gatePass) failuresList.push('artifact records failed calibration gates');
-    else details.push('artifact records all-passing gates');
-  }
   void args;
-  return makeReport('season effects calibrate --validate', {}, { details, failures: failuresList });
+  return validateTargetsArtifact({
+    outPath,
+    schema: seasonEffectTargetsSchema,
+    command: 'season effects calibrate --validate',
+    extraChecks: (parsed) => {
+      const expectedCaps = {
+        shooterFatiguePp: SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP,
+        handlerFatiguePp: SEASON_EFFECTS_HANDLER_FATIGUE_MAX_PP,
+        defenseFatiguePp: SEASON_EFFECTS_DEFENSE_FATIGUE_MAX_PP,
+        turnoverSecurityPp: SEASON_EFFECTS_TURNOVER_SECURITY_MAX_PP,
+        assistConversionPp: SEASON_EFFECTS_ASSIST_CONVERSION_MAX_PP,
+        helpDefensePp: SEASON_EFFECTS_HELP_DEFENSE_MAX_PP,
+      };
+      const capsMatch = Object.entries(expectedCaps).every(
+        ([key, value]) => parsed.mechanismCaps[key as keyof typeof parsed.mechanismCaps] === value,
+      );
+      return capsMatch
+        ? { details: ['mechanism caps match the engine constants'], failures: [] }
+        : { details: [], failures: ['artifact mechanism caps do not match the engine constants'] };
+    },
+  });
 }
 
 /** Command dispatcher for the four `season effects` subcommands. */

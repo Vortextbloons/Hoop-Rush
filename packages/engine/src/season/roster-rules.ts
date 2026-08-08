@@ -25,6 +25,9 @@ export const SEASON_ROSTER_RULES = {
   fiveStructure: { guards: 2, forwards: 2, centers: 1 },
 } as const;
 
+/** Ten-player roster size shared across season rules (seam constant). */
+export const SEASON_ROSTER_SIZE = SEASON_ROSTER_RULES.size;
+
 export interface SeasonRosterMemberInput {
   playerVersionId: string;
   playable: readonly Position[];

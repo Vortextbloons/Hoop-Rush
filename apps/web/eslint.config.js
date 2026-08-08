@@ -28,4 +28,19 @@ export default tseslint.config(
       },
     },
   },
+  // Runes modules (.svelte.ts) are plain TypeScript at the language level;
+  // parse them with the TS parser so project-service type rules apply.
+  {
+    files: ['**/*.svelte.ts'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        projectService: {
+          allowDefaultProject: ['vitest.config.ts', 'playwright.config.ts', 'e2e/*.ts'],
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 16,
+        },
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
 );

@@ -3,6 +3,7 @@ import type {
   PlayerSeasonStats,
   RosterDetailsEntry,
 } from '@hoop-rush/data-contracts';
+import { oneDecimal, percentOneDecimal } from './format';
 
 /**
  * Pure presentation helpers for the Roster browser: filtering, sorting, and
@@ -266,15 +267,15 @@ export function shotPct(made: number | null, attempted: number | null): number {
 /** Formats a 0-1 ratio as a percentage string with one decimal. */
 export function formatPct(value: number): string {
   if (value === 0) return '0%';
-  return `${(value * 100).toFixed(1)}%`;
+  return percentOneDecimal(value);
 }
 
 /** Formats a per-game value with one decimal. */
 export function formatPerGame(value: number): string {
-  return value.toFixed(1);
+  return oneDecimal(value);
 }
 
 /** Formats a rating or advanced stat with one decimal. */
 export function formatDecimal(value: number): string {
-  return value.toFixed(1);
+  return oneDecimal(value);
 }

@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import {
+  POSITION_SLOTS,
   PROJECTION_MODEL_VERSION,
   PROJECTION_TARGETS_VERSION,
   fnv1a32,
@@ -28,6 +28,8 @@ import {
 import { parseCount, parseWorkers } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import { PackagedData, REPO_ROOT, DEFAULT_MANIFEST, loadPackagedData } from './data-loader.ts';
+import { readJson, sha256Hex } from '../io.ts';
+import { mean } from '../stats.ts';
 import {
   fixtureHumanRoster,
   loadSeasonDraftCatalog,
@@ -99,18 +101,6 @@ const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const PROJECTION_DIR = resolve(STATIC_DATA, 'projection');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
 
-function sha256Hex(content: string): string {
-  return createHash('sha256').update(content).digest('hex');
-}
-
-function readJson(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch (error) {
-    throw new Error(`cannot read ${path}: ${(error as Error).message}`);
-  }
-}
-
 /** Builds a PackagedData instance from a manifest path (default repo manifest). */
 function loadData(manifestPath: string | null | undefined): PackagedData {
   const loaded = loadPackagedData(manifestPath ?? undefined);
@@ -162,7 +152,9 @@ function loadModel(
  * Reference derivation (build-time, from packaged pool aggregates).
  * ------------------------------------------------------------------------- */
 
-const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+const SLOT_POSITIONS: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [
+  position,
+]);
 
 interface PoolPlayerView {
   player: SimulationPlayer;
@@ -218,10 +210,8 @@ function archetypeFilter(archetype: ProjectionMatchupArchetype): {
   }
 }
 
-function meanOf(values: number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
+/** Local alias for the shared arithmetic mean (projection aggregates). */
+const meanOf = mean;
 
 /** Aggregates one slot-group population into a synthetic reference player. */
 function aggregateReferencePlayer(
@@ -1255,7 +1245,6 @@ function summarize(
   const mae = (a: number[], b: number[]) =>
     a.reduce((sum, value, index) => sum + Math.abs(value - (b[index] ?? 0)), 0) /
     Math.max(1, a.length);
-  const mean = (values: number[]) => values.reduce((s, v) => s + v, 0) / Math.max(1, values.length);
   const netBias = mean(projNet) - mean(simNet);
   return {
     lineups: rows.length,

@@ -242,9 +242,8 @@
       </h1>
       {#if !(started && board?.draft)}
         <p class="mt-3 max-w-xl text-sm text-muted-foreground">
-          Your franchise is rolled from the run seed. Each round draws eight global player-season
-          cards; safe picks keep the 4 PG/SG / 4 SF/PF / 3 C coverage targets reachable, and
-          disabled cards say why.
+          Your franchise is picked at random. Each round draws eight player cards; safe picks keep
+          the 4 PG/SG / 4 SF/PF / 3 C lineup targets reachable, and disabled cards say why.
         </p>
       {/if}
     </div>
@@ -269,9 +268,7 @@
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
         An active season run exists
       </h2>
-      <p class="mt-2 text-sm text-muted-foreground">
-        Resuming returns to the season hub at the last accepted checkpoint.
-      </p>
+      <p class="mt-2 text-sm text-muted-foreground">Pick up right where you left off.</p>
       <a
         href={resolve('/season/run')}
         class="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
@@ -311,8 +308,8 @@
           Start a Season Run
         </h2>
         <p class="mt-2 max-w-xl text-sm text-muted-foreground">
-          A fresh run seed rolls your franchise and the first pick. The draft, offers, and picks
-          persist to this browser, so reload resumes the exact board.
+          Your draft saves automatically in this browser — close the tab and pick up right where you
+          left off.
         </p>
         <button
           type="button"
@@ -345,11 +342,7 @@
           </h2>
           <p class="mt-2 text-sm text-muted-foreground">
             30 franchises · 82 rounds · nine ten-game blocks plus a final two-game block. One
-            franchise is yours; the rest are AI-controlled across four strength bands.
-          </p>
-          <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-            {league.teams.filter((t) => t.control === 'human').length} human franchise ·
-            {league.teams.filter((t) => t.control === 'ai').length} AI franchises
+            franchise is yours; the rest are AI-controlled.
           </p>
         </section>
       {/if}
@@ -363,7 +356,6 @@
             <span class="font-bold text-foreground">
               {franchiseName(board.draft.participants[0]?.franchiseId ?? '—')}
             </span>
-            · seed {board.draft.rootSeed.slice(0, 12)}…
           </p>
         </div>
         <SeasonDraftBoard
@@ -384,8 +376,8 @@
             Generate the AI league
           </h2>
           <p class="mt-2 text-sm text-muted-foreground">
-            The engine fills the remaining 29 rosters deterministically from the run seed,
-            respecting strength bands, role coverage, and legality.
+            The remaining 29 teams are filled out automatically, keeping each team's strength and
+            lineup needs in line.
           </p>
           <button
             type="button"
@@ -397,8 +389,7 @@
           </button>
           {#if board.phase === 'generating'}
             <p class="mt-3 font-mono text-xs text-muted-foreground">
-              Bounded deterministic generation — running off the main thread so the board stays
-              responsive.
+              Generating the league — the board stays responsive while it works.
             </p>
           {/if}
           {#if generationError}
@@ -409,7 +400,7 @@
               <p class="font-semibold">Generation exhausted</p>
               <p class="mt-1 text-muted-foreground">{generationError}</p>
               <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-                The engine never relaxes a legality rule; a different seed may succeed.
+                Try regenerating — it may succeed.
               </p>
             </div>
           {/if}
@@ -423,43 +414,9 @@
           League generated
         </h2>
         <p class="mt-2 text-sm text-muted-foreground">
-          30 rosters, 300 unique player versions, and 30 legal rotations are ready. Promoting moves
-          the draft into an active run and opens the season hub.
+          All 30 teams are set and ready. Promoting moves the draft into an active run and opens the
+          season hub.
         </p>
-        <dl class="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <div class="rounded-lg bg-surface-2 p-3">
-            <dt class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              Teams
-            </dt>
-            <dd class="font-display text-lg font-extrabold">
-              {board.generation.diagnostics.teamsGenerated}
-            </dd>
-          </div>
-          <div class="rounded-lg bg-surface-2 p-3">
-            <dt class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              Repairs
-            </dt>
-            <dd class="font-display text-lg font-extrabold">
-              {board.generation.diagnostics.teamsRepaired}
-            </dd>
-          </div>
-          <div class="rounded-lg bg-surface-2 p-3">
-            <dt class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              Backtracks
-            </dt>
-            <dd class="font-display text-lg font-extrabold">
-              {board.generation.diagnostics.backtracks}
-            </dd>
-          </div>
-          <div class="rounded-lg bg-surface-2 p-3">
-            <dt class="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-              Nodes
-            </dt>
-            <dd class="font-display text-lg font-extrabold">
-              {board.generation.diagnostics.nodesVisited}
-            </dd>
-          </div>
-        </dl>
         <button
           type="button"
           onclick={promote}
@@ -481,9 +438,6 @@
           </div>
         {/if}
       </div>
-      <p class="font-mono text-[10px] text-muted-foreground">
-        seed {board.draft.rootSeed} · generation digest {board.generation.digest}
-      </p>
     </div>
   {/if}
 </section>

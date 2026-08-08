@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.ts';
+import { franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonCompactInjuryEventSchema } from './season-health.ts';
 import { seasonGameSimulationResultSchema } from './season-game-simulation.ts';
@@ -76,7 +76,7 @@ export const seasonGameSummarySchema = z
     schemaVersion: z.literal(1),
     summaryVersion: z.literal(SEASON_GAME_SUMMARY_VERSION),
     /** Stable game id from the committed schedule artifact. */
-    gameId: z.string().regex(/^s[0-9]{6}$/),
+    gameId: seasonGameIdSchema,
     /** 1-based synchronized round; the round groups 15 games. */
     round: z.number().int().min(1).max(82),
     homeFranchiseId: franchiseIdSchema,
@@ -147,7 +147,7 @@ export type SeasonGameSummary = z.infer<typeof seasonGameSummarySchema>;
 export const seasonRetainedGameDetailSchema = z.object({
   schemaVersion: z.literal(1),
   runId: z.string().min(1).max(64),
-  gameId: z.string().regex(/^s[0-9]{6}$/),
+  gameId: seasonGameIdSchema,
   round: z.number().int().min(1).max(82),
   homeFranchiseId: franchiseIdSchema,
   awayFranchiseId: franchiseIdSchema,

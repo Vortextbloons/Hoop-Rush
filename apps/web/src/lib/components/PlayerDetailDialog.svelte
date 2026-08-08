@@ -12,6 +12,7 @@
     type RosterDetailRow,
   } from '$lib/roster-browser';
   import { formatPositions } from '$lib/player-positions';
+  import { percentOneDecimal } from '$lib/format';
   import PlayerFace from './PlayerFace.svelte';
 
   /**
@@ -201,7 +202,7 @@
         </div>
 
         <p class="mt-4 font-mono text-[10px] text-muted-foreground">
-          Peak season by selection score · {line.usage.toFixed(1)}% usage ·
+          Peak season by selection score · {percentOneDecimal(line.usage)} usage ·
           {formatPerGame(line.mpg)} minutes per game
         </p>
       {/if}

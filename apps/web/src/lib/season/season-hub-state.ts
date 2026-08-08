@@ -30,6 +30,7 @@ import {
   type SeasonRunIncompatibleInfo,
 } from '@hoop-rush/persistence';
 import { newSeasonId } from './season-ids';
+import { sleep } from '$lib/sleep';
 import {
   cachedSeasonSnapshotMatches,
   clearCachedSeasonSnapshot,
@@ -491,7 +492,7 @@ export class SeasonHubState {
       const deadline = Date.now() + 5000;
       const phaseOf = (): BlockPhase => this.block.phase;
       while (phaseOf() === 'running' && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await sleep(100);
       }
       if (phaseOf() === 'running') {
         this.runner.terminate();

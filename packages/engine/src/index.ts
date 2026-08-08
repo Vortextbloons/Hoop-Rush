@@ -12,6 +12,7 @@ export { slotRequirement, validateLineup } from './domain/lineup.ts';
 export { classifyArchetype } from './domain/archetypes.ts';
 export { createEngineContext, type EngineContext } from './sim/context.ts';
 export { fnv1a32, hex32 } from './sim/rng.ts';
+export { usageOf } from './sim/recorder.ts';
 export { simulateGame } from './sim/game.ts';
 export { checkGameResult, gameResultDigest } from './sim/invariants.ts';
 export { evaluateLineupStrength } from './challenge/lineup-eval.ts';
@@ -317,7 +318,11 @@ export {
   type SeasonRunCommandOutput,
 } from './season/season-commands.ts';
 export { seasonRunStateDigest, type SeasonRunStateDigestFacts } from './season/state-digest.ts';
-export { openSeasonTradeWindow, type SeasonWindowOpenResult } from './season/trades.ts';
+export {
+  openSeasonTradeWindow,
+  WINDOW_BLOCK_INDEX_TO_INDEX,
+  type SeasonWindowOpenResult,
+} from './season/trades.ts';
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
 export * as classic from './modes/classic/draft.ts';

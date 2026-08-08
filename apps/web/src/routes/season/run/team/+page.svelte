@@ -10,8 +10,7 @@
   import { minutePlanHorizonGames } from '@hoop-rush/engine';
   import InjuryTimeline from '$lib/components/season/InjuryTimeline.svelte';
   import RotationEditor from '$lib/components/season/RotationEditor.svelte';
-  import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
-  import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
+  import TeamRosterPanel from '$lib/components/season/TeamRosterPanel.svelte';
   import UnitChemistry from '$lib/components/season/UnitChemistry.svelte';
   import {
     blockPhaseAllowsSubmit,
@@ -19,13 +18,18 @@
   } from '$lib/season/season-block-submit';
   import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
   import { createProjectionRunner } from '$lib/season/season-projection-runner';
+  import { seasonTeamRatings } from '$lib/season/season-team-detail-view';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
   import { humanInjuryTimeline } from '$lib/season/season-health-view';
   import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
-  import { overallRatingOf, playablePositionsOf } from '$lib/season/season-catalog-index';
+  import {
+    overallRatingOf,
+    playablePositionsOf,
+    summaryRatingsOf,
+  } from '$lib/season/season-catalog-index';
 
   /**
    * Season Run team tab (M2.3.5, M2.4, M2.5): the unified rotation
@@ -161,6 +165,24 @@
   /** Accepted summaries of the last block (last-game minutes per player). */
   let summaries: SeasonGameSummary[] = $state([]);
 
+  /** 0-100 team strip for the recorded locked rotation (pending editor
+   * edits stay on the editor's own projection panel): minute-weighted
+   * player ratings, same numbers as the team detail page. */
+  const teamProjection = $derived.by(() => {
+    const run = shell.run;
+    const humanId = shell.humanFranchiseId;
+    const catalog = shell.catalog;
+    if (run === null || humanId === null || catalog === null) return null;
+    const lockedRoster = run.rosters.find((entry) => entry.franchiseId === humanId);
+    const lockedRotation = run.rotations.find((entry) => entry.franchiseId === humanId);
+    if (lockedRoster === undefined || lockedRotation === undefined) return null;
+    return seasonTeamRatings({
+      roster: lockedRoster,
+      rotation: lockedRotation,
+      summaryRatingsOf: (playerVersionId) => summaryRatingsOf(catalog, playerVersionId),
+    });
+  });
+
   $effect(() => {
     const hub = shell.hub;
     const activeRunId = shell.snapshot?.run.runId ?? null;
@@ -255,6 +277,50 @@
         </p>
       </div>
 
+      <!-- 0-100 team strip: minute-weighted player ratings from the recorded
+           locked rotation; pending editor edits are not included. -->
+      {#if teamProjection !== null}
+        <dl
+          class="grid grid-cols-3 gap-2"
+          data-season-team-projection
+          aria-label="Team ratings from the locked rotation's player ratings"
+        >
+          <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
+            <dt
+              class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+            >
+              Overall
+            </dt>
+            <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+              {teamProjection.overall}
+            </dd>
+          </div>
+          <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
+            <dt
+              class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+            >
+              Offense
+            </dt>
+            <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+              {teamProjection.offense}
+            </dd>
+          </div>
+          <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
+            <dt
+              class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+            >
+              Defense
+            </dt>
+            <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+              {teamProjection.defense}
+            </dd>
+          </div>
+        </dl>
+        <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">
+          1–100 from the locked rotation · minute-weighted player ratings
+        </p>
+      {/if}
+
       <UnitChemistry {roster} {effects} {shell} />
 
       <RotationEditor
@@ -272,18 +338,17 @@
         }}
       />
 
-      <SeasonRosterList
-        {roster}
-        {manifest}
-        {shell}
-        roleOf={(playerVersionId) =>
-          roleByVersion?.get(playerVersionId) ?? { role: '—', minutes: '—' }}
-        {effects}
-        {summaries}
-      />
-
-      {#if statsView !== null && manifest !== null}
-        <SeasonPlayerStats view={statsView} {manifest} {shell} />
+      {#if statsView !== null}
+        <TeamRosterPanel
+          {roster}
+          {manifest}
+          {shell}
+          roleOf={(playerVersionId) =>
+            roleByVersion?.get(playerVersionId) ?? { role: '—', minutes: '—' }}
+          {effects}
+          {summaries}
+          {statsView}
+        />
       {/if}
 
       {#if injuryTimeline.length > 0}

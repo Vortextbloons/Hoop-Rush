@@ -1,16 +1,17 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.ts';
+import { commandIdSchema, franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
 import {
   seasonDuplicateCommandRejectionSchema,
   seasonRunMismatchRejectionSchema,
   seasonSubmitBlockCommandSchema,
 } from './season-block.ts';
+import { seasonRunCommandBaseSchema } from './season-command-base.ts';
+import { seasonCheckpointDigestSchema, seasonRotationSetDigestSchema } from './season-digests.ts';
 import { injuryIdSchema } from './season-health.ts';
 import { seasonInfluenceLedgerEntrySchema } from './season-influence.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonTradeOfferIdSchema, seasonTradeOfferSchema } from './season-trade.ts';
-import { SEASON_RUN_SCHEMA_VERSION } from './season-versions.ts';
 
 /**
  * M2.5 typed Season Run commands (spec/2.0 M2.5, schema 7). Every command
@@ -22,23 +23,8 @@ import { SEASON_RUN_SCHEMA_VERSION } from './season-versions.ts';
  * wire shapes and the typed rejections only.
  */
 
-const commandIdSchema = z
-  .string()
-  .min(1)
-  .max(64)
-  .regex(/^[a-z0-9][a-z0-9._:-]*$/);
-
-const digestSchema = z.string().regex(/^[0-9a-f]{32}$/);
-
-/** The base fields every M2.5 run command carries. */
-const seasonRunCommandBaseSchema = z.object({
-  schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
-  commandId: commandIdSchema,
-  runId: commandIdSchema,
-  expectedStateRevision: z.number().int().nonnegative(),
-  expectedStateDigest: digestSchema,
-});
-export type SeasonRunCommandBase = z.infer<typeof seasonRunCommandBaseSchema>;
+/** The base envelope every M2.5 run command composes (see season-command-base.ts). */
+export { seasonRunCommandBaseSchema, type SeasonRunCommandBase } from './season-command-base.ts';
 
 /**
  * The command asserted a stale run state: its expected revision/digest do
@@ -47,9 +33,9 @@ export type SeasonRunCommandBase = z.infer<typeof seasonRunCommandBaseSchema>;
 export const seasonStaleStateRejectionSchema = z.object({
   code: z.literal('stale-state'),
   expectedStateRevision: z.number().int().nonnegative(),
-  expectedStateDigest: digestSchema,
+  expectedStateDigest: seasonCheckpointDigestSchema,
   currentStateRevision: z.number().int().nonnegative(),
-  currentStateDigest: digestSchema,
+  currentStateDigest: seasonCheckpointDigestSchema,
 });
 export type SeasonStaleStateRejection = z.infer<typeof seasonStaleStateRejectionSchema>;
 
@@ -177,8 +163,8 @@ export type SeasonBlockMismatchRejection = z.infer<typeof seasonBlockMismatchRej
 
 export const seasonRotationDigestMismatchRejectionSchema = z.object({
   code: z.literal('rotation-digest-mismatch'),
-  rotationDigest: digestSchema,
-  pendingRotationDigest: digestSchema,
+  rotationDigest: seasonRotationSetDigestSchema,
+  pendingRotationDigest: seasonRotationSetDigestSchema,
 });
 export type SeasonRotationDigestMismatchRejection = z.infer<
   typeof seasonRotationDigestMismatchRejectionSchema
@@ -186,8 +172,8 @@ export type SeasonRotationDigestMismatchRejection = z.infer<
 
 export const seasonGameMismatchRejectionSchema = z.object({
   code: z.literal('game-mismatch'),
-  nextGameId: z.string().regex(/^s[0-9]{6}$/),
-  pendingNextGameId: z.string().regex(/^s[0-9]{6}$/),
+  nextGameId: seasonGameIdSchema,
+  pendingNextGameId: seasonGameIdSchema,
 });
 export type SeasonGameMismatchRejection = z.infer<typeof seasonGameMismatchRejectionSchema>;
 
@@ -314,7 +300,7 @@ export type SeasonDeclineTradeOfferRejection = z.infer<
 export const seasonResumeSeasonBlockCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('resume-season-block'),
   blockIndex: z.number().int().min(0).max(8),
-  rotationDigest: digestSchema,
+  rotationDigest: seasonRotationSetDigestSchema,
 });
 export type SeasonResumeSeasonBlockCommand = z.infer<typeof seasonResumeSeasonBlockCommandSchema>;
 
@@ -339,7 +325,7 @@ export type SeasonResumeSeasonBlockRejection = z.infer<
 export const seasonForfeitInterruptedGameCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('forfeit-interrupted-game'),
   blockIndex: z.number().int().min(0).max(8),
-  nextGameId: z.string().regex(/^s[0-9]{6}$/),
+  nextGameId: seasonGameIdSchema,
 });
 export type SeasonForfeitInterruptedGameCommand = z.infer<
   typeof seasonForfeitInterruptedGameCommandSchema
@@ -441,7 +427,7 @@ export const seasonResumeSeasonBlockResultSchema = z.discriminatedUnion('status'
     status: z.literal('accepted'),
     commandId: commandIdSchema,
     blockIndex: z.number().int().min(0).max(8),
-    nextGameId: z.string().regex(/^s[0-9]{6}$/),
+    nextGameId: seasonGameIdSchema,
   }),
 ]);
 export type SeasonResumeSeasonBlockResult = z.infer<typeof seasonResumeSeasonBlockResultSchema>;
@@ -457,9 +443,9 @@ export const seasonForfeitInterruptedGameResultSchema = z.discriminatedUnion('st
     commandId: commandIdSchema,
     blockIndex: z.number().int().min(0).max(8),
     /** The game that was forfeited 2-0. */
-    forfeitedGameId: z.string().regex(/^s[0-9]{6}$/),
+    forfeitedGameId: seasonGameIdSchema,
     /** The next game in block order after the forfeit. */
-    nextGameId: z.string().regex(/^s[0-9]{6}$/),
+    nextGameId: seasonGameIdSchema,
   }),
 ]);
 export type SeasonForfeitInterruptedGameResult = z.infer<

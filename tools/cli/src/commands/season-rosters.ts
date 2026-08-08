@@ -1,6 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { Worker } from 'node:worker_threads';
 import {
   SEASON_AI_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
@@ -41,9 +40,9 @@ import {
   poolLegalFailuresOf,
   readJsonFile,
   roleTierThresholdsOf,
-  sha256Hex,
 } from './season-data.ts';
 import type { RosterCalibrationWorkerRun } from './rosters-calibration-worker.ts';
+import { commitTargetsArtifact, runWorkerChunk, runWorkerChunks } from '../artifact.ts';
 
 /**
  * `season rosters` (spec/2.0 M2.1, M2.4 roster-generation-v2): deterministic
@@ -645,6 +644,12 @@ export function seasonRostersAudit(args: {
   );
 }
 
+/**
+ * Index-based lower median; kept local because the frozen
+ * `roster-targets-v2` measured band medians were authored with it
+ * (regeneration must stay byte-identical; see `stats.ts` for the canonical
+ * median).
+ */
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -681,30 +686,13 @@ async function runCalibrationChunks(args: {
   workers: number;
   targets: SeasonRosterTargets;
 }): Promise<RosterCalibrationWorkerRun[]> {
-  const chunkSize = Math.max(1, Math.ceil(args.seeds.length / args.workers));
-  const chunks: string[][] = [];
-  for (let i = 0; i < args.seeds.length; i += chunkSize) {
-    chunks.push(args.seeds.slice(i, i + chunkSize));
-  }
-  const results = await Promise.all(
-    chunks.map(
-      (seeds) =>
-        new Promise<RosterCalibrationWorkerRun[]>((resolvePromise, rejectPromise) => {
-          const worker = new Worker(new URL('./rosters-calibration-worker.ts', import.meta.url), {
-            workerData: { ...args, seeds, variant: 'roster' },
-          });
-          worker.on('message', (message: { runs: RosterCalibrationWorkerRun[] }) => {
-            resolvePromise(message.runs);
-            void worker.terminate();
-          });
-          worker.on('error', rejectPromise);
-          worker.on('exit', (code) => {
-            if (code !== 0) rejectPromise(new Error(`worker exited ${String(code)}`));
-          });
-        }),
-    ),
-  );
-  return results.flat();
+  return runWorkerChunks<string, RosterCalibrationWorkerRun>({
+    workerUrl: new URL('./rosters-calibration-worker.ts', import.meta.url),
+    workerData: (seeds) => ({ ...args, seeds, variant: 'roster' }),
+    items: args.seeds,
+    workers: args.workers,
+    payloadKey: 'runs',
+  });
 }
 
 async function runOrderInvarianceChunk(args: {
@@ -714,21 +702,10 @@ async function runOrderInvarianceChunk(args: {
   humanRosters: Array<{ franchiseId: string; playerVersionIds: string[] }>;
   targets: SeasonRosterTargets;
 }): Promise<Array<{ seed: string; digests: string[] }>> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const worker = new Worker(new URL('./rosters-calibration-worker.ts', import.meta.url), {
-      workerData: { ...args, variant: 'order-invariance' },
-    });
-    worker.on(
-      'message',
-      (message: { orderInvariance: Array<{ seed: string; digests: string[] }> }) => {
-        resolvePromise(message.orderInvariance);
-        void worker.terminate();
-      },
-    );
-    worker.on('error', rejectPromise);
-    worker.on('exit', (code) => {
-      if (code !== 0) rejectPromise(new Error(`worker exited ${String(code)}`));
-    });
+  return runWorkerChunk<Array<{ seed: string; digests: string[] }>>({
+    workerUrl: new URL('./rosters-calibration-worker.ts', import.meta.url),
+    workerData: { ...args, variant: 'order-invariance' },
+    payloadKey: 'orderInvariance',
   });
 }
 
@@ -1096,29 +1073,17 @@ export async function seasonRostersCalibrate(
   seasonRosterTargetsSchema.parse(updatedTargets);
   if (!validateOnly) {
     const outPath = args.out ?? DEFAULT_ROSTER_TARGETS;
-    try {
-      const target = resolve(outPath);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, `${JSON.stringify(updatedTargets, null, 2)}\n`);
-      targetsWritten = true;
-      targetsPath = target;
-      // Update the manifest hash for the committed targets artifact.
-      if (resolve(outPath) === resolve(DEFAULT_ROSTER_TARGETS)) {
-        const manifestPathResolved = resolve(manifestPath);
-        const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {
-          season?: Record<string, { url?: string; contentHash?: string }>;
-        };
-        if (manifest.season !== undefined) {
-          manifest.season.rosterTargets = {
-            url: 'season/roster-targets.json',
-            contentHash: sha256Hex(readFileSync(target)),
-          };
-          writeFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
-        }
-      }
-    } catch (error) {
-      gateFailures.push(`cannot write targets: ${(error as Error).message}`);
-    }
+    const commit = commitTargetsArtifact({
+      outPath,
+      defaultTargetsPath: DEFAULT_ROSTER_TARGETS,
+      manifestPath,
+      manifestKey: 'rosterTargets',
+      manifestUrl: 'season/roster-targets.json',
+      content: updatedTargets,
+    });
+    targetsWritten = commit.written;
+    targetsPath = commit.path;
+    if (commit.error !== null) gateFailures.push(commit.error);
   }
 
   const payload = seasonRostersCalibrateReportSchema.parse({

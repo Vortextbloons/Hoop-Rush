@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.ts';
+import { franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { SEASON_HEALTH_VERSION } from './season-versions.ts';
 
@@ -65,7 +65,7 @@ export const seasonInjuryRecordSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   franchiseId: franchiseIdSchema,
   /** The game the injury occurred in (stable scheduled-game id). */
-  gameId: z.string().regex(/^s[0-9]{6}$/),
+  gameId: seasonGameIdSchema,
   type: seasonInjuryTypeSchema,
   severity: seasonInjurySeveritySchema,
   /** Occurred before halftime (eligible for the same-game-return roll). */

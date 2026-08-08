@@ -1,4 +1,5 @@
 import type { SeasonPairChemistryState } from '@hoop-rush/data-contracts';
+import { SEASON_ROSTER_SIZE } from './roster-rules.ts';
 
 /**
  * M2.4 pair chemistry (spec/2.0/04, season-chemistry-v1). Every roster's 45
@@ -33,7 +34,7 @@ export function seasonPairIsCanonical(a: string, b: string): boolean {
 
 /** All 45 unordered canonical pairs of a ten-player roster. */
 export function canonicalRosterPairs(roster: readonly string[]): Array<[string, string]> {
-  if (roster.length !== 10 || new Set(roster).size !== 10) {
+  if (roster.length !== SEASON_ROSTER_SIZE || new Set(roster).size !== SEASON_ROSTER_SIZE) {
     throw new Error(
       `season chemistry: roster must be ten distinct versions (got ${String(roster.length)})`,
     );
@@ -77,6 +78,23 @@ export function pairChemistryBasisPoints(shared: number): number {
 }
 
 /**
+ * Shared unit-chemistry mean: the arithmetic mean of the pair basis points
+ * over the unit's ten canonical pairs, rounded once. `sharedOf` resolves
+ * each pair's shared possessions; callers decide missing-pair handling
+ * (`unitChemistryBasisPoints` throws, the effects buffer defaults to zero).
+ */
+export function unitChemistryFromShared(
+  unit: readonly string[],
+  sharedOf: (a: string, b: string) => number,
+): number {
+  let sum = 0;
+  for (const [a, b] of unitPairs(unit)) {
+    sum += pairChemistryBasisPoints(sharedOf(a, b));
+  }
+  return Math.round(sum / 10);
+}
+
+/**
  * Active-unit chemistry: the arithmetic mean of its ten pair values, in
  * basis points. Every pair of the unit must exist in the supplied pair
  * states; a missing pair is a roster mismatch and throws.
@@ -86,15 +104,13 @@ export function unitChemistryBasisPoints(
   unit: readonly string[],
 ): number {
   const byKey = new Map(pairStates.map((pair) => [seasonPairKey(pair.a, pair.b), pair]));
-  let sum = 0;
-  for (const [a, b] of unitPairs(unit)) {
+  return unitChemistryFromShared(unit, (a, b) => {
     const pair = byKey.get(seasonPairKey(a, b));
     if (pair === undefined) {
       throw new Error(`season chemistry: unit pair ${a}-${b} is not a tracked pair`);
     }
-    sum += pairChemistryBasisPoints(pair.sharedPossessions);
-  }
-  return Math.round(sum / 10);
+    return pair.sharedPossessions;
+  });
 }
 
 /**

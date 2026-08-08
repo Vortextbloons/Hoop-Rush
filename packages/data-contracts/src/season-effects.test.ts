@@ -326,7 +326,7 @@ describe('season stamina input schema (M2.4)', () => {
     expect(() => seasonStaminaInputSchema.parse({ ...stamina, historicalMpg: 60.1 })).toThrow();
     expect(() => seasonStaminaInputSchema.parse({ ...stamina, historicalMpg: -0.1 })).toThrow();
     expect(() =>
-      seasonStaminaInputSchema.parse({ ...stamina, derivationVersion: 'season-stamina-v2' }),
+      seasonStaminaInputSchema.parse({ ...stamina, derivationVersion: 'season-stamina-v3' }),
     ).toThrow();
     expect(() =>
       seasonStaminaInputSchema.parse({ ...stamina, playerVersionId: 'not-an-id' }),

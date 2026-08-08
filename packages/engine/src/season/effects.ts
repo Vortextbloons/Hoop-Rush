@@ -10,9 +10,9 @@ import type {
 import type { SideIndex } from '../sim/recorder.ts';
 import {
   canonicalRosterPairs,
-  pairChemistryBasisPoints,
   seasonPairIsCanonical,
   seasonPairKey,
+  unitChemistryFromShared,
   unitPairs,
 } from './chemistry.ts';
 import { offCourtRecoveryBp, onCourtFatigueBp, recentLoadAfterGame } from './stamina.ts';
@@ -387,12 +387,7 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
     const unit = side === 0 ? this.homeUnit : this.awayUnit;
     if (unit.length === 0) return 0;
     const pairs = side === 0 ? this.homePairs : this.awayPairs;
-    let sum = 0;
-    for (const [a, b] of unitPairs(unit)) {
-      const shared = pairs.get(seasonPairKey(a, b)) ?? 0;
-      sum += pairChemistryBasisPoints(shared);
-    }
-    return Math.round(sum / 10);
+    return unitChemistryFromShared(unit, (a, b) => pairs.get(seasonPairKey(a, b)) ?? 0);
   }
 
   private record(

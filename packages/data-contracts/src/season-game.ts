@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.ts';
+import { franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
 import { SEASON_ROUND_COUNT } from './season-versions.ts';
 
 /**
@@ -16,7 +16,7 @@ export type SeasonGameStatus = z.infer<typeof seasonGameStatusSchema>;
 export const seasonGameSchema = z
   .object({
     /** Stable game id from the committed schedule artifact. */
-    gameId: z.string().regex(/^s[0-9]{6}$/),
+    gameId: seasonGameIdSchema,
     round: z.number().int().min(1).max(SEASON_ROUND_COUNT),
     homeFranchiseId: franchiseIdSchema,
     awayFranchiseId: franchiseIdSchema,

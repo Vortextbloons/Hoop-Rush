@@ -3,6 +3,7 @@
   import { franchiseAbbreviation, resolveEraTeamIdentity } from '@hoop-rush/data-contracts';
   import type { RosterDetailRow } from '$lib/roster-browser';
   import { formatPositions } from '$lib/player-positions';
+  import { oneDecimal, percentOneDecimal } from '$lib/format';
   import { X } from '@lucide/svelte';
   import { Dialog } from 'bits-ui';
   import PlayerFace from './PlayerFace.svelte';
@@ -73,7 +74,7 @@
 
   function ratio(made: number | null, attempted: number | null): string {
     if (made === null || attempted === null || attempted <= 0) return '—';
-    return `${((made / attempted) * 100).toFixed(1)}%`;
+    return percentOneDecimal(made / attempted);
   }
 
   function perGame(
@@ -82,7 +83,7 @@
   ): string {
     const value = player.stats[key];
     if (typeof value !== 'number' || player.stats.gamesPlayed <= 0) return '—';
-    return (value / player.stats.gamesPlayed).toFixed(1);
+    return oneDecimal(value / player.stats.gamesPlayed);
   }
 
   function countValue(
@@ -118,11 +119,11 @@
       case 'FT%':
         return ratio(stats.freeThrowsMade, stats.freeThrowsAttempted);
       case 'TS%':
-        return stats.tsPct === null ? '—' : `${(stats.tsPct * 100).toFixed(1)}%`;
+        return stats.tsPct === null ? '—' : percentOneDecimal(stats.tsPct);
       case 'PER':
         return optional(stats.per);
       case 'Usage':
-        return stats.usageRate === null ? '—' : `${stats.usageRate.toFixed(1)}%`;
+        return stats.usageRate === null ? '—' : percentOneDecimal(stats.usageRate);
       default:
         return '—';
     }

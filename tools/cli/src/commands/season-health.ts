@@ -1,5 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
   SEASON_GAME_VERSION,
@@ -16,7 +15,7 @@ import {
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonHealthCalibrateReportSchema } from '../report-schemas.ts';
 import { parseSeedRange, parseWorkers } from '../args.ts';
-import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR } from './season-data.ts';
 import {
   m25ToleranceGate,
   m25LiftGate,
@@ -31,6 +30,7 @@ import {
   type M25Gate,
 } from './season-calibration.ts';
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
+import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
 /**
  * `season health calibrate` (spec/2.0 M2.5, contract §17): freezes
@@ -709,24 +709,19 @@ export function runSeasonHealthCohort(
 
 /** Validates a committed injury-targets artifact (--validate mode). */
 export function validateSeasonInjuryTargets(args: SeasonHealthArgs, outPath: string): CliReport {
-  const failuresList: string[] = [];
-  const details: string[] = [];
-  let parsed: SeasonInjuryTargets | null = null;
-  try {
-    parsed = seasonInjuryTargetsSchema.parse(readJsonFile(outPath));
-    details.push(`artifact ${outPath} validates against the schema`);
-  } catch (error) {
-    failuresList.push(`artifact fails validation: ${(error as Error).message}`);
-  }
-  if (parsed !== null) {
-    // The schema literal already pins the base risk to 80 bp.
-    details.push(`base risk matches the frozen ${String(SEASON_HEALTH_BASE_RISK_BP)} bp profile`);
-    const gatePass = Object.values(parsed.gates).every(Boolean);
-    if (!gatePass) failuresList.push('artifact records failed calibration gates');
-    else details.push('artifact records all-passing gates');
-  }
   void args;
-  return makeReport('season health calibrate --validate', {}, { details, failures: failuresList });
+  return validateTargetsArtifact({
+    outPath,
+    schema: seasonInjuryTargetsSchema,
+    command: 'season health calibrate --validate',
+    extraChecks: () => ({
+      details: [
+        // The schema literal already pins the base risk to 80 bp.
+        `base risk matches the frozen ${String(SEASON_HEALTH_BASE_RISK_BP)} bp profile`,
+      ],
+      failures: [],
+    }),
+  });
 }
 
 /** `season health calibrate`: runs the gates and freezes injury-targets-v1. */
@@ -845,28 +840,17 @@ export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
       generatedAtIso: new Date().toISOString(),
     };
     seasonInjuryTargetsSchema.parse(targets);
-    try {
-      const target = resolve(outPath);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, `${JSON.stringify(targets, null, 2)}\n`);
-      targetsWritten = true;
-      targetsPath = target;
-      if (resolve(outPath) === resolve(DEFAULT_INJURY_TARGETS)) {
-        const manifestPath = args.manifest ?? DEFAULT_MANIFEST;
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-          season?: Record<string, { url?: string; contentHash?: string }>;
-        };
-        if (manifest.season !== undefined) {
-          manifest.season.injuryTargets = {
-            url: 'season/injury-targets.json',
-            contentHash: sha256Hex(readFileSync(target)),
-          };
-          writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-        }
-      }
-    } catch (error) {
-      gateFailures.push(`cannot write targets: ${(error as Error).message}`);
-    }
+    const commit = commitTargetsArtifact({
+      outPath,
+      defaultTargetsPath: DEFAULT_INJURY_TARGETS,
+      manifestPath: args.manifest ?? DEFAULT_MANIFEST,
+      manifestKey: 'injuryTargets',
+      manifestUrl: 'season/injury-targets.json',
+      content: targets,
+    });
+    targetsWritten = commit.written;
+    targetsPath = commit.path;
+    if (commit.error !== null) gateFailures.push(commit.error);
   }
 
   const payload = seasonHealthCalibrateReportSchema.parse({

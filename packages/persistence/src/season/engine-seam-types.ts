@@ -58,6 +58,15 @@ export interface SeasonRunEngineSeam {
   ): SeasonPlayerAggregate[];
   /** Pure standings reduction over finalized game records. */
   reduceSeasonStandings(league: SeasonLeague, games: readonly SeasonGame[]): SeasonStandings;
+  /**
+   * M2.5: the windowIndex opened by an accepted block index (blocks 2/4/5
+   * open windows 0/1/2). Canonical engine fact (`WINDOW_BLOCK_INDEX_TO_INDEX`
+   * in `engine/season/trades.ts`); the reload audit inverts it to validate
+   * the stored trade-window block mapping, so the rule never diverges from
+   * the engine. Declared as a value property (not a method) because the
+   * binding is the engine's exported constant.
+   */
+  windowBlockIndexToIndex: Readonly<Record<number, number>>;
   /** Canonical 32-hex digest of a 30-rotation locked set. */
   seasonRotationSetDigest(rotations: readonly SeasonRotation[]): string;
   /**

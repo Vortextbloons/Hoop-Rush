@@ -14,6 +14,7 @@ import {
   type WorkerResultsMessage,
   type WorkerStartResultMessage,
 } from '@hoop-rush/data-contracts';
+import { sleep } from '../lib/sleep';
 
 /**
  * Challenge worker entry (spec/04 static deployment and workers). Receives
@@ -52,8 +53,6 @@ function postError(requestId: string, message: string): void {
   };
   self.postMessage(payload);
 }
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 self.onmessage = (event: MessageEvent<unknown>): void => {
   const parsed = workerRequestSchema.safeParse(event.data);

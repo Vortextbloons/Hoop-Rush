@@ -7,6 +7,7 @@ import {
   humanUpcomingGames,
   pendingRotationSetDigest,
 } from './season-lock-preview';
+import { humanUpcomingGamesFromGames } from './season-presentation';
 
 /**
  * M2.3 "What changed?" lock preview unit tests (spec/2.0/11 block lock
@@ -94,6 +95,14 @@ describe('humanUpcomingGames', () => {
   it('returns the final two games for block 8', () => {
     const upcoming = humanUpcomingGames(games(), 'lakers', 8);
     expect(upcoming.map((game) => game.round)).toEqual([81, 82]);
+  });
+
+  it('agrees with the season-presentation helper on every block', () => {
+    for (let block = 0; block < 9; block += 1) {
+      expect(humanUpcomingGamesFromGames(games(), 'lakers', block)).toEqual(
+        humanUpcomingGames(games(), 'lakers', block),
+      );
+    }
   });
 });
 

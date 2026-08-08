@@ -9,6 +9,8 @@ import {
 } from '@hoop-rush/engine';
 import type { SimulationPlayer } from '@hoop-rush/data-contracts';
 import {
+  DEFAULT_ERA_ID,
+  POSITION_SLOTS,
   type EraSimulationProfile,
   type FranchiseEraPool,
   type GameResult,
@@ -138,7 +140,7 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
     }
   }
 
-  const slots: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+  const slots: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [position]);
   const averagedAnchors =
     averageProfile !== undefined
       ? ({
@@ -180,7 +182,7 @@ export function poolStrengthLineups(pool: FranchiseEraPool): {
   strong: SimulationTeam;
   weak: SimulationTeam;
 } {
-  const SLOTS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+  const SLOTS: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [position]);
   const pick = (players: typeof pool.players): SimulationTeam => {
     const remaining = [...players];
     const chosen: Array<{
@@ -321,7 +323,7 @@ export function calibrateRun(args: {
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile
     ? loadProfileFile(args.profile)
-    : data.eraProfile(args.era ?? '1990s');
+    : data.eraProfile(args.era ?? DEFAULT_ERA_ID);
 
   // The calibration fixtures must match the era under test: the harness
   // builds its league-average and strong/weak lineups from the packaged
@@ -715,7 +717,7 @@ export function calibrateSensitivity(args: {
   const data = new PackagedData(packaged.manifest, packaged.dir);
   const profile = args.profile
     ? loadProfileFile(args.profile)
-    : data.eraProfile(args.era ?? '1990s');
+    : data.eraProfile(args.era ?? DEFAULT_ERA_ID);
 
   const metrics = SENSITIVITY_FAMILIES.map((family) => {
     const fixture = loadFixture(family.id);

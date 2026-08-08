@@ -410,15 +410,16 @@
   <!-- Minutes: every player with the tap-to-type / stepper minutes controls.
        The lineup rows below handle roles, closing five, and bench order. -->
   <section aria-labelledby="minutes-heading" class="rounded-none bg-surface-1 p-3 sm:rounded-xl">
-    <div class="flex items-center justify-between gap-2">
+    <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
       <h3
         id="minutes-heading"
         class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
       >
         Target minutes
       </h3>
-      <span class="font-mono text-[10px] text-muted-foreground">
-        tap a value to type · totals exactly 240
+      <span class="font-mono text-[10px] leading-snug text-muted-foreground">
+        <span class="sm:hidden">tap a value to type exactly 240</span>
+        <span class="hidden sm:inline">tap a value to type · totals exactly 240</span>
       </span>
     </div>
     <ul class="mt-2 flex flex-col divide-y divide-border/60">
@@ -427,45 +428,55 @@
         {@const fatigue = fatigueOf(row)}
         {@const lastMinutes = lastGameMinutes.get(row.member.playerVersionId) ?? null}
         {@const eraLabel = eraLabelOf(row)}
-        <li class="flex flex-col gap-1 py-2{highlightOf(row.member.playerVersionId)}">
-          <div class="flex min-w-0 items-center gap-2 md:gap-3">
-            {#if manifest !== null && faceOf(row.member.playerVersionId) !== null}
-              <SeasonPlayerFace face={faceOf(row.member.playerVersionId)!} {manifest} size="sm" />
-            {/if}
-            <div class="min-w-0 flex-1">
-              <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <p class="min-w-0 text-sm font-semibold">{row.member.displayName}</p>
-                {#if overallByVersion?.has(row.member.playerVersionId)}
-                  <span
-                    class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs font-bold text-foreground"
+        <li class="flex flex-col gap-2 py-2.5 sm:gap-1 sm:py-2{highlightOf(row.member.playerVersionId)}">
+          <div
+            class="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3"
+          >
+            <div class="flex min-w-0 items-start gap-2 sm:items-center sm:gap-3">
+              {#if manifest !== null && faceOf(row.member.playerVersionId) !== null}
+                <SeasonPlayerFace
+                  face={faceOf(row.member.playerVersionId)!}
+                  {manifest}
+                  size="sm"
+                />
+              {/if}
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-semibold leading-snug">{row.member.displayName}</p>
+                <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                  {#if overallByVersion?.has(row.member.playerVersionId)}
+                    <span
+                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs font-bold text-foreground"
+                    >
+                      OVR {overallByVersion.get(row.member.playerVersionId)}
+                    </span>
+                  {/if}
+                  {#if fatigue !== null}
+                    <span
+                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold ${fatigue.badge}`}
+                    >
+                      {fatigue.label}
+                      {fatigue.percent}%
+                    </span>
+                  {/if}
+                </div>
+                <p class="mt-1 font-mono text-xs leading-snug text-muted-foreground">
+                  {row.role}
+                  {#if row.member.seasonKey !== undefined}· {row.member.seasonKey}{/if}
+                  {#if row.member.playable.length > 0}· {formatPositions(row.member.playable)}{/if}
+                  {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
+                </p>
+                {#if eraLabel !== null}
+                  <p
+                    class="mt-0.5 line-clamp-2 font-mono text-[10px] leading-snug text-muted-foreground/70"
                   >
-                    OVR {overallByVersion.get(row.member.playerVersionId)}
-                  </span>
-                {/if}
-                {#if fatigue !== null}
-                  <span
-                    class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold ${fatigue.badge}`}
-                  >
-                    {fatigue.label}
-                    {fatigue.percent}%
-                  </span>
+                    {eraLabel}
+                  </p>
                 {/if}
               </div>
-              <p class="font-mono text-xs text-muted-foreground">
-                {row.role}
-                {#if row.member.seasonKey !== undefined}· {row.member.seasonKey}{/if}
-                {#if row.member.playable.length > 0}· {formatPositions(row.member.playable)}{/if}
-                {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
-              </p>
-              {#if eraLabel !== null}
-                <p
-                  class="mt-0.5 line-clamp-2 font-mono text-[10px] leading-snug text-muted-foreground/70"
-                >
-                  {eraLabel}
-                </p>
-              {/if}
             </div>
-            {@render minutesControl(row)}
+            <div class="flex justify-end sm:justify-start">
+              {@render minutesControl(row)}
+            </div>
           </div>
           {#if rowFailures !== null}
             <ul
@@ -552,13 +563,13 @@
           {@const lastMinutes = lastGameMinutes.get(playerVersionId) ?? null}
           {@const eraLabel = eraLabelOf(row)}
           <li
-            class="flex flex-col gap-2 rounded-none bg-surface-1 p-3 sm:rounded-xl{highlightOf(
+            class="flex flex-col gap-2 rounded-none bg-surface-1 p-3 sm:rounded-xl md:flex-row md:items-center md:gap-3{highlightOf(
               playerVersionId,
             )}"
           >
-            <div class="flex min-w-0 items-center gap-2 md:gap-3">
+            <div class="flex min-w-0 flex-1 items-start gap-2 md:items-center md:gap-3">
               <span
-                class="w-7 shrink-0 font-mono text-[10px] font-bold uppercase text-muted-foreground"
+                class="w-6 shrink-0 pt-0.5 font-mono text-[10px] font-bold uppercase text-muted-foreground md:w-7 md:pt-0"
               >
                 {SLOT_LABELS[slotIndex]}{slotIndex + 1}
               </span>
@@ -571,37 +582,55 @@
                 />
               {/if}
               <div class="min-w-0 flex-1">
-                <div class="flex min-w-0 flex-wrap items-center gap-2">
-                  <p class="min-w-0 text-sm font-semibold">{row.member.displayName}</p>
+                <p class="text-sm font-semibold leading-snug">{row.member.displayName}</p>
+                <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                   {#if overallByVersion?.has(playerVersionId)}
                     <span
-                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs font-bold text-foreground"
+                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
                     >
                       OVR {overallByVersion.get(playerVersionId)}
                     </span>
                   {/if}
                   {#if fatigue !== null}
                     <span
-                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold ${fatigue.badge}`}
+                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${fatigue.badge}`}
                     >
                       {fatigue.label}
                       {fatigue.percent}%
                     </span>
                   {/if}
                 </div>
-                <p class="font-mono text-xs text-muted-foreground">
+                <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
                   {row.member.seasonKey ?? ''}
                   {#if row.member.playable.length > 0}· {formatPositions(row.member.playable)}{/if}
                   {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
                 </p>
                 {#if eraLabel !== null}
                   <p
-                    class="mt-0.5 line-clamp-2 font-mono text-[10px] leading-snug text-muted-foreground/70"
+                    class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
                   >
                     {eraLabel}
                   </p>
                 {/if}
               </div>
+            </div>
+            <div class="flex w-full items-center gap-2 pl-8 md:w-auto md:shrink-0 md:pl-0">
+              <select
+                value={playerVersionId}
+                {disabled}
+                aria-label={`Starter slot ${slotIndex + 1}`}
+                aria-invalid={slotFailures !== null ? 'true' : undefined}
+                aria-describedby={slotFailures !== null
+                  ? `starter-failure-${String(slotIndex)}`
+                  : undefined}
+                onchange={(event) =>
+                  changeStarter(slotIndex, (event.currentTarget as HTMLSelectElement).value)}
+                class="min-h-11 min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 md:min-h-0 md:w-48 md:flex-none md:py-1.5"
+              >
+                {#each editor.eligibleForSlot(slotIndex) as member (member.playerVersionId)}
+                  <option value={member.playerVersionId}>{member.displayName}</option>
+                {/each}
+              </select>
               <button
                 type="button"
                 aria-pressed={row.closingIndex !== -1 ? 'true' : 'false'}
@@ -620,24 +649,6 @@
                   fill={row.closingIndex !== -1 ? 'currentColor' : 'none'}
                 />
               </button>
-            </div>
-            <div class="flex items-center gap-2 pl-9 md:gap-3 md:pl-10">
-              <select
-                value={playerVersionId}
-                {disabled}
-                aria-label={`Starter slot ${slotIndex + 1}`}
-                aria-invalid={slotFailures !== null ? 'true' : undefined}
-                aria-describedby={slotFailures !== null
-                  ? `starter-failure-${String(slotIndex)}`
-                  : undefined}
-                onchange={(event) =>
-                  changeStarter(slotIndex, (event.currentTarget as HTMLSelectElement).value)}
-                class="min-h-11 min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 md:min-h-0 md:py-1.5"
-              >
-                {#each editor.eligibleForSlot(slotIndex) as member (member.playerVersionId)}
-                  <option value={member.playerVersionId}>{member.displayName}</option>
-                {/each}
-              </select>
             </div>
             {#if slotFailures !== null}
               <ul
@@ -671,13 +682,13 @@
           {@const lastMinutes = lastGameMinutes.get(playerVersionId) ?? null}
           {@const eraLabel = eraLabelOf(row)}
           <li
-            class="flex flex-col gap-2 rounded-none bg-surface-1 p-3 sm:rounded-xl{highlightOf(
+            class="flex flex-col gap-2 rounded-none bg-surface-1 p-3 sm:rounded-xl md:flex-row md:items-center md:gap-3{highlightOf(
               playerVersionId,
             )}"
           >
-            <div class="flex min-w-0 items-center gap-2 md:gap-3">
+            <div class="flex min-w-0 flex-1 items-start gap-2 md:items-center md:gap-3">
               <span
-                class="w-7 shrink-0 font-mono text-[10px] font-bold uppercase text-muted-foreground"
+                class="w-6 shrink-0 pt-0.5 font-mono text-[10px] font-bold uppercase text-muted-foreground md:w-7 md:pt-0"
               >
                 {benchIndex + 6}
               </span>
@@ -685,39 +696,41 @@
                 <SeasonPlayerFace face={faceOf(playerVersionId)!} {manifest} size="sm" />
               {/if}
               <div class="min-w-0 flex-1">
-                <div class="flex min-w-0 flex-wrap items-center gap-2">
-                  <p class="min-w-0 text-sm font-semibold">{row.member.displayName}</p>
+                <p class="text-sm font-semibold leading-snug">{row.member.displayName}</p>
+                <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                   {#if overallByVersion?.has(playerVersionId)}
                     <span
-                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs font-bold text-foreground"
+                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
                     >
                       OVR {overallByVersion.get(playerVersionId)}
                     </span>
                   {/if}
                   {#if fatigue !== null}
                     <span
-                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold ${fatigue.badge}`}
+                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${fatigue.badge}`}
                     >
                       {fatigue.label}
                       {fatigue.percent}%
                     </span>
                   {/if}
                 </div>
-                <p class="font-mono text-xs text-muted-foreground">
+                <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
                   {row.role}
                   {#if row.member.playable.length > 0}· {formatPositions(row.member.playable)}{/if}
                   {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
                 </p>
                 {#if eraLabel !== null}
                   <p
-                    class="mt-0.5 line-clamp-2 font-mono text-[10px] leading-snug text-muted-foreground/70"
+                    class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
                   >
                     {eraLabel}
                   </p>
                 {/if}
               </div>
+            </div>
+            <div class="flex shrink-0 items-center justify-end gap-2">
               <div
-                class="flex shrink-0 flex-col gap-0.5 md:flex-row"
+                class="flex items-center gap-1"
                 role="group"
                 aria-label={`Bench order for ${row.member.displayName}`}
               >
@@ -726,7 +739,7 @@
                   aria-label={`Move ${row.member.displayName} up in bench order`}
                   onclick={() => moveBenchRow(benchIndex, -1)}
                   disabled={disabled || benchIndex === 0}
-                  class="grid h-9 w-9 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 md:h-8 md:w-8"
+                  class="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 md:h-8 md:w-8"
                 >
                   <ChevronUp class="h-4 w-4" />
                 </button>
@@ -735,7 +748,7 @@
                   aria-label={`Move ${row.member.displayName} down in bench order`}
                   onclick={() => moveBenchRow(benchIndex, 1)}
                   disabled={disabled || benchIndex === 4}
-                  class="grid h-9 w-9 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 md:h-8 md:w-8"
+                  class="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 md:h-8 md:w-8"
                 >
                   <ChevronDown class="h-4 w-4" />
                 </button>
@@ -778,7 +791,7 @@
 
 {#snippet minutesControl(row: (typeof rows)[number])}
   <div
-    class="flex shrink-0 items-center gap-1"
+    class="flex w-full max-w-[9.5rem] shrink-0 items-center justify-end gap-1 sm:w-auto sm:max-w-none sm:justify-start"
     role="group"
     aria-label={`Minutes for ${row.member.displayName}`}
   >

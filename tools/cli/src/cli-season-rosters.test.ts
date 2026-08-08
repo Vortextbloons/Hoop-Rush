@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -18,6 +17,7 @@ import {
 } from './report-schemas.ts';
 import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 import { fixtureHumanRoster } from './commands/season-data.ts';
+import { sha256Hex } from './io.ts';
 import {
   seasonRostersCalibrate,
   type SeasonRostersCalibrateDeps,
@@ -43,10 +43,6 @@ const MANIFEST = join(REPO_ROOT, 'apps/web/static/data/manifest.json');
 const CATALOG = join(REPO_ROOT, 'apps/web/static/data/season/draft-catalog.json');
 const LEAGUE = join(REPO_ROOT, 'apps/web/static/data/season/league.json');
 const SEED = 'd00d2026a1b2c3d4e5f60718293a4b5c6';
-
-function sha256Hex(content: Buffer | string): string {
-  return createHash('sha256').update(content).digest('hex');
-}
 
 const BAND_SCORES: Record<SeasonStrengthBand, number> = {
   contender: 90,

@@ -39,6 +39,7 @@ import {
   simulateSeasonBlockGame,
   type SeasonBlockSimulationInput,
 } from '@hoop-rush/engine';
+import { sleep } from '../lib/sleep';
 
 /**
  * Season Run block worker entry (spec/2.0/07 background execution, M2.3,
@@ -168,8 +169,6 @@ function postError(
   seasonWorkerMessageSchema.parse(payload);
   self.postMessage(payload);
 }
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * The packaged draft catalog is immutable and content-addressed; the module

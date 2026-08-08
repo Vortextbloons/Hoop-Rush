@@ -234,7 +234,13 @@ describe('season game controller (M2.2)', () => {
     let foundResult: ReturnType<typeof simulateSeasonGame> | null = null;
     for (let i = 0; i < 40 && found === null; i += 1) {
       const { input, result } = run(`foulout-${String(i)}`, { home, away });
-      if (result.outcome === 'completed' && result.foulOuts.length > 0) {
+      if (
+        result.outcome === 'completed' &&
+        result.foulOuts.some(
+          (event) =>
+            event.side === 'away' && event.playerVersionId === away.players[4]?.playerVersionId,
+        )
+      ) {
         found = input;
         foundResult = result;
       }
@@ -244,14 +250,15 @@ describe('season game controller (M2.2)', () => {
     if (found === null || foundResult === null) {
       throw new Error('expected a game with a foul-out');
     }
-    for (const event of foundResult.foulOuts) {
-      expect(event.side).toBe('away');
-      expect(event.playerVersionId).toBe(away.players[4]?.playerVersionId);
-      const player = foundResult.away.players.find(
-        (p) => p.playerVersionId === event.playerVersionId,
-      );
-      expect(player?.fouls).toBe(6);
-    }
+    const magnetEvent = foundResult.foulOuts.find(
+      (event) =>
+        event.side === 'away' && event.playerVersionId === away.players[4]?.playerVersionId,
+    );
+    expect(magnetEvent).toBeDefined();
+    const magnetPlayer = foundResult.away.players.find(
+      (player) => player.playerVersionId === away.players[4]?.playerVersionId,
+    );
+    expect(magnetPlayer?.fouls).toBe(6);
     expect(checkSeasonGameResult(foundResult, found)).toEqual([]);
     const outPlayer = foundResult.away.players.find(
       (p) => p.playerVersionId === away.players[4]?.playerVersionId,
@@ -296,6 +303,72 @@ describe('season game controller (M2.2)', () => {
     );
     expect(deviation?.reasons).toContain('injected-injury-removal');
     expect(checkSeasonGameResult(result, input)).toEqual([]);
+  });
+
+  it('applies same-period removals in descending game-clock order', () => {
+    const away = buildSeasonTeam('away');
+    const early = away.players[0];
+    const late = away.players[1];
+    if (early === undefined || late === undefined) throw new Error('fixture missing starters');
+    const { result } = run('removal-order', {
+      away,
+      awayRotation: buildSeasonRotation(away),
+      removals: [
+        {
+          side: 'away',
+          playerVersionId: late.playerVersionId,
+          period: 2,
+          secondsRemaining: 120,
+          reason: 'injected-injury-removal',
+        },
+        {
+          side: 'away',
+          playerVersionId: early.playerVersionId,
+          period: 2,
+          secondsRemaining: 600,
+          reason: 'injected-injury-removal',
+        },
+      ],
+    });
+    if (result.outcome !== 'completed') throw new Error('expected a completed game');
+    const earlyEvent = result.removals.find(
+      (event) => event.playerVersionId === early.playerVersionId,
+    );
+    const lateEvent = result.removals.find(
+      (event) => event.playerVersionId === late.playerVersionId,
+    );
+    expect(earlyEvent?.secondsRemaining).toBeGreaterThan(lateEvent?.secondsRemaining ?? 0);
+    expect(earlyEvent?.secondsRemaining).toBeLessThanOrEqual(600);
+    expect(lateEvent?.secondsRemaining).toBeLessThanOrEqual(120);
+  });
+
+  it('defers a bench injury until the player has actual court exposure', () => {
+    const away = buildSeasonTeam('away');
+    const benchPlayer = away.players[9];
+    if (benchPlayer === undefined) throw new Error('fixture missing bench player');
+    const { result } = run('bench-removal-exposure', {
+      away,
+      awayRotation: buildSeasonRotation(away),
+      removals: [
+        {
+          side: 'away',
+          playerVersionId: benchPlayer.playerVersionId,
+          period: 1,
+          secondsRemaining: 700,
+          reason: 'injected-injury-removal',
+        },
+      ],
+    });
+    if (result.outcome !== 'completed') throw new Error('expected a completed game');
+    const event = result.removals.find(
+      (removal) => removal.playerVersionId === benchPlayer.playerVersionId,
+    );
+    expect(event).toBeDefined();
+    expect(event?.secondsRemaining).toBeLessThan(700);
+    const player = result.away.players.find(
+      (row) => row.playerVersionId === benchPlayer.playerVersionId,
+    );
+    expect(player?.seconds).toBeGreaterThan(0);
   });
 
   it('pregame unavailability selects a contingency unit and marks causes', () => {

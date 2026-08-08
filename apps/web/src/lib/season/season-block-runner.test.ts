@@ -70,6 +70,7 @@ import {
 
 class FakeWorker {
   static instances: FakeWorker[] = [];
+  static clonePostedMessages = false;
   posted: unknown[] = [];
   private listeners: Array<(event: MessageEvent<unknown>) => void> = [];
 
@@ -81,6 +82,7 @@ class FakeWorker {
   }
 
   postMessage(data: unknown): void {
+    if (FakeWorker.clonePostedMessages) structuredClone(data);
     this.posted.push(data);
   }
 
@@ -181,6 +183,10 @@ function makeRepository(run: SeasonRun): MockRepository {
 }
 
 let schedule: SeasonSchedule;
+
+beforeEach(() => {
+  FakeWorker.clonePostedMessages = false;
+});
 
 function startInput(
   run: SeasonRun,
@@ -498,6 +504,44 @@ describe('season block runner (M2.5 wire)', () => {
     });
     expect(start.commandId).toBe('cmd-1');
     expect(events.some((event) => event === 'started')).toBe(true);
+  });
+
+  it('removes reactive proxies from the request before posting to the worker', async () => {
+    const base = makeRun();
+    const run: SeasonRun = {
+      ...base,
+      transactions: [
+        {
+          transactionId: 'txn-initial-proxy',
+          commandId: null,
+          franchiseId: 'lakers',
+          type: 'initial-grant',
+          blockIndex: null,
+          appliedAtStateRevision: 0,
+          // Transaction payload values are intentionally open JSON. Zod
+          // validates them as unknown, so a Svelte $state proxy can retain
+          // its identity unless the complete wire request is snapshotted.
+          payload: new Proxy({ balance: 5 }, {}),
+          explanation: 'Initial Influence grant',
+        },
+      ],
+    };
+    const runner = createSeasonBlockRunner({
+      repository: makeRepository(run),
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: string[] = [];
+    runner.subscribe((event) => events.push(event.type));
+    FakeWorker.clonePostedMessages = true;
+
+    runner.startBlock(startInput(run));
+    await flush();
+
+    expect(FakeWorker.instances[0]?.posted).toHaveLength(1);
+    expect(events).toContain('started');
+    expect(events).not.toContain('error');
   });
 
   it('sends the pending candidate facts on a resume start request', async () => {

@@ -24,6 +24,9 @@ import {
 export type ActionType =
   'isolation' | 'pickAndRoll' | 'pickAndRollRoll' | 'postUp' | 'spotUp' | 'cut' | 'transition';
 
+export type PossessionStartType =
+  'neutral' | 'madeBasket' | 'deadBall' | 'liveTurnover' | 'defensiveRebound' | 'offensiveRebound';
+
 export const ACTION_TYPES: readonly ActionType[] = [
   'isolation',
   'pickAndRoll',
@@ -165,8 +168,13 @@ export function pickAction(
   initiator: SimulationPlayer,
   weights: readonly number[],
   rng: Rng,
+  start: PossessionStartType = 'neutral',
 ): ActionType {
-  return rng.weightedPick(ACTION_TYPES, weights);
+  const contextual = [...weights];
+  const transitionIndex = ACTION_INDEX.transition;
+  contextual[transitionIndex] =
+    (contextual[transitionIndex] ?? 0) * ENGINE_CONSTANTS.transitionStartMultiplier[start];
+  return rng.weightedPick(ACTION_TYPES, contextual);
 }
 
 /** Probability that an action produces a pass before the shot. */

@@ -17,27 +17,16 @@ import {
   type PlayersIndex,
   type RosterDetails,
 } from '@hoop-rush/data-contracts';
-import { resolve } from '$app/paths';
+import { resolveAssetUrl } from './asset-url';
 import { readCachedAsset, readCachedPool, writeCachedAsset, writeCachedPool } from './pool-cache';
 
 let manifestPromise: Promise<HoopRushManifest> | null = null;
 
-/** Absolute site root for packaged JSON assets (respects GitHub Pages base path). */
-function siteRoot(): string {
-  return resolve('/');
-}
-
 function manifestUrl(): string {
-  return `${siteRoot()}data/manifest.json`;
+  return resolveAssetUrl('manifest.json');
 }
 
 const CONTENT_HASH_MISMATCH = /content hash mismatch: expected ([0-9a-f]{64}), got ([0-9a-f]{64})/;
-
-/** Pool URLs are relative to the manifest directory (e.g. pools/lakers-1990s.json). */
-function resolveAssetUrl(url: string): string {
-  if (/^https?:\/\//.test(url) || url.startsWith('/')) return url;
-  return `${siteRoot()}data/${url}`;
-}
 
 function cacheBustedUrl(url: string): string {
   const separator = url.includes('?') ? '&' : '?';

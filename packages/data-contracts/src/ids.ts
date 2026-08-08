@@ -13,6 +13,18 @@ const id = z
   .max(64)
   .regex(/^[a-z0-9][a-z0-9._:-]*$/);
 
+/** The base id shape every opaque lowercase URL-safe id reuses. */
+export const idSchema = id;
+export type Id = z.infer<typeof idSchema>;
+
+/** Stable typed command id (system-generated or human); same base shape. */
+export const commandIdSchema = id;
+export type CommandId = z.infer<typeof commandIdSchema>;
+
+/** Stable game id from the committed Season Run schedule artifact, e.g. "s000042". */
+export const seasonGameIdSchema = z.string().regex(/^s[0-9]{6}$/);
+export type SeasonGameId = z.infer<typeof seasonGameIdSchema>;
+
 export const playerIdSchema = id;
 export type PlayerId = z.infer<typeof playerIdSchema>;
 

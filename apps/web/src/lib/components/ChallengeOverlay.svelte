@@ -4,7 +4,6 @@
   import { X } from '@lucide/svelte';
   import type { ChallengeRun, HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
-  import { BEST_OF_ATTEMPTS } from '@hoop-rush/engine';
   import type { RunnerPhase } from '$lib/challenge-runner';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
@@ -249,11 +248,5 @@
         <p class="w-full text-sm text-destructive">{error}</p>
       {/if}
     </div>
-
-    <p class="mt-4 font-mono text-[10px] text-muted-foreground">
-      seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion}
-      · bracket {run.versions.bracketVersion}
-      · schedule {run.versions.scheduleVersion}
-    </p>
   </div>
 </div>

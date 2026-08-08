@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema, seedSchema } from './ids.ts';
+import { franchiseIdSchema, seasonGameIdSchema, seedSchema } from './ids.ts';
 import {
   SEASON_GAME_COUNT,
   SEASON_LEAGUE_VERSION,
@@ -17,7 +17,7 @@ import {
 
 export const seasonScheduleGameSchema = z.object({
   /** Stable, globally unique game id, e.g. "s000042". */
-  gameId: z.string().regex(/^s[0-9]{6}$/),
+  gameId: seasonGameIdSchema,
   /** Abstract round label 1..82; each round holds 15 games. */
   round: z.number().int().min(1).max(SEASON_ROUND_COUNT),
   homeFranchiseId: franchiseIdSchema,

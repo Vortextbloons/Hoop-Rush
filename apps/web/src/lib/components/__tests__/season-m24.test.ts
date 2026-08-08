@@ -300,7 +300,7 @@ describe('CheckpointRecap (M2.4)', () => {
     expect(text).toContain('Stamina and chemistry');
     expect(text).toContain('Fatigued shooters converted at a lower rate');
     expect(text).toContain('90 opportunities');
-    expect(text).toContain('Average state 40%');
+    expect(text).toContain('Fatigue · swing');
     expect(text).toContain('-25.00pp');
     expect(text).toContain('Chemistry converted passes into assists');
   });

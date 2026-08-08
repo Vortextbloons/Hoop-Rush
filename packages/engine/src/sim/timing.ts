@@ -1,13 +1,14 @@
 import type { EraSimulationProfile } from '@hoop-rush/data-contracts';
 import type { Rng } from './rng.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
+import { REGULATION_TOTAL_SECONDS } from './periods.ts';
 
 /**
  * Era pace determines possession duration (spec/03). Both teams share the game
  * clock, so the mean trip length is 2880 / (2 * pace) seconds; trips sample
  * around that mean, clamped to the shot clock and the time remaining in the
- * period. Free throws consume additional clock so the pace target holds for
- * high-foul games too.
+ * period. Free throws are stopped-clock events; only live-ball continuations
+ * consume additional game time.
  *
  * The profile's `pace` is the league's possessions-per-game ESTIMATE (FGA +
  * 0.44*FTA - OReb + TOV from the packaged stints). That convention over-counts
@@ -22,7 +23,7 @@ export function meanTripSeconds(profile: EraSimulationProfile): number {
   const tripsPerTeamGame = profile.parameters.pace * ENGINE_CONSTANTS.estimateToTripsFactor;
   return Math.max(
     ENGINE_CONSTANTS.minimumTripSeconds,
-    2880 / (2 * tripsPerTeamGame) - ENGINE_CONSTANTS.paceDeadBallAdjustment,
+    REGULATION_TOTAL_SECONDS / (2 * tripsPerTeamGame) - ENGINE_CONSTANTS.paceDeadBallAdjustment,
   );
 }
 

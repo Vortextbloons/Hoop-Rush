@@ -357,7 +357,7 @@
     {/if}
 
     <p class="mt-6 px-3 font-mono text-xs text-muted-foreground sm:px-0">
-      Results come from accepted checkpoints; scheduled games carry no prediction.
+      Results update as checkpoints complete; scheduled games carry no prediction.
     </p>
   </section>
 {/if}

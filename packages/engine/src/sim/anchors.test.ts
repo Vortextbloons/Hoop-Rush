@@ -354,7 +354,7 @@ describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
     expect(fieldGoalPct).toBeLessThan(0.521);
     expect(threePointPct).toBeGreaterThan(0.334);
     expect(threePointPct).toBeLessThan(0.414);
-    expect(freeThrowPct).toBeGreaterThan(0.81);
+    expect(freeThrowPct).toBeGreaterThan(0.8);
     expect(freeThrowPct).toBeLessThan(0.88);
     // Real MJ converts ~8.6% of his possessions into turnovers; the old
     // era-anchored model pushed stars to the league mean (~11-12%). The

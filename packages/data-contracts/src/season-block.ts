@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
+import { seasonRunCommandBaseSchema } from './season-command-base.ts';
 import { seasonCandidateCheckpointSchema } from './season-checkpoint.ts';
+import { seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
-import { SEASON_BLOCK_VERSION, SEASON_RUN_SCHEMA_VERSION } from './season-versions.ts';
+import { SEASON_BLOCK_VERSION } from './season-versions.ts';
 
 /**
  * SubmitSeasonBlock command and its typed results (spec/2.0/07 required
@@ -18,35 +20,20 @@ import { SEASON_BLOCK_VERSION, SEASON_RUN_SCHEMA_VERSION } from './season-versio
  * checkpoint or one typed rejection.
  */
 
-export const seasonSubmitBlockCommandSchema = z.object({
-  schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
+export const seasonSubmitBlockCommandSchema = seasonRunCommandBaseSchema.extend({
   blockVersion: z.literal(SEASON_BLOCK_VERSION),
   command: z.literal('submit-season-block'),
-  /** Unique command id; the same id is rejected twice (no double commits). */
-  commandId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
-  runId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
   /** Must equal the run's accepted-block count; stale cursors are rejected. */
   expectedRevision: z.number().int().nonnegative(),
   /** 0-based block index to simulate. */
   blockIndex: z.number().int().min(0).max(8),
   /** Canonical digest of the 30 rotations being locked for this block. */
-  rotationDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  rotationDigest: seasonRotationSetDigestSchema,
   /**
    * M2.5: the locked block objective (blocks 0-7), or null for the final
    * two-game block 8. Must have been selected and offered for this block.
    */
   objectiveId: seasonObjectiveIdSchema.nullable(),
-  /** M2.5: the run state facts this submission asserts. */
-  expectedStateRevision: z.number().int().nonnegative(),
-  expectedStateDigest: z.string().regex(/^[0-9a-f]{32}$/),
 });
 export type SeasonSubmitBlockCommand = z.infer<typeof seasonSubmitBlockCommandSchema>;
 

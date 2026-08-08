@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { generateSchedule, scheduleInvariants, validateBracketContent } from '@hoop-rush/engine';
@@ -10,6 +9,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { bracketAuditReportSchema } from '../report-schemas.ts';
+import { readJson, sha256Hex } from '../io.ts';
+import { median } from '../stats.ts';
 
 /**
  * `bracket audit` (spec/09 target): validates the fixed 30-team bracket and
@@ -25,28 +26,6 @@ export const BRACKET_AUDIT_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-function readJson(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch (error) {
-    throw new Error(`cannot read ${path}: ${(error as Error).message}`);
-  }
-}
-
-function sha256Hex(content: Buffer): string {
-  return createHash('sha256').update(content).digest('hex');
-}
-
-/** Median of a sorted numeric list. */
-function median(values: readonly number[]): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  if (sorted.length === 0) return 0;
-  const mid = Math.floor(sorted.length / 2);
-  if (sorted.length % 2 === 1) return sorted[mid] ?? 0;
-  return ((sorted[mid - 1] ?? 0) + (sorted[mid] ?? 0)) / 2;
-}
-
-/** Compares the opening opponent entry against the frozen preview artifact. */
 function openingOpponentUnchanged(bracket: OpponentBracket, previewPath: string): string[] {
   const failures: string[] = [];
   const preview = readJson(previewPath);

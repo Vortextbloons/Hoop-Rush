@@ -7,7 +7,7 @@
     SeasonDraftCatalog,
     SeasonGameSummary,
   } from '@hoop-rush/data-contracts';
-  import { franchiseAbbreviation, humanFranchiseIdOf } from '@hoop-rush/data-contracts';
+  import { humanFranchiseIdOf } from '@hoop-rush/data-contracts';
   import BoxScore from '$lib/components/season/BoxScore.svelte';
   import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
   import {
@@ -184,7 +184,7 @@
       </h1>
       {#if recap}
         <p class="mt-2 text-sm text-muted-foreground">
-          {ordinal(recap.completedRounds)} rounds complete · recap of the last accepted block
+          {ordinal(recap.completedRounds)} rounds complete · recap of the last checkpoint
         </p>
       {/if}
     </div>
@@ -273,8 +273,7 @@
                     />
                     {#if retainedGameIds.includes(summary.gameId)}
                       <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-                        Detailed play-by-play facts (substitutions, unit stints) are retained for
-                        this game.
+                        Full game detail available.
                       </p>
                     {/if}
                   {:else}
@@ -286,14 +285,6 @@
           </div>
         </section>
       {/if}
-
-      <p class="font-mono text-[10px] text-muted-foreground">
-        run {run?.runId} · block {lastBlock.blockIndex} · revision {lastBlock.revision} · checkpoint {lastBlock.checkpointDigest.slice(
-          0,
-          10,
-        )}… ·
-        {franchiseAbbreviation(humanFranchiseId ?? '')}
-      </p>
     </div>
   {/if}
 </section>

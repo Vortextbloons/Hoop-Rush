@@ -1,5 +1,5 @@
 import type { BracketScheduleEntry, Seed } from '@hoop-rush/data-contracts';
-import { createRng, swapAt } from '../sim/rng.ts';
+import { createRng, shuffle, swapAt } from '../sim/rng.ts';
 
 /**
  * Fixed schedule generation (spec/01 challenge schedule). One seeded,
@@ -14,10 +14,7 @@ export const SCHEDULE_GENERATION_VERSION = 'schedule-v1';
 /** Counts assignment: which opponents appear twice instead of three times. */
 export function pickTwoGameOpponents(opponentIds: readonly string[], seed: Seed): Set<string> {
   const rng = createRng(`${seed}:counts`);
-  const shuffled = [...opponentIds];
-  for (let i = shuffled.length - 1; i > 0; i -= 1) {
-    swapAt(shuffled, i, rng.nextInt(0, i));
-  }
+  const shuffled = shuffle(opponentIds, rng);
   return new Set(shuffled.slice(0, 8));
 }
 
@@ -49,10 +46,7 @@ export function generateSchedule(
   for (const id of distinct) {
     for (let i = 0; i < (counts.get(id) ?? 0); i += 1) remaining.push(id);
   }
-  for (let i = remaining.length - 1; i > 0; i -= 1) {
-    swapAt(remaining, i, rng.nextInt(0, i));
-  }
-  slots.push(...remaining);
+  slots.push(...shuffle(remaining, rng));
 
   // Deterministically repair any immediate repeat by swapping with a later
   // slot that resolves it. 30 teams guarantee a repair always exists.
@@ -89,34 +83,112 @@ export function generateSchedule(
   return schedule;
 }
 
+/** Per-entry schedule audit facts, in schedule order. */
+export interface ScheduleEntryAuditFacts {
+  gameNumber: number;
+  opponentId: string;
+  /** gameNumber outside 1..82. */
+  outOfRange: boolean;
+  /** gameNumber seen in an earlier entry. */
+  repeatedNumber: boolean;
+  /** opponentId not present in the bracket's known opponent ids. */
+  unknownOpponent: boolean;
+  /** Repeat vs the entry referenced by gameNumber-1 (validateSchedule semantics). */
+  repeatsPreviousByGameNumber: boolean;
+  /** Repeat vs the previous array position (scheduleInvariants semantics). */
+  repeatsPreviousByPosition: boolean;
+  /** gameNumber differs from the entry's 1-based array position. */
+  gameNumberMismatchAtPosition: boolean;
+}
+
+/** Structured 82-game schedule audit facts shared by both validators. */
+export interface ScheduleAuditFacts {
+  length: number;
+  entries: ScheduleEntryAuditFacts[];
+  /** gameNumbers 1..82 absent from the schedule, ascending. */
+  missingNumbers: number[];
+  /** Opponents with exactly three scheduled games. */
+  threeCount: number;
+  /** Opponents with exactly two scheduled games. */
+  twoCount: number;
+}
+
+/**
+ * Shared 82-game schedule audit core (single implementation of the counts,
+ * range, reference, and immediate-repeat checks). The two validators
+ * (`scheduleInvariants` here and `validateSchedule` in challenge/commands.ts)
+ * format their own failure messages from these facts; the two immediate-
+ * repeat semantics are both reported because the historical validators index
+ * differently (position order vs gameNumber order) and both behaviors are
+ * preserved.
+ */
+export function auditScheduleEntries(
+  schedule: readonly BracketScheduleEntry[],
+  knownOpponentIds: ReadonlySet<string>,
+): ScheduleAuditFacts {
+  const counts = new Map<string, number>();
+  const seenNumbers = new Set<number>();
+  const entries: ScheduleEntryAuditFacts[] = [];
+  for (let index = 0; index < schedule.length; index += 1) {
+    const entry = schedule[index];
+    if (entry === undefined) continue;
+    const repeatsPreviousByPosition =
+      index > 0 && entry.opponentId === schedule[index - 1]?.opponentId;
+    const repeatsPreviousByGameNumber =
+      entry.gameNumber > 1 && entry.opponentId === schedule[entry.gameNumber - 2]?.opponentId;
+    entries.push({
+      gameNumber: entry.gameNumber,
+      opponentId: entry.opponentId,
+      outOfRange: entry.gameNumber < 1 || entry.gameNumber > 82,
+      repeatedNumber: seenNumbers.has(entry.gameNumber),
+      unknownOpponent: !knownOpponentIds.has(entry.opponentId),
+      repeatsPreviousByGameNumber,
+      repeatsPreviousByPosition,
+      gameNumberMismatchAtPosition: entry.gameNumber !== index + 1,
+    });
+    seenNumbers.add(entry.gameNumber);
+    counts.set(entry.opponentId, (counts.get(entry.opponentId) ?? 0) + 1);
+  }
+  const missingNumbers: number[] = [];
+  for (let n = 1; n <= 82; n += 1) {
+    if (!seenNumbers.has(n)) missingNumbers.push(n);
+  }
+  const countsList = [...counts.values()];
+  return {
+    length: schedule.length,
+    entries,
+    missingNumbers,
+    threeCount: countsList.filter((c) => c === 3).length,
+    twoCount: countsList.filter((c) => c === 2).length,
+  };
+}
+
 /** Whether a generated schedule satisfies the fixed counts and no-repeat rules. */
 export function scheduleInvariants(schedule: readonly BracketScheduleEntry[]): string[] {
   const failures: string[] = [];
-  if (schedule.length !== 82) {
-    failures.push(`schedule must have 82 games (got ${String(schedule.length)})`);
+  const facts = auditScheduleEntries(schedule, new Set(schedule.map((e) => e.opponentId)));
+  if (facts.length !== 82) {
+    failures.push(`schedule must have 82 games (got ${String(facts.length)})`);
     return failures;
   }
-  const counts = new Map<string, number>();
-  for (const entry of schedule) {
-    counts.set(entry.opponentId, (counts.get(entry.opponentId) ?? 0) + 1);
-    if (entry.gameNumber < 1 || entry.gameNumber > 82) {
+  for (const entry of facts.entries) {
+    if (entry.outOfRange) {
       failures.push(`gameNumber ${String(entry.gameNumber)} out of range`);
     }
   }
   for (let n = 1; n <= 82; n += 1) {
-    const entry = schedule[n - 1];
-    if (entry?.gameNumber !== n) {
+    const entry = facts.entries[n - 1];
+    if (entry !== undefined && entry.gameNumberMismatchAtPosition) {
       failures.push(`game ${String(n)} missing from the schedule`);
     }
-    if (n > 1 && entry !== undefined && entry.opponentId === schedule[n - 2]?.opponentId) {
+    if (n > 1 && entry !== undefined && entry.repeatsPreviousByPosition) {
       failures.push(`immediate repeat of ${entry.opponentId} at game ${String(n)}`);
     }
   }
-  const countsList = [...counts.values()];
-  if (countsList.filter((c) => c === 3).length !== 22) {
+  if (facts.threeCount !== 22) {
     failures.push('expected exactly 22 opponents with three games');
   }
-  if (countsList.filter((c) => c === 2).length !== 8) {
+  if (facts.twoCount !== 8) {
     failures.push('expected exactly eight opponents with two games');
   }
   return failures;

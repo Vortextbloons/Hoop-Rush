@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { eraIdSchema, franchiseIdSchema, seedSchema } from './ids.ts';
+import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonLeagueSchema } from './season-league.ts';
 import { SEASON_DRAFT_VERSION } from './season-versions.ts';
@@ -117,7 +118,7 @@ export const seasonDraftAcceptedRecordSchema = z.object({
   revisionBefore: z.number().int().nonnegative(),
   revisionAfter: z.number().int().nonnegative(),
   /** Canonical digest of the full state after this command. */
-  stateDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  stateDigest: seasonCheckpointDigestSchema,
   command: seasonDraftCommandSchema,
 });
 export type SeasonDraftAcceptedRecord = z.infer<typeof seasonDraftAcceptedRecordSchema>;

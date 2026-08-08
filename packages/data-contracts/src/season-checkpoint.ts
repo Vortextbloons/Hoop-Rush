@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { franchiseIdSchema, seedSchema } from './ids.ts';
+import { seasonCheckpointDigestSchema, seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonGameSummarySchema, seasonRetainedGameDetailSchema } from './season-game-summary.ts';
 import { seasonPlayerAggregateSchema, seasonTeamAggregateSchema } from './season-aggregates.ts';
 import { seasonStandingsSchema } from './season-standings.ts';
@@ -91,12 +92,10 @@ export const seasonCheckpointVersionsSchema = z.object({
 export type SeasonCheckpointVersions = z.infer<typeof seasonCheckpointVersionsSchema>;
 
 /** 32-hex canonical checkpoint digest (engine season/checkpoint). */
-export const seasonCheckpointDigestSchema = z.string().regex(/^[0-9a-f]{32}$/);
-export type SeasonCheckpointDigest = z.infer<typeof seasonCheckpointDigestSchema>;
+export { seasonCheckpointDigestSchema, type SeasonCheckpointDigest } from './season-digests.ts';
 
 /** 32-hex canonical digest of the locked 30-rotation set (engine season/rotation). */
-export const seasonRotationSetDigestSchema = z.string().regex(/^[0-9a-f]{32}$/);
-export type SeasonRotationSetDigest = z.infer<typeof seasonRotationSetDigestSchema>;
+export { seasonRotationSetDigestSchema, type SeasonRotationSetDigest } from './season-digests.ts';
 
 /**
  * One candidate block output. `gameSummaries` holds every completed game of

@@ -18,6 +18,8 @@ import {
 } from '@hoop-rush/engine';
 import { recordFromState, type SeasonDraftRepository } from '@hoop-rush/persistence';
 import { newSeasonId } from './season-ids';
+import { runOneShotWorker } from '$lib/one-shot-worker';
+import { sleep } from '$lib/sleep';
 import type {
   GenerationWorkerRequest,
   GenerationWorkerResponse,
@@ -216,7 +218,7 @@ export class SeasonDraftFlow {
     }
     this.error = null;
     this.setPhase('generating');
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await sleep(0);
     try {
       if (this.useWorker && this.targets !== null) {
         this.generationBridge.precomputed = await this.runGenerationInWorker(
@@ -267,36 +269,25 @@ export class SeasonDraftFlow {
     if (targets === null) {
       throw new Error('worker generation requires roster targets');
     }
-    const worker = new Worker(
-      new URL('../../workers/season-draft-generation-worker.ts', import.meta.url),
-      { type: 'module' },
-    );
-    const requestId = newSeasonId('gen');
-    return new Promise((resolve, reject) => {
-      const onMessage = (event: MessageEvent<GenerationWorkerResponse>): void => {
-        const message = event.data;
-        if (message.requestId !== requestId) return;
-        worker.removeEventListener('message', onMessage);
-        worker.terminate();
-        if (message.type === 'complete') {
-          resolve(message.generation);
-          return;
-        }
-        reject(new Error(message.message));
-      };
-      worker.addEventListener('message', onMessage);
-      worker.addEventListener('error', (event) => {
-        worker.removeEventListener('message', onMessage);
-        worker.terminate();
-        reject(new Error(event.message || 'AI league generation worker failed'));
-      });
-      const request: GenerationWorkerRequest = {
-        type: 'generate',
-        requestId,
-        input,
-        targets,
-      };
-      worker.postMessage(request);
+    const request: GenerationWorkerRequest = {
+      type: 'generate',
+      requestId: newSeasonId('gen'),
+      input,
+      targets,
+    };
+    return runOneShotWorker<
+      GenerationWorkerRequest,
+      GenerationWorkerResponse,
+      SeasonLeagueGenerationResult
+    >({
+      createWorker: () =>
+        new Worker(new URL('../../workers/season-draft-generation-worker.ts', import.meta.url), {
+          type: 'module',
+        }),
+      request,
+      resultOf: (message) => (message.type === 'complete' ? message.generation : null),
+      errorOf: (message) => (message.type === 'error' ? message.message : null),
+      errorFallback: 'AI league generation worker failed',
     });
   }
 

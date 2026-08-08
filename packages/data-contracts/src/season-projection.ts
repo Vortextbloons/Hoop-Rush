@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { eraIdSchema } from './ids.ts';
+import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   PROJECTION_MODEL_VERSION,
@@ -154,9 +155,9 @@ export const seasonProjectionSchema = z
     eraProfileVersion: z.string().min(1).max(64),
     dataVersion: z.string().min(1).max(64),
     /** Canonical digest of the roster + rotation input (32-hex). */
-    inputDigest: z.string().regex(/^[0-9a-f]{32}$/),
+    inputDigest: seasonCheckpointDigestSchema,
     /** Canonical audit digest (32-hex). */
-    digest: z.string().regex(/^[0-9a-f]{32}$/),
+    digest: seasonCheckpointDigestSchema,
     /** All representative units; weighted units sum their weights to 1. */
     units: z.array(seasonProjectionUnitSchema).min(1),
     minutes: z.array(seasonProjectionMinuteRowSchema).length(10),

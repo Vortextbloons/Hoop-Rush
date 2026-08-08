@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import {
   franchiseEraPoolSchema,
@@ -7,6 +6,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { defenseBpmCorrelationReportSchema } from '../report-schemas.ts';
+import { tryReadJson } from '../io.ts';
 
 /**
  * `data defense-bpm-correlation`: Pearson correlation between packaged
@@ -32,14 +32,6 @@ export const DATA_DEFENSE_BPM_CORRELATION_OPTIONS: Record<string, boolean> = {
 
 interface DefenseBpmCorrelationOptions {
   input: string;
-}
-
-function readJson(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -73,7 +65,7 @@ function round4(value: number): number {
 
 /** Correlates packaged defenseRating with the raw source box plus/minus. */
 export function defenseBpmCorrelation(options: DefenseBpmCorrelationOptions): CliReport {
-  const rawManifest = readJson(options.input);
+  const rawManifest = tryReadJson(options.input);
   const parsedManifest = hoopRushManifestSchema.safeParse(rawManifest);
   if (!parsedManifest.success) {
     const issue = parsedManifest.error.issues[0];
@@ -97,7 +89,7 @@ export function defenseBpmCorrelation(options: DefenseBpmCorrelationOptions): Cl
   const rows: PeakPlayerSeason[] = [];
   for (const poolRef of manifest.pools) {
     const assetPath = isAbsolute(poolRef.url) ? poolRef.url : resolve(manifestDir, poolRef.url);
-    const parsedPool = franchiseEraPoolSchema.safeParse(readJson(assetPath));
+    const parsedPool = franchiseEraPoolSchema.safeParse(tryReadJson(assetPath));
     if (!parsedPool.success) {
       const issue = parsedPool.error.issues[0];
       failures.push(
@@ -113,7 +105,7 @@ export function defenseBpmCorrelation(options: DefenseBpmCorrelationOptions): Cl
     const cached = seasonStatsCache.get(seasonKey);
     if (cached !== undefined) return cached;
     const byPlayer = new Map<string, number | null>();
-    const raw = readJson(join(rawNbaRoot, seasonKey, 'season-stats.json'));
+    const raw = tryReadJson(join(rawNbaRoot, seasonKey, 'season-stats.json'));
     if (Array.isArray(raw)) {
       for (const entry of raw) {
         const record = entry as Record<string, unknown>;

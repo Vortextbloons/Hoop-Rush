@@ -1,0 +1,24 @@
+name: Run Playwright e2e
+description: Cache and install Playwright browsers, then run the given e2e command.
+
+inputs:
+  command:
+    description: E2E command to run (e.g. `pnpm e2e:smoke` or `pnpm e2e`)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - name: Install Playwright browsers
+      run: pnpm --filter @hoop-rush/web exec playwright install --with-deps chromium
+      shell: bash
+
+    - name: Run Playwright tests
+      run: ${{ inputs.command }}
+      shell: bash

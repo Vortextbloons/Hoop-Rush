@@ -5,6 +5,7 @@ import {
   type PlannerRotationContext,
   type PlannerUnitRequest,
 } from '../season/rotation-planner.ts';
+import { OVERTIME_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS } from '../sim/periods.ts';
 
 /**
  * Read-only rotation trace (projection milestone). The trace calls the
@@ -20,7 +21,7 @@ import {
 
 const REGULATION_TICKS = 48;
 const TICK_SECONDS = 60;
-const CLOSING_WINDOW_SECONDS = 300;
+const CLOSING_WINDOW_SECONDS = OVERTIME_PERIOD_SECONDS;
 /** Non-close traces use a margin that never triggers the closing window. */
 const NON_CLOSE_MARGIN = 20;
 
@@ -63,7 +64,7 @@ function trace(context: PlannerRotationContext, closeGame: boolean): RotationTra
 
   for (let tick = 0; tick < REGULATION_TICKS; tick += 1) {
     const period = Math.floor(tick / 12) + 1;
-    const secondsRemaining = 720 - (tick % 12) * TICK_SECONDS;
+    const secondsRemaining = REGULATION_PERIOD_SECONDS - (tick % 12) * TICK_SECONDS;
     for (const player of currentUnit) {
       actualSeconds.set(player, (actualSeconds.get(player) ?? 0) + TICK_SECONDS);
     }

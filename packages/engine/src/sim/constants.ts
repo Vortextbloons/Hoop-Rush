@@ -10,12 +10,11 @@ import type { PositionResponsibilityModifiers } from './position-responsibilitie
  */
 
 /**
- * m3-engine-v10 adds the conservative reconstructed three-point path
- * (spec/12): pre-1979 and missing-record seasons with a reconstructed
- * profile shoot from the profile's pinned conservative volume and accuracy,
- * with profile-level zone floors and no generic historical era penalty.
+ * m3-engine-v11 corrects team-foul accounting and stopped-clock free throws,
+ * and conditions transition opportunities on how possession began. It
+ * retains v10's conservative reconstructed three-point path.
  */
-export const ENGINE_VERSION = 'm3-engine-v10';
+export const ENGINE_VERSION = 'm3-engine-v11';
 
 export const ENGINE_CONSTANTS = {
   version: ENGINE_VERSION,
@@ -142,6 +141,14 @@ export const ENGINE_CONSTANTS = {
   fouledShotMakeScale: 0.95,
   /** How strongly the observed free-throw-attempt rate anchors foul draws. */
   observedFoulDrawBlend: 0.5,
+  /** Share of non-shooting foul events that are offensive/team-control fouls. */
+  offensiveFoulShare: 0.32,
+  /**
+   * Offensive fouls are already represented inside observed turnover rates;
+   * subtract their calibrated per-trip share from the separate security gate
+   * so adding an explicit offensive-foul outcome does not double-count them.
+   */
+  offensiveFoulTurnoverOffset: 0.029,
 
   /** Free-throw conversion anchor: a 75 rating converts at leagueFtPct. */
   freeThrowAnchorRating: 75,
@@ -149,8 +156,8 @@ export const ENGINE_CONSTANTS = {
   /** Non-shooting fouls in the bonus award two free throws from this team-foul count. */
   bonusFoulsRegulation: 5,
   bonusFoulsOvertime: 2,
-  /** Free throws consume this many seconds of game clock each. */
-  secondsPerFreeThrow: 3,
+  /** Free throws are dead-ball events and consume no game-clock time. */
+  secondsPerFreeThrow: 0,
   /** A trip may not take longer than the shot clock. */
   shotClockSeconds: 24,
   /** Minimum sampled trip duration, in seconds. */
@@ -162,8 +169,24 @@ export const ENGINE_CONSTANTS = {
   threePointRateWeight: 0.35,
   /** Blend of era zone mix into player shot-mix selection. */
   eraZoneMixBlend: 0.55,
-  /** Base-trip allowance reserved for fouls and free throws charged afterward. */
-  paceDeadBallAdjustment: 0.75,
+  /** Base-trip allowance reserved for live-ball continuations charged afterward. */
+  paceDeadBallAdjustment: 0,
+
+  /**
+   * Possession-start multipliers for the transition action weight. Live
+   * turnovers create the strongest break opportunity, defensive rebounds a
+   * smaller one, and made baskets/dead balls suppress transition. These
+   * multipliers consume no additional RNG and only reshape the existing
+   * action draw.
+   */
+  transitionStartMultiplier: {
+    neutral: 1,
+    madeBasket: 0.45,
+    deadBall: 0.35,
+    liveTurnover: 2.15,
+    defensiveRebound: 1.55,
+    offensiveRebound: 0.2,
+  } as const,
   /**
    * Converts the profile's league possessions-per-game estimate (FGA +
    * 0.44*FTA - OReb + TOV) to the real trip rate the engine accounts in box

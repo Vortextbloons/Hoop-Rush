@@ -13,6 +13,7 @@
   } from '$lib/season/season-branding';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
+  import { oneDecimal } from '$lib/format';
 
   /**
    * League leaders board for one category (spec/2.0/02 leaders,
@@ -46,7 +47,7 @@
   const first = $derived(entries[0] ?? null);
 
   const valueText = (value: number): string =>
-    Number.isInteger(value) ? String(value) : value.toFixed(1);
+    Number.isInteger(value) ? String(value) : oneDecimal(value);
 
   /** Historical source identity for one version (logo candidates + label). */
   function versionSource(entry: SeasonLeaderEntry): {
@@ -125,7 +126,7 @@
           {valueText(first.value)}
         </span>
         <span class="block font-mono text-[10px] text-muted-foreground">
-          {first.perGame.toFixed(1)}/g
+          {oneDecimal(first.perGame)}/g
         </span>
       </p>
     </div>
@@ -156,7 +157,7 @@
               {valueText(entry.value)}
             </span>
             <span class="block font-mono text-[10px] text-muted-foreground">
-              {entry.perGame.toFixed(1)}/g
+              {oneDecimal(entry.perGame)}/g
             </span>
           </span>
         </li>

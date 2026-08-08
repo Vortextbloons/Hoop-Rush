@@ -1,4 +1,6 @@
 import {
+  emptySeasonPlayerAggregate,
+  emptySeasonTeamAggregate,
   seasonEffectsStateSchema,
   type SeasonEffectsState,
   type SeasonGameSummary,
@@ -9,6 +11,7 @@ import {
   type SeasonTeamAggregate,
 } from '@hoop-rush/data-contracts';
 import {
+  WINDOW_BLOCK_INDEX_TO_INDEX,
   createInitialSeasonInfluenceState,
   foldSeasonPlayerAggregates,
   foldSeasonTeamAggregates,
@@ -38,11 +41,15 @@ import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
  * - M2.5: `seasonRunStateDigest(facts)` (canonical mutable run-state digest)
  *   and `createInitialSeasonInfluenceState(franchiseIds)` (run-creation
  *   economy), both authoritative engine exports.
+ * - M2.5: `WINDOW_BLOCK_INDEX_TO_INDEX` (block → trade-injury window index),
+ *   the canonical trade-window map the reload audit inverts to validate the
+ *   stored trade state.
  *
  * The engine folds return one row per franchise/version that appears in the
  * summaries; the stored checkpoint contract requires the full 30-row team
  * and 300-row player tables (zero rows for anything unplayed), so the seam
- * pads the engine output with zero rows from the league and rosters. All
+ * pads the engine output with the canonical data-contracts zero-row
+ * builders (`emptySeasonTeamAggregate` / `emptySeasonPlayerAggregate`). All
  * helpers are pure TypeScript; the seam imports no Svelte, Dexie, browser,
  * or network code.
  */
@@ -58,46 +65,7 @@ export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   seasonPairIsCanonical,
   seasonRunStateDigest,
   createInitialSeasonInfluenceState,
-};
-
-const ZERO_TEAM_FIELDS: Omit<
-  SeasonTeamAggregate,
-  'franchiseId' | 'gamesPlayed' | 'wins' | 'losses'
-> = {
-  points: 0,
-  fieldGoalsMade: 0,
-  fieldGoalsAttempted: 0,
-  threePointersMade: 0,
-  threePointersAttempted: 0,
-  freeThrowsMade: 0,
-  freeThrowsAttempted: 0,
-  offensiveRebounds: 0,
-  defensiveRebounds: 0,
-  assists: 0,
-  steals: 0,
-  blocks: 0,
-  turnovers: 0,
-  fouls: 0,
-  possessions: 0,
-};
-
-const ZERO_PLAYER_FIELDS: Omit<SeasonPlayerAggregate, 'playerVersionId' | 'franchiseId'> = {
-  gamesPlayed: 0,
-  seconds: 0,
-  points: 0,
-  fieldGoalsMade: 0,
-  fieldGoalsAttempted: 0,
-  threePointersMade: 0,
-  threePointersAttempted: 0,
-  freeThrowsMade: 0,
-  freeThrowsAttempted: 0,
-  offensiveRebounds: 0,
-  defensiveRebounds: 0,
-  assists: 0,
-  steals: 0,
-  blocks: 0,
-  turnovers: 0,
-  fouls: 0,
+  windowBlockIndexToIndex: WINDOW_BLOCK_INDEX_TO_INDEX,
 };
 
 /** Engine team fold padded to the full 30-row table (zero rows unplayed). */
@@ -108,17 +76,7 @@ function paddedTeamAggregates(
   const folded = foldSeasonTeamAggregates(summaries);
   const byId = new Map(folded.map((row) => [row.franchiseId, row]));
   return league.teams
-    .map((team) => {
-      const row = byId.get(team.franchiseId);
-      if (row !== undefined) return row;
-      return {
-        franchiseId: team.franchiseId,
-        gamesPlayed: 0,
-        wins: 0,
-        losses: 0,
-        ...ZERO_TEAM_FIELDS,
-      };
-    })
+    .map((team) => byId.get(team.franchiseId) ?? emptySeasonTeamAggregate(team.franchiseId))
     .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
 }
 
@@ -134,11 +92,7 @@ function paddedPlayerAggregates(
       roster.players.map((player) => {
         const row = byId.get(player.playerVersionId);
         if (row !== undefined) return row;
-        return {
-          playerVersionId: player.playerVersionId,
-          franchiseId: roster.franchiseId,
-          ...ZERO_PLAYER_FIELDS,
-        };
+        return emptySeasonPlayerAggregate(player.playerVersionId, roster.franchiseId);
       }),
     )
     .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));

@@ -1,4 +1,5 @@
 import {
+  SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
@@ -12,8 +13,11 @@ import {
   SEASON_INFLUENCE_VERSION,
   SEASON_INJURY_TARGETS_VERSION,
   SEASON_LEADERS_VERSION,
+  SEASON_LEAGUE_VERSION,
   SEASON_OBJECTIVE_VERSION,
   SEASON_RECAP_VERSION,
+  SEASON_SCHEDULE_FORMULA_VERSION,
+  SEASON_SCHEDULE_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
   SEASON_STAMINA_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
@@ -605,7 +609,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       versions: {
         blockVersion: SEASON_BLOCK_VERSION,
         summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-        aggregatesVersion: 'season-aggregates-v1',
+        aggregatesVersion: SEASON_AGGREGATES_VERSION,
         recapVersion: SEASON_RECAP_VERSION,
         leadersVersion: SEASON_LEADERS_VERSION,
         homeCourtVersion: SEASON_HOME_COURT_VERSION,
@@ -878,9 +882,9 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   private scheduleOf(input: SeasonBlockStartInput) {
     return {
       schemaVersion: 1,
-      scheduleVersion: 'schedule-v1',
-      formulaVersion: 'schedule-formula-v1',
-      leagueVersion: 'league-v1',
+      scheduleVersion: SEASON_SCHEDULE_VERSION,
+      formulaVersion: SEASON_SCHEDULE_FORMULA_VERSION,
+      leagueVersion: SEASON_LEAGUE_VERSION,
       generationSeed: '0'.repeat(32),
       rounds: 82,
       games: input.run.games.map((game) => ({

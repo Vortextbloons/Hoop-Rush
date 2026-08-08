@@ -833,7 +833,7 @@ describe('season draft catalog schema (M2.1)', () => {
       seasonDraftCatalogSchema.parse({ ...buildCatalog(), playerVersionIdVersion: 'pv-v2' }),
     ).toThrow();
     expect(() =>
-      seasonDraftCatalogSchema.parse({ ...buildCatalog(), staminaVersion: 'season-stamina-v2' }),
+      seasonDraftCatalogSchema.parse({ ...buildCatalog(), staminaVersion: 'season-stamina-v3' }),
     ).toThrow();
     expect(() =>
       seasonDraftCatalogSchema.parse({ ...buildCatalog(), durabilityVersion: 'durability-v2' }),

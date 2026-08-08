@@ -48,15 +48,12 @@
 
   {#if preview.unchangedSinceLastLock}
     <p class="mt-2 rounded-lg bg-surface-2 p-3 text-sm">
-      <strong class="text-foreground">No rotation changes</strong> since the last accepted block —
-      this submission locks the same rotation set ({preview.pendingDigest.slice(0, 10)}…).
+      <strong class="text-foreground">No rotation changes</strong> since the last checkpoint — this submission
+      locks the same rotation set.
     </p>
   {:else if preview.changes.length === 0}
     <p class="mt-2 rounded-lg bg-surface-2 p-3 text-sm">
-      No rotation changes from the saved baseline. {#if preview.lastLockedDigest !== null}The set
-        digest still differs from the last accepted lock ({preview.pendingDigest.slice(0, 10)}… vs
-        {preview.lastLockedDigest.slice(0, 10)}…), so this block will lock a different
-        configuration.{/if}
+      No rotation changes from the saved baseline.
     </p>
   {:else}
     <p class="mt-2 text-sm text-muted-foreground">
@@ -99,18 +96,8 @@
             {game.humanIsHome ? 'vs' : 'at'}
             {franchiseName(game.opponentFranchiseId)}
           </span>
-          <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-            {game.gameId}
-          </span>
         </li>
       {/each}
     </ol>
   {/if}
-
-  <p class="mt-3 font-mono text-[10px] text-muted-foreground">
-    Pending set digest {preview.pendingDigest}
-    {#if preview.lastLockedDigest !== null}
-      · last locked {preview.lastLockedDigest}
-    {/if}
-  </p>
 </section>

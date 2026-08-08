@@ -11,7 +11,6 @@
  * the committed bytes.
  */
 
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,16 +71,13 @@ import {
 } from '@hoop-rush/engine';
 import { buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { pickBestSelectable } from './commands/season-data.ts';
+import { sha256Hex } from './io.ts';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const SEASON_DIR = resolve(STATIC_DATA, 'season');
 const FIXTURES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
-
-function sha256Hex(content: Buffer | string): string {
-  return createHash('sha256').update(content).digest('hex');
-}
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;

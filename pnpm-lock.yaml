@@ -4,6 +4,30 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@types/node':
+      specifier: ^26.1.2
+      version: 26.1.2
+    eslint:
+      specifier: ^10.8.0
+      version: 10.8.0
+    fake-indexeddb:
+      specifier: ^6.2.5
+      version: 6.2.5
+    tsx:
+      specifier: ^4.23.4
+      version: 4.23.4
+    typescript:
+      specifier: ^6.0.3
+      version: 6.0.3
+    typescript-eslint:
+      specifier: ^8.65.0
+      version: 8.65.0
+    vitest:
+      specifier: ^4.1.10
+      version: 4.1.10
+
 importers:
 
   .:
@@ -23,8 +47,11 @@ importers:
       prettier-plugin-svelte:
         specifier: ^4.1.1
         version: 4.1.1(prettier@3.9.6)(svelte@5.56.8(@typescript-eslint/types@8.65.0))
+      typescript-eslint:
+        specifier: 'catalog:'
+        version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
-        specifier: ^4.1.10
+        specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
 
   apps/web:
@@ -76,10 +103,10 @@ importers:
         specifier: ^5.4.2
         version: 5.4.2(svelte@5.56.8(@typescript-eslint/types@8.65.0))(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))(vitest@4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0)))
       '@types/node':
-        specifier: ^26.1.2
+        specifier: 'catalog:'
         version: 26.1.2
       eslint:
-        specifier: ^10.8.0
+        specifier: 'catalog:'
         version: 10.8.0(jiti@2.7.0)
       eslint-plugin-svelte:
         specifier: ^3.22.0
@@ -97,16 +124,16 @@ importers:
         specifier: ^4.3.3
         version: 4.3.3
       typescript:
-        specifier: ^6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.65.0
+        specifier: 'catalog:'
         version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vite:
         specifier: ^8.2.0
         version: 8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0)
       vitest:
-        specifier: ^4.1.10
+        specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
 
   packages/data-contracts:
@@ -116,16 +143,16 @@ importers:
         version: 4.4.3
     devDependencies:
       eslint:
-        specifier: ^10.8.0
+        specifier: 'catalog:'
         version: 10.8.0(jiti@2.7.0)
       typescript:
-        specifier: ^6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.65.0
+        specifier: 'catalog:'
         version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
-        specifier: ^4.1.10
+        specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
 
   packages/engine:
@@ -138,19 +165,19 @@ importers:
         specifier: workspace:*
         version: link:../test-fixtures
       eslint:
-        specifier: ^10.8.0
+        specifier: 'catalog:'
         version: 10.8.0(jiti@2.7.0)
       fast-check:
         specifier: ^4.9.0
         version: 4.9.0
       typescript:
-        specifier: ^6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.65.0
+        specifier: 'catalog:'
         version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
-        specifier: ^4.1.10
+        specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
 
   packages/importer:
@@ -163,22 +190,22 @@ importers:
         version: 4.4.3
     devDependencies:
       '@types/node':
-        specifier: ^26.1.2
+        specifier: 'catalog:'
         version: 26.1.2
       eslint:
-        specifier: ^10.8.0
+        specifier: 'catalog:'
         version: 10.8.0(jiti@2.7.0)
       tsx:
-        specifier: ^4.23.4
+        specifier: 'catalog:'
         version: 4.23.4
       typescript:
-        specifier: ^6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.65.0
+        specifier: 'catalog:'
         version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
-        specifier: ^4.1.10
+        specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
 
   packages/persistence:
@@ -200,19 +227,19 @@ importers:
         specifier: workspace:*
         version: link:../test-fixtures
       eslint:
-        specifier: ^10.8.0
+        specifier: 'catalog:'
         version: 10.8.0(jiti@2.7.0)
       fake-indexeddb:
-        specifier: ^6.2.5
+        specifier: 'catalog:'
         version: 6.2.5
       typescript:
-        specifier: ^6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.65.0
+        specifier: 'catalog:'
         version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
-        specifier: ^4.1.10
+        specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
 
   packages/test-fixtures:
@@ -222,16 +249,16 @@ importers:
         version: link:../data-contracts
     devDependencies:
       eslint:
-        specifier: ^10.8.0
+        specifier: 'catalog:'
         version: 10.8.0(jiti@2.7.0)
       typescript:
-        specifier: ^6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.65.0
+        specifier: 'catalog:'
         version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
-        specifier: ^4.1.10
+        specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
 
   tools/cli:
@@ -256,28 +283,28 @@ importers:
         specifier: workspace:*
         version: link:../../packages/test-fixtures
       '@types/node':
-        specifier: ^26.1.2
+        specifier: 'catalog:'
         version: 26.1.2
       dexie:
         specifier: ^4.4.4
         version: 4.4.4
       eslint:
-        specifier: ^10.8.0
+        specifier: 'catalog:'
         version: 10.8.0(jiti@2.7.0)
       fake-indexeddb:
-        specifier: ^6.2.5
+        specifier: 'catalog:'
         version: 6.2.5
       tsx:
-        specifier: ^4.23.4
+        specifier: 'catalog:'
         version: 4.23.4
       typescript:
-        specifier: ^6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
       typescript-eslint:
-        specifier: ^8.65.0
+        specifier: 'catalog:'
         version: 8.65.0(eslint@10.8.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
-        specifier: ^4.1.10
+        specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(jsdom@30.0.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.4)(yaml@2.9.0))
 
 packages:

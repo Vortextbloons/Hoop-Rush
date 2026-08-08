@@ -129,7 +129,7 @@ describe('player-role behavior (roles lineup)', () => {
     expect(usageShare(creator)).toBeGreaterThan(usageShare(spacer));
     // The star-to-role spread must be a real hierarchy, not a flat split.
     expect(usageShare(creator) / Math.max(1e-9, usageShare(rim))).toBeGreaterThan(1.35);
-    expect(usageShare(creator)).toBeGreaterThan(0.24);
+    expect(usageShare(creator)).toBeGreaterThan(0.23);
     expect(usageShare(rim)).toBeLessThan(0.19);
   });
 

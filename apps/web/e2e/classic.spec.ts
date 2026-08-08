@@ -454,7 +454,7 @@ test.describe('classic: reel draft, auto-launch, guard, and result journeys', ()
 
     await page.goto('/classic/history');
     await expect(page.getByRole('link', { name: /Classic · Ratings/ })).toBeVisible();
-    await expect(page.getByRole('link', { name: /five drafted players · seed/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /five drafted players/ })).toBeVisible();
   });
 
   test('mobile: the roll overlay, slot picker, and lineup fit without horizontal overflow', async ({

@@ -51,6 +51,7 @@ export function playFixedFivePeriods(
       secondsRemaining = period < 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS;
       state.periodIndex = period;
       state.periodFouls = [0, 0];
+      tripContext.possessionStart = 'neutral';
     }
 
     while (secondsRemaining > 0) {

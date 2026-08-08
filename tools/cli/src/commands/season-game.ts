@@ -1,6 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { Worker } from 'node:worker_threads';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   checkSeasonGameResult,
   createEngineContext,
@@ -28,8 +27,10 @@ import {
   seasonGameSimulateReportSchema,
   type SeasonGameSimulateReport,
 } from '../report-schemas.ts';
-import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile, sha256Hex } from './season-data.ts';
+import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
+import { percentile } from '../stats.ts';
+import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
 
 /**
  * M2.2 `season game` commands (spec/2.0/04): single-game simulation with
@@ -227,35 +228,22 @@ export type SeasonGameCohortRunner = (
 export async function runSeasonGameCohort(
   request: SeasonGameCohortRequest,
 ): Promise<SeasonGameGameFacts[]> {
-  const chunkSize = Math.max(1, Math.ceil(request.seedIndices.length / request.workers));
   const promises: Array<Promise<SeasonGameGameFacts[]>> = [];
   for (const fixture of request.fixtures) {
-    for (let start = 0; start < request.seedIndices.length; start += chunkSize) {
-      const seedIndices = request.seedIndices.slice(start, start + chunkSize);
-      promises.push(
-        new Promise<SeasonGameGameFacts[]>((resolvePromise, rejectPromise) => {
-          const worker = new Worker(
-            new URL('./season-game-calibration-worker.ts', import.meta.url),
-            {
-              workerData: {
-                fixtureId: fixture.fixtureId,
-                fixturePath: fixture.path,
-                seedIndices,
-                ...(request.effects === true ? { effects: true } : {}),
-              },
-            },
-          );
-          worker.on('message', (message: { facts: SeasonGameGameFacts[] }) => {
-            resolvePromise(message.facts);
-            void worker.terminate();
-          });
-          worker.on('error', rejectPromise);
-          worker.on('exit', (code) => {
-            if (code !== 0) rejectPromise(new Error(`worker exited ${String(code)}`));
-          });
+    promises.push(
+      runWorkerChunks<number, SeasonGameGameFacts>({
+        workerUrl: new URL('./season-game-calibration-worker.ts', import.meta.url),
+        workerData: (seedIndices) => ({
+          fixtureId: fixture.fixtureId,
+          fixturePath: fixture.path,
+          seedIndices,
+          ...(request.effects === true ? { effects: true } : {}),
         }),
-      );
-    }
+        items: request.seedIndices,
+        workers: request.workers,
+        payloadKey: 'facts',
+      }),
+    );
   }
   const chunks = await Promise.all(promises);
   return chunks.flat();
@@ -483,15 +471,14 @@ function renderSimulateDetails(
   return details;
 }
 
+/**
+ * Index-based lower median; kept local because the frozen
+ * `game-targets-v1` medians were authored with it (regeneration must stay
+ * byte-identical; see `stats.ts` for the canonical median).
+ */
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
-}
-
-function percentile(sorted: readonly number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
-  return sorted[index] ?? 0;
 }
 
 /** p1-p99 envelope over one aggregate metric (the frozen calibration band). */
@@ -783,29 +770,17 @@ export async function seasonGameCalibrate(
       },
     };
     seasonGameTargetsSchema.parse(targets);
-    try {
-      const target = resolve(outPath);
-      mkdirSync(dirname(target), { recursive: true });
-      writeFileSync(target, `${JSON.stringify(targets, null, 2)}\n`);
-      targetsWritten = true;
-      targetsPath = target;
-      // Update the manifest hash for the committed targets artifact.
-      if (resolve(outPath) === resolve(DEFAULT_GAME_TARGETS)) {
-        const manifestPathResolved = resolve(manifestPath);
-        const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {
-          season?: Record<string, { url?: string; contentHash?: string }>;
-        };
-        if (manifest.season !== undefined) {
-          manifest.season.gameTargets = {
-            url: 'season/game-targets.json',
-            contentHash: sha256Hex(readFileSync(target)),
-          };
-          writeFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
-        }
-      }
-    } catch (error) {
-      gateFailures.push(`cannot write targets: ${(error as Error).message}`);
-    }
+    const commit = commitTargetsArtifact({
+      outPath,
+      defaultTargetsPath: DEFAULT_GAME_TARGETS,
+      manifestPath,
+      manifestKey: 'gameTargets',
+      manifestUrl: 'season/game-targets.json',
+      content: targets,
+    });
+    targetsWritten = commit.written;
+    targetsPath = commit.path;
+    if (commit.error !== null) gateFailures.push(commit.error);
   }
 
   const payload = seasonGameCalibrateReportSchema.parse({

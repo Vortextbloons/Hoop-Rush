@@ -77,7 +77,11 @@ import {
   seasonDigestHex,
   seedFromString,
 } from '@hoop-rush/data-contracts';
-import { reduceSeasonStandings, seasonRunStateDigest } from '@hoop-rush/engine';
+import {
+  WINDOW_BLOCK_INDEX_TO_INDEX,
+  reduceSeasonStandings,
+  seasonRunStateDigest,
+} from '@hoop-rush/engine';
 import type { SeasonRunStateDigestFacts } from '@hoop-rush/engine';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { SEASON_RUN_RECORD_ID, type StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
@@ -1170,6 +1174,7 @@ export function buildStubSeasonEngineSeam(): SeasonRunEngineSeam {
     seasonPairIsCanonical: (a, b) => a < b,
     seasonRunStateDigest: seasonRunStateDigestFixture,
     createInitialSeasonInfluenceState: buildFixtureInfluenceStateFromIds,
+    windowBlockIndexToIndex: WINDOW_BLOCK_INDEX_TO_INDEX,
   };
 }
 

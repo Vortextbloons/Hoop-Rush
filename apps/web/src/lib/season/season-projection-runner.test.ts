@@ -73,7 +73,7 @@ const FAKE_PLAN_RESULT = {
 } as unknown as MinutePlanOptimizationResult;
 
 /** Ten-members fixture rotation for the optimize-rotation request. */
-function fixtureRotation(): SeasonRotation {
+function fixtureRotation(franchiseId = 'lakers'): SeasonRotation {
   const versionId = (n: number) => `pv-${String(n).padStart(32, '0')}`;
   const players = [
     { playerVersionId: versionId(1), playable: ['PG'] as const },
@@ -88,7 +88,7 @@ function fixtureRotation(): SeasonRotation {
     { playerVersionId: versionId(10), playable: ['C'] as const },
   ];
   return buildMinimalRotation({
-    franchiseId: 'lakers',
+    franchiseId,
     members: players.map((player) => ({
       playerVersionId: player.playerVersionId,
       playable: [...player.playable],

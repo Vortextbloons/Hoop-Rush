@@ -6,6 +6,9 @@ import { rebounderWeights, teamMean } from './rebounding.ts';
 import { stealerWeights } from './security.ts';
 import { blockProbability } from './shooting.ts';
 import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
+import { createRng } from './rng.ts';
+import { actionWeights, pickAction } from './usage.ts';
+import { responsibilityModifiersForSlot } from './position-responsibilities.ts';
 
 function playerAt(team: SimulationTeam, index: number): SimulationPlayer {
   const player = team.players[index];
@@ -63,5 +66,24 @@ describe('player tendencies affect possession mechanics', () => {
     expect(headWeight(rebounderWeights(highCrash, true))).toBeGreaterThan(
       headWeight(rebounderWeights(lowCrash, true)),
     );
+  });
+
+  it('creates more transition actions after live turnovers and defensive rebounds', () => {
+    const player = playerAt(buildLegalSimulationTeam(), 0);
+    const weights = actionWeights(player, responsibilityModifiersForSlot(0));
+    const transitionCount = (start: NonNullable<Parameters<typeof pickAction>[3]>): number => {
+      const rng = createRng(`transition-${start}`);
+      let count = 0;
+      for (let i = 0; i < 5_000; i += 1) {
+        if (pickAction(player, weights, rng, start) === 'transition') count += 1;
+      }
+      return count;
+    };
+
+    const deadBall = transitionCount('deadBall');
+    const defensiveRebound = transitionCount('defensiveRebound');
+    const liveTurnover = transitionCount('liveTurnover');
+    expect(defensiveRebound).toBeGreaterThan(deadBall * 2);
+    expect(liveTurnover).toBeGreaterThan(defensiveRebound);
   });
 });

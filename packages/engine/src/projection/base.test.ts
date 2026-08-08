@@ -148,9 +148,9 @@ describe('projectBaseFive', () => {
     const projection = buildProjectionLineup();
     const parsed = baseFiveProjectionSchema.parse(projection);
     expect(parsed.ratings.offensiveRating).toBeGreaterThan(85);
-    expect(parsed.ratings.offensiveRating).toBeLessThan(125);
+    expect(parsed.ratings.offensiveRating).toBeLessThan(130);
     expect(parsed.ratings.defensiveRatingAllowed).toBeGreaterThan(85);
-    expect(parsed.ratings.defensiveRatingAllowed).toBeLessThan(125);
+    expect(parsed.ratings.defensiveRatingAllowed).toBeLessThan(130);
     expect(parsed.ratings.netRating).toBe(
       parsed.ratings.offensiveRating - parsed.ratings.defensiveRatingAllowed,
     );

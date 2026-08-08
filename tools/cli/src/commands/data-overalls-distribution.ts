@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import {
   COHORT_NORMALIZATION_VERSION,
@@ -8,6 +7,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { overallsDistributionReportSchema } from '../report-schemas.ts';
+import { tryReadJson } from '../io.ts';
 
 /**
  * `data overalls-distribution`: reports the cohort percentile Overall
@@ -35,14 +35,10 @@ const BANDS: ReadonlyArray<{ label: string; min: number; max: number; targetPerc
   { label: '40-71', min: 40, max: 71, targetPercent: 20 },
 ];
 
-function readJson(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch {
-    return null;
-  }
-}
-
+/**
+ * Index-based lower median (the report convention) with a null empty case;
+ * kept local because the report's medians were authored with it.
+ */
 function median(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -84,7 +80,7 @@ function bandsFor(rows: readonly PeakPlayerSeason[], total: number) {
 
 /** Reports the cohort Overall distribution of every packaged franchise-era row. */
 export function dataOverallsDistribution(options: DataOverallsDistributionOptions): CliReport {
-  const rawManifest = readJson(options.input);
+  const rawManifest = tryReadJson(options.input);
   const parsedManifest = hoopRushManifestSchema.safeParse(rawManifest);
   if (!parsedManifest.success) {
     const issue = parsedManifest.error.issues[0];
@@ -107,7 +103,7 @@ export function dataOverallsDistribution(options: DataOverallsDistributionOption
 
   for (const poolRef of manifest.pools) {
     const assetPath = isAbsolute(poolRef.url) ? poolRef.url : resolve(manifestDir, poolRef.url);
-    const parsedPool = franchiseEraPoolSchema.safeParse(readJson(assetPath));
+    const parsedPool = franchiseEraPoolSchema.safeParse(tryReadJson(assetPath));
     if (!parsedPool.success) {
       const issue = parsedPool.error.issues[0];
       failures.push(

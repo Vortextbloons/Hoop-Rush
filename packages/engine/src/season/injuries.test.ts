@@ -8,6 +8,7 @@ import {
 import {
   applyRiskyRehabOutcome,
   applySeasonGameHealthTransition,
+  clockFromTipoffSeconds,
   rollSeasonInjuryForPlayer,
   rollSeasonRehabOutcome,
   seasonInjuryRiskBasisPoints,
@@ -63,6 +64,12 @@ function forcedRoll(rootSeed: string, gameId: string, playerVersionId: string) {
     recurrenceWindowRoundsRemaining: 10,
   });
 }
+
+describe('season injury clocks', () => {
+  it('maps the exact end of regulation to the fourth-quarter horn', () => {
+    expect(clockFromTipoffSeconds(48 * 60)).toEqual({ period: 4, seconds: 0 });
+  });
+});
 
 describe('season injury risk formula (M2.5 §5)', () => {
   it('computes the frozen coefficients exactly', () => {

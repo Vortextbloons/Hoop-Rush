@@ -83,7 +83,8 @@ export function turnoverProbability(
     (handling - c.turnoverNeutralHandling) * c.turnoverHandlingWeight -
     (passing - c.turnoverNeutralPassing) * c.turnoverPassingWeight +
     extraPressure +
-    effectsAdjustment;
+    effectsAdjustment -
+    c.offensiveFoulTurnoverOffset;
   return Math.min(c.turnoverMax, Math.max(c.turnoverMin, raw));
 }
 

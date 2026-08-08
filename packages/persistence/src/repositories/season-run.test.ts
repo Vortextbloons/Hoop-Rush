@@ -1338,6 +1338,46 @@ describe('season run M2.5 reload audit (v5)', () => {
     );
   });
 
+  it('repairs the legacy rotation-lock divergence and re-audits the recovered run', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    const base = commitInputFor(adapters, 0);
+    const locked = lockedRotationSet(adapters);
+    const lockedDigest = adapters.seam.seasonRotationSetDigest(locked);
+    expect(lockedDigest).not.toBe(base.rotationDigest);
+
+    // Legacy failure signature: the edited rotations were stored, while
+    // the accepted block, checkpoint identity, and state digest retained
+    // the pre-edit lock.
+    await repo.commitSeasonBlock({
+      ...base,
+      rotations: locked,
+    });
+
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot?.run.rotations).toEqual(locked);
+    expect(snapshot?.acceptedBlocks.at(-1)?.rotationDigest).toBe(lockedDigest);
+    expect(snapshot?.run.checkpointState?.rotationDigest).toBe(lockedDigest);
+    expect(snapshot?.run.stateDigest).toBe(
+      adapters.seam.seasonRunStateDigest({
+        stateRevision: snapshot?.run.stateRevision ?? -1,
+        checkpointState: snapshot?.run.checkpointState ?? null,
+        health: snapshot?.run.health ?? base.health,
+        influence: snapshot?.run.influence ?? base.influence,
+        transactions: snapshot?.run.transactions ?? base.transactions,
+        trade: snapshot?.run.trade ?? base.trade,
+        objectives: snapshot?.run.objectives ?? base.objectives,
+        rosters: snapshot?.run.rosters ?? adapters.run.rosters,
+        ownership: snapshot?.run.ownership ?? adapters.run.ownership,
+        rotations: snapshot?.run.rotations ?? locked,
+        effects: snapshot?.effects ?? base.effects,
+      }),
+    );
+    const stored = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+    expect(stored?.lastRotationDigest).toBe(lockedDigest);
+  });
+
   it('accepts a commit whose digest covers the locked rotation set the commit stores', async () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;

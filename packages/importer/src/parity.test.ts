@@ -7,9 +7,11 @@
  * within rounding tolerance (same stint aggregates). Ratings are pure
  * deterministic derivations, so top-5 selection ordering must also match.
  */
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { PUBLIC_DATA } from './config.ts';
+import { DEFAULT_SEASONS, PUBLIC_DATA } from './config.ts';
 import { readJson } from './json.ts';
 import { computePool, loadBbrefIds, loadManifest } from './pools/compute.ts';
 import { computeEraProfile, erasWithData } from './era-profile/profile.ts';
@@ -77,6 +79,35 @@ describe('parity: pools vs committed artifacts', () => {
       },
     );
   }
+});
+
+/** The Python fetch layer's config.py, read at test time (never imported). */
+const PYTHON_CONFIG = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../../scripts/import-nba/config.py',
+);
+
+/** Extracts the DEFAULT_SEASONS list literal from the Python config source. */
+function parsePythonSeasons(source: string): string[] {
+  const match = source.match(/DEFAULT_SEASONS = \[\n((?:\s*"[0-9-]+",\n)*)\s*\]/);
+  const group = match?.[1];
+  if (group === undefined) {
+    throw new Error(`no parseable DEFAULT_SEASONS list in ${PYTHON_CONFIG}`);
+  }
+  const entries = [...group.matchAll(/"([0-9-]+)"/g)]
+    .map((entry) => entry[1])
+    .filter((entry): entry is string => entry !== undefined);
+  if (entries.length === 0) {
+    throw new Error(`DEFAULT_SEASONS in ${PYTHON_CONFIG} has no entries`);
+  }
+  return entries;
+}
+
+describe('parity: DEFAULT_SEASONS vs the Python fetch layer', () => {
+  it('matches scripts/import-nba/config.py exactly (drift fails loudly)', () => {
+    const source = readFileSync(PYTHON_CONFIG, 'utf8');
+    expect(parsePythonSeasons(source)).toEqual([...DEFAULT_SEASONS]);
+  });
 });
 
 describe('parity: era profiles vs committed artifacts', () => {

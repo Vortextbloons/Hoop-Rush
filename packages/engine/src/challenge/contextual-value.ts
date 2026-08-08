@@ -6,12 +6,9 @@ import type {
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
+import { clamp } from '../domain/math.ts';
 
 type ReasonDraft = Omit<ContextualReason, 'priority'> & { priority: number };
-
-function clamp(value: number, low: number, high: number): number {
-  return Math.min(high, Math.max(low, value));
-}
 
 function average(values: readonly number[]): number {
   return values.length === 0 ? 50 : values.reduce((sum, value) => sum + value, 0) / values.length;

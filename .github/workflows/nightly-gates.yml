@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/setup-repo
 
       - name: Typecheck
         run: pnpm check
@@ -78,16 +78,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install Playwright browsers
-        run: pnpm --filter @hoop-rush/web exec playwright install --with-deps chromium
+      - uses: ./.github/actions/setup-repo
 
       - name: Build static site
         env:
@@ -95,7 +86,9 @@ jobs:
         run: pnpm build
 
       - name: Run full Playwright suite
-        run: pnpm e2e
+        uses: ./.github/actions/playwright-e2e
+        with:
+          command: pnpm e2e
 
       - name: Upload Playwright report
         if: failure()

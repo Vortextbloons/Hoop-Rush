@@ -16,6 +16,7 @@
     pointDifferential,
   } from '$lib/season/season-presentation';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
+  import { oneDecimal } from '$lib/format';
 
   /**
    * League tab (spec/2.0/11, M2.3.5): conference-switched provisional
@@ -282,7 +283,7 @@
                       <div class="flex items-center justify-between gap-2">
                         <dt class="font-mono text-[10px] text-muted-foreground">{cell.label}</dt>
                         <dd class="font-mono text-[10px] font-bold">
-                          {team[cell.key].toFixed(1)}
+                          {oneDecimal(team[cell.key])}
                         </dd>
                       </div>
                     {/each}
@@ -352,18 +353,23 @@
                       </a>
                     </th>
                     <td class="px-4 py-2 text-right font-mono text-[10px]">{team.gamesPlayed}</td>
-                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.ppg.toFixed(1)}</td
-                    >
-                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.rpg.toFixed(1)}</td
-                    >
-                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.apg.toFixed(1)}</td
-                    >
-                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.spg.toFixed(1)}</td
-                    >
-                    <td class="px-4 py-2 text-right font-mono text-[10px]">{team.bpg.toFixed(1)}</td
+                    <td class="px-4 py-2 text-right font-mono text-[10px]"
+                      >{oneDecimal(team.ppg)}</td
                     >
                     <td class="px-4 py-2 text-right font-mono text-[10px]"
-                      >{team.topg.toFixed(1)}</td
+                      >{oneDecimal(team.rpg)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]"
+                      >{oneDecimal(team.apg)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]"
+                      >{oneDecimal(team.spg)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]"
+                      >{oneDecimal(team.bpg)}</td
+                    >
+                    <td class="px-4 py-2 text-right font-mono text-[10px]"
+                      >{oneDecimal(team.topg)}</td
                     >
                     <td class="px-4 py-2 text-right font-mono text-[10px] font-bold">
                       {team.diff > 0 ? '+' : ''}{team.diff}

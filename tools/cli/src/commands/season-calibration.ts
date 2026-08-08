@@ -140,12 +140,7 @@ export function m25GapGate(
 }
 
 /** Arithmetic mean of a numeric array (0 for an empty array). */
-export function mean(values: readonly number[]): number {
-  if (values.length === 0) return 0;
-  let sum = 0;
-  for (const value of values) sum += value;
-  return sum / values.length;
-}
+export { mean } from '../stats.ts';
 
 /** Count / total as a fraction (0 for an empty total). */
 export function share(count: number, total: number): number {

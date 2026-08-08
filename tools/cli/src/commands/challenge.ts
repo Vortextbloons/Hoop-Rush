@@ -8,6 +8,7 @@ import {
   type ChallengeCreation,
 } from '@hoop-rush/engine';
 import {
+  FIXED_SANDBOX_ERA,
   LINEUP_STRUCTURE,
   playerIdSchema,
   seedSchema,
@@ -39,11 +40,11 @@ import { loadFixture } from './sim.ts';
  */
 
 /**
- * Fixed simulation environment era for every sandbox run (matches
- * `apps/web/src/lib/run-preamble.ts` `FIXED_SANDBOX_ERA`, spec/1.0
+ * Fixed simulation environment era for every sandbox run. Shared with the
+ * web app through `@hoop-rush/data-contracts` `FIXED_SANDBOX_ERA` (spec/1.0
  * 01-product.md: "every Sandbox run simulates in the 2010s decade").
  */
-export const FIXED_SANDBOX_ERA = '2010s';
+export { FIXED_SANDBOX_ERA };
 
 export const SIM_CHALLENGE_OPTIONS: Record<string, boolean> = {
   lineup: true,

@@ -666,34 +666,51 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     // reset implies a worker without state for this run, which receives the
     // full context again.
     if (newSummaries !== undefined) {
-      return seasonWorkerContinueRequestSchema.parse({
-        schemaVersion: 5,
-        type: 'season-block-continue',
-        rotations: state.rotations,
-        ...common,
-      });
+      return plainWorkerRequest(
+        seasonWorkerContinueRequestSchema.parse({
+          schemaVersion: 5,
+          type: 'season-block-continue',
+          rotations: state.rotations,
+          ...common,
+        }),
+      );
     }
-    return seasonWorkerStartRequestSchema.parse({
-      schemaVersion: 5,
-      type: 'season-block-start',
-      // The worker simulates with the LOCKED rotation set; the wire carries
-      // only the run context the block pipeline reads (the scheduled games,
-      // standings, draft, and other persisted facts never cross the worker
-      // boundary).
-      run: {
-        schemaVersion: state.input.run.schemaVersion,
-        runId: state.input.run.runId,
-        rootSeed: state.input.run.rootSeed,
-        versions: state.input.run.versions,
-        league: state.input.run.league,
-        rosters: state.input.run.rosters,
-        rotations: state.rotations,
-        cursor: state.input.run.cursor,
-      },
-      schedule,
-      homeCourt: state.input.homeCourt,
-      ...common,
-    });
+    return plainWorkerRequest(
+      seasonWorkerStartRequestSchema.parse({
+        schemaVersion: 5,
+        type: 'season-block-start',
+        // The worker simulates with the LOCKED rotation set; the wire carries
+        // only the run context the block pipeline reads (the scheduled games,
+        // standings, draft, and other persisted facts never cross the worker
+        // boundary).
+        run: {
+          schemaVersion: state.input.run.schemaVersion,
+          runId: state.input.run.runId,
+          rootSeed: state.input.run.rootSeed,
+          versions: state.input.run.versions,
+          league: state.input.run.league,
+          rosters: state.input.run.rosters,
+          rotations: state.rotations,
+          cursor: state.input.run.cursor,
+        },
+        schedule,
+        homeCourt: state.input.homeCourt,
+        ...common,
+      }),
+    );
+  }
+
+  /**
+   * Svelte's deeply reactive shell can place Proxy-backed values anywhere in
+   * a submitted run after a rotation edit. Zod validates and reconstructs
+   * the wire shape, but the worker boundary additionally requires every
+   * nested value to be structured-cloneable. The frozen worker contract is
+   * JSON-only, so a JSON snapshot is the simplest reliable de-proxy step.
+   */
+  function plainWorkerRequest<T extends SeasonWorkerStartRequest | SeasonWorkerContinueRequest>(
+    request: T,
+  ): T {
+    return JSON.parse(JSON.stringify(request)) as T;
   }
 
   return {

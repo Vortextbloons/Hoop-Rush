@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { contentHashSchema, eraIdSchema, franchiseIdSchema, seedSchema } from './ids.ts';
+import { contentHashSchema, eraIdSchema, franchiseIdSchema, idSchema, seedSchema } from './ids.ts';
+import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { seasonLeagueSchema } from './season-league.ts';
 import { seasonGameSchema } from './season-game.ts';
 import { seasonStandingsSchema } from './season-standings.ts';
@@ -197,7 +198,7 @@ export const seasonGenerationAuditSchema = z.object({
     z.literal(SEASON_ROSTER_TARGETS_VERSION),
   ]),
   /** Canonical digest of the generation result (engine season/digest). */
-  digest: z.string().regex(/^[0-9a-f]{32}$/),
+  digest: seasonCheckpointDigestSchema,
   diagnostics: seasonGenerationDiagnosticsSchema,
 });
 export type SeasonGenerationAudit = z.infer<typeof seasonGenerationAuditSchema>;
@@ -287,11 +288,7 @@ export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
 
 export const seasonRunSchema = z.object({
   schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
-  runId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
+  runId: idSchema,
   rootSeed: seedSchema,
   versions: seasonRunVersionsSchema,
   league: seasonLeagueSchema,
@@ -333,7 +330,7 @@ export const seasonRunSchema = z.object({
   /** M2.5: increments on every committed block AND every applied run command. */
   stateRevision: z.number().int().nonnegative(),
   /** M2.5: canonical digest of the mutable run state (32-hex, self-excluded). */
-  stateDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  stateDigest: seasonCheckpointDigestSchema,
 });
 export type SeasonRun = z.infer<typeof seasonRunSchema>;
 
@@ -350,11 +347,7 @@ export type SeasonRun = z.infer<typeof seasonRunSchema>;
  */
 export const seasonBlockRunContextSchema = z.object({
   schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
-  runId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
+  runId: idSchema,
   rootSeed: seedSchema,
   versions: seasonRunVersionsSchema,
   league: seasonLeagueSchema,

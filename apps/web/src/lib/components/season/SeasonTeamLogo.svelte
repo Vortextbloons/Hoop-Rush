@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolveLogoUrlsWithHistorical, type HoopRushManifest } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
+  import { useImageFallback } from '$lib/use-image-fallback.svelte';
 
   /**
    * Seasonal wrapper around the shared TeamLogo: uniform sizing, reserved
@@ -33,27 +34,11 @@
   const urls = $derived(
     resolveLogoUrlsWithHistorical(manifest, franchiseId, teamExternalId, [...logoCandidates]),
   );
-  let attempt = $state(0);
 
-  let lastKey = '';
-  $effect(() => {
-    const key = `${franchiseId}:${teamExternalId}:${logoCandidates.join('|')}`;
-    if (key !== lastKey) {
-      lastKey = key;
-      attempt = 0;
-    }
+  const fallback = useImageFallback({
+    urls: () => urls,
+    key: () => `${franchiseId}:${teamExternalId}:${logoCandidates.join('|')}`,
   });
-
-  const src = $derived(urls[attempt] ?? '');
-  const failed = $derived(attempt >= urls.length);
-
-  function onError() {
-    if (attempt < urls.length - 1) {
-      attempt += 1;
-      return;
-    }
-    attempt = urls.length;
-  }
 
   const boxClass = $derived(
     size === 'lg'
@@ -71,9 +56,9 @@
   aria-label={alt === '' ? undefined : alt}
   aria-hidden={alt === '' ? 'true' : undefined}
 >
-  {#if src && !failed}
+  {#if fallback.src && !fallback.failed}
     <img
-      {src}
+      src={fallback.src}
       alt=""
       width={size === 'lg' ? 80 : size === 'md' ? 40 : 28}
       height={size === 'lg' ? 80 : size === 'md' ? 40 : 28}
@@ -81,7 +66,7 @@
       loading={eager ? 'eager' : 'lazy'}
       decoding="async"
       referrerpolicy="no-referrer"
-      onerror={onError}
+      onerror={fallback.onError}
     />
   {:else}
     <span class="grid h-full w-full place-items-center font-display font-extrabold">

@@ -1,3 +1,4 @@
+import { SEASON_DRAFT_SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import {
   SEASON_DRAFT_RECORD_ID,
   storedSeasonDraftSchema,
@@ -46,7 +47,10 @@ export class DexieSeasonDraftRepository implements SeasonDraftRepository {
     // A stored row outside the current save-schema family (v1/v2 development
     // rows) is auto-cleared and never read. The raw-row view keeps the
     // runtime check meaningful even though the typed row is the v3 schema.
-    if ((record as { saveSchemaVersion?: unknown }).saveSchemaVersion !== 3) {
+    if (
+      (record as { saveSchemaVersion?: unknown }).saveSchemaVersion !==
+      SEASON_DRAFT_SAVE_SCHEMA_VERSION
+    ) {
       await this.db.seasonDrafts.delete(SEASON_DRAFT_RECORD_ID);
       return null;
     }

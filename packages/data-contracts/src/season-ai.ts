@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { franchiseIdSchema, seedSchema } from './ids.ts';
+import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
 import { seasonMinutePolicyStrategySchema, seasonRotationSchema } from './season-rotation.ts';
@@ -97,7 +98,7 @@ export const seasonRosterProjectionSummarySchema = z.object({
   /** Whether the selected roster equals the projection-best candidate. */
   selectedIsBest: z.boolean(),
   /** Canonical digest of the projection search audit (32-hex). */
-  searchDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  searchDigest: seasonCheckpointDigestSchema,
 });
 
 /**
@@ -272,7 +273,7 @@ export const seasonLeagueGenerationResultSchema = z.object({
   evaluations: z.array(seasonRosterEvaluationSchema).length(30),
   diagnostics: seasonGenerationDiagnosticsSchema,
   /** Canonical digest of the result (engine season/digest). */
-  digest: z.string().regex(/^[0-9a-f]{32}$/),
+  digest: seasonCheckpointDigestSchema,
 });
 export type SeasonLeagueGenerationResult = z.infer<typeof seasonLeagueGenerationResultSchema>;
 

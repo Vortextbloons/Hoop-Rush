@@ -5,6 +5,7 @@ import type {
   SimulationRatings,
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
+import { clamp } from '../domain/math.ts';
 
 /**
  * AI roster scoring (season-ai-v1, M2.1). Role scores are pure functions of
@@ -129,19 +130,19 @@ export function roleScoresOf(member: SeasonScoreMember): Record<SeasonRosterRole
   const r = member.detailedRatings;
   const t = member.tendencies;
   return {
-    'primary-creation': clamp(0.45 * r.ballHandling + 0.35 * r.passing + 0.2 * r.offensiveIq),
-    'secondary-creation': clamp(0.3 * r.ballHandling + 0.35 * r.passing + 0.35 * r.offensiveIq),
-    'perimeter-shooting': clamp(0.8 * r.threePoint + 0.2 * r.midrange + 0.12 * t.threePointRate),
-    'rim-finishing-interior-scoring': clamp(0.6 * r.insideScoring + 0.4 * r.closeShot),
-    'perimeter-defense': clamp(0.5 * r.perimeterDefense + 0.3 * r.steal + 0.2 * r.defensiveIq),
-    'interior-defense': clamp(0.5 * r.interiorDefense + 0.3 * r.block + 0.2 * r.defensiveIq),
-    'offensive-rebounding': clamp(0.85 * r.offensiveRebound + 0.15 * t.crashOffensiveGlassRate),
-    'defensive-rebounding': clamp(0.9 * r.defensiveRebound + 0.1 * t.crashOffensiveGlassRate),
+    'primary-creation': clamp01(0.45 * r.ballHandling + 0.35 * r.passing + 0.2 * r.offensiveIq),
+    'secondary-creation': clamp01(0.3 * r.ballHandling + 0.35 * r.passing + 0.35 * r.offensiveIq),
+    'perimeter-shooting': clamp01(0.8 * r.threePoint + 0.2 * r.midrange + 0.12 * t.threePointRate),
+    'rim-finishing-interior-scoring': clamp01(0.6 * r.insideScoring + 0.4 * r.closeShot),
+    'perimeter-defense': clamp01(0.5 * r.perimeterDefense + 0.3 * r.steal + 0.2 * r.defensiveIq),
+    'interior-defense': clamp01(0.5 * r.interiorDefense + 0.3 * r.block + 0.2 * r.defensiveIq),
+    'offensive-rebounding': clamp01(0.85 * r.offensiveRebound + 0.15 * t.crashOffensiveGlassRate),
+    'defensive-rebounding': clamp01(0.9 * r.defensiveRebound + 0.1 * t.crashOffensiveGlassRate),
   };
 }
 
-function clamp(value: number): number {
-  return Math.min(100, Math.max(0, value));
+function clamp01(value: number): number {
+  return clamp(value, 0, 100);
 }
 
 /** Weighted identity score for one candidate's role scores. */

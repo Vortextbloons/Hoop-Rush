@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.ts';
+import { commandIdSchema, franchiseIdSchema, idSchema, seasonGameIdSchema } from './ids.ts';
+import { seasonCheckpointDigestSchema, seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonStandingsSchema } from './season-standings.ts';
 import { seasonPlayerAggregateSchema, seasonTeamAggregateSchema } from './season-aggregates.ts';
 import { seasonGameSummarySchema, seasonRetainedGameDetailSchema } from './season-game-summary.ts';
@@ -29,14 +30,10 @@ import { SEASON_BLOCK_VERSION } from './season-versions.ts';
  */
 export const seasonInvalidRosterInterruptionSchema = z.object({
   code: z.literal('invalid-roster'),
-  runId: z.string().min(1).max(64),
+  runId: idSchema,
   blockIndex: z.number().int().min(0).max(8),
-  commandId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
-  nextGameId: z.string().regex(/^s[0-9]{6}$/),
+  commandId: commandIdSchema,
+  nextGameId: seasonGameIdSchema,
   humanFranchiseId: franchiseIdSchema,
   unavailablePlayerVersionIds: z.array(playerVersionIdSchema).min(1),
 });
@@ -55,18 +52,14 @@ export type SeasonInvalidRosterInterruption = z.infer<typeof seasonInvalidRoster
 export const seasonPendingBlockCandidateSchema = z.object({
   schemaVersion: z.literal(1),
   blockVersion: z.literal(SEASON_BLOCK_VERSION),
-  runId: z.string().min(1).max(64),
-  commandId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
+  runId: idSchema,
+  commandId: commandIdSchema,
   blockIndex: z.number().int().min(0).max(8),
   expectedRevision: z.number().int().nonnegative(),
   expectedStateRevision: z.number().int().nonnegative(),
-  expectedStateDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  expectedStateDigest: seasonCheckpointDigestSchema,
   objectiveId: seasonObjectiveIdSchema.nullable(),
-  nextGameId: z.string().regex(/^s[0-9]{6}$/),
+  nextGameId: seasonGameIdSchema,
   /** Completed games so far in this block, in block game order. */
   summaries: z.array(seasonGameSummarySchema).max(150),
   /** Completed human-team games so far in this block. */
@@ -81,6 +74,6 @@ export const seasonPendingBlockCandidateSchema = z.object({
   teamAggregates: z.array(seasonTeamAggregateSchema).max(30),
   /** Partial fold, sorted by playerVersionId ascending (0-300 rows). */
   playerAggregates: z.array(seasonPlayerAggregateSchema).max(300),
-  rotationDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  rotationDigest: seasonRotationSetDigestSchema,
 });
 export type SeasonPendingBlockCandidate = z.infer<typeof seasonPendingBlockCandidateSchema>;

@@ -170,7 +170,7 @@
                 ? 'bg-positive/15 text-positive'
                 : 'bg-destructive/15 text-destructive'}"
             >
-              Seeded outcome recorded: {affordance.rehabOutcome}
+              Outcome: {affordance.rehabOutcome}
             </span>
           </li>
         {/each}
@@ -234,10 +234,7 @@
         </div>
         <p class="mt-2 text-sm text-muted-foreground">
           {affordanceLabel(pendingSpend)}. The balance would move to
-          <strong class="text-foreground"> {balance - pendingSpend.cost}</strong>
-          {pendingSpend.purpose === 'risky-rehab'
-            ? ' (floor −3; the outcome is seeded and recorded).'
-            : ' (floor −3).'}
+          <strong class="text-foreground"> {balance - pendingSpend.cost}</strong> (floor −3).
         </p>
         <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
           <button

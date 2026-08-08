@@ -8,12 +8,12 @@
     SeasonPlayerStatsSortKey,
   } from '$lib/season/season-player-stats-view';
   import { formatPositions } from '$lib/player-positions';
+  import { oneDecimal, percentOneDecimal } from '$lib/format';
 
   /**
    * Full Season Run player stats table: sortable column headers (buttons +
    * aria-sort) over totals or per-game rates plus shooting percentages.
-   * Rendered twice by SeasonPlayerStats — inside the mobile disclosure and
-   * directly on desktop — with sorting state owned by the parent.
+   * Rendered on desktop by SeasonPlayerStats; mobile uses the card list instead.
    */
 
   let {
@@ -75,10 +75,10 @@
       const value = row[key];
       if (value === null) return '—';
       if (value === 0) return '0%';
-      return `${(value * 100).toFixed(1)}%`;
+      return percentOneDecimal(value);
     }
     const value = row[key];
-    return typeof value === 'number' ? value.toFixed(1) : '—';
+    return typeof value === 'number' ? oneDecimal(value) : '—';
   }
 
   function eraLabelOf(playerVersionId: string, franchiseId: string, eraId: string) {

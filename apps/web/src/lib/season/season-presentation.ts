@@ -22,6 +22,7 @@ import {
   type SeasonUpcomingHumanGame,
   type SeasonVersionSpotlight,
 } from '@hoop-rush/data-contracts';
+import { humanUpcomingGames } from './season-lock-preview';
 
 /**
  * Season Run presentation helpers (M2.3 hub/checkpoint): pure formatting and
@@ -890,30 +891,12 @@ function conferenceOfLeague(league: SeasonLeague, franchiseId: string): string {
   return league.teams.find((team) => team.franchiseId === franchiseId)?.conference ?? 'east';
 }
 
-/** Human games in a block's round range (schedule-derived, mirror of the
- * engine recap's upcoming list). */
+/** Human games in a block's round range (schedule-derived; the shared
+ * implementation lives in season-lock-preview). */
 export function humanUpcomingGamesFromGames(
   games: readonly SeasonGame[],
   humanFranchiseId: string,
   blockIndex: number,
 ): SeasonUpcomingHumanGame[] {
-  const fromRound = blockIndex * 10 + 1;
-  const toRound = blockIndex === 8 ? SEASON_ROUND_COUNT : (blockIndex + 1) * 10;
-  return games
-    .filter(
-      (game) =>
-        game.round >= fromRound &&
-        game.round <= toRound &&
-        (game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId),
-    )
-    .sort((a, b) => a.round - b.round)
-    .map((game) => ({
-      gameId: game.gameId,
-      round: game.round,
-      homeFranchiseId: game.homeFranchiseId,
-      awayFranchiseId: game.awayFranchiseId,
-      humanIsHome: game.homeFranchiseId === humanFranchiseId,
-      opponentFranchiseId:
-        game.homeFranchiseId === humanFranchiseId ? game.awayFranchiseId : game.homeFranchiseId,
-    }));
+  return humanUpcomingGames(games, humanFranchiseId, blockIndex);
 }

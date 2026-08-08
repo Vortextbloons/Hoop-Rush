@@ -717,9 +717,6 @@
               Retry starting the simulation
             </button>
           </div>
-          <p class="px-3 font-mono text-[10px] text-muted-foreground sm:px-0">
-            seed {draft.seed} · draft {draft.draftId}
-          </p>
         {/if}
 
         <LineupCourt

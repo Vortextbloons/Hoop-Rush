@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +27,9 @@ import {
   type RoleThresholds,
   type SeasonRosterMemberInput,
 } from '@hoop-rush/engine';
+import { readJson as readJsonFile, sha256Hex } from '../io.ts';
+export { sha256Hex };
+export { readJsonFile };
 
 /**
  * Season Run M2.1 CLI data loading: the packaged draft catalog, the frozen
@@ -41,18 +43,6 @@ export const DEFAULT_SEASON_DIR = resolve(REPO_ROOT, 'apps/web/static/data/seaso
 export const DEFAULT_DRAFT_CATALOG = resolve(DEFAULT_SEASON_DIR, 'draft-catalog.json');
 export const DEFAULT_LEAGUE = resolve(DEFAULT_SEASON_DIR, 'league.json');
 export const DEFAULT_ROSTER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'roster-targets.json');
-
-export function sha256Hex(content: Buffer | string): string {
-  return createHash('sha256').update(content).digest('hex');
-}
-
-export function readJsonFile(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch (error) {
-    throw new Error(`cannot read ${path}: ${(error as Error).message}`);
-  }
-}
 
 /** Loads the packaged draft catalog, hash-verified against the manifest. */
 export function loadSeasonDraftCatalog(

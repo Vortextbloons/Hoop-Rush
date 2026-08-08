@@ -40,6 +40,13 @@ export function overallRatingOf(
   return candidateOf(catalog, playerVersionId)?.summaryRatings.overallRating ?? null;
 }
 
+export function summaryRatingsOf(
+  catalog: SeasonDraftCatalog | null,
+  playerVersionId: string,
+): { overallRating: number; offenseRating: number; defenseRating: number } | null {
+  return candidateOf(catalog, playerVersionId)?.summaryRatings ?? null;
+}
+
 export function staminaRatingOf(
   catalog: SeasonDraftCatalog | null,
   playerVersionId: string,

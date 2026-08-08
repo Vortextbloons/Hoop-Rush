@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import {
@@ -21,6 +20,7 @@ import {
   seasonScheduleGenerateReportSchema,
 } from '../report-schemas.ts';
 import { DEFAULT_MANIFEST, REPO_ROOT } from './data-loader.ts';
+import { readJson, sha256Hex } from '../io.ts';
 
 /**
  * `season schedule` (spec/2.0 M2.0): generate the deterministic Season Run
@@ -50,18 +50,6 @@ export const DEFAULT_SEASON_SCHEDULE = resolve(
   REPO_ROOT,
   'apps/web/static/data/season/schedule.json',
 );
-
-function readJson(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch (error) {
-    throw new Error(`cannot read ${path}: ${(error as Error).message}`);
-  }
-}
-
-function sha256Hex(content: Buffer | string): string {
-  return createHash('sha256').update(content).digest('hex');
-}
 
 /** Serialization of the committed schedule artifact; byte-identical everywhere. */
 function serializeSchedule(schedule: SeasonSchedule): string {

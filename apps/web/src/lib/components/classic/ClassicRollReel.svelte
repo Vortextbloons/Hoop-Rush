@@ -350,7 +350,7 @@
     background: var(--color-card);
     padding: 1.5rem;
     box-shadow:
-      0 0 60px rgba(240, 77, 34, 0.18),
+      0 0 60px color-mix(in srgb, var(--color-court-rim) 18%, transparent),
       0 24px 60px rgba(0, 0, 0, 0.5);
     animation: roll-stage-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }
@@ -425,17 +425,17 @@
     background: linear-gradient(
       to right,
       transparent,
-      rgba(240, 77, 34, 0.85) 18%,
-      rgba(240, 77, 34, 0.85) 82%,
+      color-mix(in srgb, var(--color-court-rim) 85%, transparent) 18%,
+      color-mix(in srgb, var(--color-court-rim) 85%, transparent) 82%,
       transparent
     );
-    box-shadow: 0 0 12px rgba(240, 77, 34, 0.6);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color-court-rim) 60%, transparent);
   }
 
   .reel-window--active {
     box-shadow:
       inset 0 2px 14px rgba(0, 0, 0, 0.4),
-      0 0 26px rgba(240, 77, 34, 0.4);
+      0 0 26px color-mix(in srgb, var(--color-court-rim) 40%, transparent);
   }
 
   .reel-strip {
@@ -507,8 +507,8 @@
   .reel-row--final {
     color: #fff;
     font-weight: 800;
-    text-shadow: 0 0 18px rgba(240, 77, 34, 0.5);
-    box-shadow: inset 0 0 30px rgba(240, 77, 34, 0.12);
+    text-shadow: 0 0 18px color-mix(in srgb, var(--color-court-rim) 50%, transparent);
+    box-shadow: inset 0 0 30px color-mix(in srgb, var(--color-court-rim) 12%, transparent);
   }
 
   .reel-row--option {
@@ -559,13 +559,13 @@
     justify-content: center;
     min-height: 84px;
     border-radius: 14px;
-    border: 1px solid rgba(240, 77, 34, 0.35);
+    border: 1px solid color-mix(in srgb, var(--color-court-rim) 35%, transparent);
     background: radial-gradient(
       ellipse at center,
-      rgba(240, 77, 34, 0.14),
-      rgba(240, 77, 34, 0.02) 70%
+      color-mix(in srgb, var(--color-court-rim) 14%, transparent),
+      color-mix(in srgb, var(--color-court-rim) 2%, transparent) 70%
     );
-    box-shadow: 0 0 34px rgba(240, 77, 34, 0.25);
+    box-shadow: 0 0 34px color-mix(in srgb, var(--color-court-rim) 25%, transparent);
     padding: 0 16px;
     animation: roll-result-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
   }

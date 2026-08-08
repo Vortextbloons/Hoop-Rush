@@ -205,14 +205,15 @@ export interface SeasonGameEffectsMode {
   pregamePlayerStates: readonly SeasonPlayerLoadState[];
 }
 
-/** Stable removal/return queue order: period, then clock, then side. */
+/** Stable chronological queue order: period, descending game clock, then side. */
 function compareQueueEntries(
   a: { period: number; secondsRemaining: number; side: 'home' | 'away' },
   b: { period: number; secondsRemaining: number; side: 'home' | 'away' },
 ): number {
   const byPeriod = a.period - b.period;
   if (byPeriod !== 0) return byPeriod;
-  const byClock = a.secondsRemaining - b.secondsRemaining;
+  // Game clocks count down, so 600 is earlier than 100 within a period.
+  const byClock = b.secondsRemaining - a.secondsRemaining;
   if (byClock !== 0) return byClock;
   return a.side === b.side ? 0 : a.side === 'home' ? -1 : 1;
 }
@@ -388,6 +389,7 @@ class SeasonGameController {
           this.period <= 4 ? REGULATION_PERIOD_SECONDS : OVERTIME_PERIOD_SECONDS;
         this.state.periodIndex = this.period - 1;
         this.state.periodFouls = [0, 0];
+        this.tripContext.possessionStart = 'neutral';
         // M2.4: halftime recovery fires exactly once between periods 2 and 3.
         if (this.period === 3) this.effectsMode?.buffer.hook.halftime();
       }
@@ -548,26 +550,34 @@ class SeasonGameController {
     boundaryClock: number,
     periodEnded: boolean,
   ): void {
-    this.drainQueue(
-      this.removalQueue,
-      period,
-      floatClock,
-      boundaryClock,
-      periodEnded,
-      (removal, side) => {
-        side.removed.add(removal.playerVersionId);
-        side.unavailable.add(removal.playerVersionId);
-        side.causesFor(removal.playerVersionId).add('injected-injury-removal');
-        side.removalEvents.push({
-          side: removal.side,
-          playerVersionId: removal.playerVersionId,
-          period,
-          secondsRemaining: boundaryClock,
-          reason: removal.reason,
-        });
-        side.boundaryEvents.removals += 1;
-      },
-    );
+    for (let index = 0; index < this.removalQueue.length;) {
+      const removal = this.removalQueue[index];
+      if (removal === undefined) break;
+      if (!this.queueEntryIsDue(removal, period, floatClock, periodEnded)) {
+        index += 1;
+        continue;
+      }
+      const side = removal.side === 'home' ? this.home : this.away;
+      // An in-game injury can only occur during actual court exposure. If
+      // the seeded wall-clock point lands while the player is on the bench,
+      // defer it to the first legal boundary after they next take the floor.
+      if (!side.unit.includes(removal.playerVersionId)) {
+        index += 1;
+        continue;
+      }
+      this.removalQueue.splice(index, 1);
+      side.removed.add(removal.playerVersionId);
+      side.unavailable.add(removal.playerVersionId);
+      side.causesFor(removal.playerVersionId).add('injected-injury-removal');
+      side.removalEvents.push({
+        side: removal.side,
+        playerVersionId: removal.playerVersionId,
+        period,
+        secondsRemaining: boundaryClock,
+        reason: removal.reason,
+      });
+      side.boundaryEvents.removals += 1;
+    }
   }
 
   /**
@@ -632,6 +642,16 @@ class SeasonGameController {
       const side = entry.side === 'home' ? this.home : this.away;
       apply(entry, side);
     }
+  }
+
+  private queueEntryIsDue(
+    entry: { period: number; secondsRemaining: number },
+    period: number,
+    floatClock: number,
+    periodEnded: boolean,
+  ): boolean {
+    if (entry.period > period) return false;
+    return periodEnded || entry.period < period || floatClock <= entry.secondsRemaining;
   }
 
   /** Removes every active player with six personal fouls at this boundary. */

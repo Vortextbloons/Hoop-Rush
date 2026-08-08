@@ -636,7 +636,13 @@ export function auditSeasonRunState(
 
   // M2.5 trade state validity.
   const { trade } = stored;
-  const windowBlockIndexByIndex: Record<number, number> = { 0: 2, 1: 4, 2: 5 };
+  // Inverse of the engine's `WINDOW_BLOCK_INDEX_TO_INDEX` (block → window):
+  // window index → expected block. Derived from the seam's canonical map so
+  // this rule stays in the engine and can never diverge.
+  const windowBlockIndexByIndex: Record<number, number> = {};
+  for (const [blockIndex, windowIndex] of Object.entries(seam.windowBlockIndexToIndex)) {
+    windowBlockIndexByIndex[windowIndex] = Number(blockIndex);
+  }
   if (trade !== null) {
     if (trade.windows.length === 0) {
       failures.push('trade state holds no windows');

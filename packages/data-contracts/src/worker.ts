@@ -11,8 +11,14 @@ import { gameResultSchema } from './result.ts';
  * the main thread can ignore stale responses after a cancel or a route change.
  */
 
+/**
+ * Challenge block worker wire schema version: every challenge worker
+ * envelope (requests and messages) is validated against this literal.
+ */
+export const WORKER_WIRE_SCHEMA_VERSION = 1 as const;
+
 export const workerSimulateRequestSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('simulate'),
   requestId: z.string().min(1).max(64),
   /** Challenge snapshot; the sender strips recorded games to keep the post light. */
@@ -27,7 +33,7 @@ export const workerSimulateRequestSchema = z.object({
 export type WorkerSimulateRequest = z.infer<typeof workerSimulateRequestSchema>;
 
 export const workerCancelRequestSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('cancel'),
   requestId: z.string().min(1).max(64),
 });
@@ -41,7 +47,7 @@ export type WorkerCancelRequest = z.infer<typeof workerCancelRequestSchema>;
  * light.
  */
 export const workerStartRequestSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('start'),
   requestId: z.string().min(1).max(64),
   /** Challenge snapshot; only the fresh (games: []) form is accepted. */
@@ -61,7 +67,7 @@ export const workerRequestSchema = z.discriminatedUnion('type', [
 export type WorkerRequest = z.infer<typeof workerRequestSchema>;
 
 export const workerResultsMessageSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('results'),
   requestId: z.string().min(1).max(64),
   /** First game in the batch; results are consecutive games in schedule order. */
@@ -71,7 +77,7 @@ export const workerResultsMessageSchema = z.object({
 export type WorkerResultsMessage = z.infer<typeof workerResultsMessageSchema>;
 
 export const workerCompleteMessageSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('complete'),
   requestId: z.string().min(1).max(64),
   gamesDelivered: z.number().int().nonnegative(),
@@ -80,7 +86,7 @@ export const workerCompleteMessageSchema = z.object({
 export type WorkerCompleteMessage = z.infer<typeof workerCompleteMessageSchema>;
 
 export const workerErrorMessageSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('error'),
   requestId: z.string().min(1).max(64),
   message: z.string().min(1).max(512),
@@ -93,7 +99,7 @@ export type WorkerErrorMessage = z.infer<typeof workerErrorMessageSchema>;
  * is revealed, so per-game seeds and resume reproduce exactly those games.
  */
 export const workerStartResultMessageSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(WORKER_WIRE_SCHEMA_VERSION),
   type: z.literal('start-result'),
   requestId: z.string().min(1).max(64),
   chosenRunSeed: z.string().min(1).max(64),

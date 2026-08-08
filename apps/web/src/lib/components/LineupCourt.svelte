@@ -147,7 +147,7 @@
     min-height: 300px;
     overflow: hidden;
     border-radius: 0;
-    background: #c98c45;
+    background: var(--color-court-wood);
     background-image: repeating-linear-gradient(
       90deg,
       rgba(255, 255, 255, 0.07) 0 2px,
@@ -204,7 +204,7 @@
     width: 52px;
     height: 12px;
     transform: translateX(-50%);
-    border: 3px solid #f04d22;
+    border: 3px solid var(--color-court-rim);
     border-radius: 50%;
   }
   .slot {

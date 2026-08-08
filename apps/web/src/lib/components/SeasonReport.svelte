@@ -13,11 +13,12 @@
   } from '@hoop-rush/data-contracts';
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import type { SandboxHref } from '$lib/sandbox-url';
-  import { BEST_OF_ATTEMPTS, explainSeason, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
+  import { explainSeason, leagueMvp, perGamePlayer } from '@hoop-rush/engine';
   import { resolve } from '$app/paths';
   import GameStrip from '$lib/components/GameStrip.svelte';
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
+  import { oneDecimal, percentOneDecimal } from '$lib/format';
   import { SLOT_LABELS } from '$lib/player-positions';
 
   /**
@@ -138,7 +139,7 @@
       case 'turnoverMargin':
         return `${team} won the turnover margin ${String(evidence.margin)} (${String(evidence.teamTurnovers)}–${String(evidence.opponentTurnovers)}).`;
       case 'shotEfficiency':
-        return `${team} led effective FG% ${(Number(evidence.efgPct) * 100).toFixed(1)}–${(Number(evidence.opponentEfgPct) * 100).toFixed(1)}.`;
+        return `${team} led effective FG% ${percentOneDecimal(Number(evidence.efgPct))}–${percentOneDecimal(Number(evidence.opponentEfgPct))}.`;
       case 'offensiveRebounds':
         return `${team} won offensive rebounds ${String(evidence.teamOffensiveRebounds)}–${String(evidence.opponentOffensiveRebounds)}.`;
       case 'freeThrows':
@@ -160,13 +161,13 @@
   }
 
   function pct(made: number, attempted: number): string {
-    return attempted === 0 ? '—' : `${((made / attempted) * 100).toFixed(1)}%`;
+    return attempted === 0 ? '—' : percentOneDecimal(made / attempted);
   }
 
   const netRatingLabel = $derived(
     explanation.netRatingPer100 >= 0
-      ? `+${explanation.netRatingPer100.toFixed(1)}`
-      : explanation.netRatingPer100.toFixed(1),
+      ? `+${oneDecimal(explanation.netRatingPer100)}`
+      : oneDecimal(explanation.netRatingPer100),
   );
 
   const usageLeaderName = $derived.by(() => {
@@ -193,13 +194,13 @@
   }
 
   function zonePctLabel(rate: number): string {
-    return `${(rate * 100).toFixed(1)}%`;
+    return percentOneDecimal(rate);
   }
 
   /** True shooting percentage from exact season totals: PTS / (2*(FGA + 0.44*FTA)). */
   function trueShootingPct(points: number, fga: number, fta: number): string {
     const denominator = 2 * (fga + 0.44 * fta);
-    return denominator <= 0 ? '—' : `${((points / denominator) * 100).toFixed(1)}%`;
+    return denominator <= 0 ? '—' : percentOneDecimal(points / denominator);
   }
 
   /** Usage percentage: the player's possession estimate share of the team's. */
@@ -212,7 +213,7 @@
     const player = possessionEstimate(raw);
     const teamTotal = possessionEstimate(team);
     if (teamTotal <= 0) return '—';
-    return `${((player / teamTotal) * 100).toFixed(1)}%`;
+    return percentOneDecimal(player / teamTotal);
   }
 
   function perGameValue(value: number, games: number, decimals = 1): string {
@@ -220,7 +221,7 @@
   }
 
   function formatAggregateStat(value: number): string {
-    return totalsMode ? String(value) : value.toFixed(1);
+    return totalsMode ? String(value) : oneDecimal(value);
   }
 
   function toggleMode() {
@@ -274,35 +275,35 @@
           <dl class="mt-3 flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs text-muted-foreground">
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">MVP score</dt>
-              <dd class="font-bold text-foreground">{mvp.mvpScore.toFixed(1)}</dd>
+              <dd class="font-bold text-foreground">{oneDecimal(mvp.mvpScore)}</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">PTS</dt>
-              <dd class="font-bold text-foreground">{mvp.averagePoints.toFixed(1)}</dd>
+              <dd class="font-bold text-foreground">{oneDecimal(mvp.averagePoints)}</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">TS%</dt>
-              <dd class="font-bold text-foreground">{(mvp.averageEfficiency * 100).toFixed(1)}%</dd>
+              <dd class="font-bold text-foreground">{percentOneDecimal(mvp.averageEfficiency)}</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">REB</dt>
-              <dd class="font-bold text-foreground">{mvp.averageRebounds.toFixed(1)}</dd>
+              <dd class="font-bold text-foreground">{oneDecimal(mvp.averageRebounds)}</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">AST</dt>
-              <dd class="font-bold text-foreground">{mvp.averageAssists.toFixed(1)}</dd>
+              <dd class="font-bold text-foreground">{oneDecimal(mvp.averageAssists)}</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">STL</dt>
-              <dd class="font-bold text-foreground">{mvp.averageSteals.toFixed(1)}</dd>
+              <dd class="font-bold text-foreground">{oneDecimal(mvp.averageSteals)}</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">BLK</dt>
-              <dd class="font-bold text-foreground">{mvp.averageBlocks.toFixed(1)}</dd>
+              <dd class="font-bold text-foreground">{oneDecimal(mvp.averageBlocks)}</dd>
             </div>
             <div>
               <dt class="text-[9px] tracking-[0.14em] uppercase">Consistency</dt>
-              <dd class="font-bold text-foreground">{mvp.consistency.toFixed(1)}</dd>
+              <dd class="font-bold text-foreground">{oneDecimal(mvp.consistency)}</dd>
             </div>
           </dl>
         </section>
@@ -348,7 +349,9 @@
       </div>
       <div class="rounded-lg border border-border bg-card p-3">
         <dt class="font-mono text-[10px] text-muted-foreground uppercase">Opponent PPG</dt>
-        <dd class="mt-1 font-display text-xl font-extrabold">{opponentPointsPerGame.toFixed(1)}</dd>
+        <dd class="mt-1 font-display text-xl font-extrabold">
+          {oneDecimal(opponentPointsPerGame)}
+        </dd>
       </div>
       <div class="rounded-lg border border-border bg-card p-3">
         <dt class="font-mono text-[10px] text-muted-foreground uppercase">Point diff</dt>
@@ -455,10 +458,6 @@
         Edit team
       </a>
     {/if}
-    <span class="ml-auto font-mono text-[10px] text-muted-foreground">
-      seed {run.runSeed} · best of {BEST_OF_ATTEMPTS} · engine {run.versions.engineVersion} · bracket
-      {run.versions.bracketVersion} · schedule {run.versions.scheduleVersion}
-    </span>
   </div>
 </div>
 
@@ -497,8 +496,8 @@
       <li class="rounded-lg border border-border bg-surface-1 p-3">
         <span class="font-semibold">This lineup was weak on the defensive glass.</span>
         <span class="text-muted-foreground">
-          &nbsp;Opponents grabbed {(explanation.opponentOffensiveReboundRate * 100).toFixed(1)}% of
-          their own misses.
+          &nbsp;Opponents grabbed {percentOneDecimal(explanation.opponentOffensiveReboundRate)} of their
+          own misses.
         </span>
       </li>
     {/if}

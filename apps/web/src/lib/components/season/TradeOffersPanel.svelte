@@ -205,7 +205,7 @@
           {pendingOffer.action === 'accept'
             ? `You send ${playerList(pendingOffer.offer.outgoingPlayers)} and receive ${playerList(
                 pendingOffer.offer.incomingPlayers,
-              )}. The trade is atomic: ownership transfers, the rotation repairs deterministically, new pairs start at zero chemistry, and the transaction is recorded.`
+              )}. Ownership transfers, the rotation fills the open spot, and new pairs start at zero chemistry.`
             : 'The offer is marked declined and cannot be reopened this window.'}
         </p>
         <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">

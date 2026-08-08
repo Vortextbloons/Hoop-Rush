@@ -9,6 +9,7 @@ import type {
 import { SHOT_ZONES } from '@hoop-rush/data-contracts';
 import { creationScore, spacingScore } from '../domain/archetypes.ts';
 import { ENGINE_CONSTANTS } from '../sim/constants.ts';
+import { REGULATION_PERIOD_SECONDS } from '../sim/periods.ts';
 import {
   freeThrowProbability,
   freeThrowsForZone,
@@ -56,7 +57,7 @@ import {
 const ZONES: readonly ShotZone[] = SHOT_ZONES;
 
 /** Regulation period seconds used for the make-probability late-clock term (no penalty). */
-const REGULATION_START_SECONDS = 720;
+const REGULATION_START_SECONDS = REGULATION_PERIOD_SECONDS;
 
 /** Per-player ledger facts in team index order. */
 export interface LedgerPlayerFacts {

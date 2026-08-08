@@ -17,8 +17,8 @@ import {
 } from '@hoop-rush/data-contracts';
 import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
 import { getManifest } from '$lib/data';
+import { clearMemoizedLoaders, memoized, resolveAssetUrl } from '$lib/asset-url';
 import { readCachedAsset, writeCachedAsset } from '$lib/pool-cache';
-import { resolve } from '$app/paths';
 
 /**
  * PROVISIONAL IMPLEMENTATION — OWNED BY THE LEAD.
@@ -50,15 +50,6 @@ export interface SeasonArtifactUrls {
 
 const FIXED_SEASON_ERA = '2010s';
 
-function siteRoot(): string {
-  return resolve('/');
-}
-
-function resolveAssetUrl(url: string): string {
-  if (/^https?:\/\//.test(url) || url.startsWith('/')) return url;
-  return `${siteRoot()}data/${url}`;
-}
-
 async function fetchVerified<T>(
   url: string,
   contentHash: string,
@@ -70,17 +61,6 @@ async function fetchVerified<T>(
     parse,
     init: { cache: 'no-store' },
   });
-}
-
-const cache = new Map<string, Promise<unknown>>();
-
-function memoized<T>(key: string, load: () => Promise<T>): Promise<T> {
-  const existing = cache.get(key) as Promise<T> | undefined;
-  if (existing) return existing;
-  const promise = load();
-  cache.set(key, promise);
-  promise.catch(() => cache.delete(key));
-  return promise;
 }
 
 export function loadSeasonLeague(): Promise<SeasonLeague> {
@@ -190,5 +170,5 @@ export function loadSeasonProjectionModel(): Promise<ProjectionModelArtifact> {
 
 /** @internal Resets memoized loaders between unit tests. */
 export function clearSeasonAssetCaches(): void {
-  cache.clear();
+  clearMemoizedLoaders();
 }

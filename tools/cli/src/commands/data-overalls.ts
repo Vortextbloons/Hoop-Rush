@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import {
   franchiseEraPoolSchema,
@@ -6,6 +5,7 @@ import {
   type PeakPlayerSeason,
 } from '@hoop-rush/data-contracts';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
+import { tryReadJson } from '../io.ts';
 
 export const DATA_OVERALLS_OPTIONS: Record<string, boolean> = {
   input: true,
@@ -35,14 +35,6 @@ interface OverallRow {
   summaryOverall: number;
   selectionScore: number;
   selectionScoreVersion: string;
-}
-
-function readJson(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch {
-    return null;
-  }
 }
 
 function rowFromPlayer(player: PeakPlayerSeason): OverallRow {
@@ -87,7 +79,7 @@ export function dataOveralls(options: DataOverallsOptions): CliReport {
     });
   }
 
-  const rawManifest = readJson(options.input);
+  const rawManifest = tryReadJson(options.input);
   const parsedManifest = hoopRushManifestSchema.safeParse(rawManifest);
   if (!parsedManifest.success) {
     const issue = parsedManifest.error.issues[0];
@@ -110,7 +102,7 @@ export function dataOveralls(options: DataOverallsOptions): CliReport {
     if (options.era !== undefined && poolRef.eraId !== options.era) continue;
 
     const assetPath = isAbsolute(poolRef.url) ? poolRef.url : resolve(manifestDir, poolRef.url);
-    const parsedPool = franchiseEraPoolSchema.safeParse(readJson(assetPath));
+    const parsedPool = franchiseEraPoolSchema.safeParse(tryReadJson(assetPath));
     if (!parsedPool.success) {
       const issue = parsedPool.error.issues[0];
       failures.push(

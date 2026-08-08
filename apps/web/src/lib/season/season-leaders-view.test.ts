@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SeasonPlayerAggregate, SeasonTeamAggregate } from '@hoop-rush/data-contracts';
-import {
-  engineOrderLeaderTables,
-  LEADER_CATEGORIES,
-  seasonLeaderCategoryValue,
-} from './season-leaders-view';
+import { deriveSeasonLeaders } from '@hoop-rush/engine';
+import { engineOrderLeaderTables, LEADER_CATEGORIES } from './season-leaders-view';
 
 /**
  * Leaders tab ordering tests (M2.3.5): the engine-authoritative tie-break is
@@ -66,26 +63,6 @@ function player(
   };
 }
 
-describe('seasonLeaderCategoryValue', () => {
-  it('maps every category to the right aggregate field', () => {
-    const p = player('v1', 'lakers', 10, {
-      points: 100,
-      offensiveRebounds: 5,
-      defensiveRebounds: 6,
-      assists: 7,
-      steals: 8,
-      blocks: 9,
-      threePointersMade: 4,
-    });
-    expect(seasonLeaderCategoryValue(p, 'points')).toBe(100);
-    expect(seasonLeaderCategoryValue(p, 'rebounds')).toBe(11);
-    expect(seasonLeaderCategoryValue(p, 'assists')).toBe(7);
-    expect(seasonLeaderCategoryValue(p, 'steals')).toBe(8);
-    expect(seasonLeaderCategoryValue(p, 'blocks')).toBe(9);
-    expect(seasonLeaderCategoryValue(p, 'threePointersMade')).toBe(4);
-  });
-});
-
 describe('engineOrderLeaderTables', () => {
   const teams = [team('celtics', 10), team('lakers', 10), team('hawks', 10), team('spurs', 5)];
 
@@ -146,5 +123,26 @@ describe('engineOrderLeaderTables', () => {
     ];
     const tables = engineOrderLeaderTables(players, lakersOneGame);
     expect(tables.points.map((entry) => entry.playerVersionId)).toEqual(['v-one']);
+  });
+
+  it('matches the engine deriveSeasonLeaders output exactly', () => {
+    const players = [
+      player('v-big', 'lakers', 10, { points: 300, assists: 40 }),
+      player('v-rate', 'lakers', 7, { points: 240, assists: 45 }),
+      player('v-ineligible', 'hawks', 3, { points: 300, steals: 30 }),
+      player('v-eligible', 'hawks', 10, { points: 200, steals: 20 }),
+      player('v-spurs', 'spurs', 5, {
+        points: 150,
+        offensiveRebounds: 35,
+        defensiveRebounds: 45,
+        blocks: 12,
+      }),
+      player('v-zero', 'lakers', 0, { points: 0 }),
+    ];
+    const expected = deriveSeasonLeaders(teams, players);
+    const tables = engineOrderLeaderTables(players, teams);
+    for (const category of LEADER_CATEGORIES) {
+      expect(tables[category]).toEqual(expected.categories[category]);
+    }
   });
 });

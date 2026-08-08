@@ -1,8 +1,8 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  DEFAULT_ERA_ID,
   eraSimulationProfileSchema,
   franchiseEraPoolSchema,
   hoopRushManifestSchema,
@@ -15,6 +15,7 @@ import {
   type PlayersIndex,
 } from '@hoop-rush/data-contracts';
 import { UsageError } from '../args.ts';
+import { sha256Hex } from '../io.ts';
 
 /**
  * Loads packaged static artifacts from the repo (spec/09: commands read
@@ -42,7 +43,7 @@ function parseJson(path: string, bytes: Buffer): unknown {
 }
 
 function verifyHash(path: string, bytes: Buffer, expected: string): void {
-  const actual = createHash('sha256').update(bytes).digest('hex');
+  const actual = sha256Hex(bytes);
   if (actual !== expected) {
     throw new Error(`content hash mismatch for ${path}: expected ${expected}, got ${actual}`);
   }
@@ -90,7 +91,7 @@ export class PackagedData {
     return { path, bytes };
   }
 
-  eraProfile(eraId = '1990s'): EraSimulationProfile {
+  eraProfile(eraId: string = DEFAULT_ERA_ID): EraSimulationProfile {
     const cached = this.profileCache.get(eraId);
     if (cached) return cached;
     const entry = this.manifest.eraSimulationProfiles.find((e) => e.eraId === eraId);

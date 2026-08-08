@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.ts';
+import { franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonCompactInjuryEventSchema, seasonInjurySeveritySchema } from './season-health.ts';
 import { seasonEffectsSideSchema, seasonMechanismSchema } from './season-effects.ts';
@@ -90,7 +90,7 @@ export type SeasonRecordMovement = z.infer<typeof seasonRecordMovementSchema>;
 export const seasonNotablePerformanceSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   franchiseId: franchiseIdSchema,
-  gameId: z.string().regex(/^s[0-9]{6}$/),
+  gameId: seasonGameIdSchema,
   points: z.number().int().nonnegative(),
   rebounds: z.number().int().nonnegative(),
   assists: z.number().int().nonnegative(),
@@ -134,7 +134,7 @@ export type SeasonVersionSpotlight = z.infer<typeof seasonVersionSpotlightSchema
 
 /** The human team's next games after this block (final block: next opponents). */
 export const seasonUpcomingHumanGameSchema = z.object({
-  gameId: z.string().regex(/^s[0-9]{6}$/),
+  gameId: seasonGameIdSchema,
   round: z.number().int().min(1).max(82),
   homeFranchiseId: franchiseIdSchema,
   awayFranchiseId: franchiseIdSchema,

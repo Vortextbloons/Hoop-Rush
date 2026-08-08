@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { franchiseIdSchema } from './ids.ts';
+import { commandIdSchema, franchiseIdSchema, idSchema } from './ids.ts';
 
 /**
  * M2.5 transaction log contracts (spec/2.0 M2.5). Every economic fact that
@@ -30,18 +30,9 @@ export type SeasonTransactionType = z.infer<typeof seasonTransactionTypeSchema>;
  * `explanation` is the bounded human-readable summary (max 512).
  */
 export const seasonTransactionEntrySchema = z.object({
-  transactionId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/),
+  transactionId: idSchema,
   /** Null for system-generated entries without a command. */
-  commandId: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-z0-9][a-z0-9._:-]*$/)
-    .nullable(),
+  commandId: commandIdSchema.nullable(),
   /** Null for league-wide entries. */
   franchiseId: franchiseIdSchema.nullable(),
   type: seasonTransactionTypeSchema,

@@ -1,3 +1,4 @@
+import { fatigueBandOf } from '@hoop-rush/engine';
 import {
   SEASON_BLOCK_TEAM_GAMES,
   SEASON_FINAL_BLOCK_TEAM_GAMES,
@@ -9,6 +10,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import { rotationRoleOf } from './season-rotation-editor';
 import { seasonRotationSetDigest } from './season-rotation-digest';
+import { FATIGUE_BAND_LABEL, projectedFatigueBand } from './season-effects-view';
 
 /**
  * "What changed?" lock preview (spec/2.0/11 block lock preview, M2.3).
@@ -214,10 +216,7 @@ export function buildLockPreview(input: {
 }
 
 function fatigueBandName(fatigueBasisPoints: number): string {
-  if (fatigueBasisPoints < 1500) return 'Fresh';
-  if (fatigueBasisPoints < 3500) return 'Ready';
-  if (fatigueBasisPoints < 6000) return 'Tired';
-  return 'Heavy';
+  return FATIGUE_BAND_LABEL[fatigueBandOf(fatigueBasisPoints)];
 }
 
 function projectedFatigueBandName(
@@ -226,13 +225,9 @@ function projectedFatigueBandName(
   staminaRating: number,
   games: number,
 ): string {
-  let fatigue = currentFatigueBp;
-  for (let i = 0; i < games; i += 1) {
-    const seconds = minutesPerGame * 60;
-    fatigue += (seconds * 40 * (110 - staminaRating)) / 10_000;
-    fatigue = Math.max(0, Math.round(fatigue * ((4500 - 20 * staminaRating) / 10_000)));
-  }
-  return fatigueBandName(Math.min(10_000, fatigue));
+  return FATIGUE_BAND_LABEL[
+    projectedFatigueBand(currentFatigueBp, minutesPerGame, staminaRating, games)
+  ];
 }
 
 /** Convenience: the full 30-rotation set digest with the human rotation swapped. */

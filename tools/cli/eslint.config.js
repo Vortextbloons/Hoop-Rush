@@ -1,17 +1,3 @@
-import tseslint from 'typescript-eslint';
+import { sharedEslintBase } from '../../eslint.base.config.js';
 
-export default tseslint.config(
-  { ignores: ['dist/'] },
-  {
-    files: ['**/*.ts'],
-    extends: [tseslint.configs.strictTypeChecked],
-    languageOptions: {
-      parserOptions: {
-        projectService: {
-          allowDefaultProject: ['vitest.config.ts'],
-        },
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
-);
+export default sharedEslintBase(import.meta.dirname);

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -6,6 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { expect } from 'vitest';
+import { sha256Hex } from './io.ts';
 
 /**
  * Shared harness for CLI integration tests (spec/09, spec/06): the real
@@ -106,7 +106,7 @@ export function writeManifestWithBracket(
       eraSimulationProfiles: [],
       bracket: {
         url: bracketPath,
-        contentHash: createHash('sha256').update(bracketContent).digest('hex'),
+        contentHash: sha256Hex(bracketContent),
       },
       assets: {
         headshotUrlTemplate: null,

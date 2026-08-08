@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { EraSimulationProfile } from './era-sim-profile.ts';
 import { contentHashSchema, eraIdSchema, playerIdSchema, seedSchema } from './ids.ts';
+import { seasonCheckpointDigestSchema } from './season-digests.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import {
   PROJECTION_MODEL_VERSION,
@@ -459,9 +460,9 @@ export const baseFiveProjectionSchema = z
     dataVersion: z.string().min(1).max(64),
     normalizationVersion: z.literal(PROJECTION_SCHEMA_VERSION),
     /** Seedless digest of the validated input (32-hex). */
-    inputDigest: z.string().regex(/^[0-9a-f]{32}$/),
+    inputDigest: seasonCheckpointDigestSchema,
     /** Canonical audit digest of the full projection (32-hex). */
-    digest: z.string().regex(/^[0-9a-f]{32}$/),
+    digest: seasonCheckpointDigestSchema,
     /** Canonical slot-ordered lineup snapshot. */
     lineup: z.array(projectionLineupEntrySchema).length(5),
     /** This lineup's offense against the neutral reference defense. */

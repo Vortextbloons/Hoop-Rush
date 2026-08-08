@@ -344,7 +344,7 @@ describe('InfluencePanel', () => {
       },
     });
     const text = document.body.textContent;
-    expect(text).toContain('Seeded outcome recorded: failure');
+    expect(text).toContain('Outcome: failure');
   });
 });
 

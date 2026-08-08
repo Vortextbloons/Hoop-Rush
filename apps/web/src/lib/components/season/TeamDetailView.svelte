@@ -5,6 +5,7 @@
   import { eraIdentityOf, franchiseIdentityOf } from '$lib/season/season-branding';
   import type { SeasonRunShellData } from '$lib/season/season-shell-context';
   import { formatPositions } from '$lib/player-positions';
+  import { oneDecimal } from '$lib/format';
   import type {
     SeasonTeamDetail,
     SeasonTeamPlayerRow,
@@ -64,7 +65,7 @@
     if (stats === null) return '—';
     const value = stats[key];
     if (typeof value !== 'number') return '—';
-    return value.toFixed(1);
+    return oneDecimal(value);
   }
 </script>
 
@@ -95,6 +96,50 @@
       </p>
     </div>
   </div>
+
+  <!-- 0-100 team strip: minute-weighted player ratings from the locked
+       rotation (same packaged ratings as the per-player OVR chips). -->
+  {#if detail.projection !== null}
+    <dl
+      class="mt-4 grid grid-cols-3 gap-2"
+      data-season-team-projection
+      aria-label="Team ratings from the locked rotation's player ratings"
+    >
+      <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
+        <dt
+          class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+        >
+          Overall
+        </dt>
+        <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+          {detail.projection.overall}
+        </dd>
+      </div>
+      <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
+        <dt
+          class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+        >
+          Offense
+        </dt>
+        <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+          {detail.projection.offense}
+        </dd>
+      </div>
+      <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
+        <dt
+          class="font-mono text-[9px] font-bold tracking-[0.14em] text-muted-foreground uppercase"
+        >
+          Defense
+        </dt>
+        <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
+          {detail.projection.defense}
+        </dd>
+      </div>
+    </dl>
+    <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">
+      1–100 from the locked rotation · minute-weighted player ratings
+    </p>
+  {/if}
 
   <!-- Locked rotation readout -->
   <div class="mt-6 rounded-xl bg-surface-1 p-4">
@@ -197,7 +242,7 @@
               </span>
               {#if row.stats !== null}
                 <span class="whitespace-nowrap font-mono text-[10px] font-bold">
-                  {row.stats.pointsPerGame.toFixed(1)} ppg
+                  {oneDecimal(row.stats.pointsPerGame)} ppg
                 </span>
               {/if}
             </div>

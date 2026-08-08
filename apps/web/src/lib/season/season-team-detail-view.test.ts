@@ -101,6 +101,7 @@ const input = {
   league: run.league,
   summaries: [] as SeasonGameSummary[],
   overallRatingOf: () => 87,
+  summaryRatingsOf: () => ({ overallRating: 80, offenseRating: 82, defenseRating: 74 }),
   playablePositions: () => ['PG', 'SG'],
 };
 
@@ -172,6 +173,16 @@ describe('seasonTeamDetail', () => {
       expect(row.overallRating).toBe(87);
       expect(row.positions).toEqual(['PG', 'SG']);
     }
+  });
+
+  it('builds the minute-weighted 0-100 strip from the player ratings', () => {
+    const detail = detailOf(input);
+    expect(detail.projection).toEqual({ overall: 80, offense: 82, defense: 74 });
+  });
+
+  it('hides the strip when no rostered player ratings resolve', () => {
+    const detail = seasonTeamDetail({ ...input, summaryRatingsOf: () => null });
+    expect(detail?.projection).toBeNull();
   });
 
   it('folds per-player season rates from accepted summaries', () => {

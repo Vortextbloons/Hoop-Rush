@@ -9,6 +9,7 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import {
+  POSITION_SLOTS,
   playableSlotGroups,
   RATINGS_VERSION,
   RATING_MODEL_VERSION,
@@ -20,8 +21,11 @@ import { loadPackagedData, PackagedData } from './data-loader.ts';
 import { parseCount } from '../args.ts';
 import { fixtureSeed } from './sim.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from '@hoop-rush/importer';
+import { mean } from '../stats.ts';
 
-const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
+const SLOT_POSITIONS: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [
+  position,
+]);
 const CONTEXTS = ['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'] as const;
 
 interface PairAccumulator {
@@ -344,19 +348,18 @@ export function calibrateRatings(args: {
           context,
         );
       });
-      const mean = (key: keyof PairAccumulator) =>
-        totals.reduce((sum, value) => sum + value[key], 0) / Math.max(1, totals.length);
+      const meanMetric = (key: keyof PairAccumulator) => mean(totals.map((value) => value[key]));
       const winProbability =
         totals.reduce((sum, value) => sum + value.wins / Math.max(1, value.games), 0) /
         Math.max(1, totals.length);
       const metrics = {
-        netRating: mean('netRating'),
+        netRating: meanMetric('netRating'),
         winProbability,
-        offensiveEfficiency: mean('offensiveEfficiency'),
-        defensiveEfficiency: mean('defensiveEfficiency'),
-        turnovers: mean('turnovers'),
-        rebounds: mean('rebounds'),
-        shotQuality: mean('shotQuality'),
+        offensiveEfficiency: meanMetric('offensiveEfficiency'),
+        defensiveEfficiency: meanMetric('defensiveEfficiency'),
+        turnovers: meanMetric('turnovers'),
+        rebounds: meanMetric('rebounds'),
+        shotQuality: meanMetric('shotQuality'),
       };
       const adjustment = Math.max(
         -6,

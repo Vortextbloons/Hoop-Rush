@@ -1,0 +1,27 @@
+name: Setup repository
+description: Pin pnpm and Node, and install dependencies for CI jobs.
+
+inputs:
+  node-version:
+    description: Node.js version to install
+    required: false
+    default: '22'
+  pnpm-version:
+    description: pnpm version to use (kept in sync with packageManager in package.json)
+    required: false
+    default: '11.11.0'
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: ${{ inputs.pnpm-version }}
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+
+    - run: pnpm install --frozen-lockfile
+      shell: bash

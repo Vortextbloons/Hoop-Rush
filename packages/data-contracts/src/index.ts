@@ -58,6 +58,8 @@ export * from './season-game-summary.ts';
 export * from './season-aggregates.ts';
 export * from './season-recap.ts';
 export * from './season-checkpoint.ts';
+export * from './season-digests.ts';
+export * from './season-command-base.ts';
 export * from './season-effects.ts';
 export * from './season-health.ts';
 export * from './season-transactions.ts';

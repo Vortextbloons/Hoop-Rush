@@ -18,6 +18,7 @@ import { prepareTeam, prepareTeamCached, type TeamPrep } from '../sim/prepare.ts
 import { projectExpectedLedger, type LedgerSide } from './expected-ledger.ts';
 import { resolveReference } from './reference-lineups.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
+import { normalizeValue } from './normalize.ts';
 
 /**
  * Base-five projection (projection milestone): the deterministic,
@@ -78,7 +79,7 @@ function normalize(
   const perPoint = scale?.perPoint ?? fallback.perPoint;
   const min = scale?.min ?? 0;
   const max = scale?.max ?? 100;
-  return Math.min(max, Math.max(min, (raw - baseline) / Math.max(1e-9, perPoint) + 50));
+  return normalizeValue(raw, baseline, perPoint, min, max);
 }
 
 function mean(values: readonly number[]): number {

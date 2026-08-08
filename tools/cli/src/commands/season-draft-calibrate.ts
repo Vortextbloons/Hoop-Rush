@@ -1,6 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { Worker } from 'node:worker_threads';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
   SEASON_AI_VERSION,
@@ -25,9 +23,10 @@ import {
   DEFAULT_SEASON_DIR,
   loadSeasonRosterTargets,
   pickBestSelectable,
-  sha256Hex,
 } from './season-data.ts';
 import { rosterCalibrationSeed } from './season-rosters.ts';
+import { percentile } from '../stats.ts';
+import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
 
 /**
  * `season draft calibrate` (spec/2.0 M2.3.5): freezes `offer-targets-v1`
@@ -332,12 +331,11 @@ export function runSeasonDraftCalibrationSeeds(args: {
   );
 }
 
-function percentile(sorted: readonly number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(p * (sorted.length - 1))));
-  return sorted[index] ?? 0;
-}
-
+/**
+ * Index-based lower median; kept local because the frozen
+ * `offer-targets-v1` variety medians were authored with it (regeneration
+ * must stay byte-identical; see `stats.ts` for the canonical median).
+ */
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -412,30 +410,13 @@ async function runCalibrationChunks(args: {
   workers: number;
   targets: SeasonRosterTargets;
 }): Promise<SeasonDraftCalibrationRun[]> {
-  const chunkSize = Math.max(1, Math.ceil(args.seeds.length / args.workers));
-  const chunks: string[][] = [];
-  for (let i = 0; i < args.seeds.length; i += chunkSize) {
-    chunks.push(args.seeds.slice(i, i + chunkSize));
-  }
-  const results = await Promise.all(
-    chunks.map(
-      (seeds) =>
-        new Promise<SeasonDraftCalibrationRun[]>((resolvePromise, rejectPromise) => {
-          const worker = new Worker(new URL('./draft-calibration-worker.ts', import.meta.url), {
-            workerData: { ...args, seeds },
-          });
-          worker.on('message', (message: { runs: SeasonDraftCalibrationRun[] }) => {
-            resolvePromise(message.runs);
-            void worker.terminate();
-          });
-          worker.on('error', rejectPromise);
-          worker.on('exit', (code) => {
-            if (code !== 0) rejectPromise(new Error(`worker exited ${String(code)}`));
-          });
-        }),
-    ),
-  );
-  return results.flat();
+  return runWorkerChunks<string, SeasonDraftCalibrationRun>({
+    workerUrl: new URL('./draft-calibration-worker.ts', import.meta.url),
+    workerData: (seeds) => ({ ...args, seeds }),
+    items: args.seeds,
+    workers: args.workers,
+    payloadKey: 'runs',
+  });
 }
 
 export async function seasonDraftCalibrate(args: {
@@ -618,29 +599,17 @@ export async function seasonDraftCalibrate(args: {
   };
   offerTargetsSchema.parse(targets);
   const outPath = args.out ?? DEFAULT_OFFER_TARGETS;
-  try {
-    const target = resolve(outPath);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, `${JSON.stringify(targets, null, 2)}\n`);
-    targetsWritten = true;
-    targetsPath = target;
-    // Update the manifest hash for the committed targets artifact.
-    if (resolve(outPath) === resolve(DEFAULT_OFFER_TARGETS)) {
-      const manifestPathResolved = resolve(manifestPath);
-      const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {
-        season?: Record<string, { url?: string; contentHash?: string }>;
-      };
-      if (manifest.season !== undefined) {
-        manifest.season.offerTargets = {
-          url: 'season/offer-targets.json',
-          contentHash: sha256Hex(readFileSync(target)),
-        };
-        writeFileSync(manifestPathResolved, `${JSON.stringify(manifest, null, 2)}\n`);
-      }
-    }
-  } catch (error) {
-    gateFailures.push(`cannot write targets: ${(error as Error).message}`);
-  }
+  const commit = commitTargetsArtifact({
+    outPath,
+    defaultTargetsPath: DEFAULT_OFFER_TARGETS,
+    manifestPath,
+    manifestKey: 'offerTargets',
+    manifestUrl: 'season/offer-targets.json',
+    content: targets,
+  });
+  targetsWritten = commit.written;
+  targetsPath = commit.path;
+  if (commit.error !== null) gateFailures.push(commit.error);
 
   const payload = seasonDraftCalibrateReportSchema.parse({
     schemaVersion: 1,

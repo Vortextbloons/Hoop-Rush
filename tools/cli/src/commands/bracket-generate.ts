@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -8,6 +7,7 @@ import {
   type FranchiseCandidates,
 } from '@hoop-rush/engine';
 import {
+  REQUIRED_RATING_KEYS,
   opponentTeamSchema,
   type DifficultyProfile,
   type HoopRushManifest,
@@ -21,9 +21,10 @@ import {
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { bracketGenerateReportSchema } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData, REPO_ROOT } from './data-loader.ts';
-import { pools } from '@hoop-rush/importer';
+import { opponent, pools } from '@hoop-rush/importer';
 import { UsageError } from './sim.ts';
 import { parseCount } from '../args.ts';
+import { readJson, sha256Hex } from '../io.ts';
 
 /**
  * `bracket generate` (dev tool, spec/01): authors the frozen 30-team bracket
@@ -51,27 +52,6 @@ const MIN_BRACKET_SAMPLES = 32;
 const NBA_ROOT = resolve(REPO_ROOT, 'raw-data/nba');
 const OPPONENTS_DIR = resolve(REPO_ROOT, 'apps/web/static/data/opponents');
 const MANIFEST_PATH = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
-
-const RATING_KEYS = [
-  'insideScoring',
-  'closeShot',
-  'midrange',
-  'threePoint',
-  'freeThrow',
-  'ballHandling',
-  'passing',
-  'offensiveIq',
-  'offensiveRebound',
-  'defensiveRebound',
-  'perimeterDefense',
-  'interiorDefense',
-  'steal',
-  'block',
-  'defensiveIq',
-  'speed',
-  'strength',
-  'vertical',
-] as const;
 
 const TENDENCY_KEYS = [
   'usageRate',
@@ -144,14 +124,6 @@ interface Stint {
   minutes: number;
 }
 
-function readJson(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8')) as unknown;
-  } catch (error) {
-    throw new Error(`cannot read ${path}: ${(error as Error).message}`);
-  }
-}
-
 function clampRating(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)));
 }
@@ -160,21 +132,14 @@ function clampTendency(value: number): number {
   return Math.min(100, Math.max(0, value));
 }
 
-function ratio(numerator: number, denominator: number, fallback: number): number {
-  return denominator > 0 ? numerator / denominator : fallback;
-}
-
-function shrunkRatio(
-  numerator: number,
-  denominator: number,
-  prior: number,
-  priorAttempts = 80,
-): number {
-  return denominator > 0
-    ? (numerator + prior * priorAttempts) / (denominator + priorAttempts)
-    : prior;
-}
-
+/**
+ * Observed player-season anchors for bracket candidates (the possession
+ * engine's `SimulationAnchors`). Kept local on purpose: the importer's
+ * `opponent.anchorsForPlayer` shares the shrunk-ratio core but differs in
+ * two edge cases the frozen bracket was authored with — the no-split
+ * offensive-rebound fallback is a flat 0.2 share here (importer: slot-based
+ * 0.28/0.22/0.15 rounded), and the attempt rates are clamped to at most 1.
+ */
 function anchorsFromStats(
   stats: SeasonStats | undefined,
   positions: PositionUnion,
@@ -204,11 +169,11 @@ function anchorsFromStats(
     stealsPerGame: stats.steals / games,
     blocksPerGame: stats.blocks / games,
     turnoversPerGame: stats.turnovers / games,
-    fieldGoalPct: shrunkRatio(stats.fgm, stats.fga, 0.45),
-    threePointPct: stats.tpa > 0 ? shrunkRatio(stats.tpm, stats.tpa, 0.34) : null,
-    freeThrowPct: shrunkRatio(stats.ftm, stats.fta, 0.75),
-    threePointAttemptRate: Math.min(1, ratio(stats.tpa, stats.fga, 0)),
-    freeThrowAttemptRate: Math.min(1, ratio(stats.fta, stats.fga, 0.2)),
+    fieldGoalPct: opponent.shrunkRatio(stats.fgm, stats.fga, 0.45),
+    threePointPct: stats.tpa > 0 ? opponent.shrunkRatio(stats.tpm, stats.tpa, 0.34) : null,
+    freeThrowPct: opponent.shrunkRatio(stats.ftm, stats.fta, 0.75),
+    threePointAttemptRate: Math.min(1, opponent.ratio(stats.tpa, stats.fga, 0)),
+    freeThrowAttemptRate: Math.min(1, opponent.ratio(stats.fta, stats.fga, 0.2)),
   };
 }
 
@@ -346,20 +311,16 @@ export function buildCandidateCatalog(
         const player = roster.get(stint.playerExternalId);
         if (!player?.summaryRatings) continue;
         const key = `p-${stint.playerExternalId}`;
-        const summary = player.summaryRatings;
         const stats = statsBySeason.get(season)?.get(stint.playerExternalId);
         const minutes = Math.trunc(stint.minutes);
-        const games = Math.trunc(stint.gamesPlayed);
-        const score = pools.selectionScore(
-          pools.rawOverallScoreFor(player as unknown as Record<string, unknown>, summary),
-          summary.offenseRating,
-          summary.defenseRating,
-          stats?.usageRate ?? null,
-          minutes,
-          games,
-        );
-        const seasonStart = Number.parseInt(season.slice(0, 4), 10);
-        const selectionKey = [score, minutes, games, -seasonStart] as const;
+        // The importer's authoritative peak-selection key: selection-score
+        // blend, team minutes, team games, earlier season.
+        const selectionKey = pools.candidateKey({
+          season,
+          player: player as unknown as Record<string, unknown>,
+          stint: stint as unknown as Record<string, unknown>,
+          stats: (stats ?? {}) as Record<string, unknown>,
+        });
         const selectionKeyId = `${slot.franchiseId}/${key}`;
         const previous = perPlayer.get(key);
         const previousKey = selectionKeys.get(selectionKeyId);
@@ -369,7 +330,7 @@ export function buildCandidateCatalog(
           pools.compareSelectionKeys(selectionKey, previousKey) > 0
         ) {
           const ratings = {} as BracketCandidatePlayer['ratings'];
-          for (const keyName of RATING_KEYS) {
+          for (const keyName of REQUIRED_RATING_KEYS) {
             const value = player.ratings[keyName];
             ratings[keyName] = typeof value === 'number' ? clampRating(value) : 50;
           }
@@ -394,7 +355,7 @@ export function buildCandidateCatalog(
             ratings,
             tendencies,
             anchors,
-            score,
+            score: selectionKey[0] ?? 0,
           });
         }
       }
@@ -537,7 +498,7 @@ export function bracketGenerate(args: {
 
   const outPath = resolve(OPPONENTS_DIR, 'bracket.json');
   writeFileSync(outPath, `${JSON.stringify(bracket, null, 2)}\n`, 'utf8');
-  const contentHash = createHash('sha256').update(readFileSync(outPath)).digest('hex');
+  const contentHash = sha256Hex(readFileSync(outPath));
 
   const manifestPath = MANIFEST_PATH;
   const nextManifest = { ...manifest } as HoopRushManifest & { opponents?: unknown };

@@ -309,7 +309,7 @@ describe('reconstructed team end-to-end (spec/12)', () => {
         }),
         context,
       );
-      expect(result.engineVersion).toBe('m3-engine-v10');
+      expect(result.engineVersion).toBe('m3-engine-v11');
       for (const side of [result.home, result.away]) {
         expect(Number.isFinite(side.box.threes.made)).toBe(true);
         expect(Number.isFinite(side.box.threes.attempted)).toBe(true);
