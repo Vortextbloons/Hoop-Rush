@@ -63,7 +63,6 @@ export const OFFER_SAMPLE_ORDER_KEY = 'sample-order';
 export const SEASON_DRAFT_COVERAGE_REASON =
   'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks';
 
-/** Canonically sorted unowned candidates (by playerVersionId). */
 export function remainingCandidates(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -74,7 +73,6 @@ export function remainingCandidates(
     .sort((a, b) => a.playerVersionId.localeCompare(b.playerVersionId));
 }
 
-/** Members for the feasibility probe: unowned candidates minus one version. */
 function availableMembers(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -133,7 +131,6 @@ export function selectionKeepsFeasibility(
   return rosterFeasible(probe, available, remaining);
 }
 
-/** The full seed path recorded on an offer for a given turn. */
 export function offerSeedPath(participantId: string, round: number, pickOrdinal: number): string[] {
   return [
     'draft',

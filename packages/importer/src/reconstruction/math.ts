@@ -58,12 +58,10 @@ export function normalQuantile(p: number): number {
  * implementation lives in `@hoop-rush/data-contracts` (`season-hash.ts`). */
 export { fnv1a32 } from '@hoop-rush/data-contracts';
 
-/** Adds the intercept column (1.0) to a design matrix. */
 export function withIntercept(rows: readonly (readonly number[])[]): number[][] {
   return rows.map((row) => [1, ...row]);
 }
 
-/** Multiplies matrix A (m x n) by matrix B (n x p). */
 export function matMul(
   a: readonly (readonly number[])[],
   b: readonly (readonly number[])[],
@@ -86,7 +84,6 @@ export function matMul(
   return out;
 }
 
-/** Transposes a matrix. */
 export function transpose(a: readonly (readonly number[])[]): number[][] {
   const rows = a.length;
   const cols = a[0]?.length ?? 0;
@@ -141,7 +138,6 @@ export function solveLinear(a: readonly (readonly number[])[], b: readonly numbe
   return x;
 }
 
-/** Inverts a square matrix. */
 export function invert(a: readonly (readonly number[])[]): number[][] {
   const n = a.length;
   const identity: number[][] = [];

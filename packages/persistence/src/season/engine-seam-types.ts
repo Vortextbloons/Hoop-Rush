@@ -23,16 +23,14 @@ import type {
  * (spec/2.0/07 persistence, M2.3, M2.4). Kept in its own file so the
  * repository, the audit, and the test fixtures depend only on this type; the
  * production binding to `@hoop-rush/engine` lives in `engine-seam.ts`, the
- * single place that imports the engine package. The M2.4 effects helpers
- * (zero-state construction, roster id sets, canonical pair facts) are pure
- * TypeScript with no engine dependency; they live on the seam so the audit
- * and the repository never reimplement the canonical pair convention.
+ * single place that imports the engine package. The M2.4 effects helpers are
+ * pure TypeScript with no engine dependency and live on the seam so the
+ * canonical pair convention is never reimplemented.
  */
 export interface SeasonRunEngineSeam {
   /**
    * Reassembles the full 1,230-game array: scheduled games come from the
-   * schedule artifact, finalized games take their facts from the compact
-   * summaries. Games with no summary stay `scheduled`.
+   * schedule artifact, finalized games from the compact summaries.
    */
   reconstructSeasonGames(
     schedule: SeasonSchedule,
@@ -61,9 +59,8 @@ export interface SeasonRunEngineSeam {
   /**
    * M2.5: the windowIndex opened by an accepted block index (blocks 2/4/5
    * open windows 0/1/2). Canonical engine fact (`WINDOW_BLOCK_INDEX_TO_INDEX`
-   * in `engine/season/trades.ts`); the reload audit inverts it to validate
-   * the stored trade-window block mapping, so the rule never diverges from
-   * the engine. Declared as a value property (not a method) because the
+   * in `engine/season/trades.ts`); the reload audit inverts it, so the rule
+   * never diverges from the engine. Declared as a value property because the
    * binding is the engine's exported constant.
    */
   windowBlockIndexToIndex: Readonly<Record<number, number>>;
@@ -91,18 +88,15 @@ export interface SeasonRunEngineSeam {
    * M2.5: canonical 32-hex digest of the mutable run state facts
    * (`stateRevision`, `checkpointState`, `health`, `influence`,
    * `transactions`, `trade`, `objectives`, `rosters`, `ownership`,
-   * `rotations`, `effects`; the stored `stateDigest` is excluded from its
-   * own computation). The reload audit recomputes the stored digest through
-   * this binding, so corrupt or half-applied mutable state is detected.
-   * Declared as a value property (not a method) because the binding is the
-   * engine's pure function passed by reference.
+   * `rotations`, `effects`; the stored `stateDigest` excludes itself). The
+   * reload audit recomputes the stored digest through this binding, so
+   * corrupt or half-applied mutable state is detected. Value property because
+   * the binding is the engine's pure function passed by reference.
    */
   seasonRunStateDigest: (facts: SeasonRunStateDigestFacts) => string;
   /**
    * M2.5: the initial run-creation Influence state — every franchise at +2
-   * with its recorded `initial-grant` ledger entry (blockIndex/commandId
-   * null), no windows, no rehabs. Used to seed the checkpoint at draft
-   * promotion.
+   * with its recorded `initial-grant` ledger entry, no windows, no rehabs.
    */
   createInitialSeasonInfluenceState(franchiseIds: readonly string[]): SeasonInfluenceState;
 }
@@ -123,12 +117,11 @@ export interface SeasonRunStateDigestFacts {
 }
 
 /**
- * Everything the block commit writes when the engine's
- * `completeSeasonBlockCommit` produced a trade-window open (M2.5). Mirrors
- * the engine's `SeasonWindowOpenResult` in `engine/season/trades.ts`
- * (frozen shape, LEAD ADDENDUM item 3); persistence imports the engine only
- * through the seam, so the structural type lives here and the lead verifies
- * it stays identical to the engine export at integration.
+ * Everything the block commit writes when `completeSeasonBlockCommit`
+ * produced a trade-window open (M2.5). Mirrors the engine's
+ * `SeasonWindowOpenResult` (frozen shape, LEAD ADDENDUM item 3); persistence
+ * imports the engine only through the seam, so the structural type lives here
+ * and the lead verifies it stays identical at integration.
  */
 export interface SeasonWindowOpenResult {
   trade: SeasonTradeState;

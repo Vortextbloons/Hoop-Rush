@@ -74,7 +74,6 @@ export const RECONSTRUCTION_FEATURE_NAMES = [
 
 export type ReconstructionFeatureName = (typeof RECONSTRUCTION_FEATURE_NAMES)[number];
 
-/** One player-season row with raw evidence for fitting or prediction. */
 export interface ReconstructionRow {
   playerExternalId: string;
   season: string;
@@ -101,7 +100,6 @@ export function positionGroupOf(position: string | null | undefined): PositionGr
   return 'C';
 }
 
-/** Median of numbers, ignoring nulls (deterministic; ascending middle value). */
 export function median(values: readonly (number | null)[]): number {
   const present = values
     .filter((v): v is number => v !== null && Number.isFinite(v))
@@ -113,7 +111,6 @@ export function median(values: readonly (number | null)[]): number {
     : ((present[mid - 1] as number) + (present[mid] as number)) / 2;
 }
 
-/** Attempt-weighted mean of a rate column (deterministic). */
 export function attemptWeightedMean(
   numerator: readonly (number | null)[],
   denominator: readonly (number | null)[],
@@ -212,7 +209,6 @@ export function extractRawFeatures(row: ReconstructionRow, context: FeatureConte
   };
 }
 
-/** Feature vector in RECONSTRUCTION_FEATURE_NAMES order. */
 export function featureVector(raw: RawFeatures): number[] {
   return RECONSTRUCTION_FEATURE_NAMES.map((name) => raw[name]);
 }
@@ -329,7 +325,6 @@ export function buildFeatureContext(rows: readonly ReconstructionRow[]): Feature
  */
 export const PRIOR_EQUIVALENT_ATTEMPTS = 80;
 
-/** Attempt-weighted early-era priors (accuracy and attempt rate). */
 export function cohortPriors(rows: readonly ReconstructionRow[]): {
   accuracyPrior: number;
   accuracyPriorAttempts: number;

@@ -72,7 +72,6 @@ export interface ClassicChallengeCreation extends ChallengeCreationBase {
 
 export type ChallengeCreation = SandboxChallengeCreation | ClassicChallengeCreation;
 
-/** Validates a complete bracket artifact: content, legality, and schedule. */
 export function validateBracketContent(bracket: OpponentBracket): string[] {
   const failures: string[] = [];
   const opponentIds = new Set<string>();
@@ -135,7 +134,6 @@ export function validateBracketContent(bracket: OpponentBracket): string[] {
   return failures;
 }
 
-/** Validates the fixed schedule: 82 unique games, counts, and references. */
 export function validateSchedule(bracket: OpponentBracket): string[] {
   const failures: string[] = [];
   const opponentIds = new Set(bracket.opponents.map((o) => o.opponentId));
@@ -171,7 +169,6 @@ export function validateSchedule(bracket: OpponentBracket): string[] {
   return failures;
 }
 
-/** Validates draft inputs shared by creation and replay helpers. */
 function validateCreationInput(input: ChallengeCreation): string[] {
   const failures: string[] = [];
 
@@ -314,7 +311,6 @@ export function createChallenge(input: ChallengeCreation): ChallengeRun {
   return run;
 }
 
-/** Resolves the opponent for a game number against the frozen schedule. */
 export function opponentForGame(
   run: ChallengeRun,
   gameNumber: number,
@@ -441,7 +437,6 @@ export function acceptGameResult(run: ChallengeRun, result: GameResult): Challen
   };
 }
 
-/** Runs the complete 82-game challenge from the next unplayed game onward. */
 export function simulateChallenge(
   run: ChallengeRun,
   profile: EraSimulationProfile,

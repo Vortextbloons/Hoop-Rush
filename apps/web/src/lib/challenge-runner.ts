@@ -186,7 +186,7 @@ export class ChallengeRunner {
       return;
     }
     const envelope: WorkerMessage = parsed.data;
-    if (this.requestId === null || envelope.requestId !== this.requestId) return; // stale
+    if (this.requestId === null || envelope.requestId !== this.requestId) return;
     switch (envelope.type) {
       case 'results':
         for (const result of envelope.results) {
@@ -194,7 +194,7 @@ export class ChallengeRunner {
         }
         break;
       case 'start-result':
-        if (this.disposed || this.phase !== 'starting') return; // stale
+        if (this.disposed || this.phase !== 'starting') return;
         void this.handleStartResult(envelope);
         break;
       case 'error':

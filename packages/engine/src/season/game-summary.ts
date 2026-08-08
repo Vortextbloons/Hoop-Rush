@@ -28,7 +28,6 @@ import {
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */
 
-/** One compact player line from a full result player line. */
 function compactLineOf(player: {
   playerVersionId: string;
   seconds: number;
@@ -63,7 +62,6 @@ function compactLineOf(player: {
   };
 }
 
-/** Complete team box from a result side box. */
 function teamBoxOf(side: {
   franchiseId: string;
   box: {
@@ -243,7 +241,6 @@ export function seasonEffectsRollupFromEvidence(
   }));
 }
 
-/** The full mechanism evidence of a game's effects transition. */
 export function seasonEffectsEvidenceOf(
   transition: SeasonGameEffectsTransition,
 ): SeasonMechanismEvidence[] {

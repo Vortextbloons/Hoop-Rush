@@ -468,6 +468,22 @@ describe('season run repository (dexie)', () => {
     await expect(repo.loadActiveRun()).resolves.not.toBeNull();
   });
 
+  it('forceClearActiveSeasonRun removes corrupt saves without a matching runId', async () => {
+    const adapters = makeAdapters();
+    const { db, repo } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    await expect(repo.clearSeasonRun('other-run')).rejects.toThrow(/does not match/);
+    await repo.forceClearActiveSeasonRun();
+    expect(await db.seasonRuns.count()).toBe(0);
+    expect(await db.seasonRunIndex.count()).toBe(0);
+    expect(await db.seasonRunSummaries.count()).toBe(0);
+    expect(await db.seasonRunDetails.count()).toBe(0);
+    expect(await db.seasonRunBlocks.count()).toBe(0);
+    expect(await repo.loadActiveRunIndex()).toBeNull();
+    expect(await repo.loadActiveRun()).toBeNull();
+  });
+
   it('a full nine-block season reloads with reconciled standings and aggregates', async () => {
     const adapters = makeAdapters();
     const { repo, blocks, run } = adapters;
@@ -1299,7 +1315,7 @@ describe('season run M2.5 reload audit (v5)', () => {
    * facts); stored stateDigest does not recompute over the stored mutable
    * state" after a reload.
    */
-  it('rejects a commit whose stored rotations are edited but the digest covers the old set', async () => {
+  it('repairs a committed digest that covered the pre-lock rotation set', async () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
     await promote(adapters);
@@ -1332,10 +1348,22 @@ describe('season run M2.5 reload audit (v5)', () => {
       rotationDigest: adapters.seam.seasonRotationSetDigest(locked),
       stateDigest: digestOverOldSet,
     });
-    await expect(repo.loadActiveRun()).rejects.toThrow(/run.effects diverged/);
-    await expect(repo.loadActiveRun()).rejects.toThrow(
-      /stored stateDigest does not recompute over the stored mutable state/,
-    );
+    const snapshot = await loadOrThrow(adapters);
+    const repairedDigest = adapters.seam.seasonRunStateDigest({
+      stateRevision: snapshot.run.stateRevision,
+      checkpointState: snapshot.run.checkpointState,
+      health: snapshot.run.health,
+      influence: snapshot.run.influence,
+      transactions: snapshot.run.transactions,
+      trade: snapshot.run.trade,
+      objectives: snapshot.run.objectives,
+      rosters: snapshot.run.rosters,
+      ownership: snapshot.run.ownership,
+      rotations: snapshot.run.rotations,
+      effects: snapshot.effects,
+    });
+    expect(snapshot.run.stateDigest).toBe(repairedDigest);
+    expect(snapshot.acceptedBlocks.at(-1)?.stateDigest).toBe(repairedDigest);
   });
 
   it('repairs the legacy rotation-lock divergence and re-audits the recovered run', async () => {

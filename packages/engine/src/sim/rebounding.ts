@@ -15,7 +15,6 @@ import type { PositionResponsibilityModifiers } from './position-responsibilitie
  * rebounding teams land on the packaged league rate.
  */
 
-/** Team-average rating helper. */
 export function teamMean(team: SimulationTeam, rating: keyof SimulationPlayer['ratings']): number {
   return (
     team.players.reduce((sum, p) => {
@@ -105,7 +104,6 @@ export function rebounderWeights(
   });
 }
 
-/** The rebounder against precomputed rebound-rating weights. */
 export function pickRebounder(
   players: readonly SimulationPlayer[],
   weights: readonly number[],

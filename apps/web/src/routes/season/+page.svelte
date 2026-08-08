@@ -2,6 +2,7 @@
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { Dialog } from 'bits-ui';
   import type { HoopRushManifest, SeasonLeague, SeasonSchedule } from '@hoop-rush/data-contracts';
   import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
   import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
@@ -14,7 +15,9 @@
   } from '$lib/season/season-assets';
   import { getManifest, getPlayersIndex } from '$lib/data';
   import { DexieSeasonDraftRepository } from '@hoop-rush/persistence';
+  import { isSeasonRunIncompatibleError } from '@hoop-rush/persistence';
   import { getSeasonRunRepository } from '$lib/season/season-repo';
+  import { clearAllSeasonData } from '$lib/season/season-data-recovery';
   import { seasonRootSeed } from '$lib/season/season-ids';
   import { buildSeasonRunFromGeneration, sha256Hex } from '$lib/season/season-run-builder';
 
@@ -45,8 +48,34 @@
   let promoting = $state(false);
   let promoteError: string | null = $state(null);
   let resumeHref: string | null = $state(null);
+  let brokenRunError: string | null = $state(null);
   let hasDraft = $state(false);
   let faces = $state<Map<string, SeasonFaceRef>>(new Map());
+
+  let clearOpen = $state(false);
+  let clearing = $state(false);
+  let clearError: string | null = $state(null);
+
+  async function confirmClearSeasonData(): Promise<void> {
+    if (clearing) return;
+    clearing = true;
+    clearError = null;
+    try {
+      await clearAllSeasonData();
+      clearOpen = false;
+      resumeHref = null;
+      brokenRunError = null;
+      if (flow !== null) {
+        hasDraft = false;
+        started = false;
+        board = flow.state();
+      }
+    } catch (error) {
+      clearError = error instanceof Error ? error.message : String(error);
+    } finally {
+      clearing = false;
+    }
+  }
 
   $effect(() => {
     if (!browser) return;
@@ -85,10 +114,27 @@
         board = flow.state();
         // An active run takes precedence over the draft board.
         try {
-          const repo = await getSeasonRunRepository();
+          const repo = await getSeasonRunRepository(seasonSchedule);
           const index = await repo.loadActiveRunIndex();
           if (!cancelled && index) {
-            resumeHref = resolve('/season/run');
+            try {
+              const snapshot = await repo.loadActiveRun();
+              if (snapshot !== null) {
+                resumeHref = resolve('/season/run');
+              } else {
+                brokenRunError =
+                  'A saved season was found but its checkpoint is missing. Clear the broken save to start over.';
+              }
+            } catch (error) {
+              if (isSeasonRunIncompatibleError(error)) {
+                resumeHref = resolve('/season/run');
+              } else {
+                brokenRunError =
+                  error instanceof Error
+                    ? error.message
+                    : 'The saved season could not be loaded.';
+              }
+            }
           }
         } catch {
           // Persistence is best-effort on setup; the board still works.
@@ -263,6 +309,25 @@
     </p>
   {:else if !loaded}
     <p class="mt-8 px-3 font-mono text-sm text-muted-foreground sm:px-0">Loading season data…</p>
+  {:else if brokenRunError}
+    <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
+      <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
+        Saved season could not load
+      </h2>
+      <p class="mt-2 text-sm text-muted-foreground">{brokenRunError}</p>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onclick={() => (clearOpen = true)}
+          class="inline-flex items-center justify-center gap-2 rounded-lg bg-destructive px-5 py-3 font-semibold text-white transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+        >
+          Clear saved data
+        </button>
+      </div>
+      {#if clearError}
+        <p role="alert" class="mt-3 text-sm text-destructive">{clearError}</p>
+      {/if}
+    </div>
   {:else if resumeHref}
     <div class="mt-10 rounded-none bg-surface-1 sm:rounded-xl p-6">
       <h2 class="font-display text-xl font-extrabold uppercase tracking-tight">
@@ -441,3 +506,30 @@
     </div>
   {/if}
 </section>
+
+<Dialog.Root bind:open={clearOpen}>
+  <Dialog.Content
+    class="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-background p-6 shadow-xl outline-none"
+  >
+    <Dialog.Title class="font-display text-2xl font-extrabold">Clear season data?</Dialog.Title>
+    <Dialog.Description class="mt-1 text-sm text-muted-foreground">
+      This permanently deletes your saved Season Run and any in-progress draft from this browser. It
+      cannot be recovered.
+    </Dialog.Description>
+    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <Dialog.Close
+        class="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+      >
+        Cancel
+      </Dialog.Close>
+      <button
+        type="button"
+        onclick={() => void confirmClearSeasonData()}
+        disabled={clearing}
+        class="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {clearing ? 'Clearing…' : 'Yes, clear everything'}
+      </button>
+    </div>
+  </Dialog.Content>
+</Dialog.Root>

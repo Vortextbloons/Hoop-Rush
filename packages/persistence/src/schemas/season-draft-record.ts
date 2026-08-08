@@ -10,22 +10,17 @@ import {
 /**
  * Stored-record schema for the active Season Run draft (spec/2.0/03, spec/2.0/07,
  * M2.3.5, M2.4). Exactly one record exists at a time, keyed by the literal
- * 'season-draft'. The record wraps the full revisioned draft snapshot —
- * participants, offers, picks, status, revision, current offer, and the entire
- * command log (accepted and rejected summaries) — plus the completed league
- * generation result (schema 2 with roster-generation-v2 aiPools) once a
- * generate-ai-league command was accepted.
+ * 'season-draft'. The record wraps the full revisioned draft snapshot plus the
+ * completed league generation result (schema 2 with roster-generation-v2
+ * aiPools) once a generate-ai-league command was accepted.
  *
- * Save schema v3 (M2.4 roster-generation-v2): the single current stored
- * schema wrapping a season-draft-v2 state and the schema-2 generation
- * result. The v1/v2 development families (season-draft-v1 states and the
- * pre-v3 wrapper) are never read or migrated: the repository auto-clears a
- * stored row whose `saveSchemaVersion` is not 3 at load. There is no
- * recovery record and no discard screen for unfinished legacy drafts.
+ * Save schema v3 (M2.4 roster-generation-v2): the single current stored schema.
+ * The v1/v2 development families are never read or migrated: the repository
+ * auto-clears a stored row whose `saveSchemaVersion` is not 3 at load.
  *
  * Persistence only stores whatever validated record it is given; revision
  * correctness is the domain's job. Every read validates the stored value at
- * the runtime boundary, so corrupt records are surfaced instead of silently
+ * the runtime boundary, so corrupt records surface instead of silently
  * entering app state.
  */
 
@@ -55,19 +50,16 @@ export interface SeasonDraftRepository {
   /** Creates or replaces the single active Season draft record, atomically. */
   saveSeasonDraft(record: StoredSeasonDraft): Promise<void>;
   /**
-   * Loads the active Season draft record, or null when none exists. A
-   * stored row whose `saveSchemaVersion` is not 3 (the v1/v2 development
-   * families) is auto-cleared and reported as null.
+   * Loads the active Season draft record, or null when none exists. A stored
+   * row outside the current save-schema family (v1/v2 development) is
+   * auto-cleared and reported as null.
    */
   loadSeasonDraft(): Promise<StoredSeasonDraft | null>;
   /** Deletes the active Season draft record (no-op when absent). */
   clearSeasonDraft(): Promise<void>;
 }
 
-/**
- * Wraps a draft snapshot and optional generation result into the single v3
- * stored record.
- */
+/** Wraps a draft snapshot and optional generation result into the single v3 stored record. */
 export function recordFromState(
   draft: SeasonDraftState,
   generation: SeasonLeagueGenerationResult | null = null,

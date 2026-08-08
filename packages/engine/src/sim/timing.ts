@@ -18,7 +18,6 @@ import { REGULATION_TOTAL_SECONDS } from './periods.ts';
  * possessions-per-game calibration gate.
  */
 
-/** Mean wall-clock seconds of one offensive trip for the era pace. */
 export function meanTripSeconds(profile: EraSimulationProfile): number {
   const tripsPerTeamGame = profile.parameters.pace * ENGINE_CONSTANTS.estimateToTripsFactor;
   return Math.max(

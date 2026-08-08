@@ -49,7 +49,6 @@ export function observedRateFor(row: ReconstructionRow, model: ReconstructionMod
   return Math.min(row.tpa ?? 0, row.fga) / row.fga;
 }
 
-/** Trial weight for a row under a model. */
 export function trialWeightFor(row: ReconstructionRow, model: ReconstructionModel): number {
   return model === 'accuracy' ? (row.tpa ?? 0) : (row.fga ?? 0);
 }
@@ -156,7 +155,6 @@ export function fitModel(
   };
 }
 
-/** Conservative posterior quantile prediction for a raw feature vector. */
 export function predictConservative(
   model: FittedModel,
   rawFeatures: readonly number[],
@@ -278,7 +276,6 @@ export function runGroupedHoldout(
   };
 }
 
-/** Attempt-weighted metrics from held-out predictions. */
 export function metricsOf(
   predictions: readonly HeldOutPrediction[],
   model: ReconstructionModel,

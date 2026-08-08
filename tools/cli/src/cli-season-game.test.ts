@@ -198,8 +198,6 @@ describe('cli: committed season game fixtures', () => {
   });
 });
 
-// ---- injected doubles -------------------------------------------------------
-
 function targetSecondsOf(rotation: SeasonRotation): Map<string, number> {
   return new Map(rotation.targetMinutes.map((row) => [row.playerVersionId, row.minutes * 60]));
 }
@@ -429,8 +427,6 @@ describe('season game simulate (unit, injected doubles)', () => {
     );
   });
 });
-
-// ---- calibrate gate math with controlled doubles ---------------------------
 
 const PRESET_SECONDS: Record<SeasonRotationPreset, { starter: number; bench: number[] }> = {
   balanced: { starter: 33 * 60, bench: [21, 18, 15, 12, 9].map((minutes) => minutes * 60) },
@@ -715,8 +711,6 @@ describe('season game calibrate (unit, injected doubles)', () => {
     ).rejects.toThrow(UsageError);
   });
 });
-
-// ---- end-to-end against the real engine runtime ----------------------------
 
 const REAL_SEED = 'abcd2026a1b2c3d4e5f60718293a4b5c6';
 

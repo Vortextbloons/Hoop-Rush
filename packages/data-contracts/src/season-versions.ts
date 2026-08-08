@@ -1,48 +1,27 @@
 /**
- * Season Run (2.0) version boundaries (spec/2.0/02, spec/2.0/07). Every
- * Season Run freezes these versions so a saved run can be reproduced and a
- * version bump cannot silently fork one layer from another.
- *
- * Version strings are opaque and change only when the corresponding contract
- * or method changes. Runtime boundaries never infer a version from content.
+ * Season Run (2.0) version boundaries (spec/2.0/02, spec/2.0/07). Every run
+ * freezes these versions so a saved run reproduces and a bump cannot silently
+ * fork one layer from another; version strings are opaque and never inferred.
  */
 
 /**
- * Season Run persistence snapshot schema layout. Bumped to 7 by M2.5
- * (injuries, transactions, influence, objectives): the run gains the
- * `health` (season-health-v1), `transactions`, `influence`
- * (season-influence-v1), `checkpointState`, `stateRevision`, and
- * `stateDigest` fields and freezes the seven new M2.5 material versions
- * (health, trade, influence, objective, injury-targets, trade-targets,
- * influence-targets); schema 6 runs cannot continue (no health, influence,
- * or state chain exists for them). Bumped to 6 by M2.4
- * roster-generation-v2: the run freezes the roster-generation-v2,
- * season-ai-v2, and roster-targets-v2 material versions and carries the
- * generated `aiPools` (one 20-player pool per AI franchise: 29 solo, 28
- * duo); schema 5 runs cannot continue (their pools and targets do not
- * exist). Bumped to 5 by M2.4: the run froze the stamina, chemistry, and
- * effect-targets material versions and the candidate checkpoint carried
- * the 300-player / 1,350-pair effects state; schema 4 runs cannot continue
- * (no effects state exists for them). Bumped to 4 by M2.3: the run froze
- * the block, game-summary, aggregates, recap, leaders, home-court, and
- * checkpoint material versions; the Season game contract moved to
- * season-game-v2 (home court) with recalibrated season-game-targets-v2.
- * Bumped to 3 by M2.2 (rotation-planner, Season-game, and Season-game-
- * targets material versions). Bumped to 2 by M2.1 (draft facts, AI
- * assignments, rotations, audit, new material versions). The M2.0 schema
- * v1 data is development scaffolding, not a migration target.
+ * Season Run persistence snapshot schema layout. Bumped to 8 by the projection
+ * milestone minute-policy contract (each rotation freezes its versioned
+ * `minutePolicy`); schema 7 runs cannot continue (their rotations carry no
+ * policy). Bumped to 7 by M2.5 (health, transactions, influence, checkpoint
+ * state, state revision/digest fields); schema 6 runs cannot continue. Bumped
+ * to 6 by M2.4 roster-generation-v2 (`aiPools`, one 20-player pool per AI
+ * franchise); schema 5 runs cannot continue. Bumped to 5 by M2.4 (effects
+ * state); schema 4 runs cannot continue. Bumped to 4 by M2.3 (season-game-v2
+ * home court), 3 by M2.2 (rotation planner), 2 by M2.1 (draft facts, AI
+ * assignments, rotations, audit). The M2.0 schema v1 data is development
+ * scaffolding, not a migration target.
  *
- * Schema layout 5 remained the read schema after the M2.3.5 draft overhaul:
- * the `draft` facts and the `versions.draftVersion` field widened to a
- * discriminated union so legacy M2.3 runs (franchise-era draft facts,
- * `season-draft-v1`) and new runs (global eight-card offer facts,
- * `season-draft-v2`) both validated as schema 5. The M2.3.5 change recorded
- * itself through the draft versions, never through a snapshot layout bump.
- * Schema 7 continues to accept both draft-fact variants. Bumped to 8 by the
- * projection milestone minute-policy contract: every rotation freezes its
- * versioned `minutePolicy` (season-rotation-v3) and the run freezes the
- * minute-policy material version; schema 7 runs cannot continue (their
- * rotations carry no policy).
+ * Layout 5 remained the read schema after the M2.3.5 draft overhaul: the
+ * `draft` facts and `versions.draftVersion` widened to a discriminated union
+ * so legacy M2.3 runs (`season-draft-v1`) and new runs (`season-draft-v2`)
+ * both validate; the change recorded itself through draft versions, never a
+ * layout bump. Schema 7 continues to accept both draft-fact variants.
  */
 export const SEASON_RUN_SCHEMA_VERSION = 8;
 
@@ -132,11 +111,10 @@ export const SEASON_ROSTER_RULES_VERSION = 'season-roster-v1';
 /**
  * M2.4 roster-generation-v2 (replaces roster-generation-v1): deterministic
  * AI league generation through per-franchise 20-player pools — band-scoped
- * strength caps, anchor matching from canonical percentile thresholds,
- * pool repair, and constrained ten-player roster selection with
+ * strength caps, anchor matching from canonical percentile thresholds, pool
+ * repair, and constrained ten-player roster selection with
  * repair/backtracking diagnostics. See `season-ai.ts` for the recorded
- * pool/selection facts and `seasonRosterTargetsSchema` (roster-targets-v2)
- * for the frozen calibration policy and gates.
+ * pool/selection facts and `seasonRosterTargetsSchema` (roster-targets-v2).
  */
 export const SEASON_ROSTER_GENERATION_V2 = 'roster-generation-v2';
 
@@ -209,15 +187,13 @@ export const SEASON_ROTATION_PLANNER_VERSION = 'rotation-planner-v1';
 
 /**
  * Season Run single-game controller (spec/2.0/04, season-game-v4, M2.5).
- * v4 adds the M2.5 injury seam on both sides of the contract: the removal
- * reason `injury` (alongside the injected fixture reason) and the returns
+ * v4 adds the M2.5 injury seam: the removal reason `injury`, the returns
  * seam (`seasonReturnSchema` / `seasonReturnEventSchema`, reason
- * `injury-return`) on the game input and side results, plus the
+ * `injury-return`) on the game input and side results, and the
  * `human-interruption-forfeit` trigger. v3 (M2.4) added the optional
- * per-player `stamina` profile (the effects seam); absence means the zero
- * profile, so neutral adapters used by Classic stay byte-identical to the
- * M2.3 path. A zero-injury input (no removals, no returns) must reproduce
- * the v3 result byte-for-byte.
+ * per-player `stamina` profile; absence means the zero profile, so neutral
+ * Classic adapters stay byte-identical to the M2.3 path. A zero-injury input
+ * must reproduce the v3 result byte-for-byte.
  */
 export const SEASON_GAME_VERSION = 'season-game-v4';
 
@@ -253,14 +229,13 @@ export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v3';
 
 /**
  * M2.5 pure block simulation pipeline (spec/2.0/02 ten-game blocks,
- * season-block-v3): v3 threads the health state (availability, injury
- * rolls, returns, post-game recovery ticks), carries the locked block
- * objective, stops with a typed `invalid-roster` interruption when the
- * human cannot field five at a tipoff, supports resume from a pending
- * candidate, and folds the post-block influence/transactions state into
- * the candidate. v2 (M2.4) carried the effects state (load + pair
- * chemistry) across the block and simulated in stable game-id order,
- * converting to compact summaries with effects rollups and folding
+ * season-block-v3): v3 threads the health state (availability, injury rolls,
+ * returns, post-game recovery ticks), carries the locked block objective,
+ * stops with a typed `invalid-roster` interruption when the human cannot
+ * field five at a tipoff, supports resume from a pending candidate, and
+ * folds the post-block influence/transactions state into the candidate.
+ * v2 (M2.4) carried the effects state across the block in stable game-id
+ * order, converting to compact summaries with effects rollups and folding
  * standings and aggregates.
  */
 export const SEASON_BLOCK_VERSION = 'season-block-v3';
@@ -299,15 +274,13 @@ export const SEASON_HOME_COURT_VERSION = 'season-home-court-v1';
 /**
  * Canonical candidate-checkpoint contract and digest (season-checkpoint-v3,
  * M2.5). v3 adds the authoritative post-block health, influence, and
- * transaction facts plus the locked objective evaluation to the candidate,
- * and ties the checkpoint to the mutable run-state chain through
- * `expectedStateRevision`/`expectedStateDigest` (asserted pre-block) and
- * `stateRevision`/`stateDigest` (computed post-assembly). v2 (M2.4) added
- * the effects state (player load + pair chemistry) to the candidate and
- * froze the stamina, chemistry, and effect-targets material versions. The
- * digest is a pure function of the checkpoint's recorded facts, so
- * uninterrupted, cancelled/retried, terminated/reloaded, single-worker,
- * and CLI executions must agree byte-for-byte.
+ * transaction facts plus the locked objective evaluation, and ties the
+ * checkpoint to the mutable run-state chain through
+ * `expectedStateRevision`/`expectedStateDigest` (pre-block) and
+ * `stateRevision`/`stateDigest` (post-assembly). v2 (M2.4) added the effects
+ * state. The digest is a pure function of the checkpoint's recorded facts, so
+ * uninterrupted, cancelled/retried, terminated/reloaded, single-worker, and
+ * CLI executions agree byte-for-byte.
  */
 export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v3';
 
@@ -349,13 +322,11 @@ export const SEASON_EFFECT_TARGETS_LEGACY_VERSION = 'season-effect-targets-v1';
  * Packaged Season Run draft catalog artifact contract
  * (season-draft-catalog-v4, projection milestone): every candidate carries
  * the validated observed `anchors` and an optional `reconstructedThreePoint`
- * profile from its packaged pool record, so roster builders can run the
+ * profile from its packaged pool record, so roster builders run the
  * deterministic possession-level projection without scanning historical
- * datasets. v3 (M2.5) added the build-time `durability` field; v2 (M2.4)
- * added the build-time stamina profile. The draft rules version
- * (`season-draft-v2`) is unchanged, and the projection fields never thread
- * into the Season game adapter (Season game inputs are unchanged until a
- * separate Season game version says otherwise).
+ * datasets. v3 (M2.5) added `durability`; v2 (M2.4) added the stamina
+ * profile. The draft rules version is unchanged, and projection fields never
+ * thread into the Season game adapter.
  */
 export const SEASON_DRAFT_CATALOG_VERSION = 'season-draft-catalog-v4';
 

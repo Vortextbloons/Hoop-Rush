@@ -24,7 +24,6 @@ export interface ShotMixAndAnchors {
   passAnchor: number;
 }
 
-/** The subset of a pool player record the shot-mix derivation reads. */
 export interface PoolPlayerLike {
   tendencies: {
     usageRate?: number;
@@ -109,7 +108,6 @@ export function computePoolShotMix(
   };
 }
 
-/** Load the packaged Lakers pool and derive zone mix plus rating anchors. */
 export function poolShotMixAndAnchors(eraId: string, leagueThreeRate: number): ShotMixAndAnchors {
   const poolPath = join(PUBLIC_DATA, 'pools', `lakers-${eraId}.json`);
   if (!fileExists(poolPath)) {

@@ -47,7 +47,6 @@ export interface SeasonProjectionOptions {
   cache?: ProjectionCache;
 }
 
-/** One collected unit before projection. */
 interface UnitDraft {
   unitId: string;
   kind: SeasonProjectionUnit['kind'];
@@ -262,7 +261,6 @@ export function projectSeasonRoster(
     [...blended.values()].reduce((sum, entry) => sum + entry.minutes, 0),
   );
 
-  // --- Collect units ---
   const draft: UnitDraft[] = [];
   const startersKey = unitKeyOf(input.rotation.starters);
   const closingKey = unitKeyOf(input.rotation.closingFive);
@@ -405,7 +403,6 @@ export function projectSeasonRoster(
     base: unit.base,
   }));
 
-  // --- Minute rows ---
   const minutes = allVersions.map((versionId) => {
     const target =
       input.rotation.targetMinutes.find((row) => row.playerVersionId === versionId)?.minutes ?? 0;
@@ -418,7 +415,6 @@ export function projectSeasonRoster(
     };
   });
 
-  // --- Metrics ---
   const weighted = units.filter((unit) => unit.weight > 0);
   const weightedNet = (unit: SeasonProjectionUnit) => unit.base.ratings.netRating;
   const weightedRating = (picker: (unit: SeasonProjectionUnit) => number) => {

@@ -114,8 +114,7 @@ export interface BuildSeasonRunInput {
   generation: SeasonLeagueGenerationResult;
   /**
    * M2.5 initial state digest (defaults to the all-zero placeholder per the
-   * frozen fixture guidance; the lead wires `seasonRunStateDigest` at
-   * integration).
+   * frozen fixture guidance; the lead wires `seasonRunStateDigest`).
    */
   stateDigest?: string;
 }

@@ -145,7 +145,6 @@ export const seasonProjectionPlanFactsSchema = z.object({
 });
 export type SeasonProjectionPlanFacts = z.infer<typeof seasonProjectionPlanFactsSchema>;
 
-/** The complete Season projection output. */
 export const seasonProjectionSchema = z
   .object({
     schemaVersion: z.literal(1),

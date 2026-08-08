@@ -37,57 +37,37 @@ import {
  * ## Stored save schema versions
  *
  * - v4 (M2.5): the current and only read schema. The row wraps a schema-7
- *   run snapshot (which freezes the seven new M2.5 material versions) and,
- *   at row level, the authoritative mutable run state committed atomically
- *   with each block: the M2.4 effects state (`effects`), the M2.5 health
- *   state (`health`), the transaction log (`transactions`), the Influence
- *   economy (`influence`), the trade-window state (`trade`), the objective
- *   state (`objectives`), the accepted-checkpoint facts
- *   (`checkpointState`), and the run state chain (`stateRevision`,
- *   `stateDigest`).
- * - v3 (M2.4 schema-6 runs), v2 (M2.4 schema-5 runs) and v1 (M2.3 schema-4
- *   runs) are development rows: they are never read or migrated, and the
- *   repository reports them through the typed incompatibility flow. There
- *   is no recovery record; the discard-and-restart screen handles them.
+ *   run snapshot plus, at row level, the authoritative mutable run state
+ *   committed atomically with each block (effects, health, transactions,
+ *   influence, trade, objectives, checkpointState, stateRevision,
+ *   stateDigest).
+ * - v3 (M2.4 schema-6), v2 (M2.4 schema-5), v1 (M2.3 schema-4) are
+ *   development rows: never read or migrated; reported through the typed
+ *   incompatibility flow and handled by the discard-and-restart screen.
  *
- * ## Why the checkpoint does not persist the 1,230 scheduled game records
+ * ## Why the checkpoint omits the 1,230 scheduled game records
  *
- * The frozen `SeasonRun` snapshot carries the full scheduled `games` array
- * (1,230 `SeasonGame` rows). Persisting that array is redundant: game
- * identity and matchups come from the immutable schedule artifact
- * (content-hashed in `run.schedule`), and completed results are already
- * recorded in the compact summary rows. The engine helper
- * `reconstructSeasonGames(schedule, summaries)` reassembles the full array on
- * load — scheduled games stay `scheduled`, finalized games take their
- * summary facts — so the snapshot's `.length(SEASON_GAME_COUNT)` contract
- * holds without duplicating 1,230 identity rows on every checkpoint write.
- * The stored row therefore keeps the entire frozen snapshot except `games`,
- * plus the authoritative current-boundary facts: standings, team/player
- * aggregates, recap, the M2.4 effects state, the M2.5 mutable run state, and
- * the cursor facts (completedRounds, revision, lastCommandId,
- * lastRotationDigest, lastCheckpointDigest).
+ * The frozen `SeasonRun` snapshot's full `games` array (1,230 rows) is
+ * redundant: game identity and matchups come from the immutable schedule
+ * artifact (content-hashed in `run.schedule`) and completed results are in
+ * the compact summary rows. `reconstructSeasonGames(schedule, summaries)`
+ * reassembles the full array on load, so the snapshot's `.length(SEASON_GAME_COUNT)`
+ * contract holds without duplicating 1,230 identity rows per checkpoint write.
  *
  * ## Why row-level mutable state exists next to `run`
  *
- * `run` is the promotion-time snapshot: its `standings`/`cursor` are the
- * initial (all-zero) values, and since schema 7 its `health`/`transactions`/
- * `influence`/`trade`/`objectives`/`checkpointState`/`stateRevision`/
- * `stateDigest` are the initial (empty/zero) values too. The row-level
- * `standings`, `teamAggregates`, `playerAggregates`, `recap`, `effects`,
- * `health`, `transactions`, `influence`, `trade`, `objectives`,
- * `checkpointState`, `stateRevision`, `stateDigest`, and cursor facts are
- * the block commit's NEW cumulative state and are authoritative on reload;
- * the reassembled snapshot overrides `run.standings`, `run.cursor`, and the
- * eight schema-7 run state fields with them.
+ * `run` is the promotion-time snapshot (initial zero standings/cursor/state);
+ * the row-level mutable columns are the block commit's new cumulative state
+ * and are authoritative on reload, overriding the snapshot's initial values.
  */
 
 /** Single active Season Run slot; at most one row may exist. */
 export const SEASON_RUN_RECORD_ID = 'season-run';
 
 /**
- * The single stored Season Run checkpoint row (save schema v4, M2.5):
- * frozen snapshot minus the scheduled game records plus the authoritative
- * current-boundary facts, the effects state, and the M2.5 mutable run state.
+ * The single stored Season Run checkpoint row (save schema v4, M2.5): frozen
+ * snapshot minus the scheduled game records plus the authoritative
+ * current-boundary facts, effects state, and M2.5 mutable run state.
  */
 export const seasonRunRecordFieldsSchema = z.object({
   recordId: z.literal(SEASON_RUN_RECORD_ID),
@@ -112,10 +92,7 @@ export const seasonRunRecordFieldsSchema = z.object({
   playerAggregates: z.array(seasonPlayerAggregateSchema).length(SEASON_TEAM_COUNT * 10),
   /** Recap of the last accepted block; null while no block was accepted. */
   recap: seasonBlockRecapSchema.nullable(),
-  /**
-   * Authoritative M2.4 effects state at the last accepted boundary: 300
-   * player load states and 1,350 canonical pair chemistry states.
-   */
+  /** M2.4 authoritative effects state (300 player loads, 1,350 pairs) at the last boundary. */
   effects: seasonEffectsStateSchema,
   /** M2.5: authoritative health state (append-only injury records). */
   health: seasonHealthStateSchema,
@@ -143,15 +120,11 @@ export type StoredSeasonRunRecord = z.infer<typeof storedSeasonRunRecordSchema>;
 
 /**
  * Narrow read schema for the checkpoint inside `commitSeasonBlock`. The full
- * `storedSeasonRunRecordSchema` parse is reserved for promotion and every
- * load (the authoritative corruption gate before state enters the app); the
- * commit path only needs the cursor facts it guards (runId, revision, last
- * command id, completed rounds, human franchise from the league) plus the
- * M2.5 mutable-state slice it validates and rewrites (health, transactions,
- * influence, trade, objectives, checkpointState, stateRevision,
- * stateDigest) and would otherwise re-validate the entire frozen snapshot on
- * every one of the nine block commits. A corrupt snapshot portion written by
- * a buggy commit is still caught by the next load.
+ * `storedSeasonRunRecordSchema` parse is reserved for promotion and every load
+ * (the corruption gate); the commit path only needs the cursor facts it
+ * guards plus the M2.5 mutable-state slice it rewrites, avoiding re-validating
+ * the entire frozen snapshot on each of the nine block commits. A corrupt
+ * snapshot portion is still caught by the next load.
  */
 export const seasonRunCursorSchema = z.object({
   run: z.object({
@@ -165,10 +138,9 @@ export const seasonRunCursorSchema = z.object({
       ),
     }),
     /**
-     * The snapshot's roster/ownership/rotation slice. The commit rewrites
-     * rotations (locked set) and, when a trade window opens, rosters and
-     * ownership (moved players); the M2.5 state digest covers all three, so
-     * the commit reads the current values to recompute the new digest.
+     * The snapshot's roster/ownership/rotation slice, read here because the
+     * commit rewrites them (locked rotations, window-moved players) and the
+     * M2.5 state digest covers all three.
      */
     rosters: z.array(z.unknown()).optional(),
     ownership: z.array(z.unknown()).optional(),
@@ -192,12 +164,9 @@ export type SeasonRunCursor = z.infer<typeof seasonRunCursorSchema>;
 /**
  * Narrow write schema for the checkpoint fields a block commit changes. The
  * `run` snapshot portion is promotion-immutable and was fully validated when
- * it was written; the commit validates exactly the fields it writes (cursor
- * facts, standings, aggregates, recap, effects, the M2.5 mutable run state,
- * and the rosters/ownership/rotations slice of `run`), so the per-commit
+ * written; the commit validates exactly the fields it writes, so per-commit
  * cost stays inside the persistence budget without weakening the
- * corrupt-rows-throw guarantee (every load re-validates the complete stored
- * row).
+ * corrupt-rows-throw guarantee (every load re-validates the full row).
  */
 export const seasonRunCheckpointDeltaSchema = seasonRunRecordFieldsSchema
   .pick({
@@ -224,19 +193,14 @@ export const seasonRunCheckpointDeltaSchema = seasonRunRecordFieldsSchema
     /**
      * The snapshot slices a commit rewrites: the 30 rotations locked by the
      * commit and, when a trade window opened, the mutated rosters and
-     * ownership. The rest of the snapshot is promotion-immutable; rewriting
-     * exactly these slices keeps a reload aligned with the locked set and
-     * the state digest.
+     * ownership. The rest of the snapshot is promotion-immutable.
      */
     run: z.object({
       rosters: z.array(seasonRosterSchema).length(SEASON_TEAM_COUNT),
       ownership: z.array(seasonOwnershipSchema).length(SEASON_TEAM_COUNT * 10),
       rotations: z.array(seasonRotationSchema).length(SEASON_TEAM_COUNT),
     }),
-    /**
-     * Authoritative M2.4 effects state at this boundary (post-block player
-     * load + pair chemistry), committed atomically with the block.
-     */
+    /** M2.4 authoritative post-block effects state, committed with the block. */
     effects: seasonEffectsStateSchema,
   });
 export type SeasonRunCheckpointDelta = z.infer<typeof seasonRunCheckpointDeltaSchema>;
@@ -291,13 +255,11 @@ export type StoredSeasonActiveRunIndex = z.infer<typeof storedSeasonActiveRunInd
 
 /**
  * Interrupted-block pending row (M2.5, Dexie v7 `seasonPendingBlocks`, keyed
- * by runId — at most one pending block per run). Stores the full uncommitted
+ * by runId — at most one per run). Stores the uncommitted
  * `SeasonPendingBlockCandidate` plus the typed `invalid-roster` interruption
- * facts that produced it (the runner reconstructs the interruption from the
- * engine's availability facts at save time) and the row timestamp. The
- * pending row is deleted in the SAME transaction as the block commit and by
- * `discardPendingBlock`; a pending row for an already-committed blockIndex is
- * a reload-audit error.
+ * that produced it. The pending row is deleted in the SAME transaction as
+ * the block commit (and by `discardPendingBlock`); a pending row for an
+ * already-committed blockIndex is a reload-audit error.
  */
 export const storedSeasonPendingBlockRowSchema = z.object({
   /** Primary key; equals the pending candidate's runId. */

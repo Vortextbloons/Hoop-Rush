@@ -163,9 +163,6 @@ export function loadCareerPositionLabels(): Map<string, Set<string>> {
   return labelsByPlayer;
 }
 
-// ---------------------------------------------------------------------------
-// Manifest helpers
-// ---------------------------------------------------------------------------
 export interface EraEntry {
   eraId: string;
   label: string;
@@ -192,9 +189,6 @@ export function loadManifest(): Manifest {
   return readJsonLoose(manifestPath()) as Manifest;
 }
 
-// ---------------------------------------------------------------------------
-// Per-season loading
-// ---------------------------------------------------------------------------
 export interface SeasonData {
   rosterByExtId: Record<string, Record<string, unknown>>;
   stintsByTeam: Record<string, Array<Record<string, unknown>>>;
@@ -241,7 +235,6 @@ function refreshedFallbackPlayer(
   };
 }
 
-/** Return { rosterByExtId, stintsByTeam, statsByPlayer } for a season. */
 export function loadSeasonData(season: string): SeasonData {
   const cached = seasonDataCache.get(season);
   if (cached !== undefined) return cached;
@@ -353,7 +346,6 @@ function sortedJsonFiles(dir: string): string[] {
   }
 }
 
-/** Default pool worker count: one per era, capped by the machine's cores. */
 export function defaultPoolWorkers(): number {
   // Unit tests mock config paths; real worker threads would read the real
   // raw-data dirs, so the parallel default stays off under vitest.
@@ -361,9 +353,6 @@ export function defaultPoolWorkers(): number {
   return Math.min(7, availableParallelism());
 }
 
-// ---------------------------------------------------------------------------
-// Worker-thread pool orchestration
-// ---------------------------------------------------------------------------
 export interface PoolWorkerResult {
   results: TargetBuildResult[];
 }
@@ -422,7 +411,6 @@ export function partitionPoolTargets(
   return chunks;
 }
 
-/** Runs one target chunk in a worker thread and resolves with its results. */
 function runPoolChunk(
   chunk: Array<[string, string]>,
   manifest: Manifest,
@@ -462,9 +450,6 @@ function runPoolChunk(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Record building
-// ---------------------------------------------------------------------------
 /** Python num(): float(value) with NaN/TypeError/ValueError -> default. */
 function num(row: Record<string, unknown>, key: string, fallback = 0): number {
   return safeFloat(row[key], fallback);
@@ -740,7 +725,6 @@ export function overallBandForPercentile(p: number): number {
   return clamp(Math.round(value), 40, 99);
 }
 
-/** True when the row carries a usable pre-percentile raw overall score. */
 function hasRawOverallScore(row: PoolOverallRow): boolean {
   const raw = row.ratingProfile?.rawOverallScore;
   return typeof raw === 'number' && Number.isFinite(raw);
@@ -929,7 +913,6 @@ export function coverageBandForSeasons(
   return 'reconstructed';
 }
 
-/** True when at least one legal G,G,F,F,C assignment exists over the pool. */
 export function legalLineupCovered(players: readonly PoolPlayer[]): boolean {
   const slotGroupsOf = (player: PoolPlayer): readonly string[] =>
     playableSlotGroups(player.positions.playable as Position[]);
@@ -1040,7 +1023,6 @@ function asNumberOrNull(value: unknown): number | null {
   return null;
 }
 
-/** Confidence of a player's provenance over required engine fields. */
 function playerLowConfidenceShare(player: PoolPlayer): number {
   const fields = [
     ...Object.keys(player.detailedRatings),

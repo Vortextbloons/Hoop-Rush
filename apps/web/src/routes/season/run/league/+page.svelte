@@ -234,7 +234,6 @@
           No team stats yet — accept a block to fold game summaries.
         </p>
       {:else}
-        <!-- Mobile: per-team stat cards -->
         {#if desktopViewport !== true}
           <ul class="mt-6 flex flex-col gap-0 md:hidden md:gap-2">
             {#each teamStats as team (team.franchiseId)}
@@ -294,7 +293,6 @@
           </ul>
         {/if}
 
-        <!-- Desktop: complete team stats table -->
         {#if desktopViewport !== false}
           <div class="mt-6 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
             <table class="w-full min-w-[42rem] text-sm">

@@ -71,7 +71,6 @@ export function reconstructSeasonGames(
   });
 }
 
-/** A candidate checkpoint with or without its digest field. */
 export type SeasonCheckpointFacts = Omit<SeasonCandidateCheckpoint, 'digest'>;
 
 /**
@@ -100,7 +99,6 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** Canonical per-row serialization of standings (sorted by franchiseId). */
 function standingsCanonical(candidate: SeasonCheckpointFacts): unknown {
   return {
     schemaVersion: candidate.standings.schemaVersion,

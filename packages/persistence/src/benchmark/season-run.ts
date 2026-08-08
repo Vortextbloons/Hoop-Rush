@@ -43,21 +43,16 @@ import {
 /**
  * Storage and timing benchmark for the Season Run persistence layer
  * (spec/2.0/10 M2.3, spec/2.0/12 performance framework, M2.4). Builds a
- * synthetic full-season dataset — 1,230 compact summaries, 82 retained
- * details, nine accepted blocks, and a monotonically increasing M2.4 effects
- * state per block — commits it through `commitSeasonBlock` (one transaction
- * per block), reloads it through the validated snapshot path, and reports
- * p95 commit and reload times plus the serialized byte size of every stored
- * row (effects state included). The engine math is provided through the
- * `SeasonRunEngineSeam`, so the harness measures the repository mechanics
- * with the pure helpers behind it; tests and CI run the stub seam, and the
- * `season benchmark persistence` CLI command runs the production engine
- * seam.
+ * synthetic full-season dataset, commits it through `commitSeasonBlock` (one
+ * transaction per block), reloads the validated snapshot, and reports p95
+ * commit/reload times plus the serialized byte size of every stored row. The
+ * engine math runs through the `SeasonRunEngineSeam`, so the harness measures
+ * repository mechanics with the pure helpers behind it.
  *
- * Frozen budgets (documented; asserted in the cheap test suite):
+ * Frozen budgets (asserted in the cheap test suite):
  * - commit p95 <= 300 ms per block transaction
  * - reload p95 <= 1,000 ms per full validated load
- * - active-run storage <= 25 MB (serialized rows, effects state included)
+ * - active-run storage <= 25 MB (serialized rows, effects included)
  */
 export const SEASON_RUN_BUDGET_COMMIT_P95_MS = 300;
 export const SEASON_RUN_BUDGET_RELOAD_P95_MS = 1000;
@@ -101,8 +96,7 @@ export interface SeasonRunPersistenceBenchmarkOptions {
    * Builds the database for one sample. The default creates a fresh
    * `HoopRushDatabase`; fake-indexeddb-based tests pass a wrapper that
    * installs a fresh `IDBFactory` per sample (a shared factory degrades
-   * transactions for every database after the first, an artifact of the
-   * test substrate, not of the repository).
+   * transactions after the first).
    */
   createDatabase?: () => HoopRushDatabase;
 }
@@ -350,7 +344,7 @@ async function storedBytes(
 
 /**
  * Runs the full-season persistence benchmark. Each sample creates one fresh
- * database, promotes a synthetic draft, commits all nine blocks (timing every
+ * database, promotes a synthetic draft, commits all nine blocks (timing each
  * transaction), reloads the validated snapshot (timed), then the final
  * sample's stored rows are measured in bytes.
  */
@@ -369,9 +363,8 @@ export async function benchmarkSeasonRunPersistence(
   let storage: { total: number; perTable: Record<string, number> } = { total: 0, perTable: {} };
 
   for (let sample = 0; sample < samples; sample += 1) {
-    // `HoopRushDatabase` owns the fixed 'hoop-rush-saves' name; samples are
-    // isolated by the database factory (tests install a fresh fake-indexeddb
-    // factory per sample; the CLI runs one measurement per process).
+    // Samples are isolated by the database factory (tests install a fresh
+    // fake-indexeddb factory per sample; the CLI runs one per process).
     const db = (options.createDatabase ?? (() => new HoopRushDatabase()))();
     const repository = new DexieSeasonRunRepository(db, { schedule, seam });
     await repository.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run);

@@ -121,7 +121,6 @@ export interface TestRun {
 
 let cachedRun: TestRun | null = null;
 
-/** Builds (once per test file) a full synthetic league and run snapshot. */
 export function buildTestRun(options: { humanFranchiseId?: string } = {}): TestRun {
   if (cachedRun !== null) return cachedRun;
   cachedRun = buildFreshTestRun(options);
@@ -384,7 +383,6 @@ export function blockCommand(
   };
 }
 
-/** The pipeline input for a run at the given cursor state. */
 export function pipelineInput(
   run: SeasonRun,
   catalog: SeasonDraftCatalog,
@@ -457,7 +455,6 @@ export interface RunnerState {
   effects: SeasonEffectsState;
 }
 
-/** Runs one block through the pipeline and advances the runner state. */
 export function runBlock(
   state: RunnerState,
   blockIndex: number,
@@ -490,7 +487,6 @@ export function runBlock(
   return checkpoint;
 }
 
-/** Builds a fresh runner state from the shared run (cheap clone). */
 export function freshState(): RunnerState {
   const { run, catalog } = buildTestRun();
   return { run, catalog, summaries: [] as SeasonGameSummary[], effects: zeroEffectsOf(run) };

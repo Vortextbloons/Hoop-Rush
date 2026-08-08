@@ -208,7 +208,6 @@ function computeSide(input: {
   const { side, prep, opponentPrep, profile, eraPoss, passingAnchorFactor } = input;
   const players = side.players;
 
-  // --- Turnover mass per initiator ---
   const initiatorShares = normalizedWeights(prep.initiatorWeights);
   const turnoverRates = players.map((player) =>
     turnoverProbability(player, opponentPrep.pressure, eraPoss, profile),
@@ -364,7 +363,6 @@ function computeSide(input: {
     }
   }
 
-  // --- Aggregate per-shot expectations ---
   const internal: LedgerInternal = {
     fieldGoalAttempts: 0,
     fieldGoalMakes: 0,
@@ -489,7 +487,6 @@ function computeSide(input: {
     const mass = massByKey[keyIndex] ?? 0;
     const three = zone === 'cornerThree' || zone === 'aboveBreakThree';
 
-    // Field goals and points.
     internal.fieldGoalAttempts += mass;
     internal.fieldGoalMakes += mass * makeProb;
     if (three) {
@@ -501,7 +498,6 @@ function computeSide(input: {
     }
     internal.points += mass * (three ? 3 : 2) * makeProb;
 
-    // Blocks against, fouls drawn.
     internal.blocks += mass * blockProb;
     internal.fouls += mass * foulP;
 
@@ -596,7 +592,6 @@ function computeSide(input: {
       }
     }
 
-    // Per-player aggregation.
     const agg = playerAgg[shooterIndex];
     if (agg === undefined) continue;
     agg.shots += mass;

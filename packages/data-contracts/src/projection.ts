@@ -82,7 +82,6 @@ export type ProjectionComponentScale = z.infer<typeof projectionComponentScaleSc
 export const projectionWeaknessSeveritySchema = z.enum(['critical', 'major', 'minor']);
 export type ProjectionWeaknessSeverity = z.infer<typeof projectionWeaknessSeveritySchema>;
 
-/** One identified projection weakness: code, severity, threshold, value, evidence. */
 export const projectionWeaknessSchema = z.object({
   code: z.string().min(1).max(64),
   severity: projectionWeaknessSeveritySchema,
@@ -357,7 +356,6 @@ export const projectionCreationSchema = z.object({
 });
 export type ProjectionCreation = z.infer<typeof projectionCreationSchema>;
 
-/** Defensive coverage of one side. */
 export const projectionDefenseSchema = z.object({
   /** Normalized 0-100 defensive coverage score. */
   score: z.number().min(0).max(100),
@@ -447,7 +445,6 @@ export const projectionSideSchema = z.object({
 });
 export type ProjectionSide = z.infer<typeof projectionSideSchema>;
 
-/** The complete base-five projection output. */
 export const baseFiveProjectionSchema = z
   .object({
     schemaVersion: z.literal(1),

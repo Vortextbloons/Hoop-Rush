@@ -42,54 +42,33 @@ import {
 import { sleep } from '../lib/sleep';
 
 /**
- * Season Run block worker entry (spec/2.0/07 background execution, M2.3,
- * M2.5). Receives one validated block input (the run context at the
- * boundary, schedule, home-court profile, compact summaries — a full reset
- * or a per-block delta into the persistent accumulator — the effects and
- * health states, the resume game id, the locked objective, and the
- * catalog/profile asset urls it fetches and hash-verifies itself), then
- * runs the authoritative block pipeline game by game through the engine's
- * exported pieces — the same code the CLI runs through `simulateSeasonBlock`.
- *
- * The worker never touches IndexedDB or the save database; it fetches the
- * content-addressed draft catalog and era profile itself (hash-verified) and
- * memoizes them for its lifetime. It yields to the
- * event loop between games so cancellation is observed and progress
- * streams; progress posts are throttled to at most four per second and carry
- * fixed-size counters plus the latest game id and compact summary. Invariant
- * failures stop the block with seed/version/game diagnostics. The complete
- * message carries either one bounded candidate checkpoint (≤ 2 MB) for the
- * main thread to validate, accept, and persist, or — M2.5 — an uncommitted
- * pending candidate when the human franchise could not field a legal five
- * (`invalid-roster` interruption); cancelled or failed work never reaches
- * persistence.
+ * Season Run block worker entry (spec/2.0/07, M2.3, M2.5). Runs the
+ * authoritative block pipeline game by game through the engine's exported
+ * pieces — the same code the CLI runs through `simulateSeasonBlock`. Never
+ * touches IndexedDB or the save database; it fetches and hash-verifies the
+ * content-addressed draft catalog and era profile itself. Yields to the event
+ * loop between games so cancellation is observed and progress streams
+ * (throttled to at most four per second). The complete message carries either
+ * one bounded candidate checkpoint (≤ 2 MB) for the main thread to accept, or
+ * an uncommitted pending candidate on an 'invalid-roster' interruption.
  *
  * ## M2.5 state threading
  *
  * Health crosses the wire exactly like effects: `priorHealth` resets the
- * worker's accumulator (full reset), null keeps the accumulated state for a
- * continued worker. `startGameId` resumes mid-block from an interrupted
- * pending candidate: the worker simulates from that game forward and seeds
- * its block-scoped summary list from the summaries the accumulator already
- * holds for this blockIndex (the pending's partial summaries were shipped
- * as `newSummaries`/`priorSummaries`), so the assembled candidate covers the
- * FULL block (partial + resumed) without duplicates.
+ * accumulator, null keeps it. `startGameId` resumes mid-block; the block-scoped
+ * summaries the accumulator already holds seed the candidate so it covers the
+ * FULL block without duplicates.
  *
  * ## M2.5 SEAMS awaiting the health workstream
  *
- * - `simulateSeasonBlockGame` threads the health state and returns either
- *   the game facts or a typed `invalid-roster` interruption marker.
- * - `assembleSeasonBlockCandidate` accepts the post-block health state.
- * - `assembleSeasonPendingBlock` builds the uncommitted pending candidate.
- * - The candidate's `expectedStateRevision`/`expectedStateDigest` (the
- *   pre-block run state facts) are not carried by the frozen wire
- *   (`seasonBlockRunContextSchema` is unchanged per the contract, so the
- *   runner's parse strips them); the worker reads them leniently from the
- *   run context (the runner includes them there), falling back to
- *   revision-aligned zero facts. The RUNNER validates the candidate's
- *   expected state facts against the authoritative submitted run and
- *   rejects mismatches, so an unavailable seam value can never be
- *   committed.
+ * - `simulateSeasonBlockGame` threads health and returns the game facts or a
+ *   typed `invalid-roster` interruption marker.
+ * - `assembleSeasonBlockCandidate` / `assembleSeasonPendingBlock` build the
+ *   committed candidate / uncommitted pending candidate.
+ * - The candidate's `expectedStateRevision`/`expectedStateDigest` are not on
+ *   the frozen wire; the worker reads them from the run context, falling back
+ *   to zero facts. The RUNNER validates them against the authoritative run and
+ *   rejects mismatches, so a wrong seam value is never committed.
  */
 
 const PROGRESS_MIN_INTERVAL_MS = 250;
@@ -98,13 +77,11 @@ let currentRequestId: string | null = null;
 let cancelled = false;
 
 /**
- * The worker is persistent and accumulates compact summaries across blocks
- * so the main thread only ships one block's worth of deltas. The runner
- * resets the accumulator with `priorSummaries` whenever this worker has no
- * state for the run (fresh worker or resumed after a route change) and
- * appends `newSummaries` otherwise. The engine folds standings/aggregates on
- * top of the accumulated set, so a stale accumulator would fail the
- * checkpoint audit on the main thread.
+ * Persistent worker accumulates compact summaries across blocks so the main
+ * thread only ships one block's worth of deltas. `priorSummaries` resets the
+ * accumulator (fresh worker or resumed after a route change), `newSummaries`
+ * appends. A stale accumulator would fail the checkpoint audit on the main
+ * thread.
  */
 let accumulatedRunId: string | null = null;
 let accumulatedSummaries: SeasonGameSummary[] = [];
@@ -114,10 +91,10 @@ let accumulatedEffects: SeasonEffectsState | null = null;
 let accumulatedHealth: SeasonHealthState | null = null;
 
 /**
- * Wire v5 continuation context: the run-static inputs (schedule, league,
- * rosters, home-court profile) are cached per runId so continuation blocks
- * travel as deltas. A terminated worker loses the cache and the runner falls
- * back to a full start request.
+ * Wire v5 continuation context: run-static inputs (schedule, league, rosters,
+ * home-court) are cached per runId so continuation blocks travel as deltas.
+ * A terminated worker loses the cache and the runner falls back to a full
+ * start request.
  */
 interface WorkerRunContext {
   run: SeasonBlockRunContext;
@@ -135,11 +112,10 @@ function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStar
   return {
     ...request,
     type: 'season-block-start',
-    // The cached context comes from the first block handled by this
-    // persistent worker. Cursor and rotations are block-boundary state, not
-    // run-static state: reconstruct them from the continuation or the engine
-    // will reject every later block as a stale cursor (and would simulate an
-    // old rotation even when the user edited it between blocks).
+    // Cursor and rotations are block-boundary state, not run-static state:
+    // reconstruct them from the continuation or the engine rejects later
+    // blocks as a stale cursor (and would simulate an old rotation even when
+    // the user edited it between blocks).
     run: {
       ...context.run,
       rotations: request.rotations,
@@ -157,9 +133,8 @@ function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStar
 function post(
   message: SeasonWorkerProgressMessage | SeasonWorkerCompleteMessage | SeasonWorkerErrorMessage,
 ): void {
-  // The main thread parses every message at its boundary (the runner drops
-  // anything that fails the frozen wire schema), so the worker does not
-  // re-parse the ≤ 2 MB complete message it just assembled.
+  // The main thread parses every message at its boundary, so the worker does
+  // not re-parse the ≤ 2 MB complete message it just assembled.
   self.postMessage(message);
 }
 
@@ -183,13 +158,7 @@ function postError(
   self.postMessage(payload);
 }
 
-/**
- * The packaged draft catalog is immutable and content-addressed; the module
- * cache makes the fetch + hash verify + Zod parse one-time per worker
- * lifetime (~1 MB brotli with precompress). The worker intentionally does not
- * bundle dexie/IndexedDB for this cache — a direct fetch keeps the worker
- * bundle self-contained.
- */
+/** The catalog is content-addressed; fetch + hash verify + parse once per worker. */
 const catalogCache = new Map<string, SeasonDraftCatalog>();
 async function loadCatalogCached(url: string, contentHash: string): Promise<SeasonDraftCatalog> {
   const memo = catalogCache.get(contentHash);
@@ -299,10 +268,9 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
     accumulatedSummaries = [...accumulatedSummaries, ...request.newSummaries];
   }
-  // M2.4: the effects state follows the same reset/delta convention. A
-  // full reset carries the authoritative pre-block state; the delta path
-  // keeps the worker's accumulated state (the runner only sends the reset
-  // when this worker has no state for the run).
+  // M2.4: effects follows the same reset/delta convention — a full reset
+  // carries the authoritative pre-block state, the delta path keeps the
+  // worker's accumulated state.
   if (request.priorEffects !== undefined && request.priorEffects !== null) {
     accumulatedEffects = request.priorEffects;
   } else if (accumulatedRunId === null) {
@@ -313,9 +281,8 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     );
     return;
   }
-  // M2.5: the health state follows the same convention. A resume ships the
-  // pending candidate's mid-block health as a full reset; a fresh worker
-  // with no priorHealth (block 0) falls back to the empty state.
+  // M2.5: health follows the same convention; a fresh worker with no
+  // priorHealth (block 0) falls back to the empty state.
   if (request.priorHealth !== undefined && request.priorHealth !== null) {
     accumulatedHealth = request.priorHealth;
   } else if (accumulatedHealth === null) {
@@ -413,12 +380,12 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     return;
   }
   const remainingGames = games.slice(startIndex);
-  // M2.4 recovery cadence mirrors the CLI pipeline: one between-round tick
-  // per player, never before the season's first game. M2.5 resume: the tick
-  // fires only when the first resumed game crosses a round boundary, so the
-  // resume cadence matches the uninterrupted path (the pending's partial
-  // summaries already carried their ticks). The engine skips the tick when
-  // `skipRecoveryTick` is true (no round advance).
+  // M2.4 recovery cadence mirrors the CLI pipeline: one between-round tick per
+  // player, never before the first game. On resume the tick fires only when
+  // the first resumed game crosses a round boundary (the pending's partial
+  // summaries already carried their ticks), so the cadence matches the
+  // uninterrupted path. The engine skips the tick when `skipRecoveryTick` is
+  // true (no round advance).
   const { fromRound } = blockRoundRange(request.blockIndex);
   const precedingRound =
     startIndex > 0 ? (games[startIndex - 1]?.round ?? fromRound) : fromRound - 1;
@@ -534,11 +501,10 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     throw new EngineInvariantFailure(auditFailures.join('; '));
   }
   // Keep the persistent worker's summary accumulator aligned with the
-  // finalized checkpoint. `summaries` is block-scoped, while the accumulator
-  // contains prior accepted blocks (and may already contain partial games
-  // from an interrupted attempt). Replace this block's slice so the next
-  // continuation folds standings and aggregates from every accepted game
-  // exactly once.
+  // finalized checkpoint. `summaries` is block-scoped; the accumulator holds
+  // prior accepted blocks (and may already hold partial games from an
+  // interrupted attempt). Replace this block's slice so the next continuation
+  // folds standings and aggregates from every accepted game exactly once.
   accumulatedSummaries = [
     ...accumulatedSummaries.filter(
       (summary) => blockIndexForRound(summary.round) !== request.blockIndex,

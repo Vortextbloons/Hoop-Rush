@@ -28,30 +28,13 @@ import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
  * that imports `@hoop-rush/engine`; the repository, the audit, and the test
  * fixtures depend only on the interface in `engine-seam-types.ts`, so a
  * signature drift in the engine implementation is fixed here and nowhere
- * else. The M2.4 effects helpers are pure TypeScript (canonical pair and
- * zero-state construction) with no engine dependency.
+ * else. The M2.4 effects helpers are pure TypeScript with no engine dependency.
  *
- * Engine exports used:
- *
- * - `reconstructSeasonGames(schedule: SeasonSchedule, summaries: readonly SeasonGameSummary[]): SeasonGame[]`
- * - `foldSeasonTeamAggregates(summaries: readonly SeasonGameSummary[]): SeasonTeamAggregate[]`
- * - `foldSeasonPlayerAggregates(summaries: readonly SeasonGameSummary[]): SeasonPlayerAggregate[]`
- * - `reduceSeasonStandings(league: SeasonLeague, games: readonly SeasonGame[]): SeasonStandings`
- * - `seasonRotationSetDigest(rotations: readonly SeasonRotation[]): string`
- * - M2.5: `seasonRunStateDigest(facts)` (canonical mutable run-state digest)
- *   and `createInitialSeasonInfluenceState(franchiseIds)` (run-creation
- *   economy), both authoritative engine exports.
- * - M2.5: `WINDOW_BLOCK_INDEX_TO_INDEX` (block → trade-injury window index),
- *   the canonical trade-window map the reload audit inverts to validate the
- *   stored trade state.
- *
- * The engine folds return one row per franchise/version that appears in the
- * summaries; the stored checkpoint contract requires the full 30-row team
- * and 300-row player tables (zero rows for anything unplayed), so the seam
- * pads the engine output with the canonical data-contracts zero-row
- * builders (`emptySeasonTeamAggregate` / `emptySeasonPlayerAggregate`). All
- * helpers are pure TypeScript; the seam imports no Svelte, Dexie, browser,
- * or network code.
+ * The engine folds return one row per franchise/version appearing in the
+ * summaries; the stored checkpoint requires the full 30-row team and 300-row
+ * player tables (zero rows for anything unplayed), so the seam pads the engine
+ * output with the canonical data-contracts zero-row builders. All helpers are
+ * pure TypeScript; the seam imports no Svelte, Dexie, browser, or network code.
  */
 export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   reconstructSeasonGames,

@@ -16,7 +16,6 @@ import { clamp } from '../domain/math.ts';
  * a report field).
  */
 
-/** The eight basketball roles in canonical order. */
 export const ROSTER_ROLES: readonly SeasonRosterRole[] = [
   'primary-creation',
   'secondary-creation',
@@ -115,7 +114,6 @@ export const BAND_SCORE_CEILINGS: Record<SeasonStrengthBand, number> = {
   weaker: 74,
 };
 
-/** Penalty applied to candidate selection scores above the band ceiling. */
 export const BAND_CEILING_PENALTY = 1.6;
 
 export interface SeasonScoreMember {
@@ -125,7 +123,6 @@ export interface SeasonScoreMember {
   overall?: number;
 }
 
-/** 0-100 role scores for one candidate from possession inputs. */
 export function roleScoresOf(member: SeasonScoreMember): Record<SeasonRosterRole, number> {
   const r = member.detailedRatings;
   const t = member.tendencies;
@@ -145,7 +142,6 @@ function clamp01(value: number): number {
   return clamp(value, 0, 100);
 }
 
-/** Weighted identity score for one candidate's role scores. */
 export function identityScore(
   roleScores: Record<SeasonRosterRole, number>,
   identity: SeasonAiIdentity,
@@ -175,7 +171,6 @@ export function overallReportOf(members: readonly SeasonScoreMember[]): number |
  * possession-input role scores; Overall never participates.
  */
 
-/** The four percentile tiers in descending strength order. */
 export const TIER_ORDER = ['elite', 'strong', 'useful', 'depth'] as const;
 export type PercentileTier = (typeof TIER_ORDER)[number];
 
@@ -186,7 +181,6 @@ export const TIER_PERCENTILES: Record<'elite' | 'strong' | 'useful', number> = {
   useful: 0.5,
 };
 
-/** The three role-score thresholds that separate the four tiers. */
 export interface RoleThresholds {
   elite: number;
   strong: number;

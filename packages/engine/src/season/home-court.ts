@@ -55,7 +55,6 @@ export interface SeasonHomeCourtMechanisms {
   awayTurnoverPressureAdjustment: number;
 }
 
-/** Derives the two mechanism adjustments from a profile (pure, monotonic). */
 export function seasonHomeCourtMechanisms(
   profile: SeasonHomeCourtProfile,
 ): SeasonHomeCourtMechanisms {

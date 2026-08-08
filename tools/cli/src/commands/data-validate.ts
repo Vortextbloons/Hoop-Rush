@@ -35,8 +35,6 @@ export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-/** Repo-root path of the shipped manifest, independent of the invocation cwd. */
-
 interface AuditResult {
   ok: boolean;
   details: string[];

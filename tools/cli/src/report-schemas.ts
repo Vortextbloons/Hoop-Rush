@@ -20,10 +20,9 @@ import {
 } from '@hoop-rush/data-contracts';
 
 /**
- * Versioned CLI report payloads (spec/09). Every command emits a
- * runtime-validated, versioned JSON payload alongside the existing compact
- * CliReport; exit codes stay 0 (pass), 1 (failed checks), 2 (usage/data
- * error). Text output is a projection; JSON carries the full payload.
+ * Versioned CLI report payloads (spec/09): runtime-validated JSON emitted
+ * alongside the compact CliReport. Exit codes: 0 pass, 1 failed checks, 2
+ * usage/data error.
  */
 
 export const simGameReportSchema = z.object({
@@ -169,7 +168,6 @@ export const calibrationMetricSchema = z.object({
    * gate is never reported as passing.
    */
   status: calibrationMetricStatusSchema,
-  /** Derived from status: true only for 'pass'. */
   pass: z.boolean(),
   sample: z.number().int().nonnegative(),
   minimumSample: z.number().int().nonnegative(),
@@ -490,7 +488,6 @@ export const seasonDraftReproduceReportSchema = z.object({
     .string()
     .regex(/^[0-9a-f]{32}$/)
     .nullable(),
-  /** True when the final digest matches the expected digest. */
   identical: z.boolean(),
   offers: z.array(
     z.object({

@@ -71,27 +71,16 @@ import { seasonRotationSchema } from './season-rotation.ts';
 /**
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
  * validated record covers the frozen league, ten-player rosters, ownership,
- * schedule reference, all scheduled game identities, the block cursor,
- * postseason state, and — since schema version 6 (M2.4 roster-generation-v2)
- * — the frozen roster-generation-v2/season-ai-v2/roster-targets-v2 material
- * versions and the recorded `aiPools` (one 20-player pool per AI franchise:
- * 29 solo, 28 duo; human franchises get none). Schema version 7 (M2.5)
- * adds the run-scoped `health` (season-health-v1), `transactions`,
- * `influence` (season-influence-v1), `checkpointState`,
- * `stateRevision`/`stateDigest` state chain, and freezes the seven new M2.5
- * material versions (health, trade, influence, objective, injury-targets,
- * trade-targets, influence-targets); schema 6 runs cannot continue (no
- * health, influence, or state chain exists for them). Schema version 5
- * (M2.4) added the stamina, chemistry, and effect-targets material versions;
- * schema version 4 (M2.3) added the frozen block, summary, aggregates,
- * recap, leaders, home-court, and checkpoint material versions; schema
- * version 3 (M2.2) added the rotation-planner, Season-game, and
- * Season-game-targets material versions; schema version 2 (M2.1) added the
- * completed draft facts, AI assignments, generated rotations, and the
- * generation audit summary. Completed game facts live in per-block compact
- * summary rows (season-game-summary-v3), not in this snapshot's scheduled
- * `games` array; the engine reconstructs finalized game records from the
- * schedule and summaries on demand.
+ * schedule reference, all scheduled game identities, the block cursor, and
+ * postseason state, plus the frozen material versions. Since schema 6 (M2.4)
+ * it records the roster-generation-v2/season-ai-v2/roster-targets-v2
+ * versions and `aiPools` (one 20-player pool per AI franchise); since schema
+ * 7 (M2.5) it carries `health`, `transactions`, `influence`,
+ * `checkpointState`, and the `stateRevision`/`stateDigest` chain (schema 6
+ * runs cannot continue). Completed game facts live in per-block compact
+ * summary rows (season-game-summary-v3), not in the scheduled `games` array;
+ * the engine reconstructs finalized game records from the schedule and
+ * summaries on demand.
  */
 
 export {
@@ -335,15 +324,13 @@ export const seasonRunSchema = z.object({
 export type SeasonRun = z.infer<typeof seasonRunSchema>;
 
 /**
- * The run facts the Season block pipeline reads at a submission boundary
- * (spec/2.0/07): identity, cursor, league, rosters, locked rotations, and
- * versions. The worker wire carries only this context; the scheduled `games`
- * array, `standings`, `draft`, `ownership`, `postseason`, `aiAssignments`,
- * `aiPools`, `evaluations`, and `generationAudit` stay in the persisted
- * snapshot and never cross the worker boundary. `aiPools` in particular are
- * persistence-only: simulation consumes the final rosters, never the pools,
- * so this context deliberately does not gain an `aiPools` field. A full
- * `SeasonRun` satisfies this shape.
+ * The run facts the block pipeline reads at a submission boundary
+ * (spec/2.0/07): identity, cursor, league, rosters, locked rotations,
+ * versions. The worker wire carries only this context; games, standings,
+ * draft, ownership, postseason, aiAssignments, aiPools, evaluations, and
+ * generationAudit stay in the persisted snapshot. `aiPools` are
+ * persistence-only (simulation consumes rosters, never pools), so this
+ * context deliberately omits them. A full `SeasonRun` satisfies this shape.
  */
 export const seasonBlockRunContextSchema = z.object({
   schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),

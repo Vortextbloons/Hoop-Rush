@@ -16,7 +16,6 @@ import { ENGINE_CONSTANTS } from './constants.ts';
  * in a hardcoded intercept.
  */
 
-/** Defensive pressure for one defender: perimeter, steal, and IQ blend. */
 export function defenderPressure(defender: SimulationPlayer): number {
   return (
     (defender.ratings.perimeterDefense * 0.5 +
@@ -101,14 +100,12 @@ export function isSteal(rng: Rng, stealAbility: number, profile: EraSimulationPr
   return rng.chance(Math.min(0.9, Math.max(0.3, p)));
 }
 
-/** Steal attribution weights for a team, in team index order. */
 export function stealerWeights(defense: SimulationTeam): number[] {
   return defense.players.map((d) =>
     Math.max(0.5, d.ratings.steal * (0.6 + d.tendencies.stealAttemptRate / 20)),
   );
 }
 
-/** Credits the stealer against precomputed steal-rating weights. */
 export function pickStealer(
   players: readonly SimulationPlayer[],
   weights: readonly number[],

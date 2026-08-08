@@ -96,7 +96,6 @@ import { openSeasonTradeWindow, type SeasonWindowOpenResult } from './trades.ts'
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */
 
-/** Number of accepted blocks implied by a completed-round cursor value. */
 export function seasonAcceptedBlockCount(completedRounds: number): number {
   if (completedRounds <= 0) return 0;
   if (completedRounds > SEASON_ROUND_COUNT) {
@@ -112,7 +111,6 @@ export function seasonNextBlockIndex(completedRounds: number): number | null {
   return seasonAcceptedBlockCount(completedRounds);
 }
 
-/** The cursor value the run must carry for a block submission. */
 function cursorOfBlock(blockIndex: number): number {
   return blockIndex === 0 ? 0 : blockIndex * 10;
 }
@@ -154,7 +152,6 @@ export class SeasonBlockCancelledError extends Error {
   }
 }
 
-/** Everything the block pipeline needs for one block submission. */
 export interface SeasonBlockSimulationInput {
   /** The validated SubmitSeasonBlock command to execute. */
   command: SeasonSubmitBlockCommand;
@@ -341,7 +338,6 @@ export function expandSeasonRunRosters(
   return expanded;
 }
 
-/** playerVersionId -> person playerId derived from the run rosters. */
 export function rosterPlayerIdsOf(run: SeasonBlockRunContext): Map<string, string> {
   const ids = new Map<string, string>();
   for (const roster of run.rosters) {
@@ -470,7 +466,6 @@ export function seasonBlockRejection(
   return null;
 }
 
-/** Throwing validation used by the pipeline itself. */
 function requireValidSeasonBlockCommand(input: SeasonBlockSimulationInput): void {
   const rejection = seasonBlockRejection(input);
   if (rejection !== null) throw new SeasonBlockValidationError(rejection);
@@ -825,7 +820,6 @@ function staminaByVersionOf(input: SeasonBlockSimulationInput): Map<string, numb
   return ratings;
 }
 
-/** playerVersionId -> rotation target minutes for the game's twenty players. */
 function targetMinutesOf(
   input: SeasonBlockSimulationInput,
   game: SeasonScheduleGame,
@@ -856,7 +850,6 @@ function durabilityByVersionOf(input: SeasonBlockSimulationInput): Map<string, n
   return ratings;
 }
 
-/** playerVersionId -> playable positions for every expanded version. */
 function positionsOf(input: SeasonBlockSimulationInput): Map<string, readonly Position[]> {
   const positions = new Map<string, readonly Position[]>();
   for (const player of input.expanded.values()) {
@@ -865,7 +858,6 @@ function positionsOf(input: SeasonBlockSimulationInput): Map<string, readonly Po
   return positions;
 }
 
-/** The side of the game a rostered version plays for. */
 function sideOfPlayer(
   game: SeasonScheduleGame,
   playerVersionId: string,
@@ -1162,10 +1154,6 @@ export function handleSubmitSeasonBlockCommand(
   }
 }
 
-/**
- * Folds the block's evaluated objective success into the run's objective
- * selections (the persisted post-commit facts).
- */
 function objectivesWithBlockSuccess(
   objectives: SeasonObjectiveState,
   candidate: SeasonCandidateCheckpoint,
@@ -1386,7 +1374,6 @@ export function auditSeasonBlock(
     failures.push('candidate completedRounds must equal the block end');
   }
 
-  // Summary count, uniqueness, and block coverage.
   const expectedCount = seasonBlockGameCount(command.blockIndex);
   if (candidate.gameSummaries.length !== expectedCount) {
     failures.push(
@@ -1414,7 +1401,6 @@ export function auditSeasonBlock(
     }
   }
 
-  // Per-summary validity.
   for (const summary of candidate.gameSummaries) {
     failures.push(
       ...auditSeasonGameSummary(summary).map((failure) => `summary ${summary.gameId}: ${failure}`),
@@ -1445,7 +1431,6 @@ export function auditSeasonBlock(
     );
   }
 
-  // Aggregate and standings reconciliation against a fresh fold.
   const allSummaries = [...input.priorSummaries, ...candidate.gameSummaries];
   failures.push(
     ...auditSeasonStandings(
@@ -1481,7 +1466,6 @@ export function auditSeasonBlock(
     }
   }
 
-  // Recap audit.
   failures.push(
     ...auditSeasonBlockRecap(candidate.recap, {
       runId: run.runId,
@@ -1623,7 +1607,6 @@ export function auditSeasonBlock(
     failures.push('candidate transactions contain duplicate ids');
   }
 
-  // Digest verification.
   const recomputed = seasonCheckpointDigest(candidate);
   if (recomputed !== candidate.digest) {
     failures.push(`digest mismatch: stored ${candidate.digest}, recomputed ${recomputed}`);

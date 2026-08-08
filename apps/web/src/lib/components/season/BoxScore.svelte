@@ -95,7 +95,6 @@
     </p>
   </div>
 
-  <!-- Mobile: compact primary stats, then an expandable full-stat table -->
   <div class="md:hidden">
     <table class="w-full text-sm">
       <thead>
@@ -229,7 +228,6 @@
     </details>
   </div>
 
-  <!-- Desktop: full table directly -->
   <div class="hidden overflow-x-auto md:block">
     <table class="w-full min-w-[42rem] text-sm">
       <thead>

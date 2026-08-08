@@ -158,11 +158,8 @@ export const ENGINE_CONSTANTS = {
   bonusFoulsOvertime: 2,
   /** Free throws are dead-ball events and consume no game-clock time. */
   secondsPerFreeThrow: 0,
-  /** A trip may not take longer than the shot clock. */
   shotClockSeconds: 24,
-  /** Minimum sampled trip duration, in seconds. */
   minimumTripSeconds: 1,
-  /** A possession may start with this many seconds remaining at the earliest. */
   minimumStartSeconds: 0.5,
 
   /** Player-level three-point volume boost from the threePointRate tendency. */

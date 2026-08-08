@@ -88,6 +88,10 @@ function repoWith(initial: SeasonRunSnapshot | null) {
       if (runId === active?.run.runId) active = null;
       return Promise.resolve();
     }),
+    forceClearActiveSeasonRun: vi.fn(() => {
+      active = null;
+      return Promise.resolve();
+    }),
     savePendingBlock: vi.fn(() => Promise.resolve()),
     loadPendingBlock: vi.fn(() => Promise.resolve(null)),
     discardPendingBlock: vi.fn(() => Promise.resolve()),
@@ -253,6 +257,7 @@ describe('SeasonHubState between-block commands', () => {
       commitSeasonBlock: vi.fn(),
       promoteSeasonDraftToRun: vi.fn(),
       clearSeasonRun: vi.fn(() => Promise.resolve()),
+      forceClearActiveSeasonRun: vi.fn(() => Promise.resolve()),
       savePendingBlock: vi.fn(() => Promise.resolve()),
       loadPendingBlock: vi.fn(() => Promise.resolve(null)),
       discardPendingBlock: vi.fn(() => Promise.resolve()),

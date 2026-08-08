@@ -32,8 +32,8 @@ export interface RotationMember {
 export const SLOT_GROUPS: readonly SlotGroup[] = ['G', 'G', 'F', 'F', 'C'];
 
 /**
- * One player's minutes change from a rebalance. `delta` is the signed change
- * so the UI can announce who gained and who lost.
+ * One player's minutes change from a rebalance; `delta` is signed so the UI
+ * can announce who gained and who lost.
  */
 export interface MinuteAdjustment {
   playerVersionId: string;
@@ -41,8 +41,8 @@ export interface MinuteAdjustment {
   delta: number;
 }
 
-/** Result of a rebalancing minutes edit: failures (empty = committed) + the
- * players whose target minutes changed. */
+/** Result of a rebalancing minutes edit: failures (empty = committed) plus
+ * the players whose target minutes changed. */
 export interface RebalanceResult {
   failures: string[];
   adjustments: MinuteAdjustment[];
@@ -137,9 +137,8 @@ export class RotationEditor {
     });
   }
 
-  /** The roster members that can legally fill one starter slot (G, G, F, F, C).
-   * Mirrors the engine audit's slot eligibility exactly (`canPlay` against
-   * the slot's coarse group), so the pickers never offer an illegal swap. */
+  /** Members that can legally fill one starter slot, mirroring the engine
+   * audit's eligibility so the pickers never offer an illegal swap. */
   eligibleForSlot(slotIndex: number): RotationMember[] {
     const group = SLOT_GROUPS[slotIndex];
     if (group === undefined) return [];
@@ -171,10 +170,9 @@ export class RotationEditor {
   }
 
   /**
-   * Stepper adjustment that keeps the 240 total intact: +1 takes a minute
-   * from the highest-minute other player, -1 gives a minute to the
-   * lowest-minute other player (bench order breaks ties). Returns the audit
-   * failures of the resulting rotation; empty means valid.
+   * Stepper adjustment that keeps the 240 total intact: +1 takes a minute from
+   * the highest-minute other player, -1 gives one to the lowest-minute other
+   * player (bench order breaks ties). Returns the audit failures.
    */
   adjustMinutes(playerVersionId: string, delta: number): string[] {
     return this.rebalanceMinutes(playerVersionId, this.minutesFor(playerVersionId) + delta)
@@ -183,13 +181,11 @@ export class RotationEditor {
 
   /**
    * Sets one player's target minutes (clamped 0-48, integer) and rebalances
-   * the rest of the roster deterministically so the total stays exactly 240:
-   * typing higher takes minutes from the highest-minute teammates (bench
-   * order breaks ties), typing lower gives minutes to the lowest-minute
-   * teammates. Commits only when the audit is clean; on failure the rotation
-   * is unchanged and the returned failures explain why. `adjustments` lists
-   * every changed player (target first, then compensators) with signed
-   * deltas so the UI can highlight and announce the rebalance.
+   * the rest deterministically so the total stays exactly 240: typing higher
+   * takes from the highest-minute teammates, lower gives to the lowest-minute
+   * (bench order breaks ties). Commits only on a clean audit; otherwise the
+   * rotation is unchanged. `adjustments` lists every changed player with
+   * signed deltas for the UI to highlight and announce.
    */
   rebalanceMinutes(playerVersionId: string, minutes: number): RebalanceResult {
     if (!this.rosterIds.includes(playerVersionId)) {
@@ -253,10 +249,9 @@ export class RotationEditor {
 
   /**
    * Closing-five toggle: a player already closing is replaced by the best
-   * eligible non-closing player for their vacated slot; otherwise the player
-   * is assigned to the first closing slot their positions permit, displacing
-   * the incumbent. The closing five always keeps exactly five players.
-   * Reverts (with failures) when no legal result exists.
+   * eligible non-closing player for their vacated slot; otherwise they take
+   * the first closing slot their positions permit, displacing the incumbent.
+   * Keeps exactly five; reverts (with failures) when no legal result exists.
    */
   toggleClosing(playerVersionId: string): string[] {
     if (!this.rosterIds.includes(playerVersionId)) {
@@ -300,11 +295,8 @@ export class RotationEditor {
     return this.commit({ ...this.rotation, closingFive });
   }
 
-  /**
-   * Moves a bench player one step up or down in the bench order (the
-   * deterministic substitution hierarchy). No-op at the edges; reverts on
-   * audit failure.
-   */
+  /** Moves a bench player one step up or down the substitution hierarchy.
+   * No-op at the edges; reverts on audit failure. */
   moveBench(benchIndex: number, delta: -1 | 1): string[] {
     const target = benchIndex + delta;
     const benchOrder = [...this.rotation.benchOrder];
@@ -335,11 +327,10 @@ export class RotationEditor {
   }
 
   /**
-   * Commits an externally produced candidate rotation (e.g. an applied
-   * minute plan) through the same engine audit as every other mutation.
-   * Returns the committed rotation; throws when the audit rejects the
-   * candidate. Explicit apply only — the editor never adopts a rotation the
-   * engine would reject.
+   * Commits an externally produced candidate rotation (e.g. an applied minute
+   * plan) through the same engine audit as every other mutation; throws when
+   * the audit rejects it. The editor never adopts a rotation the engine would
+   * reject.
    */
   applyRotation(candidate: SeasonRotation): SeasonRotation {
     const failures = auditSeasonRotation(candidate, this.memberPlayable);
@@ -351,9 +342,9 @@ export class RotationEditor {
   }
 
   /**
-   * Assigns a roster player to a starter slot. A bench player is promoted and
-   * the displaced starter takes that bench index; swapping two starters swaps
-   * them. Reverts (with failures) when the resulting rotation is illegal.
+   * Assigns a roster player to a starter slot: a bench player is promoted and
+   * the displaced starter takes their bench index; swapping two starters
+   * swaps them. Reverts (with failures) when the result is illegal.
    */
   assignStarter(slotIndex: number, playerVersionId: string): string[] {
     const current = this.rotation.starters[slotIndex];
@@ -377,9 +368,9 @@ export class RotationEditor {
   }
 
   /**
-   * Assigns a roster player to a closing-five slot. A player already closing
-   * at another slot swaps with the incumbent; otherwise the incumbent leaves
-   * the closing five. Reverts when the resulting rotation is illegal.
+   * Assigns a roster player to a closing-five slot: a player already closing
+   * elsewhere swaps with the incumbent; otherwise the incumbent leaves the
+   * closing five. Reverts when the result is illegal.
    */
   assignClosing(slotIndex: number, playerVersionId: string): string[] {
     const current = this.rotation.closingFive[slotIndex];

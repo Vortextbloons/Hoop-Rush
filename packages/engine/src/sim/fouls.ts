@@ -47,7 +47,6 @@ export function shootingFoulProbability(
   return Math.min(0.25, Math.max(0.01, base * drawsFouls * zoneFactor * discipline));
 }
 
-/** Probability a defensive possession draws a non-shooting foul. */
 export function nonShootingFoulProbability(profile: EraSimulationProfile): number {
   const p = profile.parameters;
   return Math.min(0.3, Math.max(0.01, p.foulsPerPossession * (1 - p.shootingFoulShare)));
@@ -64,7 +63,6 @@ export function foulerWeights(defense: SimulationTeam): number[] {
   );
 }
 
-/** The fouler against precomputed fouler weights. */
 export function pickFouler(
   players: readonly SimulationPlayer[],
   weights: readonly number[],
@@ -73,7 +71,6 @@ export function pickFouler(
   return rng.weightedPick(players, weights);
 }
 
-/** Free-throw shooter weights for a team, in team index order. */
 export function freeThrowShooterWeights(team: SimulationTeam): number[] {
   return team.players.map(
     (p) => Math.max(0.5, p.tendencies.freeThrowRate) * (0.6 + 0.8 * (p.ratings.freeThrow / 100)),

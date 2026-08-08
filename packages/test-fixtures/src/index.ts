@@ -72,7 +72,6 @@ const FIXTURE_HISTORICAL_IDENTITY = {
   lineageRuleVersion: 'lineage-v1',
 };
 
-/** Field-level provenance for every strict engine field (observed/derived). */
 function fullProvenance(): PeakPlayerSeason['provenance'] {
   const entry = {
     kind: 'derived' as const,
@@ -429,7 +428,6 @@ export function buildChallengeRun(overrides: Partial<ChallengeRun> = {}): Challe
   };
 }
 
-/** Five fixture players in legal G,G,F,F,C slot order (fixture team content). */
 export function buildUserTeam(): SimulationTeam {
   return buildLegalSimulationTeam({
     teamId: 'user',
@@ -438,7 +436,6 @@ export function buildUserTeam(): SimulationTeam {
   });
 }
 
-/** Zeroed season aggregates for the five fixture players. */
 function zeroAggregates(players: readonly SimulationPlayer[]): RunAggregates {
   const zero = () => ({ made: 0, attempted: 0 });
   return {
@@ -476,7 +473,6 @@ function zeroAggregates(players: readonly SimulationPlayer[]): RunAggregates {
   };
 }
 
-/** One parametrized bracket opponent with a legal lineup and measured strength. */
 function buildBracketOpponent(
   franchiseId: string,
   opponentId: string,
@@ -541,7 +537,6 @@ function buildFixtureSchedule(opponentIds: readonly string[]): BracketScheduleEn
   return order.map((opponentId, gameNumber) => ({ gameNumber: gameNumber + 1, opponentId }));
 }
 
-/** A complete 30-opponent fixture bracket with the fixed 82-game schedule. */
 export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): OpponentBracket {
   const opponents = ALL_FRANCHISE_SLOTS.map((slot, index) =>
     buildBracketOpponent(
@@ -597,7 +592,6 @@ export function buildSimulationPlayer(overrides: Partial<SimulationPlayer> = {})
   };
 }
 
-/** Five players in legal G,G,F,F,C slot order; ids use the given prefix. */
 function legalFive(prefix: string, centerInteriorDefense?: number): SimulationPlayer[] {
   const positions: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [position]);
   return positions.map((position, i) =>
@@ -617,7 +611,6 @@ function legalFive(prefix: string, centerInteriorDefense?: number): SimulationPl
   );
 }
 
-/** A five-player lineup with a legal G,G,F,F,C position spread. */
 export function buildLegalSimulationTeam(overrides: Partial<SimulationTeam> = {}): SimulationTeam {
   return {
     teamId: 'fixture-home',
@@ -912,7 +905,6 @@ export function buildEqualFixture(): { home: SimulationTeam; away: SimulationTea
   };
 }
 
-/** One strong lineup plus a second at the given center rating. */
 function strengthPair(
   secondCenter: number,
   secondTeamId: string,

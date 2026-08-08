@@ -37,7 +37,6 @@ export interface Contract {
   deferredMoney: unknown[];
 }
 
-/** Estimate contract from overall rating and age. Matches the TS Contract interface. */
 export function deriveContract(overall: number, age: number, rng?: unknown): Contract {
   void rng;
   let baseSalary = 1_500_000;
@@ -69,7 +68,6 @@ export function deriveContract(overall: number, age: number, rng?: unknown): Con
     signingBonusByYear[0] = signingBonus;
   }
 
-  // Option type
   let option: 'player' | 'none';
   let optionYear: number | null;
   if (years >= 4) {

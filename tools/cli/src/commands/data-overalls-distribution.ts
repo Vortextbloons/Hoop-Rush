@@ -78,7 +78,6 @@ function bandsFor(rows: readonly PeakPlayerSeason[], total: number) {
   );
 }
 
-/** Reports the cohort Overall distribution of every packaged franchise-era row. */
 export function dataOverallsDistribution(options: DataOverallsDistributionOptions): CliReport {
   const rawManifest = tryReadJson(options.input);
   const parsedManifest = hoopRushManifestSchema.safeParse(rawManifest);

@@ -61,7 +61,6 @@ export function weightedPercentile(
   return sorted[sorted.length - 1]?.value ?? 0;
 }
 
-/** Data-driven conservative accuracy -> threePoint rating mapping. */
 export function buildRatingMapping(
   values: readonly number[],
 ): ThreePointReconstructionArtifact['ratingMapping'] {
@@ -124,7 +123,6 @@ export function fitThreePointReconstruction(
   const accuracyModel = fitModel(rows, context, 'accuracy', lambdas.accuracyLambda, priors);
   const attemptModel = fitModel(rows, context, 'attemptRate', lambdas.attemptRateLambda, priors);
 
-  // In-sample conservative estimates over the fit cohort.
   const cohortEstimates = { accuracy: [] as number[], attemptRate: [] as number[] };
   const floorEntries: { value: number; weight: number }[] = [];
   const ratingValues: number[] = [];
@@ -318,7 +316,6 @@ export function writeThreePointReconstructionArtifact(
   threePointArtifactByPath.delete(path);
 }
 
-/** Validates the existing artifact against the gate requirements. */
 export function validateThreePointReconstructionArtifact(
   artifact: ThreePointReconstructionArtifact,
 ): { valid: boolean; failures: string[] } {

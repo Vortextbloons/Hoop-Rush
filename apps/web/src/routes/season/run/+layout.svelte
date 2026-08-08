@@ -72,8 +72,7 @@
    * fires on an actual roster change (draft promotion or a trade). */
   let faceIndexKey = '';
   /** Snapshot rosters array identity: unchanged during a block run, so the
-   * face key string (and its 300-version join) is only rebuilt on a real
-   * roster change. */
+   * face key string (and its 300-version join) is only rebuilt on a change. */
   let rostersRef: unknown = null;
   let faceRunId = '';
 
@@ -179,6 +178,7 @@
     shell.pending = hub.pending;
     shell.interruption = hub.interruption;
     shell.commandError = hub.commandError;
+    shell.hubError = hub.error;
     recomputeRunFacts();
   }
 
@@ -187,6 +187,39 @@
   let quitOpen = $state(false);
   let quitting = $state(false);
   let quitError: string | null = $state(null);
+
+  let clearOpen = $state(false);
+  let clearing = $state(false);
+  let clearError: string | null = $state(null);
+
+  async function confirmClearSeasonData(): Promise<void> {
+    if (clearing) return;
+    clearing = true;
+    clearError = null;
+    try {
+      const result =
+        shell.hub !== null
+          ? await shell.hub.clearSeasonData()
+          : await (async () => {
+              const { clearAllSeasonData } = await import('$lib/season/season-data-recovery');
+              await clearAllSeasonData();
+              return { ok: true, error: null };
+            })();
+      if (!result.ok) {
+        clearError = result.error;
+        return;
+      }
+      clearOpen = false;
+      shell.error = null;
+      shell.hubError = null;
+      mirrorHub();
+      await goto(resolve('/season'));
+    } catch (error) {
+      clearError = error instanceof Error ? error.message : String(error);
+    } finally {
+      clearing = false;
+    }
+  }
 
   async function confirmQuit(): Promise<void> {
     if (quitting) return;
@@ -322,12 +355,29 @@
     };
   });
 
-  const showEmptyState = $derived(
-    shell.ready && shell.error === null && shell.hub !== null && shell.snapshot === null,
-  );
+  const seasonLoadError = $derived(shell.error ?? shell.hubError ?? null);
 
   /** M2.4: the stored run was made under older Season rules. */
   const incompatible = $derived(shell.hub?.incompatible ?? null);
+
+  const showBrokenResume = $derived(
+    shell.ready &&
+      seasonLoadError === null &&
+      incompatible === null &&
+      shell.hub !== null &&
+      shell.snapshot === null &&
+      shell.index !== null,
+  );
+
+  const showEmptyState = $derived(
+    shell.ready &&
+      seasonLoadError === null &&
+      incompatible === null &&
+      shell.hub !== null &&
+      shell.snapshot === null &&
+      shell.index === null &&
+      !showBrokenResume,
+  );
 
   /** Two-step discard: step 1 explains, step 2 (dialog) confirms. */
   let discardOpen = $state(false);
@@ -354,19 +404,66 @@
   <title>Season Run — Hoop Rush</title>
 </svelte:head>
 
-{#if shell.error !== null}
+{#if seasonLoadError !== null || showBrokenResume}
   <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
     <div class="scoreboard-panel p-6">
-      <h1 class="font-display text-3xl font-extrabold">Season data unavailable</h1>
-      <p class="mt-2 text-sm text-muted-foreground">{shell.error}</p>
-      <a
-        href={resolve('/season')}
-        class="mt-4 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-semibold"
-      >
-        Back to Season setup
-      </a>
+      <h1 class="font-display text-3xl font-extrabold">
+        {seasonLoadError !== null ? 'Season data unavailable' : 'Saved season could not load'}
+      </h1>
+      <p class="mt-2 text-sm text-muted-foreground">
+        {#if seasonLoadError !== null}
+          {seasonLoadError}
+        {:else}
+          A resume marker exists in this browser, but the saved season checkpoint is missing or
+          incomplete. You can clear the broken save and start fresh.
+        {/if}
+      </p>
+      <div class="mt-5 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onclick={() => (clearOpen = true)}
+          class="inline-flex items-center gap-2 rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Clear saved data
+        </button>
+        <a
+          href={resolve('/season')}
+          class="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+        >
+          Back to Season setup
+        </a>
+      </div>
+      {#if clearError !== null}
+        <p class="mt-3 text-sm text-destructive" role="alert">{clearError}</p>
+      {/if}
     </div>
   </div>
+  <Dialog.Root bind:open={clearOpen}>
+    <Dialog.Content
+      class="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-background p-6 shadow-xl outline-none"
+    >
+      <Dialog.Title class="font-display text-2xl font-extrabold">Clear season data?</Dialog.Title>
+      <Dialog.Description class="mt-1 text-sm text-muted-foreground">
+        This permanently deletes your saved Season Run and any in-progress draft from this browser.
+        It cannot be recovered.
+      </Dialog.Description>
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Dialog.Close
+          class="inline-flex items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+        >
+          Cancel
+        </Dialog.Close>
+        <button
+          type="button"
+          onclick={() => void confirmClearSeasonData()}
+          disabled={clearing}
+          class="inline-flex items-center justify-center rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {clearing ? 'Clearing…' : 'Yes, clear everything'}
+        </button>
+      </div>
+    </Dialog.Content>
+  </Dialog.Root>
 {:else if !shell.ready}
   <div class="mx-auto mt-16 w-full max-w-xl px-4 sm:px-6">
     <div class="scoreboard-panel p-6" aria-live="polite">

@@ -23,26 +23,19 @@ import {
  * report field). Generation is seeded, deterministic, and versioned, with
  * repair/backtracking diagnostics that are never relaxed on failure.
  *
- * ## roster-generation-v2 (M2.4)
- *
- * Generation proceeds through one recorded 20-player `SeasonAiPool` per AI
- * franchise (29 solo, 28 duo; human franchises get none). Each pool records
- * its franchise band + identity, exactly 20 distinct candidate versions, the
- * `anchors` the generator matched for it, the final ten selections, the
- * per-selection allocation seed paths (reproduction), and a `repairCount`.
- *
- * A pool player's tier is its highest tier across all eight roles: elite =
- * score >= the role's p90 threshold in at least one role; else strong =
- * >= p75 in at least one role; else useful = >= p50 in at least one role;
- * else depth. Thresholds are nearest-rank per role over the canonically
- * sorted (by playerVersionId) non-human candidates; ties at a threshold are
- * included in that tier.
- *
- * A super team is an average- or weaker-band selected roster whose
- * strengthScore exceeds the contender band's measured median;
- * superTeamIncidence = such rosters / (average + weaker rosters).
- * extraEliteRate = the share of AI teams that received an extra elite anchor
- * beyond the band's guarantees.
+ * roster-generation-v2 (M2.4) proceeds through one recorded 20-player
+ * `SeasonAiPool` per AI franchise (29 solo, 28 duo; human franchises get
+ * none). Each pool records its band + identity, 20 distinct candidates, the
+ * matched `anchors`, the final ten selections, per-selection allocation
+ * seed paths (reproduction), and a `repairCount`. A pool player's tier is
+ * its highest tier across all eight roles: elite = score >= the role's p90
+ * threshold in at least one role; else strong = >= p75; else useful = >=
+ * p50; else depth. Thresholds are nearest-rank per role over the canonically
+ * sorted (by playerVersionId) non-human candidates; ties are included. A
+ * super team is an average-/weaker-band selected roster whose strengthScore
+ * exceeds the contender band's measured median; superTeamIncidence = such
+ * rosters / (average + weaker rosters). extraEliteRate = the share of AI
+ * teams that received an extra elite anchor beyond the band's guarantees.
  */
 
 /** Strength band quotas for the remaining AI franchises. */
@@ -73,7 +66,6 @@ export const seasonRosterRoleSchema = z.enum([
 ]);
 export type SeasonRosterRole = z.infer<typeof seasonRosterRoleSchema>;
 
-/** Band + identity assignment for one AI franchise. */
 export const seasonAiAssignmentSchema = z.object({
   franchiseId: franchiseIdSchema,
   band: seasonStrengthBandSchema,
@@ -277,7 +269,6 @@ export const seasonLeagueGenerationResultSchema = z.object({
 });
 export type SeasonLeagueGenerationResult = z.infer<typeof seasonLeagueGenerationResultSchema>;
 
-/** One generated league in a calibration cohort. */
 export const seasonRosterCalibrationRunSchema = z.object({
   seed: seedSchema,
   teams: z.array(
@@ -323,29 +314,24 @@ export type SeasonMeasuredBand = z.infer<typeof seasonMeasuredBandSchema>;
  * The frozen `roster-targets-v2` artifact (M2.4): the calibration policy
  * every roster-generation-v2 cohort must satisfy, the verification gates,
  * and the measured facts calibration writes (validation never rewrites
- * `measured`). v2 replaces the v1 artifact (bands/identities ranges,
- * roleCoverageMinimum, heldOutPassShare, top-level quotas); the v1 artifact
- * is never produced or read by roster-generation-v2.
+ * `measured`). v2 replaces the v1 artifact; v1 is never produced or read.
  *
  * Definitions: a pool player's tier is its highest tier across all eight
- * roles (elite = score >= p90 threshold in >= 1 role; else strong = >= p75
- * in >= 1 role; else useful = >= p50 in >= 1 role; else depth). Thresholds
- * are nearest-rank per role over canonically sorted (by playerVersionId)
- * non-human candidates; ties at a threshold are included in that tier. A
- * super team is an average- or weaker-band selected roster whose
- * strengthScore exceeds the contender band's measured median;
- * superTeamIncidence = such rosters / (average + weaker rosters).
- * extraEliteRate = the share of AI teams that received an extra elite anchor
- * beyond the band's guarantees.
+ * roles (elite = score >= p90 threshold in >= 1 role; else strong = >= p75;
+ * else useful = >= p50; else depth). Thresholds are nearest-rank per role
+ * over canonically sorted non-human candidates; ties are included. A super
+ * team is an average-/weaker-band selected roster whose strengthScore
+ * exceeds the contender band's measured median; superTeamIncidence = such
+ * rosters / (average + weaker rosters). extraEliteRate = the share of AI
+ * teams with an extra elite anchor beyond the band's guarantees.
  *
  * Calibration tuning (frozen at the v2 freeze): band separation is
  * anchor-driven — contenders carry two guaranteed elite anchors, playoffs
  * one, average/weaker none — and the max-per-role roster strengthScore
  * compresses the lower bands into the catalog's wide mid-pack, so
  * `minBandSeparation` measures the contender-to-weaker median gap and the
- * ordering gate requires the contender median to lead every other band (the
- * lower three are not pairwise ordered). Gate values were frozen from the
- * 256+64 calibration cohort evidence.
+ * ordering gate only requires the contender median to lead every other band.
+ * Gate values were frozen from the 256+64 calibration cohort evidence.
  */
 export const seasonRosterTargetsSchema = z.object({
   schemaVersion: z.literal(2),

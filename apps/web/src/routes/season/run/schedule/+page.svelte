@@ -206,7 +206,6 @@
               {/if}
             </div>
 
-            <!-- Mobile: one card per game; completed games expand to a box score -->
             {#if desktopViewport !== true}
               <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
                 {#each group.rows as row (row.gameId)}
@@ -286,7 +285,6 @@
               </ul>
             {/if}
 
-            <!-- Desktop: denser table in a scroll wrapper -->
             {#if desktopViewport !== false}
               <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
                 <table class="w-full min-w-[56rem] text-sm">

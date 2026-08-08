@@ -50,21 +50,14 @@ import {
 /**
  * M2.3 `season block` commands (spec/2.0/02 ten-game blocks, spec/2.0/07).
  * All commands run the authoritative engine pipeline over a committed run
- * fixture (or a generated league) and the packaged catalog, schedule, and
- * era profile; the injectable `deps` seam lets tests substitute doubles.
- *
- * M2.5 (contract §9/§20): the pipeline input gains the pre-block `health`
- * state and the locked `objectiveId`; the runner threads the post-block
- * health/influence/transactions facts and the run state chain
- * (`checkpointState`/`stateRevision`/`stateDigest`) through the engine's
- * `deriveSeasonPostBlockState`. The fixture-driven commands simulate with an
- * empty health state and a null objective (they assert structure, not
- * economy facts); the M2.5 calibration cohorts (`season-m25-core.ts`) drive
- * health, windows, and objectives forward the same way.
- *
- * The committed schema-6 fixture stays frozen until the lead regenerates it
- * under schema 7 (M2.5 fields); until then `createSeasonBlockRunner` fails
- * the schema parse by design.
+ * fixture and the packaged artifacts; the injectable `deps` seam lets tests
+ * substitute doubles. M2.5 threads the pre-block `health` state and locked
+ * `objectiveId`, folding post-block facts and the run state chain through
+ * `deriveSeasonPostBlockState`; fixture-driven commands simulate with an
+ * empty health state and null objective (they assert structure, not economy
+ * facts), while the M2.5 cohorts (`season-m25-core.ts`) drive them forward.
+ * The committed schema-6 fixture stays frozen until regenerated under schema
+ * 7; until then `createSeasonBlockRunner` fails the schema parse by design.
  */
 
 export const SEASON_BLOCK_SIMULATE_OPTIONS: Record<string, boolean> = {
@@ -100,7 +93,6 @@ export const DEFAULT_RUN_FIXTURE = resolve(
 
 export const DEFAULT_SCHEDULE = resolve(DEFAULT_SEASON_DIR, 'schedule.json');
 
-/** Everything the block commands need to run the engine pipeline. */
 export interface SeasonBlockRunnerState {
   run: SeasonRun;
   catalog: SeasonDraftCatalog;
@@ -133,7 +125,6 @@ export function loadSeasonRunFixture(path: string): SeasonRun {
   return parsed.data;
 }
 
-/** Builds the runner state from a run fixture and the packaged artifacts. */
 export function createSeasonBlockRunner(
   options: {
     runPath?: string | null;
@@ -200,7 +191,6 @@ export function runnerNextBlockIndex(state: SeasonBlockRunnerState): number {
   return next;
 }
 
-/** Builds the SubmitSeasonBlock command for the next expected block. */
 export function runnerBlockCommand(
   state: SeasonBlockRunnerState,
   blockIndex: number,

@@ -407,8 +407,8 @@
     {/if}
   </div>
 
-  <!-- Minutes: every player with the tap-to-type / stepper minutes controls.
-       The lineup rows below handle roles, closing five, and bench order. -->
+  <!-- Minutes: every player with tap-to-type / stepper controls; the lineup
+       rows below handle roles, closing five, and bench order. -->
   <section aria-labelledby="minutes-heading" class="rounded-none bg-surface-1 p-3 sm:rounded-xl">
     <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
       <h3
@@ -510,7 +510,6 @@
     </p>
   {/if}
 
-  <!-- Closing five: one chip per configured slot, editable per-row below. -->
   <section
     aria-labelledby="closing-overview-heading"
     class="rounded-none bg-surface-1 p-3 sm:rounded-xl"
@@ -545,8 +544,7 @@
     </p>
   </section>
 
-  <!-- Unified ten-player rotation list (identical structure on every
-       breakpoint; only control density changes). -->
+  <!-- Unified ten-player rotation list; only control density changes per breakpoint. -->
   <section aria-labelledby="starters-heading" class="min-w-0">
     <h3
       id="starters-heading"

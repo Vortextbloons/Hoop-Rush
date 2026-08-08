@@ -343,7 +343,6 @@ function scoreOf(
   return total;
 }
 
-/** Number of the unit's players currently on the court (prebuilt set). */
 function overlapWith(unit: readonly string[], currentUnit: ReadonlySet<string>): number {
   let overlap = 0;
   for (const playerVersionId of unit) {
@@ -352,7 +351,6 @@ function overlapWith(unit: readonly string[], currentUnit: ReadonlySet<string>):
   return overlap;
 }
 
-/** Number of the unit's players currently on the court. */
 function currentOverlap(unit: readonly string[], currentUnit: readonly string[]): number {
   const current = new Set(currentUnit);
   let overlap = 0;
@@ -395,7 +393,6 @@ function benchTuple(unit: readonly string[], benchIndex: ReadonlyMap<string, num
   return unit.map((playerVersionId) => benchIndex.get(playerVersionId) ?? -1).sort((a, b) => a - b);
 }
 
-/** True when the configured closing five is fully available and slot-legal. */
 function closingFiveIsLegal(
   context: PlannerRotationContext,
   unavailable: ReadonlySet<string>,

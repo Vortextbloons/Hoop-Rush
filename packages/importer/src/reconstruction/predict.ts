@@ -170,7 +170,6 @@ export function predictReconstructedProfile(
   };
 }
 
-/** Posterior std-dev clamp to the profile contract cap (0.5). */
 function clampStdDev(value: number): number {
   return round6(Math.min(0.5, value));
 }

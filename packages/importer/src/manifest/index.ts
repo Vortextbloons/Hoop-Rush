@@ -156,7 +156,6 @@ export function rebuildRosterDetails(
   };
 }
 
-/** Refreshes the draft index and roster-details artifacts and updates manifest.json in place. */
 export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
   const entry = rebuildPlayersIndex(dataDir);
   const detailsEntry = rebuildRosterDetails(dataDir);
@@ -175,7 +174,6 @@ export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
 /** Cache-busting version for the historical logo asset set (m7 branding). */
 export const ASSET_CACHE_VERSION = '2026-08-03-historical-logos-v1';
 
-/** Rebuilds the complete v2 manifest from packaged artifacts. */
 export function run(dataDir = PUBLIC_DATA): void {
   const manifestPath = join(dataDir, 'manifest.json');
   const previous = fileExists(manifestPath) ? (readJson(manifestPath) as Manifest) : null;
@@ -293,7 +291,6 @@ export function run(dataDir = PUBLIC_DATA): void {
   }
   manifest['availability'] = availability;
 
-  // Era simulation profiles.
   const profiles: unknown[] = [];
   const simDir = join(dataDir, 'era-sim');
   for (const name of sortedJsonFiles(simDir)) {

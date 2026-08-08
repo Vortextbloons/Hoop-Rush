@@ -98,7 +98,6 @@
       {section.title} · provisional
     </h3>
 
-    <!-- Mobile: ranked team cards with expandable splits -->
     {#if desktopViewport !== true}
       <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
         {#each section.entries as entry (entry.row.franchiseId)}
@@ -182,7 +181,6 @@
       </ul>
     {/if}
 
-    <!-- Desktop: complete semantic table -->
     {#if desktopViewport !== false}
       <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
         <table class="w-full min-w-[42rem] text-sm">

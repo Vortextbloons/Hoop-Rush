@@ -179,7 +179,6 @@ export function computeForSeason(season: string, force = false): void {
     return;
   }
 
-  // Check if already computed (unless force)
   if (!force) {
     const meta = roster[0]?.importMeta;
     if (meta?.statsSource === 'nba_api' || meta?.statsSource === 'stints-derived') {
@@ -188,7 +187,6 @@ export function computeForSeason(season: string, force = false): void {
     }
   }
 
-  // Build stats lookup by externalId
   const statsById = new Map<string, StatsRow>();
   for (const s of statsList) {
     const pid = s['playerExternalId'];
@@ -225,7 +223,6 @@ export function computeForSeason(season: string, force = false): void {
       player.secondaryPositions = [];
     }
 
-    // Set internal ID if missing
     if (player.id === undefined || player.id === null || player.id === '') {
       const teamAbbr = (player.teamInternalId ?? 'unk').replace('team-', '');
       const first = player.firstName ?? '?';
@@ -233,7 +230,6 @@ export function computeForSeason(season: string, force = false): void {
       player.id = `p-${teamAbbr}-${first[0] ?? '?'}${last[0] ?? '?'}-${extId}`;
     }
 
-    // Convert height/weight
     const heightStr = player.height;
     if (typeof heightStr === 'string' && heightStr.includes('-')) {
       const parts = heightStr.split('-');
@@ -257,15 +253,12 @@ export function computeForSeason(season: string, force = false): void {
       }
     }
 
-    // Set secondaryPositions (overrides set it above; clear missing values).
     if (player.secondaryPositions === undefined || player.secondaryPositions === null) {
       player.secondaryPositions = [];
     }
 
-    // Get stats
     const stats: StatsRow = statsById.get(extId) ?? {};
 
-    // Derive all fields through the versioned registry (no jitter).
     const derived = derivePlayerRecord({
       season,
       playerId: extId !== '' ? `p-${extId}` : (player.id ?? undefined),
@@ -305,7 +298,6 @@ export function computeForSeason(season: string, force = false): void {
   console.log(`  [OK] computed ratings for ${String(computed)} players in ${season}`);
 }
 
-/** Default ratings worker count, capped by the machine's cores. */
 export function defaultRatingsWorkers(): number {
   // Unit tests mock config paths; real worker threads would read the real
   // raw-data dirs, so the parallel default stays off under vitest.
@@ -327,7 +319,6 @@ function chunkList<T>(items: readonly T[], workers: number): T[][] {
   return chunks;
 }
 
-/** Runs one season chunk in a worker thread; resolves when it finishes. */
 function runRatingsChunk(seasons: readonly string[], force: boolean): Promise<void> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./ratings-worker.ts', import.meta.url), {

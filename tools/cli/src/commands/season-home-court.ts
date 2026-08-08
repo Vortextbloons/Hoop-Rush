@@ -424,7 +424,6 @@ export async function seasonHomeCourtCalibrate(
 
   const pass = neutralBaseline && withinTolerance && possessionStable && monotonic;
 
-  // Write the evidence artifact when every gate passes.
   let targetsWritten = false;
   let targetsPath: string | null = null;
   const gateFailures: string[] = [];

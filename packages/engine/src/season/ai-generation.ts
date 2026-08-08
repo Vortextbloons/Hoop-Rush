@@ -151,7 +151,6 @@ export class SeasonAiTargetsError extends Error {
   }
 }
 
-/** Validates the v2 targets artifact before any allocation. */
 export function validateSeasonRosterTargets(targets: SeasonRosterTargets): void {
   // The version literals are enforced at the boundary: read them through an
   // untyped view so a null or mismatched artifact is rejected at runtime.
@@ -413,7 +412,6 @@ export interface SeasonAiGenerationInput {
   };
 }
 
-/** Band + identity assignment for all 30 franchises for a run seed. */
 export function assignAiBandsAndIdentities(input: {
   seed: Seed;
   league: SeasonLeague;
@@ -468,7 +466,6 @@ export function assignAiBandsAndIdentities(input: {
   return [...assignments, ...humanRows];
 }
 
-/** Identity counts for n AI teams: every identity within one of the rest. */
 function identityCounts(n: number, offset: number): Record<SeasonAiIdentity, number> {
   const base = Math.floor(n / IDENTITIES.length);
   const extra = n % IDENTITIES.length;
@@ -487,10 +484,6 @@ function identityCounts(n: number, offset: number): Record<SeasonAiIdentity, num
   }
   return counts;
 }
-
-// ---------------------------------------------------------------------------
-// Internal generation state
-// ---------------------------------------------------------------------------
 
 /** One AI team's private pool state (anchors live inside the pool). */
 interface PoolTeam {
@@ -997,7 +990,6 @@ function poolTenFeasibleAfterAddExact(
   return true;
 }
 
-/** Violations of the pool hard gates for adding `versionId` to `team`. */
 function gatesForAdd(state: GenerationState, team: PoolTeam, versionId: string): string[] {
   const failures: string[] = [];
   // Global scarcity: one candidate must remain for every remaining pool slot
@@ -1123,7 +1115,6 @@ function budgetForPhase(state: GenerationState, phase: SeasonAiGenerationPhase):
   }
 }
 
-/** True when a phase has consumed its node budget (selection stops early). */
 function selectionBudgetExceeded(state: GenerationState): boolean {
   return state.nodesByPhase.selection > state.selectionFloor;
 }
@@ -1219,7 +1210,6 @@ interface AnchorOption {
   threshold: number;
 }
 
-/** Eligible anchor options for one team (elite in an identity priority role). */
 function anchorOptionsFor(state: GenerationState, team: PoolTeam): AnchorOption[] {
   const priorityRoles = identityPriorityRolesOf(state.targets, team.identity);
   const options: AnchorOption[] = [];
@@ -1435,7 +1425,6 @@ function removeAnchor(state: GenerationState, team: PoolTeam, versionId: string)
   removePoolMember(state, team, versionId);
 }
 
-/** Best eligible extra-elite option for a team, or null. */
 function bestExtraEliteOption(state: GenerationState, team: PoolTeam): AnchorOption | null {
   const options = anchorOptionsFor(state, team);
   const rng = createRng(
@@ -1463,10 +1452,6 @@ function bestExtraEliteOption(state: GenerationState, team: PoolTeam): AnchorOpt
   return null;
 }
 
-/**
- * One extra-elite roll per team from a named seed. Extra anchors pass the
- * same exclusivity, tier-range, scarcity, and ten-feasibility gates.
- */
 function rollExtraEliteAnchors(state: GenerationState): void {
   for (const teamId of state.teamOrder) {
     const team = state.teams.get(teamId);
@@ -1497,7 +1482,6 @@ const TIER_DEFICIT_FACTOR: Record<PercentileTier, number> = {
   depth: 0,
 };
 
-/** The k weakest roles of the current pool (lowest role max scores). */
 function weakestRoles(
   poolRoleScores: Record<SeasonRosterRole, number>,
   count: number,
@@ -1762,7 +1746,6 @@ function snapshotPools(state: GenerationState): PoolSnapshot {
   };
 }
 
-/** Per-role counts of candidates covering each role (union arithmetic). */
 function roleCoverCountsOf(
   versionIds: Iterable<string>,
   coverageMaskByVersion: ReadonlyMap<string, number>,
@@ -1945,7 +1928,6 @@ function poolViolations(state: GenerationState, teamId: string): string[] {
   if (!poolAdmitsTenExact(state, team)) {
     violations.push('pool admits no 4/4/3 ten');
   }
-  // The full pool must cover all eight roles with its own members.
   if (!poolCoverageFeasible(state, team, null, false)) {
     violations.push('pool cannot cover all eight roles');
   }
@@ -2301,8 +2283,7 @@ function rosterOutlierCount(
   return outliers;
 }
 
-/** Hard gate: the selected ten may exceed the band cap only a bounded number
- * of times (targets.policy.maxRosterStrengthOutliers). */
+/** Hard gate: the ten may exceed the band cap only a bounded number of times. */
 function rosterOutlierBudgetOk(
   state: GenerationState,
   team: PoolTeam,

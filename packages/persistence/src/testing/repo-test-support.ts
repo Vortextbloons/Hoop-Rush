@@ -20,11 +20,10 @@ import type {
 /**
  * Shared repository test support: the 7-version Dexie store chain, the
  * fake-indexeddb factory swap, and deterministic database names. Every
- * repository contract suite runs against fake-indexeddb with one fresh
- * database per test; migration suites additionally swap in a fresh factory
- * to isolate Dexie versioning, and `restoreIndexedDb` (wired to `afterEach`)
- * puts the original factory back so the last migration test does not leak
- * its fresh factory into the worker process.
+ * repository suite runs against fake-indexeddb with one fresh database per
+ * test; migration suites swap in a fresh factory to isolate Dexie versioning,
+ * and `restoreIndexedDb` (wired to `afterEach`) restores it so the last
+ * migration test does not leak into the worker process.
  */
 
 export class TestDatabase extends Dexie {
@@ -68,8 +67,8 @@ let previousFactory: IDBFactory | null = null;
 
 /**
  * Replaces the shared fake-indexeddb factory, isolating Dexie versioning.
- * The first swap in a file remembers the original factory so
- * `restoreIndexedDb` can put it back after the migration tests finish.
+ * The first swap remembers the original factory so `restoreIndexedDb` can put
+ * it back after the migration tests finish.
  */
 export function resetIndexedDb(): void {
   if (previousFactory === null) {

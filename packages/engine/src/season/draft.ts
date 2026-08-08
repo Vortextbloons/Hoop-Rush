@@ -105,7 +105,6 @@ export function seasonDraftStateDigest(state: SeasonDraftState): string {
   return seasonDigestHex(seasonDraftStateCanonical(state));
 }
 
-/** Canonical byte-for-byte serialization of a draft state. */
 export function seasonDraftStateCanonical(state: SeasonDraftState): string {
   return JSON.stringify({
     draftVersion: state.draftVersion,
@@ -151,7 +150,6 @@ function withLog(state: SeasonDraftState, record: SeasonDraftCommandRecord): Sea
   return { ...state, commandLog: [...state.commandLog, record] };
 }
 
-/** Builds the accepted record against the already-finalized next state. */
 function acceptedAgainst(
   nextState: SeasonDraftState,
   command: SeasonDraftCommand,

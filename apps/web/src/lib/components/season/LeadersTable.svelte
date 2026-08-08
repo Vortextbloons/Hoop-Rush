@@ -93,7 +93,6 @@
   {#if entries.length === 0}
     <p class="px-4 py-3 text-sm text-muted-foreground">No qualified players yet.</p>
   {:else if first}
-    <!-- First place: headshot-led card with the historical source logo -->
     <div class="flex items-center gap-4 border-b border-border/50 px-4 py-4">
       {#if faces.get(first.playerVersionId)}
         <SeasonPlayerFace face={faces.get(first.playerVersionId)!} {manifest} size="md" />
@@ -131,7 +130,6 @@
       </p>
     </div>
 
-    <!-- Ranks 2-5: compact rows -->
     <ol class="flex flex-col divide-y divide-border/50">
       {#each entries.slice(1) as entry, index (entry.playerVersionId)}
         <li

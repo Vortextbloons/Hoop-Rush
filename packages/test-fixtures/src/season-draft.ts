@@ -253,7 +253,6 @@ export function buildSeasonDraftCatalog(
   };
 }
 
-/** Deterministic legal rotation over ten candidate versions (32/16 minutes). */
 export function buildSeasonRotation(
   franchiseId: string,
   playerVersionIds: string[],
@@ -339,7 +338,6 @@ const IDENTITY_CYCLE: Array<SeasonAiAssignment['identity']> = [
   'continuity',
 ];
 
-/** Solo-quota band + identity assignments for all 30 franchises. */
 export function buildSeasonAiAssignments(league: SeasonLeague): SeasonAiAssignment[] {
   return league.teams.map((team, index) => ({
     franchiseId: team.franchiseId,
@@ -348,7 +346,6 @@ export function buildSeasonAiAssignments(league: SeasonLeague): SeasonAiAssignme
   }));
 }
 
-/** Synthetic generation digest for fixture runs (deterministic helper). */
 export function fixtureGenerationDigest(material: string): string {
   return seasonDigestHex(material).slice(0, 32);
 }
@@ -582,7 +579,6 @@ export function buildFixtureRosterTargets(): SeasonRosterTargets {
   };
 }
 
-/** Synthetic v2 generation audit for fixture runs. */
 export function buildFixtureGenerationAudit(seed: string): SeasonRun['generationAudit'] {
   return {
     seed,
@@ -607,7 +603,6 @@ export function buildFixtureGenerationAudit(seed: string): SeasonRun['generation
   };
 }
 
-/** Synthetic per-roster evaluations for fixture runs. */
 export function buildFixtureEvaluations(
   rosters: SeasonRoster[],
   assignments: SeasonAiAssignment[],

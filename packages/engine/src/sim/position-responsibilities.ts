@@ -34,7 +34,6 @@ export interface PositionResponsibilityModifiers {
   rimProtection: number;
 }
 
-/** Assigned slot group for a slot index, from the fixed lineup structure. */
 export function slotGroupOfSlot(slot: number): SlotGroup {
   const group = LINEUP_STRUCTURE[slot];
   if (group === undefined) {
@@ -43,7 +42,6 @@ export function slotGroupOfSlot(slot: number): SlotGroup {
   return group;
 }
 
-/** Clamps every responsibility coefficient to the bounded band around 1. */
 export function boundResponsibilityModifiers(
   modifiers: PositionResponsibilityModifiers,
   bound: number,
@@ -59,7 +57,6 @@ export function boundResponsibilityModifiers(
   };
 }
 
-/** Versioned responsibility modifiers for an assigned slot (slot index only). */
 export function responsibilityModifiersForSlot(slot: number): PositionResponsibilityModifiers {
   const table = ENGINE_CONSTANTS.positionResponsibility[slotGroupOfSlot(slot)];
   return boundResponsibilityModifiers(table, ENGINE_CONSTANTS.positionResponsibilityBound);

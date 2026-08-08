@@ -48,7 +48,6 @@ export function groupMaskOf(playable: readonly Position[]): number {
   return mask;
 }
 
-/** Group coverage counts over a set of members. */
 export function rosterGroupCounts(members: readonly SeasonRosterMemberInput[]): {
   guards: number;
   forwards: number;
@@ -241,7 +240,6 @@ export function rosterFeasible(
   return rosterFeasibleFromCounts(ownedCounts, maskCounts, remainingPicks);
 }
 
-/** True when any member can fill the coarse slot group. */
 export function anyMemberPlays(
   members: readonly SeasonRosterMemberInput[],
   slot: 'G' | 'F' | 'C',

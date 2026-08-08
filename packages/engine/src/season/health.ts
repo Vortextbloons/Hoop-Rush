@@ -233,7 +233,6 @@ export function seasonGameHealthSeam(
   return { pregame, removals, returns, newInjuries };
 }
 
-/** SeasonGame[] records reconstructed from compact summaries alone. */
 function partialGamesOf(summaries: readonly SeasonGameSummary[]): SeasonRun['games'] {
   return summaries.map((summary) => ({
     gameId: summary.gameId,

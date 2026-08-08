@@ -161,7 +161,6 @@ export interface OpponentArtifact {
   players: SimPlayer[];
 }
 
-/** Numerator/denominator ratio with a fallback for a zero denominator. */
 export function ratio(numerator: number, denominator: number, fallback: number): number {
   return denominator > 0 ? numerator / denominator : fallback;
 }

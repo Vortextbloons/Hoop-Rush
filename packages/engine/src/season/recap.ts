@@ -84,7 +84,6 @@ export function seasonBlockGameCount(blockIndex: number): number {
   return blockIndex >= 8 ? 30 : 150;
 }
 
-/** The last chunk of `summaries` belonging to this block, in stable order. */
 function blockSummariesOf(
   summaries: readonly SeasonGameSummary[],
   blockIndex: number,
@@ -105,7 +104,6 @@ function winnerOf(summary: SeasonGameSummary): string {
   return summary.homeScore > summary.awayScore ? summary.homeFranchiseId : summary.awayFranchiseId;
 }
 
-/** Provisional display positions from the standings rows. */
 function positionOf(standings: SeasonStandings, franchiseId: string): number {
   const order = provisionalStandingOrder(standings);
   return order.indexOf(franchiseId) + 1;
@@ -132,7 +130,6 @@ function movementOf(
   };
 }
 
-/** Notable lines: one per (game, side, player) across the block summaries. */
 function notableLines(
   blockSummaries: readonly SeasonGameSummary[],
   humanFranchiseId: string | null,
@@ -201,7 +198,6 @@ function streaksOf(summaries: readonly SeasonGameSummary[]): SeasonStreak[] {
     .slice(0, 10);
 }
 
-/** Head-to-head facts between two franchises over the block summaries. */
 function headToHead(
   blockSummaries: readonly SeasonGameSummary[],
   franchiseA: string,
@@ -580,7 +576,6 @@ export function auditSeasonBlockRecap(
     failures.push('recap completedRounds does not match');
   }
 
-  // Human record and standings movement.
   for (const movement of [
     ...recap.standingsMovement,
     ...(recap.humanRecord ? [recap.humanRecord] : []),
@@ -624,13 +619,11 @@ export function auditSeasonBlockRecap(
     }
   }
 
-  // Streaks derive from the ordered summaries.
   const expectedStreaks = streaksOf(input.summaries);
   if (JSON.stringify(recap.streaks) !== JSON.stringify(expectedStreaks)) {
     failures.push('recap streaks do not match the ordered game results');
   }
 
-  // Version spotlights: identity, block participation, aggregates, head-to-head.
   const playedInBlock = new Set<string>();
   for (const summary of blockSummaries) {
     for (const side of ['home', 'away'] as const) {
@@ -693,7 +686,6 @@ export function auditSeasonBlockRecap(
     }
   }
 
-  // Upcoming human games match the schedule.
   const expectedUpcoming = upcomingHumanGamesOf(input);
   if (JSON.stringify(recap.upcomingHumanGames) !== JSON.stringify(expectedUpcoming)) {
     failures.push('recap upcoming human games do not match the schedule');

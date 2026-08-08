@@ -38,23 +38,18 @@ import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
  *   recorded ledger applied deltas (checked at every block boundary).
  * - income identity: every franchise balance equals
  *   `2 + acceptedBlocks + net non-grant deltas` (objective-reward,
- *   extra-trade-offer, risky-rehab). When no spends occur this reduces
- *   exactly to the contract's "income = 2 + acceptedBlocks (no spends)".
+ *   extra-trade-offer, risky-rehab).
  * - debt frequency: share of (franchise, block boundary) snapshots with a
- *   negative balance within the frozen envelope [0, 10%] (documented
- *   expectation: ~0-10% — grants-only cohorts sit at 0%; AI spends can
- *   drive balances toward the -3 floor).
+ *   negative balance within the frozen envelope [0, 10%].
  * - zero cap violations: no balance exceeds the +8 cap at any boundary.
- * - objective success rate within the frozen envelope [40%, 70%] (LEAD
- *   DECISION expectation, measured then frozen).
- * - spend rates within envelopes (documented choices pending first
- *   measurement): extra-trade-offer spend share [0, 50%] of tracked window
- *   entries; risky-rehab spend share [0, 40%] of recorded injuries.
+ * - objective success rate within the frozen envelope (LEAD DECISION
+ *   expectation, measured then frozen).
+ * - spend rates within envelopes: extra-trade-offer spend share [0, 50%]
+ *   of tracked window entries; risky-rehab spend share [0, 40%] of recorded
+ *   injuries.
  *
- * Cohort sizes (documented): 12 calibration + 4 held-out seasons (8
- * objective evaluations per season; 12 seasons give ~96 evaluations, ~5pp
- * success-rate error inside the ±15pp envelope). The runner is in-process (a
- * worker variant is deferred to stay bounded).
+ * Cohort: 12 calibration + 4 held-out seasons (~96 objective evaluations);
+ * the runner is in-process (a worker variant is deferred).
  */
 
 export const SEASON_INFLUENCE_CALIBRATE_OPTIONS: Record<string, boolean> = {
@@ -79,11 +74,9 @@ export const SEASON_INFLUENCE_BLOCK_GRANT = 1;
 /** Frozen debt-frequency envelope (documented expectation ~0-10%). */
 export const SEASON_INFLUENCE_DEBT_FREQUENCY_MAX = 0.1;
 /**
- * Frozen objective success envelope: measured and re-frozen at integration
- * (M2.5 record) — the deterministic first-choice policy succeeds ~79% of
- * blocks across the cohort, so the envelope is [0.65, 0.95]. The envelope
- * catches evaluation regressions (always-fail / always-succeed) rather than
- * prescribing a target rate.
+ * Frozen objective success envelope (measured ~79% at integration, then
+ * re-frozen): [0.65, 0.95] catches evaluation regressions (always-fail /
+ * always-succeed) rather than prescribing a target rate.
  */
 export const SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN = 0.65;
 export const SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX = 0.95;
@@ -239,7 +232,6 @@ export interface SeasonInfluenceFacts {
   rehabInjuries: number;
 }
 
-/** Measures one season's economy facts from snapshots + the final ledger. */
 export function seasonInfluenceFactsOf(season: SeasonM25SeasonFacts): SeasonInfluenceFacts {
   const run = season.run;
   let debtBoundaries = 0;
@@ -291,7 +283,6 @@ export function seasonInfluenceFactsOf(season: SeasonM25SeasonFacts): SeasonInfl
   };
 }
 
-/** Folds one cohort's economy facts. */
 export function foldInfluenceCohort(seasons: readonly SeasonM25SeasonFacts[]): {
   seasonsSimulated: number;
   balanceChecks: number;
@@ -358,7 +349,6 @@ export function foldInfluenceCohort(seasons: readonly SeasonM25SeasonFacts[]): {
   };
 }
 
-/** Evaluates the frozen influence gates over the cohort. */
 export function evaluateInfluenceGates(args: {
   calibration: ReturnType<typeof foldInfluenceCohort>;
   heldOut: ReturnType<typeof foldInfluenceCohort>;
@@ -459,7 +449,6 @@ export function evaluateInfluenceGates(args: {
   return metrics;
 }
 
-/** Influence cohort args shared by run and validate modes. */
 export interface SeasonInfluenceArgs {
   input: string | null;
   'seed-from': string | null;
@@ -471,7 +460,6 @@ export interface SeasonInfluenceArgs {
   format?: string | null;
 }
 
-/** Validates a committed influence-targets artifact (--validate mode). */
 export function validateSeasonInfluenceTargets(
   args: SeasonInfluenceArgs,
   outPath: string,

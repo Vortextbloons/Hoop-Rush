@@ -89,7 +89,6 @@ import { seasonTransactionEntry } from './transactions.ts';
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */
 
-/** The run facts a command handler reads and mutates. */
 export interface SeasonRunCommandContext {
   run: SeasonRun;
   /** Interrupted-block candidate (resume/forfeit commands only). */
@@ -109,7 +108,6 @@ export interface SeasonRunCommandContext {
   effects?: SeasonEffectsState;
 }
 
-/** The per-command typed result envelope. */
 export type SeasonRunCommandResult =
   | { command: 'select-block-objective'; result: SeasonSelectBlockObjectiveResult }
   | { command: 'spend-influence'; result: SeasonSpendInfluenceResult }
@@ -118,7 +116,6 @@ export type SeasonRunCommandResult =
   | { command: 'resume-season-block'; result: SeasonResumeSeasonBlockResult }
   | { command: 'forfeit-interrupted-game'; result: SeasonForfeitInterruptedGameResult };
 
-/** Handler output: the typed result plus the mutated run/pending to persist. */
 export interface SeasonRunCommandOutput {
   result: SeasonRunCommandResult;
   run: SeasonRun;
@@ -477,7 +474,6 @@ function handleSpendInfluence(
     };
   }
 
-  // purpose === 'risky-rehab'
   const injuryId = command.injuryId;
   if (injuryId === undefined) {
     throw new SeasonRunCommandNotImplementedError('spend-influence without injuryId');

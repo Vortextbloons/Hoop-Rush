@@ -138,7 +138,6 @@ export function target(value: number, tolerance: number, minimumSample = 200): C
   return { value: round4(value), tolerance, minimumSample };
 }
 
-/** Season keys with packaged data under raw-data/nba, sorted. */
 export function packagedSeasons(): string[] {
   return readdirSync(NBA_ROOT, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -151,14 +150,12 @@ export function packagedSeasons(): string[] {
     .sort();
 }
 
-/** Packaged seasons that fall inside the era's documented season range. */
 export function eraSeasons(era: EraDef): string[] {
   return packagedSeasons().filter(
     (season) => era.fromSeasonKey <= season && season <= era.toSeasonKey,
   );
 }
 
-/** Every era from the packaged manifest that has at least one packaged season. */
 export function erasWithData(): EraDef[] {
   const manifest = readJson(join(PUBLIC_DATA, 'manifest.json')) as { eras: EraDef[] };
   return manifest.eras.filter((era) => eraSeasons(era).length > 0);

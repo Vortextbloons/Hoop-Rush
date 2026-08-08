@@ -127,7 +127,6 @@ function patternIndexOf(franchiseId: string): number {
   return Number.parseInt(hash.slice(0, 8), 16) % LEGAL_ROSTER_PATTERNS.length;
 }
 
-/** Builds one franchise's ten roster entries from its pool + pattern. */
 function rosterOf(catalog: SeasonDraftCatalog, franchiseId: string): SeasonRosterEntry[] {
   const pool = catalog.pools.find((entry) => entry.franchiseId === franchiseId);
   if (pool === undefined) throw new Error(`no catalog pool for ${franchiseId}`);
@@ -181,7 +180,6 @@ export function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
   return { schemaVersion: 1, playerStates, pairStates };
 }
 
-/** The full 30-team catalog over one era (40 candidates per pool). */
 export function economyTestCatalog(): SeasonDraftCatalog {
   const league = buildSeasonLeague();
   return buildSeasonDraftCatalog({
@@ -374,7 +372,6 @@ export function buildEconomyTestRun(
   return { run, catalog };
 }
 
-/** Adds a raw injury record to a run's health state (test convenience). */
 export function withInjury(
   run: SeasonRun,
   injury: SeasonRun['health']['injuries'][number],
@@ -393,7 +390,6 @@ export function injuryIdOf(seed: string): `inj-${string}` {
   return `inj-${seasonNamespaceSeed(seed, 'injuries', 'test')}`;
 }
 
-/** Counts the AI-to-AI accepted offers recorded across the run's windows. */
 export function aiTradeCountOf(run: SeasonRun, humanFranchiseId: string): number {
   let count = 0;
   for (const window of run.trade?.windows ?? []) {
@@ -491,7 +487,6 @@ export function fixtureSummary(
   };
 }
 
-/** All 30 franchise ids of the fixture league. */
 export function allFixtureFranchiseIds(league: SeasonRun['league']): string[] {
   return league.teams.map((team) => team.franchiseId);
 }

@@ -510,7 +510,6 @@ function zoneSummaryArray(
   }));
 }
 
-/** Diagnostics block shared by the Classic and Season player box lines. */
 function playerDiagnostics(p: RecorderPlayer): PlayerDiagnostics {
   return {
     usage: usageOf(p.fieldGoalAttempts, p.freeThrowAttempts, p.turnovers),

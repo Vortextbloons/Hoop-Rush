@@ -46,7 +46,6 @@ export function enginePlayerKey(player: SimulationPlayer): string {
 export interface TeamPrep {
   /** Slot lookup keyed by enginePlayerKey (playerVersionId ?? playerId). */
   slotByPlayerId: Map<string, number>;
-  /** Precomputed initiator weights, in team index order. */
   initiatorWeights: number[];
   /** Per-initiator action weight tables, keyed by playerId. */
   actionWeights: Map<string, number[]>;
@@ -54,19 +53,14 @@ export interface TeamPrep {
   teammateShots: Map<string, TeammateShots>;
   /** Rebound attribution weights: [offensive, defensive], in team index order. */
   rebounderWeights: [number[], number[]];
-  /** Fouler weights, in team index order. */
   foulerWeights: number[];
-  /** Free-throw shooter weights, in team index order. */
   freeThrowShooterWeights: number[];
-  /** Stealer weights, in team index order. */
   stealerWeights: number[];
   /** Team-mean offensive rebound rating. */
   offensiveReboundMean: number;
   /** Team-mean defensive rebound rating. */
   defensiveReboundMean: number;
-  /** Mean defensive pressure across the five players. */
   pressure: number;
-  /** Mean steal rating across the five players. */
   stealAbility: number;
   /** Lineup spacing (0..1), used by the two-point efficiency anchor. */
   spacing: number;
@@ -80,15 +74,12 @@ export interface TeamPrep {
    * initiator, action, roll-man, defender, and rebounder weights).
    */
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>;
-  /** Defender selection base: zone weights + rim protection per slot. */
   defenderBase: DefenderBase;
-  /** Free-throw conversion probability per player, in team index order. */
   freeThrowP: number[];
   /** Per-initiator pass probabilities (parallel to ACTION_TYPES), keyed by playerId. */
   passP: Map<string, number[]>;
 }
 
-/** Builds the per-game preparation tables for one team. */
 export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile): TeamPrep {
   const players = team.players;
   const slotByPlayerId = new Map<string, number>();

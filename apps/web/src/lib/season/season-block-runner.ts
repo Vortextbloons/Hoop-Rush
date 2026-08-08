@@ -34,34 +34,22 @@ import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import type { SeasonArtifactUrls } from './season-assets';
 
 /**
- * Season block runner contract (spec/2.0/07 background execution, M2.3,
- * M2.5). The main-thread runner owns request ids, stale-message rejection,
- * cancellation/termination, validation, canonical acceptance, and
- * persistence. Cancelled or crashed work must leave the accepted checkpoint
- * untouched; unfinished work is discarded and deterministically reproduced
- * on the next run. The UI imports these types and reacts to runner events;
- * the implementation lives in `season-block-runner.ts` and speaks to the
- * `season-block-worker.ts` entry point through the frozen worker envelopes.
- *
- * M2.5: the complete message is a union â€” `committed` carries the candidate
- * checkpoint, `interrupted` carries the uncommitted pending candidate of an
- * `invalid-roster` interruption. The runner persists interrupted work
- * through `savePendingBlock` and emits a typed `interrupted` event;
- * `resumeBlock` reloads the pending candidate and re-ships it to the worker
- * (`startGameId` = next game, partial summaries as the accumulator seed,
- * pending effects/health as the reset) so the block resumes without
- * replaying completed games. 'complete' is emitted only for committed
- * blocks.
+ * Season block runner contract (spec/2.0/07, M2.3, M2.5). The main-thread
+ * runner owns request ids, stale-message rejection, cancellation, validation,
+ * canonical acceptance, and persistence; cancelled or crashed work leaves the
+ * accepted checkpoint untouched. The 'complete' message is a union —
+ * 'committed' carries the candidate checkpoint, 'interrupted' the uncommitted
+ * pending candidate of an 'invalid-roster' interruption. `resumeBlock`
+ * reloads the pending candidate and re-ships it so the block resumes without
+ * replaying completed games.
  *
  * ## M2.5 SEAMS awaiting the engine workstreams
  *
- * - `completeSeasonBlockCommit({ run, candidate, commandId, rotationDigest,
- *   humanFranchiseId })` â€” engine-owned (health workstream; the lead wires
- *   the export). Produces the post-block `checkpointState`, `stateRevision`,
- *   `stateDigest`, and the optional trade-window open.
- * - `seasonFranchiseLegalFiveFacts(run, franchiseId, health)` â€” engine-owned
- *   (health workstream). The runner reconstructs the typed interruption's
- *   `unavailablePlayerVersionIds` from the pending health at save time.
+ * - `completeSeasonBlockCommit` — engine-owned (health workstream; the lead
+ *   wires the export). Produces the post-block checkpoint state facts and
+ *   the optional trade-window open.
+ * - `seasonFranchiseLegalFiveFacts` — engine-owned (health workstream);
+ *   reconstructs `unavailablePlayerVersionIds` from the pending health.
  */
 
 export type SeasonRunnerEvent =
@@ -95,13 +83,11 @@ export type SeasonRunnerEvent =
       gameId: string | null;
     };
 
-/** Everything the runner needs to start one block on the worker. */
 export interface SeasonBlockStartInput {
-  /** Validated run snapshot (league, rosters, schedule reference, seeds). */
   run: SeasonRun;
   /** Authoritative effects state, including chemistry changes from trades. */
   effects: SeasonEffectsState;
-  /** The 30 rotations locked for this block (pending, not yet committed). */
+  /** The rotations locked for this block (pending, not yet committed). */
   rotations: SeasonRotation[];
   blockIndex: number;
   expectedRevision: number;
@@ -109,10 +95,7 @@ export interface SeasonBlockStartInput {
   commandId: string;
   /** Human franchise (retained detail policy); null in pure AI contexts. */
   humanFranchiseId: string | null;
-  /**
-   * M2.5: the locked block objective (blocks 0-7), or null for the final
-   * two-game block 8. Must have been selected and offered for this block.
-   */
+  /** Locked block objective (blocks 0-7), or null for the final block 8. */
   objectiveId: SeasonObjectiveId | null;
   homeCourt: SeasonHomeCourtProfile;
   /** Packaged draft catalog asset (manifest-verified). */
@@ -123,7 +106,7 @@ export interface SeasonBlockStartInput {
   profileHash: string;
 }
 
-/** Everything the runner needs to resume an interrupted block (M2.5). */
+/** Input to resume an interrupted block (M2.5). */
 export interface SeasonBlockResumeInput {
   runId: string;
   blockIndex: number;
@@ -131,7 +114,7 @@ export interface SeasonBlockResumeInput {
   rotationDigest: string;
   /** The SAME command id as the interrupted submission (idempotency). */
   commandId: string;
-  /** The 30 rotations locked at submission (never change mid-block). */
+  /** The rotations locked at submission (never change mid-block). */
   rotations: SeasonRotation[];
   /** Human franchise (retained detail policy); null in pure AI contexts. */
   humanFranchiseId: string | null;
@@ -145,19 +128,16 @@ export interface SeasonBlockResumeInput {
 }
 
 export interface SeasonBlockRunner {
-  /** Starts a block; returns the request id for cancel/terminate routing. */
   startBlock(input: SeasonBlockStartInput): string;
   /**
-   * M2.5: resumes an interrupted block from its persisted pending candidate
-   * (validated: runId, blockIndex, expectedRevision, rotationDigest);
-   * returns the request id for cancel/terminate routing.
+   * M2.5: resumes an interrupted block from its persisted pending candidate,
+   * validated against runId/blockIndex/expectedRevision/rotationDigest.
    */
   resumeBlock(input: SeasonBlockResumeInput): string;
   /** Requests cancellation; the worker stops between games. */
   cancel(requestId: string): void;
-  /** Immediately tears down the worker (route change / full abort). */
+  /** Tears down the worker immediately (route change / full abort). */
   terminate(): void;
-  /** Subscribes to runner events; returns an unsubscribe function. */
   subscribe(listener: (event: SeasonRunnerEvent) => void): () => void;
 }
 
@@ -172,16 +152,12 @@ export interface SeasonBlockRunnerDeps {
 }
 
 /**
- * Main-thread block runner (spec/2.0/07 background execution, M2.3, M2.5).
- * Owns request ids, stale-message rejection, cancellation/termination,
- * boundary validation against the accepted snapshot, canonical acceptance
- * (schema, digest, cursor facts, expected state facts), and the atomic
- * checkpoint commit. The worker returns one candidate; this runner accepts
- * it only after every check, then commits it in one IndexedDB transaction.
- * Cancelled or crashed work leaves the accepted checkpoint untouched:
- * nothing is persisted before acceptance. M2.5 interruptions are persisted
- * as pending candidates (never as accepted checkpoints) and resumed through
- * `resumeBlock`.
+ * Main-thread block runner (spec/2.0/07, M2.3, M2.5). Accepts a candidate only
+ * after every check (schema, digest, cursor facts, expected state facts), then
+ * commits it in one IndexedDB transaction; nothing is persisted before
+ * acceptance, so cancelled/crashed work leaves the accepted checkpoint
+ * untouched. M2.5 interruptions are persisted as pending candidates (never as
+ * accepted checkpoints) and resumed through `resumeBlock`.
  */
 export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): SeasonBlockRunner {
   const listeners = new Set<(event: SeasonRunnerEvent) => void>();
@@ -200,11 +176,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
 
   /**
    * Authoritative cursor state for the active run, kept in memory after every
-   * accepted commit so block starts validate without a full repository load
-   * and reconciliation audit. Keyed by runId: the first block after a page
-   * reload (or a new run) loads once from the repository, and the guarded
-   * IndexedDB commit still rejects revision regressions and duplicate
-   * command ids atomically.
+   * accepted commit so block starts validate without a full repository load.
+   * The guarded IndexedDB commit still rejects revision regressions and
+   * duplicate command ids atomically.
    */
   let runState: {
     runId: string;
@@ -212,11 +186,11 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     completedRounds: number;
     commandIds: Set<string>;
     summaries: SeasonGameSummary[];
-    /** M2.4: the authoritative pre-block effects state for the next block. */
+    /** Authoritative pre-block effects state for the next block. */
     effects: SeasonEffectsState | null;
-    /** M2.5: the authoritative pre-block health state for the next block. */
+    /** Authoritative pre-block health state for the next block. */
     health: SeasonHealthState | null;
-    /** M2.5: the run state chain facts at the last accepted boundary. */
+    /** Run state chain facts at the last accepted boundary. */
     stateRevision: number;
     stateDigest: string;
   } | null = null;
@@ -247,8 +221,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
 
   /**
    * M2.5: the packaged draft catalog the commit path needs to open trade
-   * windows (value bands, legality). The worker fetches its own copy; the
-   * runner caches one per asset url/hash.
+   * windows; the worker fetches its own copy, the runner caches one per asset.
    */
   let catalogCache: { url: string; hash: string; catalog: SeasonDraftCatalog } | null = null;
   async function resolveCatalog(input: SeasonBlockStartInput): Promise<SeasonDraftCatalog | null> {
@@ -654,7 +627,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           : {}),
       // M2.5: resume mid-block from the pending candidate's next game.
       startGameId: state.resumePending?.nextGameId ?? null,
-      // M2.5: the locked block objective.
       objectiveId: state.input.objectiveId,
       // M2.5: the authoritative pre-block Influence economy, run-scoped
       // transaction log, and the asserted run state chain facts (the worker
@@ -706,11 +678,9 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
   }
 
   /**
-   * Svelte's deeply reactive shell can place Proxy-backed values anywhere in
-   * a submitted run after a rotation edit. Zod validates and reconstructs
-   * the wire shape, but the worker boundary additionally requires every
-   * nested value to be structured-cloneable. The frozen worker contract is
-   * JSON-only, so a JSON snapshot is the simplest reliable de-proxy step.
+   * Svelte's reactive shell can leave Proxy-backed values anywhere in a
+   * submitted run; the worker boundary requires every nested value to be
+   * structured-cloneable, so a JSON snapshot de-proxies reliably.
    */
   function plainWorkerRequest<T extends SeasonWorkerStartRequest | SeasonWorkerContinueRequest>(
     request: T,
@@ -833,9 +803,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               : import('./season-assets').then((module) => module.seasonArtifactUrls()),
           ]);
           if (currentRequestId !== requestId) return;
-          // Load the run snapshot and the pending candidate (validated by
-          // the repository; a pending row for a committed block fails the
-          // reload audit).
+          // A pending row for a committed block fails the reload audit.
           const snapshot = await repository.loadActiveRun();
           if (snapshot === null) throw new Error('no active season run to resume');
           if (snapshot.run.runId !== input.runId) {
@@ -869,8 +837,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               stateDigest: snapshot.run.stateDigest,
             };
           }
-          // The resume re-uses the interrupted submission's identity facts;
-          // the run context comes from the reloaded snapshot.
+          // Reuses the interrupted submission's identity facts; the run
+          // context comes from the reloaded snapshot.
           const startInput: SeasonBlockStartInput = {
             run: snapshot.run,
             effects: snapshot.effects,

@@ -467,7 +467,6 @@ export async function seasonDraftCalibrate(args: {
   });
   const durationMs = Date.now() - start;
 
-  // Calibration metrics.
   const varietyValues = calibrationRuns.map((run) => run.variety);
   const safeValues = calibrationRuns.map((run) => run.minSafePerOffer);
   const coverageValues = calibrationRuns.map((run) => run.selectableGroupCoverageShare);
@@ -563,7 +562,6 @@ export async function seasonDraftCalibrate(args: {
 
   const pass = minSafeGate && zeroDuplicates && zeroGenerationFailures && heldOutPass;
 
-  // Freeze the targets artifact.
   let targetsWritten = false;
   let targetsPath: string | null = null;
   const gateFailures: string[] = [];

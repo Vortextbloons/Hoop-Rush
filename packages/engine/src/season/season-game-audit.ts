@@ -75,7 +75,6 @@ export function checkSeasonGameResult(
     return failures;
   }
 
-  // ---- completed game audit ----
   const ot = result.overtimePeriods;
   const expectedTotalSeconds = REGULATION_PLAYER_SECONDS + OVERTIME_PLAYER_SECONDS * ot;
 
@@ -117,7 +116,6 @@ export function checkSeasonGameResult(
       }
     }
 
-    // Scoring identities (shared scoring core).
     const accounting = auditSideAccounting(players, box, side.shotZones, (p) => p.playerVersionId);
     if (accounting.playerPointsTotal !== box.points) {
       failures.push(`${sideKey}: player points != team points`);
@@ -184,7 +182,6 @@ export function checkSeasonGameResult(
       }
     }
 
-    // Period scores reconcile with totals.
     const periodTotal = side.periodScores.reduce((a, b) => a + b, 0);
     if (side.periodScores.length !== 4 + ot) {
       failures.push(
@@ -195,7 +192,6 @@ export function checkSeasonGameResult(
       failures.push(`${sideKey}: period scores do not reconcile with the box`);
     }
 
-    // Unit-stint interval consistency and seconds accounting.
     stintAudit(failures, sideKey, result, input);
   }
 
@@ -206,7 +202,6 @@ export function checkSeasonGameResult(
     failures.push('winner does not match the final scores');
   }
 
-  // Substitution and event facts per side.
   for (const sideKey of ['home', 'away'] as const) {
     substitutionAudit(failures, sideKey, result, input);
     deviationAudit(failures, sideKey, result, input);
@@ -215,7 +210,6 @@ export function checkSeasonGameResult(
   return failures;
 }
 
-/** Stint audit: contiguous intervals, exact durations, tipoff unit, totals. */
 function stintAudit(
   failures: string[],
   sideKey: 'home' | 'away',
@@ -305,7 +299,6 @@ function stintAudit(
   }
 }
 
-/** Substitution audit: boundary linkage, in/out facts, legality, events. */
 function substitutionAudit(
   failures: string[],
   sideKey: 'home' | 'away',
@@ -515,7 +508,6 @@ function substitutionAudit(
   }
 }
 
-/** Deviation audit: exact emission set, causes, regulation-only seconds. */
 function deviationAudit(
   failures: string[],
   sideKey: 'home' | 'away',
@@ -616,7 +608,6 @@ function isDeviationReason(reason: string): boolean {
   );
 }
 
-/** Pregame legality: available roster can field the planner's initial five. */
 function sideHasLegalFiveAtTipoff(
   input: SeasonGameSimulationInput,
   sideKey: 'home' | 'away',
@@ -624,7 +615,6 @@ function sideHasLegalFiveAtTipoff(
   return initialUnitAtTipoff(input, sideKey) !== null;
 }
 
-/** Planner initial unit (starters if legal, else the first contingency). */
 function initialUnitAtTipoff(
   input: SeasonGameSimulationInput,
   sideKey: 'home' | 'away',

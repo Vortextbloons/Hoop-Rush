@@ -36,7 +36,6 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
   const loser = loserTeam(result);
   const t = FACT_THRESHOLDS;
 
-  // Turnover margin.
   const turnoverDiff = loser.box.turnovers - winner.box.turnovers;
   if (turnoverDiff >= t.turnoverMargin) {
     facts.push({
@@ -52,7 +51,6 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
     });
   }
 
-  // Effective shooting.
   const efgDiff = efg(winner) - efg(loser);
   if (efgDiff >= t.shotEfficiencyEfgDiff) {
     facts.push({
@@ -70,7 +68,6 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
     });
   }
 
-  // Offensive rebounds.
   const orebDiff = winner.box.rebounds.offensive - loser.box.rebounds.offensive;
   if (orebDiff >= t.offensiveReboundDiff) {
     facts.push({
@@ -86,7 +83,6 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
     });
   }
 
-  // Free throws.
   const ftaDiff = winner.box.freeThrows.attempted - loser.box.freeThrows.attempted;
   if (ftaDiff >= t.freeThrowAttemptDiff) {
     facts.push({
@@ -131,7 +127,6 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
     }
   }
 
-  // Overtime.
   if (result.overtimePeriods > 0) {
     const homeOtPoints = result.periodScores.home.slice(4).reduce((a, b) => a + b, 0);
     const awayOtPoints = result.periodScores.away.slice(4).reduce((a, b) => a + b, 0);

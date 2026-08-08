@@ -289,7 +289,6 @@ export function representativeEffectsState(input: SeasonGameSimulationInput): {
   };
 }
 
-/** Default authoritative engine deps for the season effects commands. */
 export const defaultEffectsEngineDeps: SeasonEffectsEngineDeps = {
   simulateSeasonGame,
   checkSeasonGameResult,
@@ -411,7 +410,6 @@ export async function runSeasonEffectsCohort(
   return chunks.flat();
 }
 
-/** In-process cohort runner for tests and small commands. */
 export function runSeasonEffectsCohortInProcess(
   request: SeasonEffectsCohortRequest,
   deps: SeasonEffectsEngineDeps,
@@ -781,7 +779,6 @@ export function seasonEffectsChemistrySeparation(deps: SeasonEffectsEngineDeps):
   };
 }
 
-/** Calibrate: runs the gates and freezes the effect-targets artifact. */
 export async function seasonEffectsCalibrate(
   args: SeasonEffectsArgs,
   deps: SeasonEffectsEngineDeps = defaultEffectsEngineDeps,
@@ -1065,7 +1062,6 @@ export function validateSeasonEffectTargets(args: SeasonEffectsArgs, outPath: st
   });
 }
 
-/** Command dispatcher for the four `season effects` subcommands. */
 export async function seasonEffectsCommand(
   args: SeasonEffectsArgs,
   extra: string[],

@@ -75,11 +75,9 @@ export const seasonDraftStateSchema = z.object({
 });
 export type SeasonDraftState = z.infer<typeof seasonDraftStateSchema>;
 
-// ---------------------------------------------------------------------------
-// Legacy season-draft-v1 state (M2.1-M2.3 franchise-era rolls). Read-only
-// recovery target: unfinished v1 drafts surface an explicit recovery screen,
-// and v1 facts inside completed runs parse through `seasonLegacyDraftFacts`.
-// ---------------------------------------------------------------------------
+// Legacy season-draft-v1 (M2.1-M2.3 franchise-era rolls): read-only recovery
+// target; unfinished v1 drafts surface an explicit recovery screen, and v1
+// facts inside completed runs parse through `seasonLegacyDraftFacts`.
 
 /** One attempted franchise-era roll during a reveal (legacy v1). */
 export const seasonDraftRollAttemptSchema = z.object({

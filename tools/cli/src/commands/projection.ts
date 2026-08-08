@@ -101,13 +101,11 @@ const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const PROJECTION_DIR = resolve(STATIC_DATA, 'projection');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
 
-/** Builds a PackagedData instance from a manifest path (default repo manifest). */
 function loadData(manifestPath: string | null | undefined): PackagedData {
   const loaded = loadPackagedData(manifestPath ?? undefined);
   return new PackagedData(loaded.manifest, loaded.dir);
 }
 
-/** Builds the strict five-slot projection input tuple from a team. */
 function lineupInput(players: readonly SimulationPlayer[]): BaseFiveProjectionInput['lineup'] {
   if (players.length !== 5) {
     throw new Error(`projection: need exactly five players, got ${String(players.length)}`);
@@ -147,10 +145,6 @@ function loadModel(
   }
   return parsed;
 }
-
-/** ---------------------------------------------------------------------------
- * Reference derivation (build-time, from packaged pool aggregates).
- * ------------------------------------------------------------------------- */
 
 const SLOT_POSITIONS: SimulationPlayer['positions'][] = POSITION_SLOTS.map((position) => [
   position,
@@ -842,10 +836,6 @@ export function projectionBuild(input: {
   );
 }
 
-/** ---------------------------------------------------------------------------
- * `projection base`: project one legal five against the era reference.
- * ------------------------------------------------------------------------- */
-
 export function projectionBase(input: {
   fixture: string | null | undefined;
   manifest?: string | null;
@@ -925,10 +915,6 @@ export function projectionBase(input: {
   }
   return makeReport('projection base', { fixture, era: eraId }, { details, payload: projection });
 }
-
-/** ---------------------------------------------------------------------------
- * `projection calibrate-base`: paired fixed-five cohorts vs the projector.
- * ------------------------------------------------------------------------- */
 
 interface CalibrationStats {
   lineups: number;

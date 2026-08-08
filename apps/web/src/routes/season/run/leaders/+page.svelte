@@ -64,7 +64,6 @@
           Rate categories require a 70% game share · ordered per-game, then value
         </p>
       </div>
-      <!-- Mobile: one category at a time -->
       <div
         role="group"
         aria-label="Leader category"
@@ -93,7 +92,6 @@
         No leader data yet — accept a block to fold game summaries.
       </p>
     {:else}
-      <!-- Mobile: the selected category's board -->
       <div class="mt-6 md:hidden">
         <LeadersTable
           category={activeCategory}
@@ -106,7 +104,6 @@
         />
       </div>
 
-      <!-- Desktop: all categories as leader columns -->
       <div class="mt-6 hidden grid-cols-2 gap-4 lg:grid-cols-3 md:grid">
         {#each LEADER_CATEGORIES as category (category)}
           <LeadersTable

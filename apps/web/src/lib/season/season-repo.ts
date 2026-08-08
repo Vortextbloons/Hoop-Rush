@@ -23,6 +23,12 @@ declare global {
 let repoPlainPromise: Promise<SeasonRunRepository> | null = null;
 let repoSchedulePromise: Promise<SeasonRunRepository> | null = null;
 
+/** Drops cached repository singletons after a full local data wipe. */
+export function resetSeasonRepositories(): void {
+  repoPlainPromise = null;
+  repoSchedulePromise = null;
+}
+
 /**
  * The concrete IndexedDB Season Run repository (lazy, once per schedule
  * supply). `loadActiveRun()` requires the schedule; index-only callers

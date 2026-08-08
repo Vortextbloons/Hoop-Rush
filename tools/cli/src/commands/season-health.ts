@@ -34,38 +34,19 @@ import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
 /**
  * `season health calibrate` (spec/2.0 M2.5, contract §17): freezes
- * `injury-targets-v1` from a season cohort plus a roll-level risk probe
- * through the engine health model.
- *
- * Season cohort (blocks 0-8 through the engine health-threaded block
- * pipeline, per-seed root seeds over the committed run fixture): observed
- * incidence (basis points), severity shares, per-severity recovery means,
- * same-game-return rate, season-ending rate, and the strong-vs-weak team
- * incidence gap (standings independence). The cohort runs with an empty
- * health start state and no objectives/windows; the observed mean risk sits
- * a few basis points above the 80 bp base because the additive risk inputs
- * (minutes, fatigue, recent load, durability penalty, the recurrence bonus
- * on returned players) are positive on average in the fixture's rotation
- * mix — the frozen ±15 bp envelope accommodates that by design.
- *
- * Roll-level probe (deterministic exposure cohorts through the engine's
- * `rollSeasonInjuryForPlayer`): the monotonicity direction assertions
- * (minutes↑ / fatigue↑ / durability↓ ⇒ incidence↑, contract §5) and the
- * recurrence-lift gate (window +40 bp vs non-window at equal other inputs).
- * The probes isolate the frozen formula's sensitivity, because season
- * simulation does not expose per-exposure risk inputs; the gate freezes an
- * absolute gap of at least 15 bp between window and non-window incidence
- * (documented choice: the +40 bp bonus at the fixture's ~90-100 bp baseline
- * yields roughly a 1.4x ratio, so the contract's ">1.5 ratio" alternative
- * would be unattainable by design; a 15 bp absolute gap is a measurable
- * floor at the cohort sizes used here).
- *
- * Cohort sizes (documented): 16 calibration + 4 held-out seasons — seasons
- * are the expensive unit (nine blocks each), and 16 seasons yield ~3,000
- * injuries: severity shares to ~1pp, season-ending to ~0.4pp, and a
- * recurrence gap of ~35 bp with ~9 bp error, all comfortably inside the
- * frozen gates. The runner is in-process (a worker variant is deferred to
- * stay bounded); worker counts and chunk order never change the facts.
+ * `injury-targets-v1` from a season cohort (blocks 0-8 through the engine
+ * health pipeline) plus a roll-level risk probe. The cohort observes
+ * incidence (bp), severity shares, per-severity recovery means, same-game
+ * return, season-ending rate, and the strong-vs-weak standings gap; its
+ * mean risk sits a few bp above the 80 bp base because the additive risk
+ * inputs are positive on average in the fixture — the frozen ±15 bp
+ * envelope accommodates that by design. The roll-level probe isolates the
+ * formula's sensitivity (season sim does not expose per-exposure inputs):
+ * monotonicity (minutes↑/fatigue↑/durability↓ ⇒ incidence↑) and a frozen
+ * absolute recurrence gap of ≥15 bp (a ratio gate would be unattainable at
+ * this baseline; 15 bp is a measurable floor at the cohort sizes used).
+ * Cohort: 16 calibration + 4 held-out seasons (~3,000 injuries); the
+ * runner is in-process (a worker variant is deferred).
  */
 
 export const SEASON_HEALTH_CALIBRATE_OPTIONS: Record<string, boolean> = {
@@ -222,7 +203,6 @@ export const seasonInjuryTargetsSchema = z.object({
 });
 export type SeasonInjuryTargets = z.infer<typeof seasonInjuryTargetsSchema>;
 
-/** The exposed-player count for a franchise across a full season. */
 function franchiseExposures(run: SeasonRun, franchiseId: string): number {
   const rotation = run.rotations.find((entry) => entry.franchiseId === franchiseId);
   if (rotation === undefined) return 0;
@@ -238,7 +218,6 @@ export interface SeasonHealthFacts {
   exposuresByFranchise: Map<string, number>;
 }
 
-/** Folds the final checkpoint's health records + rotation exposures. */
 export function seasonHealthFactsOf(
   run: SeasonRun,
   facts: SeasonM25SeasonFacts,
@@ -262,7 +241,6 @@ export function seasonHealthFactsOf(
   return { exposures, injuries, injuriesByFranchise, exposuresByFranchise };
 }
 
-/** Severity shares over a list of injuries. */
 export function severitySharesOf(injuries: readonly SeasonInjuryRecord[]): {
   minor: number;
   moderate: number;
@@ -400,7 +378,6 @@ function foldSeasonCohort(seasons: readonly SeasonM25SeasonFacts[]): SeasonHealt
   };
 }
 
-/** Evaluates the frozen gates over the calibration cohort + probes. */
 export function evaluateHealthGates(args: {
   calibration: ReturnType<typeof foldSeasonCohort>;
   heldOut: ReturnType<typeof foldSeasonCohort>;
@@ -553,7 +530,6 @@ export function evaluateHealthGates(args: {
   return metrics;
 }
 
-/** Health cohort args shared by run and validate modes. */
 export interface SeasonHealthArgs {
   input: string | null;
   'seed-from': string | null;
@@ -707,7 +683,6 @@ export function runSeasonHealthCohort(
   };
 }
 
-/** Validates a committed injury-targets artifact (--validate mode). */
 export function validateSeasonInjuryTargets(args: SeasonHealthArgs, outPath: string): CliReport {
   void args;
   return validateTargetsArtifact({

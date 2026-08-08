@@ -191,7 +191,6 @@ export function auditSeasonAggregates(input: {
   const freshTeams = foldSeasonTeamAggregates(input.summaries);
   const freshPlayers = foldSeasonPlayerAggregates(input.summaries);
 
-  // Every stored team field equals a fresh fold.
   const teamFields: ReadonlyArray<keyof Omit<SeasonTeamAggregate, 'franchiseId'>> = [
     'gamesPlayed',
     'wins',
@@ -234,7 +233,6 @@ export function auditSeasonAggregates(input: {
     }
   }
 
-  // Every stored player field equals a fresh fold.
   const playerFields: ReadonlyArray<
     keyof Omit<SeasonPlayerAggregate, 'playerVersionId' | 'franchiseId'>
   > = [
@@ -289,7 +287,6 @@ export function auditSeasonAggregates(input: {
     }
   }
 
-  // Standings reconcile with the summary-derived records.
   const recordOf = new Map<string, { wins: number; losses: number; gamesPlayed: number }>();
   const pointsFor = new Map<string, number>();
   const pointsAgainst = new Map<string, number>();
@@ -361,7 +358,6 @@ export function auditSeasonAggregates(input: {
   return failures;
 }
 
-/** Category total and per-game helpers over one player aggregate row. */
 function categoryValue(player: SeasonPlayerAggregate, category: SeasonLeaderCategory): number {
   switch (category) {
     case 'points':

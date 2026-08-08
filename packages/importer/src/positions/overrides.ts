@@ -15,7 +15,6 @@ export interface PositionOverride {
   secondary: Position[];
 }
 
-/** Reviewed position corrections (replace the noisy NBA API label). */
 export const POSITION_OVERRIDES: Readonly<Record<string, PositionOverride>> = {
   // Victor Wembanyama: source lists SF; reviewed C with SF secondary.
   '1641705': { primary: 'C', secondary: ['SF'] },

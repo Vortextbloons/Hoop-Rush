@@ -240,11 +240,11 @@
   }
 
   /**
-   * Persists a fresh roll and triggers the reel animation for it. Callers
-   * lock interactions (spinning = true) BEFORE awaiting: the engine result is
-   * synchronous, but the persist is async, so the stale pool must be hidden
-   * the moment the command is issued. spinKey only changes here, after the
-   * persisted state already matches the reels, so a resumed saved state never
+   * Persists a fresh roll and triggers the reel animation for it. Callers lock
+   * interactions (spinning = true) BEFORE awaiting: the engine result is
+   * synchronous but the persist is async, so the stale pool must be hidden the
+   * moment the command is issued. spinKey only changes here, after the
+   * persisted state matches the reels, so a resumed saved state never
    * re-animates.
    */
   async function applyRoll(next: ClassicDraftState, axis: 'both' | 'franchise' | 'era') {
@@ -327,11 +327,11 @@
 
   /**
    * Slot choice from the picker. A drafted player repositions (swapping or
-   * displacing incumbents when needed); a new player is drafted into the
-   * for invalid placements, surfaced inline. The fifth pick auto-launches the
-   * season (no reel spin — the draft is done); every other successful
-   * placement rolls the next round through the reels. Interactions lock
-   * before the async persist so the stale pool can never be clicked again.
+   * displacing incumbents); a new player is drafted into the slot. The fifth
+   * pick auto-launches the season (no reel spin — the draft is done); every
+   * other successful placement rolls the next round through the reels.
+   * Interactions lock before the async persist so the stale pool can never be
+   * clicked again.
    */
   async function placePlayer(player: IndexRow, slotIndex: number) {
     if (!draft || catalog.length === 0 || spinning || starting) return;

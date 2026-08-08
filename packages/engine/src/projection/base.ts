@@ -159,7 +159,6 @@ function coverageOf(players: readonly SimulationPlayer[], prep: TeamPrep): Proje
   };
 }
 
-/** Creation component from ledger facts. */
 function creationOf(input: {
   facts: LedgerSide;
   players: readonly SimulationPlayer[];
@@ -197,7 +196,6 @@ function creationOf(input: {
   };
 }
 
-/** Validates the exact five-slot input and returns the canonical team. */
 function validateAndBuildTeam(input: BaseFiveProjectionInput): SimulationTeam {
   const slots = input.lineup.map((entry) => entry.slot);
   for (const slot of SLOT_ORDER) {
@@ -254,7 +252,6 @@ function inputMaterial(input: BaseFiveProjectionInput, referenceId: string): str
   });
 }
 
-/** Builds one side of the output from the ledger facts and shared coverage. */
 function sideOf(input: {
   facts: LedgerSide;
   players: readonly SimulationPlayer[];

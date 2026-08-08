@@ -33,7 +33,6 @@ export const DEFAULT_RATINGS_MODEL_ARTIFACT: RatingsModelArtifact = {
   generatedAt: '2026-08-03T00:00:00.000Z',
 };
 
-/** Load the generated calibration artifact used by rating builds. */
 export function loadRatingsModelArtifact(
   path = join(PUBLIC_DATA, 'ratings-model.json'),
 ): RatingsModelArtifact {

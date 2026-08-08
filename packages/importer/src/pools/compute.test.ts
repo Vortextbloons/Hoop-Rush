@@ -61,9 +61,6 @@ vi.mock('../config.js', () => ({
   FIELD_AVAILABILITY: {},
 }));
 
-// ---------------------------------------------------------------------------
-// Fixture builders
-// ---------------------------------------------------------------------------
 interface RosterSpec {
   id: string;
   firstName: string;

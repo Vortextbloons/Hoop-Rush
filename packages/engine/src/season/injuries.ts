@@ -97,12 +97,10 @@ function rollBp(seed: string, thresholdBp: number): boolean {
   return u32Of(seed) % 10_000 < thresholdBp;
 }
 
-/** Deterministic uniform integer in [min, max] (inclusive). */
 function uniformInt(seed: string, min: number, max: number): number {
   return min + (u32Of(seed) % (max - min + 1));
 }
 
-/** Maps seconds-from-tipoff to the game clock (period, seconds remaining). */
 export function clockFromTipoffSeconds(secondsFromTipoff: number): {
   period: number;
   seconds: number;
@@ -179,7 +177,6 @@ export function seasonInjuryIdOf(seedPath: readonly string[]): string {
   return `inj-${seasonDigestHex(seedPath.join('\u0000'))}`;
 }
 
-/** Rolls one player-game exposure against the frozen injury profile. */
 export function rollSeasonInjuryForPlayer(input: SeasonInjuryRollInput): SeasonInjuryRollResult {
   const riskBasisPoints = seasonInjuryRiskBasisPoints(input);
   const occurrenceSeed = injurySeed(

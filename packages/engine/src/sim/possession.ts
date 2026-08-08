@@ -63,7 +63,6 @@ export interface TripResolution {
 export interface GameState {
   /** Team fouls committed by each side in the current period. */
   periodFouls: [number, number];
-  /** Current period index (0-based). */
   periodIndex: number;
   /** Seconds remaining in the current period; trips consume from it. */
   secondsRemaining: number;
@@ -126,7 +125,6 @@ export interface TripContext {
   effects?: SeasonEffectsHook;
 }
 
-/** Builds the shared per-game trip context (state mutates in place; the rest is stable). */
 export function createTripContext(
   rng: Rng,
   recorder: GameRecorder,
@@ -202,7 +200,7 @@ export class PossessionStepper {
     this.startedRemaining = ctx.state.secondsRemaining;
   }
 
-  /** Advances exactly one atomic unit of work and reports its boundary. */
+  /** Advances exactly one atomic unit of work. */
   step(): PossessionStep {
     if (this.phase === 'done') {
       if (this.finalStep === null) {
@@ -445,7 +443,6 @@ export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResol
   };
 }
 
-/** Consumes clock seconds (capped at remaining) and returns how much was consumed. */
 function consumeTime(state: GameState, seconds: number): number {
   const consumed = Math.min(seconds, state.secondsRemaining);
   state.secondsRemaining -= consumed;
@@ -542,7 +539,6 @@ export function assistProbabilityPure(
   );
 }
 
-/** The sampled assist probability inside the per-game trip context. */
 function assistProbability(
   ctx: TripContext,
   passer: SimulationPlayer,
@@ -594,7 +590,6 @@ function creditAssist(
   ctx.recorder.assist(offenseSide, slot);
 }
 
-/** Marks one miss as a rebound opportunity for every player on both sides. */
 function reboundChances(
   ctx: TripContext,
   offenseSide: SideIndex,
@@ -607,7 +602,6 @@ function reboundChances(
   reboundCounter[defenseSide] += 1;
 }
 
-/** Resolves a missed last free throw (live or dead-ball rebound). */
 function reboundFromMissedFreeThrow(
   ctx: TripContext,
   offenseSide: SideIndex,
@@ -752,7 +746,7 @@ function resolveShot(
     }) ?? 0;
   const effectsAdjustmentFraction = effectsAdjustment / 1_000_000;
 
-  // Shooting foul check (zone-aware, ability-aware).
+  // Shooting foul check.
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
   if (rng.chance(foulP)) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
@@ -807,7 +801,7 @@ function resolveShot(
     };
   }
 
-  // Block check (a block forces a miss, then a normal rebound).
+  // A block forces a miss, then a normal rebound.
   const blockP = blockProbability(defender, zone, action);
   if (rng.chance(blockP)) {
     recorder.block(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
@@ -824,7 +818,6 @@ function resolveShot(
     );
   }
 
-  // Shot resolution.
   const homeDefenseAdjustment =
     defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
   const shotP = makeProbability(
@@ -863,7 +856,6 @@ function resolveShot(
   );
 }
 
-/** Resolves a rebound after a missed field goal; true keeps the trip alive. */
 function reboundAfterMiss(
   ctx: TripContext,
   offenseSide: SideIndex,
@@ -922,7 +914,6 @@ function reboundAfterMiss(
   };
 }
 
-/** Team foul count in the current period for the defending side. */
 function teamInBonus(foulsInPeriod: number, overtime: boolean): boolean {
   const limit = overtime
     ? ENGINE_CONSTANTS.bonusFoulsOvertime

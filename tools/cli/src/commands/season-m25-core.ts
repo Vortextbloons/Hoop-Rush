@@ -1,24 +1,12 @@
 /**
  * M2.5 calibration core shared by `season health calibrate`, `season trade
  * calibrate`, and `season influence calibrate` (spec/2.0 M2.5, contract §17).
- *
- * Season-level cohorts run the authoritative engine block pipeline in
- * process over root-seed-cloned runs: fresh schema-7 facts per seed (empty
- * health, initial Influence, initial objectives, null trade), the post-block
- * state chain folded through the engine's `deriveSeasonPostBlockState`, and
- * trade windows opened at blocks 2/4/5 through `openSeasonTradeWindow` when
- * the cohort drives the economy. Deterministic objective selection (the
- * first offered choice per block) is applied before each full block when the
- * cohort needs objective facts. Worker counts and chunk order never change
- * the facts (the cohort runner is deliberately in-process; a worker variant
- * is deferred to stay bounded).
- *
- * Engine seams this module imports — `createInitialSeasonInfluenceState`,
- * `seasonRunStateDigest`, `deriveSeasonPostBlockState`,
- * `openSeasonTradeWindow`, `seasonObjectiveChoicesForBlock` — land in
- * `packages/engine/src/index.ts` at M2.5 integration (lead-owned file);
- * until then these imports are typecheck-red by design. `SeasonWindowOpenResult`
- * comes from the engine's `season/trades.ts` (§20 frozen shape).
+ * Cohorts run the engine block pipeline in process over root-seed-cloned
+ * runs; worker counts and chunk order never change the facts (a worker
+ * variant is deferred to stay bounded). Engine seams like
+ * `seasonRunStateDigest` and `openSeasonTradeWindow` land in
+ * `packages/engine/src/index.ts` at M2.5 integration; until then those
+ * imports are typecheck-red by design.
  */
 
 import {
@@ -53,7 +41,6 @@ import {
   type SeasonBlockRunnerState,
 } from './season-block.ts';
 
-/** The empty schema-7 health state every fresh cohort run starts with. */
 export function m25EmptyHealthState(): SeasonHealthState {
   return seasonHealthStateSchema.parse({
     schemaVersion: 1,
@@ -62,7 +49,6 @@ export function m25EmptyHealthState(): SeasonHealthState {
   });
 }
 
-/** The fixed-catalog initial objective state with no selections. */
 export function m25InitialObjectivesState(): SeasonObjectiveState {
   return seasonObjectiveStateSchema.parse({
     schemaVersion: 1,
@@ -77,11 +63,7 @@ export function m25InitialInfluenceState(franchiseIds: readonly string[]): Seaso
   return createInitialSeasonInfluenceState(franchiseIds);
 }
 
-/**
- * The mutable run-state facts `seasonRunStateDigest` canonicalizes (§20 item
- * 2): the state chain facts plus the run-scoped M2.5 families and the
- * rosters/ownership/rotations/effects the block pipeline carried.
- */
+/** The run-state facts `seasonRunStateDigest` canonicalizes (§20 item 2). */
 export interface SeasonM25RunStateFacts {
   stateRevision: number;
   checkpointState: SeasonCheckpointState | null;
@@ -96,7 +78,6 @@ export interface SeasonM25RunStateFacts {
   effects: SeasonEffectsState;
 }
 
-/** Assembles the digest facts from a run + the carried effects state. */
 export function m25RunStateFacts(
   run: SeasonRun,
   effects: SeasonEffectsState,
@@ -117,11 +98,9 @@ export function m25RunStateFacts(
 }
 
 /**
- * A fresh schema-7 run clone for one cohort seed: identical rosters,
- * schedule, and rotations, with a new root seed and clean M2.5 facts. The
- * canonical state digest is computed through the engine seam (the stateDigest
- * field is excluded from its own computation, mirroring the checkpoint
- * digest).
+ * Fresh run clone for one cohort seed (identical rosters/schedule/rotations,
+ * new root seed, clean M2.5 facts). stateDigest excludes itself from its own
+ * computation, mirroring the checkpoint digest.
  */
 export function m25FreshRun(
   base: SeasonRun,
@@ -144,14 +123,12 @@ export function m25FreshRun(
   return { ...fresh, stateDigest: seasonRunStateDigest(m25RunStateFacts(fresh, effects)) };
 }
 
-/** One trade window opened (or refused) after a block commit. */
 export interface SeasonM25WindowOpen {
   blockIndex: number;
   /** The applied window result; null when no window opens (§20). */
   result: SeasonWindowOpenResult | null;
 }
 
-/** Everything one simulated season measured. */
 export interface SeasonM25SeasonFacts {
   rootSeed: string;
   /** Final run state (health/influence/transactions/trade folded). */
@@ -170,7 +147,6 @@ export interface SeasonM25SeasonFacts {
   catalog: SeasonDraftCatalog;
 }
 
-/** Options for one cohort season run. */
 export interface SeasonM25DriverOptions {
   runPath?: string | null;
   manifestPath?: string | null;
@@ -181,11 +157,7 @@ export interface SeasonM25DriverOptions {
   driveWindows: boolean;
   /** Select the first offered objective per block 0-7 (influence cohort). */
   pickObjectives: boolean;
-  /**
-   * Determinism probe: at the first window block, re-run the window
-   * generation against the exact pre-window run and record both results
-   * (offer generation must be a pure function of the input).
-   */
+  /** Determinism probe: re-run window generation at the first window block. */
   probeWindow?: boolean;
 }
 
@@ -193,10 +165,9 @@ export interface SeasonM25DriverOptions {
 export const M25_TRADE_WINDOW_BLOCKS = [2, 4, 5] as const;
 
 /**
- * Simulates one full season through the authoritative engine pipeline with
- * the M2.5 facts threaded (health, objectives, state chain, windows).
- * Fixture-driven and cohort paths share this single driver; worker counts
- * and chunk order never change the recorded facts.
+ * Simulates one full season through the engine pipeline with M2.5 facts
+ * threaded. Fixture and cohort paths share this driver; worker counts and
+ * chunk order never change the recorded facts.
  */
 export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFacts {
   const state: SeasonBlockRunnerState = createSeasonBlockRunner({
@@ -238,9 +209,8 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
     checkpoints.push(checkpoint);
     postBlock.push({ stateRevision: state.stateRevision, stateDigest: state.stateDigest });
     balanceSnapshots.push({ ...checkpoint.influence.balances });
-    // M2.5: record the locked objective selection with its evaluated success
-    // (the candidate evaluated it at assembly; the run's selections record
-    // is the objective-history source the influence gates measure).
+    // Record the locked objective selection; run selections are the
+    // objective-history source the influence gates measure.
     if (state.objectiveId !== null && checkpoint.objective.objectiveId !== null) {
       state.run = {
         ...state.run,
@@ -266,10 +236,8 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
         blockIndex,
         rootSeed: options.rootSeed,
         humanFranchiseId: state.humanFranchiseId,
-        // M2.5: window generation needs the packaged catalog (positions +
-        // ratings for legality, value bands, and rotation repair); without
-        // it the engine throws SeasonTradeFactsError rather than recording
-        // an unvalidated window.
+        // Window generation needs the packaged catalog (positions + ratings);
+        // otherwise the engine throws SeasonTradeFactsError.
         catalog: state.catalog,
         effects: state.effects,
       };
@@ -297,9 +265,8 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
           stateRevision: result.stateRevision,
           stateDigest: result.stateDigest,
         };
-        // The window advanced the state chain (revision +1); the runner's
-        // facts must match so the next block's command asserts the
-        // post-window revision/digest.
+        // Sync runner facts to the post-window revision/digest so the next
+        // block's command asserts the advanced chain.
         state.stateRevision = result.stateRevision;
         state.stateDigest = result.stateDigest;
         state.effects = result.effects;

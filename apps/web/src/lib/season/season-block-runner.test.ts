@@ -174,6 +174,7 @@ function makeRepository(run: SeasonRun): MockRepository {
     commitSeasonBlock: vi.fn(() => Promise.resolve(undefined)),
     promoteSeasonDraftToRun: vi.fn(() => Promise.resolve(undefined)),
     clearSeasonRun: vi.fn(() => Promise.resolve(undefined)),
+    forceClearActiveSeasonRun: vi.fn(() => Promise.resolve(undefined)),
     savePendingBlock: vi.fn(() => Promise.resolve(undefined)),
     loadPendingBlock: vi.fn(() => Promise.resolve(null)),
     discardPendingBlock: vi.fn(() => Promise.resolve(undefined)),

@@ -70,7 +70,6 @@
 </script>
 
 <section aria-labelledby="team-detail-heading" class="min-w-0" data-season-team-detail>
-  <!-- Franchise masthead -->
   <div class="flex items-center gap-3">
     <SeasonTeamLogo
       {manifest}
@@ -141,7 +140,6 @@
     </p>
   {/if}
 
-  <!-- Locked rotation readout -->
   <div class="mt-6 rounded-xl bg-surface-1 p-4">
     <p class="text-label uppercase text-muted-foreground">Locked rotation</p>
     <div class="mt-3 grid gap-4 sm:grid-cols-2">
@@ -183,7 +181,6 @@
     </p>
   </div>
 
-  <!-- Roster in rotation order -->
   <div class="mt-6">
     <p class="font-mono text-[10px] text-muted-foreground">
       Roster · ten player-season versions · role and minutes from the locked rotation

@@ -222,7 +222,6 @@ export class SeasonTradeInvariantError extends Error {
  */
 export type SeasonEconomyRun = SeasonRun & { effects: SeasonEffectsState };
 
-/** Everything the block commit writes when a trade window opens. */
 export interface SeasonWindowOpenResult {
   trade: SeasonTradeState;
   influence: SeasonInfluenceState;
@@ -266,14 +265,12 @@ export interface SeasonOpenTradeWindowInput {
   effects?: SeasonEffectsState;
 }
 
-/** Derived per-version facts the trade module reads from the catalog. */
 export interface SeasonTradeCatalogFacts {
   playable: ReadonlyMap<string, readonly Position[]>;
   ratings: ReadonlyMap<string, SimulationRatings>;
   primary: ReadonlyMap<string, Position>;
 }
 
-/** Builds the derived facts maps from the packaged catalog. */
 export function seasonTradeCatalogFactsOf(catalog: SeasonDraftCatalog): SeasonTradeCatalogFacts {
   const playable = new Map<string, readonly Position[]>();
   const ratings = new Map<string, SimulationRatings>();
@@ -448,14 +445,12 @@ export function ratioMutuallyWithinBand(ratioBasisPoints: number, size: 1 | 2): 
   return reciprocal >= bounds.lower && reciprocal <= bounds.upper;
 }
 
-/** Every playerVersionId of one franchise's roster, in roster order. */
 export function rosterPlayerVersionIdsOf(run: SeasonRun, franchiseId: string): string[] {
   const roster = run.rosters.find((entry) => entry.franchiseId === franchiseId);
   if (roster === undefined) throw new SeasonTradeInvariantError(`unknown roster ${franchiseId}`);
   return roster.players.map((player) => player.playerVersionId);
 }
 
-/** All AI franchise ids (every franchise except the human's). */
 function aiFranchiseIdsOf(run: SeasonRun, humanFranchiseId: string): string[] {
   return run.league.teams
     .map((team) => team.franchiseId)
@@ -468,7 +463,6 @@ function tradeSeed(rootSeed: string, ...keys: string[]): string {
   return seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.trades, ...keys);
 }
 
-/** A deterministic 0..modulus-1 integer from a sub-seed. */
 function seedInt(seed: string, modulus: number): number {
   return drawHexInt(seed) % modulus;
 }
@@ -510,7 +504,6 @@ function primaryGroupOf(facts: SeasonTradeCatalogFacts, playerVersionId: string)
   return primary === undefined ? null : slotGroupOf(primary);
 }
 
-/** Coarse slot groups a player can play (from the catalog positions). */
 function slotGroupsOf(facts: SeasonTradeCatalogFacts, playerVersionId: string): SlotGroup[] {
   const playable = facts.playable.get(playerVersionId);
   if (playable === undefined) return [];
@@ -519,7 +512,6 @@ function slotGroupsOf(facts: SeasonTradeCatalogFacts, playerVersionId: string): 
   return (['G', 'F', 'C'] as const).filter((group) => groups.has(group));
 }
 
-/** Resulting roster ids after a same-size swap. */
 function swappedRosterIds(
   rosterIds: readonly string[],
   removed: readonly string[],
@@ -569,11 +561,6 @@ interface OfferCandidate {
   rawRatio: number;
 }
 
-/**
- * One deterministic candidate for a human-facing offer: the AI franchise,
- * swap size, outgoing human players, and incoming AI players, plus the raw
- * value ratio. Returns null when the swap would make either roster illegal.
- */
 function humanOfferCandidate(
   context: OfferGenerationContext,
   seedPath: string[],
@@ -624,7 +611,6 @@ function humanOfferCandidate(
   return { aiFranchiseId, size, outgoing, incoming, rawRatio };
 }
 
-/** AI franchises for the offer, ranked and skipping the human + used ones. */
 function rankedAiFranchises(
   context: OfferGenerationContext,
   seedPath: string[],
@@ -800,7 +786,6 @@ function coverageDepthOf(
   return depth;
 }
 
-/** The deterministic fourth human offer purchased with Influence. */
 export function generatedExtraOfferForSpend(
   rootSeed: string,
   run: SeasonEconomyRun,
@@ -1031,7 +1016,6 @@ interface AiSpendResult {
   transactions: SeasonTransactionEntry[];
 }
 
-/** Seeded AI Influence spends at window open (extra-trade-offer + risky-rehab). */
 function applyAiInfluenceSpends(
   run: SeasonRun,
   rootSeed: string,
@@ -1342,7 +1326,6 @@ export function openSeasonTradeWindow(
   };
 }
 
-/** Options for one atomic trade application. */
 export interface SeasonTradeApplicationOptions {
   /** The command id recorded on the immutable trade transaction entry. */
   commandId?: string | null;
@@ -1350,7 +1333,6 @@ export interface SeasonTradeApplicationOptions {
   appliedAtStateRevision?: number;
 }
 
-/** The mutated run plus the two roster-change rows of an applied trade. */
 export interface SeasonTradeApplicationResult {
   /** The mutated run (carries the effects state alongside the snapshot). */
   run: SeasonEconomyRun;
@@ -1465,7 +1447,6 @@ export function applySeasonTrade(
       : row,
   );
 
-  // Deterministic rotation repair for the two affected franchises.
   const rotations = run.rotations.map((rotation) => {
     if (rotation.franchiseId === toFranchiseId) {
       return repairRotationAfterTrade(rotation, facts, toIdsAfter, outgoing, incoming);
@@ -1582,7 +1563,6 @@ export function applySeasonTrade(
   };
 }
 
-/** The block index of a window (null when the trade state lacks the window). */
 function windowBlockIndexOf(run: SeasonRun, windowIndex: number): number | null {
   return (
     run.trade?.windows.find((window) => window.windowIndex === windowIndex)?.blockIndex ?? null
@@ -1642,7 +1622,6 @@ function repairRotationAfterTrade(
   return rotation;
 }
 
-/** Incoming players paired to the outgoing players whose minutes they take. */
 function pairIncomingToOutgoing(
   movedIn: readonly string[],
   movedOut: readonly string[],

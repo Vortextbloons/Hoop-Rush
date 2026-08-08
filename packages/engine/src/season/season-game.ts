@@ -205,7 +205,6 @@ export interface SeasonGameEffectsMode {
   pregamePlayerStates: readonly SeasonPlayerLoadState[];
 }
 
-/** Stable chronological queue order: period, descending game clock, then side. */
 function compareQueueEntries(
   a: { period: number; secondsRemaining: number; side: 'home' | 'away' },
   b: { period: number; secondsRemaining: number; side: 'home' | 'away' },
@@ -218,7 +217,6 @@ function compareQueueEntries(
   return a.side === b.side ? 0 : a.side === 'home' ? -1 : 1;
 }
 
-/** Per-side controller state: roster, rotation facts, unit, events, stints. */
 class SideState {
   readonly side: 'home' | 'away';
   readonly sideIndex: SideIndex;
@@ -246,7 +244,6 @@ class SideState {
   readonly returnEvents: SeasonReturnEvent[] = [];
   /** Open stint: period, immutable open clock, cursor, unit; null between periods. */
   stint: { period: number; openClock: number; cursor: number; unit: string[] } | null = null;
-  /** Events applied at the current boundary. */
   boundaryEvents: { foulOuts: number; removals: number; returns: number } = {
     foulOuts: 0,
     removals: 0,
@@ -295,7 +292,6 @@ class SideState {
     return set;
   }
 
-  /** Consumes whole-minute checkpoint marks crossed at a boundary clock. */
   consumeCheckpoints(period: number, clock: number): boolean {
     if (period > 4) return false;
     const before = this.checkpointIndex;
@@ -428,7 +424,6 @@ class SeasonGameController {
     return result;
   }
 
-  /** Tipoff: removals/returns due at (1, 720), planner initial units, forfeits. */
   private tipoff(): SeasonGameSimulationResult | null {
     this.applyDueRemovals(1, REGULATION_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS, false);
     this.applyDueReturns(1, REGULATION_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS, false);
@@ -543,7 +538,6 @@ class SeasonGameController {
     return null;
   }
 
-  /** Applies every removal due at or before the (period, boundaryClock) boundary. */
   private applyDueRemovals(
     period: number,
     floatClock: number,
@@ -654,7 +648,6 @@ class SeasonGameController {
     return periodEnded || entry.period < period || floatClock <= entry.secondsRemaining;
   }
 
-  /** Removes every active player with six personal fouls at this boundary. */
   private applyFoulOuts(side: SideState, period: number, clock: number): void {
     for (const playerVersionId of side.unit) {
       if (side.fouledOut.has(playerVersionId)) continue;
@@ -693,7 +686,6 @@ class SeasonGameController {
     return list;
   }
 
-  /** Decides whether to plan and with which recorded reason. */
   private planFor(
     side: SideState,
     period: number,
@@ -810,7 +802,6 @@ class SeasonGameController {
     }
   }
 
-  /** Rebuilds the on-court five: prep tables, trip teams, recorder slots. */
   private activateUnit(side: SideState): void {
     const { team, rosterIndices } = this.buildUnitTeam(side);
     this.tripContext.teams[side.sideIndex] = team;
@@ -850,7 +841,6 @@ class SeasonGameController {
     };
   }
 
-  /** Adds the just-played interval to each on-court player's exact seconds. */
   private accumulateStintInterval(side: SideState, period: number, clock: number): void {
     const stint = side.stint;
     if (stint === null) {
@@ -883,7 +873,6 @@ class SeasonGameController {
     stint.cursor = clock;
   }
 
-  /** Emits a coalesced stint when the unit changed or the period ended. */
   private finalizeStint(
     side: SideState,
     period: number,
@@ -1046,7 +1035,6 @@ class SeasonGameController {
   }
 }
 
-/** Season game player input -> possession engine player snapshot. */
 function toSimulationPlayer(player: SeasonGamePlayerInput): SimulationPlayer {
   return {
     playerId: player.playerId,

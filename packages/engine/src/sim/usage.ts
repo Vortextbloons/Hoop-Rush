@@ -106,7 +106,6 @@ export const identityModifiers: PositionResponsibilityModifiers = {
   rimProtection: 1,
 };
 
-/** Selects the possession initiator against precomputed creation-scaled usage weights. */
 export function pickInitiator(
   team: SimulationTeam,
   weights: readonly number[],
@@ -163,7 +162,6 @@ export function actionWeights(
   ];
 }
 
-/** Selects the play type from the initiator's precomputed action weights. */
 export function pickAction(
   initiator: SimulationPlayer,
   weights: readonly number[],
@@ -177,7 +175,6 @@ export function pickAction(
   return rng.weightedPick(ACTION_TYPES, contextual);
 }
 
-/** Probability that an action produces a pass before the shot. */
 export function passProbability(initiator: SimulationPlayer, action: ActionType): number {
   const actionBase =
     action === 'spotUp' || action === 'cut' || action === 'transition'
@@ -198,13 +195,11 @@ export function passProbability(initiator: SimulationPlayer, action: ActionType)
   );
 }
 
-/** Precomputed teammate shot weights for one initiator and action class. */
 export interface TeammateShotWeights {
   teammates: SimulationPlayer[];
   weights: number[];
 }
 
-/** Roll and pass variants of the teammate shot weights for one initiator. */
 export interface TeammateShots {
   roll: TeammateShotWeights;
   pass: TeammateShotWeights;
@@ -234,7 +229,6 @@ export function teammateShotWeights(
   return { teammates, weights };
 }
 
-/** Selects whether the initiator passes and, if so, a teammate shooter. */
 export function pickShot(
   shots: TeammateShots,
   initiator: SimulationPlayer,
@@ -294,7 +288,6 @@ export function pickAssister(
   return rng.weightedPick(candidates, assisterWeights(team, shooter, initiator));
 }
 
-/** Weight profile for a defender based on zone-relevant defense only. */
 function defenderWeight(defender: SimulationPlayer, zone: ShotZone): number {
   const zoneRating =
     zone === 'rim' || zone === 'shortMid'
@@ -320,7 +313,6 @@ export interface DefenderBase {
   matchMatrix: number[][];
 }
 
-/** Builds the per-game defender selection base for one team. */
 export function defenderBase(
   team: SimulationTeam,
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
@@ -511,7 +503,6 @@ export interface ZonePrep {
   base: number[];
 }
 
-/** Computes the pristine zone prep for one player. */
 export function zonePrep(shooter: SimulationPlayer, profile: EraSimulationProfile): ZonePrep {
   const blend = blendedZoneWeights(shooter, profile);
   const targetThreeRate = threePointTarget(shooter, profile);
@@ -566,12 +557,10 @@ export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone
   return rng.weightedPick(ZONES, applyZonePulls(action, prep.base, prep.driveRate));
 }
 
-/** Whether a zone is worth three points. */
 export function isThreePointZone(zone: ShotZone): boolean {
   return zone === 'cornerThree' || zone === 'aboveBreakThree';
 }
 
-/** Zone-based skill rating the shooter brings to a shot. */
 export function zoneSkillRating(player: SimulationPlayer, zone: ShotZone): number {
   switch (zone) {
     case 'rim':

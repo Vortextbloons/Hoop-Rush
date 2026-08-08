@@ -37,31 +37,15 @@ import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 /**
  * `season trade calibrate` (spec/2.0 M2.5, contract §17): freezes
  * `trade-targets-v1` from seasons that open trade windows at blocks 2/4/5
- * through the engine economy (`openSeasonTradeWindow`, §20 frozen shape).
- * The human franchise never acts in the cohort, so every accepted offer in
- * the recorded trade state is AI activity; the season-level gate freezes the
- * mean accepted AI trades per season in [8, 15] (LEAD DECISION, contract
- * §13: window targets 3-6 AI trades each across three windows).
- *
- * Gates (frozen):
- * - AI trades per season mean within [8, 15] (range gate over the cohort
- *   mean).
- * - zero illegal trades / zero duplicate-ownership trades: post-season every
- *   roster holds exactly ten distinct versions, the league owns 300 unique
- *   versions, and every roster keeps a legal five after any removal with
- *   valid rotation legality.
- * - accepted offers respect their value bands: `qualified` true and the
- *   ratio inside the frozen 85-115 (1-for-1) / 80-120 (2-for-2) bands.
- * - deterministic offer generation: the first window is re-generated from
- *   the exact pre-window run state and must produce identical offers.
- * - chemistry invariants: 45 canonical pairs per roster (1,350 league-wide)
- *   and every pair created by a trade carries zero-state chemistry (zero
- *   shared possessions in the effects state).
- *
- * Cohort sizes (documented): 8 calibration + 4 held-out seasons (seasons are
- * the expensive unit; the mean-across-seeds gate has ~1.1 trade error at the
- * expected per-season variance, comfortably inside the [8, 15] band). The
- * runner is in-process (a worker variant is deferred to stay bounded).
+ * through the engine economy. The human franchise never acts, so every
+ * accepted offer is AI activity; the season gate freezes the mean accepted
+ * AI trades per season in [8, 15] (LEAD DECISION, contract §13). Other
+ * frozen gates: zero illegal / duplicate-ownership trades, accepted offers
+ * inside the frozen value bands (85-115 1-for-1, 80-120 2-for-2),
+ * deterministic offer generation, and chemistry invariants (45 canonical
+ * pairs per roster, 1,350 league-wide, zero-state chemistry on traded
+ * pairs). Cohort: 8 calibration + 4 held-out seasons (seasons are the
+ * expensive unit); the runner is in-process (a worker variant is deferred).
  */
 
 export const SEASON_TRADE_CALIBRATE_OPTIONS: Record<string, boolean> = {
@@ -268,7 +252,6 @@ export function rosterAuditFailuresOf(season: SeasonM25SeasonFacts): {
   return { illegal, duplicateOwnership: 0 };
 }
 
-/** The ten-player rosters recorded at season start (the base run fixture). */
 function initialRostersOf(run: SeasonRun): string[][] {
   return run.rosters.map((roster) => roster.players.map((player) => player.playerVersionId));
 }
@@ -311,7 +294,6 @@ export function chemistryFailuresOf(season: SeasonM25SeasonFacts): {
   return { pairs, pairFailures, zeroStateNewPairFailures };
 }
 
-/** Trade cohort args shared by run and validate modes. */
 export interface SeasonTradeArgs {
   input: string | null;
   'seed-from': string | null;
@@ -338,7 +320,6 @@ export interface SeasonTradeCohortFacts {
   deterministicOffers: boolean;
 }
 
-/** Evaluates the frozen trade gates over the cohort seasons. */
 export function evaluateTradeGates(args: {
   calibration: SeasonM25SeasonFacts[];
   heldOut: SeasonM25SeasonFacts[];
@@ -431,7 +412,6 @@ export function evaluateTradeGates(args: {
   };
 }
 
-/** Validates a committed trade-targets artifact (--validate mode). */
 export function validateSeasonTradeTargets(args: SeasonTradeArgs, outPath: string): CliReport {
   void args;
   return validateTargetsArtifact({

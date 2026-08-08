@@ -43,7 +43,6 @@ function mean(values: readonly number[]): number {
   return total / values.length;
 }
 
-/** Measures the five required balance dimensions for a legal five-player team. */
 export function evaluateLineupBalance(team: SimulationTeam): LineupBalance {
   const creationValues: number[] = [];
   const shootingValues: number[] = [];

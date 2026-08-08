@@ -258,7 +258,6 @@
   </section>
 
   {#if seasonComplete}
-    <!-- Regular season complete -->
     <section
       aria-labelledby="season-complete-heading"
       class="flex flex-col gap-3 rounded-none bg-surface-1 p-4 sm:rounded-xl sm:p-5"

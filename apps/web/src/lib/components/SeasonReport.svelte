@@ -229,7 +229,6 @@
   }
 </script>
 
-<!-- Final record and League MVP -->
 <div
   class="mt-8 rounded-2xl border border-line-strong bg-card p-6 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:p-8"
   title={modeLabel}
@@ -320,7 +319,6 @@
     </div>
   </div>
 
-  <!-- The full 82-game strip -->
   <div class="mt-6 rounded-xl border border-border bg-surface-1 p-3 sm:p-4">
     <GameStrip {run} games={run.games} compact />
   </div>
@@ -461,7 +459,6 @@
   </div>
 </div>
 
-<!-- How the five won: thresholded comparisons of recorded season data -->
 <section aria-labelledby="how-won-heading" class="mt-6 rounded-xl border border-border bg-card p-5">
   <h2 id="how-won-heading" class="font-display text-xl font-extrabold tracking-tight uppercase">
     How your five won
@@ -517,7 +514,6 @@
   </p>
 </section>
 
-<!-- Five-player season table directly below the record -->
 <section
   aria-labelledby="season-table-heading"
   class="mt-6 rounded-xl border border-border bg-card p-5"
@@ -765,7 +761,6 @@
   {/if}
 </section>
 
-<!-- Aggregate facts -->
 <div class="mt-6">
   <section aria-labelledby="facts-heading" class="rounded-xl border border-border bg-card p-5">
     <h2 id="facts-heading" class="font-display text-xl font-extrabold tracking-tight uppercase">

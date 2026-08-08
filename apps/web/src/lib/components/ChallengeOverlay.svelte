@@ -171,7 +171,6 @@
       </div>
     </div>
 
-    <!-- The 82-cell strip -->
     <div class="mt-6 rounded-xl border border-border bg-card p-4 sm:p-5">
       <GameStrip {run} games={run.games} />
       <div class="mt-3 flex flex-wrap items-center gap-4 font-mono text-[10px] uppercase">
@@ -204,7 +203,6 @@
       </div>
     </div>
 
-    <!-- Actions -->
     <div class="mt-6 flex flex-wrap items-center gap-3">
       {#if phase === 'running'}
         <button

@@ -92,11 +92,9 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
       if (urls.modelUrl === undefined || urls.modelHash === undefined) {
         throw missingModelError();
       }
-      // The wire is type-only (no worker-side Zod validation), and the
-      // structure arrives from the shell's `$state` rotation editor — a
-      // Svelte 5 reactive proxy that `postMessage` cannot clone. Rebuild the
-      // request from validated plain objects so the worker boundary never
-      // sees a proxy (mirror of the block worker's both-ends Zod boundary).
+      // The wire is type-only; the structure arrives from the shell's `$state`
+      // rotation editor — a Svelte 5 reactive proxy `postMessage` cannot clone.
+      // Rebuild from validated plain objects so the worker never sees a proxy.
       const request: ProjectionRotationOptimizeRequest = {
         type: 'optimize-rotation',
         requestId: newSeasonId('proj'),
@@ -158,10 +156,15 @@ class ProjectionWorkerClient {
 
   private ensureWorker(): Worker {
     if (this.worker !== null) return this.worker;
-    const worker = new Worker(
-      this.deps.workerUrl ?? new URL('../../workers/season-projection-worker.ts', import.meta.url),
-      { type: 'module' },
-    );
+    // Vite bundles a worker only when `new URL(..., import.meta.url)` appears
+    // literally in `new Worker`; an indirection copies the .ts as a public
+    // asset that GitHub Pages serves as video/mp2t, which browsers reject.
+    const worker =
+      this.deps.workerUrl !== undefined
+        ? new Worker(this.deps.workerUrl, { type: 'module' })
+        : new Worker(new URL('../../workers/season-projection-worker.ts', import.meta.url), {
+            type: 'module',
+          });
     worker.addEventListener('message', (event: MessageEvent<ProjectionWorkerResponse>) => {
       const message = event.data;
       const entry = this.pending.get(message.requestId);

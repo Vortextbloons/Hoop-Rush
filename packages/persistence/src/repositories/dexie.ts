@@ -75,8 +75,8 @@ export class HoopRushDatabase extends Dexie {
         history: 'recordId',
       })
       .upgrade(async (tx) => {
-        // Legacy v1 active row: the full run record at recordId 'active'.
-        // Split it into the checkpoint plus one game row per accepted game.
+        // Legacy v1 active row: split the full run into a checkpoint plus one
+        // game row per accepted game.
         const legacy = await tx.table<StoredRunRecord, string>('active').get(ACTIVE_RECORD_ID);
         if (legacy === undefined) return;
         const validated = storedRunRecordSchema.parse(legacy);
@@ -102,15 +102,12 @@ export class HoopRushDatabase extends Dexie {
     this.version(4).stores({
       classicDrafts: 'recordId',
     });
-    // v4 is additive (one new table). The checkpoint fields variant and
-    // classicDraft are optional, so existing saves (v1 split rows, v2 full
-    // records, v3 checkpoints) all remain valid under v4.
+    // v4 is additive (one new table); existing saves remain valid.
     this.version(5).stores({
       seasonDrafts: 'recordId',
     });
-    // v5 is additive (one new self-contained table for the M2.1 Season draft).
-    // Older saves keep every existing table and row untouched, so no upgrade
-    // hook is needed: v5 only creates the new table in the database.
+    // v5 is additive (one new self-contained table); older saves stay untouched,
+    // so no upgrade hook is needed.
     this.version(6).stores({
       seasonRuns: 'recordId',
       seasonRunSummaries: '[runId+gameId], runId, blockIndex',
@@ -118,20 +115,14 @@ export class HoopRushDatabase extends Dexie {
       seasonRunBlocks: '[runId+blockIndex], runId',
       seasonRunIndex: 'recordId',
     });
-    // v6 is additive (five new self-contained tables for the M2.3 Season Run
-    // persistence: checkpoint, compact summaries, retained details, accepted
-    // block history, and the active-run index). Older saves keep every
-    // existing table and row untouched, so no upgrade hook is needed: v6 only
-    // creates the new tables in the database.
+    // v6 is additive (five new M2.3 Season Run tables); older saves stay
+    // untouched, so no upgrade hook is needed.
     this.version(7).stores({
       seasonPendingBlocks: 'runId',
     });
-    // v7 is additive (one new self-contained table for the M2.5 interrupted-
-    // block pending candidate, one row per run). Older saves keep every
-    // existing table and row untouched, so no upgrade hook is needed: v7 only
-    // creates the new table in the database. Save-schema-v3 rows (M2.4 runs)
-    // surface through the typed incompatibility flow; they are never
-    // migrated.
+    // v7 is additive (one new M2.5 pending-block table); older saves stay
+    // untouched, so no upgrade hook is needed. Save-schema-v3 rows (M2.4 runs)
+    // surface through the typed incompatibility flow; they are never migrated.
   }
 }
 

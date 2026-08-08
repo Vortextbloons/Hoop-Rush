@@ -95,7 +95,6 @@ export const setSeasonRotationCommandSchema = z
   });
 export type SetSeasonRotationCommand = z.infer<typeof setSeasonRotationCommandSchema>;
 
-/** Accepted/rejected result of a rotation-editing command. */
 export const seasonRotationCommandResultSchema = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('accepted'),
@@ -113,7 +112,6 @@ export const seasonRotationCommandResultSchema = z.discriminatedUnion('status', 
 ]);
 export type SeasonRotationCommandResult = z.infer<typeof seasonRotationCommandResultSchema>;
 
-/** Pregame availability entry for one rostered version. */
 export const seasonGameAvailabilitySchema = z.object({
   playerVersionId: playerVersionIdSchema,
   available: z.boolean(),
@@ -126,10 +124,10 @@ export type SeasonRemovalReason = z.infer<typeof seasonRemovalReasonSchema>;
 
 /**
  * Deterministic same-game removal, honored at the next legal boundary after
- * the recorded game clock. Production M2.2 inputs carry an empty list;
- * tests and CLI fixtures inject removals to exercise contingency behavior.
- * M2.5 adds the `injury` reason for seeded injury removals; the injected
- * fixture reason is kept for deterministic contingency tests.
+ * the recorded game clock. Production M2.2 inputs carry an empty list; tests
+ * and CLI fixtures inject removals to exercise contingency behavior. M2.5
+ * adds the `injury` reason for seeded injury removals; the injected fixture
+ * reason is kept for deterministic contingency tests.
  */
 export const seasonRemovalSchema = z.object({
   side: z.enum(['home', 'away']),
@@ -148,10 +146,10 @@ export type SeasonReturnReason = z.infer<typeof seasonReturnReasonSchema>;
 
 /**
  * Deterministic same-game return, applied at the next legal substitution
- * boundary at/after the recorded clock (mirror of removals); returned
- * players re-enter only at legal boundaries, so all minute/accounting
- * invariants hold. Production M2.5 block inputs carry the health seam's
- * returns; zero-injury inputs carry an empty list.
+ * boundary at/after the recorded clock (mirror of removals); returned players
+ * re-enter only at legal boundaries, so minute/accounting invariants hold.
+ * Production M2.5 block inputs carry the health seam's returns; zero-injury
+ * inputs carry an empty list.
  */
 export const seasonReturnSchema = z.object({
   side: z.enum(['home', 'away']),
@@ -190,7 +188,6 @@ export const seasonGamePlayerInputSchema = z
   .strict();
 export type SeasonGamePlayerInput = z.infer<typeof seasonGamePlayerInputSchema>;
 
-/** One ten-player Season side. */
 export const seasonGameTeamInputSchema = z.object({
   teamId: z.string().min(1).max(64),
   displayName: z.string().min(1).max(96),
@@ -202,12 +199,12 @@ export type SeasonGameTeamInput = z.infer<typeof seasonGameTeamInputSchema>;
 /**
  * Everything needed to reproduce one Season game: seed, game number,
  * versions, era profile, both ten-player rosters, both v2 rotations, and
- * pregame availability. `removals` is the M2.5 injury seam (reason
- * `injury`) plus the injected fixture reason; `returns` is the M2.5
- * same-game-return seam (reason `injury-return`); both are empty in
- * zero-injury inputs, which must reproduce the v3 result byte-for-byte.
- * `homeCourt` is the M2.3 home-court profile; omitting it uses the neutral
- * (zero) adapter, which is byte-identical to the M2.2 fixed-five path.
+ * pregame availability. `removals` and `returns` are the M2.5 injury seams
+ * (reasons `injury` / `injury-return`) plus the injected fixture reason;
+ * both are empty in zero-injury inputs, which must reproduce the v3 result
+ * byte-for-byte. `homeCourt` is the M2.3 home-court profile; omitting it
+ * uses the neutral (zero) adapter, byte-identical to the M2.2 fixed-five
+ * path.
  */
 export const seasonGameSimulationInputSchema = z
   .object({
@@ -426,7 +423,6 @@ export const seasonGamePlayerResultSchema = z.object({
 });
 export type SeasonGamePlayerResult = z.infer<typeof seasonGamePlayerResultSchema>;
 
-/** One side of a completed Season game. */
 export const seasonGameSideResultSchema = z.object({
   teamId: z.string().min(1).max(64),
   displayName: z.string().min(1).max(96),
@@ -479,7 +475,6 @@ export const seasonGameSideResultSchema = z.object({
 });
 export type SeasonGameSideResult = z.infer<typeof seasonGameSideResultSchema>;
 
-/** Shared completed/forfeit metadata. */
 const seasonGameResultBaseSchema = z.object({
   schemaVersion: z.literal(1),
   seed: seedSchema,
@@ -490,7 +485,6 @@ const seasonGameResultBaseSchema = z.object({
   winner: z.enum(['home', 'away']),
 });
 
-/** Forfeit trigger kinds. */
 export const seasonForfeitTriggerSchema = z.enum([
   'no-legal-five-tipoff',
   'no-legal-five-after-removal',
@@ -504,8 +498,8 @@ export type SeasonForfeitTrigger = z.infer<typeof seasonForfeitTriggerSchema>;
  * deviations, foul-outs, removals, and M2.5 return events. `forfeit` is the
  * official 2-0 result with the losing franchise and trigger fact and no
  * player statistics (M2.5 adds the `human-interruption-forfeit` trigger for
- * interrupted blocks). `noLegalFiveBoth` is returned instead of arbitrarily
- * choosing a loser when both teams are invalid before tipoff.
+ * interrupted blocks). `noLegalFiveBoth` is returned when both teams are
+ * invalid before tipoff rather than arbitrarily choosing a loser.
  */
 export const seasonGameSimulationResultSchema = z.discriminatedUnion('outcome', [
   seasonGameResultBaseSchema.extend({

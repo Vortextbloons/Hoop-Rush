@@ -32,9 +32,8 @@ export { sha256Hex };
 export { readJsonFile };
 
 /**
- * Season Run M2.1 CLI data loading: the packaged draft catalog, the frozen
- * league, and validated draft-state inputs. Every artifact is schema-checked
- * at the boundary; catalog/league hashes are verified against the manifest.
+ * Season Run M2.1 CLI data loading. Every artifact is schema-checked at the
+ * boundary; catalog/league hashes are verified against the manifest.
  */
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
@@ -70,7 +69,6 @@ export function loadSeasonDraftCatalog(
   return parsed.data;
 }
 
-/** Loads the packaged frozen league artifact. */
 export function loadSeasonLeague(leaguePath: string = DEFAULT_LEAGUE): SeasonLeague {
   const parsed = seasonLeagueSchema.safeParse(readJsonFile(leaguePath));
   if (!parsed.success) {
@@ -126,7 +124,6 @@ export function loadSeasonRosterTargets(
   return parsed.data;
 }
 
-/** Validates a draft-state input file (used by reproduce/generate). */
 export function loadDraftStateInput(path: string): SeasonDraftState {
   const parsed = seasonDraftStateSchema.safeParse(readJsonFile(path));
   if (!parsed.success) {
@@ -137,7 +134,6 @@ export function loadDraftStateInput(path: string): SeasonDraftState {
   return parsed.data;
 }
 
-/** Resolves a relative artifact path against the manifest directory. */
 export function resolveArtifact(manifestDir: string, url: string): string {
   return isAbsolute(url) ? url : resolve(manifestDir, url);
 }

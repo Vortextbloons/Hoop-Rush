@@ -25,7 +25,6 @@ const CLOSING_WINDOW_SECONDS = OVERTIME_PERIOD_SECONDS;
 /** Non-close traces use a margin that never triggers the closing window. */
 const NON_CLOSE_MARGIN = 20;
 
-/** One distinct on-court five and its planned minutes. */
 export interface RotationTraceUnit {
   players: readonly string[];
   minutes: number;
@@ -115,7 +114,6 @@ function unitKey(unit: readonly string[]): string {
   return [...unit].sort().join(',');
 }
 
-/** Planner context for a rotation: playable map plus target seconds. */
 export function traceContext(input: {
   rotation: SeasonRotation;
   members: ReadonlyMap<string, readonly Position[]>;
@@ -127,12 +125,10 @@ export function traceContext(input: {
   return { rotation: input.rotation, members: input.members, targets };
 }
 
-/** Normal (non-close) rotation trace. */
 export function traceRotationNormal(context: PlannerRotationContext): RotationTraceResult {
   return trace(context, false);
 }
 
-/** Close-game rotation trace (closing-window preference in the final five). */
 export function traceRotationClose(context: PlannerRotationContext): RotationTraceResult {
   return trace(context, true);
 }

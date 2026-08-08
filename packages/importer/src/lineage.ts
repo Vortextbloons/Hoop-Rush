@@ -1143,13 +1143,11 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
   },
 ];
 
-/** First NBA season of a modern slot (for unavailable-combination display). */
 export function firstSupportedSeason(franchiseId: string): string | null {
   const first = LINEAGE_SEGMENTS.find((s) => s.modernFranchiseId === franchiseId);
   return first?.validFromSeasonKey ?? null;
 }
 
-/** Resolves a season to the historical identity that owned it, if any. */
 export function resolveHistoricalIdentity(
   franchiseId: string,
   season: string,

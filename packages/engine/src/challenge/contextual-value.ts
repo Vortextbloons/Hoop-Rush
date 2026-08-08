@@ -98,7 +98,6 @@ function negativeReason(
   return { code, direction: 'negative', label, measuredValue, comparisonValue, priority };
 }
 
-/** Evaluate a candidate against the four players already around them. */
 export function evaluateLineupFit(
   candidate: SimulationPlayer,
   teammates: readonly SimulationPlayer[],
@@ -213,7 +212,6 @@ export function evaluateLineupFit(
   };
 }
 
-/** Evaluate a candidate's marginal value against the completed lineup and next opponent. */
 export function evaluateMatchup(
   candidate: SimulationPlayer,
   lineup: readonly SimulationPlayer[],

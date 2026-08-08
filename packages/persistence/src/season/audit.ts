@@ -24,63 +24,15 @@ import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
  * agrees with the stored checkpoint and a corrupt row or a half-applied
  * block is detected instead of entering app state.
  *
- * Checks:
- * - schedule identity: every summary matches its schedule game, every
- *   completed round is fully covered, and no game is counted twice.
- * - standings reconcile exactly with the finalized game records
- *   (`reduceSeasonStandings` over the reconstructed games).
- * - every stored summary row is accounted for in the aggregates
- *   (`foldSeasonTeamAggregates` / `foldSeasonPlayerAggregates` agree with
- *   the stored tables exactly).
- * - block history chain: revisions are contiguous 0..n-1, per-block
- *   summary counts match the stored rows, completedRounds never regresses
- *   and matches each block boundary, and the checkpoint's cursor facts
- *   (lastCommandId / lastRotationDigest / lastCheckpointDigest) agree with
- *   the last accepted block.
- * - retention policy: retained detail rows cover human-team games only and
- *   reference a stored summary.
- * - M2.4 effects state: exactly 300 player load states and 1,350 pair
- *   states, unique playerVersionIds, unique pairs, canonical a<b pair
- *   ordering, every pair member present in the player states, all
- *   fatigue/recentLoad within 0..10,000, lastCompletedRound within 0..82
- *   and never beyond the checkpoint's completedRounds, sharedPossessions
- *   within 0..10,000,000, and the effects player set exactly equal to the
- *   union of the 30 rosters' players.
- * - M2.5 health state: every injury references a known player-version id
- *   (union of the rosters) and a league franchise, its occurrence game
- *   exists in the schedule, season-ending injuries carry the sentinel
- *   `missedGamesRemaining`, non-eligible injuries never resolve a same-game
- *   return, and a positive recurrence window implies an actual return.
- * - M2.5 Influence reconciliation: every ledger entry reconciles
- *   (`balanceAfter === balanceBefore + appliedDelta`, walking each
- *   franchise's entries in order), the stored balances equal the ledger
- *   recomputation, applied deltas equal requested deltas except for
- *   cap-applied grants (0 applied above the +8 cap), and every rehab state
- *   references a recorded injury.
- * - M2.5 transaction chain: `appliedAtStateRevision` is monotonic
- *   non-decreasing and never beyond the stored stateRevision.
- * - M2.5 state chain: accepted-block `stateRevision` is strictly increasing
- *   (at least +1 per commit) and never beyond the stored stateRevision, the
- *   stored `stateDigest` recomputes exactly through
- *   `seam.seasonRunStateDigest`, and `checkpointState` matches the last
- *   accepted block exactly (null when no block was accepted).
- * - M2.5 effects-with-trade divergence rule (LEAD DECISION, documented):
- *   `run.effects` may differ from the checkpoint's effects only for blocks
- *   where a trade window opened. Accepted blocks do not persist their
- *   effects, so the checkable form is the state chain: when no window ever
- *   opened (`trade === null`) and no command applied after the last commit
- *   (`stored.stateRevision === lastBlock.stateRevision`), the stored facts
- *   (including effects) must be byte-identical to the facts the last
- *   checkpoint digested — i.e. the last accepted block's `stateDigest`
- *   recomputes over the stored facts. A window open is the only legal
- *   divergence point.
- * - M2.5 trade state: at most three windows, in windowIndex order, opened
- *   by the accepted blocks 2/4/5 (matching windowIndex 0/1/2) and never by
- *   an unaccepted block, offer ids unique per window with matching
- *   windowIndex, and closed windows carry no open offers (expiry at close).
- * - M2.5 pending-block consistency: a pending candidate for an already
- *   committed blockIndex is an error (the commit deletes the pending row in
- *   the same transaction, so a leftover row means a bug).
+ * Checks: schedule identity/coverage, standings and aggregate reconciliation,
+ * the block history chain (contiguous revisions, boundary rounds, cursor
+ * facts, monotonic state chain), the retention policy, the M2.4 effects
+ * state, the M2.5 health/Influence/transaction/state-chain/trade facts, and
+ * pending-block consistency. The M2.5 effects-with-trade divergence rule
+ * (LEAD DECISION, documented): a window open is the only legal point where
+ * `run.effects` may differ from the checkpoint effects; when no window ever
+ * opened and no command applied after the last commit, the stored facts must
+ * be byte-identical to what the last accepted block digested.
  */
 export interface SeasonRunAuditFacts {
   league: SeasonLeague;

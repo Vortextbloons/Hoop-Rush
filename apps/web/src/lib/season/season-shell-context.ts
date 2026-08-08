@@ -25,20 +25,14 @@ import type { SeasonFaceRef } from './season-branding';
 import type { RotationEditor } from './season-rotation-editor';
 
 /**
- * Season Run shell context (M2.3.5, M2.5). The `/season/run` route-group
- * layout owns one `SeasonRunShellData` instance for the lifetime of the
- * active run: the shared `SeasonHubState` (snapshot, block runner), packaged
- * assets, branding join, and derived run facts. Pages under `/season/run/*`
- * read the shell from context, so switching tabs never reloads IndexedDB and
- * never terminates an in-flight block worker. The shell is destroyed only
- * when the user leaves the run group (or reloads).
- *
- * The layout holds the instance in `$state` and mirrors hub events into it;
- * components read the reactive proxy directly from context. M2.5 adds the
- * run-state mirrors (`health`, `influence`, `trade`, `objectives`), the
- * interruption/pending mirrors, and the typed command actions
- * (`selectBlockObjective`, `spendInfluence`, `acceptTradeOffer`,
- * `declineTradeOffer`, `forfeitInterruptedGame`, `resumeBlock`).
+ * Season Run shell context (M2.3.5, M2.5). The `/season/run` layout owns one
+ * `SeasonRunShellData` instance for the lifetime of the active run (shared
+ * `SeasonHubState`, packaged assets, branding join, derived run facts), so
+ * switching tabs never reloads IndexedDB and never terminates an in-flight
+ * block worker. The shell is destroyed only when leaving the run group or on
+ * reload. M2.5 adds the run-state mirrors (`health`, `influence`, `trade`,
+ * `objectives`), the interruption/pending mirrors, and the typed command
+ * actions.
  */
 export const SEASON_RUN_SHELL_CONTEXT = Symbol('season-run-shell');
 
@@ -47,6 +41,8 @@ export interface SeasonRunShellData {
   ready: boolean;
   /** Shell-level load error (asset or repository failure). */
   error: string | null;
+  /** Hub refresh error (corrupt or unrecoverable persisted run). */
+  hubError: string | null;
   hub: SeasonHubState | null;
   snapshot: SeasonRunSnapshot | null;
   index: SeasonActiveRunIndex | null;
@@ -120,6 +116,7 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
   return {
     ready: false,
     error: null,
+    hubError: null,
     hub: null,
     snapshot: null,
     index: null,

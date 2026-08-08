@@ -66,7 +66,6 @@ export function seasonBenchmarkBlock(args: {
   });
   const perBlock: Array<{ blockIndex: number; digest: string; durationMs: number }> = [];
 
-  // Normal block (0).
   const normal = timed(state, 0);
   perBlock.push({ blockIndex: 0, digest: normal.digest, durationMs: normal.durationMs });
   const normalWithinBudget = normal.durationMs <= SEASON_BUDGET_NORMAL_BLOCK_MS;

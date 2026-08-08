@@ -21,12 +21,11 @@ import type { StoredClassicDraft } from './classic-draft-record.ts';
  * Stored-record schemas for IndexedDB (and any future adapter). Persistence
  * wraps the accepted domain ChallengeRun with storage metadata; it never
  * implements game rules or stores unaccepted state. Every read validates the
- * stored value at the runtime boundary, so corrupt records are surfaced
- * instead of silently entering application state.
+ * stored value at the runtime boundary, so corrupt records surface instead of
+ * silently entering app state.
  *
  * The active run is append-only: a checkpoint holds every run field except
  * the games array, and one game row per accepted game accumulates next to it.
- * The completed table keeps the full run record unchanged.
  */
 
 export const storedRunRecordSchema = z.object({
@@ -41,8 +40,7 @@ export type StoredRunRecord = z.infer<typeof storedRunRecordSchema>;
 
 /**
  * Active-run checkpoint (save schema 3): every ChallengeRun field except the
- * games array, plus the progress-carrying fields kept current by every
- * append. The games array is reconstructed on load from active game rows.
+ * games array, plus progress-carrying fields kept current by every append.
  */
 const activeRunCheckpointBaseSchema = challengeRunSchema.omit({
   schemaVersion: true,
@@ -55,8 +53,7 @@ export const activeRunCheckpointSchema = activeRunCheckpointBaseSchema.extend({
   /** Narrowed: an abandoned run is never stored as the active checkpoint. */
   status: z.enum(['active', 'finished']),
   /**
-   * Number of accepted games, kept current by every append. Absent on legacy
-   * checkpoints; loaders fall back to counting game rows.
+   * Number of accepted games; absent on legacy checkpoints (loaders count rows).
    */
   gamesPlayed: z.number().int().min(0).max(82).optional(),
   updatedAtIso: z.iso.datetime().optional(),
@@ -68,9 +65,7 @@ type CheckpointCarriedRunFields = z.infer<typeof activeRunCheckpointBaseSchema>;
 
 /**
  * Field names carried between the full run and the checkpoint, derived from
- * the checkpoint base schema's own shape so the two directions can never
- * drift apart: a rename or reshape of `challengeRunSchema` updates this list
- * (and the omit above) automatically.
+ * the checkpoint base schema's own shape so the two directions cannot drift.
  */
 const CHECKPOINT_CARRIED_FIELD_NAMES: readonly (keyof CheckpointCarriedRunFields)[] = Object.keys(
   activeRunCheckpointBaseSchema.shape,
@@ -106,8 +101,8 @@ export interface ActiveGameAppend {
 
 /**
  * Reduces a fresh full run record (empty games array) to a checkpoint. The
- * record is already a validated `StoredRunRecord` at this boundary; only the
- * append-only preconditions are checked here.
+ * record is already a validated `StoredRunRecord`; only the append-only
+ * preconditions are checked here.
  */
 export function checkpointFromRun(record: StoredRunRecord): ActiveRunCheckpoint {
   if (record.run.games.length !== 0) {
@@ -129,8 +124,7 @@ export function checkpointFromRun(record: StoredRunRecord): ActiveRunCheckpoint 
 
 /**
  * Assembles a ChallengeRun from an already-validated checkpoint and its game
- * rows. Read-time schema validation happens once at the adapter boundary
- * (activeRunCheckpointSchema / storedRunRecordSchema), never here.
+ * rows. Read-time schema validation happens once at the adapter boundary.
  */
 export function runFromCheckpoint(
   checkpoint: ActiveRunCheckpoint,

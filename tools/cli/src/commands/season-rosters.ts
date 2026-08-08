@@ -87,7 +87,6 @@ export const rosterCalibrationSeed = seasonCalibrationSeed;
 /** Order-invariance probe seeds: a small reversed/shuffled-input cohort. */
 export const ORDER_INVARIANCE_SEED_COUNT = 2;
 
-/** Human rosters from a finalized draft state. */
 function humanRostersOf(state: SeasonDraftState): Array<{
   franchiseId: string;
   playerVersionIds: string[];
@@ -273,7 +272,6 @@ interface AuditedLeague {
   humanFranchiseIds: string[];
 }
 
-/** Extracts auditable league facts from a run snapshot or bare result. */
 function auditedLeagueOf(input: unknown, inputPath: string): AuditedLeague {
   const runParse = seasonRunSchema.safeParse(input);
   if (runParse.success) {
@@ -644,12 +642,8 @@ export function seasonRostersAudit(args: {
   );
 }
 
-/**
- * Index-based lower median; kept local because the frozen
- * `roster-targets-v2` measured band medians were authored with it
- * (regeneration must stay byte-identical; see `stats.ts` for the canonical
- * median).
- */
+/** Index-based lower median: keeps regeneration byte-identical with the
+ * frozen `roster-targets-v2` measured medians (see `stats.ts` for canonical). */
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -710,11 +704,7 @@ async function runOrderInvarianceChunk(args: {
 }
 
 export interface SeasonRostersCalibrateDeps {
-  /**
-   * Injectable cohort runner. Tests substitute deterministic doubles for the
-   * worker-thread chunks; the default runs the authoritative
-   * `rosters-calibration-worker` with the same chunking.
-   */
+  /** Injectable cohort runner (tests substitute deterministic doubles). */
   runCohort?: (args: {
     seeds: string[];
     catalogPath: string;

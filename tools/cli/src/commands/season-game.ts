@@ -724,7 +724,6 @@ export async function seasonGameCalibrate(
     heldOutPass &&
     chunkingIndependent;
 
-  // Freeze the targets artifact when every gate passes.
   let targetsWritten = false;
   let targetsPath: string | null = null;
   const gateFailures: string[] = [];
@@ -851,7 +850,6 @@ function formatMedian(value: number | undefined): string {
   return value === undefined ? 'n/a' : value.toFixed(1);
 }
 
-/** True when every successive value is not greater than its predecessor. */
 function nonIncreasing(values: readonly number[]): boolean {
   for (let i = 1; i < values.length; i += 1) {
     const previous = values[i - 1];

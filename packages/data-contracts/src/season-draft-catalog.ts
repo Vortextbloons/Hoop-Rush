@@ -50,7 +50,6 @@ import {
  */
 export const SEASON_DRAFT_CATALOG_V3 = 'season-draft-catalog-v3';
 
-/** One canonical franchise-era pool and its playerVersionId members. */
 export const seasonDraftCatalogPoolSchema = z.object({
   franchiseId: franchiseIdSchema,
   eraId: eraIdSchema,

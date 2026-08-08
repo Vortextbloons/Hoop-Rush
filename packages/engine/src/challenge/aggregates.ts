@@ -61,7 +61,6 @@ function zeroTeamAggregate(): TeamAggregate {
   };
 }
 
-/** Fresh zeroed aggregates for the run's five snapshots, in slot order. */
 export function zeroRunAggregates(players: readonly SimulationPlayer[]): RunAggregates {
   return {
     team: zeroTeamAggregate(),

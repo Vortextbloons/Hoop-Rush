@@ -39,26 +39,19 @@ import {
 } from './season-state-cache';
 
 /**
- * Season Run hub state (spec/2.0/07 background execution, M2.3, M2.5): the
- * single UI-side owner of the accepted snapshot and the live block run. It
- * reads accepted state from the repository, subscribes to the frozen
- * `SeasonBlockRunner` events, and re-reads the snapshot after every
- * `complete`. Block submission builds the typed `SeasonSubmitBlockCommand`
- * (commandId, expectedRevision, blockIndex, rotationDigest, objectiveId,
- * expectedStateRevision/Digest) and hands the runner its
- * `SeasonBlockStartInput`; cancellation and retry route through the same
- * request id.
+ * Season Run hub state (spec/2.0/07, M2.3, M2.5): the single UI-side owner of
+ * the accepted snapshot and the live block run. Reads accepted state from the
+ * repository, subscribes to `SeasonBlockRunner` events, and re-reads the
+ * snapshot after every `complete`. Block submission builds the typed
+ * `SeasonSubmitBlockCommand` and hands the runner its `SeasonBlockStartInput`;
+ * cancellation and retry route through the same request id.
  *
- * M2.5: the hub also issues the typed between-block commands
- * (select-block-objective, spend-influence, accept/decline-trade-offer,
- * forfeit-interrupted-game) through the pure engine handler against the
- * current snapshot state, persists accepted results through
- * `repo.applySeasonRunCommand`, and mirrors the runner's `interrupted`
- * event (pending candidate + typed invalid-roster interruption) for the
- * interruption recovery panel. `resumeBlock` routes through the runner's
- * `SeasonBlockResumeInput` (the interrupted submission's identity facts).
- * The runner (persistence-owned) owns validation, canonical acceptance, and
- * atomic persistence; this module never touches IndexedDB directly.
+ * M2.5: also issues the typed between-block commands (select-block-objective,
+ * spend-influence, accept/decline-trade-offer, forfeit-interrupted-game)
+ * through the pure engine handler, persists results through
+ * `repo.applySeasonRunCommand`, and mirrors the runner's `interrupted` event
+ * for the recovery panel. The runner owns validation, canonical acceptance,
+ * and atomic persistence; this module never touches IndexedDB directly.
  */
 
 export type BlockPhase = 'idle' | 'running' | 'interrupted' | 'cancelled' | 'failed' | 'complete';
@@ -127,8 +120,7 @@ export class SeasonHubState {
   error: string | null = null;
   /**
    * M2.4: a stored run made under an older schema (schema-v4 runs cannot
-   * continue). The run rows are preserved until the user explicitly discards
-   * them through `discardIncompatibleRun`.
+   * continue), preserved until the user explicitly discards it.
    */
   incompatible: SeasonRunIncompatibleInfo | null = null;
   /**
@@ -137,16 +129,13 @@ export class SeasonHubState {
    */
   pending: SeasonPendingBlockCandidate | null = null;
   /**
-   * M2.5: the typed invalid-roster interruption (from the runner event;
-   * null after a reload — the pending candidate still proves the pause).
+   * M2.5: the typed invalid-roster interruption (from the runner event; null
+   * after a reload — the pending candidate still proves the pause).
    */
   interruption: SeasonInvalidRosterInterruption | null = null;
   /** M2.5: the last rejected between-block command, surfaced as a typed alert. */
   commandError: SeasonRunCommandError | null = null;
-  /**
-   * Packaged draft catalog for trade commands (positions + ratings). Set by
-   * the run layout after assets load.
-   */
+  /** Packaged draft catalog for trade commands; set after assets load. */
   catalog: SeasonDraftCatalog | null = null;
 
   constructor(repo: SeasonRunRepository, runner: SeasonBlockRunner) {
@@ -175,8 +164,8 @@ export class SeasonHubState {
     try {
       const index = await this.repo.loadActiveRunIndex();
       if (index !== null && cachedSeasonSnapshotMatches(index.runId, index.revision)) {
-        // The validated snapshot for this exact accepted state is already
-        // loaded; skip the full load + reconciliation audit.
+        // This exact accepted state is already loaded; skip the full load +
+        // reconciliation audit.
         this.snapshot = getCachedSeasonSnapshot();
         this.index = index;
         this.error = null;
@@ -190,10 +179,10 @@ export class SeasonHubState {
         this.incompatible = null;
       } catch (error) {
         if (isSeasonRunIncompatibleError(error)) {
-          // The stored run predates the M2.4 schema: it stays stored, but the
-          // run cannot continue; the UI shows the discard-and-restart screen.
-          // The type guard above narrowed `error`; eslint treats members of
-          // Error-typed values as unsafe, so the info is re-typed explicitly.
+          // The run predates the M2.4 schema: it stays stored but cannot
+          // continue; the UI shows the discard-and-restart screen. The guard
+          // narrowed `error` but eslint treats Error members as unsafe, so the
+          // info is re-typed explicitly.
           const info: SeasonRunIncompatibleInfo = error.info;
           this.snapshot = null;
           this.index = index;
@@ -246,6 +235,31 @@ export class SeasonHubState {
     this.snapshot = null;
     this.index = null;
     await this.refresh();
+  }
+
+  /**
+   * Recovery path for corrupt or unrecoverable saves: wipes the active run,
+   * draft, and session cache without validating run identity.
+   */
+  async clearSeasonData(): Promise<{ ok: boolean; error: string | null }> {
+    try {
+      await this.repo.forceClearActiveSeasonRun();
+      const { DexieSeasonDraftRepository } = await import('@hoop-rush/persistence');
+      await new DexieSeasonDraftRepository().clearSeasonDraft();
+      clearCachedSeasonSnapshot();
+      this.incompatible = null;
+      this.snapshot = null;
+      this.index = null;
+      this.pending = null;
+      this.interruption = null;
+      this.block = { ...IDLE_BLOCK };
+      this.error = null;
+      await this.refresh();
+      return { ok: true, error: null };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, error: `could not clear season data: ${message}` };
+    }
   }
 
   /** Next block index: the accepted-block count (0..8). */
@@ -476,11 +490,10 @@ export class SeasonHubState {
 
   /**
    * Quits the current run: stops an in-flight block (cancel, then terminate
-   * if the worker does not acknowledge), clears the run atomically
-   * (checkpoint, index, summaries, details, blocks), and reloads so the
-   * shell falls back to its empty state. Terminating a stuck worker also
-   * invalidates its pending candidate, so nothing can be committed behind
-   * the clear.
+   * if the worker does not acknowledge), clears the run atomically, and
+   * reloads so the shell falls back to its empty state. Terminating a stuck
+   * worker also invalidates its pending candidate, so nothing can commit
+   * behind the clear.
    */
   async quitRun(): Promise<{ ok: boolean; error: string | null }> {
     if (this.snapshot === null) {
@@ -575,15 +588,14 @@ export class SeasonHubState {
       });
       this.commandError = null;
       // Apply the engine mutation immediately so the hub reflects the
-      // selection before the repository round-trip (and so a stale session
-      // snapshot cache cannot flash the pre-command state back into the UI).
+      // selection before the repository round-trip, and so a stale session
+      // cache cannot flash the pre-command state back into the UI.
       if (this.snapshot !== null) {
         const effects = postCommandEffects(output.run, this.snapshot.effects);
         this.snapshot = { ...this.snapshot, run: output.run, effects };
-        // Between-block commands mutate the run without changing the
-        // accepted-block count. Replace the session cache with the
-        // post-command snapshot so refresh() cannot resurrect the
-        // pre-command trade/roster state keyed to the same revision.
+        // Between-block commands mutate the run without changing the accepted
+        // block count, so refresh() must not resurrect the pre-command state
+        // keyed to the same revision.
         setCachedSeasonSnapshot(this.snapshot);
         this.emit();
       }

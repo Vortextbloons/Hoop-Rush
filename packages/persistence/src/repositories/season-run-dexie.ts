@@ -55,54 +55,42 @@ import {
 
 /**
  * Concrete IndexedDB Season Run repository (spec/2.0/07 persistence,
- * spec/2.0/10 M2.3, M2.4, M2.5). The active Season Run lives in the
- * dedicated v6/v7 tables, isolated from the Challenge and Classic stores:
+ * spec/2.0/10 M2.3, M2.4, M2.5). The active run lives in the dedicated
+ * v6/v7 tables, isolated from the Challenge and Classic stores:
  *
- * - `seasonRuns`      — single checkpoint row at 'season-run' (snapshot
- *   minus the 1,230 scheduled game records, plus cursor facts, standings,
- *   aggregates, recap, the M2.4 effects state, and the M2.5 mutable run
- *   state: health, transactions, influence, trade, objectives,
- *   checkpointState, stateRevision, stateDigest).
- * - `seasonRunSummaries` — one compact summary per completed league game.
- * - `seasonRunDetails`   — one retained detail per human-team game.
- * - `seasonRunBlocks`    — one accepted block per commit (append-only).
- * - `seasonRunIndex`     — single lightweight active-run index row.
- * - `seasonPendingBlocks` (v7) — one interrupted-block pending candidate
- *   per run, keyed by runId.
+ * - `seasonRuns`          — single checkpoint row (snapshot minus the 1,230
+ *   scheduled games, plus cursor facts, standings, aggregates, recap, the
+ *   M2.4 effects state, and the M2.5 mutable run state).
+ * - `seasonRunSummaries`  — one compact summary per completed league game.
+ * - `seasonRunDetails`    — one retained detail per human-team game.
+ * - `seasonRunBlocks`     — one accepted block per commit (append-only).
+ * - `seasonRunIndex`      — single lightweight active-run index row.
+ * - `seasonPendingBlocks` (v7) — one interrupted-block pending candidate per
+ *   run, keyed by runId.
  *
- * `commitSeasonBlock` commits summaries, retained details, aggregates,
- * standings, cursor, revision, command id, recap, the M2.4 effects state,
- * the M2.5 mutable run state, an opened trade window's mutated
- * rosters/ownership/rotations/effects, and digests in ONE Dexie
- * transaction: either every row commits or none does, so no partial block
- * can ever be accepted. Revision regressions, duplicate command ids, and
- * stale expected state facts are rejected inside the transaction, and any
- * pending-block row for the run is deleted with it. Reads validate every
- * record through the stored schemas and run the aggregate + effects +
- * health/influence/transaction/state-chain/trade/pending reconciliation
- * audit; corrupt or half-applied state throws a typed `SeasonRunLoadError`
- * instead of entering app state.
+ * `commitSeasonBlock` writes everything in ONE Dexie transaction: either
+ * every row commits or none does, so no partial block can ever be accepted.
+ * Revision regressions, duplicate command ids, and stale expected state facts
+ * are rejected inside the transaction, and any pending-block row for the run
+ * is deleted with it. Reads validate every record through the stored schemas
+ * and run the reconciliation audit; corrupt or half-applied state throws a
+ * typed `SeasonRunLoadError`.
  *
- * ## Legacy rows (stored save schemas v1, v2, and v3)
+ * ## Legacy rows (stored save schemas v1, v2, v3)
  *
- * Pre-v4 rows (schema-4, schema-5, and schema-6 runs made under older
- * Season rules) are detected with a typed `SeasonRunIncompatibleError` and
+ * Pre-v4 rows are detected with a typed `SeasonRunIncompatibleError` and
  * NEVER deleted automatically: they cannot enter the current simulator, the
  * UI shows the explicit "Season rules changed" discard-and-restart screen,
  * and deletion happens only through `clearSeasonRun(runId)` after user
- * confirmation. A row that is corrupt beyond identification (no valid
- * `saveSchemaVersion`) still throws `SeasonRunLoadError` so corruption
- * never enters app state.
+ * confirmation. A row corrupt beyond identification throws `SeasonRunLoadError`.
  *
  * ## Schedule supply
  *
- * The repository never fetches static assets: `SeasonGame` records are
- * reassembled from the schedule artifact plus the stored summaries via the
- * engine helper `reconstructSeasonGames`, so reload needs the schedule. Pass
- * it to the constructor (used by `loadActiveRun()`) or call
- * `loadActiveRunWithSchedule(schedule)`; the exported convenience function of
- * the same name does the full load for callers that have the artifact at
- * hand. `loadActiveRun()` throws a typed error when no schedule was supplied.
+ * The repository never fetches static assets: games are reassembled from the
+ * schedule artifact plus the stored summaries via `reconstructSeasonGames`, so
+ * reload needs the schedule. Pass it to the constructor or call
+ * `loadActiveRunWithSchedule(schedule)`; `loadActiveRun()` throws a typed error
+ * when none was supplied.
  */
 
 /** Typed error for reload validation failures; never returns corrupt state. */
@@ -128,10 +116,10 @@ function isDevelopmentRow(row: unknown): boolean {
 }
 
 /**
- * M2.5 typed legacy-run detection (schema-4/schema-5/schema-6 runs made
- * under older Season rules). The stored row is preserved byte-for-byte;
- * callers surface the info through the discard-and-restart screen and delete
- * only after the user confirms via `clearSeasonRun(runId)`.
+ * M2.5 typed legacy-run detection (schema-4/schema-5/schema-6 runs under older
+ * Season rules). The stored row is preserved byte-for-byte; callers surface
+ * the info through the discard-and-restart screen and delete only after the
+ * user confirms via `clearSeasonRun(runId)`.
  */
 export class SeasonRunIncompatibleError extends Error {
   readonly info: SeasonRunIncompatibleInfo;
@@ -224,11 +212,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
 
   /**
    * Full validated snapshot; resumes at the last accepted boundary. The
-   * caller supplies the schedule artifact (the repository cannot fetch
-   * static assets); every stored row is validated and the aggregate +
-   * effects reconciliation audit runs before anything is returned. A
-   * stored development row (save-schema v1/v2) is auto-cleared and reported
-   * as null.
+   * caller supplies the schedule artifact (the repository cannot fetch static
+   * assets); every stored row is validated and the reconciliation audit runs
+   * before anything is returned.
    */
   async loadActiveRunWithSchedule(schedule: SeasonSchedule): Promise<SeasonRunSnapshot | null> {
     seasonScheduleSchema.parse(schedule);
@@ -250,7 +236,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     } catch (error) {
       if (
         error instanceof SeasonRunLoadError &&
-        (await this.repairLegacyRotationLockDivergence(error.failures))
+        ((await this.repairLegacyRotationLockDivergence(error.failures)) ||
+          (await this.repairLegacyCommittedStateDigest(error.failures)))
       ) {
         const repaired = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
         if (repaired === undefined) {
@@ -265,16 +252,15 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
   }
 
   /**
-   * Repairs one known pre-fix corruption signature from rotation edits:
-   * the commit stored the submitted rotation set but retained the previous
+   * Repairs one known pre-fix corruption signature from rotation edits: the
+   * commit stored the submitted rotation set but retained the previous
    * accepted lock/checkpoint identity and a state digest over that old set.
    *
-   * This is deliberately fail-closed. It runs only when the reload audit
-   * reports rotation-lock/state-digest divergence and no unrelated failure,
-   * there is no interrupted candidate, and all three old identity facts
-   * agree. The stored rotations are the only recoverable authoritative set
-   * (and the set the block simulator used), so recovery promotes their
-   * digest to the last accepted block and recomputes the state-chain digest.
+   * Deliberately fail-closed. Runs only when the reload audit reports
+   * rotation-lock/state-digest divergence, there is no interrupted candidate,
+   * and all three old identity facts agree. The stored rotations are the only
+   * recoverable authoritative set, so recovery promotes their digest to the
+   * last accepted block and recomputes the state-chain digest.
    */
   private async repairLegacyRotationLockDivergence(failures: readonly string[]): Promise<boolean> {
     const rotationFailure = failures.some((failure) =>
@@ -363,6 +349,83 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         });
         await this.db.seasonRuns.put(repairedCheckpoint);
         await this.db.seasonRunBlocks.put(repairedBlock);
+        return true;
+      },
+    );
+  }
+
+  /**
+   * Repairs the second pre-fix rotation signature: all lock identity facts
+   * already describe the submitted rotations, but both the checkpoint and
+   * accepted-block rows carry a digest computed over the old set. Matching
+   * bad digests in both atomically written rows distinguishes this from
+   * isolated row tampering, which remains a hard load failure.
+   */
+  private async repairLegacyCommittedStateDigest(failures: readonly string[]): Promise<boolean> {
+    const digestFailure = 'stored stateDigest does not recompute over the stored mutable state';
+    const effectsFailure =
+      'run.effects diverged from the last checkpoint effects without a trade window ' +
+      '(last block stateDigest does not recompute over the stored facts)';
+    if (
+      !failures.includes(digestFailure) ||
+      !failures.every((failure) => failure === digestFailure || failure === effectsFailure)
+    ) {
+      return false;
+    }
+
+    return this.db.transaction(
+      'rw',
+      [this.db.seasonRuns, this.db.seasonRunBlocks, this.db.seasonPendingBlocks],
+      async () => {
+        const rawCheckpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+        if (rawCheckpoint === undefined) return false;
+        const parsedCheckpoint = storedSeasonRunRecordSchema.safeParse(rawCheckpoint);
+        if (!parsedCheckpoint.success) return false;
+        const stored = parsedCheckpoint.data;
+        if (stored.revision === 0 || stored.checkpointState === null) return false;
+        if ((await this.db.seasonPendingBlocks.get(stored.run.runId)) !== undefined) return false;
+
+        const rawBlock = await this.db.seasonRunBlocks.get([stored.run.runId, stored.revision - 1]);
+        if (rawBlock === undefined) return false;
+        const parsedBlock = storedSeasonAcceptedBlockRowSchema.safeParse(rawBlock);
+        if (!parsedBlock.success) return false;
+        const last = parsedBlock.data.block;
+        if (
+          last.stateRevision !== stored.stateRevision ||
+          last.stateDigest !== stored.stateDigest ||
+          last.commandId !== stored.checkpointState.commandId ||
+          last.rotationDigest !== stored.checkpointState.rotationDigest ||
+          last.checkpointDigest !== stored.checkpointState.checkpointDigest
+        ) {
+          return false;
+        }
+
+        const stateDigest = this.seam.seasonRunStateDigest({
+          stateRevision: stored.stateRevision,
+          checkpointState: stored.checkpointState,
+          health: stored.health,
+          influence: stored.influence,
+          transactions: stored.transactions,
+          trade: stored.trade,
+          objectives: stored.objectives,
+          rosters: stored.run.rosters,
+          ownership: stored.run.ownership,
+          rotations: stored.run.rotations,
+          effects: stored.effects,
+        });
+        if (stateDigest === stored.stateDigest) return false;
+
+        const updatedAtIso = new Date().toISOString();
+        await this.db.seasonRuns.put(
+          storedSeasonRunRecordSchema.parse({ ...stored, stateDigest, updatedAtIso }),
+        );
+        await this.db.seasonRunBlocks.put(
+          storedSeasonAcceptedBlockRowSchema.parse({
+            ...parsedBlock.data,
+            block: { ...last, stateDigest },
+            updatedAtIso,
+          }),
+        );
         return true;
       },
     );
@@ -489,8 +552,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       }
     }
 
-    // M2.5: the interrupted-block pending row participates in the reload
-    // audit (a pending row for a committed blockIndex is an error).
+    // M2.5: the interrupted-block pending row participates in the reload audit.
     let pending: SeasonPendingBlockCandidate | null = null;
     if (pendingRow !== undefined) {
       try {
@@ -621,8 +683,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     }
     // Legacy rows (save schema v1-v4) are never migrated or auto-cleared: a
     // commit against one must fail rather than silently rewrite old rules.
-    // Dexie types the row as the current schema, so the raw value is read
-    // as unknown and probed at runtime (legacy rows predate the v5 literal).
+    // Dexie types the row as the current schema, so the raw value is probed
+    // at runtime (legacy rows predate the v5 literal).
     const preflight: unknown = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (preflight !== undefined && isDevelopmentRow(preflight)) {
       const info = incompatibleInfoOf(preflight);
@@ -673,8 +735,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
           throw new Error('commitSeasonBlock: completedRounds regression');
         }
         // M2.5: the submission asserted the pre-block run state facts; a
-        // stale candidate (a command or another block advanced the state
-        // chain after assembly) is rejected inside the transaction.
+        // stale candidate is rejected inside the transaction.
         if (cursor.stateRevision !== input.expectedStateRevision) {
           throw new Error(
             `commitSeasonBlock: stale expectedStateRevision ${String(input.expectedStateRevision)} ` +
@@ -703,8 +764,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
           .equals(input.runId)
           .and((row) => blockIndexForRound(row.round) === blockIndex)
           .delete();
-        // M2.5: the commit deletes any pending-block row for the run in the
-        // SAME transaction (interrupted work for this block is now moot).
+        // M2.5: delete any pending-block row in the SAME transaction (the
+        // interrupted work for this block is now moot).
         await this.db.seasonPendingBlocks.delete(input.runId);
 
         const updatedAtIso = new Date().toISOString();
@@ -759,11 +820,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
           throw new Error('commitSeasonBlock: standings miss the human franchise');
         }
 
-        // M2.5: when the engine produced a trade-window open for this
-        // commit, the window's mutated rosters/ownership/rotations/effects/
-        // trade/influence/transactions replace the block's own (the window
-        // folds AI trades/spends on top of the post-block state). The
-        // commit's stateRevision/stateDigest already include the window.
+        // M2.5: when the engine produced a trade-window open, the window's
+        // mutated rosters/ownership/rotations/effects/trade/influence/
+        // transactions replace the block's own (AI activity folds on top).
+        // The commit's stateRevision/stateDigest already include the window.
         const window = input.window;
         const mutableState = {
           health: input.health,
@@ -799,8 +859,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
           ...checkpoint,
           ...delta,
           // The snapshot portion is promotion-immutable except the locked
-          // rotations and any window-mutated rosters/ownership, which the
-          // commit rewrites as a full `run` slice.
+          // rotations and any window-mutated rosters/ownership, rewritten as
+          // a full `run` slice.
           run: {
             ...checkpoint.run,
             ...delta.run,
@@ -917,8 +977,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
       if (input.run.runId !== input.runId) {
         throw new SeasonRunCommandRunMismatchError(input.runId);
       }
-      // The command asserted the run state facts it was assembled against;
-      // a stale command is rejected (the engine recomputes the digest).
+      // The command asserted the run state facts it was assembled against; a
+      // stale command is rejected (the engine recomputes the digest).
       if (cursor.stateRevision !== command.expectedStateRevision) {
         throw new SeasonRunCommandStaleStateError(
           command.commandId,
@@ -933,9 +993,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
           cursor.stateRevision,
         );
       }
-      // Bounded commandId dedupe against the recorded command history:
-      // the last accepted block's command, the checkpoint command, the
-      // transaction log, the Influence ledger, and objective selections.
+      // Bounded commandId dedupe against the recorded command history.
       const commandId = command.commandId;
       const recorded: string[] = [];
       if (cursor.lastCommandId !== null) recorded.push(cursor.lastCommandId);
@@ -953,11 +1011,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         throw new SeasonRunCommandDuplicateError(commandId);
       }
 
-      // Store the engine-produced mutable run state. The snapshot's
+      // Store the engine-produced mutable run state: the snapshot's
       // rosters/ownership/rotations slices are rewritten (trades move
-      // players); the row-level mutable columns take the engine's run.
-      // Standings/aggregates/recap never change between blocks; the
-      // current row values are preserved through the delta parse.
+      // players); standings/aggregates/recap never change between blocks.
       const delta = seasonRunCheckpointDeltaSchema.parse({
         completedRounds: cursor.completedRounds,
         revision: cursor.revision,
@@ -996,9 +1052,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         await this.db.seasonPendingBlocks.delete(input.runId);
       } else {
         // A pending can only be produced by resume/forfeit commands, which
-        // require an existing pending row (the typed command rejections
-        // enforce it). Preserve the recorded interruption facts, advancing
-        // `nextGameId` to the pending's current value.
+        // require an existing pending row. Preserve the recorded interruption
+        // facts, advancing `nextGameId` to the pending's current value.
         const existingPending = await this.db.seasonPendingBlocks.get(input.runId);
         if (existingPending === undefined) {
           throw new SeasonRunLoadError(
@@ -1024,10 +1079,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
     const validatedRun = seasonRunSchema.parse(run);
     const { games: _games, ...runWithoutGames } = validatedRun;
     // M2.5 initial mutable run state: empty health, empty transaction log,
-    // the engine's initial Influence state (+2 per franchise), null trade
-    // state, the fixed objective catalog with no selections, a null
-    // checkpoint state, and stateRevision 0 with the canonical digest over
-    // the initial facts.
+    // initial Influence (+2 per franchise), null trade, fixed objective
+    // catalog with no selections, null checkpoint state, stateRevision 0
+    // with the canonical digest over the initial facts.
     const health = seasonHealthStateSchema.parse({
       schemaVersion: 1,
       healthVersion: SEASON_HEALTH_VERSION,
@@ -1113,8 +1167,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         }
         const existing = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
         if (existing !== undefined) {
-          // Legacy rows (save schema v1-v4) are never overwritten or
-          // migrated by a promotion: they can only be discarded explicitly.
+          // Legacy rows (save schema v1-v4) are never overwritten or migrated
+          // by a promotion; they can only be discarded explicitly.
           if (isDevelopmentRow(existing)) {
             const info = incompatibleInfoOf(existing);
             throw new SeasonRunIncompatibleError(
@@ -1175,6 +1229,55 @@ export class DexieSeasonRunRepository implements SeasonRunRepository {
         await this.db.seasonRunDetails.where('runId').equals(runId).delete();
         await this.db.seasonRunBlocks.where('runId').equals(runId).delete();
         await this.db.seasonPendingBlocks.delete(runId);
+      },
+    );
+  }
+
+  async forceClearActiveSeasonRun(): Promise<void> {
+    await this.db.transaction(
+      'rw',
+      [
+        this.db.seasonRuns,
+        this.db.seasonRunSummaries,
+        this.db.seasonRunDetails,
+        this.db.seasonRunBlocks,
+        this.db.seasonRunIndex,
+        this.db.seasonPendingBlocks,
+      ],
+      async () => {
+        const runIds = new Set<string>();
+        const indexRow = await this.db.seasonRunIndex.get(SEASON_RUN_RECORD_ID);
+        if (indexRow !== undefined) {
+          const parsedIndex = storedSeasonActiveRunIndexSchema.safeParse(indexRow);
+          if (parsedIndex.success) {
+            runIds.add(parsedIndex.data.index.runId);
+          }
+        }
+        const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+        if (checkpoint !== undefined) {
+          const parsedCheckpoint = storedSeasonRunRecordSchema.safeParse(checkpoint);
+          if (parsedCheckpoint.success) {
+            runIds.add(parsedCheckpoint.data.run.runId);
+          } else {
+            const rawRunId = (checkpoint as { run?: { runId?: unknown } }).run?.runId;
+            if (typeof rawRunId === 'string') runIds.add(rawRunId);
+          }
+        }
+        await this.db.seasonRuns.delete(SEASON_RUN_RECORD_ID);
+        await this.db.seasonRunIndex.delete(SEASON_RUN_RECORD_ID);
+        if (runIds.size === 0) {
+          await this.db.seasonRunSummaries.clear();
+          await this.db.seasonRunDetails.clear();
+          await this.db.seasonRunBlocks.clear();
+          await this.db.seasonPendingBlocks.clear();
+          return;
+        }
+        for (const runId of runIds) {
+          await this.db.seasonRunSummaries.where('runId').equals(runId).delete();
+          await this.db.seasonRunDetails.where('runId').equals(runId).delete();
+          await this.db.seasonRunBlocks.where('runId').equals(runId).delete();
+          await this.db.seasonPendingBlocks.delete(runId);
+        }
       },
     );
   }

@@ -343,7 +343,6 @@ export type SeasonForfeitInterruptedGameRejection = z.infer<
   typeof seasonForfeitInterruptedGameRejectionSchema
 >;
 
-/** One roster change produced by an accepted trade. */
 export const seasonTradeRosterChangeSchema = z.object({
   franchiseId: franchiseIdSchema,
   added: z.array(playerVersionIdSchema).min(1).max(2),
@@ -464,7 +463,6 @@ export const seasonRunCommandSchema = z.discriminatedUnion('command', [
 ]);
 export type SeasonRunCommand = z.infer<typeof seasonRunCommandSchema>;
 
-/** Every typed rejection an M2.5 run command handler can return. */
 export const seasonRunCommandRejectionSchema = z.discriminatedUnion('code', [
   seasonRunMismatchRejectionSchema,
   seasonStaleStateRejectionSchema,

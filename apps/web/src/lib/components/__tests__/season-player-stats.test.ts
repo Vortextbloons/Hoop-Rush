@@ -121,6 +121,7 @@ function minimalShell(): SeasonRunShellData {
   return {
     ready: true,
     error: null,
+    hubError: null,
     hub: null,
     snapshot: null,
     index: null,
