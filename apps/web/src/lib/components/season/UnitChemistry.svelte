@@ -64,11 +64,11 @@
       <div class="mt-3 grid gap-3 sm:grid-cols-2">
         {#if pairs.strongest.length > 0}
           <div>
-            <p class="font-mono text-[10px] text-muted-foreground">Most shared play</p>
+            <p class="font-mono text-xs text-muted-foreground">Most shared play</p>
             <ul class="mt-1 space-y-1">
               {#each pairs.strongest as pair (pair.a + pair.b)}
-                <li class="flex items-center justify-between gap-2 font-mono text-[10px]">
-                  <span class="min-w-0 truncate">
+                <li class="flex items-baseline justify-between gap-2 font-mono text-xs">
+                  <span class="min-w-0">
                     {nameOf(pair.a)} + {nameOf(pair.b)}
                   </span>
                   <span class="shrink-0 text-positive">
@@ -81,11 +81,11 @@
         {/if}
         {#if pairs.weakest.length > 0}
           <div>
-            <p class="font-mono text-[10px] text-muted-foreground">Least shared play</p>
+            <p class="font-mono text-xs text-muted-foreground">Least shared play</p>
             <ul class="mt-1 space-y-1">
               {#each pairs.weakest as pair (pair.a + pair.b)}
-                <li class="flex items-center justify-between gap-2 font-mono text-[10px]">
-                  <span class="min-w-0 truncate">
+                <li class="flex items-baseline justify-between gap-2 font-mono text-xs">
+                  <span class="min-w-0">
                     {nameOf(pair.a)} + {nameOf(pair.b)}
                   </span>
                   <span class="shrink-0 text-muted-foreground">
@@ -98,7 +98,7 @@
         {/if}
       </div>
     {/if}
-    <p class="mt-3 font-mono text-[9px] text-muted-foreground/70">
+    <p class="mt-3 font-mono text-[10px] text-muted-foreground/70">
       Shared possessions are recorded evidence from completed trips, not a prediction.
     </p>
   </section>

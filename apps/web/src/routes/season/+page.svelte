@@ -231,7 +231,7 @@
   <title>Season Run — Hoop Rush</title>
 </svelte:head>
 
-<section class="mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden py-6 sm:px-6 sm:py-10">
+<section class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip py-6 sm:px-6 sm:py-10">
   <div class="flex flex-col gap-3 px-3 sm:flex-row sm:items-end sm:justify-between sm:px-0">
     <div class="min-w-0">
       <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run · 2.0</p>

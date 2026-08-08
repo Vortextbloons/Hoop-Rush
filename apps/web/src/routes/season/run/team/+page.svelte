@@ -197,7 +197,7 @@
     <!-- Sticky action bar: validation state + simulate (identical on every
          breakpoint; the block locks from here or from the Hub preview). -->
     <div
-      class="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 px-3 sm:bottom-4 sm:px-0"
+      class="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 scroll-mb-24 px-3 sm:bottom-4 sm:px-0"
     >
       <div
         class="flex flex-col gap-3 rounded-none border border-border bg-surface-1 p-3 shadow-2xl shadow-black/40 backdrop-blur supports-[backdrop-filter]:bg-surface-1/95 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:rounded-xl"

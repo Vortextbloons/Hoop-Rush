@@ -27,7 +27,7 @@ import {
 } from '@hoop-rush/engine';
 import { parseCount, parseWorkers } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
-import { PackagedData, REPO_ROOT, loadPackagedData } from './data-loader.ts';
+import { PackagedData, REPO_ROOT, DEFAULT_MANIFEST, loadPackagedData } from './data-loader.ts';
 import {
   fixtureHumanRoster,
   loadSeasonDraftCatalog,
@@ -639,7 +639,7 @@ export function projectionAiShadow(input: {
   const profile = data.eraProfile(eraId);
   const runSeed = seed ?? 'd00d2026a1b2c3d4e5f60718293a4b5c6';
   const manifestPath = manifest ?? DEFAULT_MANIFEST;
-  let catalog;
+  let catalog: import('@hoop-rush/data-contracts').SeasonDraftCatalog;
   try {
     catalog = loadSeasonDraftCatalog(manifestPath);
   } catch (error) {
@@ -649,7 +649,7 @@ export function projectionAiShadow(input: {
       { failures: [(error as Error).message] },
     );
   }
-  let league;
+  let league: import('@hoop-rush/data-contracts').SeasonLeague;
   try {
     league = loadSeasonLeague();
   } catch (error) {
@@ -659,7 +659,7 @@ export function projectionAiShadow(input: {
       { failures: [(error as Error).message] },
     );
   }
-  let targets;
+  let targets: import('@hoop-rush/data-contracts').SeasonRosterTargets;
   try {
     targets = loadSeasonRosterTargets(manifestPath);
   } catch (error) {
@@ -670,7 +670,7 @@ export function projectionAiShadow(input: {
     );
   }
   const humanRosters = [{ franchiseId: 'lakers', playerVersionIds: fixtureHumanRoster(catalog) }];
-  let generation;
+  let generation: import('@hoop-rush/data-contracts').SeasonLeagueGenerationResult;
   try {
     generation = generateAiLeague({
       seed: runSeed,

@@ -375,24 +375,24 @@
             {/if}
             <div class="min-w-0 flex-1">
               <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <p class="min-w-0 truncate text-sm font-semibold">{row.member.displayName}</p>
+                <p class="min-w-0 text-sm font-semibold">{row.member.displayName}</p>
                 {#if overallByVersion?.has(row.member.playerVersionId)}
                   <span
-                    class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+                    class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs font-bold text-foreground"
                   >
                     OVR {overallByVersion.get(row.member.playerVersionId)}
                   </span>
                 {/if}
                 {#if fatigue !== null}
                   <span
-                    class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${fatigue.badge}`}
+                    class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold ${fatigue.badge}`}
                   >
                     {fatigue.label}
                     {fatigue.percent}%
                   </span>
                 {/if}
               </div>
-              <p class="truncate font-mono text-[10px] text-muted-foreground">
+              <p class="font-mono text-xs text-muted-foreground">
                 {row.role}
                 {#if row.member.seasonKey !== undefined}· {row.member.seasonKey}{/if}
                 {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
@@ -400,7 +400,7 @@
               </p>
               {#if eraLabel !== null}
                 <p
-                  class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
+                  class="mt-0.5 line-clamp-2 font-mono text-[10px] leading-snug text-muted-foreground/70"
                 >
                   {eraLabel}
                 </p>
@@ -460,13 +460,13 @@
       {#each closingIds as playerVersionId, slotIndex (slotIndex)}
         {@const row = rowByVersion.get(playerVersionId)}
         <li
-          class="flex items-center gap-1.5 rounded-full bg-surface-2 py-1 pr-3 pl-1 font-mono text-[10px] font-semibold text-foreground"
+          class="flex items-center gap-1.5 rounded-full bg-surface-2 py-1 pr-3 pl-1 font-mono text-xs font-semibold text-foreground"
         >
           {#if manifest !== null && faceOf(playerVersionId) !== null}
             <SeasonPlayerFace face={faceOf(playerVersionId)!} {manifest} size="sm" />
           {/if}
           <span class="text-muted-foreground">{slotLabel(slotIndex)}{slotIndex + 1}</span>
-          <span class="max-w-32 truncate">{row?.member.displayName ?? playerVersionId}</span>
+          <span class="max-w-40 truncate">{row?.member.displayName ?? playerVersionId}</span>
         </li>
       {/each}
     </ul>
@@ -513,31 +513,31 @@
               {/if}
               <div class="min-w-0 flex-1">
                 <div class="flex min-w-0 flex-wrap items-center gap-2">
-                  <p class="min-w-0 truncate text-sm font-semibold">{row.member.displayName}</p>
+                  <p class="min-w-0 text-sm font-semibold">{row.member.displayName}</p>
                   {#if overallByVersion?.has(playerVersionId)}
                     <span
-                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs font-bold text-foreground"
                     >
                       OVR {overallByVersion.get(playerVersionId)}
                     </span>
                   {/if}
                   {#if fatigue !== null}
                     <span
-                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${fatigue.badge}`}
+                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold ${fatigue.badge}`}
                     >
                       {fatigue.label}
                       {fatigue.percent}%
                     </span>
                   {/if}
                 </div>
-                <p class="truncate font-mono text-[10px] text-muted-foreground">
+                <p class="font-mono text-xs text-muted-foreground">
                   {row.member.seasonKey ?? ''}
                   {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
                   {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
                 </p>
                 {#if eraLabel !== null}
                   <p
-                    class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
+                    class="mt-0.5 line-clamp-2 font-mono text-[10px] leading-snug text-muted-foreground/70"
                   >
                     {eraLabel}
                   </p>
@@ -629,31 +629,31 @@
               {/if}
               <div class="min-w-0 flex-1">
                 <div class="flex min-w-0 flex-wrap items-center gap-2">
-                  <p class="min-w-0 truncate text-sm font-semibold">{row.member.displayName}</p>
+                  <p class="min-w-0 text-sm font-semibold">{row.member.displayName}</p>
                   {#if overallByVersion?.has(playerVersionId)}
                     <span
-                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+                      class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs font-bold text-foreground"
                     >
                       OVR {overallByVersion.get(playerVersionId)}
                     </span>
                   {/if}
                   {#if fatigue !== null}
                     <span
-                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10px] font-bold ${fatigue.badge}`}
+                      class={`shrink-0 rounded-full px-2 py-0.5 font-mono text-xs font-bold ${fatigue.badge}`}
                     >
                       {fatigue.label}
                       {fatigue.percent}%
                     </span>
                   {/if}
                 </div>
-                <p class="truncate font-mono text-[10px] text-muted-foreground">
+                <p class="font-mono text-xs text-muted-foreground">
                   {row.role}
                   {#if row.member.playable.length > 0}· {row.member.playable.join('/')}{/if}
                   {#if lastMinutes !== null}· last game {Math.round(lastMinutes)} min{/if}
                 </p>
                 {#if eraLabel !== null}
                   <p
-                    class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
+                    class="mt-0.5 line-clamp-2 font-mono text-[10px] leading-snug text-muted-foreground/70"
                   >
                     {eraLabel}
                   </p>

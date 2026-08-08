@@ -91,12 +91,7 @@ function buildModel(): ProjectionModelArtifact {
     references: {
       '1990s': {
         neutral: five('neutral'),
-        archetypes: [
-          five('perimeter'),
-          five('interior'),
-          five('pressure'),
-          five('size-switch'),
-        ],
+        archetypes: [five('perimeter'), five('interior'), five('pressure'), five('size-switch')],
       },
     },
     scales: {
@@ -266,5 +261,3 @@ describe('projectSeasonRoster', () => {
     expect(validateSeasonRotation(rotation, memberPlayable)).toEqual([]);
   });
 });
-
-

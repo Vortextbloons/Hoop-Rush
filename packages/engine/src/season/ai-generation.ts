@@ -305,7 +305,9 @@ export function attachAiProjectionSummaries(input: {
     ]),
   );
   const evaluations = generation.evaluations.map((evaluation) => {
-    const pool = generation.aiPools.find((candidate) => candidate.franchiseId === evaluation.franchiseId);
+    const pool = generation.aiPools.find(
+      (candidate) => candidate.franchiseId === evaluation.franchiseId,
+    );
     if (pool === undefined) return evaluation;
     const search = searchRosterRotationCandidates({
       catalog,
@@ -314,6 +316,10 @@ export function attachAiProjectionSummaries(input: {
       seed: seasonDigestHex(`${seed}\u0000ai-projection\u0000${evaluation.franchiseId}`),
       eraProfile,
       model,
+      // Shadow evaluation is evidence, not exhaustive search: tight per-call
+      // caps keep 29 pools tractable (the artifact policy is multi-minute per
+      // pool at the base projection's current cost).
+      caps: { completeCandidates: 8, rotationsPerRoster: 8 },
     });
     const selected = byId.get(evaluation.franchiseId) ?? [];
     const rotation = rotationById.get(evaluation.franchiseId);
@@ -342,10 +348,12 @@ export function attachAiProjectionSummaries(input: {
       }
     }
     const best = search.ranked[0];
-    const bestRoster = best === undefined ? null : best.projection.minutes.map((row) => row.playerVersionId);
+    const bestRoster =
+      best === undefined ? null : best.projection.minutes.map((row) => row.playerVersionId);
     const selectedSorted = [...selected].sort().join(',');
     const bestSorted = bestRoster === null ? null : [...bestRoster].sort().join(',');
-    const selectedIsBest = selectedSorted !== '' && bestSorted !== null && selectedSorted === bestSorted;
+    const selectedIsBest =
+      selectedSorted !== '' && bestSorted !== null && selectedSorted === bestSorted;
     const searchDigest = seasonDigestHex(
       JSON.stringify({
         seed: search.audit.seed,
@@ -484,6 +492,10 @@ interface PoolTeam {
   identity: SeasonAiIdentity;
   /** Insertion order; anchors first, then round picks and repairs. */
   pool: string[];
+  /** Position group counts of the pool, maintained incrementally. */
+  groupCounts: { guards: number; forwards: number; centers: number };
+  /** Union of role-coverage masks across the pool, maintained incrementally. */
+  coverageMask: number;
   /** Pool tier mixture, maintained incrementally (highest tier per member). */
   tierCounts: Record<PercentileTier, number>;
   /** Pool members whose identity score exceeds the band pool score cap. */
@@ -509,12 +521,16 @@ interface GenerationState {
   /** Highest tier across roles per candidate (its pool tier). */
   poolTiers: Map<string, PercentileTier>;
   identityScores: Map<string, Record<SeasonAiIdentity, number>>;
+  /** Per-candidate sums of identity priority role scores (precomputed once). */
+  identityPriorityTotals: Map<string, Record<SeasonAiIdentity, number>>;
   thresholds: Record<SeasonRosterRole, RoleThresholds>;
   humanOwned: Set<string>;
   /** Candidates not human-owned and not inside any pool. */
   unassigned: Set<string>;
   /** Incremental per-mask counts of `unassigned` (kept in sync). */
   unassignedMaskCountsArr: number[];
+  /** Per-role counts of unassigned candidates covering that role (kept in sync). */
+  unassignedRoleCoverCounts: number[];
   /** Incremental total of remaining pool slots across every team. */
   remainingSlots: number;
   teams: Map<string, PoolTeam>;
@@ -861,7 +877,10 @@ function poolTenFeasibleAfterAdd(
  * Role-coverage feasibility of a team's pool: the union of the roles the
  * pool members (plus the probe) cover must cover all eight roles. While the
  * pool is still filling, remaining unassigned candidates may still complete
- * the coverage; once the pool is full the union must stand alone.
+ * the coverage; once the pool is full the union must stand alone. The
+ * unassigned side is the precomputed per-role cover counts, which are
+ * exactly the union of the unassigned coverage masks (a role is covered by
+ * the supply iff at least one unassigned candidate covers it).
  */
 function poolCoverageFeasible(
   state: GenerationState,
@@ -877,10 +896,8 @@ function poolCoverageFeasible(
   if (poolMask === 0xff) return true;
   if (!includeUnassigned) return false;
   let unassignedMask = 0;
-  for (const candidate of state.canonicalCandidates) {
-    if (!state.unassigned.has(candidate.playerVersionId)) continue;
-    unassignedMask |= state.coverageMaskByVersion.get(candidate.playerVersionId) ?? 0;
-    if ((poolMask | unassignedMask) === 0xff) return true;
+  for (let role = 0; role < 8; role += 1) {
+    if ((state.unassignedRoleCoverCounts[role] ?? 0) > 0) unassignedMask |= 1 << role;
   }
   return (poolMask | unassignedMask) === 0xff;
 }
@@ -889,27 +906,25 @@ function poolCoverageFeasible(
  * Role-coverage scarcity across the league: after the pick, the remaining
  * unassigned candidates must still cover every role that at least one pool
  * lacks (the probe covers the picking team's own gap). This stops pools from
- * deferring their role coverage until the supply runs out.
+ * deferring their role coverage until the supply runs out. The unassigned
+ * union comes from the precomputed per-role cover counts.
  */
 function coverageScarcityAfter(state: GenerationState, team: PoolTeam, versionId: string): boolean {
   let lacking = 0xff;
   for (const teamId of state.teamOrder) {
     const t = state.teams.get(teamId);
     if (t === undefined) continue;
-    let mask = 0;
-    for (const id of t.pool) mask |= state.coverageMaskByVersion.get(id) ?? 0;
-    lacking &= ~mask;
+    lacking &= ~t.coverageMask;
   }
   const probeMask = state.coverageMaskByVersion.get(versionId) ?? 0;
   const stillLacking = lacking & ~probeMask;
   if (stillLacking === 0) return true;
-  let union = 0;
-  for (const candidate of state.canonicalCandidates) {
-    if (!state.unassigned.has(candidate.playerVersionId)) continue;
-    union |= state.coverageMaskByVersion.get(candidate.playerVersionId) ?? 0;
+  for (let role = 0; role < 8; role += 1) {
+    if ((stillLacking & (1 << role)) === 0) continue;
+    if ((state.unassignedRoleCoverCounts[role] ?? 0) <= 0) return false;
+    if ((probeMask & (1 << role)) !== 0) return false;
   }
-  // The probe leaves the unassigned pool on this pick.
-  return (union & ~probeMask & stillLacking) === stillLacking;
+  return true;
 }
 
 /**
@@ -1025,6 +1040,16 @@ function addPoolMember(
   if (mask !== undefined && mask !== 0) {
     state.unassignedMaskCountsArr[mask] = (state.unassignedMaskCountsArr[mask] ?? 0) - 1;
   }
+  const coverageMask = state.coverageMaskByVersion.get(versionId) ?? 0;
+  for (let role = 0; role < 8; role += 1) {
+    if ((coverageMask & (1 << role)) !== 0) {
+      state.unassignedRoleCoverCounts[role] = (state.unassignedRoleCoverCounts[role] ?? 0) - 1;
+    }
+  }
+  team.coverageMask |= coverageMask;
+  if (mask !== undefined && (mask & 1) !== 0) team.groupCounts.guards += 1;
+  if (mask !== undefined && (mask & 2) !== 0) team.groupCounts.forwards += 1;
+  if (mask !== undefined && (mask & 4) !== 0) team.groupCounts.centers += 1;
   state.remainingSlots -= 1;
   const tier = state.poolTiers.get(versionId) ?? 'depth';
   team.tierCounts[tier] += 1;
@@ -1043,6 +1068,24 @@ function removePoolMember(state: GenerationState, team: PoolTeam, versionId: str
   const mask = state.maskByVersion.get(versionId);
   if (mask !== undefined && mask !== 0) {
     state.unassignedMaskCountsArr[mask] = (state.unassignedMaskCountsArr[mask] ?? 0) + 1;
+  }
+  const coverageMask = state.coverageMaskByVersion.get(versionId) ?? 0;
+  for (let role = 0; role < 8; role += 1) {
+    if ((coverageMask & (1 << role)) !== 0) {
+      state.unassignedRoleCoverCounts[role] = (state.unassignedRoleCoverCounts[role] ?? 0) + 1;
+    }
+  }
+  if (mask !== undefined && (mask & 1) !== 0)
+    team.groupCounts.guards = Math.max(0, team.groupCounts.guards - 1);
+  if (mask !== undefined && (mask & 2) !== 0)
+    team.groupCounts.forwards = Math.max(0, team.groupCounts.forwards - 1);
+  if (mask !== undefined && (mask & 4) !== 0)
+    team.groupCounts.centers = Math.max(0, team.groupCounts.centers - 1);
+  // A removed member's coverage cannot be subtracted from a union, so the
+  // pool coverage mask is recomputed from the remaining pool.
+  team.coverageMask = 0;
+  for (const memberId of team.pool) {
+    team.coverageMask |= state.coverageMaskByVersion.get(memberId) ?? 0;
   }
   state.remainingSlots += 1;
   const tier = state.poolTiers.get(versionId) ?? 'depth';
@@ -1459,14 +1502,18 @@ function weakestRoles(
  * Weighted seeded ranking of a pool candidate (hard gates already passed).
  * The band tier ranges guide the pool mixture softly: deficits toward the
  * tier minimums add weight, and picking beyond a tier maximum is penalized
- * (never rejected) so pools keep a spread of tiers.
+ * (never rejected) so pools keep a spread of tiers. `priorityRoles`,
+ * `weakest`, and `poolCounts` are per-pick invariants computed once by the
+ * caller; the identity priority total is precomputed per candidate.
  */
 function poolPickScore(
   state: GenerationState,
   team: PoolTeam,
   versionId: string,
   rngRanks: ReadonlyMap<string, number>,
-  poolRoleScores: Record<SeasonRosterRole, number>,
+  priorityRoles: readonly SeasonRosterRole[],
+  weakest: readonly SeasonRosterRole[],
+  poolCounts: { guards: number; forwards: number; centers: number },
 ): number {
   const identity = identityScoreOf(state, versionId, team.identity);
   let score = identity;
@@ -1479,11 +1526,8 @@ function poolPickScore(
     }
   }
   const memberScores = state.roleScores.get(versionId);
-  const priorityRoles = identityPriorityRolesOf(state.targets, team.identity);
-  let priorityTotal = 0;
-  for (const role of priorityRoles) priorityTotal += memberScores?.[role] ?? 0;
+  const priorityTotal = state.identityPriorityTotals.get(versionId)?.[team.identity] ?? 0;
   score += (0.6 * priorityTotal) / Math.max(1, priorityRoles.length);
-  const weakest = weakestRoles(poolRoleScores, 2);
   let weakTotal = 0;
   for (const role of weakest) weakTotal += memberScores?.[role] ?? 0;
   score += (1.6 * weakTotal) / Math.max(1, weakest.length);
@@ -1497,13 +1541,14 @@ function poolPickScore(
     const cumulative = tierOverage(state, team, tier, 1);
     if (cumulative > tierRange[1]) score -= (cumulative - tierRange[1]) * TIER_DEFICIT_FACTOR[tier];
   }
-  const counts = rosterGroupCounts(membersOf(state, team.pool));
   const completion = state.targets.policy.completionTargets;
   const mask = state.maskByVersion.get(versionId) ?? 0;
   let positionHelp = 0;
-  if (Math.max(0, completion.guards - counts.guards) > 0 && (mask & 1) !== 0) positionHelp += 1;
-  if (Math.max(0, completion.forwards - counts.forwards) > 0 && (mask & 2) !== 0) positionHelp += 1;
-  if (Math.max(0, completion.centers - counts.centers) > 0 && (mask & 4) !== 0) positionHelp += 1;
+  if (Math.max(0, completion.guards - poolCounts.guards) > 0 && (mask & 1) !== 0) positionHelp += 1;
+  if (Math.max(0, completion.forwards - poolCounts.forwards) > 0 && (mask & 2) !== 0)
+    positionHelp += 1;
+  if (Math.max(0, completion.centers - poolCounts.centers) > 0 && (mask & 4) !== 0)
+    positionHelp += 1;
   score += positionHelp * 0.4;
   // Seeded ranking: the per-round candidate rank meaningfully orders
   // near-equal candidates so different seeds produce different pools.
@@ -1571,6 +1616,10 @@ function pickForPool(state: GenerationState, team: PoolTeam, round: number): str
     rngRanks.set(candidate.playerVersionId, rng.next());
   }
   const poolRoleScores = roleScoresOfIds(state, team.pool);
+  // Per-pick invariants computed once instead of once per candidate.
+  const priorityRoles = identityPriorityRolesOf(state.targets, team.identity);
+  const weakest = weakestRoles(poolRoleScores, 2);
+  const poolCounts = team.groupCounts;
   let best: { id: string; score: number } | undefined;
   for (const candidate of state.canonicalCandidates) {
     const id = candidate.playerVersionId;
@@ -1580,7 +1629,7 @@ function pickForPool(state: GenerationState, team: PoolTeam, round: number): str
     if (state.bans.has(`${team.franchiseId}:${id}`)) continue;
     if (!poolCoverageFeasible(state, team, id, true)) continue;
     if (!coverageScarcityAfter(state, team, id)) continue;
-    const score = poolPickScore(state, team, id, rngRanks, poolRoleScores);
+    const score = poolPickScore(state, team, id, rngRanks, priorityRoles, weakest, poolCounts);
     if (best === undefined || score > best.score || (score === best.score && id < best.id)) {
       best = { id, score };
     }
@@ -1616,7 +1665,7 @@ function positionScarcityAfter(state: GenerationState, team: PoolTeam, mask: num
   for (const teamId of state.teamOrder) {
     const t = state.teams.get(teamId);
     if (t === undefined) continue;
-    const counts = rosterGroupCounts(membersOf(state, t.pool));
+    const counts = t.groupCounts;
     const addToTeam = t === team;
     const g = counts.guards + (addToTeam && (mask & 1) !== 0 ? 1 : 0);
     const f = counts.forwards + (addToTeam && (mask & 2) !== 0 ? 1 : 0);
@@ -1706,6 +1755,21 @@ function snapshotPools(state: GenerationState): PoolSnapshot {
   };
 }
 
+/** Per-role counts of candidates covering each role (union arithmetic). */
+function roleCoverCountsOf(
+  versionIds: Iterable<string>,
+  coverageMaskByVersion: ReadonlyMap<string, number>,
+): number[] {
+  const counts = new Array<number>(8).fill(0);
+  for (const id of versionIds) {
+    const coverageMask = coverageMaskByVersion.get(id) ?? 0;
+    for (let role = 0; role < 8; role += 1) {
+      if ((coverageMask & (1 << role)) !== 0) counts[role] = (counts[role] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
 function restorePools(state: GenerationState, snapshot: PoolSnapshot): void {
   state.unassigned = new Set(snapshot.unassigned);
   state.unassignedMaskCountsArr = [...snapshot.unassignedMaskCountsArr];
@@ -1720,6 +1784,25 @@ function restorePools(state: GenerationState, snapshot: PoolSnapshot): void {
     team.seedPaths = [...entry.seedPaths];
     team.memberPaths = new Map(entry.memberPaths);
     team.repairCount = entry.repairCount;
+  }
+  // The incremental memberships were rebuilt above; recompute the derived
+  // role-cover counts and per-team position/coverage state from them.
+  state.unassignedRoleCoverCounts = roleCoverCountsOf(
+    state.unassigned,
+    state.coverageMaskByVersion,
+  );
+  for (const teamId of state.teamOrder) {
+    const team = state.teams.get(teamId);
+    if (team === undefined) continue;
+    team.groupCounts = { guards: 0, forwards: 0, centers: 0 };
+    team.coverageMask = 0;
+    for (const memberId of team.pool) {
+      const mask = state.maskByVersion.get(memberId);
+      if (mask !== undefined && (mask & 1) !== 0) team.groupCounts.guards += 1;
+      if (mask !== undefined && (mask & 2) !== 0) team.groupCounts.forwards += 1;
+      if (mask !== undefined && (mask & 4) !== 0) team.groupCounts.centers += 1;
+      team.coverageMask |= state.coverageMaskByVersion.get(memberId) ?? 0;
+    }
   }
 }
 
@@ -2259,13 +2342,15 @@ function selectionPickScore(
 function greedySelection(state: GenerationState, team: PoolTeam): string[] | null {
   const picked = [...team.anchors.map((anchor) => anchor.playerVersionId)];
   const rngRanks = selectionRanks(state, team);
+  // The pool is finalized before selection; sort once and reuse each round.
+  const sortedPool = [...team.pool].sort();
   while (picked.length < 10) {
     const slotsLeft = 10 - picked.length - 1;
     const pickedCounts = rosterGroupCounts(membersOf(state, picked));
     const pickedRoleScores = roleScoresOfIds(state, picked);
     const uncovered = uncoveredRoles(pickedRoleScores);
     let best: { id: string; score: number } | undefined;
-    for (const id of [...team.pool].sort()) {
+    for (const id of sortedPool) {
       if (picked.includes(id)) continue;
       const mask = state.maskByVersion.get(id) ?? 0;
       const probeCounts = {
@@ -2593,7 +2678,22 @@ function finalizeResult(
       if (!candidate) throw new Error(`missing candidate ${player.playerVersionId}`);
       return { playerVersionId: player.playerVersionId, playable: candidate.positions.playable };
     });
-    return buildMinimalRotation({ franchiseId: roster.franchiseId, members });
+    // Projection milestone: AI rotations are talent-ordered (mean detailed
+    // ratings; Overall is never a pick or rotation authority) so the
+    // strongest legal five starts and the bench hierarchy is talent-ranked.
+    return buildMinimalRotation({
+      franchiseId: roster.franchiseId,
+      members,
+      order: (a, b) => {
+        const talentOf = (member: { playerVersionId: string }): number => {
+          const candidate = state.byId.get(member.playerVersionId);
+          if (!candidate) return 0;
+          const ratings = Object.values(candidate.detailedRatings);
+          return ratings.reduce((sum, value) => sum + value, 0) / Math.max(1, ratings.length);
+        };
+        return talentOf(b) - talentOf(a);
+      },
+    });
   });
   const aiAssignments = [...state.assignments.values()];
   const evaluations = rosters.map((roster) => {
@@ -2715,6 +2815,7 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
   const roleTiers = new Map<string, Record<SeasonRosterRole, PercentileTier>>();
   const poolTiers = new Map<string, PercentileTier>();
   const identityScores = new Map<string, Record<SeasonAiIdentity, number>>();
+  const identityPriorityTotals = new Map<string, Record<SeasonAiIdentity, number>>();
   for (const candidate of canonicalCandidates) {
     const scores = roleScoresOf(candidate);
     roleScores.set(candidate.playerVersionId, scores);
@@ -2728,10 +2829,17 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     roleTiers.set(candidate.playerVersionId, tiers);
     poolTiers.set(candidate.playerVersionId, playerPercentileTier(tiers));
     const identityScoresFor = {} as Record<SeasonAiIdentity, number>;
+    const priorityTotalsFor = {} as Record<SeasonAiIdentity, number>;
     for (const identity of IDENTITIES) {
       identityScoresFor[identity] = identityScore(scores, identity);
+      let priorityTotal = 0;
+      for (const role of identityPriorityRolesOf(input.targets, identity)) {
+        priorityTotal += scores[role];
+      }
+      priorityTotalsFor[identity] = priorityTotal;
     }
     identityScores.set(candidate.playerVersionId, identityScoresFor);
+    identityPriorityTotals.set(candidate.playerVersionId, priorityTotalsFor);
   }
   const assignments = new Map(
     assignAiBandsAndIdentities({
@@ -2760,6 +2868,8 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
       band: assignment.band,
       identity: assignment.identity,
       pool: [],
+      groupCounts: { guards: 0, forwards: 0, centers: 0 },
+      coverageMask: 0,
       tierCounts: zeroTierCounts(),
       outliers: 0,
       anchors: [],
@@ -2783,10 +2893,12 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     roleTiers,
     poolTiers,
     identityScores,
+    identityPriorityTotals,
     thresholds,
     humanOwned,
     unassigned: new Set(initialUnassigned),
     unassignedMaskCountsArr: initialMaskCounts,
+    unassignedRoleCoverCounts: roleCoverCountsOf(initialUnassigned, coverageMaskByVersion),
     remainingSlots: teamOrder.length * input.targets.policy.poolSize,
     teams,
     teamOrder,

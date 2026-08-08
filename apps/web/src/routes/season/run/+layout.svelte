@@ -429,7 +429,7 @@
     </div>
   </div>
 {:else}
-  <div class="mx-auto w-full min-w-0 max-w-6xl overflow-x-hidden sm:px-6">
+  <div class="mx-auto w-full min-w-0 max-w-6xl overflow-x-clip sm:px-6">
     <div class="px-3 pt-6 sm:px-0">
       <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
         <div class="min-w-0 flex-1">
@@ -475,7 +475,7 @@
       </div>
     </nav>
 
-    <main class="min-w-0 overflow-x-hidden pb-[max(6.5rem,env(safe-area-inset-bottom))] md:pb-14">
+    <main class="min-w-0 overflow-x-clip pb-[max(6.5rem,env(safe-area-inset-bottom))] md:pb-14">
       {@render children()}
     </main>
   </div>

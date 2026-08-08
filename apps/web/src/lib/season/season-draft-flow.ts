@@ -206,6 +206,9 @@ export class SeasonDraftFlow {
    * Runs the bounded AI league generation in a worker when roster targets
    * were supplied at construction. Yields to the event loop first so the
    * pending state paints, then persists the stored record atomically.
+   * NOTE: the projection shadow pass (per-pool candidate search) is an
+   * offline CLI evaluation (`projection ai-shadow`); it must NOT ride the
+   * app's generation worker, where it would take minutes per league.
    */
   async generate(): Promise<SeasonLeagueGenerationResult | null> {
     if (this.draft?.status !== 'finalized') {

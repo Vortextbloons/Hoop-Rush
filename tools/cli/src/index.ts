@@ -766,6 +766,21 @@ const COMMANDS: Record<string, CommandEntry> = {
         }),
     };
   }),
+  'projection ai-shadow': command(async () => {
+    const { projectionAiShadow, PROJECTION_AI_SHADOW_OPTIONS } =
+      await import('./commands/projection.ts');
+    return {
+      options: PROJECTION_AI_SHADOW_OPTIONS,
+      run: (args) =>
+        projectionAiShadow({
+          manifest: getOptionString(args, 'manifest'),
+          model: getOptionString(args, 'model'),
+          era: getOptionString(args, 'era'),
+          seed: getOptionString(args, 'seed'),
+          verbose: hasOption(args, 'verbose'),
+        }),
+    };
+  }),
   'import ratings': command(async () => {
     const { importRatings, IMPORT_RATINGS_OPTIONS } = await import('./commands/import.ts');
     return {

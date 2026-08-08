@@ -104,7 +104,10 @@ const DEFAULT_SCALES: Record<string, { baseline: number; perPoint: number }> = {
   redundancy: { baseline: 60, perPoint: 1 },
 };
 
-function scaleOf(model: ProjectionModelArtifact, key: string): ProjectionComponentScale | undefined {
+function scaleOf(
+  model: ProjectionModelArtifact,
+  key: string,
+): ProjectionComponentScale | undefined {
   return model.scales[key];
 }
 
@@ -139,7 +142,8 @@ export function rankingVectorOf(
   const orebRate = ledger?.offensiveReboundRate ?? 0.25;
   const drebRate = ledger?.defensiveReboundRate ?? 0.75;
   const ftr = ledger?.freeThrowRate ?? 0.22;
-  const spacingRaw = projection.units.find((unit) => unit.weight > 0)?.base.offense.spacing.raw ?? 0.45;
+  const spacingRaw =
+    projection.units.find((unit) => unit.weight > 0)?.base.offense.spacing.raw ?? 0.45;
   const creationRaw =
     projection.units.find((unit) => unit.weight > 0)?.base.offense.creation.score ?? 55;
   const defenseScore =
@@ -202,7 +206,11 @@ const ROTATION_KEYS: Array<keyof RankingVector> = [
   'contingencyDepth',
 ];
 
-const ROBUSTNESS_KEYS: Array<keyof RankingVector> = ['matchupMean', 'matchupWorstCase', 'redundancy'];
+const ROBUSTNESS_KEYS: Array<keyof RankingVector> = [
+  'matchupMean',
+  'matchupWorstCase',
+  'redundancy',
+];
 
 function subMean(vector: RankingVector, keys: readonly (keyof RankingVector)[]): number {
   return mean(keys.map((key) => vector[key]));
@@ -216,10 +224,7 @@ export function redundancyPenaltyValue(vector: RankingVector): number {
 }
 
 /** Hard gates: returns the rejection reasons (empty means the candidate passes). */
-export function hardGateReasons(
-  gates: RankingGates,
-  projection: SeasonProjection,
-): string[] {
+export function hardGateReasons(gates: RankingGates, projection: SeasonProjection): string[] {
   const reasons: string[] = [];
   if (!gates.legal) reasons.push('roster is not legal');
   if (!gates.legalStartersAndClosers) reasons.push('no legal starter or closing five');

@@ -36,7 +36,7 @@
 
 <section
   aria-labelledby="objective-picker-heading"
-  class="rounded-lg bg-surface-2 p-3"
+  class="scroll-mb-24 rounded-lg bg-surface-2 p-3"
   data-season-objective-picker
 >
   <div class="flex flex-wrap items-baseline justify-between gap-2">

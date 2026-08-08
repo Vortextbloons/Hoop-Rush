@@ -14,6 +14,7 @@ import { seasonTradeStateSchema } from './season-trade.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
 import {
   PLAYER_VERSION_ID_VERSION,
+  SEASON_AI_V2,
   SEASON_AI_VERSION,
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
@@ -36,8 +37,10 @@ import {
   SEASON_OBJECTIVE_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
+  SEASON_ROSTER_GENERATION_V2,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
+  SEASON_ROSTER_TARGETS_V2,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROSTER_SIZE,
   SEASON_ROTATION_PLANNER_VERSION,
@@ -178,10 +181,16 @@ export type SeasonDraftFacts = z.infer<typeof seasonDraftFactsSchema>;
 /** M2.1 generation audit summary attached to the run. */
 export const seasonGenerationAuditSchema = z.object({
   seed: seedSchema,
-  aiVersion: z.literal(SEASON_AI_VERSION),
-  rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
+  aiVersion: z.union([z.literal(SEASON_AI_V2), z.literal(SEASON_AI_VERSION)]),
+  rosterGenerationVersion: z.union([
+    z.literal(SEASON_ROSTER_GENERATION_V2),
+    z.literal(SEASON_ROSTER_GENERATION_VERSION),
+  ]),
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
-  rosterTargetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
+  rosterTargetsVersion: z.union([
+    z.literal(SEASON_ROSTER_TARGETS_V2),
+    z.literal(SEASON_ROSTER_TARGETS_VERSION),
+  ]),
   /** Canonical digest of the generation result (engine season/digest). */
   digest: z.string().regex(/^[0-9a-f]{32}$/),
   diagnostics: seasonGenerationDiagnosticsSchema,
@@ -214,8 +223,11 @@ export const seasonRunVersionsSchema = z.object({
    */
   draftVersion: z.union([z.literal(SEASON_DRAFT_VERSION), z.literal(SEASON_DRAFT_LEGACY_VERSION)]),
   rosterRulesVersion: z.literal(SEASON_ROSTER_RULES_VERSION),
-  rosterGenerationVersion: z.literal(SEASON_ROSTER_GENERATION_VERSION),
-  aiVersion: z.literal(SEASON_AI_VERSION),
+  rosterGenerationVersion: z.union([
+    z.literal(SEASON_ROSTER_GENERATION_V2),
+    z.literal(SEASON_ROSTER_GENERATION_VERSION),
+  ]),
+  aiVersion: z.union([z.literal(SEASON_AI_V2), z.literal(SEASON_AI_VERSION)]),
   rotationVersion: z.literal(SEASON_ROTATION_VERSION),
   /** M2.2: substitution planner rules. */
   rotationPlannerVersion: z.literal(SEASON_ROTATION_PLANNER_VERSION),
@@ -223,7 +235,10 @@ export const seasonRunVersionsSchema = z.object({
   gameVersion: z.literal(SEASON_GAME_VERSION),
   /** M2.2->M2.3: recalibrated Season game cohort and envelopes. */
   gameTargetsVersion: z.literal(SEASON_GAME_TARGETS_VERSION),
-  rosterTargetsVersion: z.literal(SEASON_ROSTER_TARGETS_VERSION),
+  rosterTargetsVersion: z.union([
+    z.literal(SEASON_ROSTER_TARGETS_V2),
+    z.literal(SEASON_ROSTER_TARGETS_VERSION),
+  ]),
   /** M2.3: block pipeline, compact summaries, aggregates, recap, leaders. */
   blockVersion: z.literal(SEASON_BLOCK_VERSION),
   summaryVersion: z.literal(SEASON_GAME_SUMMARY_VERSION),

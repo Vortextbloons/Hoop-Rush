@@ -133,7 +133,16 @@ export const SEASON_ROSTER_RULES_VERSION = 'season-roster-v1';
  * pool/selection facts and `seasonRosterTargetsSchema` (roster-targets-v2)
  * for the frozen calibration policy and gates.
  */
-export const SEASON_ROSTER_GENERATION_VERSION = 'roster-generation-v2';
+export const SEASON_ROSTER_GENERATION_V2 = 'roster-generation-v2';
+
+/**
+ * Projection milestone roster-generation-v3 (replaces v2): identical
+ * selection phases and constraints; the persisted AI rotations are now
+ * talent-ordered (mean detailed ratings; Overall is never a rotation
+ * authority) so the strongest legal five starts and the bench hierarchy is
+ * talent-ranked. v2 output stays frozen under its own version.
+ */
+export const SEASON_ROSTER_GENERATION_VERSION = 'roster-generation-v3';
 
 /**
  * M2.4 season-ai-v2 (replaces season-ai-v1): AI decision identities,
@@ -142,7 +151,15 @@ export const SEASON_ROSTER_GENERATION_VERSION = 'roster-generation-v2';
  * identity never changes ratings, odds, or player eligibility, and Overall
  * has no pick authority (it appears only as a report field).
  */
-export const SEASON_AI_VERSION = 'season-ai-v2';
+export const SEASON_AI_V2 = 'season-ai-v2';
+
+/**
+ * Projection milestone season-ai-v3 (replaces v2): identical decision
+ * identities, bands, and evaluation weights; generation records the
+ * talent-ordered rotations of roster-generation-v3. v2 output stays frozen
+ * under its own version.
+ */
+export const SEASON_AI_VERSION = 'season-ai-v3';
 
 /**
  * M2.2 rotation contract (spec/2.0/04, season-rotation-v2). Same structural
@@ -195,7 +212,16 @@ export const SEASON_GAME_TARGETS_VERSION = 'season-game-targets-v4';
  * band/identity/incidence facts of roster-generation-v2. See
  * `seasonRosterTargetsSchema` in season-ai.ts.
  */
-export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v2';
+export const SEASON_ROSTER_TARGETS_V2 = 'roster-targets-v2';
+
+/**
+ * Projection milestone `roster-targets-v3`: the same frozen policy and
+ * measured facts as v2 (the talent-ordered rotation change does not alter
+ * selection-level strength, band, or incidence facts), re-versioned for
+ * roster-generation-v3 / season-ai-v3. The v2 artifact stays valid under its
+ * own version.
+ */
+export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v3';
 
 /**
  * M2.5 pure block simulation pipeline (spec/2.0/02 ten-game blocks,

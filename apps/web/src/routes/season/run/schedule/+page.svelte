@@ -149,7 +149,7 @@
         >
           Schedule
         </h1>
-        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+        <p class="mt-1 font-mono text-xs text-muted-foreground">
           {playedCount} of 82 played · nine checkpoints
         </p>
       </div>
@@ -165,7 +165,7 @@
             onclick={() => {
               filter = item.value;
             }}
-            class="rounded-md px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {filter ===
+            class="rounded-md px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-[0.12em] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring {filter ===
             item.value
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground'}"
@@ -191,7 +191,7 @@
               >
                 Block {group.blockIndex + 1} of 9
               </h2>
-              <span class="font-mono text-[10px] text-muted-foreground">
+              <span class="font-mono text-xs text-muted-foreground">
                 rounds {group.fromRound}–{group.toRound}
               </span>
               {#if acceptedBlockIndexes.has(group.blockIndex)}
@@ -199,7 +199,7 @@
                   href={resolve(
                     `/season/run/checkpoint/?block=${String(group.blockIndex)}` as RouteId,
                   )}
-                  class="font-mono text-[10px] text-primary underline-offset-4 hover:underline"
+                  class="font-mono text-xs text-primary underline-offset-4 hover:underline"
                 >
                   Checkpoint recap
                 </a>
@@ -213,9 +213,9 @@
                   {@const box = boxFor(row)}
                   <li data-season-schedule-row class="overflow-hidden bg-surface-1 md:rounded-xl">
                     <div
-                      class="grid grid-cols-[2rem_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 sm:gap-x-3 sm:px-4"
+                      class="grid grid-cols-[2rem_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3.5 sm:gap-x-3 sm:px-4"
                     >
-                      <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      <span class="shrink-0 font-mono text-xs text-muted-foreground">
                         R{row.round}
                       </span>
                       {#if identityOf(row.opponentFranchiseId)}
@@ -231,7 +231,7 @@
                       {/if}
                       <p class="min-w-0 text-sm font-semibold leading-tight">
                         <span
-                          class="mr-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+                          class="mr-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
                         >
                           {row.humanIsHome ? 'vs' : 'at'}
                         </span>
@@ -241,7 +241,7 @@
                       </p>
                       <div class="shrink-0 pl-1 text-right tabular-nums">
                         {#if row.won === null}
-                          <span class="font-mono text-[10px] text-muted-foreground">scheduled</span>
+                          <span class="font-mono text-xs text-muted-foreground">scheduled</span>
                         {:else}
                           <span
                             class="block font-mono text-sm font-bold leading-none {row.won
@@ -250,7 +250,7 @@
                           >
                             {row.won ? 'W' : 'L'}
                           </span>
-                          <span class="mt-0.5 block font-mono text-[10px] leading-none">
+                          <span class="mt-0.5 block font-mono text-xs leading-none">
                             {row.humanScore}–{row.opponentScore}
                             {#if row.forfeit}· forfeit{/if}
                           </span>
@@ -263,7 +263,7 @@
                         ontoggle={(event) => onBoxScoreToggle(event, row.gameId)}
                       >
                         <summary
-                          class="cursor-pointer px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring md:px-4 [&::-webkit-details-marker]:hidden"
+                          class="cursor-pointer px-3 py-2 font-mono text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring md:px-4 [&::-webkit-details-marker]:hidden"
                         >
                           Box score
                         </summary>
@@ -356,7 +356,7 @@
       </div>
     {/if}
 
-    <p class="mt-6 px-3 font-mono text-[10px] text-muted-foreground sm:px-0">
+    <p class="mt-6 px-3 font-mono text-xs text-muted-foreground sm:px-0">
       Results come from accepted checkpoints; scheduled games carry no prediction.
     </p>
   </section>

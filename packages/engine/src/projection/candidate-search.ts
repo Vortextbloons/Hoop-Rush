@@ -8,10 +8,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { seasonDigestHex } from '@hoop-rush/data-contracts';
 import { enumerateLegalFives, type PlannerMember } from '../season/rotation-planner.ts';
-import {
-  applySeasonRotationPreset,
-  buildMinimalRotation,
-} from '../season/rotation.ts';
+import { applySeasonRotationPreset, buildMinimalRotation } from '../season/rotation.ts';
 import {
   completionTargetsMet,
   legalFiveAfterAnyRemoval,
@@ -72,6 +69,16 @@ export interface RosterRotationSearchInput {
   lens?: SearchLens;
   /** Gate overrides; unspecified gates default to passing. */
   gates?: Partial<RankingGates>;
+  /**
+   * Per-call budget caps (defaults to the artifact's search policy). Callers
+   * that evaluate many pools (AI shadow mode) pass tight caps: evidence does
+   * not need exhaustive search, and the base projection cost makes the full
+   * policy multi-minute per pool.
+   */
+  caps?: {
+    completeCandidates?: number;
+    rotationsPerRoster?: number;
+  };
 }
 
 export interface SearchAudit {
@@ -129,10 +136,12 @@ interface CatalogMember {
 
 /** Seeded deterministic ordering rank for one version id (FNV-1a based). */
 function orderRank(seed: string, namespace: string, versionId: string): number {
-  return seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(0) * 16777216 +
+  return (
+    seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(0) * 16777216 +
     seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(2) * 65536 +
     seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(4) * 256 +
-    seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(6);
+    seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(6)
+  );
 }
 
 /** Cheap lens score for partial pruning (ratings/tendencies only). */
@@ -178,7 +187,11 @@ function catalogMembers(catalog: SeasonDraftCatalog): Map<string, CatalogMember>
         ? { reconstructedThreePoint: candidate.reconstructedThreePoint }
         : {}),
     };
-    members.set(candidate.playerVersionId, { playerVersionId: candidate.playerVersionId, playable: candidate.positions.playable, player });
+    members.set(candidate.playerVersionId, {
+      playerVersionId: candidate.playerVersionId,
+      playable: candidate.positions.playable,
+      player,
+    });
   }
   return members;
 }
@@ -207,7 +220,8 @@ function benchOrdersOf(input: {
   const bench = roster.filter((id) => !starters.includes(id));
   const byLens = (selector: (member: CatalogMember) => number) =>
     [...bench].sort(
-      (a, b) => selector(members.get(b) ?? benchMember(b)) - selector(members.get(a) ?? benchMember(b)),
+      (a, b) =>
+        selector(members.get(b) ?? benchMember(b)) - selector(members.get(a) ?? benchMember(b)),
     );
   const orders: string[][] = [];
   const push = (order: string[]) => {
@@ -335,8 +349,9 @@ function rotationsFor(input: {
   closingFivesCap: number;
   benchHierarchiesCap: number;
   minuteTemplatesCap: number;
+  rotationsCap: number;
 }): SeasonRotation[] {
-  const { roster, members, lens } = input;
+  const { roster, members, lens, rotationsCap } = input;
   const plannerMembers: PlannerMember[] = [...roster]
     .map((id) => ({ playerVersionId: id, playable: members.get(id)?.playable ?? [] }))
     .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
@@ -376,7 +391,10 @@ function rotationsFor(input: {
     for (const closer of closers) {
       for (const benchOrder of benchOrders) {
         for (const template of templates) {
-          if (rotations.length >= input.startingFivesCap * input.closingFivesCap * input.benchHierarchiesCap) {
+          if (
+            rotations.length >=
+            input.startingFivesCap * input.closingFivesCap * input.benchHierarchiesCap
+          ) {
             break;
           }
           const base: SeasonRotation = {
@@ -398,13 +416,13 @@ function rotationsFor(input: {
           if (seen.has(key)) continue;
           seen.add(key);
           rotations.push(withMinutes);
-          if (rotations.length >= 48) break;
+          if (rotations.length >= rotationsCap) break;
         }
-        if (rotations.length >= 48) break;
+        if (rotations.length >= rotationsCap) break;
       }
-      if (rotations.length >= 48) break;
+      if (rotations.length >= rotationsCap) break;
     }
-    if (rotations.length >= 48) break;
+    if (rotations.length >= rotationsCap) break;
   }
   return rotations;
 }
@@ -449,7 +467,9 @@ export function searchRosterRotationCandidates(
 
   // Deterministic candidate ordering under the search seed.
   const orderedAvailable = [...available].sort(
-    (a, b) => orderRank(input.seed, seedNamespace, a) - orderRank(input.seed, seedNamespace, b) || (a < b ? -1 : 1),
+    (a, b) =>
+      orderRank(input.seed, seedNamespace, a) - orderRank(input.seed, seedNamespace, b) ||
+      (a < b ? -1 : 1),
   );
 
   // Beam over partial rosters.
@@ -466,7 +486,10 @@ export function searchRosterRotationCandidates(
         const key = state.join(',');
         if (next.has(key) || complete.has(key)) continue;
         const stateMembers = rosterInputMembers(state, members);
-        if (size + 1 < 10 && !rosterFeasible(stateMembers, availableInput, 10 - stateMembers.length)) {
+        if (
+          size + 1 < 10 &&
+          !rosterFeasible(stateMembers, availableInput, 10 - stateMembers.length)
+        ) {
           continue;
         }
         if (stateMembers.length >= 5 && !legalFiveExists(stateMembers)) continue;
@@ -494,13 +517,14 @@ export function searchRosterRotationCandidates(
   }
 
   const completeRosters = [...complete.values()]
-    .sort((a, b) => a.join(',') < b.join(',') ? -1 : 1)
-    .slice(0, input.model.search.completeCandidates);
+    .sort((a, b) => (a.join(',') < b.join(',') ? -1 : 1))
+    .slice(0, input.caps?.completeCandidates ?? input.model.search.completeCandidates);
 
   // Build and project rotations for each complete roster.
   const searched: SearchableCandidate[] = [];
   let rotationsEvaluated = 0;
   const rotationBudget = input.model.search.nodeBudgets.rotation;
+  const rotationsPerRoster = input.caps?.rotationsPerRoster ?? 48;
   const defaultGates: RankingGates = {
     legal: true,
     legalStartersAndClosers: true,
@@ -526,6 +550,7 @@ export function searchRosterRotationCandidates(
       closingFivesCap: input.model.search.closingFives,
       benchHierarchiesCap: input.model.search.benchHierarchies,
       minuteTemplatesCap: input.model.search.minuteTemplates + 3,
+      rotationsCap: rotationsPerRoster,
     });
     for (const rotation of rotations) {
       if (rotationsEvaluated >= rotationBudget) break;
@@ -534,7 +559,9 @@ export function searchRosterRotationCandidates(
       try {
         projection = projectSeasonRoster(
           {
-            roster: roster.map((id) => ({ player: members.get(id)?.player ?? benchMember(id).player })),
+            roster: roster.map((id) => ({
+              player: members.get(id)?.player ?? benchMember(id).player,
+            })),
             rotation,
             eraProfile: input.eraProfile,
             model: input.model,
@@ -640,7 +667,8 @@ export function buildHumanSeasonRoster(input: HumanRosterBuildInput): HumanRoste
   const top = result.ranked[0];
   return {
     ok: top !== undefined,
-    roster: top === undefined ? null : [...top.projection.minutes.map((row) => row.playerVersionId)],
+    roster:
+      top === undefined ? null : [...top.projection.minutes.map((row) => row.playerVersionId)],
     rotation: top?.rotation ?? null,
     projection: top?.projection ?? null,
     ranked: result.ranked,

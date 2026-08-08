@@ -105,6 +105,14 @@ export const hoopRushManifestSchema = z.object({
       rosterTargets: seasonArtifactIndexEntrySchema,
     })
     .optional(),
+  /** Projection milestone: the versioned projection model artifact
+   * (projection-model-v1), hashed like every packaged asset. Optional so
+   * manifests from before the milestone stay valid. */
+  projection: z
+    .object({
+      model: seasonArtifactIndexEntrySchema,
+    })
+    .optional(),
   assets: assetConfigSchema,
 });
 export type HoopRushManifest = z.infer<typeof hoopRushManifestSchema>;

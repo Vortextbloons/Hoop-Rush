@@ -20,8 +20,9 @@ import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 // Re-pinned for the M2.5 schema-7 fixture (injuries, health, and the
-// objective/Influence-carrying checkpoint digest).
-const BLOCK_ZERO_DIGEST = '349fd368e3db815c06615e1606e7f658';
+// objective/Influence-carrying checkpoint digest) and the projection-milestone
+// v3 fixture (talent-ordered AI rotations change the rotation-set digest).
+const BLOCK_ZERO_DIGEST = '1f71b603fc9893dff503696db3c5eb73';
 
 describe('cli: season block simulate', () => {
   // The default block-0 boot is shared by the simulate and audit tests.

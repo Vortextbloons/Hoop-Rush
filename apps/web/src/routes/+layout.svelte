@@ -79,7 +79,7 @@
   </div>
 </header>
 
-<main class="min-w-0 overflow-x-hidden">
+<main class="min-w-0 overflow-x-clip">
   {@render children()}
 </main>
 

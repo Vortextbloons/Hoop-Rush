@@ -2,11 +2,13 @@ import {
   loadEraSimulationProfile,
   loadJsonAsset,
   loadSeasonDraftCatalog as loadPackagedSeasonDraftCatalog,
+  parseProjectionModelArtifact,
   parseSeasonDraftCatalog,
   seasonLeagueSchema,
   seasonRosterTargetsSchema,
   seasonScheduleSchema,
   type EraSimulationProfile,
+  type ProjectionModelArtifact,
   type SeasonDraftCatalog,
   type SeasonHomeCourtProfile,
   type SeasonLeague,
@@ -40,6 +42,10 @@ export interface SeasonArtifactUrls {
   catalogHash: string;
   profileUrl: string;
   profileHash: string;
+  /** Projection milestone: the versioned projection model artifact (absent
+   * when the manifest predates the milestone). */
+  modelUrl?: string;
+  modelHash?: string;
 }
 
 const FIXED_SEASON_ERA = '2010s';
@@ -153,12 +159,32 @@ export function seasonArtifactUrls(): Promise<SeasonArtifactUrls> {
     const catalog = manifest.season?.draftCatalog;
     const profile = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SEASON_ERA);
     if (!catalog || !profile) throw new Error('Season worker artifacts are unavailable.');
+    const model = manifest.projection?.model;
     return {
       catalogUrl: resolveAssetUrl(catalog.url),
       catalogHash: catalog.contentHash,
       profileUrl: resolveAssetUrl(profile.url),
       profileHash: profile.contentHash,
+      ...(model !== undefined
+        ? { modelUrl: resolveAssetUrl(model.url), modelHash: model.contentHash }
+        : {}),
     };
+  });
+}
+
+/**
+ * Projection milestone: loads the versioned projection model artifact
+ * (projection-model-v1) through the hashed asset pipeline, memoized per
+ * manifest hash. Throws when the manifest predates the milestone.
+ */
+export function loadSeasonProjectionModel(): Promise<ProjectionModelArtifact> {
+  return memoized('projection/model', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.projection?.model;
+    if (!entry) throw new Error('The projection model artifact is unavailable.');
+    return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) =>
+      parseProjectionModelArtifact(value),
+    );
   });
 }
 

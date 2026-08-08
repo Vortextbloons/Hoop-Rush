@@ -18,23 +18,32 @@ import { canPlay } from '../domain/positions.ts';
  * bench players play 16 each, totals equal exactly 240, and the closing five
  * initially equals the starters. The legal-five matching is deterministic:
  * members are canonically sorted by playerVersionId and the first legal
- * slot assignment is found by backtracking in slot order. M2.2 adds presets,
+ * slot assignment is found by backtracking in slot order. An optional
+ * `order` comparator (projection milestone) makes the matching and the bench
+ * hierarchy talent-ordered for callers that can score members (AI
+ * generation); the default stays byte-identical. M2.2 adds presets,
  * editing, substitution execution, and contingency behavior without replacing
  * this persisted rotation contract.
  */
 
 const STARTING_SLOTS: Array<'G' | 'F' | 'C'> = ['G', 'G', 'F', 'F', 'C'];
 
+function canonicalOrder(a: SeasonRosterMemberInput, b: SeasonRosterMemberInput): number {
+  return a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0;
+}
+
 /**
- * Deterministic legal-five matching in canonical member order. Returns the
- * five starters in slot order 0..4, or null when no legal five exists.
+ * Deterministic legal-five matching. With no `order`, members are canonically
+ * sorted and the first legal slot assignment is found by backtracking in slot
+ * order; with `order`, the same search runs over the ordered list, so the
+ * first legal five is the strongest under the caller's comparator. Returns
+ * the five starters in slot order 0..4, or null when no legal five exists.
  */
 export function matchStartingFive(
   members: readonly SeasonRosterMemberInput[],
+  order?: (a: SeasonRosterMemberInput, b: SeasonRosterMemberInput) => number,
 ): SeasonRosterMemberInput[] | null {
-  const ordered = [...members].sort((a, b) =>
-    a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0,
-  );
+  const ordered = [...members].sort(order ?? canonicalOrder);
   if (!legalFiveExists(ordered)) return null;
   const used = new Set<number>();
   const result: SeasonRosterMemberInput[] = [];
@@ -61,16 +70,20 @@ export function matchStartingFive(
 
 /**
  * Builds the minimal M2.1 rotation for a ten-player roster. Throws when the
- * roster cannot field a legal starting five.
+ * roster cannot field a legal starting five. With an `order` comparator the
+ * starters are the strongest legal five under it and the bench hierarchy
+ * follows the same order (best remaining player first); the default is
+ * byte-identical canonical behavior.
  */
 export function buildMinimalRotation(input: {
   franchiseId: string;
   members: SeasonRosterMemberInput[];
+  order?: (a: SeasonRosterMemberInput, b: SeasonRosterMemberInput) => number;
 }): SeasonRotation {
   if (input.members.length !== 10) {
     throw new Error(`rotation requires exactly ten members (got ${String(input.members.length)})`);
   }
-  const starters = matchStartingFive(input.members);
+  const starters = matchStartingFive(input.members, input.order);
   if (starters === null) {
     const detail = input.members
       .map((member) => `${member.playerVersionId}:${member.playable.join('|')}`)
@@ -78,9 +91,10 @@ export function buildMinimalRotation(input: {
     throw new Error(`roster has no legal G,G,F,F,C starting five: ${detail}`);
   }
   const starterIds = new Set(starters.map((member) => member.playerVersionId));
+  const sort = input.order ?? canonicalOrder;
   const bench = [...input.members]
     .filter((member) => !starterIds.has(member.playerVersionId))
-    .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
+    .sort(sort);
   const starterOrder = starters.map((member) => member.playerVersionId);
   const benchOrder = bench.map((member) => member.playerVersionId);
   return {
