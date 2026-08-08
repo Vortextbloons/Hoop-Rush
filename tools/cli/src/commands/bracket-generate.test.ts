@@ -17,11 +17,18 @@ describe('bracketGenerate', () => {
     expect(() => bracketGenerate({ seed: 'ab' })).toThrow(UsageError);
   });
 
-  it('accepts the committed 32-hex seed shape', () => {
-    expect(() => bracketGenerate({ seed: '8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d' })).not.toThrow(
-      UsageError,
-    );
-  });
+  // Full regeneration (30 franchises x 32 proposals, 32 benchmark games
+  // each) takes ~13s isolated and can double under the shared parallel
+  // runner, so it needs a per-test budget beyond the 30s project default.
+  it(
+    'accepts the committed 32-hex seed shape',
+    () => {
+      expect(() => bracketGenerate({ seed: '8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d' })).not.toThrow(
+        UsageError,
+      );
+    },
+    60_000,
+  );
 
   it('rejects benchmark samples too low for stable percentile separation', () => {
     expect(() =>
