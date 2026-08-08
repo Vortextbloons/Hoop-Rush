@@ -22,6 +22,7 @@ import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
 import { availabilityStripRows, humanInjuryTimeline } from '$lib/season/season-health-view';
 import { influenceViewModel, type InfluenceViewModel } from '$lib/season/season-influence-view';
 import { tradeOfferViewModel } from '$lib/season/season-trade-view';
+import { buildManifest } from '@hoop-rush/test-fixtures';
 
 vi.mock('@hoop-rush/engine', () => ({
   seasonObjectiveChoicesForBlock: () => ['win-six', 'defense-108', 'turnover-130'] as const,
@@ -348,23 +349,31 @@ describe('InfluencePanel', () => {
   });
 });
 
+function tradePanelProps(
+  offers: ReturnType<typeof tradeOffers>,
+  handlers: { onAccept: (offerId: string) => void; onDecline: (offerId: string) => void },
+) {
+  return {
+    windowIndex: 0,
+    offers,
+    manifest: buildManifest(),
+    faceOf: () => null,
+    ...handlers,
+  };
+}
+
 describe('TradeOffersPanel', () => {
   it('renders the offer rationale and confirms accept', async () => {
     const onAccept = vi.fn();
     render(TradeOffersPanel, {
-      props: {
-        windowIndex: 0,
-        offers: tradeOffers(),
-        onAccept,
-        onDecline: vi.fn(),
-      },
+      props: tradePanelProps(tradeOffers(), { onAccept, onDecline: vi.fn() }),
     });
     const text = document.body.textContent;
     expect(text).toContain('Boston Celtics');
     expect(text).toContain('Player 1');
-    expect(text).toContain('96% of outgoing');
-    expect(text).toContain('two-guard');
-    expect(text).toContain('removes 9 pairs');
+    expect(text).toContain('96%');
+    expect(text).toContain('Positions');
+    expect(text).toContain('Chemistry');
     await fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
     await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onAccept).toHaveBeenCalledWith('off-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
@@ -373,12 +382,7 @@ describe('TradeOffersPanel', () => {
   it('confirms decline without accepting', async () => {
     const onDecline = vi.fn();
     render(TradeOffersPanel, {
-      props: {
-        windowIndex: 0,
-        offers: tradeOffers(),
-        onAccept: vi.fn(),
-        onDecline,
-      },
+      props: tradePanelProps(tradeOffers(), { onAccept: vi.fn(), onDecline }),
     });
     await fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
     await fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
@@ -393,7 +397,7 @@ describe('TradeOffersPanel', () => {
       (id: string) => id,
     );
     render(TradeOffersPanel, {
-      props: { windowIndex: 0, offers: [resolved], onAccept: vi.fn(), onDecline: vi.fn() },
+      props: tradePanelProps([resolved], { onAccept: vi.fn(), onDecline: vi.fn() }),
     });
     const text = document.body.textContent;
     expect(text).toContain('Expired when block 3 locked');

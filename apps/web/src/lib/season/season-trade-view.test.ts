@@ -75,6 +75,23 @@ function runWithRosters(): SeasonRun {
   ];
   return {
     rosters,
+    rotations: [
+      {
+        franchiseId: 'lakers',
+        starters: Array.from({ length: 5 }, () => 'pv-00000000000000000000000000000000'),
+        benchOrder: Array.from({ length: 5 }, () => 'pv-00000000000000000000000000000000'),
+        targetMinutes: [
+          { playerVersionId: 'pv-00000000000000000000000000000000', minutes: 32 },
+          ...Array.from({ length: 9 }, (_, index) => ({
+            playerVersionId: `pv-fill-${String(index)}`,
+            minutes: 23,
+          })),
+        ],
+        closingFive: Array.from({ length: 5 }, () => 'pv-00000000000000000000000000000000'),
+        rotationVersion: 'season-rotation-v3',
+        minutePolicy: { policyVersion: 'minute-policy-v1', strategy: 'balanced' },
+      },
+    ],
   } as unknown as SeasonRun;
 }
 
@@ -120,12 +137,12 @@ describe('tradeOfferViewModel', () => {
     expect(vm.outgoingPlayers[0]?.displayName).toBe('Magic');
     expect(vm.incomingPlayers[0]?.displayName).toBe('Larry');
     expect(vm.incomingPlayers[0]?.available).toBe(false);
-    expect(vm.valueBandLabel).toContain('96%');
-    expect(vm.valueBandLabel).toContain('85-115');
-    expect(vm.roleFitNotes).toContain('two-guard');
-    expect(vm.rosterNeedNotes).toContain('guard depth');
-    expect(vm.rotationProjection).toContain('32 minutes');
-    expect(vm.chemistryDisruption).toEqual({ removedPairs: 9, newPairs: 9 });
+    expect(vm.valueInsight.body).toContain('96%');
+    expect(vm.roleFitInsight.body).toContain('Magic');
+    expect(vm.roleFitInsight.body).toContain('Larry');
+    expect(vm.rosterNeedInsight.body).toContain('2');
+    expect(vm.rotationInsight.body).toContain('32 min');
+    expect(vm.chemistryInsight.body).toContain('9');
     expect(vm.statusLabel).toBe('Open');
   });
 
@@ -150,8 +167,9 @@ describe('tradeOfferViewModel', () => {
       valueBand: { ratioBasisPoints: 820, band: '80-120', qualified: false },
     });
     const vm = tradeOfferViewModel(twoForTwo, runWithRosters(), null, (id: string) => id);
-    expect(vm.valueBandLabel).toContain('2-for-2');
-    expect(vm.valueBandLabel).toContain('outside band');
+    expect(vm.tradeSizeLabel).toBe('2-for-2');
+    expect(vm.valueInsight.tone).toBe('caution');
+    expect(vm.valueInsight.body).toContain('unusual');
   });
 });
 

@@ -141,8 +141,8 @@ test.describe('season M2.5: health, objectives, Influence, trades, interruption'
     // Three base human offers render with their rationale.
     const offers = panel.locator('li').filter({ has: panel.getByText('You give') });
     await expect(offers).toHaveCount(3);
-    await expect(panel.getByText(/% of outgoing/).first()).toBeVisible();
-    await expect(panel.getByText(/Role fit/).first()).toBeVisible();
+    await expect(panel.getByText(/Value/).first()).toBeVisible();
+    await expect(panel.getByText(/Positions/).first()).toBeVisible();
 
     // Decline the first offer through the explicit confirm dialog.
     const firstOffer = offers.nth(0);

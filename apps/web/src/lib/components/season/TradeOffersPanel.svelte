@@ -1,27 +1,33 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
-  import { X } from '@lucide/svelte';
-  import { tradeResolvedAt } from '$lib/season/season-trade-view';
-  import type { TradeOfferViewModel } from '$lib/season/season-trade-view';
+  import { ArrowRight, X } from '@lucide/svelte';
+  import type { HoopRushManifest } from '@hoop-rush/data-contracts';
+  import { tradeResolvedAt, type TradeOfferInsight, type TradeOfferViewModel, type TradePlayerViewModel } from '$lib/season/season-trade-view';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
   import { formatPositions } from '$lib/player-positions';
+  import SeasonPlayerFace from './SeasonPlayerFace.svelte';
 
   /**
    * Trade offers panel (M2.5): while a trade window is open the hub shows
-   * every open human offer with its full rationale — incoming/outgoing
-   * players (with health flags), value band, role fit, roster need,
-   * projected rotation change, and chemistry disruption. Accept/Decline open
-   * explicit confirm dialogs; resolved offers render their recorded status.
+   * every open human offer with player headshots, a clear give/get layout,
+   * and plain-language rationale (value, positions, depth, minutes,
+   * chemistry). Accept/Decline open explicit confirm dialogs; resolved
+   * offers render their recorded status.
    */
 
   let {
     windowIndex,
     offers,
+    manifest,
+    faceOf,
     busy = false,
     onAccept,
     onDecline,
   }: {
     windowIndex: number;
     offers: TradeOfferViewModel[];
+    manifest: HoopRushManifest;
+    faceOf: (playerVersionId: string) => SeasonFaceRef | null;
     busy?: boolean;
     onAccept: (offerId: string) => void;
     onDecline: (offerId: string) => void;
@@ -46,7 +52,7 @@
     else onDecline(offer.offer.offerId);
   }
 
-  function playerList(players: TradeOfferViewModel['incomingPlayers']): string {
+  function playerSummary(players: TradePlayerViewModel[]): string {
     return players
       .map(
         (player) =>
@@ -57,10 +63,17 @@
       .join(', ');
   }
 
-  function chemistryLabel(vm: TradeOfferViewModel): string {
-    return `removes ${String(vm.chemistryDisruption.removedPairs)} ${
-      vm.chemistryDisruption.removedPairs === 1 ? 'pair' : 'pairs'
-    } · adds ${String(vm.chemistryDisruption.newPairs)} at zero chemistry`;
+  function insightToneClass(tone: TradeOfferInsight['tone']): string {
+    if (tone === 'positive') return 'text-emerald-400';
+    if (tone === 'negative') return 'text-amber-400';
+    if (tone === 'caution') return 'text-amber-300';
+    return 'text-muted-foreground';
+  }
+
+  function healthBadge(player: TradePlayerViewModel): string | null {
+    if (!player.available) return 'Out';
+    if (player.activeInjuryIds.length > 0) return 'Injured';
+    return null;
   }
 </script>
 
@@ -76,7 +89,7 @@
     >
       Trade offers
     </h2>
-    <span class="font-mono text-[10px] text-muted-foreground">
+    <span class="text-xs text-muted-foreground">
       Window {windowIndex + 1} of 3 · closes when the next block locks
     </span>
   </div>
@@ -86,84 +99,146 @@
       No open offers in this window — spend 1 Influence on an extra trade offer or move on.
     </p>
   {:else}
-    <ul class="mt-2 flex flex-col gap-3">
+    <ul class="mt-3 flex flex-col gap-4">
       {#each offers as vm (vm.offer.offerId)}
-        <li class="rounded-lg bg-surface-2 p-3">
-          <div class="flex flex-wrap items-baseline justify-between gap-2">
-            <p class="text-sm font-semibold">
-              {vm.fromFranchiseName}
-              <span aria-hidden="true">&rarr;</span>
-              you
-            </p>
-            <span class="font-mono text-[10px] text-muted-foreground">{vm.statusLabel}</span>
-          </div>
-          <div class="mt-2 flex flex-col gap-1.5 text-sm">
-            <p class="min-w-0">
-              <span
-                class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                You give
-              </span>
-              <span class="ml-2">{playerList(vm.outgoingPlayers)}</span>
-            </p>
-            <p class="min-w-0">
-              <span
-                class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-              >
-                You get
-              </span>
-              <span class="ml-2">{playerList(vm.incomingPlayers)}</span>
-            </p>
-          </div>
-          <dl
-            class="mt-2 grid gap-x-4 gap-y-1 font-mono text-[10px] text-muted-foreground sm:grid-cols-2"
+        <li class="overflow-hidden rounded-xl border border-border bg-surface-2">
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5 sm:px-4"
           >
-            <div class="min-w-0">
-              <dt class="font-bold uppercase tracking-[0.12em]">Value</dt>
-              <dd class="mt-0.5">{vm.valueBandLabel}</dd>
+            <div class="flex min-w-0 items-center gap-2">
+              <p class="truncate text-sm font-semibold">{vm.fromFranchiseName}</p>
+              <ArrowRight class="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <p class="text-sm font-semibold text-primary">You</p>
             </div>
-            <div class="min-w-0">
-              <dt class="font-bold uppercase tracking-[0.12em]">Role fit</dt>
-              <dd class="mt-0.5">{vm.roleFitNotes}</dd>
-            </div>
-            <div class="min-w-0">
-              <dt class="font-bold uppercase tracking-[0.12em]">Roster need</dt>
-              <dd class="mt-0.5">{vm.rosterNeedNotes}</dd>
-            </div>
-            <div class="min-w-0">
-              <dt class="font-bold uppercase tracking-[0.12em]">Chemistry</dt>
-              <dd class="mt-0.5">{chemistryLabel(vm)}</dd>
-            </div>
-            <div class="min-w-0 sm:col-span-2">
-              <dt class="font-bold uppercase tracking-[0.12em]">Rotation impact</dt>
-              <dd class="mt-0.5">{vm.rotationProjection}</dd>
-            </div>
-          </dl>
-          {#if vm.offer.status === 'open'}
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onclick={() => openConfirm(vm, 'accept')}
-                disabled={busy}
-                class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Accept
-              </button>
-              <button
-                type="button"
-                onclick={() => openConfirm(vm, 'decline')}
-                disabled={busy}
-                class="inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Decline
-              </button>
-              <span class="font-mono text-[10px] text-muted-foreground">
-                Accepting moves {vm.outgoingPlayers.length}-for-{vm.incomingPlayers.length} · injuries
-                and load follow the players
+            <div class="flex items-center gap-2">
+              <span class="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {vm.tradeSizeLabel}
               </span>
+              <span class="text-xs text-muted-foreground">{vm.statusLabel}</span>
+            </div>
+          </div>
+
+          <div class="grid gap-0 sm:grid-cols-2 sm:gap-px sm:bg-border">
+            <div class="bg-surface-2 p-3 sm:p-4">
+              <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-rose-400/90">
+                You give
+              </p>
+              <ul class="mt-2 flex flex-col gap-2">
+                {#each vm.outgoingPlayers as player (player.playerVersionId)}
+                  {@const face = faceOf(player.playerVersionId)}
+                  {@const badge = healthBadge(player)}
+                  <li class="flex items-start gap-2.5">
+                    {#if face !== null}
+                      <SeasonPlayerFace {face} {manifest} size="sm" />
+                    {:else}
+                      <span
+                        class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        ?
+                      </span>
+                    {/if}
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold leading-snug">{player.displayName}</p>
+                      {#if player.playable.length > 0}
+                        <p class="text-xs text-muted-foreground">
+                          {formatPositions(player.playable)}
+                        </p>
+                      {/if}
+                      {#if player.rotationMinutes !== null}
+                        <p class="text-xs text-muted-foreground">
+                          {player.rotationMinutes} min in your rotation
+                        </p>
+                      {/if}
+                      {#if badge !== null}
+                        <p class="mt-0.5 text-xs font-medium text-amber-400">{badge}</p>
+                      {/if}
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+
+            <div class="border-t border-border bg-surface-2 p-3 sm:border-t-0 sm:p-4">
+              <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-400/90">
+                You get
+              </p>
+              <ul class="mt-2 flex flex-col gap-2">
+                {#each vm.incomingPlayers as player (player.playerVersionId)}
+                  {@const face = faceOf(player.playerVersionId)}
+                  {@const badge = healthBadge(player)}
+                  <li class="flex items-start gap-2.5">
+                    {#if face !== null}
+                      <SeasonPlayerFace {face} {manifest} size="sm" />
+                    {:else}
+                      <span
+                        class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        ?
+                      </span>
+                    {/if}
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-semibold leading-snug">{player.displayName}</p>
+                      {#if player.playable.length > 0}
+                        <p class="text-xs text-muted-foreground">
+                          {formatPositions(player.playable)}
+                        </p>
+                      {/if}
+                      {#if player.projectedMinutes !== null}
+                        <p class="text-xs text-muted-foreground">
+                          ~{player.projectedMinutes} min projected
+                        </p>
+                      {/if}
+                      {#if badge !== null}
+                        <p class="mt-0.5 text-xs font-medium text-amber-400">{badge}</p>
+                      {/if}
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          </div>
+
+          <dl class="flex flex-col gap-2 border-t border-border px-3 py-3 sm:px-4">
+            {#each [vm.valueInsight, vm.roleFitInsight, vm.rosterNeedInsight, vm.rotationInsight, vm.chemistryInsight] as insight (insight.title)}
+              <div class="min-w-0">
+                <dt class="text-xs font-semibold text-foreground">{insight.title}</dt>
+                <dd class="mt-0.5 text-sm leading-snug {insightToneClass(insight.tone)}">
+                  {insight.body}
+                </dd>
+              </div>
+            {/each}
+          </dl>
+
+          {#if vm.offer.status === 'open'}
+            <div
+              class="flex flex-col gap-2 border-t border-border px-3 py-3 sm:flex-row sm:items-center sm:px-4"
+            >
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onclick={() => openConfirm(vm, 'accept')}
+                  disabled={busy}
+                  class="inline-flex flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onclick={() => openConfirm(vm, 'decline')}
+                  disabled={busy}
+                  class="inline-flex flex-1 items-center justify-center rounded-lg border border-border px-4 py-2.5 text-sm font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none"
+                >
+                  Decline
+                </button>
+              </div>
+              <p class="text-xs text-muted-foreground sm:ml-auto">
+                Injuries and fatigue travel with the players.
+              </p>
             </div>
           {:else}
-            <p class="mt-2 font-mono text-[10px] text-muted-foreground">
+            <p class="border-t border-border px-3 py-2 text-xs text-muted-foreground sm:px-4">
               {tradeResolvedAt(vm.offer).label}
             </p>
           {/if}
@@ -203,9 +278,9 @@
         </div>
         <p class="mt-2 text-sm text-muted-foreground">
           {pendingOffer.action === 'accept'
-            ? `You send ${playerList(pendingOffer.offer.outgoingPlayers)} and receive ${playerList(
+            ? `You send ${playerSummary(pendingOffer.offer.outgoingPlayers)} and receive ${playerSummary(
                 pendingOffer.offer.incomingPlayers,
-              )}. Ownership transfers, the rotation fills the open spot, and new pairs start at zero chemistry.`
+              )}. Ownership transfers, your rotation fills the open spot, and new teammate pairings start at neutral chemistry.`
             : 'The offer is marked declined and cannot be reopened this window.'}
         </p>
         <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">

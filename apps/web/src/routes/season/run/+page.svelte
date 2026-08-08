@@ -576,10 +576,12 @@
     {/if}
 
     <!-- M2.5: trade offers panel (open window) -->
-    {#if openWindow !== null}
+    {#if openWindow !== null && shell.manifest !== null}
       <TradeOffersPanel
         windowIndex={openWindow.windowIndex}
         offers={tradeOffers}
+        manifest={shell.manifest}
+        faceOf={(playerVersionId) => shell.facesByVersion.get(playerVersionId) ?? null}
         busy={block.phase === 'running'}
         onAccept={(offerId) =>
           shell.acceptTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
