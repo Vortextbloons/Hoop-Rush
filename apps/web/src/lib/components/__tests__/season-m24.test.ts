@@ -10,6 +10,7 @@ import type {
   SeasonGameSummary,
   SeasonRoster,
 } from '@hoop-rush/data-contracts';
+import UnitChemistry from '$lib/components/season/UnitChemistry.svelte';
 import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
 import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
 import type { SeasonRunShellData } from '$lib/season/season-shell-context';
@@ -171,7 +172,7 @@ function summaryFor(seconds: number): SeasonGameSummary {
 }
 
 describe('SeasonRosterList (M2.4)', () => {
-  it('renders fatigue bands, workload, last-game minutes, and the chemistry panel', () => {
+  it('renders fatigue bands, workload, and last-game minutes', () => {
     const effects = effectsState(4000, 400);
     const { container } = render(SeasonRosterList, {
       props: {
@@ -188,17 +189,12 @@ describe('SeasonRosterList (M2.4)', () => {
     // separate text nodes inside the pill span.
     expect(text).toContain('Tired');
     expect(text).toContain('40%');
-    // Chemistry panel with shared-play evidence.
-    expect(text).toContain('Unit chemistry');
-    expect(text).toContain('Most shared play');
-    expect(text).toContain('Least shared play');
-    expect(text).toContain('400 trips');
     // Workload and last-game minutes.
     expect(text).toContain('Recent load 30%');
     expect(text).toContain('last game 32 min');
   });
 
-  it('handles a null effects state without the chemistry panel', () => {
+  it('handles a null effects state without fatigue pills', () => {
     const { container } = render(SeasonRosterList, {
       props: {
         roster: ROSTER,
@@ -210,8 +206,37 @@ describe('SeasonRosterList (M2.4)', () => {
       },
     });
     const text = container.textContent;
-    expect(text).not.toContain('Unit chemistry');
+    expect(text).not.toContain('Fresh');
     expect(text).toContain('Fixture hawks 1');
+  });
+});
+
+describe('UnitChemistry (M2.4)', () => {
+  it('renders the chemistry panel with shared-play evidence', () => {
+    const effects = effectsState(4000, 400);
+    const { container } = render(UnitChemistry, {
+      props: {
+        roster: ROSTER,
+        effects,
+        shell: minimalShell(),
+      },
+    });
+    const text = container.textContent;
+    expect(text).toContain('Unit chemistry');
+    expect(text).toContain('Most shared play');
+    expect(text).toContain('Least shared play');
+    expect(text).toContain('400 trips');
+  });
+
+  it('omits the panel when effects state is absent', () => {
+    const { container } = render(UnitChemistry, {
+      props: {
+        roster: ROSTER,
+        effects: null,
+        shell: minimalShell(),
+      },
+    });
+    expect(container.textContent).not.toContain('Unit chemistry');
   });
 });
 

@@ -1,8 +1,12 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { resolve } from '$app/paths';
-  import type { RouteId } from '$app/types';
+  import { SvelteMap } from 'svelte/reactivity';
+  import type { SeasonGameSummary } from '@hoop-rush/data-contracts';
+  import InjuryTimeline from '$lib/components/season/InjuryTimeline.svelte';
   import RotationEditor from '$lib/components/season/RotationEditor.svelte';
+  import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
+  import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
+  import UnitChemistry from '$lib/components/season/UnitChemistry.svelte';
   import {
     blockPhaseAllowsSubmit,
     buildSubmitBlockEnvelope,
@@ -11,18 +15,28 @@
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
+  import { humanInjuryTimeline } from '$lib/season/season-health-view';
+  import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
 
   /**
-   * Season Run team tab (M2.3.5): rotation workspace for the human franchise.
-   * The editor is shell-owned and survives tab switches; there is no separate
-   * save — the rotation locks when the block submits. Roster cards live on the
-   * Roster tab. The sticky action bar reports validation state; on mobile it
-   * submits the block directly, on desktop it shortcuts to the Hub.
+   * Season Run team tab (M2.3.5, M2.4, M2.5): the unified rotation
+   * workspace for the human franchise — one ten-player list that IS the
+   * rotation editor (starters, bench order, closing five, target minutes)
+   * with fatigue bands and last-game minutes inline, the unit-chemistry
+   * panel, the injury timeline, and the sticky action bar. The editor is
+   * shell-owned and survives tab switches; there is no separate save — the
+   * rotation locks when the block submits. Roster identity, fatigue, and
+   * availability context that previously lived on a separate Roster tab
+   * now render here.
    */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   const manifest = $derived(shell.manifest);
+  const run = $derived(shell.run);
+  const humanFranchiseId = $derived(shell.humanFranchiseId);
+  const effects = $derived(shell.snapshot?.effects ?? null);
+  const health = $derived(shell.health);
   const failures = $derived(shell.editor?.validate() ?? []);
   const canSubmit = $derived(
     shell.snapshot !== null &&
@@ -33,6 +47,66 @@
       blockPhaseAllowsSubmit(shell.block.phase) &&
       shell.block.phase !== 'running',
   );
+
+  /** playerVersionId -> summary Overall rating, for the editor rows/chips. */
+  const overallByVersion = $derived.by(() => {
+    const catalog = shell.catalog;
+    if (catalog === null) return null;
+    const map = new SvelteMap<string, number>();
+    for (const candidate of catalog.candidates) {
+      map.set(candidate.playerVersionId, candidate.summaryRatings.overallRating);
+    }
+    return map;
+  });
+
+  const roster = $derived(
+    run !== null && humanFranchiseId !== null
+      ? (run.rosters.find((r) => r.franchiseId === humanFranchiseId) ?? null)
+      : null,
+  );
+
+  /** Accepted summaries of the last block (last-game minutes per player). */
+  let summaries: SeasonGameSummary[] = $state([]);
+
+  $effect(() => {
+    const hub = shell.hub;
+    const activeRunId = shell.snapshot?.run.runId ?? null;
+    const accepted = shell.snapshot?.acceptedBlocks ?? [];
+    if (hub === null || activeRunId === null || accepted.length === 0) {
+      summaries = [];
+      return;
+    }
+    const lastBlock = accepted[accepted.length - 1];
+    if (lastBlock === undefined) {
+      summaries = [];
+      return;
+    }
+    void hub.loadBlockSummaries(activeRunId, lastBlock.blockIndex).then((rows) => {
+      summaries = rows;
+    });
+  });
+
+  /** M2.5: per-player injury history (health records + accepted summaries). */
+  const injuryTimeline = $derived(
+    run !== null && roster !== null && humanFranchiseId !== null && health !== null
+      ? humanInjuryTimeline(health, roster, humanFranchiseId, summaries)
+      : [],
+  );
+
+  /** Season stats view-model: roster joined to the folded aggregates. */
+  const statsView = $derived.by(() => {
+    if (roster === null || humanFranchiseId === null) return null;
+    return humanSeasonPlayerStats({
+      roster,
+      summaries: shell.snapshot?.summaries ?? [],
+      overallRatingOf: (playerVersionId) =>
+        shell.catalog?.candidates.find((c) => c.playerVersionId === playerVersionId)?.summaryRatings
+          .overallRating ?? null,
+      playablePositions: (playerVersionId) =>
+        shell.catalog?.candidates.find((c) => c.playerVersionId === playerVersionId)?.positions
+          .playable ?? [],
+    });
+  });
 
   let submitting = $state(false);
   let submitError: string | null = $state(null);
@@ -58,83 +132,104 @@
   <title>Season Run — Team — Hoop Rush</title>
 </svelte:head>
 
-<div class="flex min-w-0 flex-col gap-6 pt-6">
-  {#if shell.editor === null || manifest === null}
+<div
+  class="flex min-w-0 flex-col gap-6 pt-6 pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-0"
+>
+  {#if shell.editor === null || manifest === null || roster === null}
     <p class="px-3 font-mono text-sm text-muted-foreground sm:px-0">
-      Preparing the rotation editor…
+      Preparing the rotation workspace…
     </p>
   {:else}
-    <section
-      aria-labelledby="workspace-heading"
-      class="min-w-0 pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-0"
-    >
-      <h2
-        id="workspace-heading"
-        class="font-display px-3 text-base font-extrabold uppercase tracking-tight sm:px-0"
-      >
-        Rotation workspace
-      </h2>
-      <div class="mt-3">
-        <RotationEditor
-          editor={shell.editor}
-          disabled={shell.block.phase === 'running'}
-          faces={shell.facesByVersion}
-          {manifest}
-          onchange={() => {
-            // The editor is shell-owned; reactive deriveds above already
-            // mirror its state. Submission happens at block time.
-          }}
-        />
+    <section aria-labelledby="workspace-heading" class="flex min-w-0 flex-col gap-6 px-3 sm:px-0">
+      <div>
+        <p class="font-mono text-xs tracking-[0.16em] text-primary uppercase">Season Run · team</p>
+        <h2
+          id="workspace-heading"
+          class="font-display mt-1 text-2xl font-extrabold tracking-tight uppercase sm:text-3xl"
+        >
+          Rotation workspace
+        </h2>
+        <p class="mt-1 font-mono text-[10px] text-muted-foreground">
+          Ten player-season versions · role, minutes, fatigue, and availability resolve here · the
+          rotation locks when the block submits
+        </p>
       </div>
 
-      <!-- Sticky action bar: validation state + simulate -->
-      <div
-        class="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 px-3 sm:bottom-4 sm:px-0"
-      >
-        <div
-          class="flex flex-col gap-3 rounded-none border border-border bg-surface-1 p-3 shadow-2xl shadow-black/40 backdrop-blur supports-[backdrop-filter]:bg-surface-1/95 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:rounded-xl"
-        >
-          <p class="min-w-0 text-sm" aria-live="polite">
-            {#if failures.length === 0}
-              <span class="font-semibold text-positive">Rotation valid</span>
-              <span class="ml-2 hidden text-muted-foreground sm:inline">
-                Locks when the next block submits.
-              </span>
-            {:else}
-              <span class="font-semibold text-destructive">
-                Rotation invalid — {failures.length} issue{failures.length === 1 ? '' : 's'}
-              </span>
-            {/if}
-          </p>
-          {#if submitError}
-            <p role="alert" class="text-sm text-destructive">{submitError}</p>
-          {/if}
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <button
-              type="button"
-              onclick={() => void submitBlock()}
-              disabled={!canSubmit || submitting}
-              class="inline-flex w-full min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 md:hidden"
-            >
-              {shell.block.phase === 'running'
-                ? 'Simulating block…'
-                : submitting
-                  ? 'Preparing block…'
-                  : 'Lock & simulate block'}
-            </button>
-            <a
-              href={resolve('/season/run')}
-              aria-disabled={failures.length > 0 ? 'true' : undefined}
-              class="hidden min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-primary/60 bg-surface-2 px-4 py-2.5 text-sm font-semibold text-primary transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:border-primary hover:bg-surface-3 md:inline-flex md:w-auto md:border-transparent md:bg-primary md:px-5 md:text-primary-foreground md:hover:opacity-90 {failures.length >
-              0
-                ? 'pointer-events-none opacity-40'
-                : ''}"
-            >
-              Simulate next block
-            </a>
-          </div>
-        </div>
-      </div>
+      <UnitChemistry {roster} {effects} {shell} />
+
+      <RotationEditor
+        editor={shell.editor}
+        disabled={shell.block.phase === 'running'}
+        faces={shell.facesByVersion}
+        {manifest}
+        {effects}
+        {summaries}
+        {overallByVersion}
+        onchange={() => {
+          // The editor is shell-owned; reactive deriveds above already
+          // mirror its state. Submission happens at block time.
+        }}
+      />
+
+      <SeasonRosterList
+        {roster}
+        {manifest}
+        {shell}
+        roleOf={(playerVersionId) => {
+          const row = shell.editor
+            ?.rows()
+            .find((r) => r.member.playerVersionId === playerVersionId);
+          return { role: row?.role ?? '—', minutes: row?.minutes ?? '—' };
+        }}
+        {effects}
+        {summaries}
+      />
+
+      {#if statsView !== null && manifest !== null}
+        <SeasonPlayerStats view={statsView} {manifest} {shell} />
+      {/if}
+
+      {#if injuryTimeline.length > 0}
+        <InjuryTimeline players={injuryTimeline} />
+      {/if}
     </section>
+
+    <!-- Sticky action bar: validation state + simulate (identical on every
+         breakpoint; the block locks from here or from the Hub preview). -->
+    <div
+      class="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 px-3 sm:bottom-4 sm:px-0"
+    >
+      <div
+        class="flex flex-col gap-3 rounded-none border border-border bg-surface-1 p-3 shadow-2xl shadow-black/40 backdrop-blur supports-[backdrop-filter]:bg-surface-1/95 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:rounded-xl"
+      >
+        <p class="min-w-0 text-sm" aria-live="polite">
+          {#if failures.length === 0}
+            <span class="font-semibold text-positive">Rotation valid</span>
+            <span class="ml-2 hidden text-muted-foreground sm:inline">
+              Locks when the next block submits.
+            </span>
+          {:else}
+            <span class="font-semibold text-destructive">
+              Rotation invalid — {failures.length} issue{failures.length === 1 ? '' : 's'}
+            </span>
+          {/if}
+        </p>
+        {#if submitError}
+          <p role="alert" class="text-sm text-destructive">{submitError}</p>
+        {/if}
+        <button
+          type="button"
+          onclick={() => void submitBlock()}
+          disabled={!canSubmit || submitting}
+          class="inline-flex w-full min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+        >
+          {shell.block.phase === 'running'
+            ? 'Simulating block…'
+            : submitting
+              ? 'Preparing block…'
+              : 'Lock & simulate block'}
+        </button>
+      </div>
+    </div>
   {/if}
 </div>

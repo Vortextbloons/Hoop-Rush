@@ -1,5 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
   import type { SeasonTeamAggregate } from '@hoop-rush/data-contracts';
   import StandingsTable from '$lib/components/season/StandingsTable.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
@@ -232,43 +234,50 @@
                 aria-label={isHuman
                   ? `${shell.franchiseName(team.franchiseId)} (your team)`
                   : undefined}
-                class="overflow-hidden bg-surface-1 px-3 py-3 sm:rounded-xl sm:px-4 {isHuman
+                class="overflow-hidden bg-surface-1 px-3 py-3 sm:rounded-xl {isHuman
                   ? 'ring-1 ring-primary/40'
                   : ''}"
               >
-                <div class="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2">
-                  {#if identity}
-                    <SeasonTeamLogo
-                      {manifest}
-                      franchiseId={identity.franchiseId}
-                      teamExternalId={identity.teamExternalId}
-                      alt=""
-                      size="sm"
-                    />
-                  {:else}
-                    <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
-                  {/if}
-                  <span class="min-w-0 truncate font-semibold">
-                    {shell.franchiseName(team.franchiseId)}
-                    {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
-                  </span>
-                  <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
-                    {team.gamesPlayed} GP
-                  </span>
-                  <span class="shrink-0 font-mono text-[10px] font-bold">
-                    {team.diff > 0 ? '+' : ''}{team.diff}
-                  </span>
-                </div>
-                <dl class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1">
-                  {#each statCells as cell (cell.key)}
-                    <div class="flex items-center justify-between gap-2">
-                      <dt class="font-mono text-[10px] text-muted-foreground">{cell.label}</dt>
-                      <dd class="font-mono text-[10px] font-bold">
-                        {team[cell.key].toFixed(1)}
-                      </dd>
-                    </div>
-                  {/each}
-                </dl>
+                <a
+                  href={resolve(`/season/run/teams/?franchiseId=${team.franchiseId}` as RouteId)}
+                  data-season-team-stats-link={team.franchiseId}
+                  aria-label={`${shell.franchiseName(team.franchiseId)} roster`}
+                  class="block outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div class="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2">
+                    {#if identity}
+                      <SeasonTeamLogo
+                        {manifest}
+                        franchiseId={identity.franchiseId}
+                        teamExternalId={identity.teamExternalId}
+                        alt=""
+                        size="sm"
+                      />
+                    {:else}
+                      <span class="h-7 w-7 shrink-0" aria-hidden="true"></span>
+                    {/if}
+                    <span class="min-w-0 truncate font-semibold">
+                      {shell.franchiseName(team.franchiseId)}
+                      {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
+                    </span>
+                    <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+                      {team.gamesPlayed} GP
+                    </span>
+                    <span class="shrink-0 font-mono text-[10px] font-bold">
+                      {team.diff > 0 ? '+' : ''}{team.diff}
+                    </span>
+                  </div>
+                  <dl class="mt-2 grid grid-cols-3 gap-x-4 gap-y-1">
+                    {#each statCells as cell (cell.key)}
+                      <div class="flex items-center justify-between gap-2">
+                        <dt class="font-mono text-[10px] text-muted-foreground">{cell.label}</dt>
+                        <dd class="font-mono text-[10px] font-bold">
+                          {team[cell.key].toFixed(1)}
+                        </dd>
+                      </div>
+                    {/each}
+                  </dl>
+                </a>
               </li>
             {/each}
           </ul>
@@ -300,13 +309,22 @@
                   {@const identity = identityOf(team.franchiseId)}
                   <tr
                     data-season-team-stats-row
-                    class="border-b border-border/40 {isHuman ? 'bg-primary/10' : ''}"
+                    class="border-b border-border/40 transition-colors hover:bg-surface-2/60 {isHuman
+                      ? 'bg-primary/10'
+                      : ''}"
                     aria-label={isHuman
                       ? `${shell.franchiseName(team.franchiseId)} (your team)`
                       : undefined}
                   >
                     <th scope="row" class="max-w-48 truncate px-4 py-2 text-left font-semibold">
-                      <span class="flex items-center gap-2">
+                      <a
+                        href={resolve(
+                          `/season/run/teams/?franchiseId=${team.franchiseId}` as RouteId,
+                        )}
+                        data-season-team-stats-link={team.franchiseId}
+                        aria-label={`${shell.franchiseName(team.franchiseId)} roster`}
+                        class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary"
+                      >
                         {#if identity}
                           <SeasonTeamLogo
                             {manifest}
@@ -321,7 +339,7 @@
                           {#if isHuman}<span class="text-primary" aria-label="your team">*</span
                             >{/if}
                         </span>
-                      </span>
+                      </a>
                     </th>
                     <td class="px-4 py-2 text-right font-mono text-[10px]">{team.gamesPlayed}</td>
                     <td class="px-4 py-2 text-right font-mono text-[10px]">{team.ppg.toFixed(1)}</td

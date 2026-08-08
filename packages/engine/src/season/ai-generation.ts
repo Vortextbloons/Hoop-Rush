@@ -3,9 +3,12 @@ import {
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
   SEASON_ROTATION_VERSION,
+  seasonDigestHex,
   seasonLeagueGenerationResultSchema,
   seasonLeagueSchema,
   seasonNamespaceSeed,
+  type EraSimulationProfile,
+  type ProjectionModelArtifact,
   type SeasonAiAnchor,
   type SeasonAiAssignment,
   type SeasonAiIdentity,
@@ -20,8 +23,14 @@ import {
   type SeasonRosterTargets,
   type SeasonStrengthBand,
   type Seed,
+  type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
 import { createRng, shuffle } from '../sim/rng.ts';
+import {
+  ProjectionCache,
+  projectSeasonRoster,
+  searchRosterRotationCandidates,
+} from '../projection/index.ts';
 import { validateDraftCatalog } from './catalog-validation.ts';
 import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
 import { seasonGenerationDigest } from './digest.ts';
@@ -253,6 +262,117 @@ export class SeasonAiGenerationError extends Error {
   }
 }
 
+/**
+ * Projection milestone shadow mode: runs the bounded projection search over
+ * every AI pool and records compact summaries on the evaluations. Selection
+ * is never changed; the summary records how the current selection compares
+ * to the projection-ranked best candidate of the same pool.
+ */
+export function attachAiProjectionSummaries(input: {
+  generation: SeasonLeagueGenerationResult;
+  catalog: SeasonDraftCatalog;
+  eraProfile: EraSimulationProfile;
+  model: ProjectionModelArtifact;
+  seed: string;
+}): SeasonLeagueGenerationResult {
+  const { generation, catalog, eraProfile, model, seed } = input;
+  const byId = new Map(
+    generation.rosters.map((roster) => [
+      roster.franchiseId,
+      roster.players.map((entry) => entry.playerVersionId),
+    ]),
+  );
+  const rotationById = new Map(
+    generation.rotations.map((rotation) => [rotation.franchiseId, rotation]),
+  );
+  const playerById = new Map(
+    catalog.candidates.map((candidate) => [
+      candidate.playerVersionId,
+      {
+        playerId: candidate.playerId,
+        playerVersionId: candidate.playerVersionId,
+        displayName: candidate.displayName,
+        positions: candidate.positions.playable,
+        heightInches: candidate.heightInches,
+        weightLbs: candidate.weightLbs,
+        ratings: candidate.detailedRatings,
+        tendencies: candidate.tendencies,
+        ...(candidate.anchors !== undefined ? { anchors: candidate.anchors } : {}),
+        ...(candidate.reconstructedThreePoint !== undefined
+          ? { reconstructedThreePoint: candidate.reconstructedThreePoint }
+          : {}),
+      } satisfies SimulationPlayer,
+    ]),
+  );
+  const evaluations = generation.evaluations.map((evaluation) => {
+    const pool = generation.aiPools.find((candidate) => candidate.franchiseId === evaluation.franchiseId);
+    if (pool === undefined) return evaluation;
+    const search = searchRosterRotationCandidates({
+      catalog,
+      locked: [],
+      available: pool.playerVersionIds,
+      seed: seasonDigestHex(`${seed}\u0000ai-projection\u0000${evaluation.franchiseId}`),
+      eraProfile,
+      model,
+    });
+    const selected = byId.get(evaluation.franchiseId) ?? [];
+    const rotation = rotationById.get(evaluation.franchiseId);
+    let selectedNetRating = 0;
+    if (rotation !== undefined) {
+      try {
+        const selectedPlayers: SimulationPlayer[] = [];
+        for (const id of selected) {
+          const player = playerById.get(id);
+          if (player !== undefined) selectedPlayers.push(player);
+        }
+        if (selectedPlayers.length === 10) {
+          const projection = projectSeasonRoster(
+            {
+              roster: selectedPlayers.map((player) => ({ player })),
+              rotation,
+              eraProfile,
+              model,
+            },
+            { cache: searchCache },
+          );
+          selectedNetRating = projection.metrics.netRating;
+        }
+      } catch {
+        selectedNetRating = 0;
+      }
+    }
+    const best = search.ranked[0];
+    const bestRoster = best === undefined ? null : best.projection.minutes.map((row) => row.playerVersionId);
+    const selectedSorted = [...selected].sort().join(',');
+    const bestSorted = bestRoster === null ? null : [...bestRoster].sort().join(',');
+    const selectedIsBest = selectedSorted !== '' && bestSorted !== null && selectedSorted === bestSorted;
+    const searchDigest = seasonDigestHex(
+      JSON.stringify({
+        seed: search.audit.seed,
+        lens: search.audit.lens,
+        rotationsEvaluated: search.audit.rotationsEvaluated,
+        nodeCount: search.audit.nodeCount,
+        selected: selectedSorted,
+        best: bestSorted,
+      }),
+    );
+    return {
+      ...evaluation,
+      projectionSummary: {
+        modelVersion: model.modelVersion,
+        selectedNetRating,
+        bestNetRating: best?.projection.metrics.netRating ?? null,
+        selectedIsBest,
+        searchDigest,
+      },
+    };
+  });
+  return { ...generation, evaluations };
+}
+
+/** Shared cache across AI shadow searches (bounded, per-call). */
+const searchCache = new ProjectionCache();
+
 export interface SeasonAiGenerationInput {
   seed: Seed;
   catalog: SeasonDraftCatalog;
@@ -263,6 +383,19 @@ export interface SeasonAiGenerationInput {
   humanRosters: ReadonlyArray<{ franchiseId: string; playerVersionIds: string[] }>;
   /** Required v2 roster targets; validated before any allocation. */
   targets: SeasonRosterTargets;
+  /**
+   * Projection milestone (optional shadow mode): when present, generation
+   * runs the projection search over every AI pool AFTER the current
+   * selection phases and records compact projection summaries on the
+   * evaluations. Shadow mode never changes selection: band quotas, anchor
+   * guarantees, ownership, pool membership, legality, role coverage, outlier
+   * caps, node budgets, and repair/backtracking rules are untouched. Absent
+   * means byte-identical output to projection-free generation.
+   */
+  projection?: {
+    eraProfile: EraSimulationProfile;
+    model: ProjectionModelArtifact;
+  };
 }
 
 /** Band + identity assignment for all 30 franchises for a run seed. */
@@ -2675,7 +2808,17 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
   state.phase = 'selection';
   selectRosters(state);
 
-  return finalizeResult(state, league, input.humanFranchiseIds, input.humanRosters);
+  const generation = finalizeResult(state, league, input.humanFranchiseIds, input.humanRosters);
+  if (input.projection !== undefined) {
+    return attachAiProjectionSummaries({
+      generation,
+      catalog,
+      eraProfile: input.projection.eraProfile,
+      model: input.projection.model,
+      seed: input.seed,
+    });
+  }
+  return generation;
 }
 
 /**

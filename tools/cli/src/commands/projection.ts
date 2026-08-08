@@ -18,6 +18,7 @@ import {
 } from '@hoop-rush/data-contracts';
 import {
   createEngineContext,
+  generateAiLeague,
   projectBaseFive,
   projectSeasonRoster,
   simulateGame,
@@ -27,6 +28,12 @@ import {
 import { parseCount, parseWorkers } from '../args.ts';
 import { makeReport, type CliReport } from '../report.ts';
 import { PackagedData, REPO_ROOT, loadPackagedData } from './data-loader.ts';
+import {
+  fixtureHumanRoster,
+  loadSeasonDraftCatalog,
+  loadSeasonLeague,
+  loadSeasonRosterTargets,
+} from './season-data.ts';
 import type { SeasonProjection, SeasonRotation } from '@hoop-rush/data-contracts';
 
 /**
@@ -605,6 +612,117 @@ export const PROJECTION_SEASON_OPTIONS = {
   format: true,
   verbose: false,
 };
+
+export const PROJECTION_AI_SHADOW_OPTIONS = {
+  manifest: true,
+  model: true,
+  era: true,
+  seed: true,
+  format: true,
+  verbose: false,
+};
+
+/** `projection ai-shadow`: generates a league with projection shadow mode and
+ * compares the current AI selections against the projection-ranked best
+ * candidates of the same pools. Selection is never changed. */
+export function projectionAiShadow(input: {
+  manifest: string | null | undefined;
+  model: string | null | undefined;
+  era: string | null | undefined;
+  seed: string | null | undefined;
+  verbose: boolean;
+}): CliReport {
+  const { manifest, model: modelPath, era, seed } = input;
+  const data = loadData(manifest);
+  const model = loadModel(manifest, modelPath);
+  const eraId = era ?? '2010s';
+  const profile = data.eraProfile(eraId);
+  const runSeed = seed ?? 'd00d2026a1b2c3d4e5f60718293a4b5c6';
+  const manifestPath = manifest ?? DEFAULT_MANIFEST;
+  let catalog;
+  try {
+    catalog = loadSeasonDraftCatalog(manifestPath);
+  } catch (error) {
+    return makeReport(
+      'projection ai-shadow',
+      { manifest: manifestPath },
+      { failures: [(error as Error).message] },
+    );
+  }
+  let league;
+  try {
+    league = loadSeasonLeague();
+  } catch (error) {
+    return makeReport(
+      'projection ai-shadow',
+      { manifest: manifestPath },
+      { failures: [(error as Error).message] },
+    );
+  }
+  let targets;
+  try {
+    targets = loadSeasonRosterTargets(manifestPath);
+  } catch (error) {
+    return makeReport(
+      'projection ai-shadow',
+      { manifest: manifestPath },
+      { failures: [(error as Error).message] },
+    );
+  }
+  const humanRosters = [{ franchiseId: 'lakers', playerVersionIds: fixtureHumanRoster(catalog) }];
+  let generation;
+  try {
+    generation = generateAiLeague({
+      seed: runSeed,
+      catalog,
+      league,
+      humanFranchiseIds: ['lakers'],
+      humanRosters,
+      targets,
+      projection: { eraProfile: profile, model },
+    });
+  } catch (error) {
+    return makeReport(
+      'projection ai-shadow',
+      { seed: runSeed, era: eraId },
+      { failures: [(error as Error).message] },
+    );
+  }
+
+  const summaries = generation.evaluations.filter(
+    (evaluation) => evaluation.projectionSummary !== undefined,
+  );
+  const different = summaries.filter(
+    (evaluation) => evaluation.projectionSummary?.selectedIsBest === false,
+  );
+  const gaps = summaries
+    .map((evaluation) => {
+      const summary = evaluation.projectionSummary;
+      if (summary === undefined || summary.bestNetRating === null) return null;
+      return summary.bestNetRating - summary.selectedNetRating;
+    })
+    .filter((gap): gap is number => gap !== null);
+  const meanGap = gaps.length > 0 ? gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length : 0;
+  const details = [
+    `league generated with projection shadow mode (${String(summaries.length)} AI evaluations)`,
+    `selection differs from the projection-best in ${String(different.length)} of ${String(summaries.length)} pools`,
+    `mean best-minus-selected net-rating gap: ${meanGap.toFixed(2)} (${String(gaps.length)} pools with a best candidate)`,
+    `generation digest: ${generation.digest}`,
+  ];
+  return makeReport(
+    'projection ai-shadow',
+    { seed: runSeed, era: eraId },
+    {
+      details,
+      payload: {
+        digest: generation.digest,
+        differentPools: different.length,
+        totalPools: summaries.length,
+        meanNetGap: meanGap,
+      },
+    },
+  );
+}
 
 /** `projection season`: projects one ten-player roster with its rotation. */
 export function projectionSeason(input: {

@@ -15,13 +15,12 @@ import { mockSvelteKitApp } from '../../../test/svelte-testing';
 mockSvelteKitApp();
 
 /**
- * RotationEditor component tests (M2.3 hub, M2.3.5 team workspace): preset
- * buttons, minute steppers, the invalid-rotation alert, the compact mobile
- * rows (bench controls, closing-five toggles, 44px steppers), and per-player failure
- * placement. The editor's engine-validated commits are unit-tested in
- * season-rotation-editor.test.ts; here we verify the wiring. The component
- * renders both the compact (mobile) and the desktop workspace layouts; the
- * CSS breakpoints decide which is visible.
+ * RotationEditor component tests (M2.3 hub, M2.3.5 team workspace): one
+ * unified ten-player list at every breakpoint — preset buttons, minute
+ * steppers with visible rebalancing, tap-to-type minutes, closing-five
+ * toggles, bench move-up/down controls, the invalid-rotation alert, and
+ * per-player failure placement. The editor's engine-validated commits are
+ * unit-tested in season-rotation-editor.test.ts; here we verify the wiring.
  */
 
 function members(): RotationMember[] {
@@ -45,35 +44,59 @@ function renderEditor(overrides: { minutes?: Array<[string, number]> } = {}) {
   return { editor, onchange, ...result };
 }
 
-/** The desktop "Target minutes" list (the compact rows are the mobile list). */
-function desktopMinutesList(container: HTMLElement) {
-  const section = container.querySelector('section[aria-labelledby="minutes-heading"]');
-  if (section === null) throw new Error('desktop minutes section missing');
+/** The single unified rotation list (starters + bench rows). */
+function rotationList(container: HTMLElement) {
+  const section = container.querySelector('section[aria-labelledby="starters-heading"]');
+  if (section === null) throw new Error('starters section missing');
   return within(section as HTMLElement);
 }
 
-/** The compact (mobile) player-rows list (Minutes tab). */
-function compactRowsList(container: HTMLElement) {
-  const section = container.querySelector('section[aria-labelledby="mobile-rotation-heading"]');
-  if (section === null) throw new Error('mobile rotation section missing');
+/** The top-of-page minutes panel: all ten players with their minute controls. */
+function minutesList(container: HTMLElement) {
+  const section = container.querySelector('section[aria-labelledby="minutes-heading"]');
+  if (section === null) throw new Error('minutes section missing');
   return within(section as HTMLElement);
 }
 
 describe('RotationEditor component', () => {
-  it('shows the minute total and the bench members in the compact layout', async () => {
-    const { getByText, getByRole, container } = renderEditor();
-    const total = container.querySelector('p strong');
-    expect(total?.textContent).toBe('240');
-    expect(container.querySelector('#mobile-rotation-heading')?.textContent).toContain(
-      'Bench order',
-    );
-    expect(getByRole('heading', { name: 'Starters' })).not.toBeNull();
-    expect(getByText(/Closing five/)).not.toBeNull();
-    // The compact Bench tab keeps the narrow layout focused on reserve controls.
-    await fireEvent.click(getByRole('button', { name: 'Bench' }));
-    expect(compactRowsList(container).getAllByRole('group', { name: /Minutes for/ })).toHaveLength(
-      5,
-    );
+  it('renders one unified list: all ten players, both sections, no mobile tabs', () => {
+    const { container, queryByRole } = renderEditor();
+    expect(container.querySelector('p strong')?.textContent).toBe('240');
+    expect(queryByRole('button', { name: 'Bench' })).toBeNull();
+    expect(queryByRole('button', { name: 'Closing' })).toBeNull();
+    // Five starter rows with slot pickers and five bench rows are present.
+    const starterList = rotationList(container);
+    expect(starterList.getAllByRole('combobox', { name: /Starter slot/ })).toHaveLength(5);
+    const benchSection = container.querySelector('section[aria-labelledby="bench-heading"]');
+    if (benchSection === null) throw new Error('bench section missing');
+    expect(
+      within(benchSection as HTMLElement).getAllByRole('button', { name: /bench order/i }),
+    ).toHaveLength(10);
+    // All ten minute controls live in the top minutes panel.
+    expect(minutesList(container).getAllByRole('group', { name: /Minutes for/ })).toHaveLength(10);
+  });
+
+  it('shows the player OVR rating on the top minutes panel rows', () => {
+    const { editor } = renderEditor();
+    const first = editor.rotation.starters[0];
+    if (first === undefined) {
+      throw new Error('fixture rotation has no first starter');
+    }
+    const overallByVersion = new Map<string, number>([
+      ...editor.rotation.starters.map((id) => [id, 88] as const),
+      ...editor.rotation.benchOrder.map((id) => [id, 79] as const),
+    ]);
+    const { container } = render(RotationEditor, {
+      props: {
+        editor,
+        disabled: false,
+        onchange: vi.fn(),
+        overallByVersion,
+      },
+    });
+    const minutes = minutesList(container);
+    expect(minutes.getAllByText('OVR 88').length).toBe(5);
+    expect(minutes.getAllByText(/^OVR \d+$/).length).toBe(10);
   });
 
   it('applies a preset through the engine and reports the new rotation', async () => {
@@ -97,11 +120,11 @@ describe('RotationEditor component', () => {
     if (first === undefined || label === undefined) {
       throw new Error('fixture rotation has no first starter');
     }
-    const minutes = desktopMinutesList(container);
-    await fireEvent.click(minutes.getByRole('button', { name: `Increase minutes for ${label}` }));
+    const list = minutesList(container);
+    await fireEvent.click(list.getByRole('button', { name: `Increase minutes for ${label}` }));
     let [rotation] = onchange.mock.calls.at(-1) as [SeasonRotation, string[]];
     expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(33);
-    await fireEvent.click(minutes.getByRole('button', { name: `Decrease minutes for ${label}` }));
+    await fireEvent.click(list.getByRole('button', { name: `Decrease minutes for ${label}` }));
     [rotation] = onchange.mock.calls.at(-1) as [SeasonRotation, string[]];
     expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(32);
     const total = rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0);
@@ -109,46 +132,126 @@ describe('RotationEditor component', () => {
     expect(container.querySelector('p strong')?.textContent).toBe('240');
   });
 
-  it('compact rows adjust minutes with touch-sized steppers', async () => {
-    const { editor, onchange, container } = renderEditor();
-    const first = editor.rotation.benchOrder[0];
+  it('announces and highlights the compensated player on a stepper change', async () => {
+    const { editor, container } = renderEditor();
+    const first = editor.rotation.starters[0];
     const label = first === undefined ? undefined : editor.names.get(first);
     if (first === undefined || label === undefined) {
       throw new Error('fixture rotation has no first starter');
     }
-    const compact = compactRowsList(container);
-    const increase = compact.getByRole('button', {
-      name: `Increase minutes for ${label}`,
-    });
-    expect(increase.classList.contains('h-11')).toBe(true);
-    expect(increase.classList.contains('w-11')).toBe(true);
-    await fireEvent.click(increase);
-    const [rotation] = onchange.mock.calls.at(-1) as [SeasonRotation, string[]];
-    expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(17);
+    const list = minutesList(container);
+    await fireEvent.click(list.getByRole('button', { name: `Increase minutes for ${label}` }));
+    const status = container.querySelector('[role="status"]');
+    expect(status?.textContent ?? '').toMatch(/took 1 from/);
+    // The compensated player's row carries the highlight ring.
+    const second = editor.rotation.starters[1];
+    if (second === undefined) {
+      throw new Error('fixture rotation has no second starter');
+    }
+    const secondLabel = editor.names.get(second);
+    if (secondLabel === undefined) {
+      throw new Error('fixture rotation has no name for the second starter');
+    }
+    const row = list.getByRole('group', { name: `Minutes for ${secondLabel}` }).closest('li');
+    expect(row?.classList.contains('ring-2')).toBe(true);
   });
 
-  it('closing-five selects swap players while keeping five selected', async () => {
-    const { editor, onchange, container, getByRole } = renderEditor();
+  it('tap-to-type commits a direct minutes value through rebalancing', async () => {
+    const { editor, onchange, container } = renderEditor();
+    const first = editor.rotation.starters[0];
+    const label = first === undefined ? undefined : editor.names.get(first);
+    if (first === undefined || label === undefined) {
+      throw new Error('fixture rotation has no first starter');
+    }
+    const list = minutesList(container);
+    await fireEvent.click(list.getByRole('button', { name: `Edit target minutes for ${label}` }));
+    const input = list.getByRole('textbox', { name: `Target minutes for ${label}` });
+    await fireEvent.input(input, { target: { value: '40' } });
+    await fireEvent.keyDown(input, { key: 'Enter' });
+    const [rotation] = onchange.mock.calls.at(-1) as [SeasonRotation, string[]];
+    expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(40);
+    expect(rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(240);
+    // The editor state committed and the input closed.
+    expect(container.querySelector('input[inputmode="numeric"]')).toBeNull();
+  });
+
+  it('cancels an inline edit on Escape without changing minutes', async () => {
+    const { editor, onchange, container } = renderEditor();
+    const first = editor.rotation.starters[0];
+    const label = first === undefined ? undefined : editor.names.get(first);
+    if (first === undefined || label === undefined) {
+      throw new Error('fixture rotation has no first starter');
+    }
+    const before = onchange.mock.calls.length;
+    const list = minutesList(container);
+    await fireEvent.click(list.getByRole('button', { name: `Edit target minutes for ${label}` }));
+    const input = list.getByRole('textbox', { name: `Target minutes for ${label}` });
+    await fireEvent.input(input, { target: { value: '99' } });
+    await fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onchange.mock.calls.length).toBe(before);
+    expect(editor.minutesFor(first)).toBe(32);
+  });
+
+  it('closing-five toggles swap players while keeping five selected', async () => {
+    const { editor, onchange, container } = renderEditor();
     const bench = editor.rotation.benchOrder[0];
     if (bench === undefined) {
       throw new Error('fixture rotation has no bench player');
     }
-    const originalSlot1 = editor.rotation.closingFive[1];
-    if (originalSlot1 === undefined) {
-      throw new Error('closing five missing slot 1');
+    const benchLabel = editor.names.get(bench);
+    if (benchLabel === undefined) {
+      throw new Error('fixture rotation has no name for the bench player');
     }
-    await fireEvent.click(getByRole('button', { name: 'Closing' }));
-    const select = container.querySelector(
-      'select[aria-label="Closing slot 2"]',
-    ) as HTMLSelectElement;
-    await fireEvent.change(select, { target: { value: bench } });
+    const benchSection = container.querySelector('section[aria-labelledby="bench-heading"]');
+    if (benchSection === null) throw new Error('bench section missing');
+    const benchList = within(benchSection as HTMLElement);
+    const toggle = benchList.getByRole('button', { name: `Add ${benchLabel} to closing five` });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    await fireEvent.click(toggle);
     expect(onchange).toHaveBeenCalledTimes(1);
     expect(editor.rotation.closingFive).toHaveLength(5);
     expect(editor.rotation.closingFive.includes(bench)).toBe(true);
-    await fireEvent.change(select, { target: { value: originalSlot1 } });
+    const pressed = benchList.getByRole('button', {
+      name: `Remove ${benchLabel} from closing five`,
+    });
+    expect(pressed.getAttribute('aria-pressed')).toBe('true');
+    await fireEvent.click(pressed);
     expect(editor.rotation.closingFive).toHaveLength(5);
     expect(editor.rotation.closingFive.includes(bench)).toBe(false);
     expect(editor.validate()).toEqual([]);
+  });
+
+  it('bench move buttons reorder the substitution hierarchy', async () => {
+    const { editor, onchange, container } = renderEditor();
+    const first = editor.rotation.benchOrder[0];
+    const second = editor.rotation.benchOrder[1];
+    if (first === undefined || second === undefined) {
+      throw new Error('fixture rotation has no bench order');
+    }
+    const firstLabel = editor.names.get(first);
+    const secondLabel = editor.names.get(second);
+    if (firstLabel === undefined || secondLabel === undefined) {
+      throw new Error('fixture rotation has no bench names');
+    }
+    const benchSection = container.querySelector('section[aria-labelledby="bench-heading"]');
+    if (benchSection === null) throw new Error('bench section missing');
+    const benchList = within(benchSection as HTMLElement);
+    await fireEvent.click(
+      benchList.getByRole('button', { name: `Move ${secondLabel} up in bench order` }),
+    );
+    expect(onchange).toHaveBeenCalledTimes(1);
+    expect(editor.rotation.benchOrder[0]).toBe(second);
+    expect(editor.rotation.benchOrder[1]).toBe(first);
+    // The player at the top of the bench cannot move up any further.
+    const upForFirst = benchList.getByRole('button', {
+      name: `Move ${secondLabel} up in bench order`,
+    });
+    expect((upForFirst as HTMLButtonElement).disabled).toBe(true);
+    // The displaced player can still move up into the first spot.
+    const upForLast = benchList.getByRole('button', {
+      name: `Move ${firstLabel} up in bench order`,
+    });
+    expect((upForLast as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('an illegal starter swap is rejected by the engine and surfaced', async () => {
@@ -160,8 +263,6 @@ describe('RotationEditor component', () => {
     if (centerOnly === undefined) {
       throw new Error('fixture catalog has no center-only candidate');
     }
-    const starters = desktopMinutesList(container);
-    void starters;
     const select = container.querySelector(
       'select[aria-label="Starter slot 1"]',
     ) as HTMLSelectElement;
@@ -174,7 +275,7 @@ describe('RotationEditor component', () => {
     expect(alert?.textContent ?? '').toMatch(/rejected/);
   });
 
-  it('surfaces per-player audit failures beside the affected row', async () => {
+  it('surfaces per-player audit failures beside the affected row', () => {
     const editor = createRotationEditor(legalRotation(), members());
     // Promote a bench player who cannot play a guard slot into starter slot 0,
     // demoting the incumbent guard to the bench. The audit fails per-player
@@ -202,21 +303,14 @@ describe('RotationEditor component', () => {
     };
     const broken = createRotationEditor(brokenRotation, members());
     expect(broken.validate().length).toBeGreaterThan(0);
-    const benchName = broken.names.get(bench);
-    if (benchName === undefined) {
-      throw new Error('fixture rotation has no name for the bench player');
-    }
 
     const { container } = render(RotationEditor, {
       props: { editor: broken, disabled: false, onchange: vi.fn() },
     });
-    // The compact Starters section carries the failure for the invalid starter.
-    await fireEvent.click(within(container).getByRole('button', { name: 'Starters' }));
-    const compact = compactRowsList(container);
-    const row = compact.getByText(/cannot play slot/).closest('li');
+    const list = minutesList(container);
+    const row = list.getByText(/cannot play slot/).closest('li');
     expect(row).not.toBeNull();
     expect(row?.textContent ?? '').toMatch(/cannot play slot/);
-    // The desktop starter select for the offending player is marked invalid.
     const select = container.querySelector('select[aria-label="Starter slot 1"]');
     expect(select?.getAttribute('aria-invalid')).toBe('true');
   });
@@ -250,6 +344,9 @@ describe('RotationEditor component', () => {
     }
     for (const select of getAllByRole('combobox')) {
       expect((select as HTMLSelectElement).disabled).toBe(true);
+    }
+    for (const button of getAllByRole('button', { name: /closing five/i })) {
+      expect((button as HTMLButtonElement).disabled).toBe(true);
     }
   });
 });

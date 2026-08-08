@@ -3,6 +3,7 @@ import {
   DraftPlanner,
   loadDraftCatalog,
   reachLeagueHub,
+  selectFirstObjective,
   submitBlockAndComplete,
 } from './season-helpers';
 
@@ -36,22 +37,15 @@ function desktopRail(page: Page) {
   return page.locator('nav[aria-label="Season navigation"].md\\:block');
 }
 
-/** The visible closing-five roster player who is not currently selected. */
-async function nonClosingPlayer(page: Page): Promise<{ value: string; label: string }> {
-  const selected: string[] = [];
-  for (let slot = 1; slot <= 5; slot += 1) {
-    selected.push(
-      await page.locator(`select[aria-label="Closing slot ${String(slot)}"]`).inputValue(),
-    );
-  }
-  const options = page.locator('select[aria-label="Closing slot 1"] option');
-  const count = await options.count();
+/** A visible closing-five toggle for a roster player who is not currently selected. */
+async function nonClosingPlayer(page: Page): Promise<{ label: string }> {
+  const toggles = page.getByRole('button', { name: /Add .* to closing five/ });
+  const count = await toggles.count();
   for (let index = 0; index < count; index += 1) {
-    const option = options.nth(index);
-    const value = await option.getAttribute('value');
-    if (value !== null && !selected.includes(value)) {
-      const label = (await option.textContent())?.trim() ?? value;
-      return { value, label };
+    const toggle = toggles.nth(index);
+    if ((await toggle.getAttribute('aria-pressed')) === 'false') {
+      const label = (await toggle.getAttribute('aria-label')) ?? '';
+      return { label: label.replace(/^Add /, '').replace(/ to closing five$/, '') };
     }
   }
   throw new Error('no non-closing roster player available');
@@ -75,6 +69,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     });
     await reachLeagueHub(page, planner, { runShell: true });
 
+    await selectFirstObjective(page);
     await page.getByRole('button', { name: 'Lock rotation and simulate block' }).click();
     await expect(page.getByRole('progressbar')).toBeVisible({ timeout: 15_000 });
 
@@ -95,7 +90,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await expect(segments.nth(1)).toHaveAttribute('aria-current', 'step');
   });
 
-  test('tab navigation: six tabs, aria-current, direct links, back/forward, old-route redirects', async ({
+  test('tab navigation: five tabs, aria-current, direct links, back/forward, old-route redirects', async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -119,13 +114,10 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     );
     await expect(page.getByRole('heading', { name: 'Rotation workspace' })).toBeVisible();
 
-    await page.getByRole('link', { name: 'Roster' }).first().click();
-    await expect(page).toHaveURL(/\/season\/run\/roster\/?$/);
-    await expect(desktopRail(page).getByRole('link', { name: 'Roster' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    await expect(page.getByRole('heading', { name: 'Roster', level: 1 })).toBeVisible();
+    // The merged roster moved to the Team tab; the old Roster URL redirects.
+    await page.goto('/season/run/roster/');
+    await expect(page).toHaveURL(/\/season\/run\/team\/?$/);
+    await expect(page.getByRole('heading', { name: 'Rotation workspace' })).toBeVisible();
 
     // Schedule, League, and Leaders tabs navigate to their routes (their
     // pages land from sibling agents; the shell owns the navigation history
@@ -156,8 +148,6 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     // Direct links work.
     await page.goto('/season/run/team/');
     await expect(page.getByRole('heading', { name: 'Rotation workspace' })).toBeVisible();
-    await page.goto('/season/run/roster/');
-    await expect(page.getByRole('heading', { name: 'Roster', level: 1 })).toBeVisible();
 
     // Old routes redirect into the shell.
     await page.goto('/season/league');
@@ -166,7 +156,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await expect(page).toHaveURL(/\/season\/run\/checkpoint\/?$/);
   });
 
-  test('mobile: fixed six-tab bottom nav with safe-area padding; desktop: sticky rail only', async ({
+  test('mobile: fixed five-tab bottom nav with safe-area padding; desktop: sticky rail only', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -175,9 +165,9 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     });
     await reachLeagueHub(page, planner, { runShell: true });
 
-    // Bottom nav is visible with six tabs and marks the active tab.
+    // Bottom nav is visible with five tabs and marks the active tab.
     await expect(bottomNav(page)).toBeVisible();
-    await expect(bottomNav(page).getByRole('link')).toHaveCount(6);
+    await expect(bottomNav(page).getByRole('link')).toHaveCount(5);
     await expect(bottomNav(page).getByRole('link', { name: 'Hub' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -196,7 +186,7 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await expect(desktopRail(page)).toBeVisible();
     await expect(bottomNav(page)).toBeHidden();
-    await expect(desktopRail(page).getByRole('link')).toHaveCount(6);
+    await expect(desktopRail(page).getByRole('link')).toHaveCount(5);
   });
 
   test('team workspace on mobile: keyboard steppers, presets, closing toggle, sticky bar', async ({
@@ -220,24 +210,24 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     const increase = page.getByRole('button', { name: `Increase minutes for ${firstStarter}` });
     await increase.focus();
     await page.keyboard.press('Enter');
-    await expect(
-      page
-        .locator('section[aria-labelledby="mobile-rotation-heading"] output', { hasText: /33/ })
-        .first(),
-    ).toBeVisible();
+    await expect(page.getByText(/took 1 from/).first()).toBeVisible();
 
     // Presets rewrite target minutes through the engine tables (240 stays).
     await page.getByRole('button', { name: 'Tight' }).click();
     await expect(page.getByText('240', { exact: true }).first()).toBeVisible();
 
-    // Closing tab: swap a non-closing bench player into slot 2.
-    const { value: benchValue } = await nonClosingPlayer(page);
-    const originalSlot2 = await page.locator('select[aria-label="Closing slot 2"]').inputValue();
-    await page.getByRole('button', { name: 'Closing' }).click();
-    await page.locator('select[aria-label="Closing slot 2"]').selectOption(benchValue);
-    await expect(page.locator('select[aria-label="Closing slot 2"]')).toHaveValue(benchValue);
-    await page.locator('select[aria-label="Closing slot 2"]').selectOption(originalSlot2);
-    await expect(page.locator('select[aria-label="Closing slot 2"]')).toHaveValue(originalSlot2);
+    // Closing toggle: swap a non-closing bench player into the closing five
+    // and back out again (the five stays full).
+    const { label: benchLabel } = await nonClosingPlayer(page);
+    const toggle = page.getByRole('button', { name: `Add ${benchLabel} to closing five` });
+    await toggle.click();
+    await expect(
+      page.getByRole('button', { name: `Remove ${benchLabel} from closing five` }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: `Remove ${benchLabel} from closing five` }).click();
+    await expect(
+      page.getByRole('button', { name: `Add ${benchLabel} to closing five` }),
+    ).toBeVisible();
 
     // The sticky action bar reports a valid rotation and offers simulate on mobile.
     await expect(page.getByText('Rotation valid')).toBeVisible();
@@ -278,5 +268,49 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     });
     // The completed segment becomes a checkpoint link.
     await expect(page.locator('[data-season-tape-segment="0"]')).toHaveAttribute('href', /block=0/);
+  });
+
+  test('league team drill-down: a standings team opens its roster and locked rotation', async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      window.__HOOP_RUSH_E2E_FAKE_RUNNER__ = true;
+    });
+    await reachLeagueHub(page, planner, { runShell: true });
+
+    await page.getByRole('link', { name: 'League' }).first().click();
+    await expect(page).toHaveURL(/\/season\/run\/league\/?$/);
+
+    // Open a non-human team from the standings.
+    const link = page.locator(
+      '[data-season-standings-link]:not([data-season-standings-link="lakers"])',
+    );
+    const franchiseId = (await link.first().getAttribute('data-season-standings-link')) ?? '';
+    await link.first().click();
+    await expect(page).toHaveURL(
+      new RegExp(
+        `/season/run/teams/\\?franchiseId=${franchiseId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+      ),
+    );
+
+    // The detail page shows the franchise masthead, the locked rotation, and
+    // the ten-roster join with minutes accounting.
+    await expect(page.locator('[data-season-team-detail]')).toBeVisible();
+    await expect(page.getByText('Locked rotation', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Target minutes total 240/)).toBeVisible();
+    await expect(page.getByText('Starter G', { exact: false }).first()).toBeVisible();
+    await expect(page.getByText('Bench 1', { exact: false }).first()).toBeVisible();
+
+    // The League tab stays highlighted on the detail route.
+    await expect(desktopRail(page).getByRole('link', { name: 'League' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+
+    // Back to League, then an unknown team surfaces the not-found state.
+    await page.getByRole('link', { name: '← League' }).click();
+    await expect(page).toHaveURL(/\/season\/run\/league\/?$/);
+    await page.goto('/season/run/teams/?franchiseId=not-a-team');
+    await expect(page.getByRole('heading', { name: 'Team not found' })).toBeVisible();
   });
 });

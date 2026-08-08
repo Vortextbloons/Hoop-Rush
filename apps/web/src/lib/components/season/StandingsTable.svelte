@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { HoopRushManifest, SeasonLeague, SeasonStandings } from '@hoop-rush/data-contracts';
+  import { resolve } from '$app/paths';
+  import type { RouteId } from '$app/types';
   import {
     ordinal,
     pointDifferential,
@@ -111,8 +113,11 @@
               ? 'ring-1 ring-primary/40'
               : ''}"
           >
-            <div
-              class="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 sm:gap-x-3 sm:px-4"
+            <a
+              href={resolve(`/season/run/teams/?franchiseId=${row.franchiseId}` as RouteId)}
+              data-season-standings-link={row.franchiseId}
+              aria-label={`${franchiseName(row.franchiseId)} roster`}
+              class="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 px-3 py-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-2 sm:gap-x-3 sm:px-4"
             >
               <span class="w-7 shrink-0 font-mono text-[10px] font-bold text-muted-foreground">
                 {ordinal(entry.rank)}
@@ -140,7 +145,7 @@
                   {diffText(row.pointsFor, row.pointsAgainst)}
                 </span>
               </span>
-            </div>
+            </a>
             <details class="group border-t border-border/50">
               <summary
                 class="cursor-pointer px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
@@ -207,14 +212,21 @@
               {@const identity = identityOf(row.franchiseId)}
               <tr
                 data-season-standings-row
-                class="border-b border-border/50 {isHuman ? 'bg-primary/10' : ''}"
+                class="border-b border-border/50 transition-colors hover:bg-surface-2/60 {isHuman
+                  ? 'bg-primary/10'
+                  : ''}"
                 aria-label={isHuman ? `${franchiseName(row.franchiseId)} (your team)` : undefined}
               >
                 <td class="px-3 py-2 font-mono text-[10px] text-muted-foreground">
                   {ordinal(entry.rank)}
                 </td>
                 <th scope="row" class="max-w-44 truncate px-3 py-2 text-left font-semibold">
-                  <span class="flex items-center gap-2">
+                  <a
+                    href={resolve(`/season/run/teams/?franchiseId=${row.franchiseId}` as RouteId)}
+                    data-season-standings-link={row.franchiseId}
+                    aria-label={`${franchiseName(row.franchiseId)} roster`}
+                    class="flex items-center gap-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:text-primary"
+                  >
                     {#if manifest && identity}
                       <SeasonTeamLogo
                         {manifest}
@@ -228,7 +240,7 @@
                       {franchiseName(row.franchiseId)}
                       {#if isHuman}<span class="text-primary" aria-label="your team">*</span>{/if}
                     </span>
-                  </span>
+                  </a>
                 </th>
                 <td class="px-3 py-2 text-right font-bold">{row.wins}</td>
                 <td class="px-3 py-2 text-right">{row.losses}</td>

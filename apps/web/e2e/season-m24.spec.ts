@@ -9,7 +9,7 @@ import {
 /**
  * M2.4 stamina/chemistry journeys (spec/2.0/05, M2.4): the "Season rules
  * changed" discard-and-restart screen for legacy runs, the fatigue bands +
- * chemistry panels on the Roster tab, the Hub fatigue-risk projections, and
+ * chemistry panels on the Team tab, the Hub fatigue-risk projections, and
  * (through the real worker) the checkpoint mechanism-evidence section.
  *
  * The recovery journey injects a legacy stored run row directly into
@@ -132,7 +132,7 @@ test.describe('season M2.4: legacy recovery, fatigue and chemistry surfaces', ()
     expect(await legacyRowCount(page)).toBe(0);
   });
 
-  test('Roster tab shows fatigue bands, workload, and unit chemistry after a block', async ({
+  test('Team tab shows fatigue bands, last-game minutes, and unit chemistry after a block', async ({
     page,
   }) => {
     await page.addInitScript(() => {
@@ -141,18 +141,19 @@ test.describe('season M2.4: legacy recovery, fatigue and chemistry surfaces', ()
     await reachLeagueHub(page, planner, { runShell: true });
     await submitBlockAndComplete(page, 1, { expectBlockHeading: false });
 
-    await page.goto('/season/run/roster');
+    await page.goto('/season/run/team');
     // The chemistry panel (M2.4) renders with the recorded zero state.
     await expect(page.getByText('Unit chemistry', { exact: true })).toBeVisible();
     await expect(page.getByText('Active lineup')).toBeVisible();
-    // Fatigue band pills on the player cards (band label and percent are
+    // Fatigue band pills on the rotation rows (band label and percent are
     // separate text nodes inside the pill span).
     await expect(page.getByText('Fresh').first()).toBeVisible();
     await expect(page.getByText('0%').first()).toBeVisible();
-    await expect(page.getByText(/Recent load 0%/).first()).toBeVisible();
     // Shared-play evidence rows (pairs from the ten-player roster).
     await expect(page.getByText('Most shared play', { exact: true })).toBeVisible();
     await expect(page.getByText('Least shared play', { exact: true })).toBeVisible();
+    // Last-game minutes render beside the rotation rows.
+    await expect(page.getByText(/last game \d+ min/).first()).toBeVisible();
   });
 
   test('Hub shows the fatigue-risk projection for the pending rotation', async ({ page }) => {

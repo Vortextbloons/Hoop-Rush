@@ -13,6 +13,12 @@ const team: NavItem = {
   href: '/season/run/team',
   icon: {} as NavItem['icon'],
 };
+const league: NavItem = {
+  id: 'league',
+  label: 'League',
+  href: '/season/run/league',
+  icon: {} as NavItem['icon'],
+};
 
 describe('isNavItemActive', () => {
   it('highlights only the hub on the hub route', () => {
@@ -34,5 +40,12 @@ describe('isNavItemActive', () => {
   it('keeps the hub active on checkpoint recaps', () => {
     expect(isNavItemActive(hub, '/season/run/checkpoint')).toBe(true);
     expect(isNavItemActive(team, '/season/run/checkpoint')).toBe(false);
+  });
+
+  it('keeps the league tab active on team detail routes', () => {
+    expect(isNavItemActive(league, '/season/run/league')).toBe(true);
+    expect(isNavItemActive(league, '/season/run/teams')).toBe(true);
+    expect(isNavItemActive(hub, '/season/run/teams')).toBe(false);
+    expect(isNavItemActive(team, '/season/run/teams')).toBe(false);
   });
 });

@@ -17,6 +17,7 @@ export {
   SeasonAiGenerationError,
   SeasonAiTargetsError,
   assignAiBandsAndIdentities,
+  attachAiProjectionSummaries,
   evaluateSeasonRoster,
   fiveReachableFromCounts,
   generateAiLeague,

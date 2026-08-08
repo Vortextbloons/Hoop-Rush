@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Position } from '@hoop-rush/data-contracts';
+import { canPlay, SEASON_ROTATION_VERSION, type Position } from '@hoop-rush/data-contracts';
 import {
   ROTATION_PRESETS,
   createRotationEditor,
@@ -7,6 +7,7 @@ import {
   indexRotationFailures,
   presetLabel,
   rotationRoleOf,
+  SLOT_GROUPS,
   type RotationMember,
 } from './season-rotation-editor';
 import {
@@ -210,6 +211,172 @@ describe('RotationEditor', () => {
     }
     expect(rotationRoleOf(e.rotation, starter)).toMatch(/^Starter /);
     expect(rotationRoleOf(e.rotation, benchPlayer)).toBe('Bench 1');
+  });
+});
+
+describe('RotationEditor.rebalanceMinutes', () => {
+  it('raises one player by taking from the highest-minute teammate, keeping 240', () => {
+    const e = editor();
+    const first = e.rotation.starters[0];
+    if (first === undefined) {
+      throw new Error('fixture rotation has no starters');
+    }
+    const other = e.rotation.starters[1];
+    if (other === undefined) {
+      throw new Error('fixture rotation has no second starter');
+    }
+    const result = e.rebalanceMinutes(first, 40);
+    expect(result.failures).toEqual([]);
+    expect(e.minutesFor(first)).toBe(40);
+    expect(e.minutesFor(other)).toBe(24);
+    expect(e.validate()).toEqual([]);
+    expect(e.rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(240);
+    expect(result.adjustments[0]).toEqual({ playerVersionId: first, minutes: 40, delta: 8 });
+    expect(result.adjustments.slice(1).reduce((sum, a) => sum + a.delta, 0)).toBe(-8);
+  });
+
+  it('lowers one player by giving minutes to the lowest-minute teammate, keeping 240', () => {
+    const e = editor();
+    const first = e.rotation.starters[0];
+    if (first === undefined) {
+      throw new Error('fixture rotation has no starters');
+    }
+    const benchPlayer = e.rotation.benchOrder[0];
+    if (benchPlayer === undefined) {
+      throw new Error('fixture rotation has no bench order');
+    }
+    const result = e.rebalanceMinutes(first, 20);
+    expect(result.failures).toEqual([]);
+    expect(e.minutesFor(first)).toBe(20);
+    expect(e.minutesFor(benchPlayer)).toBe(28);
+    expect(e.validate()).toEqual([]);
+    const target = result.adjustments[0];
+    if (target === undefined) {
+      throw new Error('rebalance has no target adjustment');
+    }
+    expect(target.delta).toBe(-12);
+    expect(result.adjustments.slice(1).reduce((sum, a) => sum + a.delta, 0)).toBe(12);
+  });
+
+  it('rejects a raise with no minutes available and leaves the rotation unchanged', () => {
+    const e = editor();
+    const first = e.rotation.starters[0];
+    if (first === undefined) {
+      throw new Error('fixture rotation has no starters');
+    }
+    for (const entry of e.rotation.targetMinutes) {
+      e.setMinutes(entry.playerVersionId, 0);
+    }
+    const before = e.rotation;
+    const result = e.rebalanceMinutes(first, 20);
+    expect(result.failures.length).toBeGreaterThan(0);
+    expect(result.failures[0]).toMatch(/not enough minutes available/);
+    expect(result.adjustments).toEqual([]);
+    expect(e.rotation).toEqual(before);
+  });
+
+  it('clamps typed minutes to the 0-48 integer range and treats same-value as no-op', () => {
+    const e = editor();
+    const first = e.rotation.starters[0];
+    if (first === undefined) {
+      throw new Error('fixture rotation has no starters');
+    }
+    const clamp = e.rebalanceMinutes(first, 99);
+    expect(clamp.failures).toEqual([]);
+    expect(e.minutesFor(first)).toBe(48);
+    const noop = e.rebalanceMinutes(first, 48);
+    expect(noop.failures).toEqual([]);
+    expect(noop.adjustments).toEqual([]);
+  });
+});
+
+describe('RotationEditor.toggleClosing', () => {
+  it('adds a non-closing player to the first legal closing slot, displacing the incumbent', () => {
+    const e = editor();
+    const benchPlayer = e.rotation.benchOrder[0];
+    if (benchPlayer === undefined) {
+      throw new Error('fixture rotation has no bench order');
+    }
+    const playable = playableOf(benchPlayer);
+    const slot = SLOT_GROUPS.findIndex((group) => canPlay(playable, group));
+    expect(slot).toBeGreaterThanOrEqual(0);
+    const failures = e.toggleClosing(benchPlayer);
+    expect(failures).toEqual([]);
+    expect(e.rotation.closingFive).toHaveLength(5);
+    expect(e.rotation.closingFive[slot]).toBe(benchPlayer);
+    expect(e.validate()).toEqual([]);
+  });
+
+  it('removing a closing player replaces them with the best eligible non-closer', () => {
+    const e = editor();
+    const benchPlayer = e.rotation.benchOrder[0];
+    if (benchPlayer === undefined) {
+      throw new Error('fixture rotation has no bench order');
+    }
+    expect(e.toggleClosing(benchPlayer)).toEqual([]);
+    const slot = e.rotation.closingFive.indexOf(benchPlayer);
+    expect(slot).toBeGreaterThanOrEqual(0);
+    const failures = e.toggleClosing(benchPlayer);
+    expect(failures).toEqual([]);
+    expect(e.rotation.closingFive).toHaveLength(5);
+    expect(e.rotation.closingFive.includes(benchPlayer)).toBe(false);
+    expect(e.validate()).toEqual([]);
+  });
+
+  it('rejects a removal when no non-closing player can fill the vacated slot', () => {
+    const players: RotationMember[] = [
+      { playerVersionId: 'g1', displayName: 'G1', playable: ['PG'] },
+      { playerVersionId: 'g2', displayName: 'G2', playable: ['SG'] },
+      { playerVersionId: 'g3', displayName: 'G3', playable: ['PG'] },
+      { playerVersionId: 'g4', displayName: 'G4', playable: ['SG'] },
+      { playerVersionId: 'f1', displayName: 'F1', playable: ['SF'] },
+      { playerVersionId: 'f2', displayName: 'F2', playable: ['PF'] },
+      { playerVersionId: 'f3', displayName: 'F3', playable: ['SF'] },
+      { playerVersionId: 'f4', displayName: 'F4', playable: ['PF'] },
+      { playerVersionId: 'c1', displayName: 'C1', playable: ['C'] },
+      { playerVersionId: 'c2', displayName: 'C2', playable: ['C'] },
+    ];
+    const e = createRotationEditor(
+      {
+        franchiseId: 'lakers',
+        starters: ['g1', 'g2', 'f1', 'f2', 'c1'],
+        benchOrder: ['g3', 'g4', 'f3', 'f4', 'c2'],
+        targetMinutes: players.map((p) => ({ playerVersionId: p.playerVersionId, minutes: 24 })),
+        closingFive: ['g1', 'g2', 'g3', 'g4', 'c1'],
+        rotationVersion: SEASON_ROTATION_VERSION,
+      },
+      players,
+    );
+    // Every guard is closing, so the bench cannot fill a vacated guard slot.
+    const failures = e.toggleClosing('g1');
+    expect(failures.length).toBeGreaterThan(0);
+    expect(failures[0]).toMatch(/cannot be removed/);
+    expect(e.rotation.closingFive[0]).toBe('g1');
+  });
+});
+
+describe('RotationEditor.moveBench', () => {
+  it('moves a bench player up and down the substitution hierarchy', () => {
+    const e = editor();
+    const first = e.rotation.benchOrder[0];
+    const second = e.rotation.benchOrder[1];
+    if (first === undefined || second === undefined) {
+      throw new Error('fixture rotation has no bench order');
+    }
+    expect(e.moveBench(1, -1)).toEqual([]);
+    expect(e.rotation.benchOrder[0]).toBe(second);
+    expect(e.rotation.benchOrder[1]).toBe(first);
+    expect(rotationRoleOf(e.rotation, second)).toBe('Bench 1');
+    expect(rotationRoleOf(e.rotation, first)).toBe('Bench 2');
+    expect(e.validate()).toEqual([]);
+  });
+
+  it('is a no-op at the edges of the bench', () => {
+    const e = editor();
+    const before = e.rotation.benchOrder;
+    expect(e.moveBench(0, -1)).toEqual([]);
+    expect(e.moveBench(4, 1)).toEqual([]);
+    expect(e.rotation.benchOrder).toEqual(before);
   });
 });
 

@@ -76,6 +76,26 @@ export const seasonAiAssignmentSchema = z.object({
 });
 export type SeasonAiAssignment = z.infer<typeof seasonAiAssignmentSchema>;
 
+/**
+ * Compact projection summary (projection milestone, optional): the
+ * projection-ranked facts recorded for a generated roster when the AI
+ * generation runs with projection dependencies (shadow mode). Persisted
+ * summaries are compact by design; full candidate reports stay CLI artifacts.
+ */
+export const seasonRosterProjectionSummarySchema = z.object({
+  /** projection-model-v1 artifact version that produced the summary. */
+  modelVersion: z.string().min(1).max(64),
+  /** The selected roster's weighted net rating. */
+  selectedNetRating: z.number(),
+  /** The best projection-ranked candidate in the pool (null when the search
+   * found no complete legal candidate). */
+  bestNetRating: z.number().nullable(),
+  /** Whether the selected roster equals the projection-best candidate. */
+  selectedIsBest: z.boolean(),
+  /** Canonical digest of the projection search audit (32-hex). */
+  searchDigest: z.string().regex(/^[0-9a-f]{32}$/),
+});
+
 /** Per-roster strength evaluation from possession inputs. */
 export const seasonRosterEvaluationSchema = z.object({
   franchiseId: franchiseIdSchema,
@@ -87,6 +107,8 @@ export const seasonRosterEvaluationSchema = z.object({
   rolesCovered: z.array(seasonRosterRoleSchema),
   /** Report-only: mean packaged overall rating; never a pick authority. */
   overallReport: z.number().min(0).max(100).nullable(),
+  /** Projection milestone (optional): compact shadow-mode projection facts. */
+  projectionSummary: seasonRosterProjectionSummarySchema.optional(),
 });
 export type SeasonRosterEvaluation = z.infer<typeof seasonRosterEvaluationSchema>;
 

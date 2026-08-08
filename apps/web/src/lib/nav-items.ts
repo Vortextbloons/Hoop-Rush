@@ -15,6 +15,7 @@ export type NavItem = {
 /** Extra route ids that should keep a tab highlighted besides its exact `href`. */
 const ACTIVE_ALIASES: Readonly<Record<string, readonly string[]>> = {
   '/season/run': ['/season/run/checkpoint'],
+  '/season/run/league': ['/season/run/teams'],
 };
 
 function normalizeRouteId(routeId: string): string {

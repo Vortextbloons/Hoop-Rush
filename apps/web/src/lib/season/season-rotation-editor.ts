@@ -1,8 +1,10 @@
 import {
   SEASON_ROTATION_PRESET_TARGETS,
+  canPlay,
   type Position,
   type SeasonRotation,
   type SeasonRotationPreset,
+  type SlotGroup,
 } from '@hoop-rush/data-contracts';
 import { applySeasonRotationPreset, auditSeasonRotation } from '@hoop-rush/engine';
 
@@ -19,6 +21,30 @@ export interface RotationMember {
   playerVersionId: string;
   displayName: string;
   playable: readonly Position[];
+  /** Historical source identity (presentation only; null in fixtures). */
+  franchiseId?: string;
+  eraId?: string;
+  seasonKey?: string;
+}
+
+/** The coarse slot requirement of each lineup slot (G, G, F, F, C). */
+export const SLOT_GROUPS: readonly SlotGroup[] = ['G', 'G', 'F', 'F', 'C'];
+
+/**
+ * One player's minutes change from a rebalance. `delta` is the signed change
+ * so the UI can announce who gained and who lost.
+ */
+export interface MinuteAdjustment {
+  playerVersionId: string;
+  minutes: number;
+  delta: number;
+}
+
+/** Result of a rebalancing minutes edit: failures (empty = committed) + the
+ * players whose target minutes changed. */
+export interface RebalanceResult {
+  failures: string[];
+  adjustments: MinuteAdjustment[];
 }
 
 export const ROTATION_PRESETS: readonly SeasonRotationPreset[] = [
@@ -129,39 +155,150 @@ export class RotationEditor {
    * failures of the resulting rotation; empty means valid.
    */
   adjustMinutes(playerVersionId: string, delta: number): string[] {
-    const current = this.minutesFor(playerVersionId);
-    const clamped = Math.max(0, Math.min(48, current + delta));
-    const actualDelta = clamped - current;
-    if (actualDelta === 0) return this.validate();
-    const others = this.rotation.targetMinutes.filter(
-      (entry) => entry.playerVersionId !== playerVersionId,
-    );
-    const compensator =
-      actualDelta > 0
-        ? [...others].sort(
-            (a, b) =>
-              b.minutes - a.minutes ||
-              this.benchIndex(a.playerVersionId) - this.benchIndex(b.playerVersionId),
-          )[0]
-        : [...others].sort(
-            (a, b) =>
-              a.minutes - b.minutes ||
-              this.benchIndex(a.playerVersionId) - this.benchIndex(b.playerVersionId),
-          )[0];
-    if (!compensator || compensator.minutes <= 0 || compensator.minutes >= 48) {
-      return this.validate();
+    return this.rebalanceMinutes(playerVersionId, this.minutesFor(playerVersionId) + delta)
+      .failures;
+  }
+
+  /**
+   * Sets one player's target minutes (clamped 0-48, integer) and rebalances
+   * the rest of the roster deterministically so the total stays exactly 240:
+   * typing higher takes minutes from the highest-minute teammates (bench
+   * order breaks ties), typing lower gives minutes to the lowest-minute
+   * teammates. Commits only when the audit is clean; on failure the rotation
+   * is unchanged and the returned failures explain why. `adjustments` lists
+   * every changed player (target first, then compensators) with signed
+   * deltas so the UI can highlight and announce the rebalance.
+   */
+  rebalanceMinutes(playerVersionId: string, minutes: number): RebalanceResult {
+    if (!this.rosterIds.includes(playerVersionId)) {
+      return { failures: [`${playerVersionId} is not on the roster`], adjustments: [] };
     }
+    const clamped = Math.max(0, Math.min(48, Math.round(minutes)));
+    const current = this.minutesFor(playerVersionId);
+    const delta = clamped - current;
+    if (delta === 0) return { failures: [], adjustments: [] };
+    const take = delta > 0;
+    const others = this.rotation.targetMinutes
+      .filter((entry) => entry.playerVersionId !== playerVersionId)
+      .map((entry) => ({
+        playerVersionId: entry.playerVersionId,
+        minutes: entry.minutes,
+        benchIndex: this.benchIndex(entry.playerVersionId),
+      }))
+      .sort((a, b) =>
+        take
+          ? b.minutes - a.minutes || a.benchIndex - b.benchIndex
+          : a.minutes - b.minutes || a.benchIndex - b.benchIndex,
+      );
     const byId = new Map(
       this.rotation.targetMinutes.map((entry) => [entry.playerVersionId, entry]),
     );
-    const set = (id: string, minutes: number) => byId.set(id, { playerVersionId: id, minutes });
+    const set = (id: string, minutesValue: number) =>
+      byId.set(id, { playerVersionId: id, minutes: minutesValue });
     set(playerVersionId, clamped);
-    set(compensator.playerVersionId, compensator.minutes - actualDelta);
-    this.rotation = {
-      ...this.rotation,
-      targetMinutes: [...byId.values()],
-    };
-    return this.validate();
+    const adjustments: MinuteAdjustment[] = [{ playerVersionId, minutes: clamped, delta }];
+    let remaining = Math.abs(delta);
+    for (const other of others) {
+      if (remaining <= 0) break;
+      const capacity = take ? other.minutes : 48 - other.minutes;
+      const give = Math.min(remaining, Math.max(0, capacity));
+      if (give <= 0) continue;
+      const next = other.minutes + (take ? -give : give);
+      set(other.playerVersionId, next);
+      adjustments.push({
+        playerVersionId: other.playerVersionId,
+        minutes: next,
+        delta: take ? -give : give,
+      });
+      remaining -= give;
+    }
+    if (remaining > 0) {
+      return {
+        failures: [
+          take
+            ? `cannot raise ${playerVersionId} to ${String(clamped)} minutes: not enough minutes available from teammates`
+            : `cannot lower ${playerVersionId} to ${String(clamped)} minutes: no teammates have capacity`,
+        ],
+        adjustments: [],
+      };
+    }
+    const candidate = { ...this.rotation, targetMinutes: [...byId.values()] };
+    const failures = auditSeasonRotation(candidate, this.memberPlayable);
+    if (failures.length > 0) return { failures, adjustments: [] };
+    this.rotation = candidate;
+    return { failures: [], adjustments };
+  }
+
+  /**
+   * Closing-five toggle: a player already closing is replaced by the best
+   * eligible non-closing player for their vacated slot; otherwise the player
+   * is assigned to the first closing slot their positions permit, displacing
+   * the incumbent. The closing five always keeps exactly five players.
+   * Reverts (with failures) when no legal result exists.
+   */
+  toggleClosing(playerVersionId: string): string[] {
+    if (!this.rosterIds.includes(playerVersionId)) {
+      return [`${playerVersionId} is not on the roster`];
+    }
+    const closingFive = [...this.rotation.closingFive];
+    const currentSlot = closingFive.indexOf(playerVersionId);
+    if (currentSlot !== -1) {
+      const group = SLOT_GROUPS[currentSlot];
+      if (group === undefined) {
+        return ['closing five slot is not a G, F, or C slot'];
+      }
+      const replacement = this.rotation.targetMinutes
+        .filter((entry) => !closingFive.includes(entry.playerVersionId))
+        .map((entry) => ({
+          playerVersionId: entry.playerVersionId,
+          minutes: entry.minutes,
+          benchIndex: this.benchIndex(entry.playerVersionId),
+        }))
+        .sort(
+          (a, b) =>
+            b.minutes - a.minutes ||
+            a.benchIndex - b.benchIndex ||
+            a.playerVersionId.localeCompare(b.playerVersionId),
+        )
+        .find((entry) => canPlay(this.memberPlayable.get(entry.playerVersionId) ?? [], group));
+      if (replacement === undefined) {
+        return [
+          `closing-five player ${playerVersionId} cannot be removed: no eligible non-closing player for slot ${String(currentSlot)}`,
+        ];
+      }
+      closingFive[currentSlot] = replacement.playerVersionId;
+    } else {
+      const playable = this.memberPlayable.get(playerVersionId) ?? [];
+      const slotIndex = SLOT_GROUPS.findIndex((group) => canPlay(playable, group));
+      if (slotIndex === -1) {
+        return [`closing-five player ${playerVersionId} cannot play any closing slot`];
+      }
+      closingFive[slotIndex] = playerVersionId;
+    }
+    return this.commit({ ...this.rotation, closingFive });
+  }
+
+  /**
+   * Moves a bench player one step up or down in the bench order (the
+   * deterministic substitution hierarchy). No-op at the edges; reverts on
+   * audit failure.
+   */
+  moveBench(benchIndex: number, delta: -1 | 1): string[] {
+    const target = benchIndex + delta;
+    const benchOrder = [...this.rotation.benchOrder];
+    const current = benchOrder[benchIndex];
+    const neighbor = benchOrder[target];
+    if (
+      current === undefined ||
+      neighbor === undefined ||
+      target < 0 ||
+      target >= benchOrder.length
+    ) {
+      return [];
+    }
+    benchOrder[benchIndex] = neighbor;
+    benchOrder[target] = current;
+    return this.commit({ ...this.rotation, benchOrder });
   }
 
   private benchIndex(playerVersionId: string): number {
