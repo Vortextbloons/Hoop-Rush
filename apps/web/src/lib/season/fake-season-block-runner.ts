@@ -23,6 +23,7 @@ import {
   seasonDigestHex,
   type SeasonBlockRecap,
   type SeasonCandidateCheckpoint,
+  type SeasonCheckpointState,
   type SeasonCompactPlayerLine,
   type SeasonEffectsState,
   type SeasonGameSummary,
@@ -36,7 +37,12 @@ import {
   type SeasonTeamAggregate,
   type SeasonTransactionEntry,
 } from '@hoop-rush/data-contracts';
-import { seasonRunEngineSeam, type SeasonRunSnapshot } from '@hoop-rush/persistence';
+import {
+  seasonRunEngineSeam,
+  type SeasonRunSnapshot,
+  type SeasonWindowOpenResult,
+} from '@hoop-rush/persistence';
+import { completeSeasonBlockCommit } from '@hoop-rush/engine';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -120,13 +126,15 @@ declare global {
 }
 
 /** M2.5 commit extras for the fake (the full commit input is typed against
- * the landed `CommitSeasonBlockInput`; these are the fake-computed facts). */
+ * the landed `CommitSeasonBlockInput`; these are the engine-derived facts). */
 interface FakeM25CommitInput {
   health: SeasonHealthState;
   transactions: SeasonTransactionEntry[];
   influence: SeasonInfluenceState;
+  checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
+  window: SeasonWindowOpenResult | null;
 }
 
 export class FakeSeasonBlockRunner implements SeasonBlockRunner {
@@ -281,14 +289,15 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           pending.effects,
         );
         if (this.cancelled) return;
+        const committed = this.committedFacts(startInput, checkpoint, pending.commandId);
         await this.commitCheckpoint(startInput, pending.commandId, checkpoint, {
           health: pending.health,
           influence: this.fakeInfluenceFor(startInput, input.blockIndex),
           transactions: this.fakeTransactionsFor(input.blockIndex),
-          stateRevision: pending.expectedStateRevision + 1,
-          stateDigest: seasonDigestHex(
-            `${input.runId}:${String(pending.expectedStateRevision + 1)}`,
-          ),
+          checkpointState: committed.checkpointState,
+          stateRevision: committed.stateRevision,
+          stateDigest: committed.stateDigest,
+          window: committed.window,
         });
         this.emit({ type: 'complete', requestId, checkpoint });
       } catch (error) {
@@ -504,12 +513,15 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       null,
     );
     try {
+      const committed = this.committedFacts(input, checkpoint, input.commandId);
       await this.commitCheckpoint(input, input.commandId, checkpoint, {
         health: this.fakeHealthFor(input),
         influence: this.fakeInfluenceFor(input, input.blockIndex),
         transactions: this.fakeTransactionsFor(input.blockIndex),
-        stateRevision: input.run.stateRevision + 1,
-        stateDigest: seasonDigestHex(`${input.run.runId}:${String(input.run.stateRevision + 1)}`),
+        checkpointState: committed.checkpointState,
+        stateRevision: committed.stateRevision,
+        stateDigest: committed.stateDigest,
+        window: committed.window,
       });
     } catch (error) {
       if (this.isCancelled()) return;
@@ -681,20 +693,39 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       influence: m25.influence,
       trade: null,
       objectives: input.run.objectives,
-      checkpointState: {
-        runId: input.run.runId,
-        blockIndex: checkpoint.blockIndex,
-        completedRounds: checkpoint.completedRounds,
-        revision: checkpoint.revision,
-        commandId,
-        rotationDigest: checkpoint.rotationDigest,
-        checkpointDigest: checkpoint.digest,
-      },
+      checkpointState: m25.checkpointState,
       stateRevision: m25.stateRevision,
       stateDigest: m25.stateDigest,
       expectedStateRevision: input.run.stateRevision,
       expectedStateDigest: input.run.stateDigest,
-      window: null,
+      window: m25.window,
+    });
+  }
+
+  /**
+   * M2.5: the engine derives the post-block run state chain from the
+   * candidate and the LOCKED rotation set (mirror of the real runner, which
+   * commits the locked rotations — the human team's pending edit included —
+   * so the state digest must cover exactly that set or the reload audit
+   * reports a divergence).
+   */
+  private committedFacts(
+    input: SeasonBlockStartInput,
+    checkpoint: SeasonCandidateCheckpoint,
+    commandId: string,
+  ): {
+    checkpointState: SeasonCheckpointState;
+    stateRevision: number;
+    stateDigest: string;
+    window: SeasonWindowOpenResult | null;
+  } {
+    return completeSeasonBlockCommit({
+      run: { ...input.run, rotations: input.rotations },
+      candidate: checkpoint,
+      commandId,
+      rotationDigest: input.rotationDigest,
+      humanFranchiseId: input.humanFranchiseId,
+      effects: checkpoint.effects,
     });
   }
 

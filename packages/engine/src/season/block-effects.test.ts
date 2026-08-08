@@ -450,23 +450,7 @@ function synthState(): RunnerState {
   };
 }
 
-function checkpointDigestsOf(state: RunnerState): string[] {
-  const digests: string[] = [];
-  for (let block = 0; block < 9; block += 1) {
-    const checkpoint = runBlock(state, block);
-    digests.push(checkpoint.digest);
-  }
-  return digests;
-}
-
 describe('M2.4 block-level effects', () => {
-  it('produces identical per-block digests and effects states across full runs', () => {
-    const first = checkpointDigestsOf(synthState());
-    const second = checkpointDigestsOf(synthState());
-    expect(second).toEqual(first);
-    expect(new Set(first).size).toBe(9);
-  }, 240_000);
-
   it('accumulates fatigue and chemistry across blocks and records evidence', () => {
     const state = synthState();
     const checkpoints: SeasonCandidateCheckpoint[] = [];
@@ -477,6 +461,9 @@ describe('M2.4 block-level effects', () => {
       digests.push(checkpoint.digest);
     }
     expect(digests).toHaveLength(9);
+    // Every block produces its own digest (cross-block determinism and
+    // interruption/rerun identity are covered by block-determinism.test.ts).
+    expect(new Set(digests).size).toBe(9);
 
     const first = checkpoints[0];
     const last = checkpoints[8];

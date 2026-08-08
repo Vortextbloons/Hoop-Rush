@@ -312,12 +312,18 @@ export const SEASON_HOME_COURT_VERSION = 'season-home-court-v1';
 export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v3';
 
 /**
- * M2.4 stamina profile derivation (season-stamina-v1): the historical
- * minutes-per-game formula that maps a pool player-season's recorded
- * `stats.minutes` and `stats.gamesPlayed` to the catalog stamina rating and
- * historical MPG the game controller consumes per player.
+ * Season Run stamina model (season-stamina-v2): the historical
+ * minutes-per-game derivation formula (unchanged from v1) plus the fatigue
+ * model constants — on-court accumulation, consecutive-stint ramp, halftime
+ * recovery, the between-game recovery tick, and the recent-load factor.
+ * v2 raises accumulation and mechanism caps so fatigue is a meaningful
+ * game-to-game force; v1 saves, checkpoints, and catalogs stay readable
+ * through SEASON_STAMINA_LEGACY_VERSION.
  */
-export const SEASON_STAMINA_VERSION = 'season-stamina-v1';
+export const SEASON_STAMINA_VERSION = 'season-stamina-v2';
+
+/** Stamina model v1 (legacy): kept readable for old saves and artifacts. */
+export const SEASON_STAMINA_LEGACY_VERSION = 'season-stamina-v1';
 
 /**
  * M2.4 pair chemistry state rules (season-chemistry-v1): 45 canonical
@@ -327,12 +333,17 @@ export const SEASON_STAMINA_VERSION = 'season-stamina-v1';
 export const SEASON_CHEMISTRY_VERSION = 'season-chemistry-v1';
 
 /**
- * M2.4 frozen effect-size calibration targets (season-effect-targets-v1):
+ * Season Run effect-size calibration targets (season-effect-targets-v2):
  * bounds and envelopes for the six named possession mechanisms under
  * fatigue and chemistry inputs (shooter/handler/defensive-unit fatigue and
- * turnover-security, assist-conversion, help-defense chemistry).
+ * turnover-security, assist-conversion, help-defense chemistry). v2 widens
+ * the three fatigue mechanism caps to 5.0/3.5/2.5 percentage points; v1
+ * artifacts stay readable through SEASON_EFFECT_TARGETS_LEGACY_VERSION.
  */
-export const SEASON_EFFECT_TARGETS_VERSION = 'season-effect-targets-v1';
+export const SEASON_EFFECT_TARGETS_VERSION = 'season-effect-targets-v2';
+
+/** Effect-size calibration targets v1 (legacy): kept readable for old artifacts. */
+export const SEASON_EFFECT_TARGETS_LEGACY_VERSION = 'season-effect-targets-v1';
 
 /**
  * Packaged Season Run draft catalog artifact contract

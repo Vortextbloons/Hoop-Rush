@@ -22,6 +22,7 @@ import {
   SEASON_CHEMISTRY_VERSION,
   SEASON_DRAFT_LEGACY_VERSION,
   SEASON_DRAFT_VERSION,
+  SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_COUNT,
   SEASON_GAME_SUMMARY_VERSION,
@@ -50,6 +51,7 @@ import {
   SEASON_SCHEDULE_FORMULA_VERSION,
   SEASON_SCHEDULE_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
+  SEASON_STAMINA_LEGACY_VERSION,
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
   SEASON_TEAM_COUNT,
@@ -254,12 +256,18 @@ export const seasonRunVersionsSchema = z.object({
   homeCourtVersion: z.literal(SEASON_HOME_COURT_VERSION),
   /** M2.3: canonical checkpoint contract and digest. */
   checkpointVersion: z.literal(SEASON_CHECKPOINT_VERSION),
-  /** M2.4: stamina profile derivation (season-stamina-v1). */
-  staminaVersion: z.literal(SEASON_STAMINA_VERSION),
+  /** M2.4: stamina profile derivation (v2 since the fatigue model rebalance). */
+  staminaVersion: z.union([
+    z.literal(SEASON_STAMINA_VERSION),
+    z.literal(SEASON_STAMINA_LEGACY_VERSION),
+  ]),
   /** M2.4: pair chemistry state rules (season-chemistry-v1). */
   chemistryVersion: z.literal(SEASON_CHEMISTRY_VERSION),
-  /** M2.4: frozen effect-size calibration targets (season-effect-targets-v1). */
-  effectsTargetsVersion: z.literal(SEASON_EFFECT_TARGETS_VERSION),
+  /** M2.4: frozen effect-size calibration targets (v2 since the cap rebalance). */
+  effectsTargetsVersion: z.union([
+    z.literal(SEASON_EFFECT_TARGETS_VERSION),
+    z.literal(SEASON_EFFECT_TARGETS_LEGACY_VERSION),
+  ]),
   /** M2.5: injury and health state rules (season-health-v1). */
   healthVersion: z.literal(SEASON_HEALTH_VERSION),
   /** M2.5: trade contract (season-trade-v1). */

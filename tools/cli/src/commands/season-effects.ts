@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { z } from 'zod';
 import {
+  SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -105,7 +106,10 @@ export const SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP = 1000;
 /** The artifact written by `season effects calibrate`. */
 export const seasonEffectTargetsSchema = z.object({
   schemaVersion: z.literal(1),
-  targetsVersion: z.literal(SEASON_EFFECT_TARGETS_VERSION),
+  targetsVersion: z.union([
+    z.literal(SEASON_EFFECT_TARGETS_VERSION),
+    z.literal(SEASON_EFFECT_TARGETS_LEGACY_VERSION),
+  ]),
   mechanismCaps: z.object({
     shooterFatiguePp: z.number().min(0).max(5),
     handlerFatiguePp: z.number().min(0).max(5),

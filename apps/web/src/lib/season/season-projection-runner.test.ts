@@ -74,17 +74,18 @@ const FAKE_PLAN_RESULT = {
 
 /** Ten-members fixture rotation for the optimize-rotation request. */
 function fixtureRotation(): SeasonRotation {
+  const versionId = (n: number) => `pv-${String(n).padStart(32, '0')}`;
   const players = [
-    { playerVersionId: 'pv-1', playable: ['PG'] as const },
-    { playerVersionId: 'pv-2', playable: ['SG'] as const },
-    { playerVersionId: 'pv-3', playable: ['SF'] as const },
-    { playerVersionId: 'pv-4', playable: ['PF'] as const },
-    { playerVersionId: 'pv-5', playable: ['C'] as const },
-    { playerVersionId: 'pv-6', playable: ['PG'] as const },
-    { playerVersionId: 'pv-7', playable: ['SG'] as const },
-    { playerVersionId: 'pv-8', playable: ['SF'] as const },
-    { playerVersionId: 'pv-9', playable: ['PF'] as const },
-    { playerVersionId: 'pv-10', playable: ['C'] as const },
+    { playerVersionId: versionId(1), playable: ['PG'] as const },
+    { playerVersionId: versionId(2), playable: ['SG'] as const },
+    { playerVersionId: versionId(3), playable: ['SF'] as const },
+    { playerVersionId: versionId(4), playable: ['PF'] as const },
+    { playerVersionId: versionId(5), playable: ['C'] as const },
+    { playerVersionId: versionId(6), playable: ['PG'] as const },
+    { playerVersionId: versionId(7), playable: ['SG'] as const },
+    { playerVersionId: versionId(8), playable: ['SF'] as const },
+    { playerVersionId: versionId(9), playable: ['PF'] as const },
+    { playerVersionId: versionId(10), playable: ['C'] as const },
   ];
   return buildMinimalRotation({
     franchiseId: 'lakers',
@@ -199,6 +200,17 @@ describe('createProjectionRunner', () => {
     expect(request.load).toEqual(load);
     expect(request.horizon).toBe(10);
     expect(request.seed).toBe('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
+    // The wire is type-only and the structure arrives from a `$state` proxy
+    // editor; the runner must rebuild the request from plain, validated
+    // objects so `postMessage` never sees a proxy ("Proxy object could not
+    // be cloned"). Fresh references prove no input object crossed the
+    // boundary.
+    expect(request.structure).not.toBe(rotation);
+    expect(request.roster).not.toBe(rotation.starters);
+    for (const [index, row] of (request.load as unknown[]).entries()) {
+      expect(row).not.toBe(load[index]);
+    }
+    expect(JSON.parse(JSON.stringify(request.structure))).toEqual(rotation);
     worker.respond({
       type: 'complete',
       requestId: request.requestId,

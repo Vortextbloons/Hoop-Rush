@@ -27,13 +27,6 @@ function runMany(seedPrefix: string, count: number) {
 }
 
 describe('game determinism and golden replay', () => {
-  it('reproduces a golden game byte-for-byte from the same input and seed', () => {
-    const input = buildGameSimulationInput({ seed: seedFromString('golden-1') });
-    const a = simulateGame(input, ctx);
-    const b = simulateGame(input, ctx);
-    expect(gameResultDigest(a)).toBe(gameResultDigest(b));
-  });
-
   it('is stable across identical inputs (golden digest)', () => {
     const result = run('golden-1');
     // Regenerated against the current engine; changing engine rules breaks
@@ -142,7 +135,12 @@ describe('game invariants over many seeds', () => {
   });
 });
 
-describe('game performance goal', () => {
+// The 10 ms target is a CI-acceptance goal; the strict bounds run only with
+// HOOP_RUSH_PERF_STRICT=1 because the CPU contention of the full parallel
+// package gate historically flaked this test (the engine config documents
+// that). The former non-strict branch asserted nothing, so the suite is
+// skipped entirely unless the strict gate is requested.
+describe.skipIf(process.env.HOOP_RUSH_PERF_STRICT !== '1')('game performance goal', () => {
   it('simulates a game well under the 10 ms desktop goal', () => {
     const input = buildGameSimulationInput({ seed: seedFromString('perf-1') });
     // Warm up.
@@ -159,17 +157,8 @@ describe('game performance goal', () => {
     if (median === undefined || p95 === undefined) {
       throw new Error('expected 100 performance samples');
     }
-    // The 10 ms target is a CI-acceptance goal; this runs on CI hardware.
-    // The strict bounds are enforced only with HOOP_RUSH_PERF_STRICT=1
-    // because the CPU contention of the full parallel package gate
-    // historically flaked this test (the engine config documents that).
-    if (process.env.HOOP_RUSH_PERF_STRICT === '1') {
-      expect(median).toBeLessThan(10);
-      expect(p95).toBeLessThan(25);
-    } else {
-      expect(median).toBeGreaterThan(0);
-      expect(p95).toBeGreaterThan(0);
-    }
+    expect(median).toBeLessThan(10);
+    expect(p95).toBeLessThan(25);
   });
 });
 

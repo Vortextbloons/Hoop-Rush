@@ -16,6 +16,7 @@ import {
   unitPairs,
 } from './chemistry.ts';
 import { offCourtRecoveryBp, onCourtFatigueBp, recentLoadAfterGame } from './stamina.ts';
+import { halftimeRemovalBp } from './stamina.ts';
 
 /**
  * M2.4 stamina and chemistry effects (spec/2.0/04, spec/2.0/05,
@@ -29,9 +30,9 @@ import { offCourtRecoveryBp, onCourtFatigueBp, recentLoadAfterGame } from './sta
  *
  * | Mechanism               | Adjustment                                   | Cap    |
  * |-------------------------|----------------------------------------------|--------|
- * | shooter-fatigue         | make probability -= 2.5pp x shooter fatigue  | 2.5 pp |
- * | handler-fatigue         | turnover probability += 1.8pp x handler fat. | 1.8 pp |
- * | defensive-unit-fatigue  | opponent make probability += 1.2pp x mean fat| 1.2 pp |
+ * | shooter-fatigue         | make probability -= 5.0pp x shooter fatigue  | 5.0 pp |
+ * | handler-fatigue         | turnover probability += 3.5pp x handler fat. | 3.5 pp |
+ * | defensive-unit-fatigue  | opponent make probability += 2.5pp x mean fat| 2.5 pp |
  * | turnover-security       | turnover probability -= 1.0pp x unit chem    | 1.0 pp |
  * | assist-conversion       | assist probability += 3.5pp x unit chem      | 3.5 pp |
  * | help-defense            | make probability -= 0.8pp x defense chem     | 0.8 pp |
@@ -44,13 +45,13 @@ import { offCourtRecoveryBp, onCourtFatigueBp, recentLoadAfterGame } from './sta
  */
 
 /** Maximum shooter-fatigue make-probability reduction (percentage points). */
-export const SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP = 2.5;
+export const SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP = 5;
 
 /** Maximum handler-fatigue turnover-probability increase (pp). */
-export const SEASON_EFFECTS_HANDLER_FATIGUE_MAX_PP = 1.8;
+export const SEASON_EFFECTS_HANDLER_FATIGUE_MAX_PP = 3.5;
 
 /** Maximum defensive-unit-fatigue opponent make-probability increase (pp). */
-export const SEASON_EFFECTS_DEFENSE_FATIGUE_MAX_PP = 1.2;
+export const SEASON_EFFECTS_DEFENSE_FATIGUE_MAX_PP = 2.5;
 
 /** Maximum chemistry turnover-security probability reduction (pp). */
 export const SEASON_EFFECTS_TURNOVER_SECURITY_MAX_PP = 1.0;
@@ -338,7 +339,7 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
         const state = this.game.get(version);
         const rating = this.stamina.get(version);
         if (state === undefined || rating === undefined) continue;
-        state.fatigue = Math.max(0, state.fatigue - (500 + 3 * rating));
+        state.fatigue = Math.max(0, state.fatigue - halftimeRemovalBp(rating));
       }
     },
   };

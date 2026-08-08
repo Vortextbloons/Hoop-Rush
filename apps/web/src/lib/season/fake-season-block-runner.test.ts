@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
+import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
+import { generateSeasonSchedule, seasonRotationSetDigest } from '@hoop-rush/engine';
 import type { SeasonBlockStartInput } from './season-block-runner';
 import { FakeSeasonBlockRunner } from './fake-season-block-runner';
 
 /**
  * FakeSeasonBlockRunner unit tests: the deterministic e2e runner streams
  * progress, cancels between games, retries idempotently, and never produces
- * tied finals (the engine rejects ties).
+ * tied finals (the engine rejects ties). Commits derive the M2.5 state
+ * chain through the real `completeSeasonBlockCommit`, so the input run is a
+ * full fixture (not a skeletal double).
  */
 
 vi.mock('$lib/season/season-repo', () => ({
@@ -24,59 +27,16 @@ vi.mock('@hoop-rush/persistence', async (importOriginal) => ({
 }));
 
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
-const TEAMS = LEAGUE.teams.map((team) => team.franchiseId);
+const SCHEDULE = generateSeasonSchedule({ league: LEAGUE, seed: 'a'.repeat(32) });
 
 function minimalInput(): SeasonBlockStartInput {
-  const rosters = TEAMS.map((franchiseId, teamIndex) => ({
-    franchiseId,
-    players: Array.from({ length: 10 }, (_, slot) => ({
-      playerVersionId: `pv-${(teamIndex * 10 + slot).toString(16).padStart(32, '0')}`,
-      playerId: `p-${franchiseId}-${String(slot)}`,
-      franchiseId,
-      eraId: '1990s',
-      seasonKey: '1995-96',
-      displayName: `Fixture ${franchiseId} ${String(slot)}`,
-    })),
-  }));
-  const games = [];
-  let gameId = 1;
-  for (let round = 1; round <= 82; round += 1) {
-    for (let i = 0; i < 15; i += 1) {
-      const home = TEAMS[(round + i) % 30];
-      if (home === undefined) {
-        throw new Error(`fixture league has no team at index ${String((round + i) % 30)}`);
-      }
-      const away = TEAMS[(round + i + 8) % 30];
-      if (away === undefined) {
-        throw new Error(`fixture league has no team at index ${String((round + i + 8) % 30)}`);
-      }
-      games.push({
-        gameId: `s${String(gameId).padStart(6, '0')}`,
-        round,
-        homeFranchiseId: home,
-        awayFranchiseId: away,
-        status: 'scheduled' as const,
-        homeScore: null,
-        awayScore: null,
-        forfeitLoserFranchiseId: null,
-      });
-      gameId += 1;
-    }
-  }
+  const run = buildSeasonRunFixture({ schedule: SCHEDULE, stateDigest: '0'.repeat(32) });
   return {
-    run: {
-      runId: 'run-fake',
-      rootSeed: 'a'.repeat(32),
-      league: LEAGUE,
-      rosters,
-      games,
-      stateRevision: 0,
-      stateDigest: '0'.repeat(32),
-    } as unknown as SeasonBlockStartInput['run'],
-    rotations: [],
+    run,
+    rotations: run.rotations,
     blockIndex: 0,
     expectedRevision: 0,
-    rotationDigest: 'b'.repeat(32),
+    rotationDigest: seasonRotationSetDigest(run.rotations),
     commandId: 'blk-fake-1',
     humanFranchiseId: 'lakers',
     objectiveId: null,

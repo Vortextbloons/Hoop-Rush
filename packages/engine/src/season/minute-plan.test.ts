@@ -175,7 +175,7 @@ describe('minute-plan envelopes', () => {
   it('tired or low-stamina star teams shift toward balanced or bench-heavy', () => {
     const tired = playersOf();
     for (const id of IDS.slice(0, 5)) {
-      tired.set(id, player(id, { quality: 0.55, staminaRating: 55, fatigueBasisPoints: 5_400 }));
+      tired.set(id, player(id, { quality: 0.55, staminaRating: 60, fatigueBasisPoints: 4_500 }));
     }
     for (const id of IDS.slice(5)) {
       tired.set(id, player(id, { quality: 0.45, staminaRating: 80 }));

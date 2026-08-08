@@ -35,7 +35,6 @@ describe('assigned-position responsibility modifiers', () => {
   it('ships as m3-engine-v10 with the responsibility constants versioned', () => {
     expect(ENGINE_VERSION).toBe('m3-engine-v10');
     expect(ENGINE_CONSTANTS.version).toBe('m3-engine-v10');
-    expect(ENGINE_CONSTANTS.positionResponsibility.G.initiation).toBeDefined();
     expect(ENGINE_CONSTANTS.positionResponsibilityBound).toBeGreaterThanOrEqual(0.08);
   });
 

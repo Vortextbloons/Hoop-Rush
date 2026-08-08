@@ -122,6 +122,33 @@ export function enumerateLegalFives(
 }
 
 /**
+ * Per-context planner state memoized for the lifetime of one rotation
+ * context: the bench-hierarchy-ordered members and the benchOrder index.
+ * Both are pure functions of the immutable context, so the cache is exact.
+ */
+const plannerStateCache = new WeakMap<
+  PlannerRotationContext,
+  { members: PlannerMember[]; benchIndex: ReadonlyMap<string, number> }
+>();
+
+function plannerState(context: PlannerRotationContext): {
+  members: PlannerMember[];
+  benchIndex: ReadonlyMap<string, number>;
+} {
+  let state = plannerStateCache.get(context);
+  if (state === undefined) {
+    state = {
+      members: orderedPlannerMembers(context),
+      benchIndex: new Map(
+        context.rotation.benchOrder.map((playerVersionId, index) => [playerVersionId, index]),
+      ),
+    };
+    plannerStateCache.set(context, state);
+  }
+  return state;
+}
+
+/**
  * Tipoff unit: the configured starters when all are available and legal in
  * slot order; otherwise the first deterministic legal contingency from
  * enumerateLegalFives. Returns null when no legal five exists.
@@ -130,7 +157,7 @@ export function chooseInitialUnit(
   context: PlannerRotationContext,
   unavailable: ReadonlySet<string>,
 ): string[] | null {
-  const members = orderedPlannerMembers(context);
+  const members = plannerState(context).members;
   const playableById = new Map(members.map((member) => [member.playerVersionId, member.playable]));
 
   const starters = context.rotation.starters;
@@ -179,7 +206,7 @@ export function planUnit(
   request: PlannerUnitRequest,
   options: { candidates?: readonly (readonly string[])[] } = {},
 ): string[] | null {
-  const members = orderedPlannerMembers(context);
+  const { members, benchIndex } = plannerState(context);
   const available = new Set(
     members.map((member) => member.playerVersionId).filter((id) => !request.unavailable.has(id)),
   );
@@ -187,17 +214,14 @@ export function planUnit(
   const first = candidates[0];
   if (first === undefined) return null;
 
-  const benchIndex = new Map<string, number>();
-  context.rotation.benchOrder.forEach((playerVersionId, index) =>
-    benchIndex.set(playerVersionId, index),
-  );
-
   const preferClosing = request.closingWindow || request.period > 4;
 
   if (preferClosing) {
     if (closingFiveIsLegal(context, request.unavailable)) return [...context.rotation.closingFive];
     let best = first;
-    for (const candidate of candidates.slice(1)) {
+    for (let i = 1; i < candidates.length; i += 1) {
+      const candidate = candidates[i];
+      if (candidate === undefined) continue;
       if (closingPreferenceCompare(candidate, best, context, request, benchIndex) < 0) {
         best = candidate;
       }
@@ -214,7 +238,9 @@ export function planUnit(
 
   let best = first;
   let bestScore = scoreOf(best, base, adjustment);
-  for (const candidate of candidates.slice(1)) {
+  for (let i = 1; i < candidates.length; i += 1) {
+    const candidate = candidates[i];
+    if (candidate === undefined) continue;
     const candidateScore = scoreOf(candidate, base, adjustment);
     const scoreCompare = candidateScore - bestScore;
     const retentionCompare =
@@ -242,7 +268,7 @@ export function plannerCandidates(
   context: PlannerRotationContext,
   unavailable: ReadonlySet<string>,
 ): readonly (readonly string[])[] {
-  const members = orderedPlannerMembers(context);
+  const members = plannerState(context).members;
   const available = new Set(
     members.map((member) => member.playerVersionId).filter((id) => !unavailable.has(id)),
   );

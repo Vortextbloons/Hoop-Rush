@@ -157,11 +157,12 @@ interface CatalogMember {
 
 /** Seeded deterministic ordering rank for one version id (FNV-1a based). */
 function orderRank(seed: string, namespace: string, versionId: string): number {
+  const digest = seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`);
   return (
-    seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(0) * 16777216 +
-    seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(2) * 65536 +
-    seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(4) * 256 +
-    seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`).charCodeAt(6)
+    digest.charCodeAt(0) * 16777216 +
+    digest.charCodeAt(2) * 65536 +
+    digest.charCodeAt(4) * 256 +
+    digest.charCodeAt(6)
   );
 }
 
@@ -360,9 +361,10 @@ function rotationsFor(input: {
     .map((id) => ({ playerVersionId: id, playable: members.get(id)?.playable ?? [] }))
     .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
   const all = new Set(roster);
-  const starters = enumerateLegalFives(plannerMembers, all).slice(0, input.startingFivesCap);
+  const allFives = enumerateLegalFives(plannerMembers, all);
+  const starters = allFives.slice(0, input.startingFivesCap);
   if (starters.length === 0) return [];
-  const closers = enumerateLegalFives(plannerMembers, all).slice(0, input.closingFivesCap);
+  const closers = allFives.slice(0, input.closingFivesCap);
   const benchOrders = benchOrdersOf({
     roster,
     starters: starters[0] ?? [],
@@ -486,10 +488,12 @@ export function searchRosterRotationCandidates(
   const partialBeamsCap = input.model.search.partialBeamsPerLens;
 
   // Deterministic candidate ordering under the search seed.
+  const rankOf = new Map<string, number>();
+  for (const id of available) {
+    rankOf.set(id, orderRank(input.seed, seedNamespace, id));
+  }
   const orderedAvailable = [...available].sort(
-    (a, b) =>
-      orderRank(input.seed, seedNamespace, a) - orderRank(input.seed, seedNamespace, b) ||
-      (a < b ? -1 : 1),
+    (a, b) => (rankOf.get(a) ?? 0) - (rankOf.get(b) ?? 0) || (a < b ? -1 : 1),
   );
 
   // Beam over partial rosters.

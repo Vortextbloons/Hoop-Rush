@@ -33,7 +33,7 @@ export interface ProjectionRosterBuildRequest {
 /** One rostered player's recorded load inputs for minute planning. */
 export interface ProjectionRotationLoadRow {
   playerVersionId: string;
-  /** 45..95 stamina rating (season-stamina-v1). */
+  /** 45..95 stamina rating (season-stamina-v2). */
   staminaRating: number;
   /** 45..95 durability rating (durability-v1). */
   durability: number;

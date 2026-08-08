@@ -17,6 +17,7 @@ import {
   PLAYER_VERSION_ID_VERSION,
   SEASON_DRAFT_CATALOG_VERSION,
   SEASON_DURABILITY_VERSION,
+  SEASON_STAMINA_LEGACY_VERSION,
   SEASON_STAMINA_VERSION,
 } from './season-versions.ts';
 import {
@@ -58,17 +59,21 @@ export const seasonDraftCatalogPoolSchema = z.object({
 export type SeasonDraftCatalogPool = z.infer<typeof seasonDraftCatalogPoolSchema>;
 
 /**
- * Build-time stamina profile inside a catalog candidate (season-stamina-v1).
- * Slim by design: the version identity already lives on the candidate, so
- * the game controller expands this into the full `seasonStaminaInputSchema`
- * (adding schemaVersion and playerVersionId) when it builds player inputs.
+ * Build-time stamina profile inside a catalog candidate (season-stamina-v2;
+ * v1 profiles stay readable). Slim by design: the version identity already
+ * lives on the candidate, so the game controller expands this into the full
+ * `seasonStaminaInputSchema` (adding schemaVersion and playerVersionId) when
+ * it builds player inputs.
  */
 export const seasonDraftCandidateStaminaSchema = z.object({
   /** 45..95 stamina rating derived from historical MPG (45 = floor). */
   rating: z.number().int().min(45).max(95),
   /** Recorded historical minutes per game, capped at 60. */
   historicalMpg: z.number().min(0).max(60),
-  derivationVersion: z.literal(SEASON_STAMINA_VERSION),
+  derivationVersion: z.union([
+    z.literal(SEASON_STAMINA_VERSION),
+    z.literal(SEASON_STAMINA_LEGACY_VERSION),
+  ]),
 });
 export type SeasonDraftCandidateStamina = z.infer<typeof seasonDraftCandidateStaminaSchema>;
 
@@ -146,8 +151,11 @@ export const seasonDraftCatalogSchema = z
     ratingsVersion: z.string().min(1).max(64),
     positionNormalizationVersion: positionNormalizationVersionSchema,
     playerVersionIdVersion: z.literal(PLAYER_VERSION_ID_VERSION),
-    /** M2.4: stamina profile derivation version for every candidate. */
-    staminaVersion: z.literal(SEASON_STAMINA_VERSION),
+    /** M2.4: stamina profile derivation version for every candidate (v2). */
+    staminaVersion: z.union([
+      z.literal(SEASON_STAMINA_VERSION),
+      z.literal(SEASON_STAMINA_LEGACY_VERSION),
+    ]),
     /** M2.5: durability profile derivation version for every candidate. */
     durabilityVersion: z.literal(SEASON_DURABILITY_VERSION),
     pools: z.array(seasonDraftCatalogPoolSchema).min(1),

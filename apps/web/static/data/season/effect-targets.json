@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "targetsVersion": "season-effect-targets-v1",
+  "targetsVersion": "season-effect-targets-v2",
   "mechanismCaps": {
-    "shooterFatiguePp": 2.5,
-    "handlerFatiguePp": 1.8,
-    "defenseFatiguePp": 1.2,
+    "shooterFatiguePp": 5,
+    "handlerFatiguePp": 3.5,
+    "defenseFatiguePp": 2.5,
     "turnoverSecurityPp": 1,
     "assistConversionPp": 3.5,
     "helpDefensePp": 0.8
@@ -27,30 +27,30 @@
     "calibration": {
       "scoringDeltaMedian": 0,
       "turnoverDeltaMedian": 0,
-      "assistDeltaMedian": 0.641025641025641,
+      "assistDeltaMedian": 0,
       "gamesSimulated": 768,
       "zeroFailures": true,
       "determinismFailures": 0
     },
     "heldOut": {
-      "scoringDeltaMedian": -0.4419857159583187,
-      "turnoverDeltaMedian": -4.545454545454546,
+      "scoringDeltaMedian": -0.9009009009009009,
+      "turnoverDeltaMedian": 0,
       "assistDeltaMedian": 0,
-      "withinEnvelopeShare": 0.96875,
+      "withinEnvelopeShare": 0.9739583333333334,
       "gamesSimulated": 192
     },
     "roles": {
-      "tightStarterMedianFatigue": 331,
-      "balancedStarterMedianFatigue": 226,
-      "benchHeavyStarterMedianFatigue": 117,
-      "tightBenchMedianFatigue": 269,
-      "balancedBenchMedianFatigue": 421,
-      "benchHeavyBenchMedianFatigue": 515
+      "tightStarterMedianFatigue": 2147,
+      "balancedStarterMedianFatigue": 1771,
+      "benchHeavyStarterMedianFatigue": 1486,
+      "tightBenchMedianFatigue": 527,
+      "balancedBenchMedianFatigue": 825,
+      "benchHeavyBenchMedianFatigue": 1079
     },
     "chemistry": {
-      "stableUnitMedianBp": 7957,
-      "shuffledUnitMedianBp": 6948,
-      "separationBp": 1009
+      "stableUnitMedianBp": 7953,
+      "shuffledUnitMedianBp": 6934,
+      "separationBp": 1019
     }
   },
   "gates": {
@@ -65,5 +65,5 @@
   "engineVersion": "m3-engine-v10",
   "gameVersion": "season-game-v4",
   "gameTargetsVersion": "season-game-targets-v4",
-  "generatedAtIso": "2026-08-08T03:48:24.016Z"
+  "generatedAtIso": "2026-08-08T04:32:44.564Z"
 }

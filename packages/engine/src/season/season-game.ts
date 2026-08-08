@@ -792,37 +792,41 @@ class SeasonGameController {
 
   /** Rebuilds the on-court five: prep tables, trip teams, recorder slots. */
   private activateUnit(side: SideState): void {
-    const team = this.buildUnitTeam(side);
+    const { team, rosterIndices } = this.buildUnitTeam(side);
     this.tripContext.teams[side.sideIndex] = team;
     this.tripContext.teamUnits[side.sideIndex] = [...side.unit];
     this.tripContext.preps[side.sideIndex] = prepareTeam(team, this.profile);
-    const rosterIndices: number[] = [];
-    for (const playerVersionId of side.unit) {
-      const rosterIndex = side.rosterIndexByVersion.get(playerVersionId);
-      if (rosterIndex === undefined) {
-        throw new Error(`season: unit references an unrostered version ${playerVersionId}`);
-      }
-      rosterIndices.push(rosterIndex);
-    }
     this.recorder.setActiveFive(side.sideIndex, rosterIndices);
     // M2.4: the effects hook needs the active units for unit chemistry and
     // defensive-unit fatigue (consumes no RNG; no-op when absent).
     this.effectsMode?.buffer.hook.setActiveUnits(this.home.unit, this.away.unit);
   }
 
-  private buildUnitTeam(side: SideState): SimulationTeam {
+  private buildUnitTeam(side: SideState): {
+    team: SimulationTeam;
+    rosterIndices: number[];
+  } {
     const players: SimulationPlayer[] = [];
+    const rosterIndices: number[] = [];
     for (const playerVersionId of side.unit) {
-      const player = side.simPlayers.find((p) => p.playerVersionId === playerVersionId);
+      const rosterIndex = side.rosterIndexByVersion.get(playerVersionId);
+      if (rosterIndex === undefined) {
+        throw new Error(`season: no simulation player for version ${playerVersionId}`);
+      }
+      const player = side.simPlayers[rosterIndex];
       if (player === undefined) {
         throw new Error(`season: no simulation player for version ${playerVersionId}`);
       }
       players.push(player);
+      rosterIndices.push(rosterIndex);
     }
     return {
-      teamId: side.teamInput.teamId,
-      displayName: side.teamInput.displayName,
-      players,
+      team: {
+        teamId: side.teamInput.teamId,
+        displayName: side.teamInput.displayName,
+        players,
+      },
+      rosterIndices,
     };
   }
 

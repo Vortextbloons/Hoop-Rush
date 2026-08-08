@@ -43,6 +43,18 @@ function candidateToSimulationPlayer(candidate: SeasonDraftCandidate): Simulatio
   };
 }
 
+/**
+ * Worker-lifetime asset cache (mirror of the season block worker): the
+ * hashed URLs are stable for a session, so repeat requests skip the
+ * catalog/model/profile fetch, hash verify, and parse entirely.
+ */
+let cachedAssets: {
+  key: string;
+  catalog: Awaited<ReturnType<typeof loadSeasonDraftCatalog>>;
+  model: Awaited<ReturnType<typeof loadProjectionModelArtifact>>;
+  eraProfile: Awaited<ReturnType<typeof loadEraSimulationProfile>>;
+} | null = null;
+
 async function loadAssets(request: {
   catalogUrl: string;
   catalogHash: string;
@@ -57,11 +69,24 @@ async function loadAssets(request: {
     Awaited<ReturnType<typeof loadEraSimulationProfile>>,
   ]
 > {
-  return Promise.all([
+  const key = [
+    request.catalogUrl,
+    request.catalogHash,
+    request.modelUrl,
+    request.modelHash,
+    request.eraProfileUrl,
+    request.eraProfileHash,
+  ].join('|');
+  if (cachedAssets !== null && cachedAssets.key === key) {
+    return [cachedAssets.catalog, cachedAssets.model, cachedAssets.eraProfile];
+  }
+  const [catalog, model, eraProfile] = await Promise.all([
     loadSeasonDraftCatalog(request.catalogUrl, request.catalogHash),
     loadProjectionModelArtifact(request.modelUrl, request.modelHash),
     loadEraSimulationProfile(request.eraProfileUrl, request.eraProfileHash),
   ]);
+  cachedAssets = { key, catalog, model, eraProfile };
+  return [catalog, model, eraProfile];
 }
 
 function errorMessage(error: unknown): string {

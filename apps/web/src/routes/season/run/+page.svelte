@@ -124,6 +124,17 @@
     return { objectiveId: selection.objectiveId, name };
   });
 
+  /** M2.4: build-time stamina ratings from the catalog (constant per catalog). */
+  const staminaByVersion = $derived.by(() => {
+    const catalog = shell.catalog;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const map = new Map<string, number>();
+    for (const candidate of catalog?.candidates ?? []) {
+      map.set(candidate.playerVersionId, candidate.stamina.rating);
+    }
+    return map;
+  });
+
   const preview: LockPreview | null = $derived.by(() => {
     if (
       run === null ||
@@ -144,11 +155,6 @@
     // M2.4: fatigue-risk projections need the recorded load state and the
     // build-time stamina ratings (from the catalog).
     const effects = snapshot?.effects ?? null;
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    const staminaByVersion = new Map<string, number>();
-    for (const candidate of shell.catalog?.candidates ?? []) {
-      staminaByVersion.set(candidate.playerVersionId, candidate.stamina.rating);
-    }
     return buildLockPreview({
       pendingHumanRotation: shell.editor.rotation,
       baselineHumanRotation: baseline,

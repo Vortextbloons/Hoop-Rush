@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_STAMINA_VERSION } from './season-versions.ts';
+import { SEASON_STAMINA_LEGACY_VERSION, SEASON_STAMINA_VERSION } from './season-versions.ts';
 
 /**
  * M2.4 stamina and chemistry effects contracts (spec/2.0/05, spec/2.0/10).
@@ -31,10 +31,11 @@ export const seasonEffectsSideSchema = z.enum(['home', 'away']);
 export type SeasonEffectsSide = z.infer<typeof seasonEffectsSideSchema>;
 
 /**
- * Build-time stamina profile for one player version (season-stamina-v1).
- * Derived once per player-season from the pool's recorded minutes and
- * games played; the engine reads it from the catalog-derived player input
- * (or the absence of one means the zero profile).
+ * Build-time stamina profile for one player version (season-stamina-v2;
+ * v1 profiles stay readable). Derived once per player-season from the pool's
+ * recorded minutes and games played; the engine reads it from the
+ * catalog-derived player input (or the absence of one means the zero
+ * profile).
  */
 export const seasonStaminaInputSchema = z.object({
   schemaVersion: z.literal(1),
@@ -43,7 +44,10 @@ export const seasonStaminaInputSchema = z.object({
   rating: z.number().int().min(45).max(95),
   /** Recorded historical minutes per game, capped at 60. */
   historicalMpg: z.number().min(0).max(60),
-  derivationVersion: z.literal(SEASON_STAMINA_VERSION),
+  derivationVersion: z.union([
+    z.literal(SEASON_STAMINA_VERSION),
+    z.literal(SEASON_STAMINA_LEGACY_VERSION),
+  ]),
 });
 export type SeasonStaminaInput = z.infer<typeof seasonStaminaInputSchema>;
 

@@ -63,6 +63,7 @@ vi.mock('@hoop-rush/engine', async (importOriginal) => ({
 
 import {
   generateSeasonSchedule,
+  completeSeasonBlockCommit,
   seasonCheckpointDigest,
   seasonRotationSetDigest,
 } from '@hoop-rush/engine';
@@ -676,6 +677,63 @@ describe('season block runner (M2.5 wire)', () => {
     expect(input.transactions).toEqual([]);
     expect(input.objectives).toBeDefined();
     expect(input.checkpointState).toMatchObject({ runId: run.runId, blockIndex: 0 });
+  });
+
+  it('digests the LOCKED rotation set at commit, not the pre-submission run', async () => {
+    // A pending human rotation edit changes the locked set; the post-block
+    // state digest must cover exactly what the commit stores, or the reload
+    // audit reports "stored stateDigest does not recompute" after any edit.
+    const run = makeRun();
+    const repository = makeRepository(run);
+    const runner = createSeasonBlockRunner({
+      repository,
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    const events: Array<{ type: string; requestId?: string }> = [];
+    runner.subscribe((event) => events.push(event));
+    const human = run.rotations.find((rotation) => rotation.franchiseId === 'lakers');
+    if (human === undefined) throw new Error('fixture run has no human rotation');
+    const pending: SeasonRun['rotations'][number] = {
+      ...human,
+      targetMinutes: human.targetMinutes.map((row, index) => ({
+        ...row,
+        minutes: index < 5 ? 38 : 10,
+      })),
+    };
+    const locked = run.rotations.map((rotation) =>
+      rotation.franchiseId === 'lakers' ? pending : rotation,
+    );
+    runner.startBlock(
+      startInput(run, { rotations: locked, rotationDigest: seasonRotationSetDigest(locked) }),
+    );
+    await flush();
+    const worker = FakeWorker.instances[0];
+    expect(worker).toBeDefined();
+    const started = events.find((event) => event.type === 'started');
+    const requestId = started?.requestId ?? 'sb-1';
+    worker?.emit({
+      schemaVersion: 5,
+      type: 'season-block-complete',
+      requestId,
+      result: {
+        status: 'committed',
+        checkpoint: makeCandidate(run, { rotationDigest: seasonRotationSetDigest(locked) }),
+      },
+    });
+    await flush();
+
+    const commit = completeSeasonBlockCommit as unknown as ReturnType<typeof vi.fn>;
+    const commitInput = commit.mock.calls[0]?.[0] as { run: SeasonRun };
+    expect(commitInput.run.rotations).toEqual(locked);
+    const storedHuman = commitInput.run.rotations.find(
+      (rotation) => rotation.franchiseId === 'lakers',
+    );
+    expect(storedHuman?.targetMinutes).not.toEqual(human.targetMinutes);
+    const repositoryInput = repository.commitSeasonBlock.mock.calls[0]?.[0] as
+      CommitSeasonBlockInput | undefined;
+    expect(repositoryInput?.rotations).toEqual(locked);
   });
 
   it('sends a wire-v5 continuation when the worker already holds the run context', async () => {

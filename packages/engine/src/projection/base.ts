@@ -8,12 +8,13 @@ import type {
   ProjectionSide,
   ProjectionSlot,
   ProjectionSpacing,
+  ProjectionReferenceFive,
   SimulationPlayer,
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import { PROJECTION_SCHEMA_VERSION, seasonDigestHex } from '@hoop-rush/data-contracts';
 import { canPlay } from '../domain/positions.ts';
-import { prepareTeam, type TeamPrep } from '../sim/prepare.ts';
+import { prepareTeam, prepareTeamCached, type TeamPrep } from '../sim/prepare.ts';
 import { projectExpectedLedger, type LedgerSide } from './expected-ledger.ts';
 import { resolveReference } from './reference-lineups.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
@@ -39,6 +40,26 @@ const SLOT_GROUP: Record<ProjectionSlot, 'G' | 'F' | 'C'> = {
 };
 
 const SLOT_ORDER: readonly ProjectionSlot[] = ['G1', 'G2', 'F1', 'F2', 'C'];
+
+/**
+ * One stable SimulationTeam per reference lineup (keyed by the model
+ * artifact's players array identity) so the reference-side preparation is
+ * memoized across projections instead of rebuilt per call.
+ */
+const referenceTeamCache = new WeakMap<readonly SimulationPlayer[], SimulationTeam>();
+
+function referenceTeamOf(reference: ProjectionReferenceFive): SimulationTeam {
+  let team = referenceTeamCache.get(reference.players);
+  if (team === undefined) {
+    team = {
+      teamId: 'projection-reference',
+      displayName: `Reference ${reference.referenceId}`,
+      players: [...reference.players],
+    };
+    referenceTeamCache.set(reference.players, team);
+  }
+  return team;
+}
 
 /** Default normalization scales (fallbacks; the frozen artifact overrides). */
 const DEFAULT_SCALES: Record<string, { baseline: number; perPoint: number }> = {
@@ -304,14 +325,10 @@ function sideOf(input: {
 export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProjection {
   const team = validateAndBuildTeam(input);
   const reference = resolveReference(input.model, input.eraProfile.eraId, input.referenceId);
-  const referenceTeam: SimulationTeam = {
-    teamId: 'projection-reference',
-    displayName: `Reference ${reference.referenceId}`,
-    players: [...reference.players],
-  };
+  const referenceTeam = referenceTeamOf(reference);
 
   const prep = prepareTeam(team, input.eraProfile);
-  const referencePrep = prepareTeam(referenceTeam, input.eraProfile);
+  const referencePrep = prepareTeamCached(referenceTeam, input.eraProfile);
   const expected = projectExpectedLedger({
     team,
     prep,

@@ -1,4 +1,4 @@
-import type { SeasonRotation } from '@hoop-rush/data-contracts';
+import { seasonRotationSchema, type SeasonRotation } from '@hoop-rush/data-contracts';
 import type {
   HumanRosterBuildResult,
   MinutePlanOptimizationResult,
@@ -18,9 +18,10 @@ import type {
  * Season Run projection runner (projection milestone): the main-thread
  * client for the projection worker. Long roster autofill searches and the
  * minute-plan optimizer run off-thread; the runner resolves the hashed
- * asset references, spawns a one-shot worker, and resolves the
- * authoritative engine result. The `workerUrl` override is the test seam
- * (mirror of the season block runner).
+ * asset references, keeps one worker per runner for the session (asset
+ * fetches and parses are cached inside the worker), and resolves the
+ * authoritative engine result by requestId. The `workerUrl` override is the
+ * test seam (mirror of the season block runner).
  */
 
 export interface ProjectionRunnerDeps {
@@ -60,6 +61,7 @@ export interface ProjectionRunner {
 }
 
 export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): ProjectionRunner {
+  const client = new ProjectionWorkerClient(deps);
   return {
     async buildRoster(input: ProjectionRosterBuildInput): Promise<HumanRosterBuildResult> {
       const urls = await seasonArtifactUrls();
@@ -80,7 +82,7 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
         seed: input.seed,
         ...(input.lens !== undefined ? { lens: input.lens } : {}),
       };
-      return runWorker<HumanRosterBuildResult>(deps, request);
+      return client.request<HumanRosterBuildResult>(request);
     },
 
     async optimizeRotation(
@@ -90,6 +92,11 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
       if (urls.modelUrl === undefined || urls.modelHash === undefined) {
         throw missingModelError();
       }
+      // The wire is type-only (no worker-side Zod validation), and the
+      // structure arrives from the shell's `$state` rotation editor — a
+      // Svelte 5 reactive proxy that `postMessage` cannot clone. Rebuild the
+      // request from validated plain objects so the worker boundary never
+      // sees a proxy (mirror of the block worker's both-ends Zod boundary).
       const request: ProjectionRotationOptimizeRequest = {
         type: 'optimize-rotation',
         requestId: newSeasonId('proj'),
@@ -99,13 +106,19 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
         modelHash: urls.modelHash,
         eraProfileUrl: urls.profileUrl,
         eraProfileHash: urls.profileHash,
-        roster: input.roster,
-        structure: input.structure,
-        load: input.load,
+        roster: [...input.roster],
+        structure: seasonRotationSchema.parse(input.structure),
+        load: input.load.map((row) => ({
+          playerVersionId: row.playerVersionId,
+          staminaRating: row.staminaRating,
+          durability: row.durability,
+          fatigueBasisPoints: row.fatigueBasisPoints,
+          recentLoadBasisPoints: row.recentLoadBasisPoints,
+        })),
         horizon: input.horizon,
         seed: input.seed,
       };
-      return runWorker<MinutePlanOptimizationResult>(deps, request);
+      return client.request<MinutePlanOptimizationResult>(request);
     },
   };
 }
@@ -116,35 +129,59 @@ function missingModelError(): Error {
   );
 }
 
-/** Spawns a one-shot worker for one request and resolves the matching
- * response by requestId (rejects on worker error). */
-function runWorker<Result>(
-  deps: ProjectionRunnerDeps,
-  request: ProjectionWorkerRequest,
-): Promise<Result> {
-  const requestId = request.requestId;
-  const worker = new Worker(
-    deps.workerUrl ?? new URL('../../workers/season-projection-worker.ts', import.meta.url),
-    { type: 'module' },
-  );
-  return new Promise<Result>((resolve, reject) => {
-    const onMessage = (event: MessageEvent<ProjectionWorkerResponse>): void => {
+/**
+ * One long-lived worker per runner: assets are fetched and hash-verified
+ * once inside the worker, so repeated strategy clicks and autofill runs
+ * skip the multi-megabyte catalog download/parse. Requests resolve by
+ * requestId; a worker error rejects every in-flight request and resets the
+ * worker so the next request starts fresh.
+ */
+class ProjectionWorkerClient {
+  private worker: Worker | null = null;
+  private pending = new Map<
+    string,
+    { resolve: (result: unknown) => void; reject: (error: Error) => void }
+  >();
+
+  constructor(private readonly deps: ProjectionRunnerDeps) {}
+
+  request<Result>(request: ProjectionWorkerRequest): Promise<Result> {
+    const worker = this.ensureWorker();
+    return new Promise<Result>((resolve, reject) => {
+      this.pending.set(request.requestId, {
+        resolve: resolve as (result: unknown) => void,
+        reject,
+      });
+      worker.postMessage(request);
+    });
+  }
+
+  private ensureWorker(): Worker {
+    if (this.worker !== null) return this.worker;
+    const worker = new Worker(
+      this.deps.workerUrl ?? new URL('../../workers/season-projection-worker.ts', import.meta.url),
+      { type: 'module' },
+    );
+    worker.addEventListener('message', (event: MessageEvent<ProjectionWorkerResponse>) => {
       const message = event.data;
-      if (message.requestId !== requestId) return;
-      worker.removeEventListener('message', onMessage);
-      worker.terminate();
+      const entry = this.pending.get(message.requestId);
+      if (entry === undefined) return;
+      this.pending.delete(message.requestId);
       if (message.type === 'complete') {
-        resolve(message.result as Result);
+        entry.resolve(message.result);
         return;
       }
-      reject(new Error(message.message));
-    };
-    worker.addEventListener('message', onMessage);
-    worker.addEventListener('error', (event) => {
-      worker.removeEventListener('message', onMessage);
-      worker.terminate();
-      reject(new Error(event.message || 'projection worker failed'));
+      entry.reject(new Error(message.message));
     });
-    worker.postMessage(request);
-  });
+    worker.addEventListener('error', (event) => {
+      const error = new Error(event.message || 'projection worker failed');
+      const entries = [...this.pending.values()];
+      this.pending.clear();
+      worker.terminate();
+      if (this.worker === worker) this.worker = null;
+      for (const entry of entries) entry.reject(error);
+    });
+    this.worker = worker;
+    return worker;
+  }
 }

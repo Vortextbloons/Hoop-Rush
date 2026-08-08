@@ -156,7 +156,6 @@ describe('AI projection shadow mode', () => {
     );
     expect(aiEvaluations.length).toBeGreaterThan(0);
     for (const evaluation of aiEvaluations) {
-      expect(evaluation.projectionSummary).toBeDefined();
       expect(evaluation.projectionSummary?.modelVersion).toBe('projection-model-v1');
       expect(typeof evaluation.projectionSummary?.searchDigest).toBe('string');
       expect(evaluation.projectionSummary?.searchDigest).toMatch(/^[0-9a-f]{32}$/);

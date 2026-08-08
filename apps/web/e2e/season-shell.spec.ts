@@ -212,8 +212,9 @@ test.describe('season shell: hub, team, tabs, responsive', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByText(/took 1 from/).first()).toBeVisible();
 
-    // Presets rewrite target minutes through the engine tables (240 stays).
-    await page.getByRole('button', { name: 'Tight' }).click();
+    // Strategy buttons apply their projection plan (Starter-Heavy = the
+    // former Tight preset; the 240-minute total always stays).
+    await page.getByRole('button', { name: 'Starter-Heavy' }).click();
     await expect(page.getByText('240', { exact: true }).first()).toBeVisible();
 
     // Closing toggle: swap a non-closing bench player into the closing five

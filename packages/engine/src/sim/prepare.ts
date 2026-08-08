@@ -4,8 +4,10 @@ import type {
   SimulationTeam,
 } from '@hoop-rush/data-contracts';
 import {
+  ACTION_TYPES,
   actionWeights,
   defenderBase,
+  passProbability,
   teamInitiatorWeights,
   teammateShotWeights,
   zonePrep,
@@ -16,7 +18,7 @@ import {
 import { teamSpacing, twoPointAnchorFactor } from './shooting.ts';
 import { defenderPressure, stealerWeights } from './security.ts';
 import { rebounderWeights, teamMean } from './rebounding.ts';
-import { foulerWeights, freeThrowShooterWeights } from './fouls.ts';
+import { foulerWeights, freeThrowProbability, freeThrowShooterWeights } from './fouls.ts';
 import {
   responsibilityModifiersForSlot,
   type PositionResponsibilityModifiers,
@@ -80,6 +82,10 @@ export interface TeamPrep {
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>;
   /** Defender selection base: zone weights + rim protection per slot. */
   defenderBase: DefenderBase;
+  /** Free-throw conversion probability per player, in team index order. */
+  freeThrowP: number[];
+  /** Per-initiator pass probabilities (parallel to ACTION_TYPES), keyed by playerId. */
+  passP: Map<string, number[]>;
 }
 
 /** Builds the per-game preparation tables for one team. */
@@ -90,7 +96,9 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
   const teammateShotsByPlayer = new Map<string, TeammateShots>();
   const zonePrepByPlayer = new Map<string, ZonePrep>();
   const twoPointAnchorByPlayer = new Map<string, number | null>();
+  const passPByPlayer = new Map<string, number[]>();
   const positionModifiersByPlayer = new Map<string, PositionResponsibilityModifiers>();
+  const freeThrowP: number[] = [];
   let pressureTotal = 0;
   let stealTotal = 0;
   players.forEach((player, slot) => {
@@ -106,6 +114,11 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
     positionModifiersByPlayer.set(key, positionModifiers);
     positionModifiersByPlayer.set(player.playerId, positionModifiers);
     actionWeightsByPlayer.set(key, actionWeights(player, positionModifiers));
+    passPByPlayer.set(
+      key,
+      ACTION_TYPES.map((action) => passProbability(player, action)),
+    );
+    freeThrowP.push(freeThrowProbability(player, profile));
     teammateShotsByPlayer.set(key, {
       roll: teammateShotWeights(team, player, 'pickAndRollRoll', positionModifiersByPlayer),
       pass: teammateShotWeights(team, player, 'spotUp', positionModifiersByPlayer),
@@ -138,6 +151,8 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
     twoPointAnchor: twoPointAnchorByPlayer,
     positionModifiers: positionModifiersByPlayer,
     defenderBase: defenderBase(team, positionModifiersByPlayer),
+    freeThrowP,
+    passP: passPByPlayer,
   };
 }
 

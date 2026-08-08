@@ -34,6 +34,16 @@ export const ACTION_TYPES: readonly ActionType[] = [
   'transition',
 ];
 
+const ACTION_INDEX: Record<ActionType, number> = {
+  isolation: 0,
+  pickAndRoll: 1,
+  pickAndRollRoll: 2,
+  postUp: 3,
+  spotUp: 4,
+  cut: 5,
+  transition: 6,
+};
+
 export interface ShotSelection {
   shooter: SimulationPlayer;
   initiator: SimulationPlayer;
@@ -222,8 +232,13 @@ export function pickShot(
   initiator: SimulationPlayer,
   action: ActionType,
   rng: Rng,
+  passP?: readonly number[],
 ): ShotSelection {
-  if (!rng.chance(passProbability(initiator, action))) {
+  const pass =
+    passP === undefined
+      ? passProbability(initiator, action)
+      : (passP[ACTION_INDEX[action]] ?? passProbability(initiator, action));
+  if (!rng.chance(pass)) {
     return { shooter: initiator, initiator, passed: false };
   }
   const selected = action === 'pickAndRollRoll' ? shots.roll : shots.pass;
@@ -293,6 +308,8 @@ export interface DefenderBase {
   weights: number[][];
   /** Rim-protection factor per slot (applied on interior zones only). */
   rimProtection: number[];
+  /** Same-group matchup weight per (defenderSlot, shooterSlot). */
+  matchMatrix: number[][];
 }
 
 /** Builds the per-game defender selection base for one team. */
@@ -304,6 +321,9 @@ export function defenderBase(
     weights: ZONES.map((zone) => team.players.map((defender) => defenderWeight(defender, zone))),
     rimProtection: team.players.map(
       (defender) => positionModifiers.get(defender.playerId)?.rimProtection ?? 1,
+    ),
+    matchMatrix: team.players.map((_, defenderSlot) =>
+      team.players.map((_, shooterSlot) => sameGroupMatchWeight(defenderSlot, shooterSlot)),
     ),
   };
 }
@@ -324,11 +344,11 @@ export function pickDefender(
   shooterSlot: number,
 ): SimulationPlayer {
   const interior = zone === 'rim' || zone === 'shortMid';
-  const zoneIndex = ZONES.indexOf(zone);
+  const zoneIndex = ZONE_INDEX[zone];
   const zoneWeights = base.weights[zoneIndex] ?? [];
   const weights = new Array<number>(team.players.length);
   for (let slot = 0; slot < team.players.length; slot += 1) {
-    const match = sameGroupMatchWeight(slot, shooterSlot);
+    const match = base.matchMatrix[slot]?.[shooterSlot] ?? 1;
     const rim = interior ? (base.rimProtection[slot] ?? 1) : 1;
     weights[slot] = (zoneWeights[slot] ?? 0) * match * rim;
   }
@@ -336,6 +356,14 @@ export function pickDefender(
 }
 
 const ZONES: readonly ShotZone[] = ['rim', 'shortMid', 'longMid', 'cornerThree', 'aboveBreakThree'];
+
+const ZONE_INDEX: Record<ShotZone, number> = {
+  rim: 0,
+  shortMid: 1,
+  longMid: 2,
+  cornerThree: 3,
+  aboveBreakThree: 4,
+};
 
 /**
  * Target three-point share for one player, from the recorded season volume

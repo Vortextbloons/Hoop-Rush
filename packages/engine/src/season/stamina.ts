@@ -49,7 +49,7 @@ export function historicalMpgOf(minutes: number | null, gamesPlayed: number | nu
 export const SEASON_STAMINA_BASIS_POINT_SCALE = 10_000;
 
 /** On-court accumulation constant A (bp per second at rating floor spacing). */
-export const SEASON_STAMINA_ON_COURT_BASE = 40;
+export const SEASON_STAMINA_ON_COURT_BASE = 120;
 
 /** Off-court recovery constant B (bp per second). */
 export const SEASON_STAMINA_OFF_COURT_BASE = 3;
@@ -72,16 +72,16 @@ export const SEASON_STAMINA_ROLE_DEFENDER_BP = 8;
 /** Role bonus: rebound-contest participation, basis points per contest. */
 export const SEASON_STAMINA_ROLE_REBOUND_BP = 2;
 
-/** Halftime recovery: `SEASON_STAMINA_HALFTIME_BASE + 3 x rating` bp. */
-export const SEASON_STAMINA_HALFTIME_BASE_BP = 500;
-export const SEASON_STAMINA_HALFTIME_PER_RATING_BP = 3;
+/** Halftime recovery: `SEASON_STAMINA_HALFTIME_BASE + SEASON_STAMINA_HALFTIME_PER_RATING x rating` bp. */
+export const SEASON_STAMINA_HALFTIME_BASE_BP = 250;
+export const SEASON_STAMINA_HALFTIME_PER_RATING_BP = 2;
 
 /** Postgame recent-load update: 60% previous + 40% regulation share. */
 export const SEASON_STAMINA_RECENT_LOAD_RETAIN = 60;
 export const SEASON_STAMINA_RECENT_LOAD_SHARE = 40;
 
-/** Recent load raises the next game's accumulation by up to 20%. */
-export const SEASON_STAMINA_RECENT_LOAD_MAX_FACTOR = 1.2;
+/** Recent load raises the next game's accumulation by up to 50%. */
+export const SEASON_STAMINA_RECENT_LOAD_MAX_FACTOR = 1.5;
 
 /** Recovery tick formula constants. */
 export const SEASON_STAMINA_RECOVERY_DIVISOR = 4500;
@@ -110,7 +110,7 @@ export function stintMultiplierBp(stintSeconds: number): number {
  * On-court fatigue accumulation for one stint interval, in basis points:
  * `elapsed x A x (110 - rating) / 10000` scaled by the consecutive-stint
  * multiplier (based on the stint duration AFTER this interval) and the
- * player's recent-load factor `1 + 0.2 x recentLoad/10000`. Rounds once.
+ * player's recent-load factor `1 + 0.5 x recentLoad/10000`. Rounds once.
  */
 export function onCourtFatigueBp(
   elapsedSeconds: number,
@@ -119,7 +119,7 @@ export function onCourtFatigueBp(
   recentLoadBp: number,
 ): number {
   const multiplier = stintMultiplierBp(postIntervalStintSeconds);
-  const loadFactor = 10_000 + Math.round(0.2 * recentLoadBp);
+  const loadFactor = 10_000 + Math.round(0.5 * recentLoadBp);
   const scaled =
     elapsedSeconds * SEASON_STAMINA_ON_COURT_BASE * (110 - rating) * multiplier * loadFactor;
   return Math.round(scaled / 1_000_000_000_000);

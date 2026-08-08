@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  SEASON_EFFECT_TARGETS_LEGACY_VERSION,
+  SEASON_EFFECT_TARGETS_VERSION,
   SEASON_INFLUENCE_TARGETS_VERSION,
   SEASON_INJURY_TARGETS_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
@@ -1053,7 +1055,10 @@ export type SeasonEffectsRolesReport = z.infer<typeof seasonEffectsRolesReportSc
 export const seasonEffectsCalibrateReportSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season effects calibrate'),
-  targetsVersion: z.literal('season-effect-targets-v1'),
+  targetsVersion: z.union([
+    z.literal(SEASON_EFFECT_TARGETS_VERSION),
+    z.literal(SEASON_EFFECT_TARGETS_LEGACY_VERSION),
+  ]),
   calibrationSeedCount: z.number().int().nonnegative(),
   validationSeedCount: z.number().int().nonnegative(),
   calibrationGames: z.number().int().nonnegative(),

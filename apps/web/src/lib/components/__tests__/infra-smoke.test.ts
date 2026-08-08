@@ -22,7 +22,6 @@ describe('PlayerFace infra smoke (jsdom)', () => {
       props: { player, manifest, fallbackInitials: 'TP' },
     });
 
-    expect(container).toBeTruthy();
     expect(getByText('TP').textContent).toBe('TP');
     expect(container.querySelectorAll('img')).toHaveLength(0);
   });

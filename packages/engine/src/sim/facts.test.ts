@@ -126,7 +126,6 @@ describe('buildFacts usage fact', () => {
     );
     const result = buildFacts(game(home, away, 'home'));
     const usageFact = result.find((fact) => fact.kind === 'usage');
-    expect(usageFact).toBeDefined();
     expect(usageFact?.playerIds).toEqual(['p-workhorse']);
     expect(usageFact?.evidence.usageShare).toBeCloseTo(25 / 35, 6);
     expect(usageFact?.evidence.playerUsage).toBe(25);
@@ -173,7 +172,6 @@ describe('buildFacts usage fact', () => {
     const result = buildFacts(game(home, away, 'home'));
     const usageFact = result.find((fact) => fact.kind === 'usage');
     // Legacy formula usage = 16 + 0.44*5 + 4 = 22.2 of 22.2 team usage.
-    expect(usageFact).toBeDefined();
     expect(usageFact?.playerIds).toEqual(['p-legacy']);
     expect(usageFact?.evidence.usageShare).toBeCloseTo(1, 6);
   });

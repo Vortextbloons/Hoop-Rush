@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import { SvelteMap } from 'svelte/reactivity';
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { SeasonTeamAggregate } from '@hoop-rush/data-contracts';
@@ -38,11 +39,20 @@
   const run = $derived(shell.run);
   const standings = $derived(run?.standings ?? null);
 
-  const streakOf = (franchiseId: string): { kind: 'wins' | 'losses'; length: number } | null => {
+  /** Streak facts computed once per standings/summaries change. */
+  const streaksByFranchise = $derived.by(() => {
     const summaries = shell.snapshot?.summaries ?? [];
-    if (summaries.length === 0) return null;
-    return franchiseStreak(summaries, franchiseId);
-  };
+    const map = new SvelteMap<string, { kind: 'wins' | 'losses'; length: number } | null>();
+    for (const row of shell.run?.standings.rows ?? []) {
+      map.set(
+        row.franchiseId,
+        summaries.length === 0 ? null : franchiseStreak(summaries, row.franchiseId),
+      );
+    }
+    return map;
+  });
+  const streakOf = (franchiseId: string): { kind: 'wins' | 'losses'; length: number } | null =>
+    streaksByFranchise.get(franchiseId) ?? null;
 
   const aggregates = $derived(
     shell.snapshot ? foldSeasonAggregates(shell.snapshot.summaries) : null,
@@ -50,7 +60,7 @@
 
   const teamStats = $derived.by(() => {
     if (!aggregates || !standings) return [];
-    const byId = new Map(standings.rows.map((row) => [row.franchiseId, row]));
+    const byId = new SvelteMap(standings.rows.map((row) => [row.franchiseId, row]));
     const rows: Array<{
       franchiseId: string;
       gamesPlayed: number;

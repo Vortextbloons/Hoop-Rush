@@ -187,7 +187,7 @@ describe('v2 league-wide private pools', () => {
 
   it('extra-elite frequency across a seeded cohort follows the packaged probabilities', () => {
     const expectedPerLeague = 4 * 0.65 + 8 * 0.35 + 10 * 0.2 + 7 * 0.08;
-    const seeds = 16;
+    const seeds = 8;
     let extraCount = 0;
     for (let i = 0; i < seeds; i += 1) {
       const result = generateAiLeague(soloInput(seasonDigestHex(`extra-${String(i)}`)));

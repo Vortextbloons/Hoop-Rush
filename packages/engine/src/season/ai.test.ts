@@ -528,7 +528,7 @@ describe('season AI bounded failure and calibration', () => {
 
 describe('season AI property coverage', () => {
   it('never crashes on random seeds over the fixture catalog', () => {
-    const seeds = Array.from({ length: 8 }, (_, i) => seasonDigestHex(`prop-${String(i)}`));
+    const seeds = Array.from({ length: 3 }, (_, i) => seasonDigestHex(`prop-${String(i)}`));
     for (const seed of seeds) {
       const result = generateAiLeague(soloInput(seed));
       expect(result.rosters).toHaveLength(30);

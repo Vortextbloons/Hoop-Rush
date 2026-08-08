@@ -10,7 +10,7 @@ import type {
 } from '@hoop-rush/data-contracts';
 
 /**
- * M2.4 effects presentation (season-stamina-v1 + season-chemistry-v1).
+ * M2.4 effects presentation (season-stamina-v2 + season-chemistry-v1).
  * Fatigue bands and chemistry facts derived from the recorded effects state
  * frozen in the accepted checkpoint. The UI presents projections as
  * projections and shared possessions as evidence, never as a precise future

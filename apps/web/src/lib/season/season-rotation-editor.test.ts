@@ -411,6 +411,47 @@ describe('RotationEditor.moveBench', () => {
   });
 });
 
+describe('RotationEditor.eligibleForSlot', () => {
+  it('offers only players who can legally play the slot group', () => {
+    const e = editor();
+    const eligibleFor = (slotIndex: number) =>
+      new Set(e.eligibleForSlot(slotIndex).map((member) => member.playerVersionId));
+    for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
+      const group = SLOT_GROUPS[slotIndex];
+      if (group === undefined) continue;
+      for (const id of e.eligibleForSlot(slotIndex).map((member) => member.playerVersionId)) {
+        expect(canPlay(playableOf(id), group)).toBe(true);
+      }
+      // The roster always has someone ineligible for the slot (the fixture
+      // covers the full position archetype cycle).
+      const ineligible = members()
+        .map((member) => member.playerVersionId)
+        .find((id) => !canPlay(playableOf(id), group));
+      expect(ineligible).toBeDefined();
+      expect(eligibleFor(slotIndex).has(ineligible ?? '')).toBe(false);
+    }
+  });
+
+  it('includes every current starter in their own slot, and a center-only player only in C slots', () => {
+    const e = editor();
+    for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
+      const current = e.rotation.starters[slotIndex];
+      if (current === undefined) continue;
+      expect(e.eligibleForSlot(slotIndex).map((m) => m.playerVersionId)).toContain(current);
+    }
+    const centerOnly = members().find((member) => member.playable.join() === 'C');
+    if (centerOnly === undefined) {
+      throw new Error('fixture roster has no center-only player');
+    }
+    expect(e.eligibleForSlot(4).map((m) => m.playerVersionId)).toContain(
+      centerOnly.playerVersionId,
+    );
+    expect(e.eligibleForSlot(0).map((m) => m.playerVersionId)).not.toContain(
+      centerOnly.playerVersionId,
+    );
+  });
+});
+
 describe('RotationEditor.applyRotation', () => {
   it('commits a valid external candidate and returns the committed rotation', () => {
     const e = editor();

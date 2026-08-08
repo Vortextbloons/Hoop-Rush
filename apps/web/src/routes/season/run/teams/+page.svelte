@@ -9,6 +9,7 @@
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
   import { seasonTeamDetail } from '$lib/season/season-team-detail-view';
+  import { overallRatingOf, playablePositionsOf } from '$lib/season/season-catalog-index';
 
   /**
    * Season Run team detail (M2.5 team drill-down): any franchise's roster,
@@ -38,12 +39,8 @@
       standings: run.standings,
       league: run.league,
       summaries: shell.snapshot?.summaries ?? [],
-      overallRatingOf: (playerVersionId) =>
-        catalog.candidates.find((c) => c.playerVersionId === playerVersionId)?.summaryRatings
-          .overallRating ?? null,
-      playablePositions: (playerVersionId) =>
-        catalog.candidates.find((c) => c.playerVersionId === playerVersionId)?.positions.playable ??
-        [],
+      overallRatingOf: (playerVersionId) => overallRatingOf(catalog, playerVersionId),
+      playablePositions: (playerVersionId) => playablePositionsOf(catalog, playerVersionId),
     });
   });
 

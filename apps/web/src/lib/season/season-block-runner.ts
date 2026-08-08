@@ -421,7 +421,12 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       // silently skipping a trade window.
       const catalog = await resolveCatalog(state.input);
       const committed = completeSeasonBlockCommit({
-        run: state.input.run,
+        // The digest must cover the EXACT rotation set the commit stores:
+        // the locked rotations (the human team's pending rotation included),
+        // not the run snapshot's pre-submission rotations. Without this
+        // merge any rotation edit would make the stored stateDigest fail to
+        // recompute over the stored facts on reload.
+        run: { ...state.input.run, rotations: state.rotations },
         candidate: checkpoint,
         commandId: state.commandId,
         rotationDigest: state.rotationDigest,

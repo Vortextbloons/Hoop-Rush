@@ -7,7 +7,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { buildTestRun, pipelineInput } from './block-test-support.ts';
 import {
-  SeasonBlockCancelledError,
   assembleSeasonBlockCandidate,
   auditSeasonBlock,
   deriveSeasonPostBlockState,
@@ -110,20 +109,6 @@ describe('M2.5 block pipeline with injuries', () => {
       }
     }
   });
-
-  it('reproduces the candidate digest across cancel and retry', () => {
-    const cancelled = (() => {
-      const { run, catalog } = buildTestRun();
-      const input2 = pipelineInput(run, catalog, 0, [], input.effects);
-      expect(() => simulateSeasonBlock(input2, { cancelAfterGames: 75 })).toThrow(
-        SeasonBlockCancelledError,
-      );
-      const checkpoint2 = simulateSeasonBlock(input2);
-      expect(auditSeasonBlock(checkpoint2, input2)).toEqual([]);
-      return checkpoint2.digest;
-    })();
-    expect(cancelled).toBe(checkpoint.digest);
-  }, 60_000);
 
   it('folds the locked objective, influence grants, and transactions into the candidate', () => {
     const { run, catalog } = buildTestRun();

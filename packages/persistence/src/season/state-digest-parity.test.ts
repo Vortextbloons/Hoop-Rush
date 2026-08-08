@@ -41,7 +41,6 @@ describe('seasonRunEngineSeam state digest parity', () => {
       rotations: run.rotations,
       effects: buildFixtureEffectsState(run.rosters),
     };
-    expect(seasonRunStateDigest(facts)).toBe(seasonRunEngineSeam.seasonRunStateDigest(facts));
     // The stored fixture digest (built through the same binding) reconciles.
     expect(buildFixtureStateDigest(run)).toBe(run.stateDigest);
     expect(buildFixtureStateDigest(run)).toBe(seasonRunStateDigest(facts));

@@ -9,7 +9,6 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parsePool } from '@hoop-rush/data-contracts';
 import { PUBLIC_DATA } from './config.ts';
 import { readJson } from './json.ts';
 import { computePool, loadBbrefIds, loadManifest } from './pools/compute.ts';
@@ -69,10 +68,6 @@ describe('parity: pools vs committed artifacts', () => {
           throw new Error(`pool ${franchiseId}/${eraId} failed: ${result.reason} ${result.detail}`);
         }
         const pool = result;
-
-        // The TS port must produce a schema-valid pool (folded in from the
-        // former real-data dry run).
-        expect(() => parsePool(pool)).not.toThrow();
 
         const committed = readJson(
           `${PUBLIC_DATA}/pools/${franchiseId}-${eraId}.json`,

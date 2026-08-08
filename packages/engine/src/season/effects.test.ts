@@ -4,6 +4,7 @@ import {
   SEASON_NEUTRAL_HOME_COURT,
   SEASON_ROTATION_PRESET_TARGETS,
   SEASON_ROTATION_VERSION,
+  SEASON_STAMINA_VERSION,
   playerVersionId,
   type Position,
   type SeasonEffectsState,
@@ -73,7 +74,7 @@ function buildStaminaRoster(side: 'home' | 'away', offset = 0): StaminaRoster {
     // Starters (0-4) high-stamina, bench (5-9) medium: rating varies.
     rating: index < 5 ? 80 : 65,
     historicalMpg: index < 5 ? 28 : 16,
-    derivationVersion: 'season-stamina-v1',
+    derivationVersion: SEASON_STAMINA_VERSION,
   }));
   return {
     teamId: side === 'home' ? 'home-team' : 'away-team',
@@ -170,7 +171,7 @@ function buildLeagueState(
           playerVersionId: fillerId,
           rating: 60 + ((roster + slot) % 20),
           historicalMpg: 12 + ((roster + slot) % 20),
-          derivationVersion: 'season-stamina-v1',
+          derivationVersion: SEASON_STAMINA_VERSION,
         });
       }
     }
@@ -519,11 +520,11 @@ describe('M2.4 mechanism evidence', () => {
     );
     expect(shooterRow).toBeDefined();
     expect(shooterRow?.opportunities).toBe(1);
-    // Fatigue 5000/10000 -> input 500,000 millionths; delta -25,000 x 0.5.
+    // Fatigue 5000/10000 -> input 500,000 millionths; delta -50,000 x 0.5.
     expect(shooterRow?.inputTotals.shooter).toBe(500_000);
-    expect(shooterRow?.deltaTotals).toBe(-12_500);
-    expect(shooterRow?.deltaMin).toBe(-12_500);
-    expect(shooterRow?.deltaMax).toBe(-12_500);
+    expect(shooterRow?.deltaTotals).toBe(-25_000);
+    expect(shooterRow?.deltaMin).toBe(-25_000);
+    expect(shooterRow?.deltaMax).toBe(-25_000);
     for (const row of evidence) {
       const cap = SEASON_EFFECTS_MECHANISM_CAPS[row.mechanism];
       expect(Math.abs(row.deltaTotals)).toBeLessThanOrEqual(cap * Math.max(1, row.opportunities));

@@ -21,13 +21,14 @@ mockSvelteKitApp();
 
 /**
  * RotationEditor component tests (M2.3 hub, M2.3.5 team workspace): one
- * unified ten-player list at every breakpoint — preset buttons, minute
+ * unified ten-player list at every breakpoint — strategy buttons, minute
  * steppers with visible rebalancing, tap-to-type minutes, closing-five
  * toggles, bench move-up/down controls, the invalid-rotation alert, and
  * per-player failure placement. The editor's engine-validated commits are
  * unit-tested in season-rotation-editor.test.ts; here we verify the wiring.
- * The optimize-with-projection tests cover the page-owned hook: busy state,
- * the three plan cards, and explicit apply only.
+ * The strategy-button tests cover the page-owned projection hook: each
+ * button applies its strategy's plan automatically with the fixed preset as
+ * the fallback.
  */
 
 function members(): RotationMember[] {
@@ -144,6 +145,37 @@ describe('RotationEditor component', () => {
     const minutes = minutesList(container);
     expect(minutes.getAllByText('OVR 88').length).toBe(5);
     expect(minutes.getAllByText(/^OVR \d+$/).length).toBe(10);
+  });
+
+  it('starter slot pickers only offer players eligible for the slot', () => {
+    const { editor, container } = renderEditor();
+    const optionIds = (slotIndex: number) => [
+      ...new Set(editor.eligibleForSlot(slotIndex).map((member) => member.playerVersionId)),
+    ];
+    const centerOnly = rotationMembers().find((member) => member.playable.join() === 'C');
+    if (centerOnly === undefined) {
+      throw new Error('fixture roster has no center-only player');
+    }
+    const starterList = rotationList(container);
+    // The center-only player never appears in a guard slot picker.
+    const guardPicker = starterList.getByRole('combobox', { name: 'Starter slot 1' });
+    const guardNames = [...guardPicker.querySelectorAll('option')].map((o) => o.textContent);
+    expect(guardNames).not.toContain(centerOnly.displayName);
+    // The center picker lists exactly the center-capable roster players.
+    const centerPicker = starterList.getByRole('combobox', { name: 'Starter slot 5' });
+    const centerNames = [...centerPicker.querySelectorAll('option')].map((o) => o.textContent);
+    const expected = optionIds(4).map((id) => editor.names.get(id) ?? '');
+    expect(centerNames.sort()).toEqual(expected.sort());
+    // Every picker still contains its current starter.
+    for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
+      const current = editor.rotation.starters[slotIndex];
+      if (current === undefined) continue;
+      const picker = starterList.getByRole('combobox', {
+        name: `Starter slot ${String(slotIndex + 1)}`,
+      });
+      const names = [...picker.querySelectorAll('option')].map((o) => o.textContent);
+      expect(names).toContain(editor.names.get(current) ?? '');
+    }
   });
 
   it('applies a preset through the engine and reports the new rotation', async () => {
@@ -397,7 +429,7 @@ describe('RotationEditor component', () => {
     }
   });
 
-  it('optimizes through the page hook: busy state, three plan cards, explicit apply', async () => {
+  it('strategy buttons apply their projection plan automatically', async () => {
     const result = fixturePlanResult();
     const released: Array<(value: MinutePlanOptimizationResult) => void> = [];
     const run = vi.fn(
@@ -408,7 +440,7 @@ describe('RotationEditor component', () => {
     );
     const onchange = vi.fn();
     const editor = createRotationEditor(legalRotation(), members());
-    const { container, getByRole, queryAllByRole } = render(RotationEditor, {
+    const { getByRole } = render(RotationEditor, {
       props: {
         editor,
         disabled: false,
@@ -416,47 +448,28 @@ describe('RotationEditor component', () => {
         optimize: { run, busy: false, error: null },
       },
     });
-    await fireEvent.click(getByRole('button', { name: 'Optimize with Projection' }));
+    await fireEvent.click(getByRole('button', { name: 'Balanced' }));
     expect(run).toHaveBeenCalledTimes(1);
     // Busy while the page's promise is pending.
     const busyButton = getByRole('button', { name: 'Optimizing…' }) as HTMLButtonElement;
     expect(busyButton.disabled).toBe(true);
     released[0]?.(result);
     await waitFor(() => {
-      expect(queryAllByRole('button', { name: 'Apply' }).length).toBeGreaterThan(0);
+      expect(onchange).toHaveBeenCalledTimes(1);
     });
-    // Three plan cards with the documented facts; the heavy-strain warning
-    // only on the bench-heavy plan and Recommended on starter-heavy.
-    const panel = container.querySelector('section[aria-label="Minute optimization plans"]');
-    if (panel === null) throw new Error('plan panel missing');
-    const plans = within(panel as HTMLElement);
-    expect(plans.getAllByRole('article')).toHaveLength(3);
-    expect(plans.getByText('Starter-Heavy')).not.toBeNull();
-    expect(plans.getByText('Balanced')).not.toBeNull();
-    expect(plans.getByText('Bench-Heavy')).not.toBeNull();
-    expect(plans.getByText('3.42')).not.toBeNull();
-    expect(plans.getByText('0.72')).not.toBeNull();
-    expect(plans.getByText('25%')).not.toBeNull();
-    expect(plans.getByText('Recommended')).not.toBeNull();
-    expect(plans.getByText('Heavy strain')).not.toBeNull();
-    expect(plans.getAllByText('Ready')).toHaveLength(2);
-    expect(plans.getByText('Tired')).not.toBeNull();
-    // Explicit apply: the recommended plan commits through the editor audit.
-    await fireEvent.click(plans.getAllByRole('button', { name: 'Apply' })[0] as HTMLButtonElement);
-    expect(onchange).toHaveBeenCalledTimes(1);
+    // The plan for the clicked strategy commits through the editor audit.
     const [rotation] = onchange.mock.calls[0] as [SeasonRotation, string[]];
-    expect(rotation.minutePolicy.strategy).toBe('starter-heavy');
-    expect(editor.rotation.minutePolicy.strategy).toBe('starter-heavy');
+    expect(rotation.minutePolicy.strategy).toBe('balanced');
+    expect(editor.rotation.minutePolicy.strategy).toBe('balanced');
     expect(editor.validate()).toEqual([]);
-    expect(queryAllByRole('button', { name: 'Apply' })).toHaveLength(0);
   });
 
-  it('cancel closes the plan panel without changing the rotation', async () => {
+  it('applies the starter-heavy plan when Starter-Heavy is clicked', async () => {
     const result = fixturePlanResult();
     const run = vi.fn(() => Promise.resolve(result));
     const onchange = vi.fn();
     const editor = createRotationEditor(legalRotation(), members());
-    const { getByRole, queryAllByRole } = render(RotationEditor, {
+    const { getByRole } = render(RotationEditor, {
       props: {
         editor,
         disabled: false,
@@ -464,42 +477,97 @@ describe('RotationEditor component', () => {
         optimize: { run, busy: false, error: null },
       },
     });
-    await fireEvent.click(getByRole('button', { name: 'Optimize with Projection' }));
+    await fireEvent.click(getByRole('button', { name: 'Starter-Heavy' }));
     await waitFor(() => {
-      expect(queryAllByRole('button', { name: 'Apply' }).length).toBeGreaterThan(0);
+      expect(onchange).toHaveBeenCalledTimes(1);
     });
-    const before = editor.rotation;
-    await fireEvent.click(getByRole('button', { name: 'Cancel' }));
-    expect(queryAllByRole('button', { name: 'Apply' })).toHaveLength(0);
-    expect(editor.rotation).toBe(before);
-    expect(onchange).not.toHaveBeenCalled();
+    const [rotation] = onchange.mock.calls[0] as [SeasonRotation, string[]];
+    expect(rotation.minutePolicy.strategy).toBe('starter-heavy');
   });
 
-  it('a failed optimization leaves the rotation untouched and shows the page error', async () => {
+  it('falls back to the fixed preset when the optimization fails', async () => {
+    const run = vi.fn(() => Promise.reject(new Error('boom')));
+    const onchange = vi.fn();
+    const editor = createRotationEditor(legalRotation(), members());
+    const { getByRole } = render(RotationEditor, {
+      props: {
+        editor,
+        disabled: false,
+        onchange,
+        optimize: { run, busy: false, error: null },
+      },
+    });
+    await fireEvent.click(getByRole('button', { name: 'Balanced' }));
+    await waitFor(() => {
+      expect(onchange).toHaveBeenCalledTimes(1);
+    });
+    // The fixed Balanced table (33 / 21,18,15,12,9) is the fallback.
+    const [rotation] = onchange.mock.calls[0] as [SeasonRotation, string[]];
+    const minutes = new Map(
+      rotation.targetMinutes.map((row) => [row.playerVersionId, row.minutes]),
+    );
+    const starters = rotation.starters.map((id) => minutes.get(id));
+    expect(starters).toEqual([33, 33, 33, 33, 33]);
+    expect(editor.validate()).toEqual([]);
+    expect(editor.rotation.minutePolicy.strategy).toBe('balanced');
+  });
+
+  it('falls back to the fixed preset when the plan for the strategy is missing', async () => {
+    const result = fixturePlanResult();
+    const run = vi.fn(() => Promise.resolve(result));
+    const onchange = vi.fn();
+    const editor = createRotationEditor(legalRotation(), members());
+    const { getByRole } = render(RotationEditor, {
+      props: {
+        editor,
+        disabled: false,
+        onchange,
+        optimize: { run, busy: false, error: null },
+      },
+    });
+    // fixturePlanResult covers all three strategies, so drop the bench-heavy
+    // plan: clicking Bench-Heavy must still apply the fixed preset table.
+    run.mockImplementation(() =>
+      Promise.resolve({
+        ...result,
+        plans: result.plans.filter((plan) => plan.strategy !== 'bench-heavy'),
+      }),
+    );
+    await fireEvent.click(getByRole('button', { name: 'Bench-Heavy' }));
+    await waitFor(() => {
+      expect(onchange).toHaveBeenCalledTimes(1);
+    });
+    const [rotation] = onchange.mock.calls[0] as [SeasonRotation, string[]];
+    const minutes = new Map(
+      rotation.targetMinutes.map((row) => [row.playerVersionId, row.minutes]),
+    );
+    const starters = rotation.starters.map((id) => minutes.get(id));
+    expect(starters).toEqual([29, 29, 29, 29, 29]);
+    expect(editor.rotation.minutePolicy.strategy).toBe('bench-heavy');
+  });
+
+  it('shows the projection error and applies the preset fallback when the hook reports it', async () => {
     const run = vi.fn(() => Promise.reject(new Error('boom')));
     const editor = createRotationEditor(legalRotation(), members());
-    const before = editor.rotation;
     const props = {
       editor,
       disabled: false,
       onchange: vi.fn(),
       optimize: { run, busy: false, error: null },
     };
-    const { getByRole, queryByRole, rerender } = render(RotationEditor, { props });
-    await fireEvent.click(getByRole('button', { name: 'Optimize with Projection' }));
+    const { getByRole, rerender } = render(RotationEditor, { props });
+    await fireEvent.click(getByRole('button', { name: 'Balanced' }));
     await waitFor(() => {
-      expect(queryByRole('button', { name: 'Optimize with Projection' })).not.toBeNull();
+      expect(getByRole('button', { name: 'Balanced' })).not.toBeNull();
     });
     // The page records the failure and pushes it through the hook's error prop.
     await rerender({ ...props, optimize: { run, busy: false, error: 'boom' } });
     const alert = getByRole('alert');
-    expect(alert.textContent).toMatch(/Optimization failed: boom/);
-    expect(editor.rotation).toBe(before);
-    expect(queryByRole('button', { name: 'Apply' })).toBeNull();
-    expect(queryByRole('article')).toBeNull();
+    expect(alert.textContent).toMatch(/Projection unavailable — applied the preset minutes: boom/);
+    expect(editor.validate()).toEqual([]);
   });
 
-  it('disables the optimize button while the whole editor is disabled', () => {
+  it('disables the strategy buttons while the whole editor is disabled', () => {
     const { getByRole } = render(RotationEditor, {
       props: {
         editor: createRotationEditor(legalRotation(), members()),
@@ -508,7 +576,8 @@ describe('RotationEditor component', () => {
         optimize: { run: vi.fn(), busy: false, error: null },
       },
     });
-    const button = getByRole('button', { name: 'Optimize with Projection' }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
+    for (const name of ['Starter-Heavy', 'Balanced', 'Bench-Heavy']) {
+      expect((getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true);
+    }
   });
 });

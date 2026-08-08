@@ -293,12 +293,21 @@ export function progressLabel(completedRounds: number): string {
  * Pure fold of compact summaries into the aggregate shapes the checkpoint
  * commits (the frozen `season-aggregates-v1` fold). The snapshot exposes only
  * summaries, so the hub folds on demand; a fold over the same facts always
- * agrees with the stored checkpoint.
+ * agrees with the stored checkpoint. The fold is memoized per summaries
+ * array identity — snapshots are immutable per commit — so several tabs
+ * folding the same snapshot share one result.
  */
+const aggregateFoldCache = new WeakMap<
+  readonly SeasonGameSummary[],
+  { teams: SeasonTeamAggregate[]; players: SeasonPlayerAggregate[] }
+>();
+
 export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
   teams: SeasonTeamAggregate[];
   players: SeasonPlayerAggregate[];
 } {
+  const cached = aggregateFoldCache.get(summaries);
+  if (cached !== undefined) return cached;
   const teams = new Map<string, SeasonTeamAggregate>();
   const players = new Map<string, SeasonPlayerAggregate>();
   const touchTeam = (franchiseId: string): SeasonTeamAggregate => {
@@ -418,12 +427,14 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
       }
     }
   }
-  return {
+  const result = {
     teams: [...teams.values()].sort((a, b) => a.franchiseId.localeCompare(b.franchiseId)),
     players: [...players.values()].sort((a, b) =>
       a.playerVersionId.localeCompare(b.playerVersionId),
     ),
   };
+  aggregateFoldCache.set(summaries, result);
+  return result;
 }
 
 /**

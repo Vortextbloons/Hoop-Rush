@@ -133,6 +133,21 @@ function commitInputFor(
   };
 }
 
+/** A locked rotation set: the run's rotations with the human team edited. */
+function lockedRotationSet(dataset: Pick<Adapters, 'run'>): SeasonRun['rotations'] {
+  return dataset.run.rotations.map((rotation) =>
+    rotation.franchiseId === 'lakers'
+      ? {
+          ...rotation,
+          targetMinutes: rotation.targetMinutes.map((row, index) => ({
+            ...row,
+            minutes: index < 5 ? 38 : 10,
+          })),
+        }
+      : rotation,
+  );
+}
+
 async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
 }
@@ -1271,6 +1286,94 @@ describe('season run M2.5 reload audit (v5)', () => {
     const row = await currentRow(adapters);
     await db.seasonRuns.put({ ...row, stateDigest: 'f'.repeat(32) });
     await expect(repo.loadActiveRun()).rejects.toThrow(/stateDigest/);
+  });
+
+  /**
+   * Regression (rotation-edit divergence): the block runner commits the
+   * LOCKED rotation set (the human team's pending edit included) as the
+   * stored rotations, so the post-block state digest must cover that same
+   * set. Committing edited rotations whose digest was computed over the
+   * pre-submission set is exactly the corruption that surfaced as
+   * "run.effects diverged from the last checkpoint effects without a trade
+   * window (last block stateDigest does not recompute over the stored
+   * facts); stored stateDigest does not recompute over the stored mutable
+   * state" after a reload.
+   */
+  it('rejects a commit whose stored rotations are edited but the digest covers the old set', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    const base = commitInputFor(adapters, 0);
+    const locked = lockedRotationSet(adapters);
+    // The commit rebuilds checkpointState with the locked-set rotation digest
+    // (engine `deriveSeasonPostBlockState`); the divergence is the DIGEST
+    // covering the pre-submission rotations while the commit stores locked.
+    const checkpointState = {
+      ...base.checkpointState,
+      rotationDigest: adapters.seam.seasonRotationSetDigest(locked),
+    };
+    const digestOverOldSet = adapters.seam.seasonRunStateDigest({
+      stateRevision: base.stateRevision,
+      checkpointState,
+      health: base.health,
+      influence: base.influence,
+      transactions: base.transactions,
+      trade: base.trade,
+      objectives: base.objectives,
+      rosters: run.rosters,
+      ownership: run.ownership,
+      rotations: run.rotations,
+      effects: base.effects,
+    });
+    await repo.commitSeasonBlock({
+      ...base,
+      checkpointState,
+      rotations: locked,
+      rotationDigest: adapters.seam.seasonRotationSetDigest(locked),
+      stateDigest: digestOverOldSet,
+    });
+    await expect(repo.loadActiveRun()).rejects.toThrow(/run.effects diverged/);
+    await expect(repo.loadActiveRun()).rejects.toThrow(
+      /stored stateDigest does not recompute over the stored mutable state/,
+    );
+  });
+
+  it('accepts a commit whose digest covers the locked rotation set the commit stores', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    const base = commitInputFor(adapters, 0);
+    const locked = lockedRotationSet(adapters);
+    expect(adapters.seam.seasonRotationSetDigest(locked)).not.toBe(
+      adapters.seam.seasonRotationSetDigest(run.rotations),
+    );
+    const checkpointState = {
+      ...base.checkpointState,
+      rotationDigest: adapters.seam.seasonRotationSetDigest(locked),
+    };
+    const digestOverLocked = adapters.seam.seasonRunStateDigest({
+      stateRevision: base.stateRevision,
+      checkpointState,
+      health: base.health,
+      influence: base.influence,
+      transactions: base.transactions,
+      trade: base.trade,
+      objectives: base.objectives,
+      rosters: run.rosters,
+      ownership: run.ownership,
+      rotations: locked,
+      effects: base.effects,
+    });
+    await repo.commitSeasonBlock({
+      ...base,
+      checkpointState,
+      rotations: locked,
+      rotationDigest: adapters.seam.seasonRotationSetDigest(locked),
+      stateDigest: digestOverLocked,
+    });
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot?.acceptedBlocks).toHaveLength(1);
+    expect(snapshot?.run.rotations).toEqual(locked);
   });
 
   it('rejects a stateRevision regression behind the last accepted block', async () => {

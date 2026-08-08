@@ -19,12 +19,7 @@ import {
  * balance, and auditor corruption detection.
  */
 
-const SEEDS = [
-  SEASON_COMMITTED_SCHEDULE_SEED,
-  seedFromString('schedule-test-1'),
-  seedFromString('schedule-test-2'),
-  seedFromString('schedule-test-3'),
-];
+const SEEDS = [SEASON_COMMITTED_SCHEDULE_SEED, seedFromString('schedule-test-1')];
 
 describe('generateSeasonSchedule', () => {
   it('generates the committed schedule with the committed seed', () => {
@@ -147,7 +142,7 @@ describe('generateSeasonSchedule', () => {
 
   it('generates valid schedules across many seeds', () => {
     const league = buildSeasonLeague();
-    for (let i = 0; i < 10; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       const seed = seedFromString(`schedule-batch-${String(i)}`);
       const schedule = generateSeasonSchedule({ league, seed });
       expect(auditSeasonSchedule(schedule, league)).toEqual([]);

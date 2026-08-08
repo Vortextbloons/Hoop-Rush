@@ -36,6 +36,7 @@
   import { buildVersionFaceIndex, type SeasonVersionTuple } from '$lib/season/season-branding';
   import { createRotationEditor } from '$lib/season/season-rotation-editor';
   import { isNavItemActive, type NavItem } from '$lib/nav-items';
+  import { candidateOf, playablePositionsOf } from '$lib/season/season-catalog-index';
   import BottomNav from '$lib/components/BottomNav.svelte';
   import SeasonMasthead from '$lib/components/season/SeasonMasthead.svelte';
   import type { RotationEditor } from '$lib/season/season-rotation-editor';
@@ -70,6 +71,11 @@
    * Rosters never change during a block run, so the full-index rebuild only
    * fires on an actual roster change (draft promotion or a trade). */
   let faceIndexKey = '';
+  /** Snapshot rosters array identity: unchanged during a block run, so the
+   * face key string (and its 300-version join) is only rebuilt on a real
+   * roster change. */
+  let rostersRef: unknown = null;
+  let faceRunId = '';
 
   function recomputeRunFacts(): void {
     const snapshot = shell.snapshot;
@@ -87,25 +93,29 @@
     shell.objectives = run?.objectives ?? null;
 
     if (run !== null) {
-      const key = `${run.runId}:${run.rosters
-        .map(
-          (roster) =>
-            `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`,
-        )
-        .join('|')}`;
-      if (key !== faceIndexKey) {
-        const tuples: SeasonVersionTuple[] = run.rosters.flatMap((roster) =>
-          roster.players.map((entry) => ({
-            playerVersionId: entry.playerVersionId,
-            playerId: entry.playerId,
-            franchiseId: entry.franchiseId,
-            eraId: entry.eraId,
-            seasonKey: entry.seasonKey,
-            displayName: entry.displayName,
-          })),
-        );
-        shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
-        faceIndexKey = key;
+      if (run.runId !== faceRunId || run.rosters !== rostersRef) {
+        faceRunId = run.runId;
+        rostersRef = run.rosters;
+        const key = `${run.runId}:${run.rosters
+          .map(
+            (roster) =>
+              `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`,
+          )
+          .join('|')}`;
+        if (key !== faceIndexKey) {
+          const tuples: SeasonVersionTuple[] = run.rosters.flatMap((roster) =>
+            roster.players.map((entry) => ({
+              playerVersionId: entry.playerVersionId,
+              playerId: entry.playerId,
+              franchiseId: entry.franchiseId,
+              eraId: entry.eraId,
+              seasonKey: entry.seasonKey,
+              displayName: entry.displayName,
+            })),
+          );
+          shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
+          faceIndexKey = key;
+        }
       }
       const rebuilt = rebuildRotationEditor(run);
       shell.editor = rebuilt.editor;
@@ -130,8 +140,12 @@
     const rotation = run.rotations.find((r) => r.franchiseId === franchiseId);
     const roster = run.rosters.find((r) => r.franchiseId === franchiseId);
     if (rotation === undefined || roster === undefined) return { editor: null, key: null };
+    const key = `${run.runId}:${rotation.starters.join(',')}:${rotation.closingFive.join(',')}`;
+    if (shell.editorKey === key && shell.editor !== null) {
+      return { editor: shell.editor, key };
+    }
     const members = roster.players.map((entry) => {
-      const candidate = catalog.candidates.find((c) => c.playerVersionId === entry.playerVersionId);
+      const candidate = candidateOf(catalog, entry.playerVersionId);
       return {
         playerVersionId: entry.playerVersionId,
         displayName: entry.displayName,
@@ -141,10 +155,6 @@
         seasonKey: entry.seasonKey,
       };
     });
-    const key = `${run.runId}:${rotation.starters.join(',')}:${rotation.closingFive.join(',')}`;
-    if (shell.editorKey === key && shell.editor !== null) {
-      return { editor: shell.editor, key };
-    }
     return { editor: createRotationEditor(rotation, members), key };
   }
 
@@ -272,10 +282,8 @@
     }
     return '—';
   };
-  shell.playablePositions = (playerVersionId: string): readonly string[] => {
-    const candidate = shell.catalog?.candidates.find((c) => c.playerVersionId === playerVersionId);
-    return candidate?.positions.playable ?? [];
-  };
+  shell.playablePositions = (playerVersionId: string): readonly string[] =>
+    playablePositionsOf(shell.catalog, playerVersionId);
   shell.franchiseName = (franchiseId: string): string => {
     return (
       shell.manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)

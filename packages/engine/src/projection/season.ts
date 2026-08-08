@@ -333,10 +333,12 @@ export function projectSeasonRoster(
 
   // Contingency units: every single-player removal plus capped pair removals.
   const allVersions = members.map((member) => member.playerVersionId);
+  let legalSingleRemovals = 0;
   for (const removed of allVersions) {
     const unavailable = new Set<string>([removed]);
     const five = chooseInitialUnit(context, unavailable);
     if (five !== null) {
+      legalSingleRemovals += 1;
       draft.push({
         unitId: `contingency-${removed}`,
         kind: 'contingency',
@@ -464,10 +466,7 @@ export function projectSeasonRoster(
 
   const contingencyUnits = units.filter((unit) => unit.kind === 'contingency');
   const singleRemovalCount = allVersions.length;
-  const legalAfterRemoval = allVersions.filter(
-    (removed) => chooseInitialUnit(context, new Set<string>([removed])) !== null,
-  ).length;
-  const contingencyDepth = (legalAfterRemoval / Math.max(1, singleRemovalCount)) * 100;
+  const contingencyDepth = (legalSingleRemovals / Math.max(1, singleRemovalCount)) * 100;
 
   // Foul resilience: coverage after removing the highest-foul-exposure player.
   const highestFoul = [...players].sort((a, b) => b.tendencies.foulRate - a.tendencies.foulRate)[0];

@@ -25,6 +25,7 @@
   } from '$lib/season/season-shell-context';
   import { humanInjuryTimeline } from '$lib/season/season-health-view';
   import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
+  import { overallRatingOf, playablePositionsOf } from '$lib/season/season-catalog-index';
 
   /**
    * Season Run team tab (M2.3.5, M2.4, M2.5): the unified rotation
@@ -90,10 +91,10 @@
     const catalog = shell.catalog;
     const editor = shell.editor;
     if (catalog === null || editor === null) return null;
-    const candidateByVersion = new Map(
+    const candidateByVersion = new SvelteMap(
       catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
     );
-    const loadByVersion = new Map(
+    const loadByVersion = new SvelteMap(
       (shell.snapshot?.effects?.playerStates ?? []).map((state) => [state.playerVersionId, state]),
     );
     return [...editor.rotation.starters, ...editor.rotation.benchOrder].map((playerVersionId) => {
@@ -191,13 +192,20 @@
     return humanSeasonPlayerStats({
       roster,
       summaries: shell.snapshot?.summaries ?? [],
-      overallRatingOf: (playerVersionId) =>
-        shell.catalog?.candidates.find((c) => c.playerVersionId === playerVersionId)?.summaryRatings
-          .overallRating ?? null,
-      playablePositions: (playerVersionId) =>
-        shell.catalog?.candidates.find((c) => c.playerVersionId === playerVersionId)?.positions
-          .playable ?? [],
+      overallRatingOf: (playerVersionId) => overallRatingOf(shell.catalog, playerVersionId),
+      playablePositions: (playerVersionId) => playablePositionsOf(shell.catalog, playerVersionId),
     });
+  });
+
+  /** Roster-list role lookup: editor rows built once per editor change. */
+  const roleByVersion = $derived.by(() => {
+    const editor = shell.editor;
+    if (editor === null) return null;
+    const map = new SvelteMap<string, { role: string; minutes: number | string }>();
+    for (const row of editor.rows()) {
+      map.set(row.member.playerVersionId, { role: row.role, minutes: row.minutes });
+    }
+    return map;
   });
 
   let submitting = $state(false);
@@ -268,12 +276,8 @@
         {roster}
         {manifest}
         {shell}
-        roleOf={(playerVersionId) => {
-          const row = shell.editor
-            ?.rows()
-            .find((r) => r.member.playerVersionId === playerVersionId);
-          return { role: row?.role ?? '—', minutes: row?.minutes ?? '—' };
-        }}
+        roleOf={(playerVersionId) =>
+          roleByVersion?.get(playerVersionId) ?? { role: '—', minutes: '—' }}
         {effects}
         {summaries}
       />

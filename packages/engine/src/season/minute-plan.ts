@@ -19,16 +19,16 @@ import { onCourtFatigueBp, recentLoadAfterGame } from './stamina.ts';
  * relief; Starter-Heavy is avoided when it projects an unacceptable Heavy
  * fatigue result unless every valid plan does.
  *
- * Fatigue facts use the recorded M2.4 stamina model (season-stamina-v1):
+ * Fatigue facts use the recorded stamina model (season-stamina-v2):
  * per-game accumulation from on-court minutes through the engine's
  * on-court accumulation formula (consecutive-stint ramp at the full-game
  * stint), the between-game recovery tick, and the recent-load update,
  * starting from the current recorded fatigue. Halftime and trip-level role
  * bonuses are excluded exactly as in the shipped pre-game lock-preview
  * projection: the recorded block-end measurements for a 10-game block land
- * in the same 500-1500 basis-point range. The Heavy gate evaluates the
- * within-block peak, because the recovery model drives end-of-block
- * fatigue toward a minutes-insensitive equilibrium.
+ * in the 1,500-3,500 basis-point range for heavy-minute starters. The
+ * Heavy gate evaluates the within-block peak, because the recovery model
+ * drives end-of-block fatigue toward a minutes-insensitive equilibrium.
  *
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */

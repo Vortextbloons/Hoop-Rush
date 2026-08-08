@@ -13,6 +13,7 @@
   } from '$lib/season/season-effects-view';
   import type { SeasonEffectsState, SeasonGameSummary } from '@hoop-rush/data-contracts';
   import { formatPositions } from '$lib/player-positions';
+  import { candidateOf } from '$lib/season/season-catalog-index';
 
   /**
    * Human franchise roster cards (M2.4): ten player-season versions with
@@ -66,8 +67,8 @@
       {@const face = shell.facesByVersion.get(entry.playerVersionId) ?? null}
       {@const eraIdentity = eraIdentityOf(manifest, entry.franchiseId, entry.eraId)}
       {@const modernIdentity = franchiseIdentityOf(manifest, entry.franchiseId)}
-      {@const candidate =
-        shell.catalog?.candidates.find((c) => c.playerVersionId === entry.playerVersionId) ?? null}
+      {@const candidate = candidateOf(shell.catalog, entry.playerVersionId)}
+      {@const playable = shell.playablePositions(entry.playerVersionId)}
       {@const rotation = roleOf(entry.playerVersionId)}
       {@const load = effects === null ? null : loadStateOf(effects, entry.playerVersionId)}
       {@const band = load === null ? null : fatigueBand(load.fatigueBasisPoints)}
@@ -105,8 +106,8 @@
             </div>
             <p class="truncate font-mono text-[10px] text-muted-foreground">
               {entry.seasonKey}
-              {#if shell.playablePositions(entry.playerVersionId).length > 0}
-                · {formatPositions(shell.playablePositions(entry.playerVersionId))}
+              {#if playable.length > 0}
+                · {formatPositions(playable)}
               {/if}
             </p>
             {#if eraIdentity?.displayLabel}

@@ -22,9 +22,10 @@ const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 // Re-pinned for the M2.5 schema-7 fixture (injuries, health, and the
 // objective/Influence-carrying checkpoint digest), the projection-milestone
 // v3 fixture (talent-ordered AI rotations change the rotation-set digest),
-// and the minute-policy-v1 fixture (optimizer minute plans change the
-// rotation-set digest again).
-const BLOCK_ZERO_DIGEST = 'c416d71fd0eb36131f57c4b1b44fb48f';
+// the minute-policy-v1 fixture (optimizer minute plans change the
+// rotation-set digest again), and the season-stamina-v2 fatigue rebalance
+// (stronger accumulation and effect caps change game outcomes).
+const BLOCK_ZERO_DIGEST = '19f416f4d4fb2d00bd45a8beedd758c4';
 
 describe('cli: season block simulate', () => {
   // The default block-0 boot is shared by the simulate and audit tests.

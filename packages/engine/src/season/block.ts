@@ -656,8 +656,12 @@ export function simulateSeasonBlockGame(
   const humanPlays =
     humanFranchiseId !== null &&
     (game.homeFranchiseId === humanFranchiseId || game.awayFranchiseId === humanFranchiseId);
+  let homeLegalFacts: { legal: boolean; unavailablePlayerVersionIds: string[] } | null = null;
+  let awayLegalFacts: { legal: boolean; unavailablePlayerVersionIds: string[] } | null = null;
   if (humanPlays) {
     const facts = seasonFranchiseLegalFiveFacts(run, humanFranchiseId, health, positions);
+    if (humanFranchiseId === game.homeFranchiseId) homeLegalFacts = facts;
+    if (humanFranchiseId === game.awayFranchiseId) awayLegalFacts = facts;
     if (!facts.legal) {
       const interruption: SeasonInvalidRosterInterruption = {
         code: 'invalid-roster',
@@ -671,9 +675,9 @@ export function simulateSeasonBlockGame(
       return { interruption };
     }
   }
-  const homeLegal = seasonFranchiseLegalFiveFacts(run, game.homeFranchiseId, health, positions);
-  const awayLegal = seasonFranchiseLegalFiveFacts(run, game.awayFranchiseId, health, positions);
-  const forfeitPending = !homeLegal.legal || !awayLegal.legal;
+  homeLegalFacts ??= seasonFranchiseLegalFiveFacts(run, game.homeFranchiseId, health, positions);
+  awayLegalFacts ??= seasonFranchiseLegalFiveFacts(run, game.awayFranchiseId, health, positions);
+  const forfeitPending = !homeLegalFacts.legal || !awayLegalFacts.legal;
 
   // M2.5: the health seam — pregame availability for all 20 players, the
   // seeded injury rolls for this game, and the same-game return clocks.

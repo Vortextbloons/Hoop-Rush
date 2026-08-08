@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { ChevronDown, ChevronUp, Star, Wand2, X } from '@lucide/svelte';
+  import { ChevronDown, ChevronUp, Star } from '@lucide/svelte';
   import type {
     HoopRushManifest,
     SeasonEffectsState,
     SeasonGameSummary,
     SeasonRotation,
   } from '@hoop-rush/data-contracts';
-  import type { MinutePlanOptimizationResult, OptimizedMinutePlan } from '@hoop-rush/engine';
+  import { minuteStrategyOfPreset, type MinutePlanOptimizationResult } from '@hoop-rush/engine';
   import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
   import { eraIdentityOf } from '$lib/season/season-branding';
@@ -21,7 +21,6 @@
     indexRotationFailures,
     ROTATION_PRESETS,
     presetLabel,
-    strategyLabel,
     type MinuteAdjustment,
     type RotationEditor,
   } from '$lib/season/season-rotation-editor';
@@ -37,6 +36,11 @@
    * rebalancing (who gained and lost is announced and highlighted), and the
    * audit failures that block submission. The 240-minute total bar and the
    * closing-five chip strip render above the list on all screen sizes.
+   *
+   * The three strategy buttons (Starter-Heavy / Balanced / Bench-Heavy) run
+   * the page-owned projection optimization for their strategy and apply the
+   * recommended plan automatically; the fixed preset tables remain the
+   * fallback when projection is unavailable or fails.
    */
 
   let {
@@ -65,8 +69,9 @@
     /**
      * Optimize-with-projection hook (the page owns runner invocation:
      * shell/catalog/effects access). `run` resolves with the three minute
-     * plans or rejects; `busy`/`error` mirror the page's async state. Plans
-     * are applied explicitly only — a failure leaves the rotation untouched.
+     * plans or rejects; `busy`/`error` mirror the page's async state. Each
+     * strategy button applies the plan for its strategy automatically and
+     * falls back to the fixed preset when projection fails or is absent.
      */
     optimize?: {
       run: (rotation: SeasonRotation) => Promise<MinutePlanOptimizationResult>;
@@ -133,9 +138,8 @@
    */
   let revision = $state(0);
 
-  /** Optimize-with-projection state (explicit apply only). */
-  let planResult: MinutePlanOptimizationResult | null = $state(null);
-  let optimizingLocally = $state(false);
+  /** The strategy button currently running its projection optimization. */
+  let optimizingPreset: (typeof ROTATION_PRESETS)[number] | null = $state(null);
 
   const minutesProgress = $derived(Math.min(100, Math.round((minutesTotal / 240) * 100)));
 
@@ -270,45 +274,40 @@
     commit(editor.moveBench(benchIndex, delta));
   }
 
-  function applyPreset(preset: (typeof ROTATION_PRESETS)[number]) {
+  /**
+   * Applies one strategy: runs the page-owned projection optimization and
+   * applies that strategy's plan automatically. The fixed preset is the
+   * fallback when the hook is absent or the optimization fails, so the
+   * buttons always work (even fully offline).
+   */
+  async function applyPreset(preset: (typeof ROTATION_PRESETS)[number]) {
     if (disabled) return;
     rejection = null;
+    if (optimize !== null && !optimize.busy && optimizingPreset === null) {
+      optimizingPreset = preset;
+      try {
+        const result = await optimize.run(editor.rotation);
+        const plan = result.plans.find(
+          (candidate) => candidate.strategy === minuteStrategyOfPreset(preset),
+        );
+        if (plan !== undefined) {
+          try {
+            editor.applyRotation(plan.rotation);
+          } catch (error) {
+            rejection = `That plan is rejected: ${error instanceof Error ? error.message : String(error)}`;
+            return;
+          }
+          revision += 1;
+          emit();
+          return;
+        }
+      } catch {
+        // Fall through to the fixed preset; the page mirrors the error.
+      } finally {
+        optimizingPreset = null;
+      }
+    }
     commit(editor.applyPreset(preset));
-  }
-
-  /** Runs the page-owned projection optimization; plans apply explicitly. */
-  async function optimizeRotation() {
-    if (disabled || optimize === null || optimize.busy || optimizingLocally) return;
-    rejection = null;
-    planResult = null;
-    optimizingLocally = true;
-    try {
-      planResult = await optimize.run(editor.rotation);
-    } catch {
-      // The page owns the error state (`optimize.error`); the rotation is
-      // untouched — plans apply only through the explicit Apply button.
-      planResult = null;
-    } finally {
-      optimizingLocally = false;
-    }
-  }
-
-  function applyPlan(plan: OptimizedMinutePlan) {
-    if (disabled) return;
-    try {
-      editor.applyRotation(plan.rotation);
-    } catch (error) {
-      rejection = `That plan is rejected: ${error instanceof Error ? error.message : String(error)}`;
-      return;
-    }
-    rejection = null;
-    planResult = null;
-    revision += 1;
-    emit();
-  }
-
-  function cancelPlans() {
-    planResult = null;
   }
 
   function faceOf(playerVersionId: string): SeasonFaceRef | null {
@@ -351,120 +350,28 @@
 <div class="flex min-w-0 flex-col gap-4">
   <div class="flex flex-col gap-3">
     <h2 class="font-display text-base font-extrabold uppercase tracking-tight">Rotation</h2>
-    <div class="grid grid-cols-3 gap-2" role="group" aria-label="Minute presets">
+    <div class="grid grid-cols-3 gap-2" role="group" aria-label="Minute strategies">
       {#each ROTATION_PRESETS as preset (preset)}
         <button
           type="button"
-          onclick={() => applyPreset(preset)}
-          {disabled}
+          onclick={() => void applyPreset(preset)}
+          disabled={disabled || optimizingPreset !== null}
+          aria-busy={optimizingPreset === preset ? 'true' : undefined}
           class="min-h-11 rounded-lg bg-surface-2 px-2 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm md:min-h-0"
         >
-          {presetLabel(preset)}
+          {optimizingPreset === preset ? 'Optimizing…' : presetLabel(preset)}
         </button>
       {/each}
     </div>
-    {#if optimize !== null}
-      <button
-        type="button"
-        onclick={() => void optimizeRotation()}
-        disabled={disabled || optimize.busy || optimizingLocally}
-        aria-busy={optimize.busy || optimizingLocally ? 'true' : undefined}
-        class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40 sm:text-sm"
+    {#if optimize !== null && optimize.error !== null}
+      <p
+        role="alert"
+        class="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive"
       >
-        <Wand2 class="h-4 w-4 shrink-0" />
-        {optimize.busy || optimizingLocally ? 'Optimizing…' : 'Optimize with Projection'}
-      </button>
-      {#if optimize.error !== null}
-        <p
-          role="alert"
-          class="rounded-lg border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive"
-        >
-          Optimization failed: {optimize.error}
-        </p>
-      {/if}
+        Projection unavailable — applied the preset minutes: {optimize.error}
+      </p>
     {/if}
   </div>
-
-  {#if planResult !== null}
-    <section
-      aria-label="Minute optimization plans"
-      class="rounded-none bg-surface-1 p-3 sm:rounded-xl"
-    >
-      <div class="flex items-center justify-between gap-2">
-        <h3
-          class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
-        >
-          Minute plans
-        </h3>
-        <button
-          type="button"
-          onclick={cancelPlans}
-          class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
-        >
-          <X class="h-3.5 w-3.5" />
-          Cancel
-        </button>
-      </div>
-      <p class="mt-1 text-xs text-muted-foreground">
-        Projected for the upcoming block against the current rotation structure. Applying a plan
-        replaces only the target minutes and the recorded strategy.
-      </p>
-      <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        {#each planResult.plans as plan (plan.strategy)}
-          {@const recommended = plan.strategy === planResult.recommended}
-          <article
-            class="flex flex-col gap-2 rounded-lg border p-3 {recommended
-              ? 'border-primary/50 bg-primary/5'
-              : 'border-border bg-surface-2'}"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-sm font-bold">{strategyLabel(plan.strategy)}</p>
-              {#if recommended}
-                <span
-                  class="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold text-primary"
-                >
-                  Recommended
-                </span>
-              {/if}
-            </div>
-            <dl class="grid grid-cols-2 gap-x-2 gap-y-1 font-mono text-xs">
-              <div class="flex items-center justify-between gap-1">
-                <dt class="text-muted-foreground">Net</dt>
-                <dd class="font-bold tabular-nums">{plan.projectedNetRating.toFixed(2)}</dd>
-              </div>
-              <div class="flex items-center justify-between gap-1">
-                <dt class="text-muted-foreground">Strain</dt>
-                <dd class="font-bold tabular-nums">{FATIGUE_BAND_LABEL[plan.strainBand]}</dd>
-              </div>
-              <div class="flex items-center justify-between gap-1">
-                <dt class="text-muted-foreground">Relief</dt>
-                <dd class="font-bold tabular-nums">{Math.round(plan.relief * 100)}%</dd>
-              </div>
-              <div class="flex items-center justify-between gap-1">
-                <dt class="text-muted-foreground">Risk</dt>
-                <dd class="font-bold tabular-nums">{plan.riskScore.toFixed(2)}</dd>
-              </div>
-            </dl>
-            {#if plan.heavyStrain}
-              <span
-                class="self-start rounded-full bg-destructive/15 px-2 py-0.5 font-mono text-[10px] font-bold text-destructive"
-              >
-                Heavy strain
-              </span>
-            {/if}
-            <button
-              type="button"
-              onclick={() => applyPlan(plan)}
-              {disabled}
-              class="mt-auto min-h-9 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Apply
-            </button>
-          </article>
-        {/each}
-      </div>
-    </section>
-  {/if}
 
   <div class="flex flex-col gap-2">
     <p class="text-sm break-words text-muted-foreground">
@@ -727,10 +634,8 @@
                   changeStarter(slotIndex, (event.currentTarget as HTMLSelectElement).value)}
                 class="min-h-11 min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 md:min-h-0 md:py-1.5"
               >
-                {#each rows as r (r.member.playerVersionId)}
-                  <option value={r.member.playerVersionId}>
-                    {r.member.displayName}
-                  </option>
+                {#each editor.eligibleForSlot(slotIndex) as member (member.playerVersionId)}
+                  <option value={member.playerVersionId}>{member.displayName}</option>
                 {/each}
               </select>
             </div>

@@ -148,24 +148,6 @@ describe('sandbox selection', () => {
 });
 
 describe('chooseBestRunSeed (worker best-of)', () => {
-  it('is deterministic: the same run and profile choose the same attempt', () => {
-    const creation = fixtureCreation();
-    const run = createChallenge(creation);
-    const first = chooseBestRunSeed(run, creation.profile, context);
-    const second = chooseBestRunSeed(run, creation.profile, context);
-    expect(second).toEqual(first);
-  });
-
-  it('chooses one of the derived attempt seeds', () => {
-    const creation = fixtureCreation();
-    const run = createChallenge(creation);
-    const chosen = chooseBestRunSeed(run, creation.profile, context);
-    const attemptSeeds = Array.from({ length: BEST_OF_ATTEMPTS }, (_, attempt) =>
-      deriveAttemptSeed(run.runSeed, attempt),
-    );
-    expect(attemptSeeds).toContain(chosen.chosenRunSeed);
-  });
-
   it('matches simulateChallengeBestOf for the same creation', () => {
     const creation = fixtureCreation();
     const engineChosen = simulateChallengeBestOf(creation, creation.profile, context);

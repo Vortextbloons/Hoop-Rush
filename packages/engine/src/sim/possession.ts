@@ -427,10 +427,6 @@ export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResol
   };
 }
 
-function freeThrowProbabilityFor(ctx: TripContext, shooter: SimulationPlayer): number {
-  return freeThrowProbability(shooter, ctx.profile);
-}
-
 /** Consumes clock seconds (capped at remaining) and returns how much was consumed. */
 function consumeTime(state: GameState, seconds: number): number {
   const consumed = Math.min(seconds, state.secondsRemaining);
@@ -647,7 +643,8 @@ function resolveFreeThrows(
   }
   for (let i = 0; i < attempts; i += 1) {
     const last = i === attempts - 1;
-    const p = freeThrowProbabilityFor(ctx, shooter);
+    const p =
+      ctx.preps[offenseSide].freeThrowP[shooterSlot] ?? freeThrowProbability(shooter, ctx.profile);
     const made = rng.chance(p);
     recorder.freeThrow(offenseSide, shooterSlot, made);
     consumeTime(ctx.state, 1);
@@ -704,7 +701,13 @@ function resolveShot(
   if (teammateShots === undefined) {
     throw new Error(`possession: no teammate shot table for ${initiator.playerId}`);
   }
-  const shot = pickShot(teammateShots, initiator, action, rng);
+  const shot = pickShot(
+    teammateShots,
+    initiator,
+    action,
+    rng,
+    teamPrep.passP.get(enginePlayerKey(initiator)),
+  );
   const shooter = shot.shooter;
   const zonePrep = teamPrep.zonePrep.get(enginePlayerKey(shooter));
   if (zonePrep === undefined) {

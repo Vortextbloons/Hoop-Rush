@@ -137,6 +137,15 @@ export class RotationEditor {
     });
   }
 
+  /** The roster members that can legally fill one starter slot (G, G, F, F, C).
+   * Mirrors the engine audit's slot eligibility exactly (`canPlay` against
+   * the slot's coarse group), so the pickers never offer an illegal swap. */
+  eligibleForSlot(slotIndex: number): RotationMember[] {
+    const group = SLOT_GROUPS[slotIndex];
+    if (group === undefined) return [];
+    return this.members.filter((member) => canPlay(member.playable, group));
+  }
+
   minutesFor(playerVersionId: string): number {
     return (
       this.rotation.targetMinutes.find((t) => t.playerVersionId === playerVersionId)?.minutes ?? 0
