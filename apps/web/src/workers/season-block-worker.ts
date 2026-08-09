@@ -104,7 +104,6 @@ interface WorkerRunContext {
 }
 const contextByRunId = new Map<string, WorkerRunContext>();
 
-/** Rebuilds a full start request from a continuation + the cached run context. */
 function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStartRequest | null {
   const context = contextByRunId.get(request.runId);
   if (context === undefined) return null;
@@ -158,7 +157,6 @@ function postError(
   self.postMessage(payload);
 }
 
-/** The catalog is content-addressed; fetch + hash verify + parse once per worker. */
 const catalogCache = new Map<string, SeasonDraftCatalog>();
 async function loadCatalogCached(url: string, contentHash: string): Promise<SeasonDraftCatalog> {
   const memo = catalogCache.get(contentHash);
@@ -168,7 +166,6 @@ async function loadCatalogCached(url: string, contentHash: string): Promise<Seas
   return catalog;
 }
 
-/** The era profile is immutable and content-addressed; fetch + sha256 + parse once per worker. */
 const profileCache = new Map<string, EraSimulationProfile>();
 async function loadProfileCached(url: string, contentHash: string): Promise<EraSimulationProfile> {
   const memo = profileCache.get(contentHash);

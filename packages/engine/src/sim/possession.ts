@@ -746,7 +746,6 @@ function resolveShot(
     }) ?? 0;
   const effectsAdjustmentFraction = effectsAdjustment / 1_000_000;
 
-  // Shooting foul check.
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
   if (rng.chance(foulP)) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);

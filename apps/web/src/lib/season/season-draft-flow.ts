@@ -41,10 +41,8 @@ import type {
  * stays responsive while the bounded roster-selection search executes.
  */
 
-/** Solo Season Run participant id (one human franchise). */
 export const SOLO_PARTICIPANT_ID = 'human';
 
-/** The frozen completion targets every human roster must satisfy (4G/4F/3C). */
 export const COVERAGE_TARGETS = { guards: 4, forwards: 4, centers: 3 } as const;
 
 export type SeasonDraftFlowPhase = 'idle' | 'drafting' | 'finalized' | 'generating' | 'complete';
@@ -59,7 +57,6 @@ export interface SeasonDraftFlowState {
   phase: SeasonDraftFlowPhase;
 }
 
-/** Counts of guard/forward/center-capable picks against the 4/4/3 targets. */
 export function coverageNeeds(
   picks: readonly SeasonDraftPick[],
   catalog: SeasonDraftCatalog,
@@ -98,7 +95,6 @@ export class SeasonDraftFlow {
   lastRecord: SeasonDraftCommandRecord | null = null;
   phase: SeasonDraftFlowPhase = 'idle';
   error: string | null = null;
-  /** Optional hook so the UI can mirror phase changes before long work finishes. */
   onPhaseChange: (() => void) | null = null;
 
   constructor(
@@ -120,7 +116,6 @@ export class SeasonDraftFlow {
     }
   }
 
-  /** The packaged catalog the flow validates commands against. */
   get catalog(): SeasonDraftCatalog {
     return this.catalogRef;
   }
@@ -146,7 +141,6 @@ export class SeasonDraftFlow {
     return false;
   }
 
-  /** Clears the persisted draft (leave-and-discard). */
   async clear(): Promise<void> {
     await this.repo.clearSeasonDraft();
     this.draft = null;
@@ -156,7 +150,6 @@ export class SeasonDraftFlow {
     this.error = null;
   }
 
-  /** Snapshot of the flow for the board. */
   state(): SeasonDraftFlowState {
     return {
       draft: this.draft,
@@ -166,7 +159,6 @@ export class SeasonDraftFlow {
     };
   }
 
-  /** Starts a fresh solo draft against the frozen league + catalog. */
   async create(input: { rootSeed: Seed; league: SeasonLeague }): Promise<SeasonDraftCommandRecord> {
     this.error = null;
     const record = await this.apply(

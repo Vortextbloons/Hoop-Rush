@@ -20,7 +20,6 @@ export function getCachedSeasonSnapshot(): SeasonRunSnapshot | null {
   return cached?.snapshot ?? null;
 }
 
-/** True when the cache holds the exact accepted state for this run. */
 export function cachedSeasonSnapshotMatches(runId: string, revision: number): boolean {
   if (cached === null) return false;
   const snapshot = cached.snapshot;

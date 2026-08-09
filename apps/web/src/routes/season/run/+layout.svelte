@@ -357,7 +357,6 @@
 
   const seasonLoadError = $derived(shell.error ?? shell.hubError ?? null);
 
-  /** M2.4: the stored run was made under older Season rules. */
   const incompatible = $derived(shell.hub?.incompatible ?? null);
 
   const showBrokenResume = $derived(
@@ -379,7 +378,6 @@
       !showBrokenResume,
   );
 
-  /** Two-step discard: step 1 explains, step 2 (dialog) confirms. */
   let discardOpen = $state(false);
   let discarding = $state(false);
   let discardError: string | null = $state(null);

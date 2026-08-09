@@ -27,7 +27,6 @@ interface CachedPoolRecord {
   savedAt: number;
 }
 
-/** Large validated JSON assets (players index, roster details, catalog). */
 interface CachedAssetRecord {
   /** SHA-256 content hash of the asset at write time. */
   key: string;
@@ -50,7 +49,6 @@ db.version(2).stores({
   assets: 'key',
 });
 
-/** Read a previously cached pool when its content hash still matches. */
 export async function readCachedPool(
   key: string,
   expectedHash: string,
@@ -67,7 +65,6 @@ export async function readCachedPool(
   }
 }
 
-/** Persist a validated pool for future visits; failures are silently ignored. */
 export async function writeCachedPool(
   key: string,
   contentHash: string,
@@ -99,7 +96,6 @@ export async function readCachedAsset<T>(
   }
 }
 
-/** Persist a validated asset for future visits; failures are silently ignored. */
 export async function writeCachedAsset(contentHash: string, value: unknown): Promise<void> {
   try {
     await db.assets.put({ key: contentHash, value, savedAt: Date.now() });

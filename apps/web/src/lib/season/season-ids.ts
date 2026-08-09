@@ -9,13 +9,11 @@ import { randomHex } from '$lib/random-hex';
  * Identity generation is UI-only work: domain logic never derives ids here.
  */
 
-/** Fresh command/run id under the frozen id contract. */
 export function newSeasonId(prefix: string): string {
   const random = randomHex(16);
   return `${prefix}-${random}`;
 }
 
-/** Fresh 32-hex Season Run root seed. */
 export function seasonRootSeed(): Seed {
   return randomHex(32);
 }

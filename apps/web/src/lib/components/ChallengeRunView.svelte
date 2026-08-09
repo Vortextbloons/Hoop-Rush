@@ -37,7 +37,6 @@
   let profile = $state.raw<EraSimulationProfile | null>(null);
   let run = $state.raw<ChallengeRun | null>(null);
   let loadError = $state<string | null>(null);
-  /** playerId → peak season for lineup headshots. */
   let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
 
   let phase = $state<RunnerPhase>('idle');
@@ -165,7 +164,6 @@
     };
   });
 
-  /** Bounded aria-live announcements instead of one per game. */
   function announceProgress(current: ChallengeRun): void {
     const record = current.aggregates.team;
     const live = document.getElementById('challenge-announcer');

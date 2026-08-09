@@ -98,15 +98,12 @@ export interface SeasonBlockStartInput {
   /** Locked block objective (blocks 0-7), or null for the final block 8. */
   objectiveId: SeasonObjectiveId | null;
   homeCourt: SeasonHomeCourtProfile;
-  /** Packaged draft catalog asset (manifest-verified). */
   catalogUrl: string;
   catalogHash: string;
-  /** Packaged era simulation profile asset (manifest-verified). */
   profileUrl: string;
   profileHash: string;
 }
 
-/** Input to resume an interrupted block (M2.5). */
 export interface SeasonBlockResumeInput {
   runId: string;
   blockIndex: number;
@@ -119,10 +116,8 @@ export interface SeasonBlockResumeInput {
   /** Human franchise (retained detail policy); null in pure AI contexts. */
   humanFranchiseId: string | null;
   homeCourt: SeasonHomeCourtProfile;
-  /** Packaged draft catalog asset (manifest-verified). */
   catalogUrl: string;
   catalogHash: string;
-  /** Packaged era simulation profile asset (manifest-verified). */
   profileUrl: string;
   profileHash: string;
 }
@@ -316,7 +311,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     return worker;
   }
 
-  /** M2.5: validates the submitted run state facts match the candidate. */
   function assertExpectedState(
     checkpoint: SeasonCandidateCheckpoint,
     input: SeasonBlockStartInput,
@@ -332,7 +326,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
   }
 
-  /** M2.5: folds the block's evaluated objective success into the run's selections. */
   function objectivesWithSuccess(
     input: SeasonBlockStartInput,
     checkpoint: SeasonCandidateCheckpoint,
@@ -491,7 +484,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
   }
 
-  /** M2.5: an invalid-roster interruption â€” persist the pending candidate. */
   async function acceptInterruption(pending: SeasonPendingBlockCandidate): Promise<void> {
     const requestId = currentRequestId;
     const state = current;
@@ -557,7 +549,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
   }
 
-  /** Shared request builder for fresh starts and resumes. */
   function buildRequest(
     requestId: string,
     state: NonNullable<typeof current>,

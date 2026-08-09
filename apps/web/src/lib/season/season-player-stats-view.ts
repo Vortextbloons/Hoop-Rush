@@ -52,10 +52,8 @@ export interface SeasonPlayerStatsView {
   hasStats: boolean;
 }
 
-/** Measure toggle for the stats table: per-game rates or season totals. */
 export type SeasonPlayerStatsMeasure = 'perGame' | 'totals';
 
-/** Sortable column keys for the stats table. */
 export type SeasonPlayerStatsSortKey =
   | 'displayName'
   | 'gamesPlayed'
@@ -144,7 +142,6 @@ export function humanSeasonPlayerStats(input: {
   return { franchiseId: roster.franchiseId, rows, hasStats: summaries.length > 0 };
 }
 
-/** Folded season stats for one rostered player (null when they have not played). */
 export function playerSeasonStatsRow(input: {
   playerVersionId: string;
   displayName: string;

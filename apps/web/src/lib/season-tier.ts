@@ -35,7 +35,6 @@ const TIER_STYLES: Record<SeasonTier, Pick<SeasonTierInfo, 'badgeClass' | 'iconC
   },
 };
 
-/** Maps final win total to a season tier and badge styling. */
 export function seasonTierFromWins(wins: number): SeasonTierInfo {
   if (wins >= 82) {
     return { tier: 'perfect', label: '82-0 · perfect', ...TIER_STYLES.perfect };

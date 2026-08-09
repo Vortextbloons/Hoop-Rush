@@ -81,9 +81,6 @@ function paddedPlayerAggregates(
     .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
 }
 
-/**
- * Sorted unique player-version ids across every roster.
- */
 function seasonRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[] {
   return [
     ...new Set(rosters.flatMap((roster) => roster.players.map((player) => player.playerVersionId))),
@@ -95,7 +92,6 @@ function seasonPairKey(a: string, b: string): string {
   return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
 }
 
-/** Canonical pair ordering: a must be lexicographically smaller than b. */
 function seasonPairIsCanonical(a: string, b: string): boolean {
   return a < b;
 }

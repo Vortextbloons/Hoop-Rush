@@ -9,10 +9,8 @@
  * it. Pure functions only — no Svelte, no DOM — unit-testable in node.
  */
 
-/** Canonical detailed positions in presentation order (PG, SG, SF, PF, C). */
 export const DETAILED_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'] as const;
 
-/** Full slot names in lineup-slot order (Point Guard, …). */
 export const DETAILED_POSITION_NAMES = [
   'Point Guard',
   'Shooting Guard',
@@ -21,13 +19,10 @@ export const DETAILED_POSITION_NAMES = [
   'Center',
 ] as const;
 
-/** Lineup slot abbreviations: PG, SG, SF, PF, C. */
 export const SLOT_LABELS = DETAILED_POSITIONS;
 
-/** Lineup slot full names: Point Guard, Shooting Guard, … */
 export const SLOT_NAMES = DETAILED_POSITION_NAMES;
 
-/** Lineup slot indexes 0–4 (PG, SG, SF, PF, C). */
 export const SLOT_INDEXES = [0, 1, 2, 3, 4] as const;
 
 /**

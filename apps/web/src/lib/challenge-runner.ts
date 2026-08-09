@@ -30,7 +30,6 @@ import { sleep } from '$lib/sleep';
  * saveActiveRun) before the first game is ever revealed.
  */
 
-/** Minimum presentation duration: one committed reveal roughly every 36 ms. */
 export const REVEAL_INTERVAL_MS = 36;
 
 export type RunnerPhase = 'idle' | 'starting' | 'running' | 'paused' | 'finished' | 'error';
@@ -143,7 +142,6 @@ export class ChallengeRunner {
     this.beginReveal(run);
   }
 
-  /** Cancels the worker, discards buffered results, keeps the persisted prefix. */
   cancel(): void {
     if (this.phase !== 'running' && this.phase !== 'starting') return;
     this.phase = 'paused';
@@ -242,7 +240,6 @@ export class ChallengeRunner {
     this.beginReveal(updatedRun);
   }
 
-  /** Posts the simulate request for the reveal and starts the paced pump. */
   private beginReveal(run: ChallengeRun): void {
     const profile = this.profile;
     if (!this.worker || !this.requestId || !profile) return;
@@ -265,12 +262,10 @@ export class ChallengeRunner {
     void this.pump();
   }
 
-  /** True when this pump generation was superseded (cancel/dispose/fail). */
   private isStale(token: number): boolean {
     return this.disposed || token !== this.pumpToken;
   }
 
-  /** Accepts, persists, and reveals queued results at the paced interval. */
   private async pump(): Promise<void> {
     const token = ++this.pumpToken;
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -353,7 +348,6 @@ export class ChallengeRunner {
     }
   }
 
-  /** Moves the finished run from active into completed history atomically. */
   private async promote(run: ChallengeRun): Promise<void> {
     const completedAtIso = new Date().toISOString();
     const completed: StoredRunRecord = {

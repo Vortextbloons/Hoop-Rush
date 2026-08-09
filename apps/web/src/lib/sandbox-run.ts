@@ -23,11 +23,6 @@ import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
  * in the fixed '2010s' environment era.
  */
 
-/**
- * Creates the 82-game run for the given five players, saves it as the active
- * run, and navigates to the challenge page. Throws on any failure so the
- * caller can surface the error.
- */
 export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): Promise<void> {
   if (players.length !== 5) {
     throw new Error('A lineup needs exactly five players.');

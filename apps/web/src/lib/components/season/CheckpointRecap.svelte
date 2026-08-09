@@ -66,7 +66,6 @@
         : `${ordinal(movement.positionAfter)} in conference`
     })`;
 
-  /** M2.5: one-line injury evidence summary (recorded facts only). */
   const injurySummary = $derived(
     `${String(recap.injuryEvidence.injuries)} ${
       recap.injuryEvidence.injuries === 1 ? 'injury' : 'injuries'
@@ -80,7 +79,6 @@
   const franchiseIdentity = (franchiseId: string) =>
     manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
 
-  /** Historical source identity for one player version (logo + season). */
   function versionSource(playerVersionId: string): {
     teamExternalId: string;
     logoCandidates: readonly string[];

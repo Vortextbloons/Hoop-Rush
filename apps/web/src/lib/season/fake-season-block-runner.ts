@@ -379,7 +379,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     });
   }
 
-  /** The pending candidate for the interruption seam (no games completed). */
   private async buildPending(input: SeasonBlockStartInput): Promise<SeasonPendingBlockCandidate> {
     const { fromRound, toRound } = blockRoundRange(input.blockIndex);
     const blockGames = input.run.games
@@ -550,7 +549,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     this.emit({ type: 'complete', requestId, checkpoint });
   }
 
-  /** Builds the full candidate checkpoint for the given summaries. */
   private async buildCheckpoint(
     input: SeasonBlockStartInput,
     summaries: SeasonGameSummary[],
@@ -901,7 +899,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       })),
     } as const;
   }
-  /** Games in the simulated block (also useful for specs). */
   static gamesToLock(blockIndex: number): number {
     return gamesToLockForBlock(blockIndex);
   }

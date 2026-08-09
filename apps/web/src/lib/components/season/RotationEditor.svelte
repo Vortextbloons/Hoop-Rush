@@ -57,10 +57,8 @@
     editor: RotationEditor;
     disabled: boolean;
     onchange: (rotation: RotationEditor['rotation'], failures: string[]) => void;
-    /** playerVersionId -> face refs for compact rows (optional). */
     faces?: ReadonlyMap<string, SeasonFaceRef> | null;
     manifest?: HoopRushManifest | null;
-    /** playerVersionId -> summary Overall rating (optional presentation data). */
     overallByVersion?: ReadonlyMap<string, number> | null;
     /** Recorded M2.4 effects state (fatigue band per row; optional). */
     effects?: SeasonEffectsState | null;
@@ -101,7 +99,6 @@
     void revision;
     return editor.rotation.closingFive;
   });
-  /** All ten rows in lineup order (starters by slot, then bench order). */
   const orderedRows = $derived.by(() => {
     void revision;
     return [
@@ -407,8 +404,6 @@
     {/if}
   </div>
 
-  <!-- Minutes: every player with tap-to-type / stepper controls; the lineup
-       rows below handle roles, closing five, and bench order. -->
   <section aria-labelledby="minutes-heading" class="rounded-none bg-surface-1 p-3 sm:rounded-xl">
     <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
       <h3
@@ -544,7 +539,6 @@
     </p>
   </section>
 
-  <!-- Unified ten-player rotation list; only control density changes per breakpoint. -->
   <section aria-labelledby="starters-heading" class="min-w-0">
     <h3
       id="starters-heading"

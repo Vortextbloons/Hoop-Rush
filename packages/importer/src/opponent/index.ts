@@ -20,8 +20,6 @@ export const BRACKET_VERSION = 'bracket-m3-v3';
 export const SEASON_KEY = '1995-96';
 export const OPPONENTS_DIR = join(PUBLIC_DATA, 'opponents');
 export const POOL_PATH = join(PUBLIC_DATA, 'pools', 'lakers-1990s.json');
-
-// Van Exel, Threatt, A.C. Green, Horry, Divac -> G, G, F, F, C.
 export const LINEUP = [
   { playerId: 'p-89', slotIndex: 0, position: 'G' },
   { playerId: 'p-9', slotIndex: 1, position: 'G' },

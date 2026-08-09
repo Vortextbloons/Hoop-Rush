@@ -1,8 +1,3 @@
-/**
- * Import pipeline commands: ratings, pools, era profiles, manifest refresh,
- * opponent authoring, calibration freeze, and the full run-all orchestrator
- * (Python fetch layer + TS compute).
- */
 import {
   DEFAULT_SEASONS,
   eraProfile,

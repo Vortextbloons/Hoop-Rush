@@ -34,7 +34,13 @@ import type { RotationEditor } from './season-rotation-editor';
  * `objectives`), the interruption/pending mirrors, and the typed command
  * actions.
  */
-export const SEASON_RUN_SHELL_CONTEXT = Symbol('season-run-shell');
+/**
+ * A string key remains identical when Vite hot-reloads this module before all
+ * consumers have been replaced. A module-local Symbol can leave the layout
+ * and a child page using different context keys during HMR, causing
+ * `getContext` to return undefined until a full reload.
+ */
+export const SEASON_RUN_SHELL_CONTEXT = 'hoop-rush:season-run-shell';
 
 export interface SeasonRunShellData {
   /** True once assets, repo, runner, and the first refresh have settled. */
@@ -111,7 +117,6 @@ export interface SeasonRunShellData {
   resumeBlock: () => Promise<void>;
 }
 
-/** Initial (empty) shell object; the layout turns it into `$state`. */
 export function initialSeasonRunShellData(): SeasonRunShellData {
   return {
     ready: false,

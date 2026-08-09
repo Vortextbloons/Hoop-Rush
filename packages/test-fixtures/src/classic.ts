@@ -96,7 +96,6 @@ export function buildClassicCatalog(
   }));
 }
 
-/** A classic pick in a legal slot; defaults to round 1, Lakers 1990s, slot 0. */
 export function buildClassicPick(overrides: Partial<ClassicPick> = {}): ClassicPick {
   return {
     round: 1,

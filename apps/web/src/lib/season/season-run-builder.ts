@@ -68,7 +68,6 @@ import { createInitialSeasonInfluenceState } from '@hoop-rush/engine';
  * command asserts the real initial digest.
  */
 
-/** SHA-256 content hash of the committed schedule artifact (Web Crypto). */
 export async function sha256Hex(material: string): Promise<string | null> {
   return sha256Bytes(new TextEncoder().encode(material));
 }
@@ -119,7 +118,6 @@ export interface BuildSeasonRunInput {
   stateDigest?: string;
 }
 
-/** Builds and schema-validates the initial run snapshot for promotion. */
 export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): SeasonRun {
   const {
     runId,

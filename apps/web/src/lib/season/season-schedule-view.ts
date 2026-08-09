@@ -17,7 +17,6 @@ import { finalizeGameRecords, humanScheduleRows } from './season-presentation';
  * summaries — the UI never invents a result.
  */
 
-/** One human-team game as the Schedule tab renders it. */
 export interface ScheduleBlockRow {
   gameId: string;
   /** Finalized game record (status/scores merged from summaries). */
@@ -37,7 +36,6 @@ export interface ScheduleBlockRow {
   forfeit: boolean;
 }
 
-/** One of the nine block sections, in round order. */
 export interface ScheduleBlockGroup {
   blockIndex: number;
   fromRound: number;
@@ -71,7 +69,6 @@ export function scheduleBlockRows(
   }));
 }
 
-/** Groups rows into the nine block sections with their round ranges. */
 export function scheduleBlockGroups(rows: readonly ScheduleBlockRow[]): ScheduleBlockGroup[] {
   const groups: ScheduleBlockGroup[] = [];
   for (let blockIndex = 0; blockIndex < SEASON_BLOCK_COUNT; blockIndex += 1) {
@@ -86,7 +83,6 @@ export function scheduleBlockGroups(rows: readonly ScheduleBlockRow[]): Schedule
   return groups;
 }
 
-/** Played-game count of the human team (for filter labels). */
 export function playedScheduleCount(rows: readonly ScheduleBlockRow[]): number {
   return rows.reduce((count, row) => (row.played ? count + 1 : count), 0);
 }

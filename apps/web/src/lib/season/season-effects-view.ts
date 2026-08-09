@@ -20,7 +20,6 @@ import type {
 
 export type FatigueBand = 'fresh' | 'ready' | 'tired' | 'heavy';
 
-/** Fatigue band of a basis-point fatigue value (engine-authoritative). */
 export const fatigueBand = fatigueBandOf;
 
 export const FATIGUE_BAND_LABEL: Record<FatigueBand, string> = {
@@ -37,24 +36,20 @@ export const FATIGUE_BAND_BADGE: Record<FatigueBand, string> = {
   heavy: 'bg-destructive/15 text-destructive',
 };
 
-/** Fatigue as a percentage (0..100) for band display. */
 export function fatiguePercent(fatigueBasisPoints: number): number {
   return Math.round((fatigueBasisPoints / 10_000) * 100);
 }
 
-/** The recorded load state of one version (null when absent). */
 export function loadStateOf(state: SeasonEffectsState, playerVersionId: string) {
   return state.playerStates.find((player) => player.playerVersionId === playerVersionId) ?? null;
 }
 
-/** Shared possessions of one canonical pair (0 when absent). */
 export function pairSharedOf(state: SeasonEffectsState, a: string, b: string): number {
   const [x, y] = a < b ? [a, b] : [b, a];
   const pair = state.pairStates.find((p) => p.a === x && p.b === y);
   return pair?.sharedPossessions ?? 0;
 }
 
-/** Active-lineup chemistry (basis points) for a five-man unit. */
 export function activeLineupChemistryBp(
   state: SeasonEffectsState,
   unit: readonly string[],
@@ -67,7 +62,6 @@ export function activeLineupChemistryBp(
   }
 }
 
-/** The strongest and weakest recorded pairs of a ten-player roster. */
 export function strongestAndWeakestPairs(
   state: SeasonEffectsState,
   rosterVersions: readonly string[],
@@ -91,7 +85,6 @@ export function strongestAndWeakestPairs(
   };
 }
 
-/** Projected band of a player after `games` upcoming games at `minutesPerGame`. */
 export function projectedFatigueBand(
   currentFatigueBp: number,
   minutesPerGame: number,
@@ -127,7 +120,6 @@ export interface BlockMechanismEvidenceRow {
   avgInputFraction: number;
 }
 
-/** Aggregates the retained details' mechanism evidence for one block. */
 export function aggregateMechanismEvidence(
   details: readonly SeasonRetainedGameDetail[],
 ): BlockMechanismEvidenceRow[] {
@@ -193,7 +185,6 @@ export const MECHANISM_LABEL: Record<BlockMechanismEvidenceRow['mechanism'], str
   'help-defense': 'Chemistry helped defense contest shots',
 };
 
-/** Delta in percentage points (signed) from integer millionths. */
 export function deltaToPp(millionths: number): number {
   return millionths / 10_000;
 }

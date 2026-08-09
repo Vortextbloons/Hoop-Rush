@@ -36,7 +36,6 @@
 
   type IndexRow = PlayersIndexEntry;
 
-  /** One slot ref: enough to locate a peak player-season in the index and pools. */
   type SlotRef = { playerId: string; franchiseId: string; eraId: string };
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -305,7 +304,6 @@
     return resolvePlayerRefs(refs, m);
   }
 
-  /** Resolves the picked players, then starts and persists the 82-game run. */
   async function play82() {
     if (!ready || !index || !manifest) return;
     starting = true;

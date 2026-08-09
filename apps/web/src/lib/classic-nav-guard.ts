@@ -10,7 +10,6 @@ import type { ClassicDraftState } from '@hoop-rush/data-contracts';
  * fifth pick marks itself with setClassicGuardBypass so the guard lets it pass.
  */
 
-/** Marks the NEXT client-side navigation as automatic (challenge launch). */
 let bypass = false;
 export function setClassicGuardBypass(enabled: boolean): void {
   bypass = enabled;

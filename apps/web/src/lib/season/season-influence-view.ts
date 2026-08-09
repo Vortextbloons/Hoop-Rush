@@ -141,7 +141,6 @@ export function influenceViewModel(
   };
 }
 
-/** True when a spend of `cost` stays at/above the -3 floor. */
 export function canAffordSpend(balance: number, cost: number): boolean {
   return balance - cost >= SEASON_INFLUENCE_FLOOR;
 }
@@ -216,7 +215,6 @@ export function objectiveChoicesViewModel(run: SeasonRun): ObjectiveChoicesViewM
   };
 }
 
-/** The most recent evaluated selection (success recorded), newest block first. */
 function lastEvaluatedSelection(
   run: SeasonRun,
   definitions: Map<SeasonObjectiveId, (typeof SEASON_OBJECTIVE_CATALOG)[number]>,
@@ -235,13 +233,11 @@ function lastEvaluatedSelection(
   return null;
 }
 
-/** Accepted blocks implied by the run cursor (one block per ten rounds). */
 function acceptedBlockCountOf(completedRounds: number): number {
   if (completedRounds <= 0) return 0;
   return Math.ceil(completedRounds / 10);
 }
 
-/** The 0-based block index the run is about to play (blocks 0-7 only). */
 export function currentObjectiveBlock(run: SeasonRun): number | null {
   if (run.cursor.completedRounds >= SEASON_ROUND_COUNT) return null;
   const blockIndex = acceptedBlockCountOf(run.cursor.completedRounds);

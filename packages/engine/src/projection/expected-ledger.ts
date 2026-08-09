@@ -232,7 +232,6 @@ function computeSide(input: {
   const nonShootingFoulRate = noTurnover * expectedNsfPerTrip;
   const shotMass = noTurnover * 100;
 
-  // --- Shot mass ---
   // Aggregated per distinct (shooter, zone, action, defender) key with cached
   // zone shares, defender distributions, and per-key shot probabilities, so
   // the expensive probability functions run at most once per key instead of

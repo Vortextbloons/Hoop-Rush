@@ -28,7 +28,6 @@ export interface RotationMember {
   seasonKey?: string;
 }
 
-/** The coarse slot requirement of each lineup slot (G, G, F, F, C). */
 export const SLOT_GROUPS: readonly SlotGroup[] = ['G', 'G', 'F', 'F', 'C'];
 
 /**
@@ -84,7 +83,6 @@ export function presetMinutes(preset: SeasonRotationPreset, roleIndex: number): 
   return roleIndex < 5 ? table.starters : (table.bench[roleIndex - 5] ?? 0);
 }
 
-/** Role label for a player in a rotation (starter slot / bench index). */
 export function rotationRoleOf(rotation: SeasonRotation, playerVersionId: string): string {
   const starterIndex = rotation.starters.indexOf(playerVersionId);
   if (starterIndex !== -1) {
@@ -113,7 +111,6 @@ export class RotationEditor {
     this.rosterIds = members.map((m) => m.playerVersionId);
   }
 
-  /** All ten members with their current minutes and role. */
   rows(): Array<{
     member: RotationMember;
     minutes: number;
@@ -320,7 +317,6 @@ export class RotationEditor {
     return index === -1 ? this.rotation.benchOrder.length : index;
   }
 
-  /** Rewrites only the target minutes through the engine preset table. */
   applyPreset(preset: SeasonRotationPreset): string[] {
     this.rotation = applySeasonRotationPreset(this.rotation, preset);
     return this.validate();
@@ -397,7 +393,6 @@ export class RotationEditor {
   }
 }
 
-/** Builds a fresh editor from a rotation and roster identity + positions. */
 export function createRotationEditor(
   rotation: SeasonRotation,
   roster: Array<{ playerVersionId: string; displayName: string; playable: readonly Position[] }>,
@@ -425,7 +420,6 @@ const FAILURE_ID_PATTERNS = [
   /\bno position data for closing-five player ([a-z0-9][a-z0-9._:-]*)/,
 ] as const;
 
-/** PlayerVersionId named by a failure message, or null for global failures. */
 export function failurePlayerVersionId(failure: string): string | null {
   for (const pattern of FAILURE_ID_PATTERNS) {
     const match = failure.match(pattern);

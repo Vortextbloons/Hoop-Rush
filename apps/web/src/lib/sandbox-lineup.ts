@@ -49,7 +49,6 @@ export async function loadRunPlayersById(
   return new Map(entries);
 }
 
-/** The run's five players in slot order once their pools have resolved. */
 export function lineupPlayersFromRun(
   currentRun: ChallengeRun,
   byId: Map<string, PeakPlayerSeason>,

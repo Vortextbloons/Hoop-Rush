@@ -30,7 +30,6 @@ export function commitTargetsArtifact(args: {
     const target = resolve(args.outPath);
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, `${JSON.stringify(args.content, null, 2)}\n`);
-    // Update the manifest hash for the committed targets artifact.
     if (resolve(args.outPath) === resolve(args.defaultTargetsPath)) {
       const manifestPathResolved = resolve(args.manifestPath);
       const manifest = JSON.parse(readFileSync(manifestPathResolved, 'utf8')) as {

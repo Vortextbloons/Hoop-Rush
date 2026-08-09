@@ -159,7 +159,6 @@ export class SeasonHubState {
     return () => this.listeners.delete(listener);
   }
 
-  /** Reloads the accepted snapshot + active-run index from the repository. */
   async refresh(): Promise<void> {
     try {
       const index = await this.repo.loadActiveRunIndex();
@@ -262,22 +261,18 @@ export class SeasonHubState {
     }
   }
 
-  /** Next block index: the accepted-block count (0..8). */
   nextBlockIndex(): number | null {
     return this.snapshot?.acceptedBlocks.length ?? null;
   }
 
-  /** Block summaries for one accepted block (gameId ascending). */
   loadBlockSummaries(runId: string, blockIndex: number): Promise<SeasonGameSummary[]> {
     return this.repo.loadBlockSummaries(runId, blockIndex);
   }
 
-  /** Retained detail rows for the run's human games (gameId ascending). */
   loadRetainedDetails(runId: string): Promise<SeasonRetainedGameDetail[]> {
     return this.repo.loadRetainedDetails(runId);
   }
 
-  /** Validates the command shape and starts the block on the runner. */
   startBlock(envelope: SubmitBlockEnvelope): void {
     const parsed = seasonSubmitBlockCommandSchema.safeParse(envelope.command);
     if (!parsed.success) {
@@ -481,7 +476,6 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  /** Requests cancellation; the worker stops between games. */
   cancel(): void {
     const requestId = this.block.requestId;
     if (this.block.phase !== 'running' || requestId === null) return;
@@ -523,7 +517,6 @@ export class SeasonHubState {
     }
   }
 
-  /** Re-issues the same idempotent command after cancel/failure. */
   async retry(): Promise<void> {
     if (this.block.command === null || this.block.startInput === null) return;
     if (this.block.phase !== 'cancelled' && this.block.phase !== 'failed') return;

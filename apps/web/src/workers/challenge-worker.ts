@@ -27,7 +27,6 @@ import { sleep } from '../lib/sleep';
  * message once at its boundary.
  */
 
-/** Results posted per message; keeps the post count near 82 / BATCH_SIZE. */
 const BATCH_SIZE = 4;
 
 let currentRequestId: string | null = null;

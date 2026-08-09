@@ -49,7 +49,6 @@ export interface SubmitBlockFailure {
 export type BuildSubmitBlockEnvelopeResult =
   { ok: true; envelope: SubmitBlockEnvelope } | { ok: false; error: SubmitBlockFailure };
 
-/** Phases in which a fresh block may be submitted. */
 export function blockPhaseAllowsSubmit(phase: string): boolean {
   return phase === 'idle' || phase === 'complete' || phase === 'cancelled' || phase === 'failed';
 }
@@ -161,7 +160,6 @@ export async function buildSubmitBlockEnvelope(
   return { ok: true, envelope: { command, start } };
 }
 
-/** The recorded objective selection for a block (null when not selected). */
 function selectedObjectiveIdOf(
   run: NonNullable<SeasonRunShellData['run']>,
   blockIndex: number,

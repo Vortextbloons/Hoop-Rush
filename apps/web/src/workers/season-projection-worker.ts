@@ -93,7 +93,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** Request types the projection worker handles. */
 const SUPPORTED_REQUEST_TYPES = new Set(['build-roster', 'optimize-rotation'] as const);
 
 self.addEventListener('message', (event: MessageEvent<ProjectionWorkerRequest>) => {

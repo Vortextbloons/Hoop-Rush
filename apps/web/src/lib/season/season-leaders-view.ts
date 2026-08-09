@@ -18,7 +18,6 @@ import { deriveSeasonLeaders } from '@hoop-rush/engine';
  * All values still derive from the same aggregate fold.
  */
 
-/** All six leader categories in the display order of the Leaders tab. */
 export const LEADER_CATEGORIES: readonly SeasonLeaderCategory[] = [
   'points',
   'rebounds',

@@ -24,7 +24,6 @@ import {
 
 export type InjuryStatus = 'active' | 'returned' | 'none';
 
-/** Records that keep a player unavailable at the next tipoff. */
 export function activeInjuriesOf(
   health: SeasonHealthState,
   playerVersionId: string,
@@ -37,7 +36,6 @@ export function activeInjuriesOf(
   );
 }
 
-/** Availability status of one player from the recorded health state. */
 export function injuryStatusOf(health: SeasonHealthState, playerVersionId: string): InjuryStatus {
   if (activeInjuriesOf(health, playerVersionId).length > 0) return 'active';
   const hasRecord = health.injuries.some((record) => record.playerVersionId === playerVersionId);
@@ -176,7 +174,6 @@ function occurrenceRoundOf(
   return games.find((game) => game.gameId === record.gameId)?.round ?? 0;
 }
 
-/** One recorded injury fact on a player's timeline (health record + game facts). */
 export interface InjuryTimelineEntry {
   injuryId: string;
   gameId: string;
@@ -282,7 +279,6 @@ export const INJURY_SEVERITY_BADGE: Record<SeasonInjurySeverity, string> = {
   'season-ending': 'bg-destructive/15 text-destructive',
 };
 
-/** Severity band presentation (label + badge class), like `FATIGUE_BAND_LABEL`. */
 export function injuryBandOf(severity: SeasonInjurySeverity): {
   label: string;
   badge: string;

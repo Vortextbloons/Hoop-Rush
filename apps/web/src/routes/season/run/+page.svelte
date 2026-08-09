@@ -207,7 +207,6 @@
     }
   }
 
-  /** W-L of the human team inside one accepted block's round range. */
   function blockRecord(blockIndex: number): { wins: number; losses: number } | null {
     const summaries = snapshot?.summaries ?? [];
     if (humanFranchiseId === null) return null;
@@ -244,7 +243,6 @@
 </svelte:head>
 
 <div class="flex min-w-0 flex-col gap-6 pt-6">
-  <!-- 1. Season tape -->
   <section aria-labelledby="season-tape-heading" class="px-3 sm:px-0">
     <h2 id="season-tape-heading" class="sr-only">Season progress</h2>
     {#if snapshot !== null}
@@ -303,7 +301,6 @@
         onResume={() => shell.resumeBlock()}
       />
     {:else}
-      <!-- 2. Next decision panel -->
       <section
         aria-labelledby="next-decision-heading"
         class="flex flex-col gap-4 rounded-none border border-border bg-surface-1 p-4 sm:rounded-xl sm:p-5"
@@ -344,7 +341,6 @@
         {/if}
 
         <div class="grid gap-4 lg:grid-cols-3">
-          <!-- (a) Next opponents -->
           <div class="rounded-lg bg-surface-2 p-3">
             <h3
               class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
@@ -384,7 +380,6 @@
             {/if}
           </div>
 
-          <!-- (b) Pending rotation changes -->
           <div class="rounded-lg bg-surface-2 p-3">
             <h3
               class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
@@ -472,7 +467,6 @@
             </div>
           {/if}
 
-          <!-- (d) Compact lock preview -->
           <div class="rounded-lg bg-surface-2 p-3">
             <h3
               class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
@@ -528,7 +522,6 @@
           </div>
         </div>
 
-        <!-- (d) Simulate action + (e) live progress -->
         <div class="flex flex-col gap-3">
           {#if rotationFailures.length > 0}
             <p
@@ -626,7 +619,6 @@
       />
     {/if}
 
-    <!-- 3. Recent recap affordance -->
     {#if recentBlocks.length > 0}
       <section aria-labelledby="recent-recaps-heading" class="px-3 sm:px-0">
         <h2

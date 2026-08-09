@@ -101,13 +101,11 @@
     return manifest.eras.find((era) => era.eraId === id)?.label ?? id;
   }
 
-  /** Deterministic fractional jitter per spin so consecutive spins start differently. */
   function jitterFor(key: number): number {
     const frac = key * 0.6180339887498949;
     return frac - Math.floor(frac);
   }
 
-  /** Strip start offset (px) so several option rows pass before the final row locks in. */
   function spinStartPx(optionCount: number, key: number): number {
     const travelRows = optionCount * OPTION_REPEATS - 1 + jitterFor(key);
     return -(travelRows * ROW_HEIGHT_PX);
@@ -159,7 +157,6 @@
     spinTimer = setTimeout(settle, duration);
   }
 
-  /** The reels locked in: show the landed franchise + era, then close. */
   function settle() {
     spinTimer = null;
     franchiseSpinning = false;
@@ -173,7 +170,6 @@
     resultTimer = setTimeout(finish, reduced ? FADE_MS : RESULT_MS);
   }
 
-  /** The modal closes; the parent reveals the rolled pool. */
   function finish() {
     if (resultTimer !== null) {
       clearTimeout(resultTimer);

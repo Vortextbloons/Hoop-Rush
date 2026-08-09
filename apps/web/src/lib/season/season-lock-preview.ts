@@ -82,7 +82,6 @@ export function gamesToLockForBlock(blockIndex: number): number {
   return blockIndex >= 8 ? SEASON_FINAL_BLOCK_TEAM_GAMES : SEASON_BLOCK_TEAM_GAMES;
 }
 
-/** The human team's games inside a block's round range, from the schedule. */
 export function humanUpcomingGames(
   games: readonly SeasonGame[],
   humanFranchiseId: string,
@@ -230,7 +229,6 @@ function projectedFatigueBandName(
   ];
 }
 
-/** Convenience: the full 30-rotation set digest with the human rotation swapped. */
 export function pendingRotationSetDigest(
   runRotations: readonly SeasonRotation[],
   pendingHumanRotation: SeasonRotation,

@@ -8,12 +8,10 @@ import { resolve } from '$app/paths';
  * and evict on failure so a later request retries.
  */
 
-/** Absolute site root for packaged JSON assets (respects GitHub Pages base path). */
 export function siteRoot(): string {
   return resolve('/');
 }
 
-/** Pool URLs are relative to the manifest directory (e.g. pools/lakers-1990s.json). */
 export function resolveAssetUrl(url: string): string {
   if (/^https?:\/\//.test(url) || url.startsWith('/')) return url;
   return `${siteRoot()}data/${url}`;
@@ -21,7 +19,6 @@ export function resolveAssetUrl(url: string): string {
 
 const memoCache = new Map<string, Promise<unknown>>();
 
-/** Runs `load` once per key, sharing the in-flight promise and retrying after failure. */
 export function memoized<T>(key: string, load: () => Promise<T>): Promise<T> {
   const existing = memoCache.get(key) as Promise<T> | undefined;
   if (existing) return existing;

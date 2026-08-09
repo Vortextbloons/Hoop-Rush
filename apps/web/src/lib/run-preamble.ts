@@ -11,10 +11,8 @@ import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
  * opponent bracket. Every run simulates in the same environment era.
  */
 
-/** Fixed simulation environment era for every sandbox and classic run. */
 export const FIXED_SANDBOX_ERA = '2010s';
 
-/** Loads the frozen era profile and opponent bracket for run creation. */
 export async function loadRunPreamble(): Promise<{
   manifest: HoopRushManifest;
   profile: EraSimulationProfile;

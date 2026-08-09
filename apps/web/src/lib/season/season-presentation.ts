@@ -97,7 +97,6 @@ export function formatClock(totalSeconds: number): string {
   return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
 }
 
-/** Current winning/losing streak from ordered game summaries (round order). */
 export function franchiseStreak(
   summaries: readonly SeasonGameSummary[],
   franchiseId: string,
@@ -170,7 +169,6 @@ export const LEADER_CATEGORY_LABELS: Record<SeasonLeaderCategory, string> = {
   threePointersMade: '3-pointers',
 };
 
-/** Franchise labels from the packaged manifest (display + abbreviation). */
 export function franchiseLabelMap(manifest: HoopRushManifest): Map<string, string> {
   return new Map(manifest.modernFranchiseSlots.map((slot) => [slot.franchiseId, slot.displayName]));
 }
@@ -246,7 +244,6 @@ export function boxScoreFromSummary(
   };
 }
 
-/** Human schedule rows for the season view: game, opponent, result, score. */
 export interface ScheduleRow {
   game: SeasonGame;
   opponentFranchiseId: string;
@@ -598,7 +595,6 @@ export function deriveNotablePerformances(
   }));
 }
 
-/** Version-versus-version spotlights for a block, from recorded lines. */
 export function deriveVersionSpotlights(
   blockSummaries: readonly SeasonGameSummary[],
   rosters: readonly SeasonRosterEntry[],

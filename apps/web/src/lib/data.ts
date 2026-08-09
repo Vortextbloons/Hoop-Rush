@@ -35,7 +35,6 @@ function cacheBustedUrl(url: string): string {
 
 const manifestRequestInit: RequestInit = { cache: 'no-store' };
 
-/** Load (once) and validate the Hoop Rush manifest. */
 export function getManifest(): Promise<HoopRushManifest> {
   if (!manifestPromise) {
     manifestPromise = loadManifest(manifestUrl(), manifestRequestInit);
@@ -47,7 +46,6 @@ export function getManifest(): Promise<HoopRushManifest> {
   return manifestPromise;
 }
 
-/** Refetch the manifest from the server, replacing the memoized value. */
 function reloadManifest(): Promise<HoopRushManifest> {
   manifestPromise = loadManifest(cacheBustedUrl(manifestUrl()), manifestRequestInit);
   manifestPromise.catch(() => {
@@ -56,7 +54,6 @@ function reloadManifest(): Promise<HoopRushManifest> {
   return manifestPromise;
 }
 
-/** True when a packaged asset failed its SHA-256 content-hash check. */
 function isContentHashMismatch(error: unknown): boolean {
   return error instanceof Error && CONTENT_HASH_MISMATCH.test(error.message);
 }
@@ -100,7 +97,6 @@ async function retryWithFreshManifest<T>(
 
 const poolCache = new Map<string, Promise<FranchiseEraPool>>();
 
-/** Load, hash-verify, and validate a franchise-era pool asset. */
 export function getPool(entry: PoolIndexEntry): Promise<FranchiseEraPool> {
   const key = `${entry.franchiseId}/${entry.eraId}`;
   let promise = poolCache.get(key);
@@ -157,7 +153,6 @@ async function loadPoolForKey(
 
 const profileCache = new Map<string, Promise<EraSimulationProfile>>();
 
-/** Load, hash-verify, and validate an era simulation profile asset. */
 export function getEraSimulationProfile(
   entry: SimProfileIndexEntry,
 ): Promise<EraSimulationProfile> {
@@ -184,7 +179,6 @@ export function getEraSimulationProfile(
 
 const bracketCache = new Map<string, Promise<OpponentBracket>>();
 
-/** Load, hash-verify, and validate the frozen opponent bracket as a unit. */
 export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> {
   const key = entry.url;
   let promise = bracketCache.get(key);
@@ -209,7 +203,6 @@ export function getBracket(entry: OpponentIndexEntry): Promise<OpponentBracket> 
 
 let playersIndexPromise: Promise<PlayersIndex> | null = null;
 
-/** Load, hash-verify, and validate the draft index (compact identity rows). */
 export function getPlayersIndex(): Promise<PlayersIndex> {
   if (!playersIndexPromise) {
     playersIndexPromise = loadPlayersIndexFor();
@@ -258,7 +251,6 @@ async function loadPlayersIndexFor(): Promise<PlayersIndex> {
 
 let rosterDetailsPromise: Promise<RosterDetails> | null = null;
 
-/** Load, hash-verify, and validate the roster-details asset (stats, height/weight). */
 export function getRosterDetails(): Promise<RosterDetails> {
   if (!rosterDetailsPromise) {
     rosterDetailsPromise = loadRosterDetailsFor();

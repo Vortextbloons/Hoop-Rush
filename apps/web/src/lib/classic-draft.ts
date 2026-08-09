@@ -18,7 +18,6 @@ import { generateSeed } from '$lib/sandbox-url';
  * index and the manifest pools are the whole surface.
  */
 
-/** The franchise/era grouping key used for every bucket lookup. */
 function franchiseEraKey(franchiseId: string, eraId: string): string {
   return `${franchiseId}/${eraId}`;
 }
@@ -57,7 +56,6 @@ export function buildFranchiseEraBuckets(
   return buckets;
 }
 
-/** One catalog entry per packaged manifest pool, in manifest.pools order. */
 export function buildClassicCatalog(
   manifest: HoopRushManifest,
   index: PlayersIndex,
@@ -73,7 +71,6 @@ export function buildClassicCatalog(
   }));
 }
 
-/** The complete eligible pool for one rolled pair, sorted for the presentation. */
 export function classicPoolRows(
   index: PlayersIndex,
   pair: { franchiseId: string; eraId: string },
@@ -86,7 +83,6 @@ export function classicPoolRows(
   );
 }
 
-/** Persists the authoritative draft state so reload resumes at the exact round. */
 export async function saveClassicDraftState(draft: ClassicDraftState): Promise<void> {
   await challengeRepository.saveClassicDraft({
     recordId: 'classic-draft',
@@ -95,18 +91,15 @@ export async function saveClassicDraftState(draft: ClassicDraftState): Promise<v
   });
 }
 
-/** Loads the persisted draft, or null when no draft has been started. */
 export async function loadClassicDraftState(): Promise<ClassicDraftState | null> {
   const record = await challengeRepository.loadClassicDraft();
   return record?.draft ?? null;
 }
 
-/** Discards the persisted draft (leave-and-discard) so the next visit starts fresh. */
 export async function clearClassicDraftState(): Promise<void> {
   await challengeRepository.clearClassicDraft();
 }
 
-/** Fresh seed for a classic draft at the UI boundary. */
 export function classicDraftSeed(): Seed {
   return generateSeed();
 }

@@ -17,7 +17,6 @@ import { oneDecimal, percentOneDecimal } from './format';
  */
 export type RosterDetailRow = PlayersIndexEntry & RosterDetailsEntry;
 
-/** One flat row of the roster browser: a group header or a player. */
 export type RosterListItem<T = RosterDetailRow> =
   | { type: 'group'; franchiseId: string; eraId: string; count: number }
   | { type: 'player'; player: T };
@@ -89,7 +88,6 @@ export function lowercaseName(row: PlayersIndexEntry): string {
   return folded;
 }
 
-/** The year a season key starts in ("1990-91" -> 1990). */
 function seasonStartYear(seasonKey: string): number {
   return Number.parseInt(seasonKey, 10);
 }
@@ -119,7 +117,6 @@ function compareText(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
-/** Applies the sort mode to a copy of the rows. 'none' preserves dataset order. */
 export function sortRoster(
   rows: RosterDetailRow[],
   sortId: RosterSortId,
@@ -156,7 +153,6 @@ export function sortRoster(
   }
 }
 
-/** Applies franchise, decade, position, and name-query filters. */
 export function filterRoster(rows: RosterDetailRow[], filters: RosterFilters): RosterDetailRow[] {
   const franchiseId = filters.franchiseId;
   const eraId = filters.eraId;
@@ -172,14 +168,12 @@ export function filterRoster(rows: RosterDetailRow[], filters: RosterFilters): R
   );
 }
 
-/** One team/decade bucket in dataset order (used by the 'none' organization). */
 export interface RosterGroup {
   franchiseId: string;
   eraId: string;
   players: RosterDetailRow[];
 }
 
-/** Groups rows by franchise then era, preserving dataset order. */
 export function groupRoster(rows: RosterDetailRow[]): RosterGroup[] {
   const groups: RosterGroup[] = [];
   const byKey = new Map<string, RosterGroup>();
@@ -264,18 +258,15 @@ export function shotPct(made: number | null, attempted: number | null): number {
   return made / attempted;
 }
 
-/** Formats a 0-1 ratio as a percentage string with one decimal. */
 export function formatPct(value: number): string {
   if (value === 0) return '0%';
   return percentOneDecimal(value);
 }
 
-/** Formats a per-game value with one decimal. */
 export function formatPerGame(value: number): string {
   return oneDecimal(value);
 }
 
-/** Formats a rating or advanced stat with one decimal. */
 export function formatDecimal(value: number): string {
   return oneDecimal(value);
 }

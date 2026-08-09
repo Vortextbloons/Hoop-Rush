@@ -17,7 +17,6 @@ import {
  * identity.
  */
 
-/** Minimal identity a season player card needs for a branded face. */
 export interface SeasonFaceRef {
   playerId: string;
   playerExternalId: string;
@@ -77,7 +76,6 @@ function tupleKey(playerId: string, franchiseId: string, eraId: string, seasonKe
   return `${playerId}\0${franchiseId}\0${eraId}\0${seasonKey}`;
 }
 
-/** The modern franchise slot for a franchiseId, or null when missing. */
 export function franchiseIdentityOf(
   manifest: HoopRushManifest,
   franchiseId: string,
@@ -102,7 +100,6 @@ export function eraIdentityOf(
   return { displayLabel: identity.displayLabel, logoCandidates: identity.logoCandidates };
 }
 
-/** Initials for a fallback face from any display name. */
 export function initialsOf(displayName: string): string {
   const parts = displayName
     .trim()

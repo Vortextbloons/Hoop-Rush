@@ -71,7 +71,6 @@
       shell.block.phase !== 'running',
   );
 
-  /** playerVersionId -> summary Overall rating, for the editor rows/chips. */
   const overallByVersion = $derived.by(() => {
     const catalog = shell.catalog;
     if (catalog === null) return null;
@@ -208,7 +207,6 @@
       : [],
   );
 
-  /** Season stats view-model: roster joined to the folded aggregates. */
   const statsView = $derived.by(() => {
     if (roster === null || humanFranchiseId === null) return null;
     return humanSeasonPlayerStats({
@@ -219,7 +217,6 @@
     });
   });
 
-  /** Roster-list role lookup: editor rows built once per editor change. */
   const roleByVersion = $derived.by(() => {
     const editor = shell.editor;
     if (editor === null) return null;

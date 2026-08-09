@@ -23,7 +23,6 @@
 
   const PAGE_SIZE = 48;
 
-  /** Typing delay before the pool list re-filters the players index. */
   const SEARCH_DEBOUNCE_MS = 80;
 
   const BADGE_TITLES: Record<RatingBadgeLabel, string> = {
@@ -56,7 +55,6 @@
     onpick: (player: IndexRow) => void;
   } = $props();
 
-  /** Raw input value; `search` below is the debounced query the pool reads. */
   let searchInput = $state('');
   let search = $state('');
   let positionFilter = $state<SlotIndex | null>(null);

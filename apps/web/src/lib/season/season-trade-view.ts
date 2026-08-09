@@ -62,7 +62,6 @@ export interface TradeOfferViewModel {
 /** Windows open after accepted checkpoints for blocks 2, 4, 5. */
 export const TRADE_WINDOW_BLOCK_INDEX: readonly number[] = [2, 4, 5];
 
-/** The block index whose accepted checkpoint opens `windowIndex`. */
 export function windowBlockIndexOf(windowIndex: number): number | null {
   return TRADE_WINDOW_BLOCK_INDEX[windowIndex] ?? null;
 }
@@ -321,7 +320,6 @@ export function openWindowOf(trade: SeasonTradeState | null): SeasonTradeWindowS
   return trade?.windows.find((window) => window.status === 'open') ?? null;
 }
 
-/** Human-facing offers in the currently open trade window. */
 export function humanTradeOffersOf(
   trade: SeasonTradeState | null,
   humanFranchiseId: string | null,
@@ -338,7 +336,6 @@ export interface TradeResolution {
   resolvedByBlockIndex: number | null;
 }
 
-/** How an offer was resolved (recorded status facts only). */
 export function tradeResolvedAt(offer: SeasonTradeOffer): TradeResolution {
   if (offer.status === 'open') {
     return {

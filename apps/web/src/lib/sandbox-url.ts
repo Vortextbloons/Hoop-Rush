@@ -30,7 +30,6 @@ export interface UrlStateValidation {
   error: string | null;
 }
 
-/** Route template literal so callers can pass the result through resolve(). */
 export type SandboxHref = `/sandbox?${string}`;
 
 const SLOT_PATTERN = /^([^@]+)@([^/]+)\/([^/]+)$/;
@@ -128,7 +127,6 @@ export function parseSandboxUrl(
   };
 }
 
-/** Encodes a completed sandbox lineup into a draft URL the sandbox page can restore. */
 export function buildSandboxHref(slots: RunPlayerSelection[]): SandboxHref {
   const params = new URLSearchParams();
   params.set(
@@ -138,7 +136,6 @@ export function buildSandboxHref(slots: RunPlayerSelection[]): SandboxHref {
   return `/sandbox?${params.toString()}`;
 }
 
-/** Generates a fresh game seed at the UI boundary (never in domain logic). */
 export function generateSeed(): Seed {
   return randomHex(16);
 }

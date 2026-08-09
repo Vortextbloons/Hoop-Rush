@@ -130,7 +130,6 @@
     };
   });
 
-  /** The engine catalog: one entry per packaged manifest pool, in pool order. */
   const catalog = $derived.by(() =>
     manifest && index ? buildClassicCatalog(manifest, index) : [],
   );
@@ -149,12 +148,10 @@
     roll ? (manifest?.eras.find((e) => e.eraId === roll.eraId) ?? null) : null,
   );
 
-  /** Era-scoped historical identity for the landed roll (franchise + era). */
   const rollIdentity = $derived(
     manifest && roll ? resolveEraTeamIdentity(manifest, roll.franchiseId, roll.eraId) : null,
   );
 
-  /** The complete eligible pool for the current roll, sorted per presentation. */
   const rollRows = $derived(index && roll ? classicPoolRows(index, roll, presentation) : []);
 
   const poolHeading = $derived(
@@ -184,7 +181,6 @@
     return rowByPickKey?.get(`${pick.playerId}|${pick.franchiseId}|${pick.eraId}`) ?? null;
   }
 
-  /** Drafted players in slot order, as index rows for the shared court. */
   const slots = $derived.by((): (IndexRow | null)[] => {
     const rows: (IndexRow | null)[] = [null, null, null, null, null];
     if (!draft) return rows;
@@ -257,12 +253,10 @@
     }
   }
 
-  /** The reels settled: the pool for the new roll is ready to browse. */
   function onReelSettled() {
     spinning = false;
   }
 
-  /** Starts a fresh draft in the chosen immutable variant. */
   async function startDraft(variant: Variant) {
     if (!manifest || !index) return;
     setupError = null;
@@ -385,7 +379,6 @@
     }
   }
 
-  /** Leaves the draft: clears the saved state and navigates to the blocked target. */
   async function discardAndLeave() {
     const target = guardTarget;
     guardOpen = false;
