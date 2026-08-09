@@ -33,11 +33,13 @@ function cacheBustedUrl(url: string): string {
   return `${url}${separator}v=${String(Date.now())}`;
 }
 
-const manifestRequestInit: RequestInit = { cache: 'no-store' };
-
 export function getManifest(): Promise<HoopRushManifest> {
   if (!manifestPromise) {
-    manifestPromise = loadManifest(manifestUrl(), manifestRequestInit);
+    // Normal browser caching: a reload reuses the HTTP-cached manifest (the
+    // app.html preload also serves it). Stale deployments recover through
+    // `reloadManifest`'s cache-busted request below; the retry stays bounded
+    // to one reload per asset.
+    manifestPromise = loadManifest(manifestUrl());
     // A failed load must not poison the cache: the next request retries.
     manifestPromise.catch(() => {
       manifestPromise = null;
@@ -47,7 +49,7 @@ export function getManifest(): Promise<HoopRushManifest> {
 }
 
 function reloadManifest(): Promise<HoopRushManifest> {
-  manifestPromise = loadManifest(cacheBustedUrl(manifestUrl()), manifestRequestInit);
+  manifestPromise = loadManifest(cacheBustedUrl(manifestUrl()));
   manifestPromise.catch(() => {
     manifestPromise = null;
   });

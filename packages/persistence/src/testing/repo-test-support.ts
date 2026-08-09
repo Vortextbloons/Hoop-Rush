@@ -5,8 +5,13 @@ import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 import type {
   StoredSeasonAcceptedBlockRow,
   StoredSeasonActiveRunIndex,
+  StoredSeasonAlmanacRow,
+  StoredSeasonCommandLogRow,
+  StoredSeasonCompletedIndex,
+  StoredSeasonCompletedRunRow,
   StoredSeasonDetailRow,
   StoredSeasonPendingBlockRow,
+  StoredSeasonPostseasonSummaryRow,
   StoredSeasonRunRecord,
   StoredSeasonSummaryRow,
 } from '../schemas/season-run-record.ts';
@@ -39,6 +44,11 @@ export class TestDatabase extends Dexie {
   seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
   seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
   seasonPendingBlocks!: EntityTable<StoredSeasonPendingBlockRow, 'runId'>;
+  seasonPostseasonSummaries!: Table<StoredSeasonPostseasonSummaryRow, [string, string]>;
+  seasonCommandLog!: Table<StoredSeasonCommandLogRow, [string, number]>;
+  seasonAlmanacs!: EntityTable<StoredSeasonAlmanacRow, 'runId'>;
+  seasonCompletedRuns!: EntityTable<StoredSeasonCompletedRunRow, 'runId'>;
+  seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
 
   constructor(name: string) {
     super(name);
@@ -60,6 +70,13 @@ export class TestDatabase extends Dexie {
       seasonRunIndex: 'recordId',
     });
     this.version(7).stores({ seasonPendingBlocks: 'runId' });
+    this.version(8).stores({
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+    });
   }
 }
 

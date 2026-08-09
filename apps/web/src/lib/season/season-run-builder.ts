@@ -1,9 +1,12 @@
 import {
   SEASON_AGGREGATES_VERSION,
   SEASON_AI_VERSION,
+  SEASON_ALMANAC_VERSION,
+  SEASON_AWARDS_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
+  SEASON_COMMAND_LOG_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
@@ -18,8 +21,11 @@ import {
   SEASON_LEAGUE_VERSION,
   SEASON_OBJECTIVE_CATALOG,
   SEASON_OBJECTIVE_VERSION,
+  SEASON_POSTSEASON_SUMMARY_VERSION,
+  SEASON_POSTSEASON_TARGETS_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
+  SEASON_REPLAY_EXPORT_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
   SEASON_ROSTER_TARGETS_VERSION,
@@ -28,13 +34,14 @@ import {
   SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
-  SEASON_SEED_NAMESPACES,
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
+  SEASON_TIEBREAK_VERSION,
+  SEASON_TRADE_GRADE_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
   PLAYER_VERSION_ID_VERSION,
-  seasonNamespaceSeed,
+  buildInitialPostseasonState,
   seasonRunSchema,
   sha256Hex as sha256Bytes,
   type SeasonDraftState,
@@ -73,34 +80,7 @@ export async function sha256Hex(material: string): Promise<string | null> {
 }
 
 function emptyPostseason(rootSeed: Seed): SeasonRun['postseason'] {
-  const game = (gameId: 'seven-eight' | 'nine-ten' | 'final') => ({
-    gameId,
-    status: 'scheduled' as const,
-    homeFranchiseId: null,
-    awayFranchiseId: null,
-    winnerFranchiseId: null,
-    loserFranchiseId: null,
-    homeScore: null,
-    awayScore: null,
-  });
-  const conference = (id: 'east' | 'west') => ({
-    conference: id,
-    ranking: null,
-    games: {
-      sevenEight: game('seven-eight'),
-      nineTen: game('nine-ten'),
-      final: game('final'),
-    },
-    playoffSeeds: null,
-  });
-  return {
-    schemaVersion: 1,
-    postseasonVersion: SEASON_POSTSEASON_VERSION,
-    seed: seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.postseasonTies),
-    playIn: { east: conference('east'), west: conference('west') },
-    bracket: null,
-    championFranchiseId: null,
-  };
+  return buildInitialPostseasonState(rootSeed);
 }
 
 export interface BuildSeasonRunInput {
@@ -177,6 +157,14 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
       tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
       influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+      tiebreakVersion: SEASON_TIEBREAK_VERSION,
+      postseasonSummaryVersion: SEASON_POSTSEASON_SUMMARY_VERSION,
+      awardsVersion: SEASON_AWARDS_VERSION,
+      tradeGradeVersion: SEASON_TRADE_GRADE_VERSION,
+      commandLogVersion: SEASON_COMMAND_LOG_VERSION,
+      almanacVersion: SEASON_ALMANAC_VERSION,
+      replayExportVersion: SEASON_REPLAY_EXPORT_VERSION,
+      postseasonTargetsVersion: SEASON_POSTSEASON_TARGETS_VERSION,
     },
     league: correctedLeague,
     rosters: generation.rosters,
@@ -222,7 +210,10 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       })),
     },
     cursor: { schemaVersion: 1, completedRounds: 0 },
+    stage: 'regular-season',
     postseason: emptyPostseason(rootSeed),
+    awards: null,
+    completion: null,
     draft: {
       draftVersion: SEASON_DRAFT_VERSION,
       participants: draft.participants.map((participant) => ({

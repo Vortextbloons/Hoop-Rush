@@ -1301,6 +1301,10 @@ export function openSeasonTradeWindow(
   };
   const stateDigest = seasonRunStateDigest({
     stateRevision: next.stateRevision,
+    stage: next.stage,
+    postseason: next.postseason,
+    awards: next.awards,
+    completion: next.completion,
     checkpointState: next.checkpointState,
     health: next.health,
     influence: next.influence,

@@ -32,13 +32,13 @@ import {
   SEASON_STAMINA_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
-  seasonNamespaceSeed,
+  buildInitialPostseasonState,
   playerVersionId,
+  seasonNamespaceSeed,
   type SeasonGame,
   type SeasonHealthState,
   type SeasonInfluenceState,
   type SeasonLeague,
-  type SeasonPostseasonState,
   type SeasonRoster,
   type SeasonRun,
   type SeasonSchedule,
@@ -206,35 +206,8 @@ function scheduledGames(schedule: SeasonSchedule): SeasonGame[] {
   }));
 }
 
-function emptyPostseason(rootSeed: string): SeasonPostseasonState {
-  const game = (gameId: 'seven-eight' | 'nine-ten' | 'final') => ({
-    gameId,
-    status: 'scheduled' as const,
-    homeFranchiseId: null,
-    awayFranchiseId: null,
-    winnerFranchiseId: null,
-    loserFranchiseId: null,
-    homeScore: null,
-    awayScore: null,
-  });
-  const conference = (id: 'east' | 'west') => ({
-    conference: id,
-    ranking: null,
-    games: {
-      sevenEight: game('seven-eight'),
-      nineTen: game('nine-ten'),
-      final: game('final'),
-    },
-    playoffSeeds: null,
-  });
-  return {
-    schemaVersion: 1,
-    postseasonVersion: SEASON_POSTSEASON_VERSION,
-    seed: seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.postseasonTies),
-    playIn: { east: conference('east'), west: conference('west') },
-    bracket: null,
-    championFranchiseId: null,
-  };
+function emptyPostseason(rootSeed: string): SeasonRun['postseason'] {
+  return buildInitialPostseasonState(rootSeed);
 }
 
 /**
@@ -320,6 +293,14 @@ export function buildSeasonRunFixture(input: {
       injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
       tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
       influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+      tiebreakVersion: 'tiebreaker-v1',
+      postseasonSummaryVersion: 'postseason-summary-v1',
+      awardsVersion: 'awards-v1',
+      tradeGradeVersion: 'trade-grade-v1',
+      commandLogVersion: 'command-log-v1',
+      almanacVersion: 'almanac-v1',
+      replayExportVersion: 'replay-export-v1',
+      postseasonTargetsVersion: 'postseason-targets-v1',
     },
     league,
     rosters,
@@ -339,7 +320,10 @@ export function buildSeasonRunFixture(input: {
     games: scheduledGames(input.schedule),
     standings: zeroStandings(league),
     cursor: { schemaVersion: 1, completedRounds: 0 },
+    stage: 'regular-season',
     postseason: emptyPostseason(seed),
+    awards: null,
+    completion: null,
     draft: buildFixtureSeasonDraftFacts(),
     aiAssignments,
     aiPools: buildSeasonAiPools(aiAssignments, 'lakers'),

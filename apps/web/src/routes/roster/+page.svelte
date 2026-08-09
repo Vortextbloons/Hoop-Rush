@@ -28,7 +28,17 @@
   import AsyncState from '$lib/components/AsyncState.svelte';
   import RosterComparison from '$lib/components/RosterComparison.svelte';
   import RosterTable from '$lib/components/RosterTable.svelte';
-  import PlayerDetailDialog from '$lib/components/PlayerDetailDialog.svelte';
+
+  /** The player-detail dialog chunk loads only when a roster player is selected. */
+  let playerDetailModule: Promise<
+    typeof import('$lib/components/PlayerDetailDialog.svelte')
+  > | null = null;
+  function loadPlayerDetailDialog(): Promise<
+    typeof import('$lib/components/PlayerDetailDialog.svelte')
+  > {
+    playerDetailModule ??= import('$lib/components/PlayerDetailDialog.svelte');
+    return playerDetailModule;
+  }
 
   type IndexRow = RosterDetailRow;
 
@@ -643,11 +653,16 @@
     />
   {/if}
 
-  <PlayerDetailDialog
-    player={dialogPlayer}
-    manifest={manifest!}
-    {franchiseName}
-    {eraLabel}
-    onClose={closePlayer}
-  />
+  {#if dialogPlayer}
+    {#await loadPlayerDetailDialog() then { default: PlayerDetailDialog }}
+      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Loading…</p>
+      <PlayerDetailDialog
+        player={dialogPlayer}
+        manifest={manifest!}
+        {franchiseName}
+        {eraLabel}
+        onClose={closePlayer}
+      />
+    {/await}
+  {/if}
 </section>

@@ -1199,6 +1199,10 @@ export function deriveSeasonPostBlockState(input: {
   const stateRevision = input.run.stateRevision + 1;
   const stateDigest = seasonRunStateDigest({
     stateRevision,
+    stage: input.run.stage,
+    postseason: input.run.postseason,
+    awards: input.run.awards,
+    completion: input.run.completion,
     checkpointState,
     health: input.candidate.health,
     influence: input.candidate.influence,

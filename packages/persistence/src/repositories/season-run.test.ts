@@ -1330,6 +1330,10 @@ describe('season run M2.5 reload audit (v5)', () => {
     };
     const digestOverOldSet = adapters.seam.seasonRunStateDigest({
       stateRevision: base.stateRevision,
+      stage: run.stage,
+      postseason: run.postseason,
+      awards: run.awards,
+      completion: run.completion,
       checkpointState,
       health: base.health,
       influence: base.influence,
@@ -1351,6 +1355,10 @@ describe('season run M2.5 reload audit (v5)', () => {
     const snapshot = await loadOrThrow(adapters);
     const repairedDigest = adapters.seam.seasonRunStateDigest({
       stateRevision: snapshot.run.stateRevision,
+      stage: snapshot.run.stage,
+      postseason: snapshot.run.postseason,
+      awards: snapshot.run.awards,
+      completion: snapshot.run.completion,
       checkpointState: snapshot.run.checkpointState,
       health: snapshot.run.health,
       influence: snapshot.run.influence,
@@ -1390,6 +1398,10 @@ describe('season run M2.5 reload audit (v5)', () => {
     expect(snapshot?.run.stateDigest).toBe(
       adapters.seam.seasonRunStateDigest({
         stateRevision: snapshot?.run.stateRevision ?? -1,
+        stage: snapshot?.run.stage ?? 'regular-season',
+        postseason: snapshot?.run.postseason ?? adapters.run.postseason,
+        awards: snapshot?.run.awards ?? null,
+        completion: snapshot?.run.completion ?? null,
         checkpointState: snapshot?.run.checkpointState ?? null,
         health: snapshot?.run.health ?? base.health,
         influence: snapshot?.run.influence ?? base.influence,
@@ -1421,6 +1433,10 @@ describe('season run M2.5 reload audit (v5)', () => {
     };
     const digestOverLocked = adapters.seam.seasonRunStateDigest({
       stateRevision: base.stateRevision,
+      stage: run.stage,
+      postseason: run.postseason,
+      awards: run.awards,
+      completion: run.completion,
       checkpointState,
       health: base.health,
       influence: base.influence,
@@ -1468,6 +1484,10 @@ describe('season run M2.5 reload audit (v5)', () => {
     };
     const stateDigest = adapters.seam.seasonRunStateDigest({
       stateRevision: stored.stateRevision,
+      stage: stored.run.stage,
+      postseason: stored.run.postseason,
+      awards: stored.run.awards,
+      completion: stored.run.completion,
       checkpointState: stored.checkpointState,
       health: stored.health,
       influence: stored.influence,

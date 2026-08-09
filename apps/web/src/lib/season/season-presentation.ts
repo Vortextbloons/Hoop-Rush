@@ -97,16 +97,10 @@ export function formatClock(totalSeconds: number): string {
   return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
 }
 
-export function franchiseStreak(
-  summaries: readonly SeasonGameSummary[],
+function streakOfGames(
+  games: readonly SeasonGameSummary[],
   franchiseId: string,
 ): { kind: 'wins' | 'losses'; length: number } | null {
-  const games = summaries
-    .filter(
-      (summary) =>
-        summary.homeFranchiseId === franchiseId || summary.awayFranchiseId === franchiseId,
-    )
-    .sort((a, b) => a.round - b.round);
   if (games.length === 0) return null;
   let streak = 0;
   let kind: 'wins' | 'losses' | null = null;
@@ -126,6 +120,54 @@ export function franchiseStreak(
   }
   if (kind === null) return null;
   return { kind, length: streak };
+}
+
+export function franchiseStreak(
+  summaries: readonly SeasonGameSummary[],
+  franchiseId: string,
+): { kind: 'wins' | 'losses'; length: number } | null {
+  const games = summaries
+    .filter(
+      (summary) =>
+        summary.homeFranchiseId === franchiseId || summary.awayFranchiseId === franchiseId,
+    )
+    .sort((a, b) => a.round - b.round);
+  return streakOfGames(games, franchiseId);
+}
+
+/**
+ * One-pass streak computation for many franchises: groups every summary by
+ * participating franchise and sorts each list once, instead of filtering and
+ * sorting the full summary set once per team. Returns null entries for
+ * franchises with no games, exactly like `franchiseStreak`.
+ */
+export function franchiseStreaks(
+  summaries: readonly SeasonGameSummary[],
+  franchiseIds: readonly string[],
+): Map<string, { kind: 'wins' | 'losses'; length: number } | null> {
+  const gamesByFranchise = new Map<string, SeasonGameSummary[]>();
+  for (const summary of summaries) {
+    const home = gamesByFranchise.get(summary.homeFranchiseId);
+    if (home !== undefined) {
+      home.push(summary);
+    } else {
+      gamesByFranchise.set(summary.homeFranchiseId, [summary]);
+    }
+    const away = gamesByFranchise.get(summary.awayFranchiseId);
+    if (away !== undefined) {
+      away.push(summary);
+    } else {
+      gamesByFranchise.set(summary.awayFranchiseId, [summary]);
+    }
+  }
+  for (const games of gamesByFranchise.values()) {
+    games.sort((a, b) => a.round - b.round);
+  }
+  const result = new Map<string, { kind: 'wins' | 'losses'; length: number } | null>();
+  for (const franchiseId of franchiseIds) {
+    result.set(franchiseId, streakOfGames(gamesByFranchise.get(franchiseId) ?? [], franchiseId));
+  }
+  return result;
 }
 
 export function didWin(summary: SeasonGameSummary, franchiseId: string): boolean {
@@ -756,8 +798,12 @@ export function deriveBlockRecap(input: {
     };
   };
   const streaks: SeasonStreak[] = [];
+  const streaksByFranchise = franchiseStreaks(
+    allSummaries,
+    league.teams.map((team) => team.franchiseId),
+  );
   for (const team of league.teams) {
-    const streak = franchiseStreak(allSummaries, team.franchiseId);
+    const streak = streaksByFranchise.get(team.franchiseId) ?? null;
     if (streak && streak.length >= 2) {
       streaks.push({ franchiseId: team.franchiseId, kind: streak.kind, length: streak.length });
     }

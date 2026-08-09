@@ -5,6 +5,7 @@ export * from './schemas/season-run-record.ts';
 export * from './repositories/dexie.ts';
 export * from './repositories/season-draft.ts';
 export * from './repositories/season-run.ts';
+export * from './repositories/season-postseason.ts';
 export * from './repositories/season-run-dexie.ts';
 export * from './season/engine-seam.ts';
 export * from './season/engine-seam-types.ts';

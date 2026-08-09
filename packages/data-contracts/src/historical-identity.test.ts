@@ -241,4 +241,18 @@ describe('resolveEraTeamIdentity', () => {
     expect(identity.displayLabel).toBe('Seattle SuperSonics');
     expect(identity.logoCandidates).toEqual([]);
   });
+
+  it('memoizes per manifest identity and franchise/era key (read-only sharing)', () => {
+    const m = manifest(FULL_LINEAGE);
+    const first = resolveEraTeamIdentity(m, 'thunder', '2000s');
+    const second = resolveEraTeamIdentity(m, 'thunder', '2000s');
+    // Identical inputs on the same manifest share the cached object.
+    expect(second).toBe(first);
+    // A different franchise/era key resolves independently.
+    expect(resolveEraTeamIdentity(m, 'kings', '1970s')).not.toBe(first);
+    // A different manifest instance computes fresh values.
+    const other = manifest(FULL_LINEAGE);
+    expect(resolveEraTeamIdentity(other, 'thunder', '2000s')).not.toBe(first);
+    expect(resolveEraTeamIdentity(other, 'thunder', '2000s')).toEqual(first);
+  });
 });

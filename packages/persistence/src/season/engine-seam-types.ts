@@ -1,4 +1,5 @@
 import type {
+  SeasonAwards,
   SeasonCheckpointState,
   SeasonEffectsState,
   SeasonGame,
@@ -9,8 +10,11 @@ import type {
   SeasonObjectiveState,
   SeasonOwnership,
   SeasonPlayerAggregate,
+  SeasonPostseasonState,
   SeasonRoster,
   SeasonRotation,
+  SeasonRunCompletion,
+  SeasonRunStage,
   SeasonSchedule,
   SeasonStandings,
   SeasonTeamAggregate,
@@ -85,13 +89,14 @@ export interface SeasonRunEngineSeam {
   /** True when `a < b` (canonical pair ordering). */
   seasonPairIsCanonical(a: string, b: string): boolean;
   /**
-   * M2.5: canonical 32-hex digest of the mutable run state facts
-   * (`stateRevision`, `checkpointState`, `health`, `influence`,
-   * `transactions`, `trade`, `objectives`, `rosters`, `ownership`,
-   * `rotations`, `effects`; the stored `stateDigest` excludes itself). The
-   * reload audit recomputes the stored digest through this binding, so
-   * corrupt or half-applied mutable state is detected. Value property because
-   * the binding is the engine's pure function passed by reference.
+   * M2.5/M2.6: canonical 32-hex digest of the mutable run state facts
+   * (`stateRevision`, `stage`, `postseason`, `awards`, `completion`,
+   * `checkpointState`, `health`, `influence`, `transactions`, `trade`,
+   * `objectives`, `rosters`, `ownership`, `rotations`, `effects`; the
+   * stored `stateDigest` excludes itself). The reload audit recomputes the
+   * stored digest through this binding, so corrupt or half-applied mutable
+   * state is detected. Value property because the binding is the engine's
+   * pure function passed by reference.
    */
   seasonRunStateDigest: (facts: SeasonRunStateDigestFacts) => string;
   /**
@@ -101,9 +106,20 @@ export interface SeasonRunEngineSeam {
   createInitialSeasonInfluenceState(franchiseIds: readonly string[]): SeasonInfluenceState;
 }
 
-/** The mutable run-state facts the M2.5 state digest covers. */
+/**
+ * The mutable run-state facts the M2.5/M2.6 state digest covers (M2.6 adds
+ * `stage`, the postseason-v2 state, `awards`, and `completion`).
+ */
 export interface SeasonRunStateDigestFacts {
   stateRevision: number;
+  /** M2.6: the explicit run stage. */
+  stage: SeasonRunStage;
+  /** M2.6: the postseason-v2 state machine. */
+  postseason: SeasonPostseasonState;
+  /** M2.6: derived season awards; null until postseason qualification. */
+  awards: SeasonAwards | null;
+  /** M2.6: completion state; null until a champion is decided. */
+  completion: SeasonRunCompletion | null;
   checkpointState: SeasonCheckpointState | null;
   health: SeasonHealthState;
   influence: SeasonInfluenceState;

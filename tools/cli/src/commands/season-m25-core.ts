@@ -14,6 +14,7 @@ import {
   SEASON_HEALTH_VERSION,
   SEASON_OBJECTIVE_CATALOG,
   SEASON_OBJECTIVE_VERSION,
+  buildInitialPostseasonState,
   seasonHealthStateSchema,
   seasonObjectiveStateSchema,
   type SeasonCandidateCheckpoint,
@@ -63,9 +64,17 @@ export function m25InitialInfluenceState(franchiseIds: readonly string[]): Seaso
   return createInitialSeasonInfluenceState(franchiseIds);
 }
 
-/** The run-state facts `seasonRunStateDigest` canonicalizes (§20 item 2). */
+/** The run-state facts `seasonRunStateDigest` canonicalizes (§20 item 2, M2.6). */
 export interface SeasonM25RunStateFacts {
   stateRevision: number;
+  /** M2.6: the explicit run stage. */
+  stage: SeasonRun['stage'];
+  /** M2.6: the postseason-v2 state. */
+  postseason: SeasonRun['postseason'];
+  /** M2.6: season awards (null until postseason qualification). */
+  awards: SeasonRun['awards'];
+  /** M2.6: completion state (null until a champion is decided). */
+  completion: SeasonRun['completion'];
   checkpointState: SeasonCheckpointState | null;
   health: SeasonHealthState;
   influence: SeasonInfluenceState;
@@ -84,6 +93,10 @@ export function m25RunStateFacts(
 ): SeasonM25RunStateFacts {
   return {
     stateRevision: run.stateRevision,
+    stage: run.stage,
+    postseason: run.postseason,
+    awards: run.awards,
+    completion: run.completion,
     checkpointState: run.checkpointState,
     health: run.health,
     influence: run.influence,
@@ -111,6 +124,12 @@ export function m25FreshRun(
   const fresh: SeasonRun = {
     ...base,
     rootSeed,
+    // M2.6: the postseason scaffold (seeds, scheduled play-in ids) derives
+    // from the run root seed, so each cohort seed owns its scaffold.
+    stage: 'regular-season',
+    postseason: buildInitialPostseasonState(rootSeed),
+    awards: null,
+    completion: null,
     health: m25EmptyHealthState(),
     transactions: [],
     influence: m25InitialInfluenceState(franchiseIds),

@@ -10,12 +10,12 @@ import type {
   SeasonPairChemistryState,
   SeasonPendingBlockCandidate,
   SeasonPlayerLoadState,
-  SeasonPostseasonState,
   SeasonRun,
   SeasonSchedule,
   SeasonTeamAggregate,
   SeasonPlayerAggregate,
 } from './index.ts';
+import { buildInitialPostseasonState } from './season-postseason.ts';
 import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
 import { SEASON_ALIGNMENT } from './season-alignment.ts';
 
@@ -92,52 +92,9 @@ export function buildGames(schedule: SeasonSchedule): SeasonGame[] {
   }));
 }
 
-export function buildPostseason(seed: string): SeasonPostseasonState {
-  const conferenceState = (conference: 'east' | 'west') => ({
-    conference,
-    ranking: null,
-    games: {
-      sevenEight: {
-        gameId: 'seven-eight' as const,
-        status: 'scheduled' as const,
-        homeFranchiseId: null,
-        awayFranchiseId: null,
-        winnerFranchiseId: null,
-        loserFranchiseId: null,
-        homeScore: null,
-        awayScore: null,
-      },
-      nineTen: {
-        gameId: 'nine-ten' as const,
-        status: 'scheduled' as const,
-        homeFranchiseId: null,
-        awayFranchiseId: null,
-        winnerFranchiseId: null,
-        loserFranchiseId: null,
-        homeScore: null,
-        awayScore: null,
-      },
-      final: {
-        gameId: 'final' as const,
-        status: 'scheduled' as const,
-        homeFranchiseId: null,
-        awayFranchiseId: null,
-        winnerFranchiseId: null,
-        loserFranchiseId: null,
-        homeScore: null,
-        awayScore: null,
-      },
-    },
-    playoffSeeds: null,
-  });
-  return {
-    schemaVersion: 1,
-    postseasonVersion: 'postseason-v1',
-    seed,
-    playIn: { east: conferenceState('east'), west: conferenceState('west') },
-    bracket: null,
-    championFranchiseId: null,
-  };
+/** M2.6 initial postseason state (postseason-v2 scaffold). */
+export function buildPostseason(seed: string): SeasonRun['postseason'] {
+  return buildInitialPostseasonState(seed);
 }
 
 /** Empty M2.5 health state: no injury records yet. */
@@ -218,16 +175,16 @@ export function buildRun(): SeasonRun {
                 : ('active-trader' as const),
   }));
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     runId: 'fixture-run-1',
     rootSeed: SEED,
     versions: {
-      runSchemaVersion: 8,
+      runSchemaVersion: 9,
       leagueVersion: 'league-v1',
       scheduleVersion: 'schedule-v1',
       scheduleFormulaVersion: 'schedule-formula-v1',
       standingsVersion: 'standings-v1',
-      postseasonVersion: 'postseason-v1',
+      postseasonVersion: 'postseason-v2',
       seedDerivationVersion: 'season-seeds-v1',
       playerVersionIdVersion: 'player-version-id-v1',
       draftVersion: 'season-draft-v2',
@@ -257,6 +214,14 @@ export function buildRun(): SeasonRun {
       injuryTargetsVersion: 'injury-targets-v1',
       tradeTargetsVersion: 'trade-targets-v1',
       influenceTargetsVersion: 'influence-targets-v1',
+      tiebreakVersion: 'tiebreaker-v1',
+      postseasonSummaryVersion: 'postseason-summary-v1',
+      awardsVersion: 'awards-v1',
+      tradeGradeVersion: 'trade-grade-v1',
+      commandLogVersion: 'command-log-v1',
+      almanacVersion: 'almanac-v1',
+      replayExportVersion: 'replay-export-v1',
+      postseasonTargetsVersion: 'postseason-targets-v1',
     },
     league,
     rosters,
@@ -298,7 +263,10 @@ export function buildRun(): SeasonRun {
       })),
     },
     cursor: { schemaVersion: 1, completedRounds: 0 },
+    stage: 'regular-season',
     postseason: buildPostseason(SEED),
+    awards: null,
+    completion: null,
     draft: {
       draftVersion: 'season-draft-v2',
       participants: [

@@ -47,7 +47,7 @@
       class="flex items-center gap-2.5 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <img
-        src={asset('/app-icon-512.png')}
+        src={asset('/app-icon-96.png')}
         alt=""
         class="h-9 w-9 rounded-lg object-contain"
         width="36"

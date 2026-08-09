@@ -3,7 +3,6 @@
   import { resolve } from '$app/paths';
   import type { RouteId } from '$app/types';
   import type { HoopRushManifest, SeasonGameSummary } from '@hoop-rush/data-contracts';
-  import BoxScore from '$lib/components/season/BoxScore.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
@@ -42,12 +41,20 @@
    * Box scores mount only when their <details> opens (progressive
    * disclosure): each row's three table variants stay out of the DOM until
    * first expanded, then remain mounted so closing/reopening is instant.
+   * The BoxScore chunk itself is lazy-loaded on first open.
    */
   let openedBoxScores = $state.raw(new Set<string>());
   function onBoxScoreToggle(event: Event, gameId: string) {
     if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
     if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
     openedBoxScores = new Set([...openedBoxScores, gameId]);
+  }
+
+  let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null =
+    null;
+  function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
+    boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
+    return boxScoreModule;
   }
 
   /**
@@ -268,14 +275,19 @@
                         </summary>
                         <div class="border-t border-border/40 p-3">
                           {#if openedBoxScores.has(row.gameId)}
-                            <BoxScore
-                              {box}
-                              opponentName={shell.franchiseName(row.opponentFranchiseId)}
-                              resultLabel={resultLabel(row)}
-                              {manifest}
-                              teamFranchiseId={humanFranchiseId}
-                              opponentFranchiseId={row.opponentFranchiseId}
-                            />
+                            {#await loadBoxScore() then { default: BoxScore }}
+                              <p class="py-2 font-mono text-xs text-muted-foreground">
+                                Loading box score…
+                              </p>
+                              <BoxScore
+                                {box}
+                                opponentName={shell.franchiseName(row.opponentFranchiseId)}
+                                resultLabel={resultLabel(row)}
+                                {manifest}
+                                teamFranchiseId={humanFranchiseId}
+                                opponentFranchiseId={row.opponentFranchiseId}
+                              />
+                            {/await}
                           {/if}
                         </div>
                       </details>

@@ -6,6 +6,7 @@ import { seasonGameSchema } from './season-game.ts';
 import { seasonStandingsSchema } from './season-standings.ts';
 import { seasonCursorSchema } from './season-cursor.ts';
 import { seasonPostseasonStateSchema } from './season-postseason.ts';
+import { seasonAwardsSchema } from './season-awards.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonCheckpointStateSchema } from './season-checkpoint.ts';
 import { seasonHealthStateSchema } from './season-health.ts';
@@ -18,9 +19,12 @@ import {
   SEASON_AI_V2,
   SEASON_AI_VERSION,
   SEASON_AGGREGATES_VERSION,
+  SEASON_ALMANAC_VERSION,
+  SEASON_AWARDS_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
+  SEASON_COMMAND_LOG_VERSION,
   SEASON_DRAFT_LEGACY_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
@@ -38,8 +42,11 @@ import {
   SEASON_LEADERS_VERSION,
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_OBJECTIVE_VERSION,
+  SEASON_POSTSEASON_SUMMARY_VERSION,
+  SEASON_POSTSEASON_TARGETS_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
+  SEASON_REPLAY_EXPORT_VERSION,
   SEASON_ROSTER_GENERATION_V2,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
@@ -56,6 +63,8 @@ import {
   SEASON_STAMINA_VERSION,
   SEASON_STANDINGS_VERSION,
   SEASON_TEAM_COUNT,
+  SEASON_TIEBREAK_VERSION,
+  SEASON_TRADE_GRADE_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
 } from './season-versions.ts';
@@ -71,16 +80,21 @@ import { seasonRotationSchema } from './season-rotation.ts';
 /**
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
  * validated record covers the frozen league, ten-player rosters, ownership,
- * schedule reference, all scheduled game identities, the block cursor, and
- * postseason state, plus the frozen material versions. Since schema 6 (M2.4)
- * it records the roster-generation-v2/season-ai-v2/roster-targets-v2
- * versions and `aiPools` (one 20-player pool per AI franchise); since schema
- * 7 (M2.5) it carries `health`, `transactions`, `influence`,
- * `checkpointState`, and the `stateRevision`/`stateDigest` chain (schema 6
- * runs cannot continue). Completed game facts live in per-block compact
- * summary rows (season-game-summary-v3), not in the scheduled `games` array;
- * the engine reconstructs finalized game records from the schedule and
- * summaries on demand.
+ * schedule reference, all scheduled game identities, the block cursor, the
+ * explicit season `stage`, the postseason-v2 state, awards, and completion
+ * state, plus the frozen material versions. Since schema 9 (M2.6
+ * postseason-foundations) it carries `stage`, the validated v2 postseason
+ * state, `awards`, and `completion`, and the M2.6 material versions
+ * (tiebreaker, postseason summaries, awards, trade grades, command log,
+ * almanac, replay exports, postseason targets); schema 8 runs cannot
+ * continue. Since schema 6 (M2.4) it recorded the
+ * roster-generation-v2/season-ai-v2/roster-targets-v2 versions and
+ * `aiPools` (one 20-player pool per AI franchise); since schema 7 (M2.5) it
+ * carries `health`, `transactions`, `influence`, `checkpointState`, and the
+ * `stateRevision`/`stateDigest` chain. Completed game facts live in
+ * per-block compact summary rows (season-game-summary-v3), not in the
+ * scheduled `games` array; the engine reconstructs finalized game records
+ * from the schedule and summaries on demand.
  */
 
 export {
@@ -89,6 +103,29 @@ export {
   seasonOwnershipSchema,
 } from './season-roster.ts';
 export type { SeasonRosterEntry, SeasonRoster, SeasonOwnership } from './season-roster.ts';
+
+/**
+ * The explicit run stage (M2.6). `regular-season` runs advance through the
+ * nine blocks; `play-in` runs resolve the Play-In Tournament; `playoffs`
+ * runs resolve the bracket; `completed` runs finished with a champion and
+ * were (or can be) promoted to completed history. Older active saves
+ * (schema 8 and below) are incompatible and require an explicit restart.
+ */
+export const seasonRunStageSchema = z.enum(['regular-season', 'play-in', 'playoffs', 'completed']);
+export type SeasonRunStage = z.infer<typeof seasonRunStageSchema>;
+
+/**
+ * Completion state of a run (M2.6): set exactly when a champion is decided
+ * and the postseason is final. `almanacDigest` is the canonical digest of
+ * the promoted almanac; `finalizedAtStateRevision` pins the run state chain
+ * position at promotion.
+ */
+export const seasonRunCompletionSchema = z.object({
+  championFranchiseId: franchiseIdSchema,
+  almanacDigest: seasonCheckpointDigestSchema,
+  finalizedAtStateRevision: z.number().int().nonnegative(),
+});
+export type SeasonRunCompletion = z.infer<typeof seasonRunCompletionSchema>;
 
 /** Legacy M2.1-M2.3 draft facts: franchise-era rolls, claims, and picks. */
 export const seasonLegacyDraftFactsSchema = z.object({
@@ -272,55 +309,114 @@ export const seasonRunVersionsSchema = z.object({
   tradeTargetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
   /** M2.5: frozen Influence calibration targets (influence-targets-v1). */
   influenceTargetsVersion: z.literal(SEASON_INFLUENCE_TARGETS_VERSION),
+  /** M2.6: authoritative regular-season tiebreak rules (tiebreaker-v1). */
+  tiebreakVersion: z.literal(SEASON_TIEBREAK_VERSION),
+  /** M2.6: compact postseason summaries (postseason-summary-v1). */
+  postseasonSummaryVersion: z.literal(SEASON_POSTSEASON_SUMMARY_VERSION),
+  /** M2.6: season awards derivation (awards-v1). */
+  awardsVersion: z.literal(SEASON_AWARDS_VERSION),
+  /** M2.6: trade-grade contract (trade-grade-v1). */
+  tradeGradeVersion: z.literal(SEASON_TRADE_GRADE_VERSION),
+  /** M2.6: accepted-command log (command-log-v1). */
+  commandLogVersion: z.literal(SEASON_COMMAND_LOG_VERSION),
+  /** M2.6: completed-season almanac (almanac-v1). */
+  almanacVersion: z.literal(SEASON_ALMANAC_VERSION),
+  /** M2.6: replay exports (replay-export-v1). */
+  replayExportVersion: z.literal(SEASON_REPLAY_EXPORT_VERSION),
+  /** M2.6: frozen postseason calibration targets (postseason-targets-v1). */
+  postseasonTargetsVersion: z.literal(SEASON_POSTSEASON_TARGETS_VERSION),
 });
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
 
-export const seasonRunSchema = z.object({
-  schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
-  runId: idSchema,
-  rootSeed: seedSchema,
-  versions: seasonRunVersionsSchema,
-  league: seasonLeagueSchema,
-  rosters: z.array(seasonRosterSchema).length(SEASON_TEAM_COUNT),
-  ownership: z.array(seasonOwnershipSchema).length(SEASON_TEAM_COUNT * SEASON_ROSTER_SIZE),
-  schedule: seasonScheduleReferenceSchema,
-  /** All 1,230 league games; scheduled until played. */
-  games: z.array(seasonGameSchema).length(SEASON_GAME_COUNT),
-  standings: seasonStandingsSchema,
-  cursor: seasonCursorSchema,
-  postseason: seasonPostseasonStateSchema,
-  /** M2.1: completed human draft facts. */
-  draft: seasonDraftFactsSchema,
-  /** M2.1: band + identity assignment for every franchise (30 rows). */
-  aiAssignments: z.array(seasonAiAssignmentSchema).length(SEASON_TEAM_COUNT),
-  /** M2.4 roster-generation-v2: one pool per AI franchise (29 solo, 28 duo). */
-  aiPools: z.array(seasonAiPoolSchema).min(28).max(29),
-  /** M2.1: one legal rotation per franchise (30 rows). */
-  rotations: z.array(seasonRotationSchema).length(SEASON_TEAM_COUNT),
-  /** M2.1: generation audit summary (digest, diagnostics, versions). */
-  generationAudit: seasonGenerationAuditSchema,
-  /** M2.1: per-roster strength evaluations (30 rows). */
-  evaluations: z.array(seasonRosterEvaluationSchema).length(SEASON_TEAM_COUNT),
-  /** M2.5: run-scoped trade-window state (null until the first window opens). */
-  trade: seasonTradeStateSchema.nullable(),
-  /** M2.5: run-scoped objective selections per block 0-7 (fixed catalog). */
-  objectives: seasonObjectiveStateSchema,
-  /**
-   * M2.5: run-scoped health state (append-only injury records; availability
-   * is derived, never stored separately).
-   */
-  health: seasonHealthStateSchema,
-  /** M2.5: append-only run-scoped transaction log entries. */
-  transactions: z.array(seasonTransactionEntrySchema),
-  /** M2.5: Influence economy state (balances, ledger, windows, rehabs). */
-  influence: seasonInfluenceStateSchema,
-  /** M2.5: latest accepted checkpoint facts; null until the first block commits. */
-  checkpointState: seasonCheckpointStateSchema.nullable(),
-  /** M2.5: increments on every committed block AND every applied run command. */
-  stateRevision: z.number().int().nonnegative(),
-  /** M2.5: canonical digest of the mutable run state (32-hex, self-excluded). */
-  stateDigest: seasonCheckpointDigestSchema,
-});
+export const seasonRunSchema = z
+  .object({
+    schemaVersion: z.literal(SEASON_RUN_SCHEMA_VERSION),
+    runId: idSchema,
+    rootSeed: seedSchema,
+    versions: seasonRunVersionsSchema,
+    league: seasonLeagueSchema,
+    rosters: z.array(seasonRosterSchema).length(SEASON_TEAM_COUNT),
+    ownership: z.array(seasonOwnershipSchema).length(SEASON_TEAM_COUNT * SEASON_ROSTER_SIZE),
+    schedule: seasonScheduleReferenceSchema,
+    /** All 1,230 league games; scheduled until played. */
+    games: z.array(seasonGameSchema).length(SEASON_GAME_COUNT),
+    standings: seasonStandingsSchema,
+    cursor: seasonCursorSchema,
+    /** M2.6: the explicit run stage (regular-season, play-in, playoffs, completed). */
+    stage: seasonRunStageSchema,
+    /** M2.6: the validated postseason-v2 state machine. */
+    postseason: seasonPostseasonStateSchema,
+    /** M2.6: season awards; null until postseason qualification. */
+    awards: seasonAwardsSchema.nullable(),
+    /** M2.6: completion state; null until a champion is decided. */
+    completion: seasonRunCompletionSchema.nullable(),
+    /** M2.1: completed human draft facts. */
+    draft: seasonDraftFactsSchema,
+    /** M2.1: band + identity assignment for every franchise (30 rows). */
+    aiAssignments: z.array(seasonAiAssignmentSchema).length(SEASON_TEAM_COUNT),
+    /** M2.4 roster-generation-v2: one pool per AI franchise (29 solo, 28 duo). */
+    aiPools: z.array(seasonAiPoolSchema).min(28).max(29),
+    /** M2.1: one legal rotation per franchise (30 rows). */
+    rotations: z.array(seasonRotationSchema).length(SEASON_TEAM_COUNT),
+    /** M2.1: generation audit summary (digest, diagnostics, versions). */
+    generationAudit: seasonGenerationAuditSchema,
+    /** M2.1: per-roster strength evaluations (30 rows). */
+    evaluations: z.array(seasonRosterEvaluationSchema).length(SEASON_TEAM_COUNT),
+    /** M2.5: run-scoped trade-window state (null until the first window opens). */
+    trade: seasonTradeStateSchema.nullable(),
+    /** M2.5: run-scoped objective selections per block 0-7 (fixed catalog). */
+    objectives: seasonObjectiveStateSchema,
+    /**
+     * M2.5: run-scoped health state (append-only injury records; availability
+     * is derived, never stored separately).
+     */
+    health: seasonHealthStateSchema,
+    /** M2.5: append-only run-scoped transaction log entries. */
+    transactions: z.array(seasonTransactionEntrySchema),
+    /** M2.5: Influence economy state (balances, ledger, windows, rehabs). */
+    influence: seasonInfluenceStateSchema,
+    /** M2.5: latest accepted checkpoint facts; null until the first block commits. */
+    checkpointState: seasonCheckpointStateSchema.nullable(),
+    /** M2.5: increments on every committed block AND every applied run command. */
+    stateRevision: z.number().int().nonnegative(),
+    /** M2.5: canonical digest of the mutable run state (32-hex, self-excluded). */
+    stateDigest: seasonCheckpointDigestSchema,
+  })
+  .superRefine((run, ctx) => {
+    // M2.6 stage/completion coupling (frozen): a completed run must carry a
+    // champion and completion state; an active run (regular-season, play-in,
+    // playoffs) must carry neither.
+    if (run.stage === 'completed') {
+      if (run.completion === null) {
+        ctx.addIssue({ code: 'custom', message: 'a completed run must carry completion state' });
+      }
+      if (run.postseason.championFranchiseId === null) {
+        ctx.addIssue({ code: 'custom', message: 'a completed run must carry a champion' });
+      }
+    } else if (run.completion !== null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `an active ${run.stage} run must not carry completion state`,
+      });
+    }
+    if (run.completion !== null) {
+      if (run.completion.championFranchiseId !== run.postseason.championFranchiseId) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'completion champion must match the postseason champion',
+        });
+      }
+    }
+    // M2.6 awards coupling: awards are derived from the frozen regular-season
+    // facts after postseason qualification, so they exist only from the
+    // playoffs stage onward.
+    if (run.awards !== null && (run.stage === 'regular-season' || run.stage === 'play-in')) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `awards cannot exist before the playoffs (run stage: ${run.stage})`,
+      });
+    }
+  });
 export type SeasonRun = z.infer<typeof seasonRunSchema>;
 
 /**

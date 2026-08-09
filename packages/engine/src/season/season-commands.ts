@@ -157,6 +157,10 @@ function economyRunOf(context: SeasonRunCommandContext): SeasonEconomyRun {
 function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonRunStateDigest>[0] {
   return {
     stateRevision: run.stateRevision,
+    stage: run.stage,
+    postseason: run.postseason,
+    awards: run.awards,
+    completion: run.completion,
     checkpointState: run.checkpointState,
     health: run.health,
     influence: run.influence,
@@ -923,6 +927,22 @@ export function handleSeasonRunCommand(
       return handleResumeSeasonBlock(command, context);
     case 'forfeit-interrupted-game':
       return handleForfeitInterruptedGame(command, context);
+    // M2.6 postseason commands: engine handlers land in a later phase; the
+    // typed dispatch rejects them explicitly rather than falling through.
+    case 'start-postseason':
+    case 'advance-postseason':
+    case 'submit-postseason-rotation':
+    case 'spectate-postseason-game':
+    case 'fast-forward-postseason':
+      throw new SeasonRunCommandNotImplementedError(command.command);
+    // M2.6 postseason commands: the engine handlers land in a later M2.6
+    // phase; the contract is validated here and dispatch stays typed.
+    case 'start-postseason':
+    case 'advance-postseason':
+    case 'submit-postseason-rotation':
+    case 'spectate-postseason-game':
+    case 'fast-forward-postseason':
+      throw new SeasonRunCommandNotImplementedError(command.command);
     case 'submit-season-block':
       throw new SeasonRunCommandNotImplementedError(
         'submit-season-block is handled by the block pipeline, not the run command dispatch',

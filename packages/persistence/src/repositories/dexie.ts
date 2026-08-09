@@ -22,8 +22,13 @@ import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 import type {
   StoredSeasonAcceptedBlockRow,
   StoredSeasonActiveRunIndex,
+  StoredSeasonAlmanacRow,
+  StoredSeasonCommandLogRow,
+  StoredSeasonCompletedIndex,
+  StoredSeasonCompletedRunRow,
   StoredSeasonDetailRow,
   StoredSeasonPendingBlockRow,
+  StoredSeasonPostseasonSummaryRow,
   StoredSeasonRunRecord,
   StoredSeasonSummaryRow,
 } from '../schemas/season-run-record.ts';
@@ -59,6 +64,16 @@ export class HoopRushDatabase extends Dexie {
   seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
   /** M2.5: one interrupted-block pending candidate per run, keyed by runId. */
   seasonPendingBlocks!: EntityTable<StoredSeasonPendingBlockRow, 'runId'>;
+  /** M2.6: one postseason game summary per row, keyed [runId+gameId]. */
+  seasonPostseasonSummaries!: Table<StoredSeasonPostseasonSummaryRow, [string, string]>;
+  /** M2.6: one accepted command per row, append-only, keyed [runId+ordinal]. */
+  seasonCommandLog!: Table<StoredSeasonCommandLogRow, [string, number]>;
+  /** M2.6: one promoted almanac per completed season, keyed by runId. */
+  seasonAlmanacs!: EntityTable<StoredSeasonAlmanacRow, 'runId'>;
+  /** M2.6: one final run snapshot per completed season, keyed by runId. */
+  seasonCompletedRuns!: EntityTable<StoredSeasonCompletedRunRow, 'runId'>;
+  /** M2.6: completed-season history index, keyed by runId. */
+  seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
 
   constructor() {
     super('hoop-rush-saves');
@@ -123,6 +138,17 @@ export class HoopRushDatabase extends Dexie {
     // v7 is additive (one new M2.5 pending-block table); older saves stay
     // untouched, so no upgrade hook is needed. Save-schema-v3 rows (M2.4 runs)
     // surface through the typed incompatibility flow; they are never migrated.
+    this.version(8).stores({
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+    });
+    // v8 is additive (five new M2.6 postseason-foundations tables); older
+    // saves stay untouched, so no upgrade hook is needed. Save-schema-v1-v5
+    // rows (pre-M2.6 runs) surface through the typed incompatibility flow;
+    // they are never migrated.
   }
 }
 

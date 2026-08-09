@@ -8,7 +8,6 @@
     SeasonGameSummary,
   } from '@hoop-rush/data-contracts';
   import { humanFranchiseIdOf } from '@hoop-rush/data-contracts';
-  import BoxScore from '$lib/components/season/BoxScore.svelte';
   import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
   import {
     loadSeasonDraftCatalog,
@@ -40,6 +39,24 @@
   let retainedGameIds = $state<string[]>([]);
   /** Reactive mirror of the hub's plain snapshot field. */
   let snapshot = $state<SeasonRunSnapshot | null>(null);
+
+  /**
+   * Box scores render only after their <details> first opens; the BoxScore
+   * chunk itself is lazy-loaded on first open.
+   */
+  let openedBoxScores = $state.raw(new Set<string>());
+  function onBoxScoreToggle(event: Event, gameId: string) {
+    if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
+    if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
+    openedBoxScores = new Set([...openedBoxScores, gameId]);
+  }
+
+  let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null =
+    null;
+  function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
+    boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
+    return boxScoreModule;
+  }
 
   $effect(() => {
     if (!browser) return;
@@ -238,7 +255,10 @@
           <div class="mt-3 flex flex-col gap-3">
             {#each humanGames as summary (summary.gameId)}
               {@const box = boxFor(summary)}
-              <details class="group rounded-xl bg-surface-1 open:ring-1 open:ring-ring/30">
+              <details
+                class="group rounded-xl bg-surface-1 open:ring-1 open:ring-ring/30"
+                ontoggle={(event) => onBoxScoreToggle(event, summary.gameId)}
+              >
                 <summary
                   class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
                 >
@@ -264,17 +284,24 @@
                 </summary>
                 <div class="border-t border-border/60 p-4">
                   {#if box}
-                    <BoxScore
-                      {box}
-                      opponentName={summary.homeFranchiseId === humanFranchiseId
-                        ? franchiseName(summary.awayFranchiseId)
-                        : franchiseName(summary.homeFranchiseId)}
-                      resultLabel={resultLabel(summary)}
-                    />
-                    {#if retainedGameIds.includes(summary.gameId)}
-                      <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-                        Full game detail available.
-                      </p>
+                    {#if openedBoxScores.has(summary.gameId)}
+                      {#await loadBoxScore() then { default: BoxScore }}
+                        <p class="py-2 font-mono text-xs text-muted-foreground">
+                          Loading box score…
+                        </p>
+                        <BoxScore
+                          {box}
+                          opponentName={summary.homeFranchiseId === humanFranchiseId
+                            ? franchiseName(summary.awayFranchiseId)
+                            : franchiseName(summary.homeFranchiseId)}
+                          resultLabel={resultLabel(summary)}
+                        />
+                      {/await}
+                      {#if retainedGameIds.includes(summary.gameId)}
+                        <p class="mt-2 font-mono text-[10px] text-muted-foreground">
+                          Full game detail available.
+                        </p>
+                      {/if}
                     {/if}
                   {:else}
                     <p class="text-sm text-muted-foreground">Box score unavailable.</p>

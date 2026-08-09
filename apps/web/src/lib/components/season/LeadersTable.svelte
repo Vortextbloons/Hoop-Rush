@@ -69,9 +69,20 @@
     };
   }
 
+  /** Resolved once per entry: the markup and meta call it several times. */
+  const sourceByVersion = $derived.by(() => {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const map = new Map<string, ReturnType<typeof versionSource>>();
+    for (const entry of entries) map.set(entry.playerVersionId, versionSource(entry));
+    return map;
+  });
+  const firstSource = $derived(
+    first !== null ? (sourceByVersion.get(first.playerVersionId) ?? null) : null,
+  );
+
   /** "ABBR · 1995-96 · 10 gp" plus the era identity label when it differs. */
   function sourceMeta(entry: SeasonLeaderEntry): string {
-    const source = versionSource(entry);
+    const source = sourceByVersion.get(entry.playerVersionId) ?? null;
     if (source === null)
       return `${franchiseAbbrev(entry.franchiseId)} · ${String(entry.gamesPlayed)} gp`;
     return `${franchiseAbbrev(entry.franchiseId)} · ${source.seasonKey} · ${String(entry.gamesPlayed)} gp${source.seasonLabel}`;
@@ -102,20 +113,20 @@
           {playerName(first.playerVersionId)}
         </p>
         <p class="mt-0.5 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-          {#if versionSource(first)}
+          {#if firstSource}
             <SeasonTeamLogo
               {manifest}
               franchiseId={first.franchiseId}
-              teamExternalId={versionSource(first)!.teamExternalId}
-              logoCandidates={versionSource(first)!.logoCandidates}
+              teamExternalId={firstSource.teamExternalId}
+              logoCandidates={firstSource.logoCandidates}
               alt=""
               size="sm"
             />
           {/if}
           {franchiseAbbrev(first.franchiseId)} · {first.gamesPlayed} gp
-          {#if versionSource(first)}
+          {#if firstSource}
             <span class="hidden min-w-0 truncate sm:inline">
-              {versionSource(first)!.seasonKey}{versionSource(first)!.seasonLabel}
+              {firstSource.seasonKey}{firstSource.seasonLabel}
             </span>
           {/if}
         </p>

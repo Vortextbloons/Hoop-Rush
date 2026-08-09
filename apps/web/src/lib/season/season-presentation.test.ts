@@ -13,6 +13,7 @@ import {
   finalizeGameRecords,
   foldSeasonAggregates,
   franchiseStreak,
+  franchiseStreaks,
   humanScheduleRows,
   ordinal,
   provisionalRanking,
@@ -227,6 +228,39 @@ describe('franchiseStreak', () => {
 
   it('returns null without games', () => {
     expect(franchiseStreak([], 'lakers')).toBeNull();
+  });
+});
+
+describe('franchiseStreaks', () => {
+  it('matches franchiseStreak per franchise in one pass', () => {
+    const summaries = [
+      summary({ gameId: 's000001', round: 1, homeScore: 90, awayScore: 100 }),
+      summary({ gameId: 's000002', round: 2 }),
+      summary({ gameId: 's000003', round: 3 }),
+      summary({ gameId: 's000004', round: 4, homeScore: 90, awayScore: 100 }),
+    ];
+    const franchiseIds = ['lakers', 'celtics', 'warriors', 'not-a-team'];
+    const batched = franchiseStreaks(summaries, franchiseIds);
+    for (const franchiseId of franchiseIds) {
+      expect(batched.get(franchiseId)).toEqual(franchiseStreak(summaries, franchiseId));
+    }
+  });
+
+  it('handles games out of round order identically to the per-team sort', () => {
+    const summaries = [
+      summary({ gameId: 's000003', round: 3 }),
+      summary({ gameId: 's000001', round: 1, homeScore: 90, awayScore: 100 }),
+      summary({ gameId: 's000002', round: 2 }),
+    ];
+    const batched = franchiseStreaks(summaries, ['lakers', 'celtics']);
+    expect(batched.get('lakers')).toEqual(franchiseStreak(summaries, 'lakers'));
+    expect(batched.get('celtics')).toEqual(franchiseStreak(summaries, 'celtics'));
+  });
+
+  it('returns null for every franchise without summaries', () => {
+    const batched = franchiseStreaks([], ['lakers', 'celtics']);
+    expect(batched.get('lakers')).toBeNull();
+    expect(batched.get('celtics')).toBeNull();
   });
 });
 

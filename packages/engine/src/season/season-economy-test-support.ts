@@ -26,10 +26,10 @@ import {
   SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
-  SEASON_SEED_NAMESPACES,
   SEASON_STAMINA_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
+  buildInitialPostseasonState,
   seasonNamespaceSeed,
   seasonRunSchema,
   type SeasonDraftCatalog,
@@ -67,7 +67,7 @@ import { createInitialSeasonInfluenceState } from './influence.ts';
 /** Seed used by the fixtures; callers override with their own hex seed. */
 export const ECONOMY_TEST_SEED = 'b1d2e3f405162738495a6b7c8d9e0f11';
 
-/** M2.5 schema-7 version set for the fixture runs. */
+/** M2.6 schema-9 version set for the fixture runs. */
 export const SEASON_VERSIONS_M25: SeasonRun['versions'] = {
   runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
   leagueVersion: 'league-v1',
@@ -104,6 +104,14 @@ export const SEASON_VERSIONS_M25: SeasonRun['versions'] = {
   injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
   tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
   influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+  tiebreakVersion: 'tiebreaker-v1',
+  postseasonSummaryVersion: 'postseason-summary-v1',
+  awardsVersion: 'awards-v1',
+  tradeGradeVersion: 'trade-grade-v1',
+  commandLogVersion: 'command-log-v1',
+  almanacVersion: 'almanac-v1',
+  replayExportVersion: 'replay-export-v1',
+  postseasonTargetsVersion: 'postseason-targets-v1',
 };
 
 /**
@@ -283,45 +291,7 @@ export function buildEconomyTestRun(
         .map((other) => ({ franchiseId: other.franchiseId, wins: 0, losses: 0 })),
     })),
   };
-  const postseasonGame = (gameId: 'seven-eight' | 'nine-ten' | 'final') => ({
-    gameId,
-    status: 'scheduled' as const,
-    homeFranchiseId: null as string | null,
-    awayFranchiseId: null as string | null,
-    winnerFranchiseId: null as string | null,
-    loserFranchiseId: null as string | null,
-    homeScore: null as number | null,
-    awayScore: null as number | null,
-  });
-  const postseason: SeasonRun['postseason'] = {
-    schemaVersion: 1,
-    postseasonVersion: SEASON_POSTSEASON_VERSION,
-    seed: seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.postseasonTies),
-    playIn: {
-      east: {
-        conference: 'east',
-        ranking: null,
-        games: {
-          sevenEight: postseasonGame('seven-eight'),
-          nineTen: postseasonGame('nine-ten'),
-          final: postseasonGame('final'),
-        },
-        playoffSeeds: null,
-      },
-      west: {
-        conference: 'west',
-        ranking: null,
-        games: {
-          sevenEight: postseasonGame('seven-eight'),
-          nineTen: postseasonGame('nine-ten'),
-          final: postseasonGame('final'),
-        },
-        playoffSeeds: null,
-      },
-    },
-    bracket: null,
-    championFranchiseId: null,
-  };
+  const postseason = buildInitialPostseasonState(seed);
   const franchiseIds = league.teams.map((team) => team.franchiseId);
 
   const run: SeasonRun = {
@@ -342,7 +312,10 @@ export function buildEconomyTestRun(
     games,
     standings,
     cursor: { schemaVersion: 1, completedRounds: 0 },
+    stage: 'regular-season',
     postseason,
+    awards: null,
+    completion: null,
     draft: buildFixtureSeasonDraftFacts(),
     aiAssignments,
     aiPools: buildSeasonAiPools(aiAssignments, humanFranchiseId),

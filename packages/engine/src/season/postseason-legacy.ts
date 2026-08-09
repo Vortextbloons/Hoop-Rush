@@ -1,29 +1,32 @@
 import {
-  SEASON_POSTSEASON_VERSION,
-  seasonPostseasonStateSchema,
+  SEASON_POSTSEASON_LEGACY_VERSION as SEASON_POSTSEASON_VERSION,
+  seasonPostseasonStateV1Schema as seasonPostseasonStateSchema,
   type ConferenceId,
-  type PlayInGame,
-  type PlayInGameId,
-  type PlayoffBracket,
-  type PlayoffConferenceBracket,
-  type PlayoffRound,
-  type PlayoffSeries,
-  type PlayoffSeriesGame,
+  type PlayInGameV1 as PlayInGame,
+  type PlayInGameIdV1 as PlayInGameId,
+  type PlayoffBracketV1 as PlayoffBracket,
+  type PlayoffConferenceBracketV1 as PlayoffConferenceBracket,
+  type PlayoffRoundV1 as PlayoffRound,
+  type PlayoffSeriesV1 as PlayoffSeries,
+  type PlayoffSeriesGameV1 as PlayoffSeriesGame,
   type SeasonLeague,
-  type SeasonPostseasonState,
+  type SeasonPostseasonStateV1 as SeasonPostseasonState,
 } from '@hoop-rush/data-contracts';
 import { franchisesInConference } from './league.ts';
 
 /**
- * Season Run postseason state machine (spec/2.0/02, postseason-v1). M2.0
- * receives an explicitly seeded top ten per conference and carries the facts
- * later tiebreak work requires; the full published NBA tiebreak sequence
- * lands in M2.6. The machine implements the exact 7/8, 9/10, and final
- * Play-In flow, fixed 1-8, 4-5, 3-6, 2-7 first-round pairings, no
- * reseeding, best-of-seven series ending immediately at four wins, the
- * 2-2-1-1-1 home pattern, and a caller-supplied Finals home-court team.
- * Every transition is a pure function of the current state and the submitted
- * result; nothing depends on call order or external randomness.
+ * FROZEN Season Run postseason state machine (spec/2.0/02, postseason-v1,
+ * M2.0-M2.5). M2.6 postseason-foundations replaces the v1 CONTRACT with the
+ * validated postseason-v2 contract (`season-postseason.ts`); this module is
+ * the frozen v1 implementation kept for reference, artifact audit, and
+ * legacy readability. It compiles against the legacy v1 types (aliased to
+ * their v1 names here) and is never used by schema-9 runs; the v2 machine
+ * arrives in a later M2.6 phase. The machine implements the exact 7/8,
+ * 9/10, and final Play-In flow, fixed 1-8, 4-5, 3-6, 2-7 first-round
+ * pairings, no reseeding, best-of-seven series ending immediately at four
+ * wins, the 2-2-1-1-1 home pattern, and a caller-supplied Finals home-court
+ * team. Every transition is a pure function of the current state and the
+ * submitted result; nothing depends on call order or external randomness.
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */
 

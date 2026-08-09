@@ -25,7 +25,7 @@ const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 // the minute-policy-v1 fixture (optimizer minute plans change the
 // rotation-set digest again), and the season-stamina-v2 fatigue rebalance
 // (stronger accumulation and effect caps change game outcomes).
-const BLOCK_ZERO_DIGEST = '9d56c84d66d476b143e97fa39c48d4dd';
+const BLOCK_ZERO_DIGEST = '1129a85b030565ff08cdc6c532389c4b';
 
 describe('cli: season block simulate', () => {
   // The default block-0 boot is shared by the simulate and audit tests.

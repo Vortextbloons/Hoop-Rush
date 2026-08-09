@@ -9,7 +9,6 @@
     SeasonRosterEntry,
   } from '@hoop-rush/data-contracts';
   import { blockRoundRange } from '@hoop-rush/data-contracts';
-  import BoxScore from '$lib/components/season/BoxScore.svelte';
   import CheckpointRecap from '$lib/components/season/CheckpointRecap.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
   import {
@@ -43,6 +42,24 @@
   let retainedGameIds = $state<string[]>([]);
   let blockDetails = $state<SeasonRetainedGameDetail[]>([]);
   let loadError = $state<string | null>(null);
+
+  /**
+   * Box scores render only after their <details> first opens; the BoxScore
+   * chunk itself is lazy-loaded on first open.
+   */
+  let openedBoxScores = $state.raw(new Set<string>());
+  function onBoxScoreToggle(event: Event, gameId: string) {
+    if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
+    if (!event.currentTarget.open || openedBoxScores.has(gameId)) return;
+    openedBoxScores = new Set([...openedBoxScores, gameId]);
+  }
+
+  let boxScoreModule: Promise<typeof import('$lib/components/season/BoxScore.svelte')> | null =
+    null;
+  function loadBoxScore(): Promise<typeof import('$lib/components/season/BoxScore.svelte')> {
+    boxScoreModule ??= import('$lib/components/season/BoxScore.svelte');
+    return boxScoreModule;
+  }
 
   const requestedBlock = $derived.by(() => {
     const raw = page.url.searchParams.get('block');
@@ -300,7 +317,10 @@
             {#each humanGames as summary (summary.gameId)}
               {@const box = boxFor(summary)}
               {@const opponentId = opponentOf(summary)}
-              <details class="group bg-surface-1 open:ring-1 open:ring-ring/30 sm:rounded-xl">
+              <details
+                class="group bg-surface-1 open:ring-1 open:ring-ring/30 sm:rounded-xl"
+                ontoggle={(event) => onBoxScoreToggle(event, summary.gameId)}
+              >
                 <summary
                   class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
                 >
@@ -334,18 +354,25 @@
                 </summary>
                 <div class="border-t border-border/60 p-4">
                   {#if box}
-                    <BoxScore
-                      {box}
-                      opponentName={shell.franchiseName(opponentId)}
-                      resultLabel={resultLabel(summary)}
-                      {manifest}
-                      teamFranchiseId={humanFranchiseId}
-                      opponentFranchiseId={opponentId}
-                    />
-                    {#if retainedGameIds.includes(summary.gameId)}
-                      <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-                        Full game detail available.
-                      </p>
+                    {#if openedBoxScores.has(summary.gameId)}
+                      {#await loadBoxScore() then { default: BoxScore }}
+                        <p class="py-2 font-mono text-xs text-muted-foreground">
+                          Loading box score…
+                        </p>
+                        <BoxScore
+                          {box}
+                          opponentName={shell.franchiseName(opponentId)}
+                          resultLabel={resultLabel(summary)}
+                          {manifest}
+                          teamFranchiseId={humanFranchiseId}
+                          opponentFranchiseId={opponentId}
+                        />
+                      {/await}
+                      {#if retainedGameIds.includes(summary.gameId)}
+                        <p class="mt-2 font-mono text-[10px] text-muted-foreground">
+                          Full game detail available.
+                        </p>
+                      {/if}
                     {/if}
                   {:else}
                     <p class="text-sm text-muted-foreground">Box score unavailable.</p>

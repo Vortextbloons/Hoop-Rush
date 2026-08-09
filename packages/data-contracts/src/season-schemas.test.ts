@@ -37,6 +37,11 @@ import {
   seasonDeclineTradeOfferCommandSchema,
   seasonResumeSeasonBlockCommandSchema,
   seasonForfeitInterruptedGameCommandSchema,
+  seasonStartPostseasonCommandSchema,
+  seasonAdvancePostseasonCommandSchema,
+  seasonSubmitPostseasonRotationCommandSchema,
+  seasonSpectatePostseasonGameCommandSchema,
+  seasonFastForwardPostseasonCommandSchema,
   seasonRunCommandSchema,
   seasonRunCommandRejectionSchema,
   seasonSelectBlockObjectiveResultSchema,
@@ -285,12 +290,17 @@ describe('season cursor schema', () => {
   });
 });
 
-describe('season postseason schema', () => {
+describe('season postseason schema (M2.6 postseason-v2)', () => {
   it('round-trips an empty postseason state', () => {
     const state = roundTrip(seasonPostseasonStateSchema, buildPostseason(SEED));
     expect(state.bracket).toBeNull();
     expect(state.playIn.east.playoffSeeds).toBeNull();
     expect(state.playIn.west.ranking).toBeNull();
+    expect(state.tiebreakResolutions).toEqual([]);
+    expect(state.finalsHomeCourtDrawSeed).toMatch(/^[0-9a-f]{32}$/);
+    // Stable play-in ids are pinned on the scaffold.
+    expect(state.playIn.east.games.sevenEight.gameId).toBe('pi-east-seven-eight');
+    expect(state.playIn.west.games.final.gameId).toBe('pi-west-final');
   });
 
   it('rejects corrupt play-in states', () => {
@@ -306,6 +316,21 @@ describe('season postseason schema', () => {
       },
     };
     expect(() => seasonPostseasonStateSchema.parse(bad)).toThrow();
+    // A play-in game whose id does not match its slot is corrupt.
+    const wrongGameId = {
+      ...state,
+      playIn: {
+        ...state.playIn,
+        east: {
+          ...state.playIn.east,
+          games: {
+            ...state.playIn.east.games,
+            nineTen: { ...state.playIn.east.games.nineTen, gameId: 'pi-west-nine-ten' },
+          },
+        },
+      },
+    };
+    expect(() => seasonPostseasonStateSchema.parse(wrongGameId)).toThrow();
     // A final play-in game whose winner is not a participant is corrupt.
     const winnerNotInGame = {
       ...state,
@@ -316,7 +341,7 @@ describe('season postseason schema', () => {
           ranking: Array.from({ length: 10 }, (_, i) => `team-${String(i + 1)}`),
           games: {
             sevenEight: {
-              gameId: 'seven-eight',
+              gameId: 'pi-east-seven-eight',
               status: 'final',
               homeFranchiseId: 'team-7',
               awayFranchiseId: 'team-8',
@@ -326,7 +351,7 @@ describe('season postseason schema', () => {
               awayScore: 90,
             },
             nineTen: {
-              gameId: 'nine-ten',
+              gameId: 'pi-east-nine-ten',
               status: 'scheduled',
               homeFranchiseId: null,
               awayFranchiseId: null,
@@ -336,7 +361,7 @@ describe('season postseason schema', () => {
               awayScore: null,
             },
             final: {
-              gameId: 'final',
+              gameId: 'pi-east-final',
               status: 'scheduled',
               homeFranchiseId: null,
               awayFranchiseId: null,
@@ -359,7 +384,7 @@ describe('season postseason schema', () => {
           ...winnerNotInGame.playIn.east,
           games: {
             sevenEight: {
-              gameId: 'seven-eight',
+              gameId: 'pi-east-seven-eight',
               status: 'final',
               homeFranchiseId: 'team-7',
               awayFranchiseId: 'team-8',
@@ -369,7 +394,7 @@ describe('season postseason schema', () => {
               awayScore: 90,
             },
             nineTen: {
-              gameId: 'nine-ten',
+              gameId: 'pi-east-nine-ten',
               status: 'scheduled',
               homeFranchiseId: null,
               awayFranchiseId: null,
@@ -379,7 +404,7 @@ describe('season postseason schema', () => {
               awayScore: null,
             },
             final: {
-              gameId: 'final',
+              gameId: 'pi-east-final',
               status: 'scheduled',
               homeFranchiseId: null,
               awayFranchiseId: null,
@@ -402,13 +427,37 @@ describe('season postseason schema', () => {
         },
       }),
     ).toThrow();
+    // A bracket without both conferences' resolved seeds is corrupt.
+    expect(() =>
+      seasonPostseasonStateSchema.parse({
+        ...state,
+        playIn: {
+          ...state.playIn,
+          east: {
+            ...state.playIn.east,
+            playoffSeeds: Array.from({ length: 8 }, (_, i) => `team-${String(i + 1)}`),
+          },
+        },
+        bracket: { ...emptyBracketFixture() },
+      }),
+    ).toThrow();
+    // A champion cannot exist without a bracket.
+    expect(() =>
+      seasonPostseasonStateSchema.parse({ ...state, championFranchiseId: 'lakers' }),
+    ).toThrow();
   });
 
   it('rejects a wrong postseason version', () => {
     expect(() =>
       seasonPostseasonStateSchema.parse({
         ...buildPostseason(SEED),
-        postseasonVersion: 'postseason-v2',
+        postseasonVersion: 'postseason-v1',
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonPostseasonStateSchema.parse({
+        ...buildPostseason(SEED),
+        tiebreakVersion: 'tiebreaker-v2',
       }),
     ).toThrow();
   });
@@ -440,6 +489,7 @@ describe('season postseason schema', () => {
       challengerWins: 2,
       games: [
         {
+          gameId: 'po-east-first-round-1-g1',
           gameNumber: 1,
           homeFranchiseId: 'team-1',
           awayFranchiseId: 'team-8',
@@ -449,6 +499,7 @@ describe('season postseason schema', () => {
           winnerFranchiseId: 'team-1',
         },
         {
+          gameId: 'po-east-first-round-1-g2',
           gameNumber: 2,
           homeFranchiseId: 'team-1',
           awayFranchiseId: 'team-8',
@@ -458,6 +509,7 @@ describe('season postseason schema', () => {
           winnerFranchiseId: 'team-1',
         },
         {
+          gameId: 'po-east-first-round-1-g3',
           gameNumber: 3,
           homeFranchiseId: 'team-8',
           awayFranchiseId: 'team-1',
@@ -467,6 +519,7 @@ describe('season postseason schema', () => {
           winnerFranchiseId: 'team-1',
         },
         {
+          gameId: 'po-east-first-round-1-g4',
           gameNumber: 4,
           homeFranchiseId: 'team-8',
           awayFranchiseId: 'team-1',
@@ -476,6 +529,7 @@ describe('season postseason schema', () => {
           winnerFranchiseId: 'team-8',
         },
         {
+          gameId: 'po-east-first-round-1-g5',
           gameNumber: 5,
           homeFranchiseId: 'team-1',
           awayFranchiseId: 'team-8',
@@ -511,6 +565,7 @@ describe('season postseason schema', () => {
         ...base,
         games: [
           {
+            gameId: 'po-east-first-round-1-g1',
             gameNumber: 1,
             homeFranchiseId: 'team-1',
             awayFranchiseId: 'team-8',
@@ -531,6 +586,7 @@ describe('season postseason schema', () => {
       schema.safeParse({
         ...base,
         games: Array.from({ length: 7 }, (_, i) => ({
+          gameId: `po-east-first-round-1-g${String(i + 1)}`,
           gameNumber: i + 1,
           homeFranchiseId: 'team-1',
           awayFranchiseId: 'team-8',
@@ -545,8 +601,94 @@ describe('season postseason schema', () => {
     ).toBe(false);
     // Wins must equal played games.
     expect(schema.safeParse({ ...base, homeCourtWins: 2 }).success).toBe(false);
+    // A game id that does not match the series slot is corrupt.
+    expect(
+      schema.safeParse({
+        ...base,
+        games: [
+          {
+            gameId: 'po-east-first-round-1-g9',
+            gameNumber: 1,
+            homeFranchiseId: 'team-1',
+            awayFranchiseId: 'team-8',
+            status: 'final',
+            homeScore: 100,
+            awayScore: 90,
+            winnerFranchiseId: 'team-1',
+          },
+        ],
+        homeCourtWins: 1,
+      }).success,
+    ).toBe(false);
+    // Out-of-sequence game numbers are corrupt.
+    expect(
+      schema.safeParse({
+        ...base,
+        games: [
+          {
+            gameId: 'po-east-first-round-1-g2',
+            gameNumber: 2,
+            homeFranchiseId: 'team-1',
+            awayFranchiseId: 'team-8',
+            status: 'final',
+            homeScore: 100,
+            awayScore: 90,
+            winnerFranchiseId: 'team-1',
+          },
+        ],
+        homeCourtWins: 1,
+      }).success,
+    ).toBe(false);
   });
 });
+
+/** A minimal schema-valid empty bracket (all slots unpaired). */
+function emptyBracketFixture() {
+  const pending = (seriesId: string, round: string, conference: 'east' | 'west') => ({
+    seriesId,
+    round,
+    conference,
+    higherSeed: null,
+    lowerSeed: null,
+    homeCourtFranchiseId: null,
+    challengerFranchiseId: null,
+    homeCourtWins: 0,
+    challengerWins: 0,
+    games: [],
+    winnerFranchiseId: null,
+  });
+  const conferenceBracket = (conference: 'east' | 'west') => ({
+    conference,
+    seeds: Array.from({ length: 8 }, (_, i) => `team-${String(i + 1)}`),
+    firstRound: [1, 2, 3, 4].map((n) =>
+      pending(`${conference}-first-round-${String(n)}`, 'first-round', conference),
+    ),
+    semifinals: [1, 2].map((n) =>
+      pending(`${conference}-semifinal-${String(n)}`, 'conference-semifinal', conference),
+    ),
+    conferenceFinal: pending(`${conference}-conference-final`, 'conference-final', conference),
+  });
+  return {
+    schemaVersion: 1,
+    postseasonVersion: 'postseason-v2',
+    east: conferenceBracket('east'),
+    west: conferenceBracket('west'),
+    finals: {
+      seriesId: 'finals',
+      round: 'finals',
+      conference: null,
+      higherSeed: null,
+      lowerSeed: null,
+      homeCourtFranchiseId: 'team-1',
+      challengerFranchiseId: null,
+      homeCourtWins: 0,
+      challengerWins: 0,
+      games: [],
+      winnerFranchiseId: null,
+    },
+    championFranchiseId: null,
+  };
+}
 
 describe('season run schema', () => {
   it('round-trips a complete snapshot', () => {
@@ -1607,10 +1749,10 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     expect(seasonRosterTargetsSchema.safeParse(undefined).success).toBe(false);
   });
 
-  it('round-trips a schema-8 run with its aiPools and M2.5 state', () => {
+  it('round-trips a schema-9 run with its aiPools and M2.5 state', () => {
     const run = roundTrip(seasonRunSchema, buildRun());
-    expect(run.schemaVersion).toBe(8);
-    expect(run.versions.runSchemaVersion).toBe(8);
+    expect(run.schemaVersion).toBe(9);
+    expect(run.versions.runSchemaVersion).toBe(9);
     expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
     expect(run.versions.aiVersion).toBe('season-ai-v2');
     expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
@@ -1643,14 +1785,16 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     ).toThrow();
   });
 
-  it('rejects a schema-7 snapshot (schema 7 runs cannot continue)', () => {
+  it('rejects schema-7 and schema-8 snapshots (older runs cannot continue)', () => {
     const run = buildRun();
-    const schema7 = {
-      ...run,
-      schemaVersion: 7,
-      versions: { ...run.versions, runSchemaVersion: 7 },
-    };
-    expect(() => seasonRunSchema.parse(schema7)).toThrow();
+    for (const older of [7, 8]) {
+      const stale = {
+        ...run,
+        schemaVersion: older,
+        versions: { ...run.versions, runSchemaVersion: older },
+      };
+      expect(() => seasonRunSchema.parse(stale)).toThrow();
+    }
   });
 });
 
@@ -2046,9 +2190,9 @@ describe('season pending block family (M2.5)', () => {
   });
 });
 
-describe('season commands (M2.5, schema 8)', () => {
+describe('season commands (M2.5/M2.6, schema 9)', () => {
   const base = {
-    schemaVersion: 8,
+    schemaVersion: 9,
     commandId: 'cmd-1',
     runId: 'fixture-run-1',
     expectedStateRevision: 3,
@@ -2079,6 +2223,41 @@ describe('season commands (M2.5, schema 8)', () => {
       },
       { ...base, command: 'resume-season-block', blockIndex: 1, rotationDigest: '0'.repeat(32) },
       { ...base, command: 'forfeit-interrupted-game', blockIndex: 1, nextGameId: 's000016' },
+      { ...base, command: 'start-postseason' },
+      { ...base, command: 'advance-postseason' },
+      {
+        ...base,
+        command: 'advance-postseason',
+        targetGameId: 'pi-east-seven-eight',
+      },
+      {
+        ...base,
+        command: 'submit-postseason-rotation',
+        targetGameId: 'pi-east-seven-eight',
+        rotation: {
+          franchiseId: 'hawks',
+          rotation: {
+            franchiseId: 'hawks',
+            starters: Array.from({ length: 5 }, (_, i) => fixturePlayerId(i)),
+            benchOrder: Array.from({ length: 5 }, (_, i) => fixturePlayerId(5 + i)),
+            targetMinutes: [
+              ...Array.from({ length: 5 }, (_, i) => ({
+                playerVersionId: fixturePlayerId(i),
+                minutes: 32,
+              })),
+              ...Array.from({ length: 5 }, (_, i) => ({
+                playerVersionId: fixturePlayerId(5 + i),
+                minutes: 16,
+              })),
+            ],
+            closingFive: Array.from({ length: 5 }, (_, i) => fixturePlayerId(i)),
+            minutePolicy: { policyVersion: 'minute-policy-v1', strategy: 'balanced' },
+            rotationVersion: 'season-rotation-v3',
+          },
+        },
+      },
+      { ...base, command: 'spectate-postseason-game', targetGameId: 'po-finals-g7' },
+      { ...base, command: 'fast-forward-postseason' },
     ];
     const individual = [
       seasonSelectBlockObjectiveCommandSchema,
@@ -2087,6 +2266,12 @@ describe('season commands (M2.5, schema 8)', () => {
       seasonDeclineTradeOfferCommandSchema,
       seasonResumeSeasonBlockCommandSchema,
       seasonForfeitInterruptedGameCommandSchema,
+      seasonStartPostseasonCommandSchema,
+      seasonAdvancePostseasonCommandSchema,
+      seasonAdvancePostseasonCommandSchema,
+      seasonSubmitPostseasonRotationCommandSchema,
+      seasonSpectatePostseasonGameCommandSchema,
+      seasonFastForwardPostseasonCommandSchema,
     ];
     for (let index = 0; index < commands.length; index += 1) {
       const command = commands[index];
@@ -2095,6 +2280,30 @@ describe('season commands (M2.5, schema 8)', () => {
       expect(schema.safeParse(command).success).toBe(true);
       expect(seasonRunCommandSchema.safeParse(command).success).toBe(true);
     }
+    // Missing concurrency fields and malformed rotation payloads are rejected.
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        command: 'start-postseason',
+        runId: 'fixture-run-1',
+        expectedStateRevision: 3,
+        expectedStateDigest: '0'.repeat(32),
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'submit-postseason-rotation',
+        targetGameId: 'pi-east-seven-eight',
+        rotation: { franchiseId: 'hawks' },
+      }),
+    ).toThrow();
+    expect(() =>
+      seasonRunCommandSchema.parse({
+        ...base,
+        command: 'spectate-postseason-game',
+        targetGameId: 's000001',
+      }),
+    ).toThrow();
     expect(() =>
       seasonRunCommandSchema.parse({
         ...base,
@@ -2288,7 +2497,7 @@ describe('season commands (M2.5, schema 8)', () => {
 
   it('parses submit-season-block with the M2.5 objective and state fields', () => {
     const command = {
-      schemaVersion: 8,
+      schemaVersion: 9,
       blockVersion: 'season-block-v3',
       command: 'submit-season-block',
       commandId: 'cmd-submit-1',

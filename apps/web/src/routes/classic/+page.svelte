@@ -39,8 +39,18 @@
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
-  import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
+
+  /** The slot-picker dialog chunk loads only when a player is selected. */
+  let slotPickerModule: Promise<
+    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+  > | null = null;
+  function loadSlotPickerDialog(): Promise<
+    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+  > {
+    slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
+    return slotPickerModule;
+  }
 
   type IndexRow = PlayersIndexEntry;
   type Variant = 'ratings' | 'ball-knowledge';
@@ -727,17 +737,22 @@
     {/if}
   {/if}
 
-  <SlotPickerDialog
-    player={pickerPlayer}
-    {slots}
-    manifest={manifest!}
-    {presentation}
-    allowDisplacement
-    onplace={placePlayer}
-    onclose={() => {
-      if (mounted) pickerPlayer = null;
-    }}
-  />
+  {#if pickerPlayer}
+    {#await loadSlotPickerDialog() then { default: SlotPickerDialog }}
+      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Loading…</p>
+      <SlotPickerDialog
+        player={pickerPlayer}
+        {slots}
+        manifest={manifest!}
+        {presentation}
+        allowDisplacement
+        onplace={placePlayer}
+        onclose={() => {
+          if (mounted) pickerPlayer = null;
+        }}
+      />
+    {/await}
+  {/if}
 
   <Dialog.Root
     open={guardOpen}

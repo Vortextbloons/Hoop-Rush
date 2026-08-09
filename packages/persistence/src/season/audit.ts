@@ -537,6 +537,10 @@ export function auditSeasonRunState(
   try {
     recomputedDigest = seam.seasonRunStateDigest({
       stateRevision: stored.stateRevision,
+      stage: stored.run.stage,
+      postseason: stored.run.postseason,
+      awards: stored.run.awards,
+      completion: stored.run.completion,
       checkpointState: stored.checkpointState,
       health: stored.health,
       influence: stored.influence,

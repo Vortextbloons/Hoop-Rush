@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  SEASON_POSTSEASON_VERSION,
+  SEASON_POSTSEASON_LEGACY_VERSION as SEASON_POSTSEASON_VERSION,
   type ConferenceId,
-  type PlayoffBracket,
-  type PlayoffSeries,
-  type SeasonPostseasonState,
+  type PlayoffBracketV1 as PlayoffBracket,
+  type PlayoffSeriesV1 as PlayoffSeries,
+  type SeasonPostseasonStateV1 as SeasonPostseasonState,
 } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
 import { createRng } from '../sim/rng.ts';
@@ -15,13 +15,14 @@ import {
   setPlayInRankings,
   submitPlayInGame,
   submitPlayoffGame,
-} from './postseason.ts';
+} from './postseason-legacy.ts';
 
 /**
- * Season Run postseason tests (spec/2.0/02, postseason-v1): every Play-In
- * branch, arbitrary best-of-seven winner sequences, immediate stopping at
- * four wins, the 2-2-1-1-1 home pattern, fixed bracket paths, and absence
- * of duplicate or missing teams.
+ * FROZEN Season Run postseason v1 tests (spec/2.0/02, postseason-v1): every
+ * Play-In branch, arbitrary best-of-seven winner sequences, immediate
+ * stopping at four wins, the 2-2-1-1-1 home pattern, fixed bracket paths,
+ * and absence of duplicate or missing teams. The v1 contract was replaced
+ * by postseason-v2 in M2.6; these tests keep the frozen machine green.
  */
 
 const league = buildSeasonLeague();

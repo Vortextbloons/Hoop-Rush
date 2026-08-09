@@ -14,6 +14,10 @@ function baseFacts(): SeasonRunStateDigestFacts {
   const input = pipelineInput(run, catalog, 0);
   return {
     stateRevision: run.stateRevision,
+    stage: run.stage,
+    postseason: run.postseason,
+    awards: run.awards,
+    completion: run.completion,
     checkpointState: run.checkpointState,
     health: input.health,
     influence: input.influence ?? run.influence,
@@ -212,6 +216,66 @@ describe('seasonRunStateDigest', () => {
             },
           }),
         ],
+        [
+          'run stage',
+          (f) => ({
+            ...f,
+            stage:
+              f.stage === 'regular-season' ? ('play-in' as const) : ('regular-season' as const),
+          }),
+        ],
+        [
+          'postseason tie resolution',
+          (f) => ({
+            ...f,
+            postseason: {
+              ...f.postseason,
+              tiebreakResolutions: [
+                ...f.postseason.tiebreakResolutions,
+                {
+                  resolutionId: 'tie-x',
+                  conference: 'east',
+                  kind: 'seeding',
+                  rule: 'head-to-head',
+                  teams: ['lakers', 'celtics'],
+                  slots: [7, 8],
+                  evidence: [{ label: 'h2h', value: 1 }],
+                  drawSeed: null,
+                },
+              ],
+            },
+          }),
+        ],
+        [
+          'awards facts',
+          (f) => ({
+            ...f,
+            awards: {
+              schemaVersion: 1,
+              awardsVersion: 'awards-v1',
+              runId: f.checkpointState?.runId ?? 'fixture-run-1',
+              mvp: { playerVersionId: 'pv-a', franchiseId: 'lakers' },
+              defensivePlayerOfYear: { playerVersionId: 'pv-b', franchiseId: 'celtics' },
+              sixthManOfYear: { playerVersionId: 'pv-c', franchiseId: 'lakers' },
+              allLeagueFirstTeam: Array.from({ length: 5 }, (_, index) => ({
+                playerVersionId: `pv-team-${String(index)}`,
+                franchiseId: 'lakers',
+              })),
+              digest: '0'.repeat(32),
+            },
+          }),
+        ],
+        [
+          'completion state',
+          (f) => ({
+            ...f,
+            completion: {
+              championFranchiseId: 'lakers',
+              almanacDigest: 'a'.repeat(32),
+              finalizedAtStateRevision: f.stateRevision,
+            },
+          }),
+        ],
       ];
     for (const [label, mutate] of cases) {
       expect(seasonRunStateDigest(mutate(facts)), label).not.toBe(digest);
@@ -222,6 +286,10 @@ describe('seasonRunStateDigest', () => {
     const { run } = buildTestRun();
     const factsOfRun = (snapshot: typeof run): SeasonRunStateDigestFacts => ({
       stateRevision: snapshot.stateRevision,
+      stage: snapshot.stage,
+      postseason: snapshot.postseason,
+      awards: snapshot.awards,
+      completion: snapshot.completion,
       checkpointState: snapshot.checkpointState,
       health: snapshot.health,
       influence: snapshot.influence,

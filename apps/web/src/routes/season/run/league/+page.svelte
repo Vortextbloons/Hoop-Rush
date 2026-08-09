@@ -12,7 +12,7 @@
   } from '$lib/season/season-shell-context';
   import {
     foldSeasonAggregates,
-    franchiseStreak,
+    franchiseStreaks,
     pointDifferential,
   } from '$lib/season/season-presentation';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
@@ -40,17 +40,16 @@
   const run = $derived(shell.run);
   const standings = $derived(run?.standings ?? null);
 
-  /** Streak facts computed once per standings/summaries change. */
+  /** Streak facts computed in one pass over the summaries (once per change). */
   const streaksByFranchise = $derived.by(() => {
     const summaries = shell.snapshot?.summaries ?? [];
-    const map = new SvelteMap<string, { kind: 'wins' | 'losses'; length: number } | null>();
-    for (const row of shell.run?.standings.rows ?? []) {
-      map.set(
-        row.franchiseId,
-        summaries.length === 0 ? null : franchiseStreak(summaries, row.franchiseId),
-      );
-    }
-    return map;
+    const rows = shell.run?.standings.rows ?? [];
+    return new SvelteMap(
+      franchiseStreaks(
+        summaries,
+        rows.map((row) => row.franchiseId),
+      ),
+    );
   });
   const streakOf = (franchiseId: string): { kind: 'wins' | 'losses'; length: number } | null =>
     streaksByFranchise.get(franchiseId) ?? null;

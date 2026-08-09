@@ -48,3 +48,29 @@ export function seasonDigestHex(material: string): string {
   }
   return out;
 }
+
+/**
+ * Order-independent JSON serialization (algorithm-identical to the engine's
+ * `canonicalJson` in `season/checkpoint.ts`): object keys are sorted
+ * recursively, array order is preserved, undefined values are skipped. Used
+ * by data-contracts digest contracts (e.g. the command log) so a digest is a
+ * pure function of the recorded facts, never of key insertion order.
+ */
+export function canonicalJson(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => canonicalJson(entry)).join(',')}]`;
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const keys = Object.keys(record).sort();
+    const parts: string[] = [];
+    for (const key of keys) {
+      const entry = record[key];
+      if (entry === undefined) continue;
+      parts.push(`${JSON.stringify(key)}:${canonicalJson(entry)}`);
+    }
+    return `{${parts.join(',')}}`;
+  }
+  return JSON.stringify(value);
+}

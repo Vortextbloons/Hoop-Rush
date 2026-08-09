@@ -30,6 +30,10 @@ describe('seasonRunEngineSeam state digest parity', () => {
     const run = buildFixtureRun({ seed: SEED, runId: 'digest-parity-run', schedule });
     const facts: SeasonRunStateDigestFacts = {
       stateRevision: run.stateRevision,
+      stage: run.stage,
+      postseason: run.postseason,
+      awards: run.awards,
+      completion: run.completion,
       checkpointState: run.checkpointState,
       health: run.health,
       influence: run.influence,

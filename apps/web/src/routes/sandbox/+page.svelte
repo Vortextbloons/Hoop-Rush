@@ -24,8 +24,18 @@
   import LineupSummaryNav from '$lib/components/LineupSummaryNav.svelte';
   import DraftValuePanel from '$lib/components/DraftValuePanel.svelte';
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
-  import SlotPickerDialog from '$lib/components/draft/SlotPickerDialog.svelte';
   import AsyncState from '$lib/components/AsyncState.svelte';
+
+  /** The slot-picker dialog chunk loads only when a player is selected. */
+  let slotPickerModule: Promise<
+    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+  > | null = null;
+  function loadSlotPickerDialog(): Promise<
+    typeof import('$lib/components/draft/SlotPickerDialog.svelte')
+  > {
+    slotPickerModule ??= import('$lib/components/draft/SlotPickerDialog.svelte');
+    return slotPickerModule;
+  }
   import {
     SLOT_INDEXES,
     SLOT_LABELS,
@@ -609,13 +619,18 @@
     {/if}
   {/if}
 
-  <SlotPickerDialog
-    player={pickerPlayer}
-    {slots}
-    manifest={manifest!}
-    presentation="sandbox"
-    allowDisplacement
-    onplace={placePlayer}
-    onclose={closePicker}
-  />
+  {#if pickerPlayer}
+    {#await loadSlotPickerDialog() then { default: SlotPickerDialog }}
+      <p class="px-4 py-3 font-mono text-xs text-muted-foreground">Loading…</p>
+      <SlotPickerDialog
+        player={pickerPlayer}
+        {slots}
+        manifest={manifest!}
+        presentation="sandbox"
+        allowDisplacement
+        onplace={placePlayer}
+        onclose={closePicker}
+      />
+    {/await}
+  {/if}
 </section>

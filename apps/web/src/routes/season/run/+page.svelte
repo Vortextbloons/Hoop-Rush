@@ -9,7 +9,6 @@
   import ObjectivePicker from '$lib/components/season/ObjectivePicker.svelte';
   import SeasonTape from '$lib/components/season/SeasonTape.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
-  import TradeOffersPanel from '$lib/components/season/TradeOffersPanel.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import {
     SEASON_RUN_SHELL_CONTEXT,
@@ -35,8 +34,23 @@
     objectiveChoicesViewModel,
     type InfluenceSpendAffordance,
   } from '$lib/season/season-influence-view';
-  import { openWindowOf, tradeOfferViewModel, humanTradeOffersOf } from '$lib/season/season-trade-view';
+  import {
+    openWindowOf,
+    tradeOfferViewModel,
+    humanTradeOffersOf,
+  } from '$lib/season/season-trade-view';
   import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
+
+  /** The trade panel chunk loads only when a trade window is open. */
+  let tradeOffersModule: Promise<
+    typeof import('$lib/components/season/TradeOffersPanel.svelte')
+  > | null = null;
+  function loadTradeOffersPanel(): Promise<
+    typeof import('$lib/components/season/TradeOffersPanel.svelte')
+  > {
+    tradeOffersModule ??= import('$lib/components/season/TradeOffersPanel.svelte');
+    return tradeOffersModule;
+  }
 
   /**
    * Season Run hub tab (M2.3.5, M2.5): season tape, the next-decision panel
@@ -576,26 +590,29 @@
 
     <!-- M2.5: trade offers panel (open window) -->
     {#if openWindow !== null && shell.manifest !== null}
-      <TradeOffersPanel
-        windowIndex={openWindow.windowIndex}
-        offers={tradeOffers}
-        manifest={shell.manifest}
-        catalog={shell.catalog}
-        summaries={snapshot?.summaries ?? []}
-        faceOf={(playerVersionId) => shell.facesByVersion.get(playerVersionId) ?? null}
-        commandError={
-          commandError !== null &&
+      {#await loadTradeOffersPanel() then { default: TradeOffersPanel }}
+        <p class="px-3 py-3 font-mono text-xs text-muted-foreground sm:px-0">
+          Loading trade offers…
+        </p>
+        <TradeOffersPanel
+          windowIndex={openWindow.windowIndex}
+          offers={tradeOffers}
+          manifest={shell.manifest}
+          catalog={shell.catalog}
+          summaries={snapshot?.summaries ?? []}
+          faceOf={(playerVersionId) => shell.facesByVersion.get(playerVersionId) ?? null}
+          commandError={commandError !== null &&
           (commandError.command === 'accept-trade-offer' ||
             commandError.command === 'decline-trade-offer')
             ? commandError.message
-            : null
-        }
-        busy={block.phase === 'running'}
-        onAccept={(offerId) =>
-          shell.acceptTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
-        onDecline={(offerId) =>
-          shell.declineTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
-      />
+            : null}
+          busy={block.phase === 'running'}
+          onAccept={(offerId) =>
+            shell.acceptTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
+          onDecline={(offerId) =>
+            shell.declineTradeOffer({ windowIndex: openWindow.windowIndex, offerId })}
+        />
+      {/await}
     {/if}
 
     <!-- M2.5: Influence panel (balance, ledger, spend affordances) -->

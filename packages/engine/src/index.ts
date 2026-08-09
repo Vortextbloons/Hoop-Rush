@@ -62,6 +62,8 @@ export {
   type GenerateSeasonScheduleInput,
 } from './season/schedule.ts';
 export { reduceSeasonStandings, auditSeasonStandings } from './season/standings.ts';
+// FROZEN postseason-v1 state machine (M2.6 replaced the v1 contract with
+// postseason-v2; the v2 machine lands in a later M2.6 phase).
 export {
   setPlayInRankings,
   submitPlayInGame,
@@ -72,7 +74,7 @@ export {
   type PostseasonRankings,
   type PlayInGameResult,
   type PlayoffGameResult,
-} from './season/postseason.ts';
+} from './season/postseason-legacy.ts';
 // Season Run (2.0 M2.1) ten-player draft, roster legality, AI generation,
 // rotations, and generation digests.
 export {

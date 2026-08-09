@@ -12,6 +12,9 @@ import { seasonInfluenceLedgerEntrySchema } from './season-influence.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonTradeOfferIdSchema, seasonTradeOfferSchema } from './season-trade.ts';
+import { postseasonGameIdSchema } from './season-postseason.ts';
+import { seasonRotationSchema } from './season-rotation.ts';
+import { seasonRunStageSchema } from './season-run.ts';
 
 /**
  * M2.5 typed Season Run commands (spec/2.0 M2.5, schema 7). Every command
@@ -176,6 +179,228 @@ export const seasonGameMismatchRejectionSchema = z.object({
   pendingNextGameId: seasonGameIdSchema,
 });
 export type SeasonGameMismatchRejection = z.infer<typeof seasonGameMismatchRejectionSchema>;
+
+// ---------------------------------------------------------------------------
+// M2.6 postseason commands and typed rejections (spec/2.0/02 Playoffs).
+// ---------------------------------------------------------------------------
+
+/**
+ * The command requires a run stage the run is not in (e.g. starting the
+ * postseason before the regular season completes, or advancing the
+ * postseason after completion).
+ */
+export const seasonInvalidStageRejectionSchema = z.object({
+  code: z.literal('invalid-stage'),
+  /** The stage the command requires. */
+  requiredStage: seasonRunStageSchema,
+  /** The run's current stage. */
+  currentStage: seasonRunStageSchema,
+});
+export type SeasonInvalidStageRejection = z.infer<typeof seasonInvalidStageRejectionSchema>;
+
+/**
+ * The command named a postseason game that is not the run's current expected
+ * game (wrong phase, wrong series, or wrong game number).
+ */
+export const seasonWrongGameRejectionSchema = z.object({
+  code: z.literal('wrong-game'),
+  targetGameId: postseasonGameIdSchema,
+  /** The postseason game the run expects next. */
+  nextGameId: postseasonGameIdSchema,
+});
+export type SeasonWrongGameRejection = z.infer<typeof seasonWrongGameRejectionSchema>;
+
+/** The submitted postseason rotation is not legal against the roster. */
+export const seasonInvalidRotationRejectionSchema = z.object({
+  code: z.literal('invalid-rotation'),
+  franchiseId: franchiseIdSchema,
+  /** Legality reasons for the submitted rotation. */
+  reasons: z.array(z.string().min(1).max(256)).min(1),
+});
+export type SeasonInvalidRotationRejection = z.infer<typeof seasonInvalidRotationRejectionSchema>;
+
+/** The rotation (or a risky-rehab request) names a player who cannot play. */
+export const seasonUnavailablePlayerRejectionSchema = z.object({
+  code: z.literal('unavailable-player'),
+  playerVersionId: playerVersionIdSchema,
+  reason: z.enum(['injured', 'not-on-roster']),
+});
+export type SeasonUnavailablePlayerRejection = z.infer<
+  typeof seasonUnavailablePlayerRejectionSchema
+>;
+
+/**
+ * A risky-rehab spend was requested but the franchise lacks the required
+ * Influence balance (postseason Influence spending supports risky rehab
+ * only).
+ */
+export const seasonInsufficientRehabResourcesRejectionSchema = z.object({
+  code: z.literal('insufficient-rehab-resources'),
+  franchiseId: franchiseIdSchema,
+  /** The franchise balance before the rejected spend. */
+  balance: z.number().int(),
+  /** Influence required for the requested rehab. */
+  required: z.number().int(),
+});
+export type SeasonInsufficientRehabResourcesRejection = z.infer<
+  typeof seasonInsufficientRehabResourcesRejectionSchema
+>;
+
+/** The named series cannot receive the requested advance (unpaired/complete/not current). */
+export const seasonInvalidSeriesStateRejectionSchema = z.object({
+  code: z.literal('invalid-series-state'),
+  seriesId: z.string().min(1).max(64),
+  reason: z.enum(['unpaired', 'complete', 'not-current']),
+});
+export type SeasonInvalidSeriesStateRejection = z.infer<
+  typeof seasonInvalidSeriesStateRejectionSchema
+>;
+
+/**
+ * The postseason state failed an integrity check (accounting or structural
+ * inconsistency); the command is rejected without mutating the run.
+ */
+export const seasonIntegrityFailureRejectionSchema = z.object({
+  code: z.literal('integrity-failure'),
+  reason: z.string().min(1).max(256),
+});
+export type SeasonIntegrityFailureRejection = z.infer<typeof seasonIntegrityFailureRejectionSchema>;
+
+/**
+ * Start the postseason from the final regular-season standings (M2.6):
+ * resolves qualification and seeding ties through the versioned tiebreak
+ * sequence, records the deterministic resolutions, sets the Play-In
+ * rankings, and moves the run to the `play-in` stage. Requires the
+ * `regular-season` stage with all 82 rounds complete.
+ */
+export const seasonStartPostseasonCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('start-postseason'),
+});
+export type SeasonStartPostseasonCommand = z.infer<typeof seasonStartPostseasonCommandSchema>;
+
+export const seasonStartPostseasonRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonInvalidStageRejectionSchema,
+  seasonIntegrityFailureRejectionSchema,
+]);
+export type SeasonStartPostseasonRejection = z.infer<typeof seasonStartPostseasonRejectionSchema>;
+
+/**
+ * Advance the postseason until the next human lineup decision (M2.6). The
+ * engine simulates the target game (or the next playable game when omitted)
+ * and continues until a human rotation is required or the postseason ends.
+ */
+export const seasonAdvancePostseasonCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('advance-postseason'),
+  /** The next postseason game to simulate; omitted advances the next playable game. */
+  targetGameId: postseasonGameIdSchema.optional(),
+});
+export type SeasonAdvancePostseasonCommand = z.infer<typeof seasonAdvancePostseasonCommandSchema>;
+
+export const seasonAdvancePostseasonRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonInvalidStageRejectionSchema,
+  seasonWrongGameRejectionSchema,
+  seasonInvalidSeriesStateRejectionSchema,
+  seasonIntegrityFailureRejectionSchema,
+]);
+export type SeasonAdvancePostseasonRejection = z.infer<
+  typeof seasonAdvancePostseasonRejectionSchema
+>;
+
+/** The human postseason rotation payload (rotation + optional risky rehab). */
+export const seasonPostseasonRotationPayloadSchema = z.object({
+  franchiseId: franchiseIdSchema,
+  /** The legal ten-player rotation (starters, closing five, target minutes). */
+  rotation: seasonRotationSchema,
+  /**
+   * Optional risky-rehab spend for an injured player before the target game
+   * (postseason Influence spending supports risky rehab only).
+   */
+  riskyRehabInjuryId: injuryIdSchema.optional(),
+});
+export type SeasonPostseasonRotationPayload = z.infer<typeof seasonPostseasonRotationPayloadSchema>;
+
+/**
+ * Submit the human postseason rotation for the target game (M2.6). Human
+ * rotations may change between games; AI rotations are fixed.
+ */
+export const seasonSubmitPostseasonRotationCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('submit-postseason-rotation'),
+  targetGameId: postseasonGameIdSchema,
+  rotation: seasonPostseasonRotationPayloadSchema,
+});
+export type SeasonSubmitPostseasonRotationCommand = z.infer<
+  typeof seasonSubmitPostseasonRotationCommandSchema
+>;
+
+export const seasonSubmitPostseasonRotationRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonInvalidStageRejectionSchema,
+  seasonWrongGameRejectionSchema,
+  seasonInvalidRotationRejectionSchema,
+  seasonUnavailablePlayerRejectionSchema,
+  seasonInsufficientRehabResourcesRejectionSchema,
+  seasonIntegrityFailureRejectionSchema,
+]);
+export type SeasonSubmitPostseasonRotationRejection = z.infer<
+  typeof seasonSubmitPostseasonRotationRejectionSchema
+>;
+
+/**
+ * Spectate the next postseason game after elimination (M2.6): simulates the
+ * named game with no human decision required.
+ */
+export const seasonSpectatePostseasonGameCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('spectate-postseason-game'),
+  targetGameId: postseasonGameIdSchema,
+});
+export type SeasonSpectatePostseasonGameCommand = z.infer<
+  typeof seasonSpectatePostseasonGameCommandSchema
+>;
+
+export const seasonSpectatePostseasonGameRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonInvalidStageRejectionSchema,
+  seasonWrongGameRejectionSchema,
+  seasonInvalidSeriesStateRejectionSchema,
+  seasonIntegrityFailureRejectionSchema,
+]);
+export type SeasonSpectatePostseasonGameRejection = z.infer<
+  typeof seasonSpectatePostseasonGameRejectionSchema
+>;
+
+/**
+ * Fast-forward an eliminated run to its champion (M2.6): simulates every
+ * remaining postseason game with fixed AI rotations and completes the run.
+ */
+export const seasonFastForwardPostseasonCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('fast-forward-postseason'),
+  /** Optional terminal target; defaults to the champion-deciding game. */
+  targetGameId: postseasonGameIdSchema.optional(),
+});
+export type SeasonFastForwardPostseasonCommand = z.infer<
+  typeof seasonFastForwardPostseasonCommandSchema
+>;
+
+export const seasonFastForwardPostseasonRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonInvalidStageRejectionSchema,
+  seasonIntegrityFailureRejectionSchema,
+]);
+export type SeasonFastForwardPostseasonRejection = z.infer<
+  typeof seasonFastForwardPostseasonRejectionSchema
+>;
 
 /**
  * Select the block's objective BEFORE block submission. The objective is
@@ -451,7 +676,101 @@ export type SeasonForfeitInterruptedGameResult = z.infer<
   typeof seasonForfeitInterruptedGameResultSchema
 >;
 
-/** Every M2.5 typed run command (submit-season-block lives in season-block.ts). */
+/** Shared accepted shape of postseason advancement results. */
+export const seasonPostseasonAdvanceResultSchema = z.object({
+  status: z.literal('accepted'),
+  commandId: commandIdSchema,
+  /** The run stage after the advance. */
+  stage: seasonRunStageSchema,
+  /** Games simulated by this advance, in play order. */
+  advancedGameIds: z.array(postseasonGameIdSchema),
+  /** Whether the run now needs a human rotation ('rotation') or not ('none'). */
+  nextDecision: z.enum(['rotation', 'none']),
+  /** The next game awaiting a human rotation, when one is needed. */
+  nextGameId: postseasonGameIdSchema.nullable(),
+  /** The next game to simulate with AI rotations, when the run continues. */
+  aiNextGameId: postseasonGameIdSchema.nullable(),
+});
+
+export const seasonStartPostseasonResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonStartPostseasonRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    /** The run stage after the start (always `play-in`). */
+    stage: z.literal('play-in'),
+    /** The derived postseason namespace seed. */
+    postseasonSeed: z.string().regex(/^[0-9a-f]{16,64}$/),
+    /** The first game awaiting resolution (a Play-In game). */
+    nextGameId: z.string().regex(/^pi-(east|west)-(seven-eight|nine-ten|final)$/),
+  }),
+]);
+export type SeasonStartPostseasonResult = z.infer<typeof seasonStartPostseasonResultSchema>;
+
+export const seasonAdvancePostseasonResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonAdvancePostseasonRejectionSchema,
+  }),
+  seasonPostseasonAdvanceResultSchema,
+]);
+export type SeasonAdvancePostseasonResult = z.infer<typeof seasonAdvancePostseasonResultSchema>;
+
+export const seasonSubmitPostseasonRotationResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonSubmitPostseasonRotationRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    targetGameId: postseasonGameIdSchema,
+    franchiseId: franchiseIdSchema,
+    /** Canonical digest of the locked rotation (engine season/rotation). */
+    rotationDigest: seasonRotationSetDigestSchema,
+  }),
+]);
+export type SeasonSubmitPostseasonRotationResult = z.infer<
+  typeof seasonSubmitPostseasonRotationResultSchema
+>;
+
+export const seasonSpectatePostseasonGameResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonSpectatePostseasonGameRejectionSchema,
+  }),
+  seasonPostseasonAdvanceResultSchema,
+]);
+export type SeasonSpectatePostseasonGameResult = z.infer<
+  typeof seasonSpectatePostseasonGameResultSchema
+>;
+
+export const seasonFastForwardPostseasonResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonFastForwardPostseasonRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    /** The run stage after the fast-forward (always `completed`). */
+    stage: z.literal('completed'),
+    championFranchiseId: franchiseIdSchema,
+  }),
+]);
+export type SeasonFastForwardPostseasonResult = z.infer<
+  typeof seasonFastForwardPostseasonResultSchema
+>;
+
+/** Every M2.5/M2.6 typed run command (submit-season-block lives in season-block.ts). */
 export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonSelectBlockObjectiveCommandSchema,
   seasonSpendInfluenceCommandSchema,
@@ -460,6 +779,11 @@ export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonResumeSeasonBlockCommandSchema,
   seasonForfeitInterruptedGameCommandSchema,
   seasonSubmitBlockCommandSchema,
+  seasonStartPostseasonCommandSchema,
+  seasonAdvancePostseasonCommandSchema,
+  seasonSubmitPostseasonRotationCommandSchema,
+  seasonSpectatePostseasonGameCommandSchema,
+  seasonFastForwardPostseasonCommandSchema,
 ]);
 export type SeasonRunCommand = z.infer<typeof seasonRunCommandSchema>;
 
@@ -484,5 +808,12 @@ export const seasonRunCommandRejectionSchema = z.discriminatedUnion('code', [
   seasonBlockMismatchRejectionSchema,
   seasonRotationDigestMismatchRejectionSchema,
   seasonGameMismatchRejectionSchema,
+  seasonInvalidStageRejectionSchema,
+  seasonWrongGameRejectionSchema,
+  seasonInvalidRotationRejectionSchema,
+  seasonUnavailablePlayerRejectionSchema,
+  seasonInsufficientRehabResourcesRejectionSchema,
+  seasonInvalidSeriesStateRejectionSchema,
+  seasonIntegrityFailureRejectionSchema,
 ]);
 export type SeasonRunCommandRejection = z.infer<typeof seasonRunCommandRejectionSchema>;

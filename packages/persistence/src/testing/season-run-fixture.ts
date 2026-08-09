@@ -3,9 +3,12 @@ import {
   SEASON_ALIGNMENT,
   SEASON_AI_VERSION,
   SEASON_AGGREGATES_VERSION,
+  SEASON_ALMANAC_VERSION,
+  SEASON_AWARDS_VERSION,
   SEASON_BLOCK_VERSION,
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
+  SEASON_COMMAND_LOG_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_GAME_COUNT,
@@ -22,8 +25,11 @@ import {
   SEASON_MINUTE_POLICY_VERSION,
   SEASON_OBJECTIVE_CATALOG,
   SEASON_OBJECTIVE_VERSION,
+  SEASON_POSTSEASON_SUMMARY_VERSION,
+  SEASON_POSTSEASON_TARGETS_VERSION,
   SEASON_POSTSEASON_VERSION,
   SEASON_RECAP_VERSION,
+  SEASON_REPLAY_EXPORT_VERSION,
   SEASON_ROSTER_GENERATION_VERSION,
   SEASON_ROSTER_RULES_VERSION,
   SEASON_ROSTER_SIZE,
@@ -37,10 +43,13 @@ import {
   SEASON_STANDINGS_VERSION,
   SEASON_STAMINA_VERSION,
   SEASON_SEED_DERIVATION_VERSION,
+  SEASON_TIEBREAK_VERSION,
+  SEASON_TRADE_GRADE_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
   PLAYER_VERSION_ID_VERSION,
   buildEmptyHealth,
+  buildInitialPostseasonState,
   seasonEffectsStateSchema,
   seasonGameSimulationResultSchema,
   seasonHealthStateSchema,
@@ -64,7 +73,6 @@ import {
   type SeasonPairChemistryState,
   type SeasonPendingBlockCandidate,
   type SeasonPlayerAggregate,
-  type SeasonPostseasonState,
   type SeasonRetainedGameDetail,
   type SeasonRoster,
   type SeasonRotation,
@@ -388,46 +396,8 @@ function fixtureAiPools(league: SeasonLeague): SeasonRun['aiPools'] {
     });
 }
 
-function emptyPostseason(seed: string): SeasonPostseasonState {
-  const game = () => ({
-    gameId: 'seven-eight' as const,
-    status: 'scheduled' as const,
-    homeFranchiseId: null,
-    awayFranchiseId: null,
-    winnerFranchiseId: null,
-    loserFranchiseId: null,
-    homeScore: null,
-    awayScore: null,
-  });
-  return {
-    schemaVersion: 1,
-    postseasonVersion: SEASON_POSTSEASON_VERSION,
-    seed,
-    playIn: {
-      east: {
-        conference: 'east',
-        ranking: null,
-        games: {
-          sevenEight: game(),
-          nineTen: { ...game(), gameId: 'nine-ten' as const },
-          final: { ...game(), gameId: 'final' as const },
-        },
-        playoffSeeds: null,
-      },
-      west: {
-        conference: 'west',
-        ranking: null,
-        games: {
-          sevenEight: game(),
-          nineTen: { ...game(), gameId: 'nine-ten' as const },
-          final: { ...game(), gameId: 'final' as const },
-        },
-        playoffSeeds: null,
-      },
-    },
-    bracket: null,
-    championFranchiseId: null,
-  };
+function emptyPostseason(seed: string): SeasonRun['postseason'] {
+  return buildInitialPostseasonState(seed);
 }
 
 function scheduledGames(schedule: SeasonSchedule): SeasonGame[] {
@@ -494,6 +464,14 @@ export function buildFixtureRun(input: {
       injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
       tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
       influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+      tiebreakVersion: SEASON_TIEBREAK_VERSION,
+      postseasonSummaryVersion: SEASON_POSTSEASON_SUMMARY_VERSION,
+      awardsVersion: SEASON_AWARDS_VERSION,
+      tradeGradeVersion: SEASON_TRADE_GRADE_VERSION,
+      commandLogVersion: SEASON_COMMAND_LOG_VERSION,
+      almanacVersion: SEASON_ALMANAC_VERSION,
+      replayExportVersion: SEASON_REPLAY_EXPORT_VERSION,
+      postseasonTargetsVersion: SEASON_POSTSEASON_TARGETS_VERSION,
     },
     league,
     rosters,
@@ -513,7 +491,10 @@ export function buildFixtureRun(input: {
     games: scheduledGames(schedule),
     standings: zeroStandings(league),
     cursor: { schemaVersion: 1, completedRounds: 0 },
+    stage: 'regular-season',
     postseason: emptyPostseason(fixtureSeedFromString(`${seed}:postseason`)),
+    awards: null,
+    completion: null,
     draft: buildFixtureSeasonDraftFacts(seed),
     aiAssignments: fixtureAiAssignments(league),
     aiPools: fixtureAiPools(league),
@@ -590,6 +571,10 @@ export function buildFixtureRun(input: {
     ...run,
     stateDigest: seasonRunStateDigestFixture({
       stateRevision: 0,
+      stage: 'regular-season',
+      postseason: run.postseason,
+      awards: null,
+      completion: null,
       checkpointState: null,
       health: run.health,
       influence: run.influence,
@@ -1185,6 +1170,10 @@ export function buildFixtureStateDigest(
 ): string {
   return seasonRunStateDigestFixture({
     stateRevision: overrides.stateRevision ?? run.stateRevision,
+    stage: overrides.stage ?? run.stage,
+    postseason: overrides.postseason ?? run.postseason,
+    awards: overrides.awards ?? run.awards,
+    completion: overrides.completion ?? run.completion,
     checkpointState: overrides.checkpointState ?? run.checkpointState,
     health: overrides.health ?? run.health,
     influence: overrides.influence ?? run.influence,

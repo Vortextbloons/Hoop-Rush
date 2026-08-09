@@ -107,8 +107,33 @@ export function resolveHistoricalIdentitySpans(
  * The era-scoped identity for a franchise slot, with display labels and logo
  * candidates ready for UI consumption. `spans` empty means the slot has no
  * NBA lineage in the era; callers then keep the modern slot identity.
+ *
+ * Memoized per manifest identity and (franchise, era) key: the league/roster
+ * pages resolve identities for the same manifest thousands of times, and the
+ * manifest is immutable for the lifetime of a loaded session. The returned
+ * object is shared; callers must treat it as read-only.
  */
+const eraIdentityCache = new WeakMap<HoopRushManifest, Map<string, EraTeamIdentity>>();
+
 export function resolveEraTeamIdentity(
+  manifest: HoopRushManifest,
+  franchiseId: string,
+  eraId: string,
+): EraTeamIdentity {
+  let byKey = eraIdentityCache.get(manifest);
+  if (byKey === undefined) {
+    byKey = new Map();
+    eraIdentityCache.set(manifest, byKey);
+  }
+  const key = `${franchiseId}\0${eraId}`;
+  const cached = byKey.get(key);
+  if (cached !== undefined) return cached;
+  const identity = computeEraTeamIdentity(manifest, franchiseId, eraId);
+  byKey.set(key, identity);
+  return identity;
+}
+
+function computeEraTeamIdentity(
   manifest: HoopRushManifest,
   franchiseId: string,
   eraId: string,

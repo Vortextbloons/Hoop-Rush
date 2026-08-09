@@ -28,8 +28,18 @@ export const SEASON_SEED_NAMESPACES = {
   objectives: 'objectives',
   /** Reserved: roguelike upgrade offers (M2.9). */
   upgrades: 'upgrades',
-  /** M2.6 final random draw for tied postseason qualification. */
+  /** M2.6 standings ties (Play-In qualification and playoff seeding). */
   postseasonTies: 'postseason-ties',
+  /** M2.6 Play-In game simulation. */
+  playInGames: 'postseason-play-in',
+  /** M2.6 playoff game simulation. */
+  playoffGames: 'postseason-playoff-games',
+  /** M2.6 AI postseason rotation decisions. */
+  aiPostseasonRotations: 'postseason-ai-rotations',
+  /** M2.6 postseason injury occurrence, severity, and recovery. */
+  postseasonInjuries: 'postseason-injuries',
+  /** M2.6 deterministic draws (e.g. the Finals home-court fallback). */
+  postseasonDraws: 'postseason-draws',
 } as const;
 export type SeasonSeedNamespace = keyof typeof SEASON_SEED_NAMESPACES;
 

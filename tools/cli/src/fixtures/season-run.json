@@ -1,14 +1,14 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "runId": "fixture-season-run-1",
   "rootSeed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
   "versions": {
-    "runSchemaVersion": 8,
+    "runSchemaVersion": 9,
     "leagueVersion": "league-v1",
     "scheduleVersion": "schedule-v1",
     "scheduleFormulaVersion": "schedule-formula-v1",
     "standingsVersion": "standings-v1",
-    "postseasonVersion": "postseason-v1",
+    "postseasonVersion": "postseason-v2",
     "seedDerivationVersion": "season-seeds-v1",
     "playerVersionIdVersion": "player-version-id-v1",
     "draftVersion": "season-draft-v2",
@@ -37,7 +37,15 @@
     "objectiveVersion": "season-objective-v1",
     "injuryTargetsVersion": "injury-targets-v1",
     "tradeTargetsVersion": "trade-targets-v1",
-    "influenceTargetsVersion": "influence-targets-v1"
+    "influenceTargetsVersion": "influence-targets-v1",
+    "tiebreakVersion": "tiebreaker-v1",
+    "postseasonSummaryVersion": "postseason-summary-v1",
+    "awardsVersion": "awards-v1",
+    "tradeGradeVersion": "trade-grade-v1",
+    "commandLogVersion": "command-log-v1",
+    "almanacVersion": "almanac-v1",
+    "replayExportVersion": "replay-export-v1",
+    "postseasonTargetsVersion": "postseason-targets-v1"
   },
   "league": {
     "schemaVersion": 1,
@@ -21188,17 +21196,21 @@
     "schemaVersion": 1,
     "completedRounds": 0
   },
+  "stage": "regular-season",
   "postseason": {
     "schemaVersion": 1,
-    "postseasonVersion": "postseason-v1",
-    "seed": "d00d2026a1b2c3d4e5f60718293a4b5c6",
+    "postseasonVersion": "postseason-v2",
+    "tiebreakVersion": "tiebreaker-v1",
+    "seed": "be45cc0dc9bb74a936d408b3122a5afd",
+    "finalsHomeCourtDrawSeed": "5300cac8bd38e8a410cf4686360d65b8",
+    "tiebreakResolutions": [],
     "playIn": {
       "east": {
         "conference": "east",
         "ranking": null,
         "games": {
           "sevenEight": {
-            "gameId": "seven-eight",
+            "gameId": "pi-east-seven-eight",
             "status": "scheduled",
             "homeFranchiseId": null,
             "awayFranchiseId": null,
@@ -21208,7 +21220,7 @@
             "awayScore": null
           },
           "nineTen": {
-            "gameId": "nine-ten",
+            "gameId": "pi-east-nine-ten",
             "status": "scheduled",
             "homeFranchiseId": null,
             "awayFranchiseId": null,
@@ -21218,7 +21230,7 @@
             "awayScore": null
           },
           "final": {
-            "gameId": "final",
+            "gameId": "pi-east-final",
             "status": "scheduled",
             "homeFranchiseId": null,
             "awayFranchiseId": null,
@@ -21235,7 +21247,7 @@
         "ranking": null,
         "games": {
           "sevenEight": {
-            "gameId": "seven-eight",
+            "gameId": "pi-west-seven-eight",
             "status": "scheduled",
             "homeFranchiseId": null,
             "awayFranchiseId": null,
@@ -21245,7 +21257,7 @@
             "awayScore": null
           },
           "nineTen": {
-            "gameId": "nine-ten",
+            "gameId": "pi-west-nine-ten",
             "status": "scheduled",
             "homeFranchiseId": null,
             "awayFranchiseId": null,
@@ -21255,7 +21267,7 @@
             "awayScore": null
           },
           "final": {
-            "gameId": "final",
+            "gameId": "pi-west-final",
             "status": "scheduled",
             "homeFranchiseId": null,
             "awayFranchiseId": null,
@@ -21271,6 +21283,8 @@
     "bracket": null,
     "championFranchiseId": null
   },
+  "awards": null,
+  "completion": null,
   "draft": {
     "draftVersion": "season-draft-v2",
     "participants": [
@@ -27643,5 +27657,5 @@
   },
   "checkpointState": null,
   "stateRevision": 0,
-  "stateDigest": "340372a5bf076da979fe8c7704878ef5"
+  "stateDigest": "f06021a6874d87eace764694d8f9e3f6"
 }

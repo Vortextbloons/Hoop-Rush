@@ -585,7 +585,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     } else {
       priorSummaries = summaries;
     }
-    const common = {
+    // The worker boundary requires every nested value to be
+    // structured-cloneable, and Svelte's reactive shell can leave
+    // Proxy-backed values anywhere in a submitted run. Each slice the
+    // request carries is extracted to a plain snapshot here, so the wire
+    // payload is never a whole-request JSON round trip (the delta path
+    // ships no schedule or league context at all).
+    const plainRotations = deepClonePlain(state.rotations);
+    const plainCommon = {
       requestId,
       runId: state.input.run.runId,
       rootSeed: state.input.run.rootSeed,
@@ -597,24 +604,24 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       catalogHash: artifacts.catalogHash,
       profileUrl: artifacts.profileUrl,
       profileHash: artifacts.profileHash,
-      ...(priorSummaries !== undefined ? { priorSummaries } : {}),
-      ...(newSummaries !== undefined ? { newSummaries } : {}),
+      ...(priorSummaries !== undefined ? { priorSummaries: deepClonePlain(priorSummaries) } : {}),
+      ...(newSummaries !== undefined ? { newSummaries: deepClonePlain(newSummaries) } : {}),
       // M2.4: the authoritative pre-block effects state rides the full
       // reset (fresh worker or resume); the delta path keeps the worker's
       // accumulated effects state. A resume ships the pending candidate's
       // mid-block effects as the reset (the worker's accumulated state is
       // the pre-block state for interrupted work, which would be stale).
       ...(state.resumePending !== null
-        ? { priorEffects: state.resumePending.effects }
+        ? { priorEffects: deepClonePlain(state.resumePending.effects) }
         : priorSummaries !== undefined
-          ? { priorEffects: state.input.effects }
+          ? { priorEffects: deepClonePlain(state.input.effects) }
           : {}),
       // M2.5: the health state follows the same convention; a resume ships
       // the pending candidate's mid-block health as the reset.
       ...(state.resumePending !== null
-        ? { priorHealth: state.resumePending.health }
+        ? { priorHealth: deepClonePlain(state.resumePending.health) }
         : priorSummaries !== undefined
-          ? { priorHealth: state.input.run.health }
+          ? { priorHealth: deepClonePlain(state.input.run.health) }
           : {}),
       // M2.5: resume mid-block from the pending candidate's next game.
       startGameId: state.resumePending?.nextGameId ?? null,
@@ -623,8 +630,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       // transaction log, and the asserted run state chain facts (the worker
       // folds the block's grants on top of the economy and emits the full
       // append-only log inside the candidate).
-      priorInfluence: state.input.run.influence,
-      priorTransactions: state.input.run.transactions,
+      priorInfluence: deepClonePlain(state.input.run.influence),
+      priorTransactions: deepClonePlain(state.input.run.transactions),
       expectedStateRevision: state.input.run.stateRevision,
       expectedStateDigest: state.input.run.stateDigest,
       humanFranchiseId: state.input.humanFranchiseId,
@@ -634,49 +641,34 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     // reset implies a worker without state for this run, which receives the
     // full context again.
     if (newSummaries !== undefined) {
-      return plainWorkerRequest(
-        seasonWorkerContinueRequestSchema.parse({
-          schemaVersion: 5,
-          type: 'season-block-continue',
-          rotations: state.rotations,
-          ...common,
-        }),
-      );
-    }
-    return plainWorkerRequest(
-      seasonWorkerStartRequestSchema.parse({
+      return seasonWorkerContinueRequestSchema.parse({
         schemaVersion: 5,
-        type: 'season-block-start',
-        // The worker simulates with the LOCKED rotation set; the wire carries
-        // only the run context the block pipeline reads (the scheduled games,
-        // standings, draft, and other persisted facts never cross the worker
-        // boundary).
-        run: {
-          schemaVersion: state.input.run.schemaVersion,
-          runId: state.input.run.runId,
-          rootSeed: state.input.run.rootSeed,
-          versions: state.input.run.versions,
-          league: state.input.run.league,
-          rosters: state.input.run.rosters,
-          rotations: state.rotations,
-          cursor: state.input.run.cursor,
-        },
-        schedule,
-        homeCourt: state.input.homeCourt,
-        ...common,
+        type: 'season-block-continue',
+        rotations: plainRotations,
+        ...plainCommon,
+      });
+    }
+    return seasonWorkerStartRequestSchema.parse({
+      schemaVersion: 5,
+      type: 'season-block-start',
+      // The worker simulates with the LOCKED rotation set; the wire carries
+      // only the run context the block pipeline reads (the scheduled games,
+      // standings, draft, and other persisted facts never cross the worker
+      // boundary).
+      run: deepClonePlain({
+        schemaVersion: state.input.run.schemaVersion,
+        runId: state.input.run.runId,
+        rootSeed: state.input.run.rootSeed,
+        versions: state.input.run.versions,
+        league: state.input.run.league,
+        rosters: state.input.run.rosters,
+        rotations: state.rotations,
+        cursor: state.input.run.cursor,
       }),
-    );
-  }
-
-  /**
-   * Svelte's reactive shell can leave Proxy-backed values anywhere in a
-   * submitted run; the worker boundary requires every nested value to be
-   * structured-cloneable, so a JSON snapshot de-proxies reliably.
-   */
-  function plainWorkerRequest<T extends SeasonWorkerStartRequest | SeasonWorkerContinueRequest>(
-    request: T,
-  ): T {
-    return JSON.parse(JSON.stringify(request)) as T;
+      schedule: deepClonePlain(schedule),
+      homeCourt: deepClonePlain(state.input.homeCourt),
+      ...plainCommon,
+    });
   }
 
   return {
@@ -920,6 +912,28 @@ function dedupeByGameId(details: SeasonRetainedGameDetail[]): SeasonRetainedGame
     result.push(detail);
   }
   return result;
+}
+
+/**
+ * Deep plain snapshot of worker-boundary payload slices. Walks arrays and
+ * objects and rebuilds them from their own enumerable keys, so Svelte $state
+ * Proxy-backed values are de-proxied without a whole-payload JSON round trip.
+ * Wire values are all plain JSON (Zod-validated at both ends): no Date, Map,
+ * or class instances cross the boundary.
+ */
+function deepClonePlain<T>(value: T): T {
+  if (Array.isArray(value)) {
+    const items = value as unknown[];
+    return items.map((item) => deepClonePlain(item)) as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(value)) {
+      out[key] = deepClonePlain((value as Record<string, unknown>)[key]);
+    }
+    return out as T;
+  }
+  return value;
 }
 
 /** Singleton runner for the application (lazy deps; e2e may inject a fake). */

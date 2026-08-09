@@ -5,8 +5,13 @@
  */
 
 /**
- * Season Run persistence snapshot schema layout. Bumped to 8 by the projection
- * milestone minute-policy contract (each rotation freezes its versioned
+ * Season Run persistence snapshot schema layout. Bumped to 9 by the M2.6
+ * postseason-foundations milestone: the run carries an explicit `stage`, the
+ * postseason state is the validated v2 state machine (stable `pi-`/`po-`
+ * game ids, tie-resolution records, saved Finals home-court draw), and the
+ * mutable-state digest covers stage, postseason, awards, and completion;
+ * schema 8 runs cannot continue. Bumped to 8 by the projection milestone
+ * minute-policy contract (each rotation freezes its versioned
  * `minutePolicy`); schema 7 runs cannot continue (their rotations carry no
  * policy). Bumped to 7 by M2.5 (health, transactions, influence, checkpoint
  * state, state revision/digest fields); schema 6 runs cannot continue. Bumped
@@ -21,9 +26,10 @@
  * `draft` facts and `versions.draftVersion` widened to a discriminated union
  * so legacy M2.3 runs (`season-draft-v1`) and new runs (`season-draft-v2`)
  * both validate; the change recorded itself through draft versions, never a
- * layout bump. Schema 7 continues to accept both draft-fact variants.
+ * layout bump. Schema 7 continued to accept both draft-fact variants, and
+ * schema 9 continues to.
  */
-export const SEASON_RUN_SCHEMA_VERSION = 8;
+export const SEASON_RUN_SCHEMA_VERSION = 9;
 
 /**
  * Stored Season Run draft record save-schema version (v3, M2.4): the single
@@ -34,13 +40,14 @@ export const SEASON_RUN_SCHEMA_VERSION = 8;
 export const SEASON_DRAFT_SAVE_SCHEMA_VERSION = 3;
 
 /**
- * Stored Season Run checkpoint row save-schema version (v5, projection
- * milestone): the current storage wrapper around a schema-8 run snapshot
- * (rotations carry the versioned minute policy) plus the row-level mutable
- * state. v1-v4 development rows surface through the typed incompatibility
- * flow; they are never read or migrated.
+ * Stored Season Run checkpoint row save-schema version (v6, M2.6
+ * postseason-foundations): the current storage wrapper around a schema-9 run
+ * snapshot (stage, postseason-v2 state, awards, completion, the extended
+ * version set) plus the row-level mutable state. v1-v5 development rows
+ * surface through the typed incompatibility flow; they are never read or
+ * migrated.
  */
-export const SEASON_RUN_SAVE_SCHEMA_VERSION = 5;
+export const SEASON_RUN_SAVE_SCHEMA_VERSION = 6;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -59,8 +66,80 @@ export const SEASON_SCHEDULE_FORMULA_VERSION = 'schedule-formula-v1';
 /** Pure standings reduction rule set (derived facts only, no mutable table). */
 export const SEASON_STANDINGS_VERSION = 'standings-v1';
 
-/** Play-In and best-of-seven playoff state machine rules. */
-export const SEASON_POSTSEASON_VERSION = 'postseason-v1';
+/**
+ * Play-In and best-of-seven playoff state machine rules. M2.6
+ * postseason-foundations replaces postseason-v1 with the validated
+ * postseason-v2 contract: stable `pi-{conference}-{matchup}` and
+ * `po-{seriesId}-g{gameNumber}` game ids, the explicit season `stage`,
+ * deterministic tie-resolution records, a saved Finals home-court draw seed,
+ * and the run digest covering stage, postseason state, awards, and
+ * completion. Old runs (postseason-v1) are incompatible and restart.
+ */
+export const SEASON_POSTSEASON_VERSION = 'postseason-v2';
+
+/**
+ * Legacy Play-In and best-of-seven state machine rules (`postseason-v1`,
+ * M2.0-M2.5). Kept readable for frozen v1 artifacts and the frozen engine
+ * state machine (`season/postseason-legacy.ts`); new runs never use it.
+ */
+export const SEASON_POSTSEASON_LEGACY_VERSION = 'postseason-v1';
+
+/**
+ * Authoritative regular-season tiebreak rules (M2.6): the versioned
+ * published NBA tiebreak sequence that resolves Play-In qualification
+ * (seeds 7-10), playoff seeding (1-8), and the Finals home-court decision.
+ * Resolutions are recorded as deterministic tie-resolution facts on the
+ * postseason state; a required random draw derives from the saved league
+ * seed namespace and is recorded with its draw seed.
+ */
+export const SEASON_TIEBREAK_VERSION = 'tiebreaker-v1';
+
+/**
+ * Compact postseason game summaries (M2.6): one summary per Play-In and
+ * playoff game, kept separate from regular-season summaries so
+ * regular-season statistics remain frozen for awards. Carries matchup
+ * identity, phase, round, series, game number, winner, score, forfeit
+ * status, player statistics, rotation evidence, injury results, and a
+ * deterministic result digest.
+ */
+export const SEASON_POSTSEASON_SUMMARY_VERSION = 'postseason-summary-v1';
+
+/**
+ * Season awards contract (M2.6): MVP, Defensive Player of the Year, Sixth
+ * Man of the Year, and All-League First Team, derived from recorded
+ * regular-season facts after postseason qualification, with a deterministic
+ * digest.
+ */
+export const SEASON_AWARDS_VERSION = 'awards-v1';
+
+/** Trade-grade contract (M2.6): bounded per-window grades for accepted trades. */
+export const SEASON_TRADE_GRADE_VERSION = 'trade-grade-v1';
+
+/**
+ * Accepted-command log contract (M2.6): the append-only authoritative log
+ * of every accepted run command with ordinal, payload, pre/post state
+ * revision and digest, result digest, and related game/transaction ids.
+ * Rejected commands never enter it.
+ */
+export const SEASON_COMMAND_LOG_VERSION = 'command-log-v1';
+
+/**
+ * Completed-season almanac contract (M2.6): the champion-history record
+ * created atomically at promotion (final result, almanac, champion,
+ * finalized command log, completed-history registration, active-run
+ * removal).
+ */
+export const SEASON_ALMANAC_VERSION = 'almanac-v1';
+
+/** Replay-export contract (M2.6): self-contained postseason game exports. */
+export const SEASON_REPLAY_EXPORT_VERSION = 'replay-export-v1';
+
+/**
+ * Frozen postseason calibration cohort and envelope targets (M2.6,
+ * postseason-targets-v1): the later postseason simulation phases calibrate
+ * against these targets; the artifact is committed through the CLI.
+ */
+export const SEASON_POSTSEASON_TARGETS_VERSION = 'postseason-targets-v1';
 
 /** Named seed derivation tree version (spec/2.0/07 deterministic seed tree). */
 export const SEASON_SEED_DERIVATION_VERSION = 'season-seeds-v1';

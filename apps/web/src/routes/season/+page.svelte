@@ -3,7 +3,13 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { Dialog } from 'bits-ui';
-  import type { HoopRushManifest, SeasonLeague, SeasonSchedule } from '@hoop-rush/data-contracts';
+  import type {
+    HoopRushManifest,
+    PlayersIndex,
+    SeasonLeague,
+    SeasonRosterTargets,
+    SeasonSchedule,
+  } from '@hoop-rush/data-contracts';
   import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
   import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
   import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
@@ -37,6 +43,7 @@
   let manifest = $state<HoopRushManifest | null>(null);
   let league = $state<SeasonLeague | null>(null);
   let schedule = $state<SeasonSchedule | null>(null);
+  let playersIndex = $state.raw<PlayersIndex | null>(null);
   let assetsError: string | null = $state(null);
   let loaded = $state(false);
   let busy = $state(false);
@@ -77,41 +84,45 @@
     }
   }
 
+  /**
+   * Fresh-visit gating (performance): the ~17 MB draft catalog is only
+   * downloaded, hashed, JSON-parsed, and Zod-validated when it is actually
+   * needed — a saved draft exists (resume) or the user clicks Start draft.
+   * A fresh setup visit loads only the manifest, league, schedule, roster
+   * targets, and the players index, plus a cheap read of the small saved
+   * draft record.
+   */
   $effect(() => {
     if (!browser) return;
     let cancelled = false;
     Promise.all([
       getManifest(),
       loadSeasonLeague(),
-      loadSeasonDraftCatalog(),
       loadSeasonSchedule(),
       loadSeasonRosterTargets(),
       getPlayersIndex(),
     ])
-      .then(async ([m, seasonLeague, catalog, seasonSchedule, rosterTargets, playersIndex]) => {
+      .then(async ([m, seasonLeague, seasonSchedule, rosterTargets, ix]) => {
         if (cancelled) return;
         manifest = m;
         league = seasonLeague;
         schedule = seasonSchedule;
-        faces = buildVersionFaceIndex(
-          playersIndex.players,
-          catalog.candidates.map((candidate) => ({
-            playerVersionId: candidate.playerVersionId,
-            playerId: candidate.playerId,
-            franchiseId: candidate.franchiseId,
-            eraId: candidate.eraId,
-            seasonKey: candidate.seasonKey,
-            displayName: candidate.displayName,
-          })),
-        );
-        const { SeasonDraftFlow } = await import('$lib/season/season-draft-flow');
-        flow = new SeasonDraftFlow(new DexieSeasonDraftRepository(), catalog, rosterTargets);
-        flow.onPhaseChange = () => {
-          if (flow !== null) board = flow.state();
-        };
-        board = flow.state();
-        hasDraft = await flow.load();
-        board = flow.state();
+        playersIndex = ix;
+        // The saved draft record is small (picks + command log); the catalog
+        // only loads when a draft exists so the board can reconstruct.
+        const draftRepo = new DexieSeasonDraftRepository();
+        const storedDraft = await draftRepo.loadSeasonDraft();
+        if (cancelled) return;
+        if (storedDraft !== null) {
+          await ensureFlow(rosterTargets);
+          if (cancelled) return;
+          if (flow !== null) {
+            hasDraft = await flow.load();
+            board = flow.state();
+          }
+        } else {
+          hasDraft = false;
+        }
         // An active run takes precedence over the draft board.
         try {
           const repo = await getSeasonRunRepository(seasonSchedule);
@@ -130,9 +141,7 @@
                 resumeHref = resolve('/season/run');
               } else {
                 brokenRunError =
-                  error instanceof Error
-                    ? error.message
-                    : 'The saved season could not be loaded.';
+                  error instanceof Error ? error.message : 'The saved season could not be loaded.';
               }
             }
           }
@@ -152,16 +161,49 @@
     };
   });
 
+  /**
+   * Loads the draft catalog (memoized) and constructs the flow. The catalog
+   * is required for both the board and every draft command, so it is created
+   * exactly once per visit, when the draft is started or resumed.
+   */
+  async function ensureFlow(rosterTargets?: SeasonRosterTargets): Promise<SeasonDraftFlow | null> {
+    if (flow !== null) return flow;
+    const catalog = await loadSeasonDraftCatalog();
+    const targets = rosterTargets ?? (await loadSeasonRosterTargets());
+    const { SeasonDraftFlow } = await import('$lib/season/season-draft-flow');
+    const instance = new SeasonDraftFlow(new DexieSeasonDraftRepository(), catalog, targets);
+    instance.onPhaseChange = () => {
+      if (flow !== null) board = flow.state();
+    };
+    if (playersIndex !== null) {
+      faces = buildVersionFaceIndex(
+        playersIndex.players,
+        catalog.candidates.map((candidate) => ({
+          playerVersionId: candidate.playerVersionId,
+          playerId: candidate.playerId,
+          franchiseId: candidate.franchiseId,
+          eraId: candidate.eraId,
+          seasonKey: candidate.seasonKey,
+          displayName: candidate.displayName,
+        })),
+      );
+    }
+    flow = instance;
+    return instance;
+  }
+
   const franchiseName = (franchiseId: string): string =>
     manifest?.modernFranchiseSlots.find((slot) => slot.franchiseId === franchiseId)?.displayName ??
     franchiseId;
 
   async function startDraft() {
-    if (!flow || !league) return;
+    if (!league) return;
     busy = true;
     actionError = null;
     try {
-      const record = await flow.create({ rootSeed: seasonRootSeed(), league });
+      const instance = await ensureFlow();
+      if (instance === null) return;
+      const record = await instance.create({ rootSeed: seasonRootSeed(), league });
       if (record.status === 'rejected') {
         actionError = record.message;
       } else {
@@ -170,7 +212,7 @@
     } catch (error) {
       actionError = error instanceof Error ? error.message : String(error);
     } finally {
-      board = flow.state();
+      if (flow !== null) board = flow.state();
       busy = false;
     }
   }

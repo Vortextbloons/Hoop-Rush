@@ -31,8 +31,8 @@ import {
   SEASON_TRADE_TARGETS_VERSION,
   SEASON_TRADE_VERSION,
   SEASON_OBJECTIVE_CATALOG,
+  buildInitialPostseasonState,
   seasonEffectsStateSchema,
-  seasonNamespaceSeed,
   seasonRunSchema,
   type SeasonCheckpointVersions,
   type SeasonDraftCatalog,
@@ -190,6 +190,14 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
       injuryTargetsVersion: VERSIONS.injuryTargetsVersion,
       tradeTargetsVersion: VERSIONS.tradeTargetsVersion,
       influenceTargetsVersion: VERSIONS.influenceTargetsVersion,
+      tiebreakVersion: 'tiebreaker-v1',
+      postseasonSummaryVersion: 'postseason-summary-v1',
+      awardsVersion: 'awards-v1',
+      tradeGradeVersion: 'trade-grade-v1',
+      commandLogVersion: 'command-log-v1',
+      almanacVersion: 'almanac-v1',
+      replayExportVersion: 'replay-export-v1',
+      postseasonTargetsVersion: 'postseason-targets-v1',
     },
     league,
     rosters: generation.rosters,
@@ -235,7 +243,10 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
       })),
     },
     cursor: { schemaVersion: 1, completedRounds: 0 },
+    stage: 'regular-season',
     postseason: emptyPostseason(TEST_SEED),
+    awards: null,
+    completion: null,
     draft: buildFixtureSeasonDraftFacts(),
     aiAssignments: generation.aiAssignments,
     aiPools: fixtureAiPools(generation.aiAssignments),
@@ -311,34 +322,7 @@ export function emptyHealthState(): SeasonHealthState {
 }
 
 function emptyPostseason(rootSeed: string): SeasonRun['postseason'] {
-  const game = (gameId: 'seven-eight' | 'nine-ten' | 'final') => ({
-    gameId,
-    status: 'scheduled' as const,
-    homeFranchiseId: null,
-    awayFranchiseId: null,
-    winnerFranchiseId: null,
-    loserFranchiseId: null,
-    homeScore: null,
-    awayScore: null,
-  });
-  const conference = (id: 'east' | 'west') => ({
-    conference: id,
-    ranking: null,
-    games: {
-      sevenEight: game('seven-eight'),
-      nineTen: game('nine-ten'),
-      final: game('final'),
-    },
-    playoffSeeds: null,
-  });
-  return {
-    schemaVersion: 1,
-    postseasonVersion: SEASON_POSTSEASON_VERSION,
-    seed: seasonNamespaceSeed(rootSeed, 'postseason-ties'),
-    playIn: { east: conference('east'), west: conference('west') },
-    bracket: null,
-    championFranchiseId: null,
-  };
+  return buildInitialPostseasonState(rootSeed);
 }
 
 // The generated schedule is a pure function of (league, seed), and every
