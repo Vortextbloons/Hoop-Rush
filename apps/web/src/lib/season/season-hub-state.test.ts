@@ -4,7 +4,11 @@ import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
 import { generateSeasonSchedule, seasonObjectiveChoicesForBlock } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { SeasonHubState, type BlockRunState } from './season-hub-state';
-import { clearCachedSeasonSnapshot, getCachedSeasonSnapshot, setCachedSeasonSnapshot } from './season-state-cache';
+import {
+  clearCachedSeasonSnapshot,
+  getCachedSeasonSnapshot,
+  setCachedSeasonSnapshot,
+} from './season-state-cache';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -52,6 +56,12 @@ class FakeRunner implements SeasonBlockRunner {
     this.terminateCalls += 1;
   }
 
+  /** Performance pass: recorded for assertions; no worker in the fake. */
+  prewarmCalls = 0;
+  prewarm(): void {
+    this.prewarmCalls += 1;
+  }
+
   subscribe(listener: (event: SeasonRunnerEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -96,6 +106,8 @@ function repoWith(initial: SeasonRunSnapshot | null) {
     loadPendingBlock: vi.fn(() => Promise.resolve(null)),
     discardPendingBlock: vi.fn(() => Promise.resolve()),
     applySeasonRunCommand: vi.fn(() => Promise.resolve()),
+    loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),
+    upsertSeasonRunPlayerSlice: vi.fn(() => Promise.resolve()),
   };
 }
 
@@ -265,6 +277,8 @@ describe('SeasonHubState between-block commands', () => {
         active = { ...initial, run: input.run };
         return Promise.resolve();
       }),
+      loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),
+      upsertSeasonRunPlayerSlice: vi.fn(() => Promise.resolve()),
     };
 
     const runner = new FakeRunner();

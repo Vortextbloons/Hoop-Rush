@@ -145,13 +145,14 @@
     return { objectiveId: selection.objectiveId, name };
   });
 
-  /** M2.4: build-time stamina ratings from the catalog (constant per catalog). */
+  /** M2.4: build-time stamina ratings from the compact player slice
+   * (constant per run; the catalog is never parsed for this view). */
   const staminaByVersion = $derived.by(() => {
-    const catalog = shell.catalog;
+    const slice = shell.playerSlice;
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, number>();
-    for (const candidate of catalog?.candidates ?? []) {
-      map.set(candidate.playerVersionId, candidate.stamina.rating);
+    for (const entry of slice.values()) {
+      map.set(entry.playerVersionId, entry.staminaRating);
     }
     return map;
   });
@@ -566,6 +567,9 @@
             type="button"
             onclick={() => void submitBlock()}
             disabled={!canSubmit || submitting}
+            data-can-submit={canSubmit}
+            data-block-phase={block.phase}
+            data-editor-ready={shell.editor !== null}
             class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:text-base"
           >
             {block.phase === 'running'

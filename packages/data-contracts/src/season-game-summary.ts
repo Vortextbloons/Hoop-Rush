@@ -27,6 +27,14 @@ export const seasonCompactPlayerLineSchema = z.object({
   playerVersionId: playerVersionIdSchema,
   /** Exact on-court seconds (integer). */
   seconds: z.number().int().min(0),
+  /**
+   * M2.6 awards facts: true when the player was in the actual opening
+   * lineup (the first period-1 unit stint) of the game. Optional so
+   * season-game-summary-v3 records (pre-M2.6) parse unchanged; engine
+   * conversion always emits it, and award/aggregate folds treat absence
+   * as false.
+   */
+  started: z.boolean().optional(),
   points: z.number().int().min(0),
   fieldGoalsMade: z.number().int().min(0),
   fieldGoalsAttempted: z.number().int().min(0),

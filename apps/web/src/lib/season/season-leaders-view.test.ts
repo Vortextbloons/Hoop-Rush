@@ -44,6 +44,8 @@ function player(
     playerVersionId,
     franchiseId,
     gamesPlayed,
+    appearances: gamesPlayed,
+    started: gamesPlayed,
     seconds: gamesPlayed * 2400,
     points: 0,
     fieldGoalsMade: 0,

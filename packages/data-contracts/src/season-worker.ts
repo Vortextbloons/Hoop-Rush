@@ -165,10 +165,36 @@ export const seasonWorkerCancelRequestSchema = z.object({
 });
 export type SeasonWorkerCancelRequest = z.infer<typeof seasonWorkerCancelRequestSchema>;
 
+/**
+ * Performance pass: worker prewarm. The main thread posts this after the run
+ * shell is interactive (idle callback) so the worker fetches, hash-verifies,
+ * and caches the packaged catalog and era profile BEFORE the first block
+ * start; a later start request then pays no download/parse time. The worker
+ * responds with `season-block-warm-ack`; no simulation state is touched.
+ */
+export const seasonWorkerWarmRequestSchema = z.object({
+  schemaVersion: z.literal(SEASON_WORKER_WIRE_SCHEMA_VERSION),
+  type: z.literal('season-block-warm'),
+  requestId: z.string().min(1).max(64),
+  catalogUrl: z.string().min(1).max(512),
+  catalogHash: contentHashSchema,
+  profileUrl: z.string().min(1).max(512),
+  profileHash: contentHashSchema,
+});
+export type SeasonWorkerWarmRequest = z.infer<typeof seasonWorkerWarmRequestSchema>;
+
+export const seasonWorkerWarmAckMessageSchema = z.object({
+  schemaVersion: z.literal(SEASON_WORKER_WIRE_SCHEMA_VERSION),
+  type: z.literal('season-block-warm-ack'),
+  requestId: z.string().min(1).max(64),
+});
+export type SeasonWorkerWarmAckMessage = z.infer<typeof seasonWorkerWarmAckMessageSchema>;
+
 export const seasonWorkerRequestSchema = z.discriminatedUnion('type', [
   seasonWorkerStartRequestSchema,
   seasonWorkerContinueRequestSchema,
   seasonWorkerCancelRequestSchema,
+  seasonWorkerWarmRequestSchema,
 ]);
 export type SeasonWorkerRequest = z.infer<typeof seasonWorkerRequestSchema>;
 
@@ -228,5 +254,6 @@ export const seasonWorkerMessageSchema = z.discriminatedUnion('type', [
   seasonWorkerProgressMessageSchema,
   seasonWorkerCompleteMessageSchema,
   seasonWorkerErrorMessageSchema,
+  seasonWorkerWarmAckMessageSchema,
 ]);
 export type SeasonWorkerMessage = z.infer<typeof seasonWorkerMessageSchema>;

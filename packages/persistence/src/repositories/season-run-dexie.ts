@@ -37,6 +37,7 @@ import {
   SEASON_RUN_RECORD_ID,
   seasonRunCheckpointDeltaSchema,
   seasonRunCursorSchema,
+  seasonRunPlayerSliceEntrySchema,
   storedSeasonAcceptedBlockRowSchema,
   storedSeasonActiveRunIndexSchema,
   storedSeasonAlmanacRowSchema,
@@ -45,13 +46,20 @@ import {
   storedSeasonCompletedRunRowSchema,
   storedSeasonDetailRowSchema,
   storedSeasonPendingBlockRowSchema,
+  storedSeasonPlayerSliceRowSchema,
+  storedSeasonPostseasonDetailRowSchema,
   storedSeasonPostseasonSummaryRowSchema,
   storedSeasonRunRecordSchema,
   storedSeasonSummaryRowSchema,
   seasonCompletedSeasonSchema,
+  seasonPostseasonDetailSchema,
+  type SeasonCompletedRunIndexEntry,
   type SeasonCompletedSeason,
+  type SeasonPostseasonDetail,
+  type SeasonRunPlayerSliceEntry,
   type StoredSeasonRunRecord,
 } from '../schemas/season-run-record.ts';
+import type { Table } from 'dexie';
 import {
   SEASON_DRAFT_RECORD_ID,
   storedSeasonDraftSchema,
@@ -132,6 +140,29 @@ export class SeasonRunLoadError extends Error {
     this.name = 'SeasonRunLoadError';
     this.failures = failures;
   }
+}
+
+/**
+ * Every table that holds run-scoped Season Run rows (performance pass).
+ * Lifecycle deletions route through `deleteRunRows` inside a transaction over
+ * exactly this set, so no teardown can leave orphaned rows.
+ */
+function SEASON_RUN_SCOPED_TABLES(db: HoopRushDatabase): Table<unknown>[] {
+  return [
+    db.seasonRuns,
+    db.seasonRunSummaries,
+    db.seasonRunDetails,
+    db.seasonRunBlocks,
+    db.seasonRunIndex,
+    db.seasonPendingBlocks,
+    db.seasonPostseasonSummaries,
+    db.seasonPostseasonDetails,
+    db.seasonCommandLog,
+    db.seasonAlmanacs,
+    db.seasonCompletedRuns,
+    db.seasonCompletedIndex,
+    db.seasonRunPlayerSlices,
+  ] as Table<unknown>[];
 }
 
 /** True when the raw row carries a saveSchemaVersion outside the current family. */
@@ -465,32 +496,40 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     );
   }
 
+  /**
+   * THE single run-scoped deletion path (performance pass). Every Season Run
+   * table carries rows keyed by runId; lifecycle callers (quit, force-clear,
+   * corrupt-save recovery, replacement-run promotion, completed-run
+   * deletion) all route through here so no orphaned row can survive a run
+   * teardown. Must be invoked inside a 'rw' transaction that includes every
+   * table in `SEASON_RUN_SCOPED_TABLES`.
+   */
+  private async deleteRunRows(runId: string): Promise<void> {
+    await this.db.seasonRunSummaries.where('runId').equals(runId).delete();
+    await this.db.seasonRunDetails.where('runId').equals(runId).delete();
+    await this.db.seasonRunBlocks.where('runId').equals(runId).delete();
+    await this.db.seasonPendingBlocks.delete(runId);
+    await this.db.seasonPostseasonSummaries.where('runId').equals(runId).delete();
+    await this.db.seasonPostseasonDetails.where('runId').equals(runId).delete();
+    await this.db.seasonCommandLog.where('runId').equals(runId).delete();
+    await this.db.seasonAlmanacs.delete(runId);
+    await this.db.seasonCompletedRuns.delete(runId);
+    await this.db.seasonCompletedIndex.delete(runId);
+    await this.db.seasonRunPlayerSlices.delete(runId);
+  }
+
   /** Deletes the checkpoint row, the index row, and every run row of a development checkpoint. */
   private async clearDevelopmentRow(): Promise<void> {
-    await this.db.transaction(
-      'rw',
-      [
-        this.db.seasonRuns,
-        this.db.seasonRunSummaries,
-        this.db.seasonRunDetails,
-        this.db.seasonRunBlocks,
-        this.db.seasonRunIndex,
-        this.db.seasonPendingBlocks,
-      ],
-      async () => {
-        const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-        if (checkpoint === undefined) return;
-        await this.db.seasonRuns.delete(SEASON_RUN_RECORD_ID);
-        await this.db.seasonRunIndex.delete(SEASON_RUN_RECORD_ID);
-        const runId = (checkpoint as { run?: { runId?: unknown } }).run?.runId;
-        if (typeof runId === 'string') {
-          await this.db.seasonRunSummaries.where('runId').equals(runId).delete();
-          await this.db.seasonRunDetails.where('runId').equals(runId).delete();
-          await this.db.seasonRunBlocks.where('runId').equals(runId).delete();
-          await this.db.seasonPendingBlocks.delete(runId);
-        }
-      },
-    );
+    await this.db.transaction('rw', SEASON_RUN_SCOPED_TABLES(this.db), async () => {
+      const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+      if (checkpoint === undefined) return;
+      await this.db.seasonRuns.delete(SEASON_RUN_RECORD_ID);
+      await this.db.seasonRunIndex.delete(SEASON_RUN_RECORD_ID);
+      const runId = (checkpoint as { run?: { runId?: unknown } }).run?.runId;
+      if (typeof runId === 'string') {
+        await this.deleteRunRows(runId);
+      }
+    });
   }
 
   private async loadValidated(
@@ -657,10 +696,11 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
   }
 
   async loadBlockSummaries(runId: string, blockIndex: number): Promise<SeasonGameSummary[]> {
+    // Performance pass: the [runId+blockIndex] composite index serves this
+    // exact query; the old blockIndex-only scan walked every run's rows.
     const rows = await this.db.seasonRunSummaries
-      .where('blockIndex')
-      .equals(blockIndex)
-      .and((row) => row.runId === runId)
+      .where('[runId+blockIndex]')
+      .equals([runId, blockIndex])
       .toArray();
     return byGameId(
       rows.map((row) => {
@@ -789,9 +829,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         // Block summaries replace the block's prior rows; a legal commit only
         // ever appends (the revision guard above), so this is defensive.
         await this.db.seasonRunSummaries
-          .where('blockIndex')
-          .equals(blockIndex)
-          .and((row) => row.runId === input.runId)
+          .where('[runId+blockIndex]')
+          .equals([input.runId, blockIndex])
           .delete();
         await this.db.seasonRunDetails
           .where('runId')
@@ -857,10 +896,13 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         // M2.5: when the engine produced a trade-window open, the window's
         // mutated rosters/ownership/rotations/effects/trade/influence/
         // transactions replace the block's own (AI activity folds on top).
-        // The commit's stateRevision/stateDigest already include the window.
+        // The commit's stateRevision/stateDigest already include the window
+        // and are computed over the WINDOW health, so the stored health must
+        // be the window's or the reload audit's digest recomputation fails
+        // (regression fix).
         const window = input.window;
         const mutableState = {
-          health: input.health,
+          health: window !== null ? window.health : input.health,
           transactions: window !== null ? window.transactions : input.transactions,
           influence: window !== null ? window.influence : input.influence,
           trade: window !== null ? window.trade : input.trade,
@@ -1108,7 +1150,11 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     });
   }
 
-  async promoteSeasonDraftToRun(draft: StoredSeasonDraft, run: SeasonRun): Promise<void> {
+  async promoteSeasonDraftToRun(
+    draft: StoredSeasonDraft,
+    run: SeasonRun,
+    playerSlice?: SeasonRunPlayerSliceEntry[],
+  ): Promise<void> {
     const validatedDraft = storedSeasonDraftSchema.parse(draft);
     const validatedRun = seasonRunSchema.parse(run);
     const { games: _games, ...runWithoutGames } = validatedRun;
@@ -1189,15 +1235,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     });
     await this.db.transaction(
       'rw',
-      [
-        this.db.seasonRuns,
-        this.db.seasonRunSummaries,
-        this.db.seasonRunDetails,
-        this.db.seasonRunBlocks,
-        this.db.seasonRunIndex,
-        this.db.seasonDrafts,
-        this.db.seasonPendingBlocks,
-      ],
+      [...SEASON_RUN_SCOPED_TABLES(this.db), this.db.seasonDrafts],
       async () => {
         const storedDraft = await this.db.seasonDrafts.get(SEASON_DRAFT_RECORD_ID);
         if (storedDraft !== undefined && storedDraft.draft.runId !== validatedDraft.draft.runId) {
@@ -1223,101 +1261,127 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             : typeof (existing as { run?: { runId?: unknown } }).run?.runId === 'string'
               ? (existing as { run: { runId: string } }).run.runId
               : null;
+          // Replacement-run promotion: every row of the superseded run goes
+          // through the shared deletion path so no orphaned row survives.
           if (existingRunId !== null && existingRunId !== validatedRun.runId) {
-            await this.db.seasonRunSummaries.where('runId').equals(existingRunId).delete();
-            await this.db.seasonRunDetails.where('runId').equals(existingRunId).delete();
-            await this.db.seasonRunBlocks.where('runId').equals(existingRunId).delete();
-            await this.db.seasonPendingBlocks.delete(existingRunId);
+            await this.deleteRunRows(existingRunId);
           }
         }
         await this.db.seasonRuns.put(checkpointRow);
         await this.db.seasonRunIndex.put(indexRow);
+        if (playerSlice !== undefined && playerSlice.length > 0) {
+          await this.db.seasonRunPlayerSlices.put(
+            storedSeasonPlayerSliceRowSchema.parse({
+              runId: validatedRun.runId,
+              players: playerSlice.map((entry) => seasonRunPlayerSliceEntrySchema.parse(entry)),
+              updatedAtIso: new Date().toISOString(),
+            }),
+          );
+        }
         await this.db.seasonDrafts.delete(SEASON_DRAFT_RECORD_ID);
       },
     );
   }
 
+  async loadSeasonRunPlayerSlice(runId: string): Promise<SeasonRunPlayerSliceEntry[] | null> {
+    const row = await this.db.seasonRunPlayerSlices.get(runId);
+    if (row === undefined) return null;
+    const parsed = storedSeasonPlayerSliceRowSchema.parse(row);
+    if (parsed.runId !== runId) {
+      throw new SeasonRunLoadError(
+        ['player slice row runId does not match its key'],
+        'corrupt stored Season Run player slice row',
+      );
+    }
+    return parsed.players;
+  }
+
+  async upsertSeasonRunPlayerSlice(
+    runId: string,
+    entries: SeasonRunPlayerSliceEntry[],
+  ): Promise<void> {
+    if (entries.length === 0) return;
+    await this.db.transaction('rw', this.db.seasonRunPlayerSlices, async () => {
+      const existing = await this.db.seasonRunPlayerSlices.get(runId);
+      const byVersion = new Map<string, SeasonRunPlayerSliceEntry>(
+        (existing?.players ?? []).map((entry) => [entry.playerVersionId, entry]),
+      );
+      for (const entry of entries) {
+        const parsed = seasonRunPlayerSliceEntrySchema.parse(entry);
+        byVersion.set(parsed.playerVersionId, parsed);
+      }
+      await this.db.seasonRunPlayerSlices.put(
+        storedSeasonPlayerSliceRowSchema.parse({
+          runId,
+          players: [...byVersion.values()],
+          updatedAtIso: new Date().toISOString(),
+        }),
+      );
+    });
+  }
+
   async clearSeasonRun(runId: string): Promise<void> {
-    await this.db.transaction(
-      'rw',
-      [
-        this.db.seasonRuns,
-        this.db.seasonRunSummaries,
-        this.db.seasonRunDetails,
-        this.db.seasonRunBlocks,
-        this.db.seasonRunIndex,
-        this.db.seasonPendingBlocks,
-      ],
-      async () => {
-        const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-        if (checkpoint !== undefined) {
-          const parsed = storedSeasonRunRecordSchema.safeParse(checkpoint);
-          const storedRunId = parsed.success
-            ? parsed.data.run.runId
-            : typeof (checkpoint as { run?: { runId?: unknown } }).run?.runId === 'string'
-              ? (checkpoint as { run: { runId: string } }).run.runId
-              : null;
-          if (storedRunId !== null && storedRunId !== runId) {
-            throw new Error('clearSeasonRun: runId does not match the active checkpoint');
-          }
+    await this.db.transaction('rw', SEASON_RUN_SCOPED_TABLES(this.db), async () => {
+      const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+      if (checkpoint !== undefined) {
+        const parsed = storedSeasonRunRecordSchema.safeParse(checkpoint);
+        const storedRunId = parsed.success
+          ? parsed.data.run.runId
+          : typeof (checkpoint as { run?: { runId?: unknown } }).run?.runId === 'string'
+            ? (checkpoint as { run: { runId: string } }).run.runId
+            : null;
+        if (storedRunId !== null && storedRunId !== runId) {
+          throw new Error('clearSeasonRun: runId does not match the active checkpoint');
         }
-        await this.db.seasonRuns.delete(SEASON_RUN_RECORD_ID);
-        await this.db.seasonRunIndex.delete(SEASON_RUN_RECORD_ID);
-        await this.db.seasonRunSummaries.where('runId').equals(runId).delete();
-        await this.db.seasonRunDetails.where('runId').equals(runId).delete();
-        await this.db.seasonRunBlocks.where('runId').equals(runId).delete();
-        await this.db.seasonPendingBlocks.delete(runId);
-      },
-    );
+      }
+      await this.db.seasonRuns.delete(SEASON_RUN_RECORD_ID);
+      await this.db.seasonRunIndex.delete(SEASON_RUN_RECORD_ID);
+      await this.deleteRunRows(runId);
+    });
   }
 
   async forceClearActiveSeasonRun(): Promise<void> {
-    await this.db.transaction(
-      'rw',
-      [
-        this.db.seasonRuns,
-        this.db.seasonRunSummaries,
-        this.db.seasonRunDetails,
-        this.db.seasonRunBlocks,
-        this.db.seasonRunIndex,
-        this.db.seasonPendingBlocks,
-      ],
-      async () => {
-        const runIds = new Set<string>();
-        const indexRow = await this.db.seasonRunIndex.get(SEASON_RUN_RECORD_ID);
-        if (indexRow !== undefined) {
-          const parsedIndex = storedSeasonActiveRunIndexSchema.safeParse(indexRow);
-          if (parsedIndex.success) {
-            runIds.add(parsedIndex.data.index.runId);
-          }
+    await this.db.transaction('rw', SEASON_RUN_SCOPED_TABLES(this.db), async () => {
+      const runIds = new Set<string>();
+      const indexRow = await this.db.seasonRunIndex.get(SEASON_RUN_RECORD_ID);
+      if (indexRow !== undefined) {
+        const parsedIndex = storedSeasonActiveRunIndexSchema.safeParse(indexRow);
+        if (parsedIndex.success) {
+          runIds.add(parsedIndex.data.index.runId);
         }
-        const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-        if (checkpoint !== undefined) {
-          const parsedCheckpoint = storedSeasonRunRecordSchema.safeParse(checkpoint);
-          if (parsedCheckpoint.success) {
-            runIds.add(parsedCheckpoint.data.run.runId);
-          } else {
-            const rawRunId = (checkpoint as { run?: { runId?: unknown } }).run?.runId;
-            if (typeof rawRunId === 'string') runIds.add(rawRunId);
-          }
+      }
+      const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+      if (checkpoint !== undefined) {
+        const parsedCheckpoint = storedSeasonRunRecordSchema.safeParse(checkpoint);
+        if (parsedCheckpoint.success) {
+          runIds.add(parsedCheckpoint.data.run.runId);
+        } else {
+          const rawRunId = (checkpoint as { run?: { runId?: unknown } }).run?.runId;
+          if (typeof rawRunId === 'string') runIds.add(rawRunId);
         }
-        await this.db.seasonRuns.delete(SEASON_RUN_RECORD_ID);
-        await this.db.seasonRunIndex.delete(SEASON_RUN_RECORD_ID);
-        if (runIds.size === 0) {
-          await this.db.seasonRunSummaries.clear();
-          await this.db.seasonRunDetails.clear();
-          await this.db.seasonRunBlocks.clear();
-          await this.db.seasonPendingBlocks.clear();
-          return;
-        }
-        for (const runId of runIds) {
-          await this.db.seasonRunSummaries.where('runId').equals(runId).delete();
-          await this.db.seasonRunDetails.where('runId').equals(runId).delete();
-          await this.db.seasonRunBlocks.where('runId').equals(runId).delete();
-          await this.db.seasonPendingBlocks.delete(runId);
-        }
-      },
-    );
+      }
+      await this.db.seasonRuns.delete(SEASON_RUN_RECORD_ID);
+      await this.db.seasonRunIndex.delete(SEASON_RUN_RECORD_ID);
+      if (runIds.size === 0) {
+        // Unidentifiable active state: wipe every run-scoped table so no
+        // partial rows can leak into a later run.
+        await this.db.seasonRunSummaries.clear();
+        await this.db.seasonRunDetails.clear();
+        await this.db.seasonRunBlocks.clear();
+        await this.db.seasonPendingBlocks.clear();
+        await this.db.seasonPostseasonSummaries.clear();
+        await this.db.seasonPostseasonDetails.clear();
+        await this.db.seasonCommandLog.clear();
+        await this.db.seasonAlmanacs.clear();
+        await this.db.seasonCompletedRuns.clear();
+        await this.db.seasonCompletedIndex.clear();
+        await this.db.seasonRunPlayerSlices.clear();
+        return;
+      }
+      for (const runId of runIds) {
+        await this.deleteRunRows(runId);
+      }
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -1330,6 +1394,9 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
     const summaries = input.summaries.map((summary) =>
       seasonPostseasonSummarySchema.parse(summary),
     );
+    const details = (input.details ?? []).map((detail) =>
+      seasonPostseasonDetailSchema.parse(detail),
+    );
     if (validatedRun.runId !== input.runId || command.runId !== input.runId) {
       throw new SeasonRunCommandRunMismatchError(input.runId);
     }
@@ -1338,11 +1405,17 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         throw new SeasonRunCommandRunMismatchError(input.runId);
       }
     }
+    for (const detail of details) {
+      if (detail.runId !== input.runId) {
+        throw new SeasonRunCommandRunMismatchError(input.runId);
+      }
+    }
     await this.db.transaction(
       'rw',
       [
         this.db.seasonRuns,
         this.db.seasonPostseasonSummaries,
+        this.db.seasonPostseasonDetails,
         this.db.seasonCommandLog,
         this.db.seasonPendingBlocks,
       ],
@@ -1405,6 +1478,16 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         const entries = existingLogRows
           .map((row) => storedSeasonCommandLogRowSchema.parse(row).entry)
           .sort((a, b) => a.ordinal - b.ordinal);
+        // The append-only log must stay dense from ordinal 0: a gap (missing
+        // row or row/entry ordinal disagreement) would make the next ordinal
+        // ambiguous, so it is rejected rather than appended over.
+        for (let index = 0; index < entries.length; index += 1) {
+          if (entries[index]?.ordinal !== index) {
+            throw new SeasonPostseasonIntegrityError(
+              `command log ordinals are not dense from 0 (gap at ordinal ${String(index)})`,
+            );
+          }
+        }
         const ordinal = entries.length;
         const entry = seasonCommandLogEntrySchema.parse({
           runId: input.runId,
@@ -1475,6 +1558,17 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             })),
           );
         }
+        if (details.length > 0) {
+          await this.db.seasonPostseasonDetails.bulkPut(
+            details.map((detail) => ({
+              runId: input.runId,
+              gameId: detail.gameId,
+              phase: detail.phase,
+              detail,
+              updatedAtIso: new Date().toISOString(),
+            })),
+          );
+        }
       },
     );
   }
@@ -1509,6 +1603,22 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       );
     }
     return parsed.summary;
+  }
+
+  async loadPostseasonDetails(runId: string): Promise<SeasonPostseasonDetail[]> {
+    const rows = await this.db.seasonPostseasonDetails.where('runId').equals(runId).toArray();
+    const details: SeasonPostseasonDetail[] = [];
+    for (const row of rows) {
+      const parsed = storedSeasonPostseasonDetailRowSchema.parse(row);
+      if (parsed.gameId !== parsed.detail.gameId || parsed.phase !== parsed.detail.phase) {
+        throw new SeasonRunLoadError(
+          [`postseason detail row ${row.gameId} identity does not match its facts`],
+          'corrupt stored Season Run postseason detail row',
+        );
+      }
+      details.push(parsed.detail);
+    }
+    return details.sort((a, b) => (a.gameId < b.gameId ? -1 : 1));
   }
 
   async loadCommandLog(runId: string): Promise<SeasonCommandLog | null> {
@@ -1743,23 +1853,24 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
         this.db.seasonRunSummaries,
         this.db.seasonRunDetails,
         this.db.seasonRunBlocks,
+        this.db.seasonPendingBlocks,
         this.db.seasonPostseasonSummaries,
+        this.db.seasonPostseasonDetails,
         this.db.seasonCommandLog,
         this.db.seasonAlmanacs,
         this.db.seasonCompletedRuns,
         this.db.seasonCompletedIndex,
+        this.db.seasonRunPlayerSlices,
       ],
       async () => {
-        await this.db.seasonRunSummaries.where('runId').equals(runId).delete();
-        await this.db.seasonRunDetails.where('runId').equals(runId).delete();
-        await this.db.seasonRunBlocks.where('runId').equals(runId).delete();
-        await this.db.seasonPostseasonSummaries.where('runId').equals(runId).delete();
-        await this.db.seasonCommandLog.where('runId').equals(runId).delete();
-        await this.db.seasonAlmanacs.delete(runId);
-        await this.db.seasonCompletedRuns.delete(runId);
-        await this.db.seasonCompletedIndex.delete(runId);
+        await this.deleteRunRows(runId);
       },
     );
+  }
+
+  async listCompletedSeasonRuns(): Promise<SeasonCompletedRunIndexEntry[]> {
+    const rows = await this.db.seasonCompletedIndex.orderBy('completedAtIso').reverse().toArray();
+    return rows.map((row) => storedSeasonCompletedIndexSchema.parse(row));
   }
 
   async buildReplayExport(runId: string, gameId: string): Promise<SeasonReplayExport | null> {

@@ -71,7 +71,10 @@ function slotGroupLabel(group: string): string {
   if (group === 'F') return 'forward';
   if (group === 'C') return 'center';
   if (group.includes('/')) {
-    return group.split('/').map((part) => slotGroupLabel(part)).join('/');
+    return group
+      .split('/')
+      .map((part) => slotGroupLabel(part))
+      .join('/');
   }
   const detailed: Record<string, string> = {
     PG: 'point guard',
@@ -199,7 +202,10 @@ function rotationInsightOf(
   };
 }
 
-function chemistryInsightOf(disruption: { removedPairs: number; newPairs: number }): TradeOfferInsight {
+function chemistryInsightOf(disruption: {
+  removedPairs: number;
+  newPairs: number;
+}): TradeOfferInsight {
   const { removedPairs, newPairs } = disruption;
   const pairWord = (count: number): string => (count === 1 ? 'pairing' : 'pairings');
   if (removedPairs === 0 && newPairs === 0) {
@@ -240,9 +246,7 @@ export function tradeOfferViewModel(
   const minutesById = new Map(
     (rotation?.targetMinutes ?? []).map((entry) => [entry.playerVersionId, entry.minutes]),
   );
-  const outgoingMinutes = offer.outgoingPlayerVersionIds.map(
-    (id) => minutesById.get(id) ?? null,
-  );
+  const outgoingMinutes = offer.outgoingPlayerVersionIds.map((id) => minutesById.get(id) ?? null);
   const projectedIncomingMinutes = outgoingMinutes.map((minutes) => minutes ?? 16);
 
   const viewPlayer = (

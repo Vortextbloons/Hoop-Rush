@@ -47,6 +47,7 @@ import {
   type SeasonWindowOpenResult,
 } from '@hoop-rush/persistence';
 import { completeSeasonBlockCommit } from '@hoop-rush/engine';
+import { assembleCommittedSnapshot } from '$lib/season/season-block-runner';
 import type {
   SeasonBlockResumeInput,
   SeasonBlockRunner,
@@ -309,7 +310,13 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           stateDigest: committed.stateDigest,
           window: committed.window,
         });
-        this.emit({ type: 'complete', requestId, checkpoint });
+        const committedView = await this.committedSnapshot(
+          startInput,
+          checkpoint,
+          pending.commandId,
+          committed,
+        );
+        this.emit({ type: 'complete', requestId, checkpoint, snapshot: committedView });
       } catch (error) {
         if (this.isCancelled()) return;
         this.emit({
@@ -338,6 +345,11 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear();
     this.listeners.clear();
+  }
+
+  /** Performance pass: the fake needs no packaged asset prewarm. */
+  prewarm(): void {
+    // no-op (test seam; the fake never fetches packaged assets)
   }
 
   subscribe(listener: (event: SeasonRunnerEvent) => void): () => void {
@@ -521,8 +533,14 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       this.fakeHealthFor(input),
       null,
     );
+    let committed: {
+      checkpointState: SeasonCheckpointState;
+      stateRevision: number;
+      stateDigest: string;
+      window: SeasonWindowOpenResult | null;
+    } | null = null;
     try {
-      const committed = this.committedFacts(input, checkpoint, input.commandId);
+      committed = this.committedFacts(input, checkpoint, input.commandId);
       await this.commitCheckpoint(input, input.commandId, checkpoint, {
         health: this.fakeHealthFor(input),
         influence: this.fakeInfluenceFor(input, input.blockIndex),
@@ -545,8 +563,55 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       });
       return;
     }
-    if (this.isCancelled()) return;
-    this.emit({ type: 'complete', requestId, checkpoint });
+    // `committed` is non-null here: the try above either assigned it or
+    // returned on error/cancel. The type-level narrowing is lost across the
+    // catch, so the null guard stays.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (this.isCancelled() || committed === null) return;
+    const snapshot = await this.committedSnapshot(input, checkpoint, input.commandId, committed);
+    this.emit({ type: 'complete', requestId, checkpoint, snapshot });
+  }
+
+  /**
+   * Performance pass: the authoritative post-commit snapshot the real runner
+   * also emits (mirror of `assembleCommittedSnapshot` over the fake's own
+   * committed facts), so the hub renders immediately after the commit.
+   */
+  private async committedSnapshot(
+    input: SeasonBlockStartInput,
+    checkpoint: SeasonCandidateCheckpoint,
+    commandId: string,
+    committed: {
+      checkpointState: SeasonCheckpointState;
+      stateRevision: number;
+      stateDigest: string;
+      window: SeasonWindowOpenResult | null;
+    },
+  ): Promise<SeasonRunSnapshot> {
+    const schedule = this.scheduleOf(input);
+    // The prior-state read is best effort: without a repository (unit tests,
+    // pre-promotion states) the snapshot still assembles over an empty prior.
+    let current: SeasonRunSnapshot | null = null;
+    try {
+      current = await loadCurrentSnapshot(schedule);
+    } catch {
+      current = null;
+    }
+    return assembleCommittedSnapshot({
+      run: input.run,
+      rotations: input.rotations,
+      checkpoint,
+      commandId,
+      rotationDigest: input.rotationDigest,
+      window: committed.window,
+      checkpointState: committed.checkpointState,
+      stateRevision: committed.stateRevision,
+      stateDigest: committed.stateDigest,
+      schedule,
+      priorSummaries: current?.summaries ?? [],
+      priorAcceptedBlocks: current?.acceptedBlocks ?? [],
+      priorRetainedDetails: current?.retainedDetails ?? [],
+    });
   }
 
   private async buildCheckpoint(

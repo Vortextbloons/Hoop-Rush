@@ -1,12 +1,22 @@
-import { describe, expect, it, vi } from 'vitest';
-import type {
-  SeasonEffectsState,
-  SeasonGameSummary,
-  SeasonPendingBlockCandidate,
-  SeasonRun,
-  SeasonRunCommand,
-  SeasonTradeOffer,
+﻿import { describe, expect, it, vi } from 'vitest';
+import {
+  playoffGameIdOf,
+  seasonRunSchema,
+  type SeasonDraftCatalog,
+  type SeasonEffectsState,
+  type SeasonGameEffectsTransition,
+  type SeasonGameSimulationInput,
+  type SeasonGameSimulationResult,
+  type SeasonGameSideResult,
+  type SeasonGameSummary,
+  type SeasonPendingBlockCandidate,
+  type SeasonRotation,
+  type SeasonRun,
+  type SeasonRunCommand,
+  type SeasonTradeOffer,
+  type Position,
 } from '@hoop-rush/data-contracts';
+import { buildEraSimulationProfile } from '@hoop-rush/test-fixtures';
 import { handleSeasonRunCommand, type SeasonRunCommandContext } from './season-commands.ts';
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
 import { openSeasonTradeWindow } from './trades.ts';
@@ -16,9 +26,12 @@ import {
   withInjury,
   zeroEffectsOf,
 } from './season-economy-test-support.ts';
+import { seasonPlayerAvailable } from './injuries.ts';
+import { matchStartingFive } from './rotation.ts';
+import { zeroSeasonGameTransition, type SeasonPostseasonGameResolver } from './postseason.ts';
 
 /**
- * M2.5 typed run command tests (spec/2.0/07 M2.5 §8): the six handlers, their
+ * M2.5 typed run command tests (spec/2.0/07 M2.5 Â§8): the six handlers, their
  * deterministic preconditions and typed rejections, state-chain advancement
  * (revision +1 + recomputed digest), and replay determinism. The health
  * seams (risky-rehab outcome rolls, forfeit summaries, pending advancement)
@@ -138,6 +151,7 @@ vi.mock('./health.ts', async (importOriginal) => {
 });
 
 const HUMAN = 'lakers';
+const TEST_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 
 /** A fresh run with window 0 open (accepted block 2), revision 1. */
 function windowedFixture(seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a'): {
@@ -606,7 +620,7 @@ describe('spend-influence command', () => {
       missedGamesRemaining: 4,
       actualReturnRound: null,
       seasonEnding: false,
-      rehabModifier: 0,
+      rehabModifier: 0 as const,
       recurrenceWindowRoundsRemaining: 0,
       seedPath: ['injuries', 'test'],
     });
@@ -667,7 +681,7 @@ describe('spend-influence command', () => {
       missedGamesRemaining: 2,
       actualReturnRound: null,
       seasonEnding: false,
-      rehabModifier: 0,
+      rehabModifier: 0 as const,
       recurrenceWindowRoundsRemaining: 0,
       seedPath: ['injuries', 'test'],
     });
@@ -1118,5 +1132,922 @@ describe('command replay determinism', () => {
     expect(first.run).toEqual({ ...run, effects: context.effects });
     expect(first.result.result.status).toBe('rejected');
     void offer;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M2.6 postseason commands (spec/2.0/02 playoffs). The fixture run sits at
+// the end of the regular season (cursor 82); the rankings seam places the
+// human at west seed 7; the documented resolver seam forces winners while
+// the machine (summaries, health, bracket advancement) stays real.
+// ---------------------------------------------------------------------------
+
+function forcedCompletedResult(
+  gameInput: SeasonGameSimulationInput,
+  homeScore: number,
+  awayScore: number,
+  pregameEffects: SeasonEffectsState,
+): { result: SeasonGameSimulationResult; transition: SeasonGameEffectsTransition } {
+  const homeWon = homeScore > awayScore;
+  const sideOf = (side: 'home' | 'away', score: number): SeasonGameSideResult => {
+    const team = side === 'home' ? gameInput.home : gameInput.away;
+    const fgm = Math.floor(score / 2);
+    const ftm = score % 2;
+    return {
+      teamId: team.teamId,
+      displayName: team.displayName,
+      franchiseId: team.franchiseId,
+      score,
+      periodScores: [score],
+      box: {
+        points: score,
+        fieldGoals: { made: fgm, attempted: fgm },
+        threes: { made: 0, attempted: 0 },
+        freeThrows: { made: ftm, attempted: ftm },
+        rebounds: { total: 0, offensive: 0, defensive: 0, team: 0 },
+        assists: 0,
+        steals: 0,
+        blocks: 0,
+        turnovers: 0,
+        fouls: 0,
+        possessions: 60,
+        diagnostics: {
+          assistedFieldGoals: 0,
+          unassistedFieldGoals: fgm,
+          reboundOpportunities: 0,
+          contestedShots: 0,
+        },
+      },
+      players: team.players.map((player, index) => ({
+        playerVersionId: player.playerVersionId,
+        playerId: player.playerId,
+        seconds: 1440,
+        minutes: 24,
+        points: index === 0 ? score : 0,
+        fieldGoals: { made: index === 0 ? fgm : 0, attempted: index === 0 ? fgm : 0 },
+        threes: { made: 0, attempted: 0 },
+        freeThrows: { made: index === 0 ? ftm : 0, attempted: index === 0 ? ftm : 0 },
+        rebounds: { total: 0, offensive: 0, defensive: 0 },
+        assists: 0,
+        steals: 0,
+        blocks: 0,
+        turnovers: 0,
+        fouls: 0,
+        diagnostics: {
+          usage: 0,
+          shotZones: [],
+          assistOpportunities: 0,
+          offensiveReboundChances: 0,
+          defensiveReboundChances: 0,
+          contestedShots: 0,
+        },
+      })),
+      shotZones: [],
+      returns: [],
+    };
+  };
+  return {
+    result: {
+      schemaVersion: 1,
+      outcome: 'completed',
+      seed: gameInput.seed,
+      gameNumber: gameInput.gameNumber,
+      dataVersion: gameInput.dataVersion,
+      engineVersion: 'engine-v1',
+      profileVersion: gameInput.profile.profileVersion,
+      winner: homeWon ? 'home' : 'away',
+      overtimePeriods: 0,
+      home: sideOf('home', homeScore),
+      away: sideOf('away', awayScore),
+      substitutions: [],
+      unitStints: [],
+      deviations: [],
+      foulOuts: [],
+      removals: [],
+    },
+    transition: zeroSeasonGameTransition(pregameEffects),
+  };
+}
+
+function forcedPostseasonResolver(
+  plan: (home: string, away: string, gameId: string) => 'home' | 'away',
+): SeasonPostseasonGameResolver {
+  return ({ gameId, gameInput, pregameEffects }) => {
+    const winnerSide = plan(gameInput.home.franchiseId, gameInput.away.franchiseId, gameId);
+    return forcedCompletedResult(
+      gameInput,
+      winnerSide === 'home' ? 110 : 90,
+      winnerSide === 'home' ? 90 : 110,
+      pregameEffects,
+    );
+  };
+}
+
+/** The human wins every game it plays; the home side wins otherwise. */
+function humanWinsEveryGame(home: string, away: string): 'home' | 'away' {
+  if (home === HUMAN) return 'home';
+  if (away === HUMAN) return 'away';
+  return 'home';
+}
+
+function homeTeamWinsEveryGame(): 'home' {
+  return 'home';
+}
+
+function eastTopTen(league: SeasonRun['league']): string[] {
+  return league.teams
+    .filter((team) => team.conference === 'east')
+    .map((team) => team.franchiseId)
+    .slice(0, 10);
+}
+
+function westTopTenWithout(league: SeasonRun['league'], excluded: string): string[] {
+  return league.teams
+    .filter((team) => team.conference === 'west')
+    .map((team) => team.franchiseId)
+    .filter((id) => id !== excluded)
+    .slice(0, 10);
+}
+
+/** The postseason fixture: a completed regular season over the economy run. */
+function postseasonFixture(
+  options: {
+    seed?: string;
+    resolver?: SeasonPostseasonGameResolver;
+    rankings?: (input: {
+      league: SeasonRun['league'];
+      standings: SeasonRun['standings'];
+      seed: string;
+    }) => { east: string[]; west: string[] };
+  } = {},
+): SeasonRunCommandContext & {
+  run: SeasonRun;
+  catalog: SeasonDraftCatalog;
+  profile: ReturnType<typeof buildEraSimulationProfile>;
+} {
+  const { run: base, catalog } = buildEconomyTestRun({ seed: options.seed });
+  const run: SeasonRun = {
+    ...base,
+    cursor: { schemaVersion: 1, completedRounds: 82 },
+  };
+  return {
+    run,
+    pending: null,
+    humanFranchiseId: HUMAN,
+    catalog,
+    effects: zeroEffectsOf(run),
+    profile: buildEraSimulationProfile(),
+    rankings:
+      options.rankings ??
+      (({ league }) => ({
+        east: eastTopTen(league),
+        west: [
+          ...westTopTenWithout(league, HUMAN).slice(0, 6),
+          HUMAN,
+          ...westTopTenWithout(league, HUMAN).slice(6, 9),
+        ],
+      })),
+    postseasonGameResolver: options.resolver ?? forcedPostseasonResolver(homeTeamWinsEveryGame),
+  };
+}
+
+/** The human's saved rotation with minutes redistributed off injured players. */
+function restedRotation(run: SeasonRun, franchiseId: string, catalog: SeasonDraftCatalog) {
+  const saved = run.rotations.find((rotation) => rotation.franchiseId === franchiseId);
+  if (saved === undefined) throw new Error(`no rotation for ${franchiseId}`);
+  const roster = run.rosters.find((entry) => entry.franchiseId === franchiseId);
+  if (roster === undefined) throw new Error(`no roster for ${franchiseId}`);
+  const playableOf = new Map<string, readonly Position[]>();
+  for (const player of roster.players) {
+    const candidate = catalog.candidates.find(
+      (entry) => entry.playerVersionId === player.playerVersionId,
+    );
+    playableOf.set(player.playerVersionId, candidate?.positions.playable ?? []);
+  }
+  const members = roster.players.map((player) => ({
+    playerVersionId: player.playerVersionId,
+    playable: playableOf.get(player.playerVersionId) ?? [],
+  }));
+  const available = members.filter((member) =>
+    seasonPlayerAvailable(run.health, member.playerVersionId),
+  );
+  const starters = matchStartingFive(available);
+  if (starters === null) throw new Error(`no legal five available for ${franchiseId}`);
+  const starterIds = new Set(starters.map((starter) => starter.playerVersionId));
+  const benchAvailable = available.filter((member) => !starterIds.has(member.playerVersionId));
+  const benchInjured = members.filter(
+    (member) => !starterIds.has(member.playerVersionId) && !available.includes(member),
+  );
+  const plan = new Map<string, number>();
+  for (const starter of starters) plan.set(starter.playerVersionId, 32);
+  for (const member of benchAvailable) plan.set(member.playerVersionId, 16);
+  for (const member of benchInjured) plan.set(member.playerVersionId, 0);
+  const capacity = (id: string): number => 48 - (plan.get(id) ?? 0);
+  let total = [...plan.values()].reduce((sum, value) => sum + value, 0);
+  const orderedIds = [...plan.keys()].sort();
+  for (;;) {
+    if (total >= 240) break;
+    const candidate = orderedIds.find((id) => capacity(id) > 0);
+    if (candidate === undefined) throw new Error(`cannot fill 240 minutes for ${franchiseId}`);
+    plan.set(candidate, (plan.get(candidate) ?? 0) + 1);
+    total += 1;
+  }
+  return {
+    ...saved,
+    starters: starters.map((starter) => starter.playerVersionId),
+    benchOrder: [...benchAvailable, ...benchInjured].map((member) => member.playerVersionId),
+    targetMinutes: roster.players.map((player) => ({
+      playerVersionId: player.playerVersionId,
+      minutes: plan.get(player.playerVersionId) ?? 0,
+    })),
+    closingFive: starters.map((starter) => starter.playerVersionId),
+  };
+}
+
+function expectSchemaValidRun(run: SeasonRun): void {
+  const parsed = seasonRunSchema.safeParse(run);
+  if (!parsed.success) {
+    throw new Error(`run fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`);
+  }
+}
+
+describe('start-postseason command', () => {
+  it('accepts from a completed regular season and moves to the play-in stage', () => {
+    const context = postseasonFixture();
+    const output = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'start-postseason') throw new Error('unexpected command');
+    const result = outputResult.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    expect(result.stage).toBe('play-in');
+    expect(result.postseasonSeed).toMatch(/^[0-9a-f]{16,64}$/);
+    expect(result.nextGameId).toBe('pi-east-seven-eight');
+    expect(output.run.stage).toBe('play-in');
+    expect(output.run.postseason.playIn.east.ranking).toHaveLength(10);
+    expect(output.run.postseason.playIn.west.ranking).toHaveLength(10);
+    expect(output.run.stateRevision).toBe(context.run.stateRevision + 1);
+    expectSchemaValidRun(output.run);
+  });
+
+  it('rejects an incomplete regular season and a run that already started', () => {
+    const context = postseasonFixture();
+    const incomplete = {
+      ...context.run,
+      cursor: { schemaVersion: 1 as const, completedRounds: 80 },
+    };
+    const incompleteOutput = handleSeasonRunCommand(
+      commandOf(incomplete, { command: 'start-postseason', commandId: 'start-incomplete' }),
+      { ...context, run: incomplete },
+    );
+    if (incompleteOutput.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(incompleteOutput.result.result.rejection.code).toBe('invalid-stage');
+    const started = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (started.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const again = handleSeasonRunCommand(
+      commandOf(started.run, { command: 'start-postseason', commandId: 'start-2' }),
+      { ...context, run: started.run },
+    );
+    if (again.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(again.result.result.rejection.code).toBe('invalid-stage');
+  });
+
+  it('rejects invalid rankings with integrity-failure and a stale state', () => {
+    const context = postseasonFixture();
+    const badRankings = postseasonFixture({
+      rankings: ({ league }) => ({
+        east: eastTopTen(league),
+        // An east team inside the west top ten breaks the conference rule.
+        west: [...westTopTenWithout(league, HUMAN).slice(0, 9), ...eastTopTen(league).slice(0, 1)],
+      }),
+    });
+    const output = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-bad' }),
+      badRankings,
+    );
+    if (output.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(output.result.result.rejection.code).toBe('integrity-failure');
+    const stale = handleSeasonRunCommand(
+      commandOf(
+        { ...context.run, stateRevision: context.run.stateRevision + 5 },
+        { command: 'start-postseason', commandId: 'start-stale' },
+      ),
+      context,
+    );
+    if (stale.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(stale.result.result.rejection.code).toBe('stale-state');
+  });
+
+  it('rejects a run mismatch', () => {
+    const context = postseasonFixture();
+    const other = buildEconomyTestRun({ runId: 'other-run' }).run;
+    const mismatch = handleSeasonRunCommand(
+      commandOf(other, { command: 'start-postseason', commandId: 'start-mismatch' }),
+      context,
+    );
+    if (mismatch.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(mismatch.result.result.rejection.code).toBe('run-mismatch');
+  });
+});
+
+describe('advance-postseason command', () => {
+  it('runs the whole tournament when the human rotation stays valid', () => {
+    // TEST_SEED keeps the human healthy through the full run (no rotation
+    // stops), so the carried rotation simulates every human game.
+    const context = postseasonFixture({
+      seed: TEST_SEED,
+      resolver: forcedPostseasonResolver(humanWinsEveryGame),
+    });
+    const start = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const output = handleSeasonRunCommand(
+      commandOf(start.run, { command: 'advance-postseason', commandId: 'adv-1' }),
+      { ...context, run: start.run },
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'advance-postseason') throw new Error('unexpected command');
+    const result = outputResult.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    // The east play-in is AI-only; the human's carried rotation stays valid,
+    // so the single advance simulates every remaining game.
+    expect(result.stage).toBe('completed');
+    expect(result.nextDecision).toBe('none');
+    expect(result.advancedGameIds).toContain('pi-east-seven-eight');
+    expect(result.advancedGameIds).toContain('pi-west-seven-eight');
+    expect(result.advancedGameIds).toContain(playoffGameIdOf('finals', 1));
+    expect(output.run.stage).toBe('completed');
+    expectSchemaValidRun(output.run);
+  });
+
+  it('stops at a human game whose rotation plans minutes for injured players', () => {
+    const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
+    const start = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const humanRoster = start.run.rosters.find((roster) => roster.franchiseId === HUMAN);
+    if (humanRoster === undefined) throw new Error('no human roster');
+    const injuries = humanRoster.players.slice(0, 2).map((player, index) => ({
+      injuryId: `inj-${'9'.repeat(31)}${String(index)}`,
+      playerVersionId: player.playerVersionId,
+      franchiseId: HUMAN,
+      gameId: 's000001',
+      type: 'lower-body' as const,
+      severity: 'season-ending' as const,
+      occurredBeforeHalftime: true,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 999,
+      missedGamesRemaining: 999,
+      actualReturnRound: null,
+      seasonEnding: true,
+      rehabModifier: 0 as const,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: ['injuries', 's000001', player.playerVersionId, 'occurrence'],
+    }));
+    const injured = { ...start.run, health: { ...start.run.health, injuries } };
+    const output = handleSeasonRunCommand(
+      commandOf(injured, { command: 'advance-postseason', commandId: 'adv-1' }),
+      { ...context, run: injured },
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'advance-postseason') throw new Error('unexpected command');
+    const result = outputResult.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    expect(result.nextDecision).toBe('rotation');
+    expect(result.nextGameId).toBe('pi-west-seven-eight');
+    expect(result.advancedGameIds).toEqual([
+      'pi-east-seven-eight',
+      'pi-east-nine-ten',
+      'pi-east-final',
+    ]);
+    expect(result.aiNextGameId).toBeNull();
+  });
+
+  it('rejects wrong-game targets, invalid stages, and stale states', () => {
+    const context = postseasonFixture();
+    const start = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const firstAdvance = handleSeasonRunCommand(
+      commandOf(start.run, {
+        command: 'advance-postseason',
+        commandId: 'adv-first',
+        targetGameId: 'pi-east-nine-ten',
+      }),
+      { ...context, run: start.run },
+    );
+    if (firstAdvance.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const wrongGame = handleSeasonRunCommand(
+      commandOf(firstAdvance.run, {
+        command: 'advance-postseason',
+        commandId: 'adv-wrong',
+        // The 7/8 game is already played: not an upcoming target.
+        targetGameId: 'pi-east-seven-eight',
+      }),
+      { ...context, run: firstAdvance.run },
+    );
+    if (wrongGame.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(wrongGame.result.result.rejection.code).toBe('wrong-game');
+    if (wrongGame.result.result.rejection.code !== 'wrong-game') throw new Error('unexpected');
+    expect(wrongGame.result.result.rejection.nextGameId).toBe('pi-east-final');
+    const wrongStage = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'advance-postseason', commandId: 'adv-stage' }),
+      context,
+    );
+    if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(wrongStage.result.result.rejection.code).toBe('invalid-stage');
+    const stale = handleSeasonRunCommand(
+      commandOf(
+        { ...start.run, stateRevision: start.run.stateRevision + 3 },
+        { command: 'advance-postseason', commandId: 'adv-stale' },
+      ),
+      { ...context, run: start.run },
+    );
+    if (stale.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(stale.result.result.rejection.code).toBe('stale-state');
+  });
+});
+
+describe('submit-postseason-rotation command', () => {
+  /** Injures two human players so the advance stops at the human's game. */
+  function humanInjuredRun(context: SeasonRunCommandContext): SeasonRun {
+    const humanRoster = context.run.rosters.find((roster) => roster.franchiseId === HUMAN);
+    if (humanRoster === undefined) throw new Error('no human roster');
+    const injuries = humanRoster.players.slice(0, 2).map((player, index) => ({
+      injuryId: `inj-${'7'.repeat(31)}${String(index)}`,
+      playerVersionId: player.playerVersionId,
+      franchiseId: HUMAN,
+      gameId: 's000001',
+      type: 'lower-body' as const,
+      severity: 'season-ending' as const,
+      occurredBeforeHalftime: true,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 999,
+      missedGamesRemaining: 999,
+      actualReturnRound: null,
+      seasonEnding: true,
+      rehabModifier: 0 as const,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: ['injuries', 's000001', player.playerVersionId, 'occurrence'],
+    }));
+    return { ...context.run, health: { ...context.run.health, injuries } };
+  }
+
+  function advancedToHumanGame(): {
+    context: SeasonRunCommandContext & { catalog: SeasonDraftCatalog };
+    run: SeasonRun;
+  } {
+    const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
+    const start = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    // Two injured players: the carried rotation plans minutes for them, so
+    // the first advance runs the east play-in and stops at the human's west
+    // 7/8 game with a rotation decision.
+    const injured = humanInjuredRun({ ...context, run: start.run });
+    const advance = handleSeasonRunCommand(
+      commandOf(injured, { command: 'advance-postseason', commandId: 'adv-1' }),
+      { ...context, run: injured },
+    );
+    const advanceResult = advance.result;
+    if (advanceResult.command !== 'advance-postseason') throw new Error('unexpected command');
+    if (advanceResult.result.status !== 'accepted') throw new Error('expected acceptance');
+    if (
+      advanceResult.result.nextDecision !== 'rotation' ||
+      advanceResult.result.nextGameId === null
+    ) {
+      throw new Error('expected a rotation decision');
+    }
+    return { context: { ...context, run: advance.run }, run: advance.run };
+  }
+
+  it('accepts a legal rotation and locks it into the run', () => {
+    const { context, run } = advancedToHumanGame();
+    const rotation = restedRotation(run, HUMAN, context.catalog);
+    const output = handleSeasonRunCommand(
+      commandOf(run, {
+        command: 'submit-postseason-rotation',
+        commandId: 'sub-1',
+        targetGameId: 'pi-west-seven-eight',
+        rotation: { franchiseId: HUMAN, rotation },
+      }),
+      context,
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'submit-postseason-rotation')
+      throw new Error('unexpected command');
+    const result = outputResult.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    expect(result.targetGameId).toBe('pi-west-seven-eight');
+    expect(result.franchiseId).toBe(HUMAN);
+    expect(result.rotationDigest).toMatch(/^[0-9a-f]{32}$/);
+    expect(output.run.rotations.find((entry) => entry.franchiseId === HUMAN)).toEqual(rotation);
+    expect(output.run.stateRevision).toBe(run.stateRevision + 1);
+    expectSchemaValidRun(output.run);
+  });
+
+  it('applies a risky-rehab spend with the recorded ledger entry and transaction', () => {
+    const { context, run } = advancedToHumanGame();
+    const rotation = restedRotation(run, HUMAN, context.catalog);
+    const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
+    if (humanRoster === undefined) throw new Error('no human roster');
+    const player = humanRoster.players[0];
+    if (player === undefined) throw new Error('no player');
+    const injuryId = injuryIdOf('postseason-rehab');
+    const withInjuryRun = withInjury(run, {
+      injuryId,
+      playerVersionId: player.playerVersionId,
+      franchiseId: HUMAN,
+      gameId: 's000001',
+      type: 'lower-body',
+      severity: 'moderate',
+      occurredBeforeHalftime: true,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 4,
+      missedGamesRemaining: 4,
+      actualReturnRound: null,
+      seasonEnding: false,
+      rehabModifier: 0 as const,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: [
+        'postseason-injuries',
+        'pi-west-seven-eight',
+        player.playerVersionId,
+        'occurrence',
+      ],
+    });
+    const output = handleSeasonRunCommand(
+      commandOf(withInjuryRun, {
+        command: 'submit-postseason-rotation',
+        commandId: 'sub-rehab',
+        targetGameId: 'pi-west-seven-eight',
+        rotation: { franchiseId: HUMAN, rotation, riskyRehabInjuryId: injuryId },
+      }),
+      { ...context, run: withInjuryRun },
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'submit-postseason-rotation')
+      throw new Error('unexpected command');
+    if (outputResult.result.status !== 'accepted') throw new Error('expected acceptance');
+    const ledgerEntry = output.run.influence.ledger.find(
+      (entry) => entry.commandId === 'sub-rehab',
+    );
+    expect(ledgerEntry).toBeDefined();
+    expect(ledgerEntry?.source).toBe('risky-rehab');
+    expect(ledgerEntry?.requestedDelta).toBe(-2);
+    const balanceAfter = output.run.influence.balances[HUMAN];
+    expect(balanceAfter).toBe((context.run.influence.balances[HUMAN] ?? 0) - 2);
+    expect(output.run.transactions.some((entry) => entry.commandId === 'sub-rehab')).toBe(true);
+    const injuryAfter = output.run.health.injuries.find((entry) => entry.injuryId === injuryId);
+    expect(injuryAfter?.rehabModifier).not.toBe(0);
+    expectSchemaValidRun(output.run);
+  });
+
+  it('rejects wrong-game targets, invalid rotations, unavailable players, and rehab balance', () => {
+    const { context, run } = advancedToHumanGame();
+    const rotation = restedRotation(run, HUMAN, context.catalog);
+
+    // Wrong target: the current next game is the human's west 7/8 game.
+    const wrongTarget = handleSeasonRunCommand(
+      commandOf(run, {
+        command: 'submit-postseason-rotation',
+        commandId: 'sub-wrongtarget',
+        targetGameId: 'pi-east-final',
+        rotation: { franchiseId: HUMAN, rotation },
+      }),
+      context,
+    );
+    if (wrongTarget.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(wrongTarget.result.result.rejection.code).toBe('wrong-game');
+
+    // Invalid rotation: a duplicated starter breaks the partition.
+    const broken: SeasonRotation = {
+      ...rotation,
+      starters: [
+        rotation.starters[0] ?? '',
+        rotation.starters[0] ?? '',
+        ...rotation.starters.slice(2),
+      ],
+    };
+    const invalidRotation = handleSeasonRunCommand(
+      commandOf(run, {
+        command: 'submit-postseason-rotation',
+        commandId: 'sub-invalid',
+        targetGameId: 'pi-west-seven-eight',
+        rotation: { franchiseId: HUMAN, rotation: broken },
+      }),
+      context,
+    );
+    if (invalidRotation.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(invalidRotation.result.result.rejection.code).toBe('invalid-rotation');
+
+    // Unavailable player: planned minutes on an injured rostered player.
+    const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
+    if (humanRoster === undefined) throw new Error('no human roster');
+    const player = humanRoster.players[0];
+    if (player === undefined) throw new Error('no player');
+    const withInjuryRun = withInjury(run, {
+      injuryId: injuryIdOf('postseason-unavailable'),
+      playerVersionId: player.playerVersionId,
+      franchiseId: HUMAN,
+      gameId: 's000001',
+      type: 'lower-body',
+      severity: 'moderate',
+      occurredBeforeHalftime: true,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 3,
+      missedGamesRemaining: 3,
+      actualReturnRound: null,
+      seasonEnding: false,
+      rehabModifier: 0 as const,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: [
+        'postseason-injuries',
+        'pi-west-seven-eight',
+        player.playerVersionId,
+        'occurrence',
+      ],
+    });
+    // The submitted rotation plans minutes for the injured player (the saved
+    // rotation, not the rested one): unavailable-player rejection.
+    const saved = run.rotations.find((entry) => entry.franchiseId === HUMAN);
+    if (saved === undefined) throw new Error('no human rotation');
+    const unavailable = handleSeasonRunCommand(
+      commandOf(withInjuryRun, {
+        command: 'submit-postseason-rotation',
+        commandId: 'sub-unavailable',
+        targetGameId: 'pi-west-seven-eight',
+        rotation: { franchiseId: HUMAN, rotation: saved },
+      }),
+      { ...context, run: withInjuryRun },
+    );
+    if (unavailable.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(unavailable.result.result.rejection.code).toBe('unavailable-player');
+
+    // Insufficient rehab resources: a balance below the floor after the spend
+    // (the run still carries the active injury).
+    const poor = {
+      ...withInjuryRun,
+      influence: {
+        ...withInjuryRun.influence,
+        balances: { ...withInjuryRun.influence.balances, [HUMAN]: -2 },
+      },
+    };
+    const insufficient = handleSeasonRunCommand(
+      commandOf(poor, {
+        command: 'submit-postseason-rotation',
+        commandId: 'sub-poor',
+        targetGameId: 'pi-west-seven-eight',
+        rotation: {
+          franchiseId: HUMAN,
+          rotation,
+          riskyRehabInjuryId: injuryIdOf('postseason-unavailable'),
+        },
+      }),
+      { ...context, run: poor },
+    );
+    if (insufficient.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(insufficient.result.result.rejection.code).toBe('insufficient-rehab-resources');
+    expect(insufficient.result.result.rejection).toMatchObject({ required: 2 });
+
+    // Duplicate commandId after a rehab spend (the ledger records it).
+    const rehabRun = withInjury(run, {
+      injuryId: injuryIdOf('postseason-duplicate'),
+      playerVersionId: player.playerVersionId,
+      franchiseId: HUMAN,
+      gameId: 's000001',
+      type: 'lower-body',
+      severity: 'moderate',
+      occurredBeforeHalftime: true,
+      sameGameReturn: false,
+      sameGameReturned: null,
+      missedGamesTotal: 3,
+      missedGamesRemaining: 3,
+      actualReturnRound: null,
+      seasonEnding: false,
+      rehabModifier: 0 as const,
+      recurrenceWindowRoundsRemaining: 0,
+      seedPath: [
+        'postseason-injuries',
+        'pi-west-seven-eight',
+        player.playerVersionId,
+        'occurrence',
+      ],
+    });
+    const rehabCommand = commandOf(rehabRun, {
+      command: 'submit-postseason-rotation',
+      commandId: 'sub-duplicate',
+      targetGameId: 'pi-west-seven-eight',
+      rotation: {
+        franchiseId: HUMAN,
+        rotation,
+        riskyRehabInjuryId: injuryIdOf('postseason-duplicate'),
+      },
+    });
+    const firstRehab = handleSeasonRunCommand(rehabCommand, { ...context, run: rehabRun });
+    if (firstRehab.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const duplicate = handleSeasonRunCommand(rehabCommand, { ...context, run: firstRehab.run });
+    if (duplicate.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(duplicate.result.result.rejection.code).toBe('duplicate-command');
+  });
+});
+
+describe('spectate-postseason-game command', () => {
+  it('spectates the current game after elimination and rejects wrong targets', () => {
+    const context = postseasonFixture({
+      resolver: forcedPostseasonResolver((home, away) => {
+        if (home === HUMAN) return 'away';
+        if (away === HUMAN) return 'home';
+        return 'home';
+      }),
+    });
+    const start = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    // The human loses every game it plays, so the targeted advance through
+    // the west final eliminates them and stops at the first playoff game.
+    const advance = handleSeasonRunCommand(
+      commandOf(start.run, {
+        command: 'advance-postseason',
+        commandId: 'adv-1',
+        targetGameId: 'po-west-first-round-1-g1',
+      }),
+      { ...context, run: start.run },
+    );
+    const advanceResult = advance.result;
+    if (advanceResult.command !== 'advance-postseason') throw new Error('unexpected command');
+    if (advanceResult.result.status !== 'accepted') throw new Error('expected acceptance');
+    // The wrong-game rejections: not the current game, and a human game.
+    const wrongTarget = handleSeasonRunCommand(
+      commandOf(advance.run, {
+        command: 'spectate-postseason-game',
+        commandId: 'spec-wrong',
+        targetGameId: 'po-west-first-round-1-g5',
+      }),
+      { ...context, run: advance.run },
+    );
+    if (wrongTarget.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(wrongTarget.result.result.rejection.code).toBe('wrong-game');
+
+    const output = handleSeasonRunCommand(
+      commandOf(advance.run, {
+        command: 'spectate-postseason-game',
+        commandId: 'spec-1',
+        targetGameId: 'po-west-first-round-1-g2',
+      }),
+      { ...context, run: advance.run },
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'spectate-postseason-game') throw new Error('unexpected command');
+    const result = outputResult.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    expect(result.advancedGameIds).toEqual(['po-west-first-round-1-g2']);
+    expect(output.postseasonSummaries?.[0]?.gameId).toBe('po-west-first-round-1-g2');
+    expect(output.run.stateRevision).toBe(advance.run.stateRevision + 1);
+    expectSchemaValidRun(output.run);
+  });
+
+  it('rejects an invalid stage (regular season) and a stale state', () => {
+    const context = postseasonFixture();
+    const wrongStage = handleSeasonRunCommand(
+      commandOf(context.run, {
+        command: 'spectate-postseason-game',
+        commandId: 'spec-stage',
+        targetGameId: 'pi-east-seven-eight',
+      }),
+      context,
+    );
+    if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(wrongStage.result.result.rejection.code).toBe('invalid-stage');
+    const stale = handleSeasonRunCommand(
+      commandOf(
+        { ...context.run, stateRevision: context.run.stateRevision + 1 },
+        {
+          command: 'spectate-postseason-game',
+          commandId: 'spec-stale',
+          targetGameId: 'pi-east-seven-eight',
+        },
+      ),
+      context,
+    );
+    if (stale.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(stale.result.result.rejection.code).toBe('stale-state');
+  });
+});
+
+describe('fast-forward-postseason command', () => {
+  it('completes an eliminated run with the champion and completion state', () => {
+    const context = postseasonFixture({
+      resolver: forcedPostseasonResolver((home, away) => {
+        if (home === HUMAN) return 'away';
+        if (away === HUMAN) return 'home';
+        return 'home';
+      }),
+      rankings: ({ league }) => ({
+        east: eastTopTen(league),
+        west: westTopTenWithout(league, HUMAN).slice(0, 10),
+      }),
+    });
+    // The human is not in the rankings: every game is AI-only.
+    const start = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const output = handleSeasonRunCommand(
+      commandOf(start.run, { command: 'fast-forward-postseason', commandId: 'ff-1' }),
+      { ...context, run: start.run },
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'fast-forward-postseason') throw new Error('unexpected command');
+    const result = outputResult.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    expect(result.stage).toBe('completed');
+    expect(result.championFranchiseId).toMatch(/^[a-z0-9._:-]+$/);
+    expect(output.run.stage).toBe('completed');
+    expect(output.run.completion?.championFranchiseId).toBe(result.championFranchiseId);
+    expect(output.run.completion?.almanacDigest).toBe('0'.repeat(32));
+    expect(output.run.completion?.finalizedAtStateRevision).toBe(output.run.stateRevision);
+    expect(output.run.postseason.championFranchiseId).toBe(result.championFranchiseId);
+    expect(output.postseasonSummaries?.length).toBeGreaterThan(20);
+    expectSchemaValidRun(output.run);
+  });
+
+  it('rejects an active human, an invalid stage, and a bad target', () => {
+    const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
+    // The human is alive in the play-in: fast-forward must not skip their
+    // decisions, so the started run rejects with integrity-failure.
+    const activeStart = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (activeStart.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const activeHuman = handleSeasonRunCommand(
+      commandOf(activeStart.run, {
+        command: 'fast-forward-postseason',
+        commandId: 'ff-active',
+        targetGameId: 'po-east-first-round-1-g1',
+      }),
+      { ...context, run: activeStart.run },
+    );
+    if (activeHuman.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(activeHuman.result.result.rejection.code).toBe('integrity-failure');
+    // A regular-season run fails the stage before anything else.
+    const wrongStage = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'fast-forward-postseason', commandId: 'ff-stage' }),
+      context,
+    );
+    if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(wrongStage.result.result.rejection.code).toBe('invalid-stage');
+    // A target that is no longer upcoming rejects with integrity-failure.
+    const aiOnly = postseasonFixture({
+      rankings: (input) => ({
+        east: eastTopTen(input.league),
+        west: westTopTenWithout(input.league, HUMAN),
+      }),
+    });
+    const start = handleSeasonRunCommand(
+      commandOf(aiOnly.run, { command: 'start-postseason', commandId: 'start-1' }),
+      aiOnly,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const advance = handleSeasonRunCommand(
+      commandOf(start.run, {
+        command: 'advance-postseason',
+        commandId: 'adv-1',
+        targetGameId: 'pi-west-nine-ten',
+      }),
+      { ...aiOnly, run: start.run },
+    );
+    if (advance.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const badTarget = handleSeasonRunCommand(
+      commandOf(advance.run, {
+        command: 'fast-forward-postseason',
+        commandId: 'ff-badtarget',
+        targetGameId: 'pi-east-seven-eight',
+      }),
+      { ...aiOnly, run: advance.run },
+    );
+    if (badTarget.result.result.status !== 'rejected') throw new Error('expected rejection');
+    expect(badTarget.result.result.rejection.code).toBe('integrity-failure');
   });
 });

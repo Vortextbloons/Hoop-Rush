@@ -44,10 +44,7 @@ const LAZY_COMPONENTS = {
 
 /** Resolves a component's emitted client chunk URL from the built manifest. */
 function chunkUrlOf(component: (typeof LAZY_COMPONENTS)[keyof typeof LAZY_COMPONENTS]): string {
-  const manifestPath = new URL(
-    '../.svelte-kit/output/client/.vite/manifest.json',
-    import.meta.url,
-  );
+  const manifestPath = new URL('../.svelte-kit/output/client/.vite/manifest.json', import.meta.url);
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<
     string,
     { file?: string }

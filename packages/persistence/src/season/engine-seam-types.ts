@@ -147,6 +147,8 @@ export interface SeasonWindowOpenResult {
   ownership: SeasonOwnership[];
   rotations: SeasonRotation[];
   effects: SeasonEffectsState;
+  /** Post-window health state (AI risky-rehab outcomes mutate injury records). */
+  health: SeasonHealthState;
   stateRevision: number;
   stateDigest: string;
 }

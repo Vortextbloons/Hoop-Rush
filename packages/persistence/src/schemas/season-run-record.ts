@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  franchiseIdSchema,
+  postseasonGameIdSchema,
   seasonAcceptedBlockSchema,
   seasonActiveRunIndexSchema,
   seasonAlmanacSchema,
@@ -8,7 +10,9 @@ import {
   seasonCheckpointStateSchema,
   seasonCommandLogEntrySchema,
   seasonCommandLogSchema,
+  seasonCompactInjuryEventSchema,
   seasonEffectsStateSchema,
+  seasonGameSimulationResultSchema,
   seasonGameSummarySchema,
   seasonHealthStateSchema,
   seasonInfluenceStateSchema,
@@ -16,6 +20,7 @@ import {
   seasonObjectiveStateSchema,
   seasonPendingBlockCandidateSchema,
   seasonPlayerAggregateSchema,
+  seasonPostseasonPhaseSchema,
   seasonPostseasonSummarySchema,
   seasonRetainedGameDetailSchema,
   seasonRosterSchema,
@@ -50,8 +55,8 @@ import {
  *   state committed atomically with each block (effects, health,
  *   transactions, influence, trade, objectives, checkpointState,
  *   stateRevision, stateDigest). M2.6 adds the append-only command log, the
- *   postseason summary rows, and the completed-season rows in the v8 Dexie
- *   tables.
+ *   postseason summary rows, the retained postseason detail rows, and the
+ *   completed-season rows in the v8/v10 Dexie tables.
  * - v5 (projection), v4 (M2.5), v3 (M2.4 schema-6), v2 (M2.4 schema-5),
  *   v1 (M2.3 schema-4) are development rows: never read or migrated;
  *   reported through the typed incompatibility flow and handled by the
@@ -332,6 +337,53 @@ export type StoredSeasonPostseasonSummaryRow = z.infer<
 >;
 
 /**
+ * One retained postseason game detail (M2.6, `seasonPostseasonDetails`,
+ * persistence-level): the retained-detail analog for postseason games. The
+ * regular-season retained rows key `s...`-prefixed game ids; postseason game
+ * ids (`pi-...`/`po-...`) do not validate against
+ * `seasonRetainedGameDetailSchema`, so the payload reuses the same
+ * data-contract building blocks — the full `seasonGameSimulationResultSchema`
+ * result plus the compact `injuryEvents` rollup — wrapped with the postseason
+ * game identity (phase + matchup). A persistence-level structural type; no
+ * data-contract schema exists for it (the engine hands the raw result and
+ * injury rollup to the worker).
+ */
+export const seasonPostseasonDetailSchema = z.object({
+  schemaVersion: z.literal(1),
+  runId: z.string().min(1).max(64),
+  /** Stable `pi-...` or `po-...` postseason game id. */
+  gameId: postseasonGameIdSchema,
+  /** 'play-in' | 'playoffs' (mirrors the game's phase). */
+  phase: seasonPostseasonPhaseSchema,
+  homeFranchiseId: franchiseIdSchema,
+  awayFranchiseId: franchiseIdSchema,
+  /** The full M2.2 result: substitutions, stints, deviations, diagnostics. */
+  result: seasonGameSimulationResultSchema,
+  /** Compact injury-event rollup for display (empty when none). */
+  injuryEvents: z.array(seasonCompactInjuryEventSchema),
+});
+export type SeasonPostseasonDetail = z.infer<typeof seasonPostseasonDetailSchema>;
+
+/**
+ * One retained postseason game detail row (M2.6, `seasonPostseasonDetails`,
+ * keyed by [runId+gameId]). Separate from the regular-season detail rows so
+ * postseason details are keyed by their own game-id space. `gameId` must equal
+ * the detail's own game id; `phase` mirrors the detail for indexed queries.
+ */
+export const storedSeasonPostseasonDetailRowSchema = z.object({
+  runId: z.string().min(1).max(64),
+  /** Stable `pi-...` or `po-...` postseason game id. */
+  gameId: z.string().min(1).max(64),
+  /** 'play-in' | 'playoffs' (mirrors the detail facts). */
+  phase: z.enum(['play-in', 'playoffs']),
+  /** The retained postseason game detail. */
+  detail: seasonPostseasonDetailSchema,
+  /** Written by the adapter, never by domain logic. */
+  updatedAtIso: z.iso.datetime().optional(),
+});
+export type StoredSeasonPostseasonDetailRow = z.infer<typeof storedSeasonPostseasonDetailRowSchema>;
+
+/**
  * One accepted-command log row (M2.6, `seasonCommandLog`, keyed by
  * [runId+ordinal]). Append-only: ordinals are dense from 0, and a row whose
  * ordinal disagrees with its entry facts is a load-time corruption.
@@ -394,6 +446,13 @@ export const storedSeasonCompletedIndexSchema = z.object({
 });
 export type StoredSeasonCompletedIndex = z.infer<typeof storedSeasonCompletedIndexSchema>;
 
+/**
+ * One completed-history metadata entry as returned by
+ * `listCompletedSeasonRuns` (the validated `seasonCompletedIndex` row; its
+ * `recordId` equals the completed run's runId).
+ */
+export type SeasonCompletedRunIndexEntry = StoredSeasonCompletedIndex;
+
 /** The complete loaded completed-season view (validated, assembled). */
 export const seasonCompletedSeasonSchema = z.object({
   run: seasonRunSchema,
@@ -403,3 +462,54 @@ export const seasonCompletedSeasonSchema = z.object({
   postseasonSummaries: z.array(seasonPostseasonSummarySchema),
 });
 export type SeasonCompletedSeason = z.infer<typeof seasonCompletedSeasonSchema>;
+
+// ---------------------------------------------------------------------------
+// Performance pass: the compact per-run player presentation slice (Dexie v9).
+// ---------------------------------------------------------------------------
+
+/**
+ * One compact per-player row of the run's presentation slice. Everything the
+ * rotation editor, team page, lock preview, and leader/roster views read from
+ * the full packaged draft catalog for a roster player, frozen at draft
+ * promotion (and topped up when a trade moves a catalog player into a
+ * roster). The full catalog stays inside the simulation worker and behind the
+ * lazy trade-only path; the shell renders from this slice alone.
+ */
+export const seasonRunPlayerSliceEntrySchema = z.object({
+  playerVersionId: z.string().min(1).max(64),
+  /** Identity tuple for the players-index face join (mirrors roster entry). */
+  playerId: z.string().min(1).max(64),
+  franchiseId: z.string().min(1).max(64),
+  eraId: z.string().min(1).max(64),
+  seasonKey: z.string().min(1).max(64),
+  displayName: z.string().min(1).max(128),
+  /** The candidate's reviewed playable detailed positions. */
+  positionsPlayable: z.array(z.string().min(1).max(2)).min(1).max(5),
+  /** Build-time summary ratings (overall/offense/defense). */
+  summaryRatings: z.object({
+    overallRating: z.number().int().min(0).max(100),
+    offenseRating: z.number().int().min(0).max(100),
+    defenseRating: z.number().int().min(0).max(100),
+  }),
+  /** Build-time stamina rating (45..95; 70 when unknown). */
+  staminaRating: z.number().int().min(0).max(100),
+  /** Build-time durability rating (45..95; 70 when unknown). */
+  durabilityRating: z.number().int().min(0).max(100),
+});
+export type SeasonRunPlayerSliceEntry = z.infer<typeof seasonRunPlayerSliceEntrySchema>;
+
+/**
+ * The stored compact slice row (Dexie v9 `seasonRunPlayerSlices`, keyed by
+ * runId — at most one per run). Written atomically with draft promotion and
+ * topped up after trades; deleted by the same lifecycle paths as every other
+ * run-scoped row.
+ */
+export const storedSeasonPlayerSliceRowSchema = z.object({
+  /** Primary key; equals the run's runId. */
+  runId: z.string().min(1).max(64),
+  /** Compact presentation facts, keyed by playerVersionId (unique). */
+  players: z.array(seasonRunPlayerSliceEntrySchema).min(1),
+  /** Written by the adapter, never by domain logic. */
+  updatedAtIso: z.iso.datetime().optional(),
+});
+export type StoredSeasonPlayerSliceRow = z.infer<typeof storedSeasonPlayerSliceRowSchema>;

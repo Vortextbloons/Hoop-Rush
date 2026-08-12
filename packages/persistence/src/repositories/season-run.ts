@@ -24,6 +24,7 @@ import type {
 import { SEASON_RUN_SAVE_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import type { StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 import type { SeasonWindowOpenResult } from '../season/engine-seam-types.ts';
+import type { SeasonRunPlayerSliceEntry } from '../schemas/season-run-record.ts';
 
 /**
  * Season Run repository contract (spec/2.0/07 persistence, M2.3, M2.4, M2.5).
@@ -219,7 +220,16 @@ export interface SeasonRunRepository {
   /** Atomic checkpoint commit (see contract above). */
   commitSeasonBlock(input: CommitSeasonBlockInput): Promise<void>;
   /** Atomic draft-to-run promotion (see contract above). */
-  promoteSeasonDraftToRun(draft: StoredSeasonDraft, run: SeasonRun): Promise<void>;
+  promoteSeasonDraftToRun(
+    draft: StoredSeasonDraft,
+    run: SeasonRun,
+    /**
+     * Performance pass: the compact per-run player presentation slice,
+     * persisted in the same atomic transaction (positions/ratings/stamina/
+     * durability/identity for every roster player).
+     */
+    playerSlice?: SeasonRunPlayerSliceEntry[],
+  ): Promise<void>;
   /** Removes the active run and all of its rows. */
   clearSeasonRun(runId: string): Promise<void>;
   /**
@@ -247,6 +257,18 @@ export interface SeasonRunRepository {
    * then stores the engine-produced mutable run state and pending candidate.
    */
   applySeasonRunCommand(input: SeasonRunCommandApplication): Promise<void>;
+  /**
+   * Performance pass: loads the compact per-run player presentation slice
+   * (positions/ratings/stamina/durability/identity for roster players),
+   * frozen at draft promotion and topped up after trades.
+   */
+  loadSeasonRunPlayerSlice(runId: string): Promise<SeasonRunPlayerSliceEntry[] | null>;
+  /**
+   * Performance pass: merges compact presentation entries into the stored
+   * slice (idempotent, keyed by playerVersionId). The shell tops up roster
+   * players that entered through a trade without rewriting the whole row.
+   */
+  upsertSeasonRunPlayerSlice(runId: string, entries: SeasonRunPlayerSliceEntry[]): Promise<void>;
 }
 
-export type { SeasonCandidateCheckpoint, SeasonWindowOpenResult };
+export type { SeasonCandidateCheckpoint, SeasonWindowOpenResult, SeasonRunPlayerSliceEntry };

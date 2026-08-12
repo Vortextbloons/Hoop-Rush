@@ -423,17 +423,17 @@
         {@const fatigue = fatigueOf(row)}
         {@const lastMinutes = lastGameMinutes.get(row.member.playerVersionId) ?? null}
         {@const eraLabel = eraLabelOf(row)}
-        <li class="flex flex-col gap-2 py-2.5 sm:gap-1 sm:py-2{highlightOf(row.member.playerVersionId)}">
+        <li
+          class="flex flex-col gap-2 py-2.5 sm:gap-1 sm:py-2{highlightOf(
+            row.member.playerVersionId,
+          )}"
+        >
           <div
             class="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3"
           >
             <div class="flex min-w-0 items-start gap-2 sm:items-center sm:gap-3">
               {#if manifest !== null && faceOf(row.member.playerVersionId) !== null}
-                <SeasonPlayerFace
-                  face={faceOf(row.member.playerVersionId)!}
-                  {manifest}
-                  size="sm"
-                />
+                <SeasonPlayerFace face={faceOf(row.member.playerVersionId)!} {manifest} size="sm" />
               {/if}
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold leading-snug">{row.member.displayName}</p>

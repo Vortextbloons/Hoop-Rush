@@ -1,5 +1,10 @@
 <script lang="ts">
-  import type { HoopRushManifest, SeasonEffectsState, SeasonGameSummary, SeasonRoster } from '@hoop-rush/data-contracts';
+  import type {
+    HoopRushManifest,
+    SeasonEffectsState,
+    SeasonGameSummary,
+    SeasonRoster,
+  } from '@hoop-rush/data-contracts';
   import SeasonPlayerStats from '$lib/components/season/SeasonPlayerStats.svelte';
   import SeasonRosterList from '$lib/components/season/SeasonRosterList.svelte';
   import type { SeasonPlayerStatsView } from '$lib/season/season-player-stats-view';
@@ -83,15 +88,7 @@
 
   <div class="mt-4">
     {#if view === 'roster'}
-      <SeasonRosterList
-        {roster}
-        {manifest}
-        {shell}
-        {roleOf}
-        {effects}
-        {summaries}
-        embedded
-      />
+      <SeasonRosterList {roster} {manifest} {shell} {roleOf} {effects} {summaries} embedded />
     {:else}
       <SeasonPlayerStats view={statsView} {manifest} {shell} embedded />
     {/if}

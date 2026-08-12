@@ -47,6 +47,8 @@ const ZERO_TEAM: Omit<SeasonTeamAggregate, 'franchiseId' | 'gamesPlayed' | 'wins
 
 const ZERO_PLAYER: Omit<SeasonPlayerAggregate, 'playerVersionId' | 'franchiseId'> = {
   gamesPlayed: 0,
+  appearances: 0,
+  started: 0,
   seconds: 0,
   points: 0,
   fieldGoalsMade: 0,
@@ -150,6 +152,8 @@ export function foldSeasonPlayerAggregates(
           rows.set(line.playerVersionId, row);
         }
         row.gamesPlayed += 1;
+        row.appearances += line.seconds > 0 ? 1 : 0;
+        row.started += line.started === true ? 1 : 0;
         row.seconds += line.seconds;
         row.points += line.points;
         row.fieldGoalsMade += line.fieldGoalsMade;
@@ -237,6 +241,8 @@ export function auditSeasonAggregates(input: {
     keyof Omit<SeasonPlayerAggregate, 'playerVersionId' | 'franchiseId'>
   > = [
     'gamesPlayed',
+    'appearances',
+    'started',
     'seconds',
     'points',
     'fieldGoalsMade',

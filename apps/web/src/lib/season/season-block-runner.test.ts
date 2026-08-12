@@ -5,6 +5,7 @@ import {
   seasonWorkerCancelRequestSchema,
   seasonWorkerContinueRequestSchema,
   seasonWorkerStartRequestSchema,
+  seasonWorkerWarmRequestSchema,
   type SeasonBlockRecap,
   type SeasonCandidateCheckpoint,
   type SeasonGameSummary,
@@ -179,6 +180,8 @@ function makeRepository(run: SeasonRun): MockRepository {
     loadPendingBlock: vi.fn(() => Promise.resolve(null)),
     discardPendingBlock: vi.fn(() => Promise.resolve(undefined)),
     applySeasonRunCommand: vi.fn(() => Promise.resolve(undefined)),
+    loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),
+    upsertSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(undefined)),
   };
   return repository;
 }
@@ -322,6 +325,8 @@ function makeCandidate(
       playerVersionId: player.playerVersionId,
       franchiseId: roster.franchiseId,
       gamesPlayed: 0,
+      appearances: 0,
+      started: 0,
       seconds: 0,
       points: 0,
       fieldGoalsMade: 0,
@@ -506,6 +511,37 @@ describe('season block runner (M2.5 wire)', () => {
     });
     expect(start.commandId).toBe('cmd-1');
     expect(events.some((event) => event === 'started')).toBe(true);
+  });
+
+  it('prewarms the worker with the packaged asset URLs (performance pass)', async () => {
+    const run = makeRun();
+    const runner = createSeasonBlockRunner({
+      repository: makeRepository(run),
+      schedule,
+      workerUrl: 'fake-worker.ts',
+      artifacts,
+    });
+    runner.prewarm();
+    await flush();
+
+    expect(FakeWorker.instances).toHaveLength(1);
+    const raw = FakeWorker.instances[0]?.posted[0];
+    expect(raw).toBeDefined();
+    const warm = seasonWorkerWarmRequestSchema.parse(raw);
+    expect(warm.type).toBe('season-block-warm');
+    expect(warm.catalogUrl).toBe('u');
+    expect(warm.profileUrl).toBe('p');
+
+    // Prewarm is idempotent while the worker is alive.
+    runner.prewarm();
+    await flush();
+    expect(FakeWorker.instances[0]?.posted).toHaveLength(1);
+
+    // A terminated worker may be prewarmed again (fresh worker, fresh caches).
+    runner.terminate();
+    runner.prewarm();
+    await flush();
+    expect(FakeWorker.instances).toHaveLength(2);
   });
 
   it('removes reactive proxies from the request before posting to the worker', async () => {

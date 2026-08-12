@@ -10,10 +10,10 @@
   } from '$lib/season/season-shell-context';
   import { seasonTeamDetail } from '$lib/season/season-team-detail-view';
   import {
-    overallRatingOf,
-    playablePositionsOf,
-    summaryRatingsOf,
-  } from '$lib/season/season-catalog-index';
+    overallRatingOfSlice,
+    playablePositionsOfSlice,
+    summaryRatingsOfSlice,
+  } from '$lib/season/season-player-slice';
 
   /**
    * Season Run team detail (M2.5 team drill-down): any franchise's roster,
@@ -32,8 +32,9 @@
   const detail = $derived.by(() => {
     const run = shell.run;
     const manifest = shell.manifest;
-    const catalog = shell.catalog;
-    if (run === null || manifest === null || catalog === null || franchiseId === '') return null;
+    if (run === null || manifest === null || !shell.playerSliceReady || franchiseId === '')
+      return null;
+    const slice = shell.playerSlice;
     const roster = run.rosters.find((r) => r.franchiseId === franchiseId);
     const rotation = run.rotations.find((r) => r.franchiseId === franchiseId);
     if (roster === undefined || rotation === undefined) return null;
@@ -43,9 +44,9 @@
       standings: run.standings,
       league: run.league,
       summaries: shell.snapshot?.summaries ?? [],
-      overallRatingOf: (playerVersionId) => overallRatingOf(catalog, playerVersionId),
-      summaryRatingsOf: (playerVersionId) => summaryRatingsOf(catalog, playerVersionId),
-      playablePositions: (playerVersionId) => playablePositionsOf(catalog, playerVersionId),
+      overallRatingOf: (playerVersionId) => overallRatingOfSlice(slice, playerVersionId),
+      summaryRatingsOf: (playerVersionId) => summaryRatingsOfSlice(slice, playerVersionId),
+      playablePositions: (playerVersionId) => playablePositionsOfSlice(slice, playerVersionId),
     });
   });
 

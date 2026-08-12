@@ -1,5 +1,6 @@
 import {
   blockIndexForRound,
+  postseasonGameIdSchema,
   SEASON_GAMES_PER_ROUND,
   SEASON_INFLUENCE_CAP,
   SEASON_ENDING_MISSED_GAMES_SENTINEL,
@@ -420,7 +421,13 @@ export function auditSeasonRunState(
         `injury ${injury.injuryId} references franchise ${injury.franchiseId} outside the league`,
       );
     }
-    if (scheduleById.get(injury.gameId) === undefined) {
+    // M2.6: postseason injuries record their real postseason game id
+    // (`pi-...` / `po-...`), which is not part of the regular-season
+    // schedule; only regular-season injury ids must match a scheduled game.
+    if (
+      scheduleById.get(injury.gameId) === undefined &&
+      !postseasonGameIdSchema.safeParse(injury.gameId).success
+    ) {
       failures.push(`injury ${injury.injuryId} occurrence game ${injury.gameId} is not scheduled`);
     }
     if (

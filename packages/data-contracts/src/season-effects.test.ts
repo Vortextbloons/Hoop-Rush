@@ -199,6 +199,8 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
       playerVersionId: ownership.playerVersionId,
       franchiseId: ownership.ownerFranchiseId,
       gamesPlayed: 0,
+      appearances: 0,
+      started: 0,
       seconds: 0,
       points: 0,
       fieldGoalsMade: 0,

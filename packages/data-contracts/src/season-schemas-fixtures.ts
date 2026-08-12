@@ -588,6 +588,8 @@ function buildPlayerAggregateRows(): SeasonPlayerAggregate[] {
     playerVersionId: fixturePlayerId(index),
     franchiseId: 'lakers',
     gamesPlayed: 0,
+    appearances: 0,
+    started: 0,
     seconds: 0,
     points: 0,
     fieldGoalsMade: 0,

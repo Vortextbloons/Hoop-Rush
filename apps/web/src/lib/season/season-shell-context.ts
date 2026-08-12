@@ -15,6 +15,7 @@ import type {
   SeasonTradeState,
 } from '@hoop-rush/data-contracts';
 import type { SeasonRunSnapshot } from '@hoop-rush/persistence';
+import type { SeasonRunPlayerSlice } from './season-player-slice';
 import type {
   BlockRunState,
   SeasonHubState,
@@ -57,8 +58,19 @@ export interface SeasonRunShellData {
   league: SeasonLeague | null;
   catalog: SeasonDraftCatalog | null;
   schedule: SeasonSchedule | null;
+  /**
+   * Performance pass: the compact per-run player presentation slice
+   * (positions/ratings/stamina/durability), loaded from IndexedDB with the
+   * shell. Views render from this; the full catalog stays lazy.
+   */
+  playerSlice: SeasonRunPlayerSlice;
+  /** True once the player slice row is loaded (or known missing). */
+  playerSliceReady: boolean;
   /** playerVersionId -> face refs (players-index join) for the run's rosters. */
   facesByVersion: Map<string, SeasonFaceRef>;
+  /** Performance pass: false until the global players index finished loading
+   * after first paint; face views keep a loading fallback meanwhile. */
+  facesReady: boolean;
   run: SeasonRun | null;
   humanFranchiseId: string | null;
   humanTeam: SeasonTeam | null;
@@ -87,6 +99,13 @@ export interface SeasonRunShellData {
   interruption: SeasonInvalidRosterInterruption | null;
   /** M2.5: the last rejected between-block command (typed alert). */
   commandError: SeasonRunCommandError | null;
+  /** Performance pass: cross-tab invalidation banner (another tab moved the
+   * run); null when nothing external changed. */
+  externalChange: { kind: 'commit' | 'clear' | 'replace'; message: string } | null;
+  /** Performance pass: clears the cross-tab banner (user acknowledged it). */
+  acknowledgeExternalChange: () => void;
+  /** Performance pass: prewarms the worker's packaged asset caches. */
+  prewarmWorker: () => void;
   playerName: (playerVersionId: string) => string;
   playablePositions: (playerVersionId: string) => readonly string[];
   franchiseName: (franchiseId: string) => string;
@@ -141,7 +160,10 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     league: null,
     catalog: null,
     schedule: null,
+    playerSlice: new Map(),
+    playerSliceReady: false,
     facesByVersion: new Map(),
+    facesReady: false,
     run: null,
     humanFranchiseId: null,
     humanTeam: null,
@@ -156,6 +178,9 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     pending: null,
     interruption: null,
     commandError: null,
+    externalChange: null,
+    acknowledgeExternalChange: () => undefined,
+    prewarmWorker: () => undefined,
     playerName: () => '—',
     playablePositions: () => [],
     franchiseName: () => '—',

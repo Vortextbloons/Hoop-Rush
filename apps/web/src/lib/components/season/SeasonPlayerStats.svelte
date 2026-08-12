@@ -98,8 +98,12 @@
       </div>
     {:else}
       <p class="font-mono text-[10px] text-muted-foreground">
-        <span class="md:hidden">Folded from accepted game summaries · choose a sort metric below</span>
-        <span class="hidden md:inline">Folded from accepted game summaries · tap column headers to sort</span>
+        <span class="md:hidden"
+          >Folded from accepted game summaries · choose a sort metric below</span
+        >
+        <span class="hidden md:inline"
+          >Folded from accepted game summaries · tap column headers to sort</span
+        >
       </p>
     {/if}
     {#if view.hasStats}
@@ -139,7 +143,9 @@
   </div>
 
   {#if !view.hasStats}
-    <div class="mt-3 rounded-xl border border-dashed border-border/70 bg-surface-1 px-4 py-8 text-center">
+    <div
+      class="mt-3 rounded-xl border border-dashed border-border/70 bg-surface-1 px-4 py-8 text-center"
+    >
       <p class="font-mono text-xs font-semibold text-foreground">No season stats yet</p>
       <p class="mt-1 font-mono text-[10px] text-muted-foreground">
         Accept a block to fold per-player season stats.

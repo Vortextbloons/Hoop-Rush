@@ -6,10 +6,13 @@
   import type {
     HoopRushManifest,
     PlayersIndex,
+    SeasonDraftCatalog,
     SeasonLeague,
     SeasonRosterTargets,
+    SeasonRun,
     SeasonSchedule,
   } from '@hoop-rush/data-contracts';
+  import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
   import SeasonDraftBoard from '$lib/components/season/SeasonDraftBoard.svelte';
   import type { SeasonDraftFlow, SeasonDraftFlowState } from '$lib/season/season-draft-flow';
   import { buildVersionFaceIndex, type SeasonFaceRef } from '$lib/season/season-branding';
@@ -292,7 +295,8 @@
         draft: flow.draft,
         generation: flow.generation,
       });
-      await repo.promoteSeasonDraftToRun(stored, run);
+      const slice = buildPlayerSlice(run, flow.catalog);
+      await repo.promoteSeasonDraftToRun(stored, run, slice);
       await goto(resolve('/season/run'));
     } catch (error) {
       promoteError = error instanceof Error ? error.message : String(error);
@@ -312,6 +316,40 @@
     } finally {
       busy = false;
     }
+  }
+
+  /**
+   * Performance pass: the compact per-run player presentation slice (one
+   * entry per rostered version: positions, summary ratings, stamina,
+   * durability, identity), persisted atomically with the draft promotion.
+   * The `/season/run` shell renders from this slice so it never needs to
+   * parse the ~17 MB catalog; trades later top it up from the lazy catalog.
+   */
+  function buildPlayerSlice(
+    run: SeasonRun,
+    catalog: SeasonDraftCatalog,
+  ): SeasonRunPlayerSliceEntry[] {
+    const byVersion = new Map(catalog.candidates.map((c) => [c.playerVersionId, c]));
+    const entries: SeasonRunPlayerSliceEntry[] = [];
+    for (const roster of run.rosters) {
+      for (const entry of roster.players) {
+        const candidate = byVersion.get(entry.playerVersionId);
+        if (candidate === undefined) continue;
+        entries.push({
+          playerVersionId: entry.playerVersionId,
+          playerId: entry.playerId,
+          franchiseId: entry.franchiseId,
+          eraId: entry.eraId,
+          seasonKey: entry.seasonKey,
+          displayName: entry.displayName,
+          positionsPlayable: [...candidate.positions.playable],
+          summaryRatings: { ...candidate.summaryRatings },
+          staminaRating: candidate.stamina.rating,
+          durabilityRating: candidate.durability.rating,
+        });
+      }
+    }
+    return entries;
   }
 </script>
 

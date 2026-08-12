@@ -384,6 +384,8 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
       playerVersionId,
       franchiseId,
       gamesPlayed: 0,
+      appearances: 0,
+      started: 0,
       seconds: 0,
       points: 0,
       fieldGoalsMade: 0,
@@ -449,6 +451,8 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
       for (const line of lines) {
         const player = touchPlayer(line.playerVersionId, team.franchiseId);
         player.gamesPlayed += 1;
+        if (line.seconds > 0) player.appearances += 1;
+        if (line.started === true) player.started += 1;
         player.seconds += line.seconds;
         player.points += line.points;
         player.fieldGoalsMade += line.fieldGoalsMade;

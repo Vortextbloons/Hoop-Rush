@@ -7,7 +7,11 @@ import type {
   SeasonRun,
   SeasonRunCommand,
 } from '@hoop-rush/data-contracts';
-import type { SeasonCompletedSeason } from '../schemas/season-run-record.ts';
+import type {
+  SeasonCompletedRunIndexEntry,
+  SeasonCompletedSeason,
+  SeasonPostseasonDetail,
+} from '../schemas/season-run-record.ts';
 
 /**
  * Season Run postseason repository contract (spec/2.0/07 persistence, M2.6
@@ -18,9 +22,9 @@ import type { SeasonCompletedSeason } from '../schemas/season-run-record.ts';
  *
  * Transactional guarantees (frozen):
  * - `commitPostseasonAdvancement` is atomic: the run state chain position,
- *   the postseason summaries, and the command-log row commit in ONE
- *   transaction (all rows commit or none, so no partial advancement is ever
- *   accepted).
+ *   the postseason summaries, the optional retained postseason details, and
+ *   the command-log row commit in ONE transaction (all rows commit or none,
+ *   so no partial advancement is ever accepted).
  * - `promoteChampionToCompleted` is one atomic transaction: save the final
  *   result, create the almanac, record the champion, finalize the command
  *   log, register completed history, and remove the active-run pointer.
@@ -36,6 +40,12 @@ export interface CommitPostseasonAdvancementInput {
   run: SeasonRun;
   /** New postseason summaries produced by the advance, in play order. */
   summaries: SeasonPostseasonSummary[];
+  /**
+   * Optional retained postseason game details produced by the advance
+   * (the retained-detail analog for postseason games). Committed in the
+   * SAME transaction as the run state, summaries, and command log.
+   */
+  details?: SeasonPostseasonDetail[];
   /** The typed command that produced the advance (validated + recorded). */
   command: SeasonRunCommand;
   /** The run state chain position the command asserted. */
@@ -88,15 +98,17 @@ export interface SeasonPostseasonRepository {
    * Atomically commits one postseason advancement: validates run identity
    * and the command's expected state facts, stores the engine-produced run
    * state (stage/postseason/awards/completion slice), the new postseason
-   * summaries, and the append-only command-log row — all in one
-   * transaction. A duplicate commandId or ordinal is rejected without
-   * mutating anything.
+   * summaries, the optional retained postseason details, and the
+   * append-only command-log row — all in one transaction. A duplicate
+   * commandId or ordinal is rejected without mutating anything.
    */
   commitPostseasonAdvancement(input: CommitPostseasonAdvancementInput): Promise<void>;
   /** Every postseason summary of the run, ordered by gameId ascending. */
   loadPostseasonSummaries(runId: string): Promise<SeasonPostseasonSummary[]>;
   /** One postseason summary by game id; null when absent. */
   loadPostseasonSummary(runId: string, gameId: string): Promise<SeasonPostseasonSummary | null>;
+  /** Every retained postseason game detail of the run, ordered by gameId ascending. */
+  loadPostseasonDetails(runId: string): Promise<SeasonPostseasonDetail[]>;
   /** The full append-only command log (entries in ordinal order); null when absent. */
   loadCommandLog(runId: string): Promise<SeasonCommandLog | null>;
   /**
@@ -108,10 +120,15 @@ export interface SeasonPostseasonRepository {
   promoteChampionToCompleted(input: PromoteChampionInput): Promise<void>;
   /** The full completed-season view (validated); null when absent. */
   loadCompletedSeason(runId: string): Promise<SeasonCompletedSeason | null>;
+  /**
+   * Every completed-season history metadata entry, newest first (the
+   * validated `seasonCompletedIndex` rows).
+   */
+  listCompletedSeasonRuns(): Promise<SeasonCompletedRunIndexEntry[]>;
   /** Deletes a completed season and every row of its run. */
   deleteCompletedSeason(runId: string): Promise<void>;
   /** Builds a validated self-contained replay export of one postseason game. */
   buildReplayExport(runId: string, gameId: string): Promise<SeasonReplayExport | null>;
 }
 
-export type { SeasonCompletedSeason };
+export type { SeasonCompletedSeason, SeasonCompletedRunIndexEntry, SeasonPostseasonDetail };

@@ -37,6 +37,11 @@ import {
   getCachedSeasonSnapshot,
   setCachedSeasonSnapshot,
 } from './season-state-cache';
+import {
+  createSeasonRunChannel,
+  type SeasonRunChannel,
+  type SeasonRunMutation,
+} from './season-cross-tab';
 
 /**
  * Season Run hub state (spec/2.0/07, M2.3, M2.5): the single UI-side owner of
@@ -112,6 +117,18 @@ export class SeasonHubState {
   private readonly runner: SeasonBlockRunner;
   private readonly listeners = new Set<() => void>();
   private unsubscribeRunner: (() => void) | null = null;
+  /**
+   * Performance pass: cross-tab mutation channel. Another tab's commit,
+   * clear, or replacement invalidates the local cache, reloads the active
+   * index/snapshot, cancels stale local simulation, and surfaces the
+   * actionable "run changed in another tab" state.
+   */
+  private readonly channel: SeasonRunChannel;
+  private unsubscribeChannel: (() => void) | null = null;
+  /** True while a cross-tab reload is in flight (dedupes concurrent signals). */
+  private externalReloading = false;
+  /** Cross-tab invalidation reason, surfaced to the UI as an actionable banner. */
+  externalChange: { kind: SeasonRunMutation['kind']; message: string } | null = null;
 
   snapshot: SeasonRunSnapshot | null = null;
   index: SeasonActiveRunIndex | null = null;
@@ -144,14 +161,84 @@ export class SeasonHubState {
     this.unsubscribeRunner = runner.subscribe((event) => {
       this.onRunnerEvent(event);
     });
+    this.channel = createSeasonRunChannel();
+    this.unsubscribeChannel = this.channel.subscribe((mutation) => {
+      void this.onExternalMutation(mutation);
+    });
   }
 
   /** Tears down the runner subscription and worker (route change). */
   destroy(): void {
     this.unsubscribeRunner?.();
     this.unsubscribeRunner = null;
+    this.unsubscribeChannel?.();
+    this.unsubscribeChannel = null;
+    this.channel.close();
     this.runner.terminate();
     this.listeners.clear();
+  }
+
+  /** Performance pass: prewarms the worker's packaged asset caches. */
+  prewarm(): void {
+    this.runner.prewarm();
+  }
+
+  /**
+   * Cross-tab recovery (performance pass): another tab committed, cleared,
+   * or replaced the run. Invalidate the session cache, cancel local
+   * simulation when it can no longer commit (stale expected facts), reload
+   * the active index/snapshot, and surface an actionable banner. The
+   * repository's revision/digest guards remain authoritative for writes;
+   * this only makes the stale tab recover promptly.
+   */
+  private async onExternalMutation(mutation: SeasonRunMutation): Promise<void> {
+    if (this.externalReloading) return;
+    this.externalReloading = true;
+    try {
+      const localRunId = this.snapshot?.run.runId ?? this.index?.runId ?? null;
+      const localRevision = this.snapshot?.acceptedBlocks.length ?? this.index?.revision ?? -1;
+      if (
+        mutation.kind === 'commit' &&
+        mutation.runId === localRunId &&
+        mutation.revision === localRevision
+      ) {
+        // Already applied this exact boundary (e.g. a duplicate delivery).
+        return;
+      }
+      if (mutation.kind === 'commit' && localRunId !== null && mutation.runId !== localRunId) {
+        // A different run became active elsewhere; fall through to reload.
+      }
+      // Stale local simulation: the run moved underneath it, so its
+      // expectedStateRevision/digest can no longer commit. Cancel cleanly so
+      // the UI never stays "running" against stale state.
+      if (this.block.phase === 'running' && this.block.requestId !== null) {
+        this.cancel();
+      }
+      clearCachedSeasonSnapshot();
+      this.externalChange = {
+        kind: mutation.kind,
+        message:
+          mutation.kind === 'clear'
+            ? 'The season was cleared in another tab.'
+            : mutation.kind === 'replace'
+              ? 'A new season replaced the active run in another tab.'
+              : `The season advanced to block ${String(mutation.revision + 1)} in another tab.`,
+      };
+      await this.refresh();
+      // The banner stays until the user acts on it or the state moves on;
+      // an identical later mutation is still recoverable (cleared below).
+      if (this.block.phase !== 'running') {
+        this.emit();
+      }
+    } finally {
+      this.externalReloading = false;
+    }
+  }
+
+  /** Clears the cross-tab change banner (user acknowledged it). */
+  acknowledgeExternalChange(): void {
+    this.externalChange = null;
+    this.emit();
   }
 
   subscribe(listener: () => void): () => void {
@@ -166,6 +253,24 @@ export class SeasonHubState {
         // This exact accepted state is already loaded; skip the full load +
         // reconciliation audit.
         this.snapshot = getCachedSeasonSnapshot();
+        this.index = index;
+        this.error = null;
+        this.incompatible = null;
+        this.emit();
+        return;
+      }
+      // Performance pass: the in-memory snapshot is authoritative when it
+      // already matches the persisted index (accepted block count). The full
+      // validated `loadActiveRun()` (schema parse + reconciliation audit) is
+      // reserved for cold starts, browser reloads, explicit recovery, and
+      // externally changed saves — never for every accepted block or an
+      // ordinary between-block command.
+      if (
+        index !== null &&
+        this.snapshot !== null &&
+        this.snapshot.run.runId === index.runId &&
+        this.snapshot.acceptedBlocks.length === index.revision
+      ) {
         this.index = index;
         this.error = null;
         this.incompatible = null;
@@ -230,6 +335,8 @@ export class SeasonHubState {
     const incompatible = this.incompatible;
     if (incompatible === null) return;
     await this.repo.clearSeasonRun(incompatible.runId);
+    clearCachedSeasonSnapshot();
+    this.channel.announce({ kind: 'clear', runId: incompatible.runId, committedAt: Date.now() });
     this.incompatible = null;
     this.snapshot = null;
     this.index = null;
@@ -253,6 +360,7 @@ export class SeasonHubState {
       this.interruption = null;
       this.block = { ...IDLE_BLOCK };
       this.error = null;
+      this.channel.announce({ kind: 'clear', runId: null, committedAt: Date.now() });
       await this.refresh();
       return { ok: true, error: null };
     } catch (error) {
@@ -271,6 +379,22 @@ export class SeasonHubState {
 
   loadRetainedDetails(runId: string): Promise<SeasonRetainedGameDetail[]> {
     return this.repo.loadRetainedDetails(runId);
+  }
+
+  /** Performance pass: loads the compact per-run player presentation slice. */
+  loadPlayerSlice(
+    runId: string,
+  ): Promise<import('@hoop-rush/persistence').SeasonRunPlayerSliceEntry[] | null> {
+    return this.repo.loadSeasonRunPlayerSlice(runId);
+  }
+
+  /** Performance pass: merges catalog facts for traded-in roster players into
+   * the stored slice so the rotation editor never loses positions. */
+  upsertPlayerSlice(
+    runId: string,
+    entries: import('@hoop-rush/persistence').SeasonRunPlayerSliceEntry[],
+  ): Promise<void> {
+    return this.repo.upsertSeasonRunPlayerSlice(runId, entries);
   }
 
   startBlock(envelope: SubmitBlockEnvelope): void {
@@ -509,6 +633,8 @@ export class SeasonHubState {
     }
     try {
       await this.repo.clearSeasonRun(runId);
+      clearCachedSeasonSnapshot();
+      this.channel.announce({ kind: 'clear', runId, committedAt: Date.now() });
       await this.refresh();
       return { ok: true, error: null };
     } catch (error) {
@@ -647,17 +773,25 @@ export class SeasonHubState {
         this.block.latestGameId = null;
         this.block.latestResult = null;
         this.block.error = null;
-        // The runner committed atomically (deleting any pending row in the
-        // same transaction); re-read the accepted snapshot and clear the
-        // interrupted state before the UI can submit the next block.
+        // Performance pass: the runner committed atomically (deleting any
+        // pending row in the same transaction) and carries the authoritative
+        // in-memory snapshot of everything the transaction stored. Apply it
+        // directly — no full `loadActiveRun()` reload + reconciliation audit
+        // after an accepted block. The session cache is updated so later
+        // route mounts reuse this exact state.
         this.pending = null;
         this.interruption = null;
-        clearCachedSeasonSnapshot();
-        void (async () => {
-          await this.refresh();
-          this.block = { ...IDLE_BLOCK };
-          this.emit();
-        })();
+        this.snapshot = event.snapshot;
+        this.index = indexAfterCommit(this.index, event.snapshot);
+        setCachedSeasonSnapshot(event.snapshot);
+        this.block = { ...IDLE_BLOCK };
+        this.channel.announce({
+          kind: 'commit',
+          runId: event.snapshot.run.runId,
+          revision: event.snapshot.acceptedBlocks.length,
+          committedAt: Date.now(),
+        });
+        this.emit();
         return;
       }
       case 'interrupted':
@@ -693,6 +827,46 @@ export class SeasonHubState {
   private emit(): void {
     for (const listener of this.listeners) listener();
   }
+}
+
+/**
+ * Performance pass: the active-run index row right after an accepted block,
+ * derived from the committed snapshot (the repository updated the persisted
+ * row in the same transaction). Kept in the hub so the next `refresh()` can
+ * reuse the in-memory snapshot without a repository round trip.
+ */
+function indexAfterCommit(
+  index: SeasonActiveRunIndex | null,
+  snapshot: SeasonRunSnapshot,
+): SeasonActiveRunIndex | null {
+  const humanFranchiseId = humanFranchiseIdOf(snapshot.run.league);
+  const humanRow =
+    humanFranchiseId === null
+      ? null
+      : (snapshot.run.standings.rows.find((row) => row.franchiseId === humanFranchiseId) ?? null);
+  if (index === null) {
+    return {
+      runId: snapshot.run.runId,
+      rootSeed: snapshot.run.rootSeed,
+      humanFranchiseId: humanFranchiseId ?? '',
+      completedRounds: snapshot.run.cursor.completedRounds,
+      revision: snapshot.acceptedBlocks.length,
+      humanWins: humanRow?.wins ?? 0,
+      humanLosses: humanRow?.losses ?? 0,
+      updatedAtIso: new Date().toISOString(),
+    };
+  }
+  return {
+    ...index,
+    runId: snapshot.run.runId,
+    rootSeed: snapshot.run.rootSeed,
+    humanFranchiseId: humanFranchiseId ?? index.humanFranchiseId,
+    completedRounds: snapshot.run.cursor.completedRounds,
+    revision: snapshot.acceptedBlocks.length,
+    humanWins: humanRow?.wins ?? index.humanWins,
+    humanLosses: humanRow?.losses ?? index.humanLosses,
+    updatedAtIso: new Date().toISOString(),
+  };
 }
 
 /** Human-readable explanation of a typed command rejection (UI alert). */

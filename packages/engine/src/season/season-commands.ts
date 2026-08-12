@@ -1,7 +1,11 @@
 import type {
+  EraSimulationProfile,
   SeasonAcceptTradeOfferCommand,
   SeasonAcceptTradeOfferRejection,
   SeasonAcceptTradeOfferResult,
+  SeasonAdvancePostseasonCommand,
+  SeasonAdvancePostseasonRejection,
+  SeasonAdvancePostseasonResult,
   SeasonAlreadyRehabbedRejection,
   SeasonAlreadySpentRejection,
   SeasonBlockMismatchRejection,
@@ -11,12 +15,18 @@ import type {
   SeasonDraftCatalog,
   SeasonDuplicateCommandRejection,
   SeasonEffectsState,
+  SeasonFastForwardPostseasonCommand,
+  SeasonFastForwardPostseasonRejection,
+  SeasonFastForwardPostseasonResult,
   SeasonForfeitInterruptedGameCommand,
   SeasonForfeitInterruptedGameRejection,
   SeasonForfeitInterruptedGameResult,
   SeasonGameMismatchRejection,
   SeasonInjuryNotActiveRejection,
   SeasonInsufficientBalanceRejection,
+  SeasonInsufficientRehabResourcesRejection,
+  SeasonInvalidRotationRejection,
+  SeasonInvalidStageRejection,
   SeasonNoPendingBlockRejection,
   SeasonNotAtBoundaryRejection,
   SeasonNoWindowRejection,
@@ -25,6 +35,9 @@ import type {
   SeasonOfferNotOpenRejection,
   SeasonOfferUnknownRejection,
   SeasonPendingBlockCandidate,
+  SeasonPostseasonState,
+  SeasonPostseasonSummary,
+  Position,
   SeasonResumeSeasonBlockCommand,
   SeasonResumeSeasonBlockRejection,
   SeasonResumeSeasonBlockResult,
@@ -33,21 +46,67 @@ import type {
   SeasonRunCommand,
   SeasonRunCommandRejection,
   SeasonRunMismatchRejection,
+  SeasonRunStage,
   SeasonSelectBlockObjectiveCommand,
   SeasonSelectBlockObjectiveRejection,
   SeasonSelectBlockObjectiveResult,
+  SeasonSpectatePostseasonGameCommand,
+  SeasonSpectatePostseasonGameRejection,
+  SeasonSpectatePostseasonGameResult,
   SeasonSpendInfluenceCommand,
   SeasonSpendInfluenceRejection,
   SeasonSpendInfluenceResult,
   SeasonStaleStateRejection,
+  SeasonStartPostseasonCommand,
+  SeasonStartPostseasonRejection,
+  SeasonStartPostseasonResult,
+  SeasonSubmitPostseasonRotationCommand,
+  SeasonSubmitPostseasonRotationRejection,
+  SeasonSubmitPostseasonRotationResult,
+  SeasonUnavailablePlayerRejection,
   SeasonWindowNotOpenRejection,
+  SeasonWrongGameRejection,
 } from '@hoop-rush/data-contracts';
-import { advancePendingAfterForfeit, seasonForfeitSummaryForGame } from './health.ts';
+import { SEASON_ROUND_COUNT, playInGameIdOf } from '@hoop-rush/data-contracts';
+import { expandSeasonRunRosters } from './block.ts';
+import {
+  advancePendingAfterForfeit,
+  seasonForfeitSummaryForGame,
+  seasonFranchiseLegalFiveFacts,
+} from './health.ts';
 import { seasonNextBlockIndex } from './block.ts';
-import { applyRiskyRehabOutcome, rollSeasonRehabOutcome } from './injuries.ts';
+import {
+  applyRiskyRehabOutcome,
+  rollSeasonRehabOutcome,
+  seasonPlayerAvailable,
+} from './injuries.ts';
 import { applySeasonInfluenceSpend, SEASON_INFLUENCE_FLOOR } from './influence.ts';
 import { seasonObjectiveChoicesForBlock } from './objectives.ts';
-import { validateSeasonRoster, type SeasonRosterMemberInput } from './roster-rules.ts';
+import {
+  POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
+  SEASON_POSTSEASON_RISKY_REHAB_COST,
+  SeasonPostseasonContextError,
+  SeasonPostseasonInvariantError,
+  rollPostseasonRehabOutcome,
+  seasonPostseasonApplyGameResult,
+  seasonPostseasonHumanEliminated,
+  seasonPostseasonHumanPlaysGame,
+  seasonPostseasonNextGame,
+  seasonPostseasonSetRankings,
+  seasonPostseasonStageOf,
+  seasonPostseasonUpcomingGames,
+  simulateSeasonPostseasonGame,
+  type SeasonPostseasonGameResolver,
+  type SeasonPostseasonRankingsFn,
+  type SeasonPostseasonRankingsInput,
+} from './postseason.ts';
+import { rankSeasonPostseason } from './tiebreakers.ts';
+import {
+  legalFiveExists,
+  validateSeasonRoster,
+  type SeasonRosterMemberInput,
+} from './roster-rules.ts';
+import { validateSeasonRotation, seasonRotationSetDigest } from './rotation.ts';
 import { seasonRunStateDigest } from './state-digest.ts';
 import {
   applySeasonTrade,
@@ -106,6 +165,23 @@ export interface SeasonRunCommandContext {
    * Required for every accepted command.
    */
   effects?: SeasonEffectsState;
+  /**
+   * M2.6: the regular-season rankings seam for `start-postseason` (Track A's
+   * tiebreaker pipeline feeds it at integration). A missing seam on the
+   * start command throws `SeasonPostseasonContextError`.
+   */
+  rankings?: SeasonPostseasonRankingsFn;
+  /**
+   * M2.6: the era simulation profile for postseason games (the command layer
+   * mirrors the block pipeline's profile carrier). Required by the four
+   * simulating handlers; a missing profile throws `SeasonPostseasonContextError`.
+   */
+  profile?: EraSimulationProfile;
+  /**
+   * M2.6: the per-game simulation seam (documented test/CLI stub target).
+   * Defaults to the real Season game controller.
+   */
+  postseasonGameResolver?: SeasonPostseasonGameResolver;
 }
 
 export type SeasonRunCommandResult =
@@ -114,12 +190,24 @@ export type SeasonRunCommandResult =
   | { command: 'accept-trade-offer'; result: SeasonAcceptTradeOfferResult }
   | { command: 'decline-trade-offer'; result: SeasonDeclineTradeOfferResult }
   | { command: 'resume-season-block'; result: SeasonResumeSeasonBlockResult }
-  | { command: 'forfeit-interrupted-game'; result: SeasonForfeitInterruptedGameResult };
+  | { command: 'forfeit-interrupted-game'; result: SeasonForfeitInterruptedGameResult }
+  | { command: 'start-postseason'; result: SeasonStartPostseasonResult }
+  | { command: 'advance-postseason'; result: SeasonAdvancePostseasonResult }
+  | { command: 'submit-postseason-rotation'; result: SeasonSubmitPostseasonRotationResult }
+  | { command: 'spectate-postseason-game'; result: SeasonSpectatePostseasonGameResult }
+  | { command: 'fast-forward-postseason'; result: SeasonFastForwardPostseasonResult };
 
 export interface SeasonRunCommandOutput {
   result: SeasonRunCommandResult;
   run: SeasonRun;
   pending: SeasonPendingBlockCandidate | null;
+  /**
+   * M2.6: the postseason summaries the command's accepted advance produced
+   * (in play order). The run snapshot does not retain compact postseason
+   * summaries (they persist as separate rows beside the run), so the engine
+   * carries them on the output for the commit side.
+   */
+  postseasonSummaries?: SeasonPostseasonSummary[];
 }
 
 /** Marker error for unimplemented handlers (kept for compatibility). */
@@ -139,7 +227,12 @@ type DispatchableCommandKind =
   | 'accept-trade-offer'
   | 'decline-trade-offer'
   | 'resume-season-block'
-  | 'forfeit-interrupted-game';
+  | 'forfeit-interrupted-game'
+  | 'start-postseason'
+  | 'advance-postseason'
+  | 'submit-postseason-rotation'
+  | 'spectate-postseason-game'
+  | 'fast-forward-postseason';
 
 /**
  * The engine-facing run view for this dispatch: the command layer supplies
@@ -184,9 +277,13 @@ function advanceRunState(run: SeasonEconomyRun): SeasonRun {
  * True when the commandId appears anywhere in the run's recorded history:
  * the accepted checkpoint (`checkpointState.commandId`), any influence
  * ledger entry's commandId, any transaction entry's commandId, or any
- * recorded objective selection's `selectedByCommandId`. The persistence
- * repository additionally guards against races; this check covers every
- * recorded command-scoped fact in the snapshot.
+ * recorded objective selection's `selectedByCommandId`. M2.6 postseason
+ * commands record commandIds in the snapshot only through the influence
+ * ledger (submit-with-rehab) and transactions; the authoritative accepted-
+ * command log lives beside the run (command-log-v1, persistence side), so
+ * the persistence repository additionally guards full duplicates. The
+ * persistence repository additionally guards against races; this check
+ * covers every recorded command-scoped fact in the snapshot.
  */
 function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
   if (run.checkpointState !== null && run.checkpointState.commandId === commandId) return true;
@@ -904,6 +1001,787 @@ function handleForfeitInterruptedGame(
   };
 }
 
+/** The stage the postseason command handlers require to run. */
+const REQUIRED_POSTSEASON_STAGE: SeasonRunStage = 'play-in';
+
+function postseasonInvalidStageRejection(run: SeasonRun): SeasonInvalidStageRejection {
+  return {
+    code: 'invalid-stage',
+    requiredStage: REQUIRED_POSTSEASON_STAGE,
+    currentStage: run.stage,
+  };
+}
+
+function rejectedStart(
+  command: SeasonStartPostseasonCommand,
+  rejection: SeasonStartPostseasonRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'start-postseason',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+/**
+ * M2.6 `start-postseason` (spec/2.0/02 playoffs): moves a completed regular
+ * season into the `play-in` stage by recording the rankings seam output
+ * (Track A's tiebreaker pipeline supplies the ordered top ten; the machine
+ * records no tiebreak resolutions itself). Requires the `regular-season`
+ * stage with all 82 rounds accepted.
+ */
+function handleStartPostseason(
+  command: SeasonStartPostseasonCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, null);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  if (run.stage !== 'regular-season' || run.cursor.completedRounds < SEASON_ROUND_COUNT) {
+    const rejection: SeasonInvalidStageRejection = {
+      code: 'invalid-stage',
+      requiredStage: 'regular-season',
+      currentStage: run.stage,
+    };
+    return rejectedStart(command, rejection, run);
+  }
+  let postseason: SeasonPostseasonState;
+  try {
+    const rankings =
+      context.rankings ??
+      ((input: SeasonPostseasonRankingsInput) => {
+        const ranked = rankSeasonPostseason(input.league, input.standings, input.seed);
+        return { east: ranked.east.topTen, west: ranked.west.topTen };
+      });
+    const rankingResult = rankings({
+      league: run.league,
+      standings: run.standings,
+      seed: run.rootSeed,
+    });
+    postseason = seasonPostseasonSetRankings(run.postseason, run.league, rankingResult);
+  } catch (error) {
+    if (error instanceof SeasonPostseasonInvariantError) {
+      return rejectedStart(command, { code: 'integrity-failure', reason: error.message }, run);
+    }
+    throw error;
+  }
+  const next = advanceRunState({ ...run, stage: 'play-in', postseason });
+  return {
+    result: {
+      command: 'start-postseason',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        stage: 'play-in',
+        postseasonSeed: postseason.seed,
+        nextGameId: playInGameIdOf('east', 'seven-eight'),
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function rejectedAdvance(
+  command: SeasonAdvancePostseasonCommand,
+  rejection: SeasonAdvancePostseasonRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'advance-postseason',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+/**
+ * M2.6 `advance-postseason`: simulates the next playable game (or the
+ * optional target) and continues through AI-only games until a human
+ * rotation is required (every human game waits for a fresh submission), the
+ * tournament ends with a champion, or the target game is reached. A target
+ * that cannot materialize (a game beyond a series' clinch point) runs the
+ * advance to its natural end. Accepted results carry the advanced game ids,
+ * the next decision, and the summaries for the commit side.
+ */
+function handleAdvancePostseason(
+  command: SeasonAdvancePostseasonCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, null);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  if (run.stage === 'regular-season' || run.stage === 'completed') {
+    return rejectedAdvance(command, postseasonInvalidStageRejection(run), run);
+  }
+  if (context.catalog === undefined || context.profile === undefined) {
+    throw new SeasonPostseasonContextError(
+      'advance-postseason requires the draft catalog and era profile (context.catalog, context.profile)',
+    );
+  }
+  const expanded = expandSeasonRunRosters(run, context.catalog);
+  const positions = new Map<string, readonly Position[]>();
+  for (const player of expanded.values()) {
+    positions.set(player.playerVersionId, player.positions);
+  }
+  const target = command.targetGameId;
+  if (target !== undefined) {
+    const upcoming = seasonPostseasonUpcomingGames(run.postseason);
+    if (!upcoming.includes(target)) {
+      const next = seasonPostseasonNextGame(run.postseason);
+      if (next.kind === 'integrity-failure') {
+        return rejectedAdvance(command, { code: 'integrity-failure', reason: next.reason }, run);
+      }
+      if (next.kind === 'complete') {
+        return rejectedAdvance(
+          command,
+          { code: 'integrity-failure', reason: 'the postseason is complete' },
+          run,
+        );
+      }
+      return rejectedAdvance(
+        command,
+        { code: 'wrong-game', targetGameId: target, nextGameId: next.gameId },
+        run,
+      );
+    }
+  }
+  const humanFranchiseId = context.humanFranchiseId;
+  let current = run;
+  const advanced: string[] = [];
+  const summaries: SeasonPostseasonSummary[] = [];
+  let humanWait: string | null = null;
+  let integrityReason: string | null = null;
+  for (;;) {
+    const decision = seasonPostseasonNextGame(current.postseason);
+    if (decision.kind === 'integrity-failure') {
+      integrityReason = decision.reason;
+      break;
+    }
+    if (decision.kind === 'complete') break;
+    const gameId = decision.gameId;
+    if (
+      humanFranchiseId !== null &&
+      seasonPostseasonHumanPlaysGame(current.postseason, gameId, humanFranchiseId)
+    ) {
+      // The human rotation decision (documented): the human's saved rotation
+      // carries over between games; the advance stops at a human game only
+      // when the rotation cannot play — no legal five from the available
+      // players, or planned minutes on an unavailable player. The human then
+      // repairs (submit a rotation resting the injured player at zero
+      // minutes), rehabilitates (postseason risky rehab), or — once a
+      // forfeit command exists — forfeits.
+      const humanRotation = current.rotations.find(
+        (rotation) => rotation.franchiseId === humanFranchiseId,
+      );
+      const minutesOnUnavailable = (humanRotation?.targetMinutes ?? []).some(
+        (entry) =>
+          entry.minutes > 0 && !seasonPlayerAvailable(current.health, entry.playerVersionId),
+      );
+      const legalFacts = seasonFranchiseLegalFiveFacts(
+        current,
+        humanFranchiseId,
+        current.health,
+        positions,
+      );
+      if (minutesOnUnavailable || !legalFacts.legal) {
+        humanWait = gameId;
+        break;
+      }
+    }
+    const outcome = simulateSeasonPostseasonGame(
+      {
+        run: current,
+        effects: current.effects,
+        expanded,
+        catalog: context.catalog,
+        profile: context.profile,
+        gameId,
+        humanFranchiseId,
+      },
+      { resolver: context.postseasonGameResolver },
+    );
+    if (outcome.kind === 'integrity-failure') {
+      integrityReason = outcome.reason;
+      break;
+    }
+    current = {
+      ...current,
+      postseason: seasonPostseasonApplyGameResult(
+        current.postseason,
+        outcome.facts,
+        current.league,
+        current.standings,
+      ),
+      health: outcome.nextHealth,
+      effects: outcome.nextEffects,
+    };
+    advanced.push(gameId);
+    summaries.push(outcome.summary);
+    if (target !== undefined && gameId === target) break;
+  }
+  if (integrityReason !== null) {
+    return rejectedAdvance(command, { code: 'integrity-failure', reason: integrityReason }, run);
+  }
+  const stage = seasonPostseasonStageOf(current.postseason);
+  const completion =
+    stage === 'completed'
+      ? {
+          championFranchiseId: current.postseason.championFranchiseId as string,
+          // LEAD DECISION (documented): the promotion replaces the zero
+          // digest when the almanac persists; the run schema only requires
+          // the 32-hex shape here.
+          almanacDigest: POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
+          finalizedAtStateRevision: run.stateRevision + 1,
+        }
+      : null;
+  const nextRun = advanceRunState({ ...current, stage, completion });
+  const after = seasonPostseasonNextGame(nextRun.postseason);
+  const nextGameIdAfter = after.kind === 'game' ? after.gameId : null;
+  const humanNext =
+    nextGameIdAfter !== null &&
+    humanFranchiseId !== null &&
+    seasonPostseasonHumanPlaysGame(nextRun.postseason, nextGameIdAfter, humanFranchiseId);
+  const nextDecision = humanWait !== null || humanNext ? 'rotation' : 'none';
+  return {
+    result: {
+      command: 'advance-postseason',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        stage,
+        advancedGameIds: advanced,
+        nextDecision,
+        nextGameId: humanWait ?? (humanNext ? nextGameIdAfter : null),
+        aiNextGameId: nextDecision === 'rotation' ? null : nextGameIdAfter,
+      },
+    },
+    run: nextRun,
+    pending: null,
+    postseasonSummaries: summaries,
+  };
+}
+
+function rejectedSubmit(
+  command: SeasonSubmitPostseasonRotationCommand,
+  rejection: SeasonSubmitPostseasonRotationRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'submit-postseason-rotation',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+/**
+ * M2.6 `submit-postseason-rotation`: locks the human rotation for the target
+ * game (which must be the run's current next game and involve the human),
+ * validates rotation legality, availability, and the optional risky-rehab
+ * spend (the only postseason Influence use; the seeded outcome applies
+ * `applyRiskyRehabOutcome` semantics and is recorded on the ledger and
+ * transaction log). The recorded rotation replaces the human's saved
+ * rotation, so it persists between games until the next submission.
+ */
+function handleSubmitPostseasonRotation(
+  command: SeasonSubmitPostseasonRotationCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, null);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  if (run.stage === 'regular-season' || run.stage === 'completed') {
+    return rejectedSubmit(command, postseasonInvalidStageRejection(run), run);
+  }
+  const next = seasonPostseasonNextGame(run.postseason);
+  if (next.kind === 'integrity-failure') {
+    return rejectedSubmit(command, { code: 'integrity-failure', reason: next.reason }, run);
+  }
+  if (next.kind === 'complete') {
+    return rejectedSubmit(
+      command,
+      { code: 'integrity-failure', reason: 'the postseason is complete' },
+      run,
+    );
+  }
+  if (command.targetGameId !== next.gameId) {
+    const rejection: SeasonWrongGameRejection = {
+      code: 'wrong-game',
+      targetGameId: command.targetGameId,
+      nextGameId: next.gameId,
+    };
+    return rejectedSubmit(command, rejection, run);
+  }
+  const humanFranchiseId = context.humanFranchiseId;
+  if (humanFranchiseId === null) {
+    throw new SeasonRunCommandNotImplementedError(
+      'submit-postseason-rotation requires a human franchise (the command layer supplies it)',
+    );
+  }
+  if (!seasonPostseasonHumanPlaysGame(run.postseason, command.targetGameId, humanFranchiseId)) {
+    const rejection: SeasonWrongGameRejection = {
+      code: 'wrong-game',
+      targetGameId: command.targetGameId,
+      nextGameId: next.gameId,
+    };
+    return rejectedSubmit(command, rejection, run);
+  }
+  const payload = command.rotation;
+  if (payload.franchiseId !== humanFranchiseId) {
+    const rejection: SeasonInvalidRotationRejection = {
+      code: 'invalid-rotation',
+      franchiseId: payload.franchiseId,
+      reasons: [
+        `rotation targets ${payload.franchiseId} but the human franchise is ${humanFranchiseId}`,
+      ],
+    };
+    return rejectedSubmit(command, rejection, run);
+  }
+  if (context.catalog === undefined) {
+    throw new SeasonPostseasonContextError(
+      'submit-postseason-rotation requires the draft catalog (context.catalog)',
+    );
+  }
+  const humanRoster = run.rosters.find((roster) => roster.franchiseId === humanFranchiseId);
+  const memberPlayable = new Map<string, readonly Position[]>();
+  for (const player of humanRoster?.players ?? []) {
+    const candidate = context.catalog.candidates.find(
+      (entry) => entry.playerVersionId === player.playerVersionId,
+    );
+    memberPlayable.set(player.playerVersionId, candidate?.positions.playable ?? []);
+  }
+  const rotationFailures = validateSeasonRotation(payload.rotation, memberPlayable);
+  if (rotationFailures.length > 0) {
+    return rejectedSubmit(
+      command,
+      { code: 'invalid-rotation', franchiseId: payload.franchiseId, reasons: rotationFailures },
+      run,
+    );
+  }
+  const rostered = new Set((humanRoster?.players ?? []).map((player) => player.playerVersionId));
+  for (const playerVersionId of [
+    ...payload.rotation.starters,
+    ...payload.rotation.benchOrder,
+    ...payload.rotation.closingFive,
+  ]) {
+    if (!rostered.has(playerVersionId)) {
+      const rejection: SeasonUnavailablePlayerRejection = {
+        code: 'unavailable-player',
+        playerVersionId,
+        reason: 'not-on-roster',
+      };
+      return rejectedSubmit(command, rejection, run);
+    }
+  }
+  // Availability contract (documented): a rotation may list an injured player
+  // only at zero minutes (rest); a player with planned minutes must be able
+  // to play, and the rotation must be able to field a legal five from the
+  // available players — otherwise the human must repair, rehabilitate, or
+  // (future command) forfeit.
+  for (const entry of payload.rotation.targetMinutes) {
+    if (entry.minutes > 0 && !seasonPlayerAvailable(run.health, entry.playerVersionId)) {
+      const rejection: SeasonUnavailablePlayerRejection = {
+        code: 'unavailable-player',
+        playerVersionId: entry.playerVersionId,
+        reason: 'injured',
+      };
+      return rejectedSubmit(command, rejection, run);
+    }
+  }
+  {
+    const availableMembers: SeasonRosterMemberInput[] = [];
+    for (const player of humanRoster?.players ?? []) {
+      const playable = memberPlayable.get(player.playerVersionId);
+      if (playable === undefined || playable.length === 0) continue;
+      if (seasonPlayerAvailable(run.health, player.playerVersionId)) {
+        availableMembers.push({ playerVersionId: player.playerVersionId, playable });
+      }
+    }
+    if (!legalFiveExists(availableMembers)) {
+      return rejectedSubmit(
+        command,
+        {
+          code: 'invalid-rotation',
+          franchiseId: payload.franchiseId,
+          reasons: [
+            `only ${String(availableMembers.length)} players available; the rotation cannot field a legal five`,
+          ],
+        },
+        run,
+      );
+    }
+  }
+  let health = run.health;
+  let influence = run.influence;
+  let transactions = run.transactions;
+  const rehabInjuryId = payload.riskyRehabInjuryId;
+  if (rehabInjuryId !== undefined) {
+    const injury = run.health.injuries.find((entry) => entry.injuryId === rehabInjuryId);
+    // Rejection mapping (documented, flagged for the lead): the M2.6 submit
+    // union has no injury-not-active / already-rehabbed codes, so an invalid
+    // rehab reference rejects with integrity-failure and a precise reason.
+    const active =
+      injury !== undefined &&
+      injury.franchiseId === humanFranchiseId &&
+      injury.sameGameReturned !== true &&
+      injury.missedGamesRemaining > 0;
+    if (injury === undefined || !active) {
+      return rejectedSubmit(
+        command,
+        {
+          code: 'integrity-failure',
+          reason: `risky-rehab injury ${rehabInjuryId} is not an active injury of ${humanFranchiseId}`,
+        },
+        run,
+      );
+    }
+    if (run.influence.rehabs[rehabInjuryId] !== undefined) {
+      return rejectedSubmit(
+        command,
+        { code: 'integrity-failure', reason: `injury ${rehabInjuryId} was already rehabilitated` },
+        run,
+      );
+    }
+    const balance = run.influence.balances[humanFranchiseId] ?? 0;
+    if (balance < SEASON_INFLUENCE_FLOOR + SEASON_POSTSEASON_RISKY_REHAB_COST) {
+      const rejection: SeasonInsufficientRehabResourcesRejection = {
+        code: 'insufficient-rehab-resources',
+        franchiseId: humanFranchiseId,
+        balance,
+        required: SEASON_POSTSEASON_RISKY_REHAB_COST,
+      };
+      return rejectedSubmit(command, rejection, run);
+    }
+    const outcome = rollPostseasonRehabOutcome(run.rootSeed, rehabInjuryId);
+    health = applyRiskyRehabOutcome(health, rehabInjuryId, outcome);
+    const spend = applySeasonInfluenceSpend({
+      influence,
+      franchiseId: humanFranchiseId,
+      source: 'risky-rehab',
+      requestedDelta: -SEASON_POSTSEASON_RISKY_REHAB_COST,
+      blockIndex: null,
+      commandId: command.commandId,
+      explanation: `Spent ${String(SEASON_POSTSEASON_RISKY_REHAB_COST)} Influence on postseason risky rehab for ${rehabInjuryId} (${outcome})`,
+      injuryId: rehabInjuryId,
+      rehabOutcome: outcome,
+    });
+    influence = spend.influence;
+    transactions = [
+      ...transactions,
+      seasonTransactionEntry({
+        transactionId: `txn-${command.commandId}`,
+        commandId: command.commandId,
+        franchiseId: humanFranchiseId,
+        type: 'influence-spend',
+        blockIndex: null,
+        appliedAtStateRevision: run.stateRevision + 1,
+        payload: { purpose: 'risky-rehab', injuryId: rehabInjuryId, outcome },
+        explanation: `Spent ${String(SEASON_POSTSEASON_RISKY_REHAB_COST)} Influence on postseason risky rehab for ${rehabInjuryId} (${outcome})`,
+      }),
+    ];
+  }
+  const rotations = run.rotations.map((rotation) =>
+    rotation.franchiseId === humanFranchiseId ? payload.rotation : rotation,
+  );
+  const nextRun = advanceRunState({ ...run, rotations, health, influence, transactions });
+  return {
+    result: {
+      command: 'submit-postseason-rotation',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        targetGameId: command.targetGameId,
+        franchiseId: payload.franchiseId,
+        rotationDigest: seasonRotationSetDigest([payload.rotation]),
+      },
+    },
+    run: nextRun,
+    pending: null,
+  };
+}
+
+function rejectedSpectate(
+  command: SeasonSpectatePostseasonGameCommand,
+  rejection: SeasonSpectatePostseasonGameRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'spectate-postseason-game',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+/**
+ * M2.6 `spectate-postseason-game`: simulates exactly the named game with the
+ * fixed AI rotations. The target must be the run's current next game and
+ * must not involve the human franchise (the human plays their own games
+ * through advance + submit); the primary use case is spectating after
+ * elimination. Accepted results reuse the advance result shape.
+ */
+function handleSpectatePostseasonGame(
+  command: SeasonSpectatePostseasonGameCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, null);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  if (run.stage === 'regular-season' || run.stage === 'completed') {
+    return rejectedSpectate(command, postseasonInvalidStageRejection(run), run);
+  }
+  if (context.catalog === undefined || context.profile === undefined) {
+    throw new SeasonPostseasonContextError(
+      'spectate-postseason-game requires the draft catalog and era profile (context.catalog, context.profile)',
+    );
+  }
+  const decision = seasonPostseasonNextGame(run.postseason);
+  if (decision.kind === 'integrity-failure') {
+    return rejectedSpectate(command, { code: 'integrity-failure', reason: decision.reason }, run);
+  }
+  if (decision.kind === 'complete') {
+    return rejectedSpectate(
+      command,
+      { code: 'integrity-failure', reason: 'the postseason is complete' },
+      run,
+    );
+  }
+  if (command.targetGameId !== decision.gameId) {
+    const rejection: SeasonWrongGameRejection = {
+      code: 'wrong-game',
+      targetGameId: command.targetGameId,
+      nextGameId: decision.gameId,
+    };
+    return rejectedSpectate(command, rejection, run);
+  }
+  const humanFranchiseId = context.humanFranchiseId;
+  if (
+    humanFranchiseId !== null &&
+    seasonPostseasonHumanPlaysGame(run.postseason, command.targetGameId, humanFranchiseId)
+  ) {
+    const rejection: SeasonWrongGameRejection = {
+      code: 'wrong-game',
+      targetGameId: command.targetGameId,
+      nextGameId: decision.gameId,
+    };
+    return rejectedSpectate(command, rejection, run);
+  }
+  const expanded = expandSeasonRunRosters(run, context.catalog);
+  const outcome = simulateSeasonPostseasonGame(
+    {
+      run,
+      effects: run.effects,
+      expanded,
+      catalog: context.catalog,
+      profile: context.profile,
+      gameId: command.targetGameId,
+      humanFranchiseId,
+    },
+    { resolver: context.postseasonGameResolver },
+  );
+  if (outcome.kind === 'integrity-failure') {
+    return rejectedSpectate(command, { code: 'integrity-failure', reason: outcome.reason }, run);
+  }
+  const current = {
+    ...run,
+    postseason: seasonPostseasonApplyGameResult(
+      run.postseason,
+      outcome.facts,
+      run.league,
+      run.standings,
+    ),
+    health: outcome.nextHealth,
+    effects: outcome.nextEffects,
+  };
+  const stage = seasonPostseasonStageOf(current.postseason);
+  const completion =
+    stage === 'completed'
+      ? {
+          championFranchiseId: current.postseason.championFranchiseId as string,
+          almanacDigest: POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
+          finalizedAtStateRevision: run.stateRevision + 1,
+        }
+      : null;
+  const nextRun = advanceRunState({ ...current, stage, completion });
+  const after = seasonPostseasonNextGame(nextRun.postseason);
+  const nextGameIdAfter = after.kind === 'game' ? after.gameId : null;
+  const humanNext =
+    nextGameIdAfter !== null &&
+    humanFranchiseId !== null &&
+    seasonPostseasonHumanPlaysGame(nextRun.postseason, nextGameIdAfter, humanFranchiseId);
+  return {
+    result: {
+      command: 'spectate-postseason-game',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        stage,
+        advancedGameIds: [command.targetGameId],
+        nextDecision: humanNext ? 'rotation' : 'none',
+        nextGameId: humanNext ? nextGameIdAfter : null,
+        aiNextGameId: humanNext ? null : nextGameIdAfter,
+      },
+    },
+    run: nextRun,
+    pending: null,
+    postseasonSummaries: [outcome.summary],
+  };
+}
+
+function rejectedFastForward(
+  command: SeasonFastForwardPostseasonCommand,
+  rejection: SeasonFastForwardPostseasonRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: 'fast-forward-postseason',
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    },
+    run,
+    pending: null,
+  };
+}
+
+/**
+ * M2.6 `fast-forward-postseason`: simulates every remaining game with the
+ * fixed AI rotations through the champion and completes the run. Requires
+ * the human franchise to be eliminated (an active human would be skipping
+ * lineup decisions; the union has no better code, so the rejection is
+ * integrity-failure — flagged for the lead). The optional target is
+ * validated as an upcoming game; the accepted result is always stage
+ * `completed` with the champion.
+ */
+function handleFastForwardPostseason(
+  command: SeasonFastForwardPostseasonCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, null);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  if (run.stage === 'regular-season' || run.stage === 'completed') {
+    return rejectedFastForward(command, postseasonInvalidStageRejection(run), run);
+  }
+  if (command.targetGameId !== undefined) {
+    const upcoming = seasonPostseasonUpcomingGames(run.postseason);
+    if (!upcoming.includes(command.targetGameId)) {
+      return rejectedFastForward(
+        command,
+        {
+          code: 'integrity-failure',
+          reason: `fast-forward target ${command.targetGameId} is not an upcoming postseason game`,
+        },
+        run,
+      );
+    }
+  }
+  const humanFranchiseId = context.humanFranchiseId;
+  if (
+    humanFranchiseId !== null &&
+    !seasonPostseasonHumanEliminated(run.postseason, humanFranchiseId)
+  ) {
+    return rejectedFastForward(
+      command,
+      {
+        code: 'integrity-failure',
+        reason: `the human franchise ${humanFranchiseId} still has postseason decisions; fast-forward requires elimination`,
+      },
+      run,
+    );
+  }
+  if (context.catalog === undefined || context.profile === undefined) {
+    throw new SeasonPostseasonContextError(
+      'fast-forward-postseason requires the draft catalog and era profile (context.catalog, context.profile)',
+    );
+  }
+  const expanded = expandSeasonRunRosters(run, context.catalog);
+  let current = run;
+  const summaries: SeasonPostseasonSummary[] = [];
+  let integrityReason: string | null = null;
+  for (;;) {
+    const decision = seasonPostseasonNextGame(current.postseason);
+    if (decision.kind === 'integrity-failure') {
+      integrityReason = decision.reason;
+      break;
+    }
+    if (decision.kind === 'complete') break;
+    const outcome = simulateSeasonPostseasonGame(
+      {
+        run: current,
+        effects: current.effects,
+        expanded,
+        catalog: context.catalog,
+        profile: context.profile,
+        gameId: decision.gameId,
+        humanFranchiseId,
+      },
+      { resolver: context.postseasonGameResolver },
+    );
+    if (outcome.kind === 'integrity-failure') {
+      integrityReason = outcome.reason;
+      break;
+    }
+    current = {
+      ...current,
+      postseason: seasonPostseasonApplyGameResult(
+        current.postseason,
+        outcome.facts,
+        current.league,
+        current.standings,
+      ),
+      health: outcome.nextHealth,
+      effects: outcome.nextEffects,
+    };
+    summaries.push(outcome.summary);
+  }
+  if (integrityReason !== null) {
+    return rejectedFastForward(
+      command,
+      { code: 'integrity-failure', reason: integrityReason },
+      run,
+    );
+  }
+  const championFranchiseId = current.postseason.championFranchiseId;
+  if (championFranchiseId === null) {
+    return rejectedFastForward(
+      command,
+      { code: 'integrity-failure', reason: 'the tournament finished without a champion' },
+      run,
+    );
+  }
+  const completion = {
+    championFranchiseId,
+    almanacDigest: POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
+    finalizedAtStateRevision: run.stateRevision + 1,
+  };
+  const nextRun = advanceRunState({ ...current, stage: 'completed', completion });
+  return {
+    result: {
+      command: 'fast-forward-postseason',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        stage: 'completed',
+        championFranchiseId,
+      },
+    },
+    run: nextRun,
+    pending: null,
+    postseasonSummaries: summaries,
+  };
+}
+
 /**
  * The typed run command dispatch (spec/2.0/07 M2.5 §8): validates run
  * identity, commandId uniqueness, and the expected state revision/digest,
@@ -927,22 +1805,16 @@ export function handleSeasonRunCommand(
       return handleResumeSeasonBlock(command, context);
     case 'forfeit-interrupted-game':
       return handleForfeitInterruptedGame(command, context);
-    // M2.6 postseason commands: engine handlers land in a later phase; the
-    // typed dispatch rejects them explicitly rather than falling through.
     case 'start-postseason':
+      return handleStartPostseason(command, context);
     case 'advance-postseason':
+      return handleAdvancePostseason(command, context);
     case 'submit-postseason-rotation':
+      return handleSubmitPostseasonRotation(command, context);
     case 'spectate-postseason-game':
+      return handleSpectatePostseasonGame(command, context);
     case 'fast-forward-postseason':
-      throw new SeasonRunCommandNotImplementedError(command.command);
-    // M2.6 postseason commands: the engine handlers land in a later M2.6
-    // phase; the contract is validated here and dispatch stays typed.
-    case 'start-postseason':
-    case 'advance-postseason':
-    case 'submit-postseason-rotation':
-    case 'spectate-postseason-game':
-    case 'fast-forward-postseason':
-      throw new SeasonRunCommandNotImplementedError(command.command);
+      return handleFastForwardPostseason(command, context);
     case 'submit-season-block':
       throw new SeasonRunCommandNotImplementedError(
         'submit-season-block is handled by the block pipeline, not the run command dispatch',

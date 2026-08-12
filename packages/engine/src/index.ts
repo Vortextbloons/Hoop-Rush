@@ -63,7 +63,7 @@ export {
 } from './season/schedule.ts';
 export { reduceSeasonStandings, auditSeasonStandings } from './season/standings.ts';
 // FROZEN postseason-v1 state machine (M2.6 replaced the v1 contract with
-// postseason-v2; the v2 machine lands in a later M2.6 phase).
+// postseason-v2; the v1 machine stays readable for legacy v1 artifacts).
 export {
   setPlayInRankings,
   submitPlayInGame,
@@ -75,6 +75,56 @@ export {
   type PlayInGameResult,
   type PlayoffGameResult,
 } from './season/postseason-legacy.ts';
+// Season Run (2.0 M2.6) authoritative regular-season tiebreak ranking:
+// ranks all 15 teams of both conferences from the saved standings facts
+// with the published NBA tiebreak sequence and records every applied
+// criterion as a deterministic tie-resolution trace.
+export {
+  rankSeasonPostseason,
+  type SeasonConferenceRanking,
+  type SeasonPostseasonRankings,
+} from './season/tiebreakers.ts';
+// Season Run (2.0 M2.6) postseason-v2 state machine: Play-In resolution,
+// the fixed 16-team best-of-seven bracket with 2-2-1-1-1 home pattern, the
+// deterministic Finals home-court decision, per-game postseason summaries,
+// and the injury/rehab/forfeit paths.
+export {
+  SEASON_POSTSEASON_RISKY_REHAB_COST,
+  POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
+  seasonPostseasonSetRankings,
+  seasonPostseasonNextGame,
+  seasonPostseasonUpcomingGames,
+  seasonPostseasonGameTeamsOf,
+  seasonPostseasonHumanPlaysGame,
+  seasonPostseasonHumanEliminated,
+  seasonPostseasonApplyGameResult,
+  decideSeasonFinalsHomeCourt,
+  seasonPostseasonStageOf,
+  rollPostseasonInjuryForPlayer,
+  rollPostseasonRehabOutcome,
+  defaultSeasonPostseasonGameResolver,
+  zeroSeasonGameTransition,
+  simulateSeasonPostseasonGame,
+  seasonPostseasonSummaryFromGame,
+  SeasonPostseasonInvariantError,
+  type SeasonPostseasonRankingsInput,
+  type SeasonPostseasonRankingsFn,
+  type SeasonPostseasonNextGame,
+  type SeasonPostseasonGameFacts,
+  type SeasonPostseasonGameResolver,
+  type SeasonPostseasonGameOutcome,
+  type SeasonPostseasonGameSimulationInput,
+} from './season/postseason.ts';
+// Season Run (2.0 M2.6) awards: MVP, Defensive Player of the Year, Sixth
+// Man of the Year, and All-League First Team, derived from recorded
+// regular-season facts with the transparent composite and availability
+// factor, plus the deterministic self-consistent digest.
+export {
+  deriveSeasonAwards,
+  SEASON_AWARD_MIN_GAME_SHARE,
+  SEASON_AWARD_FULL_SEASON_GAMES,
+  type SeasonAwardsInput,
+} from './season/awards.ts';
 // Season Run (2.0 M2.1) ten-player draft, roster legality, AI generation,
 // rotations, and generation digests.
 export {

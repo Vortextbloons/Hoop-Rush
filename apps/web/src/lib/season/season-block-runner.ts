@@ -1,5 +1,7 @@
 ﻿import type {
+  SeasonAcceptedBlock,
   SeasonCandidateCheckpoint,
+  SeasonCheckpointState,
   SeasonDraftCatalog,
   SeasonEffectsState,
   SeasonGameSummary,
@@ -14,22 +16,29 @@
   SeasonRun,
 } from '@hoop-rush/data-contracts';
 import {
+  seasonAcceptedBlockSchema,
   seasonWorkerCancelRequestSchema,
   seasonWorkerContinueRequestSchema,
   seasonWorkerMessageSchema,
   seasonWorkerStartRequestSchema,
+  seasonWorkerWarmRequestSchema,
   type SeasonScoreline,
   type SeasonWorkerContinueRequest,
   type SeasonWorkerStartRequest,
 } from '@hoop-rush/data-contracts';
 import {
   completeSeasonBlockCommit,
+  reconstructSeasonGames,
   seasonCheckpointDigest,
   seasonFranchiseLegalFiveFacts,
   seasonNextBlockIndex,
   seasonRotationSetDigest,
 } from '@hoop-rush/engine';
-import type { SeasonRunRepository, SeasonWindowOpenResult } from '@hoop-rush/persistence';
+import type {
+  SeasonRunRepository,
+  SeasonRunSnapshot,
+  SeasonWindowOpenResult,
+} from '@hoop-rush/persistence';
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import type { SeasonArtifactUrls } from './season-assets';
 
@@ -63,7 +72,19 @@ export type SeasonRunnerEvent =
       latestGameId: string | null;
       latestResult: SeasonScoreline | null;
     }
-  | { type: 'complete'; requestId: string; checkpoint: SeasonCandidateCheckpoint }
+  | {
+      type: 'complete';
+      requestId: string;
+      checkpoint: SeasonCandidateCheckpoint;
+      /**
+       * Performance pass: the authoritative in-memory committed snapshot
+       * (post-commit run, summaries, retained details, accepted blocks,
+       * effects). Built from the exact facts the IndexedDB transaction
+       * stored, so the hub can render immediately without a full
+       * `loadActiveRun()` reload + reconciliation audit.
+       */
+      snapshot: SeasonRunSnapshot;
+    }
   | {
       type: 'interrupted';
       requestId: string;
@@ -133,6 +154,13 @@ export interface SeasonBlockRunner {
   cancel(requestId: string): void;
   /** Tears down the worker immediately (route change / full abort). */
   terminate(): void;
+  /**
+   * Performance pass: prewarms the persistent worker's packaged asset
+   * caches (catalog + era profile) so the first block start pays no
+   * download/parse time. Idempotent and non-blocking; safe to call from an
+   * idle callback after the shell is interactive. Never starts a block.
+   */
+  prewarm(): void;
   subscribe(listener: (event: SeasonRunnerEvent) => void): () => void;
 }
 
@@ -158,6 +186,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
   const listeners = new Set<(event: SeasonRunnerEvent) => void>();
   let worker: Worker | null = null;
   let currentRequestId: string | null = null;
+  /** Performance pass: the in-flight prewarm request id (warm-ack matching). */
+  let warmRequestId: string | null = null;
+  /** Performance pass: prewarm only runs once per worker lifetime. */
+  let warmed = false;
   let current: {
     blockIndex: number;
     expectedRevision: number;
@@ -181,6 +213,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     completedRounds: number;
     commandIds: Set<string>;
     summaries: SeasonGameSummary[];
+    /** Accepted blocks of every commit (revision ascending). */
+    blocks: SeasonAcceptedBlock[];
+    /** Retained details of every commit (gameId ascending). */
+    retainedDetails: SeasonRetainedGameDetail[];
     /** Authoritative pre-block effects state for the next block. */
     effects: SeasonEffectsState | null;
     /** Authoritative pre-block health state for the next block. */
@@ -267,7 +303,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     });
     worker.addEventListener('message', (event: MessageEvent<unknown>) => {
       const parsed = seasonWorkerMessageSchema.safeParse(event.data);
-      if (!parsed.success || parsed.data.requestId !== currentRequestId) return;
+      if (!parsed.success) return;
+      // Performance pass: a warm-ack confirms the worker cached the packaged
+      // assets; it carries its own request id and never touches block state.
+      if (parsed.data.type === 'season-block-warm-ack') {
+        if (parsed.data.requestId === warmRequestId) warmRequestId = null;
+        return;
+      }
+      if (parsed.data.requestId !== currentRequestId) return;
       const message = parsed.data;
       if (current === null) return;
       if (message.type === 'season-block-progress') {
@@ -324,24 +367,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     if (checkpoint.expectedStateDigest !== input.run.stateDigest) {
       failures.push('candidate expectedStateDigest does not match the run state');
     }
-  }
-
-  function objectivesWithSuccess(
-    input: SeasonBlockStartInput,
-    checkpoint: SeasonCandidateCheckpoint,
-  ): SeasonObjectiveState {
-    if (checkpoint.blockIndex === 8) return input.run.objectives;
-    const selection = input.run.objectives.selections[checkpoint.blockIndex];
-    if (selection === undefined) {
-      throw new Error(`no objective selection recorded for block ${String(checkpoint.blockIndex)}`);
-    }
-    return {
-      ...input.run.objectives,
-      selections: {
-        ...input.run.objectives.selections,
-        [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective.success },
-      },
-    };
   }
 
   async function acceptCandidate(checkpoint: SeasonCandidateCheckpoint): Promise<void> {
@@ -412,7 +437,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         ...(state.resumePending?.retainedDetails ?? []),
         ...checkpoint.retainedDetails,
       ]);
-      const objectives = objectivesWithSuccess(state.input, checkpoint);
+      const objectives = objectivesWithSuccess(state.input.run, checkpoint);
       await repository.commitSeasonBlock({
         runId: checkpoint.runId,
         revision: checkpoint.revision + 1,
@@ -443,6 +468,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       // The commit is authoritative: keep the in-memory cursor and the
       // worker's summary accumulator in sync so the next block starts and
       // ships deltas without a repository load.
+      const priorSummaries = runState?.runId === checkpoint.runId ? runState.summaries : [];
+      const priorAcceptedBlocks = runState?.runId === checkpoint.runId ? runState.blocks : [];
+      const priorRetainedDetails =
+        runState?.runId === checkpoint.runId ? runState.retainedDetails : [];
       if (runState === null || runState.runId !== checkpoint.runId) {
         runState = {
           runId: checkpoint.runId,
@@ -450,6 +479,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           completedRounds: checkpoint.completedRounds,
           commandIds: new Set(),
           summaries: [],
+          blocks: [],
+          retainedDetails: [],
           effects: checkpoint.effects,
           health: checkpoint.health,
           stateRevision: state.input.run.stateRevision,
@@ -461,13 +492,30 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       runState.commandIds.add(state.commandId);
       runState.summaries = [...runState.summaries, ...checkpoint.gameSummaries];
       runState.effects = window !== null ? window.effects : checkpoint.effects;
-      runState.health = checkpoint.health;
+      runState.health = window !== null ? window.health : checkpoint.health;
       runState.stateRevision = committed.stateRevision;
       runState.stateDigest = committed.stateDigest;
       workerSummaryRunId = checkpoint.runId;
       workerSummaryCount = runState.summaries.length;
       workerRosterKey = JSON.stringify(state.input.run.rosters);
-      emit({ type: 'complete', requestId, checkpoint });
+      // Performance pass: assemble the authoritative committed snapshot from
+      // the exact stored facts so the hub renders without a full reload.
+      const snapshot = assembleCommittedSnapshot({
+        run: state.input.run,
+        rotations: state.rotations,
+        checkpoint,
+        commandId: state.commandId,
+        rotationDigest: state.rotationDigest,
+        window,
+        checkpointState: committed.checkpointState,
+        stateRevision: committed.stateRevision,
+        stateDigest: committed.stateDigest,
+        schedule: await resolveSchedule(),
+        priorSummaries,
+        priorAcceptedBlocks,
+        priorRetainedDetails,
+      });
+      emit({ type: 'complete', requestId, checkpoint, snapshot });
     } catch (error) {
       emit({
         type: 'error',
@@ -723,6 +771,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               completedRounds: snapshot.run.cursor.completedRounds,
               commandIds: new Set(snapshot.acceptedBlocks.map((block) => block.commandId)),
               summaries: snapshot.summaries,
+              blocks: [...snapshot.acceptedBlocks],
+              retainedDetails: [...snapshot.retainedDetails],
               effects: snapshot.effects,
               health: snapshot.run.health,
               stateRevision: snapshot.run.stateRevision,
@@ -814,6 +864,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               completedRounds: snapshot.run.cursor.completedRounds,
               commandIds: new Set(snapshot.acceptedBlocks.map((block) => block.commandId)),
               summaries: snapshot.summaries,
+              blocks: [...snapshot.acceptedBlocks],
+              retainedDetails: [...snapshot.retainedDetails],
               effects: snapshot.effects,
               health: snapshot.run.health,
               stateRevision: snapshot.run.stateRevision,
@@ -886,12 +938,53 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       worker = null;
       currentRequestId = null;
       current = null;
+      warmRequestId = null;
+      warmed = false;
       // A fresh worker holds no summary state; the next start re-sends the
       // full prior summaries. The in-memory run cursor survives (keyed by
       // runId) so resumed blocks still avoid a repository load.
       workerSummaryRunId = null;
       workerSummaryCount = 0;
       workerRosterKey = null;
+    },
+
+    /**
+     * Performance pass: prewarms the persistent worker's packaged asset
+     * caches from an idle callback. Safe to call any time; no-ops while a
+     * block is running, once already warmed, or when assets are missing.
+     */
+    prewarm(): void {
+      if (currentRequestId !== null || warmed) return;
+      warmed = true;
+      void (async () => {
+        try {
+          const artifacts =
+            deps.artifacts !== undefined
+              ? await deps.artifacts()
+              : await import('./season-assets').then((module) => module.seasonArtifactUrls());
+          // A block can start while the warm artifacts resolve; re-check (the
+          // type-level narrowing is stale across the await).
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          if (currentRequestId !== null) return;
+          const target = createWorker();
+          const requestId = `warm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+          warmRequestId = requestId;
+          target.postMessage(
+            seasonWorkerWarmRequestSchema.parse({
+              schemaVersion: 5,
+              type: 'season-block-warm',
+              requestId,
+              catalogUrl: artifacts.catalogUrl,
+              catalogHash: artifacts.catalogHash,
+              profileUrl: artifacts.profileUrl,
+              profileHash: artifacts.profileHash,
+            }),
+          );
+        } catch {
+          // Warm is best-effort; the first block start re-attempts the loads.
+          warmRequestId = null;
+        }
+      })();
     },
 
     subscribe(listener: (event: SeasonRunnerEvent) => void): () => void {
@@ -912,6 +1005,101 @@ function dedupeByGameId(details: SeasonRetainedGameDetail[]): SeasonRetainedGame
     result.push(detail);
   }
   return result;
+}
+
+/**
+ * Performance pass: assembles the authoritative post-commit snapshot from
+ * the EXACT facts the IndexedDB commit stored (locked rotations, window
+ * mutations, committed state chain), plus the reconstructed finalized game
+ * records from the schedule. Both the real runner and the e2e fake runner
+ * emit it inside the `complete` event so the hub renders immediately after
+ * the successful transaction instead of re-reading the whole run.
+ */
+export function assembleCommittedSnapshot(input: {
+  run: SeasonRun;
+  /** The rotations locked by this block (the human's pending set included). */
+  rotations: SeasonRotation[];
+  checkpoint: SeasonCandidateCheckpoint;
+  commandId: string;
+  rotationDigest: string;
+  window: SeasonWindowOpenResult | null;
+  checkpointState: SeasonCheckpointState;
+  stateRevision: number;
+  stateDigest: string;
+  schedule: SeasonSchedule;
+  /** Summaries of every earlier block (excludes this block's). */
+  priorSummaries: SeasonGameSummary[];
+  /** Accepted blocks of every earlier commit (excludes this one). */
+  priorAcceptedBlocks: SeasonAcceptedBlock[];
+  /** Retained details of earlier blocks; the block's own are merged in. */
+  priorRetainedDetails: SeasonRetainedGameDetail[];
+}): SeasonRunSnapshot {
+  const { run, rotations, checkpoint, window, schedule } = input;
+  const objectives = objectivesWithSuccess(run, checkpoint);
+  const postCommitRun: SeasonRun = {
+    ...run,
+    // The commit stores the window-mutated roster/ownership when a window
+    // opened, else the snapshot's own; rotations are always the locked set
+    // (window repairs notwithstanding).
+    rosters: window !== null ? window.rosters : run.rosters,
+    ownership: window !== null ? window.ownership : run.ownership,
+    rotations: window !== null ? window.rotations : rotations,
+    cursor: { schemaVersion: 1, completedRounds: checkpoint.completedRounds },
+    standings: checkpoint.standings,
+    health: window !== null ? window.health : checkpoint.health,
+    influence: window !== null ? window.influence : checkpoint.influence,
+    transactions: window !== null ? window.transactions : checkpoint.transactions,
+    trade: window !== null ? window.trade : run.trade,
+    objectives,
+    checkpointState: input.checkpointState,
+    stateRevision: input.stateRevision,
+    stateDigest: input.stateDigest,
+  };
+  const summaries = [...input.priorSummaries, ...checkpoint.gameSummaries];
+  const retainedDetails = dedupeByGameId([
+    ...input.priorRetainedDetails,
+    ...checkpoint.retainedDetails,
+  ]);
+  const acceptedBlock = seasonAcceptedBlockSchema.parse({
+    runId: checkpoint.runId,
+    blockIndex: checkpoint.blockIndex,
+    completedRounds: checkpoint.completedRounds,
+    revision: checkpoint.revision + 1,
+    commandId: input.commandId,
+    rotationDigest: input.rotationDigest,
+    checkpointDigest: checkpoint.digest,
+    summaryCount: checkpoint.gameSummaries.length,
+    stateRevision: input.stateRevision,
+    stateDigest: input.stateDigest,
+  });
+  return {
+    run: { ...postCommitRun, games: reconstructSeasonGames(schedule, summaries) },
+    summaries: [...summaries].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
+    retainedDetails: retainedDetails.sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
+    acceptedBlocks: [...input.priorAcceptedBlocks, acceptedBlock].sort(
+      (a, b) => a.revision - b.revision,
+    ),
+    effects: window !== null ? window.effects : checkpoint.effects,
+  };
+}
+
+/** The engine's per-block objective-success fold (mirror of the commit path;
+ * a missing selection keeps the objectives unchanged, matching the engine's
+ * `objectivesWithBlockSuccess` so fake-runner checkpoints assemble too). */
+function objectivesWithSuccess(
+  run: SeasonRun,
+  checkpoint: SeasonCandidateCheckpoint,
+): SeasonObjectiveState {
+  if (checkpoint.blockIndex === 8) return run.objectives;
+  const selection = run.objectives.selections[checkpoint.blockIndex];
+  if (selection === undefined) return run.objectives;
+  return {
+    ...run.objectives,
+    selections: {
+      ...run.objectives.selections,
+      [checkpoint.blockIndex]: { ...selection, success: checkpoint.objective.success },
+    },
+  };
 }
 
 /**

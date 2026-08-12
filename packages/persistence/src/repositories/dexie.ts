@@ -28,6 +28,8 @@ import type {
   StoredSeasonCompletedRunRow,
   StoredSeasonDetailRow,
   StoredSeasonPendingBlockRow,
+  StoredSeasonPlayerSliceRow,
+  StoredSeasonPostseasonDetailRow,
   StoredSeasonPostseasonSummaryRow,
   StoredSeasonRunRecord,
   StoredSeasonSummaryRow,
@@ -66,6 +68,8 @@ export class HoopRushDatabase extends Dexie {
   seasonPendingBlocks!: EntityTable<StoredSeasonPendingBlockRow, 'runId'>;
   /** M2.6: one postseason game summary per row, keyed [runId+gameId]. */
   seasonPostseasonSummaries!: Table<StoredSeasonPostseasonSummaryRow, [string, string]>;
+  /** M2.6: one retained postseason game detail per row, keyed [runId+gameId]. */
+  seasonPostseasonDetails!: Table<StoredSeasonPostseasonDetailRow, [string, string]>;
   /** M2.6: one accepted command per row, append-only, keyed [runId+ordinal]. */
   seasonCommandLog!: Table<StoredSeasonCommandLogRow, [string, number]>;
   /** M2.6: one promoted almanac per completed season, keyed by runId. */
@@ -74,6 +78,8 @@ export class HoopRushDatabase extends Dexie {
   seasonCompletedRuns!: EntityTable<StoredSeasonCompletedRunRow, 'runId'>;
   /** M2.6: completed-season history index, keyed by runId. */
   seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
+  /** Performance pass: one compact per-run player presentation/simulation slice, keyed by runId. */
+  seasonRunPlayerSlices!: EntityTable<StoredSeasonPlayerSliceRow, 'runId'>;
 
   constructor() {
     super('hoop-rush-saves');
@@ -149,6 +155,82 @@ export class HoopRushDatabase extends Dexie {
     // saves stay untouched, so no upgrade hook is needed. Save-schema-v1-v5
     // rows (pre-M2.6 runs) surface through the typed incompatibility flow;
     // they are never migrated.
+    this.version(9)
+      .stores({
+        seasonRuns: 'recordId',
+        // Performance pass: summary rows gain the [runId+blockIndex] composite
+        // index (block summary reads and block-scoped deletes no longer scan);
+        // runId indexes remain for lifecycle cleanup.
+        seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+        seasonRunDetails: '[runId+gameId], runId',
+        seasonRunBlocks: '[runId+blockIndex], runId',
+        seasonRunIndex: 'recordId',
+        seasonPendingBlocks: 'runId',
+        seasonPostseasonSummaries: '[runId+gameId], runId',
+        seasonCommandLog: '[runId+ordinal], runId',
+        seasonAlmanacs: 'runId',
+        seasonCompletedRuns: 'runId',
+        seasonCompletedIndex: 'recordId, completedAtIso',
+        // Performance pass: one compact per-run player presentation slice.
+        seasonRunPlayerSlices: 'runId',
+      })
+      .upgrade(async (tx) => {
+        // Performance pass reset: Season Run rows written before this schema
+        // were assembled with different runtime assumptions (eager catalog
+        // joins, per-block summary scans, no player slice). All Season Run
+        // tables are cleared atomically so old saves cannot leak partial rows;
+        // Challenge (`active`/`activeGames`/`completed`/`history`) and Classic
+        // (`classicDrafts`) stores are untouched.
+        await tx.table('seasonRuns').clear();
+        await tx.table('seasonRunSummaries').clear();
+        await tx.table('seasonRunDetails').clear();
+        await tx.table('seasonRunBlocks').clear();
+        await tx.table('seasonRunIndex').clear();
+        await tx.table('seasonPendingBlocks').clear();
+        await tx.table('seasonPostseasonSummaries').clear();
+        await tx.table('seasonCommandLog').clear();
+        await tx.table('seasonAlmanacs').clear();
+        await tx.table('seasonCompletedRuns').clear();
+        await tx.table('seasonCompletedIndex').clear();
+      });
+    this.version(10)
+      .stores({
+        seasonRuns: 'recordId',
+        seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+        seasonRunDetails: '[runId+gameId], runId',
+        seasonRunBlocks: '[runId+blockIndex], runId',
+        seasonRunIndex: 'recordId',
+        seasonPendingBlocks: 'runId',
+        seasonPostseasonSummaries: '[runId+gameId], runId',
+        // M2.6: one retained postseason game detail per row, keyed [runId+gameId].
+        seasonPostseasonDetails: '[runId+gameId], runId',
+        seasonCommandLog: '[runId+ordinal], runId',
+        seasonAlmanacs: 'runId',
+        seasonCompletedRuns: 'runId',
+        seasonCompletedIndex: 'recordId, completedAtIso',
+        seasonRunPlayerSlices: 'runId',
+      })
+      .upgrade(async (tx) => {
+        // Postseason-details reset: Season Run rows written before this schema
+        // predate the retained postseason detail rows (and their runtime
+        // assumptions), so the full Season Run set — INCLUDING the new details
+        // table — is cleared atomically, mirroring the v9 reset. Old saves
+        // cannot leak partial rows into the new detail store; Challenge and
+        // Classic stores are untouched.
+        await tx.table('seasonRuns').clear();
+        await tx.table('seasonRunSummaries').clear();
+        await tx.table('seasonRunDetails').clear();
+        await tx.table('seasonRunBlocks').clear();
+        await tx.table('seasonRunIndex').clear();
+        await tx.table('seasonPendingBlocks').clear();
+        await tx.table('seasonPostseasonSummaries').clear();
+        await tx.table('seasonPostseasonDetails').clear();
+        await tx.table('seasonCommandLog').clear();
+        await tx.table('seasonAlmanacs').clear();
+        await tx.table('seasonCompletedRuns').clear();
+        await tx.table('seasonCompletedIndex').clear();
+        await tx.table('seasonRunPlayerSlices').clear();
+      });
   }
 }
 

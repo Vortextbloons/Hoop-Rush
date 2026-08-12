@@ -24,6 +24,7 @@ import {
   type SeasonWorkerErrorMessage,
   type SeasonWorkerProgressMessage,
   type SeasonWorkerStartRequest,
+  type SeasonWorkerWarmAckMessage,
 } from '@hoop-rush/data-contracts';
 import {
   assembleSeasonBlockCandidate,
@@ -130,7 +131,11 @@ function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStar
 }
 
 function post(
-  message: SeasonWorkerProgressMessage | SeasonWorkerCompleteMessage | SeasonWorkerErrorMessage,
+  message:
+    | SeasonWorkerProgressMessage
+    | SeasonWorkerCompleteMessage
+    | SeasonWorkerErrorMessage
+    | SeasonWorkerWarmAckMessage,
 ): void {
   // The main thread parses every message at its boundary, so the worker does
   // not re-parse the ≤ 2 MB complete message it just assembled.
@@ -550,6 +555,29 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     return;
   }
   const request = parsed.data;
+  if (request.type === 'season-block-warm') {
+    // Performance pass: preload and cache the packaged catalog and era
+    // profile so the first block start pays no download/parse time. No
+    // simulation state is touched; the ack lets the runner know the worker
+    // is ready without racing a concurrent block start (onmessage is
+    // sequential, and the cached assets make a concurrent start instant).
+    void (async () => {
+      try {
+        await Promise.all([
+          loadCatalogCached(request.catalogUrl, request.catalogHash),
+          loadProfileCached(request.profileUrl, request.profileHash),
+        ]);
+        post({
+          schemaVersion: 5,
+          type: 'season-block-warm-ack',
+          requestId: request.requestId,
+        });
+      } catch (error) {
+        postError(request.requestId, 'internal', `worker prewarm failed: ${errorMessage(error)}`);
+      }
+    })();
+    return;
+  }
   if (request.type === 'season-block-cancel') {
     if (request.requestId === currentRequestId) {
       cancelled = true;

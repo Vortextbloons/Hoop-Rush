@@ -228,6 +228,8 @@ describe('season block recap (M2.3)', () => {
       playerVersionId: 'pv-x',
       franchiseId: 'lakers',
       gamesPlayed: 0,
+      appearances: 0,
+      started: 0,
       seconds: 0,
       points: 0,
       fieldGoalsMade: 0,

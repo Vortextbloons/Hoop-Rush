@@ -130,11 +130,14 @@
 
 <div class="mt-3 flex flex-col gap-3 md:hidden" data-season-player-stats-mobile>
   <div class="flex flex-col gap-2">
-    <label class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+    <label
+      class="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
+    >
       Sort by
       <select
         value={sortKey}
-        onchange={(event) => onSort((event.currentTarget as HTMLSelectElement).value as SeasonPlayerStatsSortKey)}
+        onchange={(event) =>
+          onSort((event.currentTarget as HTMLSelectElement).value as SeasonPlayerStatsSortKey)}
         class="mt-1 min-h-11 w-full rounded-lg bg-surface-2 px-3 py-2 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {#each mobileSortOptions as option (option.key)}
@@ -152,7 +155,9 @@
     </button>
   </div>
 
-  <ul class="flex flex-col divide-y divide-border/60 overflow-hidden rounded-xl border border-border/40 bg-surface-1">
+  <ul
+    class="flex flex-col divide-y divide-border/60 overflow-hidden rounded-xl border border-border/40 bg-surface-1"
+  >
     {#each rows as row (row.playerVersionId)}
       {@const face = faceOf(row.playerVersionId)}
       {@const eraLabel = eraLabelOf(row.playerVersionId, row.franchiseId, row.eraId)}

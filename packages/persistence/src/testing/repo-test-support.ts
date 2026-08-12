@@ -11,6 +11,8 @@ import type {
   StoredSeasonCompletedRunRow,
   StoredSeasonDetailRow,
   StoredSeasonPendingBlockRow,
+  StoredSeasonPlayerSliceRow,
+  StoredSeasonPostseasonDetailRow,
   StoredSeasonPostseasonSummaryRow,
   StoredSeasonRunRecord,
   StoredSeasonSummaryRow,
@@ -45,10 +47,12 @@ export class TestDatabase extends Dexie {
   seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
   seasonPendingBlocks!: EntityTable<StoredSeasonPendingBlockRow, 'runId'>;
   seasonPostseasonSummaries!: Table<StoredSeasonPostseasonSummaryRow, [string, string]>;
+  seasonPostseasonDetails!: Table<StoredSeasonPostseasonDetailRow, [string, string]>;
   seasonCommandLog!: Table<StoredSeasonCommandLogRow, [string, number]>;
   seasonAlmanacs!: EntityTable<StoredSeasonAlmanacRow, 'runId'>;
   seasonCompletedRuns!: EntityTable<StoredSeasonCompletedRunRow, 'runId'>;
   seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
+  seasonRunPlayerSlices!: EntityTable<StoredSeasonPlayerSliceRow, 'runId'>;
 
   constructor(name: string) {
     super(name);
@@ -76,6 +80,35 @@ export class TestDatabase extends Dexie {
       seasonAlmanacs: 'runId',
       seasonCompletedRuns: 'runId',
       seasonCompletedIndex: 'recordId, completedAtIso',
+    });
+    this.version(9).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
+    });
+    this.version(10).stores({
+      seasonRuns: 'recordId',
+      seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
+      seasonRunDetails: '[runId+gameId], runId',
+      seasonRunBlocks: '[runId+blockIndex], runId',
+      seasonRunIndex: 'recordId',
+      seasonPendingBlocks: 'runId',
+      seasonPostseasonSummaries: '[runId+gameId], runId',
+      seasonPostseasonDetails: '[runId+gameId], runId',
+      seasonCommandLog: '[runId+ordinal], runId',
+      seasonAlmanacs: 'runId',
+      seasonCompletedRuns: 'runId',
+      seasonCompletedIndex: 'recordId, completedAtIso',
+      seasonRunPlayerSlices: 'runId',
     });
   }
 }

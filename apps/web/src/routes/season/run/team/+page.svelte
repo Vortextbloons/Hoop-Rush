@@ -26,10 +26,12 @@
   import { humanInjuryTimeline } from '$lib/season/season-health-view';
   import { humanSeasonPlayerStats } from '$lib/season/season-player-stats-view';
   import {
-    overallRatingOf,
-    playablePositionsOf,
-    summaryRatingsOf,
-  } from '$lib/season/season-catalog-index';
+    durabilityRatingOfSlice,
+    overallRatingOfSlice,
+    playablePositionsOfSlice,
+    staminaRatingOfSlice,
+    summaryRatingsOfSlice,
+  } from '$lib/season/season-player-slice';
 
   /**
    * Season Run team tab (M2.3.5, M2.4, M2.5): the unified rotation
@@ -72,11 +74,11 @@
   );
 
   const overallByVersion = $derived.by(() => {
-    const catalog = shell.catalog;
-    if (catalog === null) return null;
+    const slice = shell.playerSlice;
+    if (shell.playerSliceReady && slice.size === 0) return new SvelteMap<string, number>();
     const map = new SvelteMap<string, number>();
-    for (const candidate of catalog.candidates) {
-      map.set(candidate.playerVersionId, candidate.summaryRatings.overallRating);
+    for (const entry of slice.values()) {
+      map.set(entry.playerVersionId, entry.summaryRatings.overallRating);
     }
     return map;
   });
@@ -87,26 +89,22 @@
       : null,
   );
 
-  /** Optimize-with-projection inputs: ten load rows from catalog stamina/
-   * durability and the recorded effects state, and the upcoming-block
-   * horizon from the run cursor. */
+  /** Optimize-with-projection inputs: ten load rows from the compact player
+   * slice stamina/durability and the recorded effects state, and the
+   * upcoming-block horizon from the run cursor. */
   const optimizeLoad = $derived.by(() => {
-    const catalog = shell.catalog;
+    const slice = shell.playerSlice;
     const editor = shell.editor;
-    if (catalog === null || editor === null) return null;
-    const candidateByVersion = new SvelteMap(
-      catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
-    );
+    if (!shell.playerSliceReady || editor === null) return null;
     const loadByVersion = new SvelteMap(
       (shell.snapshot?.effects?.playerStates ?? []).map((state) => [state.playerVersionId, state]),
     );
     return [...editor.rotation.starters, ...editor.rotation.benchOrder].map((playerVersionId) => {
-      const candidate = candidateByVersion.get(playerVersionId);
       const load = loadByVersion.get(playerVersionId);
       return {
         playerVersionId,
-        staminaRating: candidate?.stamina.rating ?? 70,
-        durability: candidate?.durability.rating ?? 70,
+        staminaRating: staminaRatingOfSlice(slice, playerVersionId) ?? 70,
+        durability: durabilityRatingOfSlice(slice, playerVersionId) ?? 70,
         fatigueBasisPoints: load?.fatigueBasisPoints ?? 0,
         recentLoadBasisPoints: load?.recentLoadBasisPoints ?? 0,
       };
@@ -170,15 +168,15 @@
   const teamProjection = $derived.by(() => {
     const run = shell.run;
     const humanId = shell.humanFranchiseId;
-    const catalog = shell.catalog;
-    if (run === null || humanId === null || catalog === null) return null;
+    const slice = shell.playerSlice;
+    if (run === null || humanId === null || !shell.playerSliceReady) return null;
     const lockedRoster = run.rosters.find((entry) => entry.franchiseId === humanId);
     const lockedRotation = run.rotations.find((entry) => entry.franchiseId === humanId);
     if (lockedRoster === undefined || lockedRotation === undefined) return null;
     return seasonTeamRatings({
       roster: lockedRoster,
       rotation: lockedRotation,
-      summaryRatingsOf: (playerVersionId) => summaryRatingsOf(catalog, playerVersionId),
+      summaryRatingsOf: (playerVersionId) => summaryRatingsOfSlice(slice, playerVersionId),
     });
   });
 
@@ -209,11 +207,12 @@
 
   const statsView = $derived.by(() => {
     if (roster === null || humanFranchiseId === null) return null;
+    const slice = shell.playerSlice;
     return humanSeasonPlayerStats({
       roster,
       summaries: shell.snapshot?.summaries ?? [],
-      overallRatingOf: (playerVersionId) => overallRatingOf(shell.catalog, playerVersionId),
-      playablePositions: (playerVersionId) => playablePositionsOf(shell.catalog, playerVersionId),
+      overallRatingOf: (playerVersionId) => overallRatingOfSlice(slice, playerVersionId),
+      playablePositions: (playerVersionId) => playablePositionsOfSlice(slice, playerVersionId),
     });
   });
 

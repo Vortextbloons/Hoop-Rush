@@ -78,6 +78,13 @@ export const seasonPlayerAggregateSchema = z.object({
   /** Owning franchise of this version (ownership is exclusive). */
   franchiseId: franchiseIdSchema,
   gamesPlayed: z.number().int().nonnegative(),
+  /**
+   * M2.6 awards facts: games with recorded on-court seconds greater than
+   * zero (a zero-second line is not an appearance).
+   */
+  appearances: z.number().int().nonnegative(),
+  /** Games the player was in the actual opening lineup (from the first period-1 stint). */
+  started: z.number().int().nonnegative(),
   seconds: z.number().int().nonnegative(),
   points: z.number().int().nonnegative(),
   fieldGoalsMade: z.number().int().nonnegative(),
@@ -108,6 +115,8 @@ export function emptySeasonPlayerAggregate(
     playerVersionId,
     franchiseId,
     gamesPlayed: 0,
+    appearances: 0,
+    started: 0,
     seconds: 0,
     points: 0,
     fieldGoalsMade: 0,

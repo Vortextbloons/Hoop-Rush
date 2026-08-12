@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
+import { postseasonGameIdSchema } from './season-postseason.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { SEASON_HEALTH_VERSION } from './season-versions.ts';
 
@@ -64,8 +65,13 @@ export const seasonInjuryRecordSchema = z.object({
   injuryId: injuryIdSchema,
   playerVersionId: playerVersionIdSchema,
   franchiseId: franchiseIdSchema,
-  /** The game the injury occurred in (stable scheduled-game id). */
-  gameId: seasonGameIdSchema,
+  /**
+   * The game the injury occurred in. M2.6: postseason injuries record the
+   * real postseason game id (`pi-...` / `po-...`); regular-season injuries
+   * record the stable scheduled-game id. The availability derivation is
+   * player-scoped, so either id type derives identically.
+   */
+  gameId: z.union([seasonGameIdSchema, postseasonGameIdSchema]),
   type: seasonInjuryTypeSchema,
   severity: seasonInjurySeveritySchema,
   /** Occurred before halftime (eligible for the same-game-return roll). */

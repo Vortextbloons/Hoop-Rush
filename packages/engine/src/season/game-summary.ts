@@ -28,23 +28,27 @@ import {
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */
 
-function compactLineOf(player: {
-  playerVersionId: string;
-  seconds: number;
-  points: number;
-  fieldGoals: { made: number; attempted: number };
-  threes: { made: number; attempted: number };
-  freeThrows: { made: number; attempted: number };
-  rebounds: { offensive: number; defensive: number };
-  assists: number;
-  steals: number;
-  blocks: number;
-  turnovers: number;
-  fouls: number;
-}): SeasonCompactPlayerLine {
+function compactLineOf(
+  player: {
+    playerVersionId: string;
+    seconds: number;
+    points: number;
+    fieldGoals: { made: number; attempted: number };
+    threes: { made: number; attempted: number };
+    freeThrows: { made: number; attempted: number };
+    rebounds: { offensive: number; defensive: number };
+    assists: number;
+    steals: number;
+    blocks: number;
+    turnovers: number;
+    fouls: number;
+  },
+  started: boolean,
+): SeasonCompactPlayerLine {
   return {
     playerVersionId: player.playerVersionId,
     seconds: player.seconds,
+    started,
     points: player.points,
     fieldGoalsMade: player.fieldGoals.made,
     fieldGoalsAttempted: player.fieldGoals.attempted,
@@ -128,6 +132,26 @@ function zeroTeamBox(franchiseId: string): SeasonTeamBox {
 }
 
 /**
+ * The actual opening lineup of one side: the five players on the court at
+ * the first tipoff. The opening stint is the recorded period-1 stint with
+ * the latest start clock (largest `startSecondsRemaining`); when the
+ * simulation records no stints (defensive fallback), no player is a
+ * starter. M2.6 awards facts.
+ */
+function openingStartersOf(result: SeasonGameSimulationResult, side: 'home' | 'away'): Set<string> {
+  if (result.outcome !== 'completed') return new Set();
+  let opening: { startSecondsRemaining: number; players: readonly string[] } | null = null;
+  for (const stint of result.unitStints) {
+    if (stint.side !== side || stint.period !== 1) continue;
+    if (opening === null || stint.startSecondsRemaining > opening.startSecondsRemaining) {
+      opening = { startSecondsRemaining: stint.startSecondsRemaining, players: stint.players };
+    }
+  }
+  if (opening === null) return new Set();
+  return new Set(opening.players);
+}
+
+/**
  * Converts one simulation result plus its schedule game into a compact
  * summary. The schedule game is the source of identity (gameId, round,
  * home/away franchise); the result's side boxes carry the franchise ids and
@@ -187,8 +211,16 @@ export function seasonGameSummaryFromResult(
     forfeitLoserFranchiseId: null,
     homeBox: teamBoxOf(result.home),
     awayBox: teamBoxOf(result.away),
-    homePlayers: sortedLines(result.home.players.map((player) => compactLineOf(player))),
-    awayPlayers: sortedLines(result.away.players.map((player) => compactLineOf(player))),
+    homePlayers: sortedLines(
+      result.home.players.map((player) =>
+        compactLineOf(player, openingStartersOf(result, 'home').has(player.playerVersionId)),
+      ),
+    ),
+    awayPlayers: sortedLines(
+      result.away.players.map((player) =>
+        compactLineOf(player, openingStartersOf(result, 'away').has(player.playerVersionId)),
+      ),
+    ),
     ...(effectsTransition !== undefined && effectsTransition.evidence.length > 0
       ? { effectsRollup: seasonEffectsRollupFromEvidence(effectsTransition.evidence) }
       : {}),

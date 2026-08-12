@@ -638,6 +638,7 @@ function fixturePlayerLine(
   return {
     playerVersionId: playerVersionIdValue,
     seconds,
+    started: slot < 5,
     points: fieldGoalsMade * 2 + threePointersMade + freeThrowsMade,
     fieldGoalsMade,
     fieldGoalsAttempted,
@@ -890,6 +891,8 @@ export function foldPlayerAggregatesFixture(
     playerVersionId: playerVersionIdValue,
     franchiseId: ownerOf.get(playerVersionIdValue) ?? 'lakers',
     gamesPlayed: 0,
+    appearances: 0,
+    started: 0,
     seconds: 0,
     points: 0,
     fieldGoalsMade: 0,
@@ -921,6 +924,8 @@ export function foldPlayerAggregatesFixture(
         const row = totals.get(line.playerVersionId);
         if (row === undefined) continue;
         row.gamesPlayed += 1;
+        row.appearances += line.seconds > 0 ? 1 : 0;
+        row.started += line.started === true ? 1 : 0;
         row.seconds += line.seconds;
         row.points += line.points;
         row.fieldGoalsMade += line.fieldGoalsMade;

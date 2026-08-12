@@ -1,8 +1,16 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
   import { ArrowRight, ChevronRight, X } from '@lucide/svelte';
-  import type { HoopRushManifest, SeasonDraftCatalog, SeasonGameSummary } from '@hoop-rush/data-contracts';
-  import { tradeResolvedAt, type TradeOfferViewModel, type TradePlayerViewModel } from '$lib/season/season-trade-view';
+  import type {
+    HoopRushManifest,
+    SeasonDraftCatalog,
+    SeasonGameSummary,
+  } from '@hoop-rush/data-contracts';
+  import {
+    tradeResolvedAt,
+    type TradeOfferViewModel,
+    type TradePlayerViewModel,
+  } from '$lib/season/season-trade-view';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
   import { formatPositions } from '$lib/player-positions';
   import { overallRatingOf, playablePositionsOf } from '$lib/season/season-catalog-index';
@@ -115,7 +123,10 @@
   </div>
 
   {#if commandError}
-    <p role="alert" class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+    <p
+      role="alert"
+      class="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+    >
       {commandError}
     </p>
   {/if}
@@ -137,7 +148,9 @@
               <p class="text-sm font-semibold text-primary">You</p>
             </div>
             <div class="flex items-center gap-2">
-              <span class="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span
+                class="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+              >
                 {vm.tradeSizeLabel}
               </span>
               <span class="text-xs text-muted-foreground">{vm.statusLabel}</span>
@@ -200,7 +213,10 @@
                           <p class="mt-0.5 text-xs font-medium text-amber-400">{badge}</p>
                         {/if}
                       </div>
-                      <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <ChevronRight
+                        class="h-4 w-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
                     </button>
                   </li>
                 {/each}
@@ -258,7 +274,10 @@
                           <p class="mt-0.5 text-xs font-medium text-amber-400">{badge}</p>
                         {/if}
                       </div>
-                      <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <ChevronRight
+                        class="h-4 w-4 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
                     </button>
                   </li>
                 {/each}

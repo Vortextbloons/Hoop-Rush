@@ -26,13 +26,9 @@
     onClose: () => void;
   } = $props();
 
-  const candidate = $derived(
-    player === null ? null : candidateOf(catalog, player.playerVersionId),
-  );
+  const candidate = $derived(player === null ? null : candidateOf(catalog, player.playerVersionId));
   const eraLabel = $derived(
-    player === null
-      ? null
-      : eraIdentityOf(manifest, player.franchiseId, player.eraId).displayLabel,
+    player === null ? null : eraIdentityOf(manifest, player.franchiseId, player.eraId).displayLabel,
   );
 
   function pct(value: number | null): string {
@@ -89,12 +85,16 @@
             </span>
           {/if}
           {#if player.offenseRating !== null}
-            <span class="rounded-lg bg-surface-2 px-3 py-1.5 font-mono text-xs font-semibold text-muted-foreground">
+            <span
+              class="rounded-lg bg-surface-2 px-3 py-1.5 font-mono text-xs font-semibold text-muted-foreground"
+            >
               OFF {player.offenseRating}
             </span>
           {/if}
           {#if player.defenseRating !== null}
-            <span class="rounded-lg bg-surface-2 px-3 py-1.5 font-mono text-xs font-semibold text-muted-foreground">
+            <span
+              class="rounded-lg bg-surface-2 px-3 py-1.5 font-mono text-xs font-semibold text-muted-foreground"
+            >
               DEF {player.defenseRating}
             </span>
           {/if}
@@ -102,7 +102,9 @@
 
         {#if candidate?.anchors}
           <section class="mt-4">
-            <h3 class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            <h3
+              class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+            >
               Peak season
             </h3>
             <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
@@ -148,7 +150,9 @@
 
         {#if runStats !== null}
           <section class="mt-4 border-t border-border pt-4">
-            <h3 class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            <h3
+              class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+            >
               This season run
             </h3>
             <p class="mt-1 text-xs text-muted-foreground">
@@ -157,19 +161,27 @@
             <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
               <div>
                 <dt class="text-xs text-muted-foreground">MPG</dt>
-                <dd class="font-mono text-sm font-semibold">{oneDecimal(runStats.minutesPerGame)}</dd>
+                <dd class="font-mono text-sm font-semibold">
+                  {oneDecimal(runStats.minutesPerGame)}
+                </dd>
               </div>
               <div>
                 <dt class="text-xs text-muted-foreground">PPG</dt>
-                <dd class="font-mono text-sm font-semibold">{oneDecimal(runStats.pointsPerGame)}</dd>
+                <dd class="font-mono text-sm font-semibold">
+                  {oneDecimal(runStats.pointsPerGame)}
+                </dd>
               </div>
               <div>
                 <dt class="text-xs text-muted-foreground">RPG</dt>
-                <dd class="font-mono text-sm font-semibold">{oneDecimal(runStats.reboundsPerGame)}</dd>
+                <dd class="font-mono text-sm font-semibold">
+                  {oneDecimal(runStats.reboundsPerGame)}
+                </dd>
               </div>
               <div>
                 <dt class="text-xs text-muted-foreground">APG</dt>
-                <dd class="font-mono text-sm font-semibold">{oneDecimal(runStats.assistsPerGame)}</dd>
+                <dd class="font-mono text-sm font-semibold">
+                  {oneDecimal(runStats.assistsPerGame)}
+                </dd>
               </div>
               <div>
                 <dt class="text-xs text-muted-foreground">FG%</dt>
