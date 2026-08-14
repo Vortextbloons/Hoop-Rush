@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { SEASON_STAMINA_LEGACY_VERSION, SEASON_STAMINA_VERSION } from './season-versions.ts';
 
@@ -8,6 +9,17 @@ import { SEASON_STAMINA_LEGACY_VERSION, SEASON_STAMINA_VERSION } from './season-
  * load and per-pair shared-possession chemistry across games, applies
  * bounded effects through named possession mechanisms, and records the
  * evidence that explanations and calibration audits read.
+ *
+ * M2.6.5 (spec/2.0/15, season-chemistry-v2): the effects state is
+ * rotation-scoped. `playerStates` holds exactly 300 ACTIVE load records —
+ * one per locked rotation member — and `pairStates` exactly 1,350 ACTIVE
+ * canonical pairs (45 per ten-player rotation). Inactive depth owns
+ * `inactivePlayerStates` (0-150 records, frozen while inactive) and
+ * archived pairs carry `franchiseId` and preserve demoted relationships
+ * without counting as active pairs. Game transitions carry only the 300
+ * active players, so game inputs/results stay exactly ten rotation players
+ * and zero-signing cohorts reproduce the prior seeded summaries
+ * byte-for-byte.
  *
  * All probability-style values are integer millionths (probability ×
  * 1,000,000). Bounds are generous enough that no legitimate engine output
@@ -88,17 +100,53 @@ export const seasonPairChemistryStateSchema = z
 export type SeasonPairChemistryState = z.infer<typeof seasonPairChemistryStateSchema>;
 
 /**
- * The effects state frozen in each candidate checkpoint: exactly 300 player
- * load states (one per rostered version in the 30-team league) and exactly
- * 1,350 canonical pair states (45 per ten-player roster). Every pair member
- * must be a rostered player, every playerVersionId unique, and every pair
- * canonical.
+ * One archived pair record (season-chemistry-v2): a demoted player's frozen
+ * chemistry with a former rotation teammate. Archived records preserve the
+ * relationship for a later promotion (restore) without counting as active
+ * pairs; a trade deletes the traded player's archived records. `a < b`
+ * canonically; `franchiseId` records the roster the pair belonged to.
+ */
+export const seasonArchivedPairChemistryStateSchema = z
+  .object({
+    franchiseId: franchiseIdSchema,
+    a: playerVersionIdSchema,
+    b: playerVersionIdSchema,
+    sharedPossessions: z.number().int().min(0).max(10_000_000),
+  })
+  .superRefine((pair, ctx) => {
+    if (pair.a >= pair.b) {
+      ctx.addIssue({
+        code: 'custom',
+        message: `archived pair is not canonical (a < b): ${pair.a} >= ${pair.b}`,
+      });
+    }
+  });
+export type SeasonArchivedPairChemistryState = z.infer<
+  typeof seasonArchivedPairChemistryStateSchema
+>;
+
+/**
+ * The effects state frozen in each candidate checkpoint (schema 2,
+ * season-chemistry-v2): exactly 300 ACTIVE player load states (one per
+ * locked rotation member across the 30-team league), zero to 150 inactive
+ * player load states (rostered depth outside the rotation, frozen while
+ * inactive), exactly 1,350 ACTIVE canonical pair states (45 per ten-player
+ * rotation), and zero or more archived pairs carrying `franchiseId`.
+ * Every active pair member must be an active player, every active
+ * playerVersionId unique (active and inactive sets disjoint), every active
+ * pair canonical, and every archived pair canonical.
  */
 export const seasonEffectsStateSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
+    /** Exactly 300 ACTIVE load records (one per locked rotation member). */
     playerStates: z.array(seasonPlayerLoadStateSchema).length(300),
+    /** Zero to 150 inactive load records, frozen while inactive. */
+    inactivePlayerStates: z.array(seasonPlayerLoadStateSchema).max(150),
+    /** Exactly 1,350 ACTIVE canonical pairs (45 per ten-player rotation). */
     pairStates: z.array(seasonPairChemistryStateSchema).length(1350),
+    /** Archived demoted-relationship records with franchiseId (max 1,350). */
+    archivedPairs: z.array(seasonArchivedPairChemistryStateSchema).max(1350),
   })
   .superRefine((state, ctx) => {
     const players = new Set<string>();
@@ -111,6 +159,22 @@ export const seasonEffectsStateSchema = z
       }
       players.add(player.playerVersionId);
     }
+    const inactivePlayers = new Set<string>();
+    for (const player of state.inactivePlayerStates) {
+      if (inactivePlayers.has(player.playerVersionId)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `duplicate inactive player load state ${player.playerVersionId}`,
+        });
+      }
+      inactivePlayers.add(player.playerVersionId);
+      if (players.has(player.playerVersionId)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `player ${player.playerVersionId} appears both active and inactive`,
+        });
+      }
+    }
     const pairs = new Set<string>();
     for (const pair of state.pairStates) {
       const key = `${pair.a}\u0000${pair.b}`;
@@ -121,11 +185,22 @@ export const seasonEffectsStateSchema = z
       if (!players.has(pair.a) || !players.has(pair.b)) {
         ctx.addIssue({
           code: 'custom',
-          message: `pair member is not a rostered player: ${key}`,
+          message: `pair member is not an active rotation player: ${key}`,
         });
       }
       if (pair.a >= pair.b) {
         ctx.addIssue({ code: 'custom', message: `pair is not canonical: ${key}` });
+      }
+    }
+    const archived = new Set<string>();
+    for (const pair of state.archivedPairs) {
+      const key = `${pair.franchiseId}\u0000${pair.a}\u0000${pair.b}`;
+      if (archived.has(key)) {
+        ctx.addIssue({ code: 'custom', message: `duplicate archived pair ${key}` });
+      }
+      archived.add(key);
+      if (pair.a >= pair.b) {
+        ctx.addIssue({ code: 'custom', message: `archived pair is not canonical: ${key}` });
       }
     }
   });
@@ -158,9 +233,11 @@ export const seasonMechanismEvidenceSchema = z.object({
 export type SeasonMechanismEvidence = z.infer<typeof seasonMechanismEvidenceSchema>;
 
 /**
- * The effects delta one game produces: the 300 pregame and postgame player
- * load states, the per-pair shared-possession increments (at most the 1,350
- * league pairs), and the mechanism evidence rows (at most one per mechanism
+ * The effects delta one game produces: the 300 pregame and postgame ACTIVE
+ * player load states (exactly the locked rotation members; inactive depth
+ * never receives minutes, load, chemistry, or injury exposure), the
+ * per-pair shared-possession increments (at most the 1,350 ACTIVE league
+ * pairs), and the mechanism evidence rows (at most one per mechanism
  * per side: 6 x 2 = 12). The block pipeline folds these into the effects
  * state and the recap.
  */

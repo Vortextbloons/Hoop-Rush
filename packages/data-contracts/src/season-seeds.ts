@@ -40,6 +40,14 @@ export const SEASON_SEED_NAMESPACES = {
   postseasonInjuries: 'postseason-injuries',
   /** M2.6 deterministic draws (e.g. the Finals home-court fallback). */
   postseasonDraws: 'postseason-draws',
+  /**
+   * M2.6.5 free-agency streams: canonical identity selection
+   * (`free-agency/{window}/canonical/{playerId}`), market composition
+   * (`free-agency/{window}/composition/...`), AI declarations
+   * (`free-agency/{window}/ai/{franchiseId}/...`), and final draws
+   * (`free-agency/{window}/draw/...`).
+   */
+  freeAgency: 'free-agency',
 } as const;
 export type SeasonSeedNamespace = keyof typeof SEASON_SEED_NAMESPACES;
 

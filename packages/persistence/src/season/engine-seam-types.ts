@@ -2,6 +2,7 @@ import type {
   SeasonAwards,
   SeasonCheckpointState,
   SeasonEffectsState,
+  SeasonFreeAgencyState,
   SeasonGame,
   SeasonGameSummary,
   SeasonHealthState,
@@ -71,10 +72,21 @@ export interface SeasonRunEngineSeam {
   /** Canonical 32-hex digest of a 30-rotation locked set. */
   seasonRotationSetDigest(rotations: readonly SeasonRotation[]): string;
   /**
-   * Sorted unique player-version ids across every roster (300 for a 30-team
-   * league). The audit requires the effects player set to equal this set.
+   * Sorted unique player-version ids across every roster (300-450 for a
+   * 30-team league under roster-v2). The audit requires the effects
+   * INACTIVE player set and every archived pair to reference rostered
+   * versions.
    */
   seasonRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[];
+  /**
+   * M2.6.5: sorted unique player-version ids across the 30 locked
+   * rotations (exactly 300: ten rotation members per franchise). The v2
+   * effects state holds exactly one ACTIVE load record per rotation member
+   * and the 1,350 canonical ACTIVE pairs per rotation, so the audit
+   * reconciles the active effects sets against this union — never against
+   * the full 300-450 roster union.
+   */
+  seasonRotationPlayerVersionIds(rotations: readonly SeasonRotation[]): string[];
   /**
    * Zero effects state for a league: one fresh load state per rostered
    * version and the 1,350 canonical zero-shared-possession pairs. Used to
@@ -89,14 +101,20 @@ export interface SeasonRunEngineSeam {
   /** True when `a < b` (canonical pair ordering). */
   seasonPairIsCanonical(a: string, b: string): boolean;
   /**
-   * M2.5/M2.6: canonical 32-hex digest of the mutable run state facts
+   * M2.5/M2.6/M2.6.5: canonical 32-hex digest of the mutable run state facts
    * (`stateRevision`, `stage`, `postseason`, `awards`, `completion`,
    * `checkpointState`, `health`, `influence`, `transactions`, `trade`,
-   * `objectives`, `rosters`, `ownership`, `rotations`, `effects`; the
-   * stored `stateDigest` excludes itself). The reload audit recomputes the
-   * stored digest through this binding, so corrupt or half-applied mutable
-   * state is detected. Value property because the binding is the engine's
-   * pure function passed by reference.
+   * `objectives`, `rosters`, `ownership`, `rotations`, `effects`,
+   * `freeAgency`; the stored `stateDigest` excludes itself). The reload
+   * audit recomputes the stored digest through this binding, so corrupt or
+   * half-applied mutable state is detected. Value property because the
+   * binding is the engine's pure function passed by reference.
+   *
+   * M2.6.5 integration note: the engine adds `freeAgency` to its digest
+   * scope in the same milestone; until the engine binding lands, the
+   * production seam passes the widened facts through and the digest
+   * recomputation and the stored digests stay on the same engine function,
+   * so parity holds on both sides of the integration.
    */
   seasonRunStateDigest: (facts: SeasonRunStateDigestFacts) => string;
   /**
@@ -107,8 +125,11 @@ export interface SeasonRunEngineSeam {
 }
 
 /**
- * The mutable run-state facts the M2.5/M2.6 state digest covers (M2.6 adds
- * `stage`, the postseason-v2 state, `awards`, and `completion`).
+ * The mutable run-state facts the M2.5/M2.6/M2.6.5 state digest covers (M2.6
+ * adds `stage`, the postseason-v2 state, `awards`, and `completion`; M2.6.5
+ * adds the free-agency state). The engine's `seasonRunStateDigest` is the
+ * single implementation; this widened shape is the persistence-side contract
+ * the audit and fixtures feed it.
  */
 export interface SeasonRunStateDigestFacts {
   stateRevision: number;
@@ -130,6 +151,8 @@ export interface SeasonRunStateDigestFacts {
   ownership: readonly SeasonOwnership[];
   rotations: readonly SeasonRotation[];
   effects: SeasonEffectsState;
+  /** M2.6.5: run-scoped free-agency market state (windows, declarations, signings). */
+  freeAgency: SeasonFreeAgencyState;
 }
 
 /**

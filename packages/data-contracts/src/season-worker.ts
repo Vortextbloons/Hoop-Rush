@@ -24,11 +24,14 @@ import { seasonScheduleSchema } from './season-schedule.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
 
 /**
- * Season block worker wire schema version (5 since the M2.5 scoreline
- * progress payload): every season worker envelope is validated against
- * this literal. The version history lives in the module docstring below.
+ * Season block worker wire schema version (6 since the M2.6.5 roster-depth
+ * milestone: the complete message carries the post-block free-agency state
+ * inside the checkpoint-v4 candidate, and start requests carry the
+ * 10-15-player rosters of the schema-10 run context): every season worker
+ * envelope is validated against this literal. The version history lives in
+ * the module docstring below.
  */
-export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 5 as const;
+export const SEASON_WORKER_WIRE_SCHEMA_VERSION = 6 as const;
 
 /**
  * Season Run block worker envelopes (spec/2.0/07 background execution, M2.3;

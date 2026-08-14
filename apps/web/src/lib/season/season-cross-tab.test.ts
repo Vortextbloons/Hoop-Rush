@@ -23,7 +23,7 @@ describe('Season Run cross-tab channel', () => {
     });
 
     sender.announce({ kind: 'commit', runId: 'run-a', revision: 2, committedAt: 1 });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await expect.poll(() => received.length).toBe(1);
 
     expect(received).toHaveLength(1);
     expect(received[0]?.kind).toBe('commit');
@@ -49,9 +49,15 @@ describe('Season Run cross-tab channel', () => {
     raw.postMessage({ kind: 'bogus' });
     raw.postMessage(null);
     raw.postMessage({ kind: 'clear', committedAt: 'not-a-number', sourceId: 'x' });
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(received).toHaveLength(0);
+    // The probe commit is queued behind the garbage on the same broadcast
+    // bus: once it arrives, the garbage was already processed and dropped.
+    // (Sent from a separate channel: a channel ignores its own announces.)
+    const probeChannel = createSeasonRunChannel();
+    probeChannel.announce({ kind: 'commit', runId: 'probe', revision: 1, committedAt: 2 });
+    await expect.poll(() => received.map((mutation) => mutation.kind)).toContain('commit');
+    expect(received.filter((mutation) => mutation.kind === 'commit')).toHaveLength(1);
     raw.close();
+    probeChannel.close();
     channel.close();
   });
 

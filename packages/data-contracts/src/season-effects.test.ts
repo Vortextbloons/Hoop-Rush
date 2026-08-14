@@ -16,6 +16,7 @@ import {
   seasonStaminaInputSchema,
   seasonWorkerStartRequestSchema,
   SEASON_NEUTRAL_HOME_COURT,
+  SEASON_WORKER_WIRE_SCHEMA_VERSION,
   type SeasonCandidateCheckpoint,
   type SeasonEffectsState,
   type SeasonGameSummary,
@@ -24,6 +25,7 @@ import {
   type SeasonWorkerStartRequest,
 } from './index.ts';
 import {
+  buildEmptyFreeAgency,
   buildEmptyHealth,
   buildInitialInfluence,
   buildRun,
@@ -67,7 +69,13 @@ function buildEffectsState(): SeasonEffectsState {
       }
     }
   }
-  return { schemaVersion: 1, playerStates, pairStates };
+  return {
+    schemaVersion: 2,
+    playerStates,
+    inactivePlayerStates: [],
+    pairStates,
+    archivedPairs: [],
+  };
 }
 
 const MECHANISM_EVIDENCE = {
@@ -145,29 +153,32 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
   const run = buildRun();
   return {
     schemaVersion: 1,
-    checkpointVersion: 'season-checkpoint-v3',
+    checkpointVersion: 'season-checkpoint-v4',
     runId: run.runId,
     rootSeed: run.rootSeed,
     versions: {
-      blockVersion: 'season-block-v3',
+      blockVersion: 'season-block-v4',
       summaryVersion: 'season-game-summary-v3',
-      aggregatesVersion: 'season-aggregates-v1',
-      recapVersion: 'season-recap-v3',
+      aggregatesVersion: 'season-aggregates-v2',
+      recapVersion: 'season-recap-v4',
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
       gameVersion: 'season-game-v4',
       gameTargetsVersion: 'season-game-targets-v4',
       seedDerivationVersion: 'season-seeds-v1',
       staminaVersion: 'season-stamina-v1',
-      chemistryVersion: 'season-chemistry-v1',
+      chemistryVersion: 'season-chemistry-v2',
       effectsTargetsVersion: 'season-effect-targets-v1',
       healthVersion: 'season-health-v1',
-      tradeVersion: 'season-trade-v1',
+      tradeVersion: 'season-trade-v2',
       influenceVersion: 'season-influence-v1',
       objectiveVersion: 'season-objective-v1',
       injuryTargetsVersion: 'injury-targets-v1',
-      tradeTargetsVersion: 'trade-targets-v1',
+      tradeTargetsVersion: 'trade-targets-v2',
       influenceTargetsVersion: 'influence-targets-v1',
+      freeAgencyVersion: 'season-free-agency-v1',
+      freeAgencyIndexVersion: 'free-agency-index-v1',
+      freeAgencyTargetsVersion: 'free-agency-targets-v1',
     },
     blockIndex: 0,
     completedRounds: 0,
@@ -221,7 +232,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
     retainedDetails: [],
     recap: {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v3',
+      recapVersion: 'season-recap-v4',
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 0,
@@ -242,11 +253,19 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
       },
       objectiveEvidence: null,
       tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+      freeAgencyEvidence: {
+        windowIndex: null,
+        signings: [],
+        influenceDelta: 0,
+        seasonSignings: 0,
+        seasonSpend: 0,
+      },
       influenceBalance: { humanBalance: 2 },
     },
     effects,
     health: buildEmptyHealth(),
     influence: buildInitialInfluence(),
+    freeAgency: buildEmptyFreeAgency(),
     transactions: [],
     objective: {
       objectiveId: null,
@@ -279,7 +298,7 @@ function buildCheckpoint(effects: SeasonEffectsState): SeasonCandidateCheckpoint
 function buildWorkerRequest(priorEffects: SeasonEffectsState | null): SeasonWorkerStartRequest {
   const run = buildRun();
   return {
-    schemaVersion: 5,
+    schemaVersion: SEASON_WORKER_WIRE_SCHEMA_VERSION,
     type: 'season-block-start',
     requestId: 'req-1',
     runId: run.runId,
@@ -385,7 +404,9 @@ describe('season effects state schema (M2.4)', () => {
     const state = roundTrip(seasonEffectsStateSchema, buildEffectsState());
     expect(state.playerStates).toHaveLength(300);
     expect(state.pairStates).toHaveLength(1350);
-    expect(state.schemaVersion).toBe(1);
+    expect(state.schemaVersion).toBe(2);
+    expect(state.inactivePlayerStates).toHaveLength(0);
+    expect(state.archivedPairs).toHaveLength(0);
   });
 
   it('rejects wrong player and pair counts', () => {
@@ -611,7 +632,7 @@ describe('season checkpoint effects (M2.4)', () => {
     ).toThrow();
   });
 
-  it('freezes the three M2.4 material versions in the checkpoint versions', () => {
+  it('freezes the M2.4/M2.6.5 material versions in the checkpoint versions', () => {
     const checkpoint = buildCheckpoint(buildEffectsState());
     expect(roundTrip(seasonCheckpointVersionsSchema, checkpoint.versions).staminaVersion).toBe(
       'season-stamina-v1',
@@ -619,7 +640,7 @@ describe('season checkpoint effects (M2.4)', () => {
     expect(() =>
       seasonCheckpointVersionsSchema.parse({
         ...checkpoint.versions,
-        chemistryVersion: 'season-chemistry-v2',
+        chemistryVersion: 'season-chemistry-v1',
       }),
     ).toThrow();
     expect(() =>
@@ -648,7 +669,7 @@ describe('season worker start request priorEffects (M2.4)', () => {
       buildWorkerRequest(buildEffectsState()),
     );
     expect(withState.priorEffects?.pairStates).toHaveLength(1350);
-    const corrupt = { ...buildEffectsState(), schemaVersion: 2 };
+    const corrupt = { ...buildEffectsState(), schemaVersion: 1 };
     expect(() =>
       seasonWorkerStartRequestSchema.parse(buildWorkerRequest(corrupt as never)),
     ).toThrow();
@@ -660,7 +681,7 @@ describe('season block recap effects evidence (M2.4)', () => {
     const run = buildRun();
     return {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v3',
+      recapVersion: 'season-recap-v4',
       runId: run.runId,
       blockIndex: 0,
       completedRounds: 0,
@@ -681,6 +702,13 @@ describe('season block recap effects evidence (M2.4)', () => {
       },
       objectiveEvidence: null,
       tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+      freeAgencyEvidence: {
+        windowIndex: null,
+        signings: [],
+        influenceDelta: 0,
+        seasonSignings: 0,
+        seasonSpend: 0,
+      },
       influenceBalance: { humanBalance: 2 },
     };
   }
@@ -788,11 +816,11 @@ describe('season run schema version 7 (M2.5)', () => {
   it('freezes the seven M2.5 material versions and the state chain on the run', () => {
     const run = buildRun();
     expect(run.versions.healthVersion).toBe('season-health-v1');
-    expect(run.versions.tradeVersion).toBe('season-trade-v1');
+    expect(run.versions.tradeVersion).toBe('season-trade-v2');
     expect(run.versions.influenceVersion).toBe('season-influence-v1');
     expect(run.versions.objectiveVersion).toBe('season-objective-v1');
     expect(run.versions.injuryTargetsVersion).toBe('injury-targets-v1');
-    expect(run.versions.tradeTargetsVersion).toBe('trade-targets-v1');
+    expect(run.versions.tradeTargetsVersion).toBe('trade-targets-v2');
     expect(run.versions.influenceTargetsVersion).toBe('influence-targets-v1');
     expect(run.checkpointState).toBeNull();
     expect(run.stateRevision).toBe(0);
@@ -806,5 +834,12 @@ describe('season run schema version 7 (M2.5)', () => {
     expect(() => seasonRunSchema.parse({ ...run, health: undefined })).toThrow();
     expect(() => seasonRunSchema.parse({ ...run, influence: undefined })).toThrow();
     expect(() => seasonRunSchema.parse({ ...run, stateDigest: 'not-a-digest' })).toThrow();
+  });
+
+  it('rejects schema 9 snapshots without the free-agency state', () => {
+    const run = buildRun();
+    expect(() => seasonRunSchema.parse({ ...run, freeAgency: undefined })).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, schemaVersion: 9 })).toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, rosters: run.rosters.slice(0, 5) })).toThrow();
   });
 });

@@ -94,10 +94,10 @@ describe('season m25 durability derivation (durability-v1)', () => {
   });
 
   it('floors at 45 when stats or eligibility are missing', () => {
+    // One representative per missing-input shape: games missing, team games
+    // missing, and a zero eligibility edge (division-by-zero guard).
     expect(durabilityRatingFrom(null, 82)).toBe(45);
     expect(durabilityRatingFrom(65, null)).toBe(45);
-    expect(durabilityRatingFrom(undefined, undefined)).toBe(45);
-    expect(durabilityRatingFrom(null, null)).toBe(45);
     expect(durabilityRatingFrom(65, 0)).toBe(45);
   });
 

@@ -3,6 +3,7 @@ import { franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonCompactInjuryEventSchema, seasonInjurySeveritySchema } from './season-health.ts';
 import { seasonEffectsSideSchema, seasonMechanismSchema } from './season-effects.ts';
+import { seasonFreeAgencyBandSchema } from './season-free-agency.ts';
 import {
   seasonObjectiveEvaluationFactsSchema,
   seasonObjectiveIdSchema,
@@ -11,10 +12,12 @@ import { SEASON_RECAP_VERSION } from './season-versions.ts';
 
 /**
  * Block recap (spec/2.0/02 recap, spec/2.0/11 block recap, M2.5,
- * season-recap-v3). Every claim derives from saved league facts: game
- * summaries, standings, aggregates, the block-level effects evidence
- * (M2.4), and — since v3 — the block-level injury, objective, trade, and
- * Influence evidence. All arrays are bounded.
+ * season-recap-v3; M2.6.5 season-recap-v4). Every claim derives from saved
+ * league facts: game summaries, standings, aggregates, the block-level
+ * effects evidence (M2.4), the block-level injury, objective, trade, and
+ * Influence evidence (M2.5), and — since v4 — the block-level free-agency
+ * evidence (signings, human Influence delta, season signing/spend counts).
+ * All arrays are bounded.
  */
 
 /** Block-level effects evidence for one mechanism on one side (M2.4). */
@@ -64,6 +67,33 @@ export const seasonBlockTradeEvidenceSchema = z.object({
   influenceDelta: z.number().int(),
 });
 export type SeasonBlockTradeEvidence = z.infer<typeof seasonBlockTradeEvidenceSchema>;
+
+/**
+ * M2.6.5 block-level free-agency evidence (season-recap-v4): the window
+ * resolved this block (if any), its signings, the human franchise's
+ * Influence delta from free agency this block, and the human franchise's
+ * season signing/spend counts (caps 3/6).
+ */
+export const seasonBlockFreeAgencyEvidenceSchema = z.object({
+  /** The window resolved this block, when one was. */
+  windowIndex: z.number().int().min(0).max(2).nullable(),
+  /** Signings recorded this block, each with its franchise and band. */
+  signings: z.array(
+    z.object({
+      franchiseId: franchiseIdSchema,
+      playerVersionId: playerVersionIdSchema,
+      band: seasonFreeAgencyBandSchema,
+      influenceCost: z.number().int().min(1).max(3),
+    }),
+  ),
+  /** The human franchise's free-agency Influence delta this block (≤ 0). */
+  influenceDelta: z.number().int(),
+  /** The human franchise's season signing count after this block (cap 3). */
+  seasonSignings: z.number().int().min(0).max(3),
+  /** The human franchise's season free-agency spend after this block (cap 6). */
+  seasonSpend: z.number().int().min(0).max(6),
+});
+export type SeasonBlockFreeAgencyEvidence = z.infer<typeof seasonBlockFreeAgencyEvidenceSchema>;
 
 /**
  * M2.5 recap Influence balance (LEAD DECISION: recap shows the human
@@ -170,6 +200,8 @@ export const seasonBlockRecapSchema = z.object({
   objectiveEvidence: seasonBlockObjectiveEvidenceSchema.nullable(),
   /** M2.5: block-level trade evidence. */
   tradeEvidence: seasonBlockTradeEvidenceSchema,
+  /** M2.6.5: block-level free-agency evidence. */
+  freeAgencyEvidence: seasonBlockFreeAgencyEvidenceSchema,
   /** M2.5: human Influence balance at block end. */
   influenceBalance: seasonBlockInfluenceBalanceSchema,
 });

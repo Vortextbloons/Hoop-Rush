@@ -174,13 +174,22 @@ export const seasonLeadersSchema = z.object({
 });
 export type SeasonLeaders = z.infer<typeof seasonLeadersSchema>;
 
-/** Both aggregate tables, canonically sorted, ready for storage and digests. */
+/**
+ * Both aggregate tables, canonically sorted, ready for storage and digests.
+ * M2.6.5 (season-aggregates-v2): `players` accepts 300-450 rows as acquired
+ * players begin appearing (rows are created at signing application, so a
+ * fresh run starts at 300 and grows); presentation merges absent rows as
+ * factual zero-game/zero-minute records rather than inventing them.
+ */
 export const seasonAggregatesSchema = z.object({
   schemaVersion: z.literal(1),
   aggregatesVersion: z.literal(SEASON_AGGREGATES_VERSION),
   /** Sorted by franchiseId ascending. */
   teams: z.array(seasonTeamAggregateSchema).length(SEASON_TEAM_COUNT),
-  /** Sorted by playerVersionId ascending. */
-  players: z.array(seasonPlayerAggregateSchema).length(SEASON_TEAM_COUNT * 10),
+  /** Sorted by playerVersionId ascending (300-450 rows). */
+  players: z
+    .array(seasonPlayerAggregateSchema)
+    .min(300)
+    .max(SEASON_TEAM_COUNT * 15),
 });
 export type SeasonAggregates = z.infer<typeof seasonAggregatesSchema>;

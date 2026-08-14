@@ -36,6 +36,8 @@ import {
   seasonOwnershipSchema,
   seasonAwardsSchema,
   seasonPostseasonStateSchema,
+  SEASON_ROSTER_MAX_SIZE,
+  SEASON_ROSTER_MIN_SIZE,
   SEASON_RUN_SAVE_SCHEMA_VERSION,
   SEASON_TEAM_COUNT,
 } from '@hoop-rush/data-contracts';
@@ -49,18 +51,18 @@ import {
  *
  * ## Stored save schema versions
  *
- * - v6 (M2.6): the current and only read schema. The row wraps a schema-9
- *   run snapshot (stage, postseason-v2 state, awards, completion, the
- *   extended version set) plus, at row level, the authoritative mutable run
- *   state committed atomically with each block (effects, health,
- *   transactions, influence, trade, objectives, checkpointState,
- *   stateRevision, stateDigest). M2.6 adds the append-only command log, the
- *   postseason summary rows, the retained postseason detail rows, and the
- *   completed-season rows in the v8/v10 Dexie tables.
- * - v5 (projection), v4 (M2.5), v3 (M2.4 schema-6), v2 (M2.4 schema-5),
- *   v1 (M2.3 schema-4) are development rows: never read or migrated;
- *   reported through the typed incompatibility flow and handled by the
- *   discard-and-restart screen.
+ * - v7 (M2.6.5): the current and only read schema. The row wraps a schema-10
+ *   run snapshot (rosters of 10-15 distinct versions, 300-450 ownership
+ *   rows, the run-scoped free-agency state, the extended version set) plus,
+ *   at row level, the authoritative mutable run state committed atomically
+ *   with each block (effects, health, transactions, influence, trade,
+ *   objectives, checkpointState, stateRevision, stateDigest). M2.6 adds the
+ *   append-only command log, the postseason summary rows, the retained
+ *   postseason detail rows, and the completed-season rows in the v8/v10
+ *   Dexie tables.
+ * - v6 (M2.6) through v1 (M2.3 schema-4) are development rows: never read
+ *   or migrated; reported through the typed incompatibility flow and
+ *   handled by the discard-and-restart screen.
  *
  * ## Why the checkpoint omits the 1,230 scheduled game records
  *
@@ -86,8 +88,8 @@ import {
 export const SEASON_RUN_RECORD_ID = 'season-run';
 
 /**
- * The single stored Season Run checkpoint row (save schema v6, M2.6): frozen
- * snapshot minus the scheduled game records plus the authoritative
+ * The single stored Season Run checkpoint row (save schema v7, M2.6.5):
+ * frozen snapshot minus the scheduled game records plus the authoritative
  * current-boundary facts, effects state, and M2.5 mutable run state.
  */
 export const seasonRunRecordFieldsSchema = z.object({
@@ -115,8 +117,11 @@ export const seasonRunRecordFieldsSchema = z.object({
   standings: seasonStandingsSchema,
   /** Latest cumulative team aggregates, sorted by franchiseId ascending. */
   teamAggregates: z.array(seasonTeamAggregateSchema).length(SEASON_TEAM_COUNT),
-  /** Latest cumulative player aggregates, sorted by playerVersionId ascending. */
-  playerAggregates: z.array(seasonPlayerAggregateSchema).length(SEASON_TEAM_COUNT * 10),
+  /** Latest cumulative player aggregates, sorted by playerVersionId ascending (300-450 rows; M2.6.5). */
+  playerAggregates: z
+    .array(seasonPlayerAggregateSchema)
+    .min(SEASON_TEAM_COUNT * SEASON_ROSTER_MIN_SIZE)
+    .max(SEASON_TEAM_COUNT * SEASON_ROSTER_MAX_SIZE),
   /** Recap of the last accepted block; null while no block was accepted. */
   recap: seasonBlockRecapSchema.nullable(),
   /** M2.4 authoritative effects state (300 player loads, 1,350 pairs) at the last boundary. */

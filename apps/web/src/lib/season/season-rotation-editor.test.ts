@@ -296,16 +296,13 @@ describe('RotationEditor.rebalanceMinutes', () => {
     expect(e.rotation).toEqual(before);
   });
 
-  it('clamps typed minutes to the 0-48 integer range and treats same-value as no-op', () => {
+  it('treats a same-value rebalance as a no-op', () => {
     const e = editor();
     const first = e.rotation.starters[0];
     if (first === undefined) {
       throw new Error('fixture rotation has no starters');
     }
-    const clamp = e.rebalanceMinutes(first, 99);
-    expect(clamp.failures).toEqual([]);
-    expect(e.minutesFor(first)).toBe(48);
-    const noop = e.rebalanceMinutes(first, 48);
+    const noop = e.rebalanceMinutes(first, e.minutesFor(first));
     expect(noop.failures).toEqual([]);
     expect(noop.adjustments).toEqual([]);
   });

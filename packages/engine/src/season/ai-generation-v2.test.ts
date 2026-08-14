@@ -398,41 +398,41 @@ describe('v2 scarcity and failure', () => {
     expect(error.allocationState).toContain('unassignedCount');
   });
 
-  it('enforces the anchor node budget without relaxing rules', () => {
-    const targets = buildTestTargets();
-    const tight = {
-      ...targets,
-      policy: {
-        ...targets.policy,
-        nodeBudgets: { anchorMatching: 1, poolRepair: 40000, rosterSelection: 600000 },
-      },
-    } as unknown as SeasonRosterTargets;
-    expect(() =>
-      generateAiLeague({ ...soloInput(seedFromString('budget-anchors')), targets: tight }),
-    ).toThrow(SeasonAiGenerationError);
-    try {
-      generateAiLeague({ ...soloInput(seedFromString('budget-anchors')), targets: tight });
-      throw new Error('expected budget exhaustion');
-    } catch (error) {
-      if (!(error instanceof SeasonAiGenerationError)) throw error;
-      expect(error.phase).toBe('anchors');
-      expect(error.diagnostics.nodeBudget).toBe(1 + 40000 + 600000);
-    }
-  });
-
-  it('enforces the pool-repair node budget without relaxing rules', () => {
-    const targets = buildTestTargets();
-    const tight = {
-      ...targets,
-      policy: {
-        ...targets.policy,
-        nodeBudgets: { anchorMatching: 20000, poolRepair: 1, rosterSelection: 600000 },
-      },
-    } as unknown as SeasonRosterTargets;
-    expect(() =>
-      generateAiLeague({ ...soloInput(seedFromString('budget-pool')), targets: tight }),
-    ).toThrow(SeasonAiGenerationError);
-  });
+  it.each([
+    [
+      'anchor matching',
+      { anchorMatching: 1, poolRepair: 40000, rosterSelection: 600000 },
+      'budget-anchors',
+      'anchors',
+      640001,
+    ],
+    [
+      'pool repair',
+      { anchorMatching: 20000, poolRepair: 1, rosterSelection: 600000 },
+      'budget-pool',
+      null,
+      null,
+    ],
+  ] as const)(
+    'enforces the %s node budget without relaxing rules',
+    (_label, nodeBudgets, seed, expectedPhase, expectedBudget) => {
+      const targets = {
+        ...buildTestTargets(),
+        policy: {
+          ...buildTestTargets().policy,
+          nodeBudgets,
+        },
+      } as unknown as SeasonRosterTargets;
+      try {
+        generateAiLeague({ ...soloInput(seedFromString(seed)), targets });
+        throw new Error('expected budget exhaustion');
+      } catch (error) {
+        if (!(error instanceof SeasonAiGenerationError)) throw error;
+        if (expectedPhase !== null) expect(error.phase).toBe(expectedPhase);
+        if (expectedBudget !== null) expect(error.diagnostics.nodeBudget).toBe(expectedBudget);
+      }
+    },
+  );
 
   it('rejects null or mismatched targets before any allocation', () => {
     expect(() =>

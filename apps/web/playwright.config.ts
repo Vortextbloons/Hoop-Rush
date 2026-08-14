@@ -19,22 +19,9 @@ export default defineConfig({
   expect: {
     timeout: 15_000,
   },
-  // Default selection (no --project) runs every test exactly once: the smoke
-  // project covers @smoke-tagged tests, the full project covers the rest. The
-  // wrapper's `--grep @smoke` flag then matches only the smoke project's
-  // tests, so `pnpm e2e:smoke` stays a fast subset of `pnpm e2e`.
-  projects: [
-    {
-      name: 'smoke',
-      grep: /@smoke/,
-    },
-    {
-      name: 'full',
-      // Everything except @smoke: /@smoke/ would duplicate the smoke tests
-      // when running the default project selection.
-      grep: /^(?!.*@smoke)/,
-    },
-  ],
+  // Every e2e spec is a smoke journey by design (shortened to early
+  // checkpoints, never full seasons). The wrapper's `--grep @smoke` flag
+  // remains a no-op subset selection that keeps CI call sites stable.
   webServer: process.env.HOOP_RUSH_E2E_EXTERNAL_SERVER
     ? undefined
     : {

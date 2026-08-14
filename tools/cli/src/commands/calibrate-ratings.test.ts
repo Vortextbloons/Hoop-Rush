@@ -35,19 +35,11 @@ describe('buildRatingsModelArtifact', () => {
     },
   };
 
-  it('records the actual samples under sampleCountPerContext', () => {
+  it('builds the ratings model artifact with samples, confidence, and version advances', () => {
     const output = buildRatingsModelArtifact({ artifact: loaded, playerAdjustments, samples });
     expect(output.sampleCountPerContext).toBe(samples);
-  });
-
-  it('carries the confidence target through from the loaded artifact', () => {
-    const output = buildRatingsModelArtifact({ artifact: loaded, playerAdjustments, samples });
     expect(output.confidenceTargetSamplesPerContext).toBe(loaded.confidenceTargetSamplesPerContext);
     expect(output.confidenceTargetSamplesPerContext).not.toBe(loaded.sampleCountPerContext);
-  });
-
-  it('records per-player confidence against the target, not the previous sample count', () => {
-    const output = buildRatingsModelArtifact({ artifact: loaded, playerAdjustments, samples });
     for (const entry of Object.values(output.playerAdjustments ?? {})) {
       expect(entry.confidence).toBe(
         calibrationConfidence(
@@ -59,10 +51,6 @@ describe('buildRatingsModelArtifact', () => {
       // sample count (512) must not shrink confidence to 128/512 = 0.25.
       expect(entry.confidence).toBe(0.5);
     }
-  });
-
-  it('advances model and ratings versions while keeping the schema version', () => {
-    const output = buildRatingsModelArtifact({ artifact: loaded, playerAdjustments, samples });
     expect(output.schemaVersion).toBe(2);
     expect(output.modelVersion).toBe(RATING_MODEL_VERSION);
     expect(output.ratingsVersion).toBe(RATINGS_VERSION);

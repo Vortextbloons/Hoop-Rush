@@ -61,6 +61,16 @@ export const seasonReplayAssetHashesSchema = z.object({
   schedule: contentHashSchema,
   draftCatalog: contentHashSchema,
   eraProfile: contentHashSchema,
+  /**
+   * M2.6.5: the free-agent eligibility index the run's markets drew from.
+   * Optional so pre-M2.6.5 exports stay valid.
+   */
+  freeAgencyIndex: contentHashSchema.optional(),
+  /**
+   * M2.6.5: the frozen free-agency calibration targets artifact. Optional so
+   * pre-M2.6.5 exports stay valid.
+   */
+  freeAgencyTargets: contentHashSchema.optional(),
 });
 export type SeasonReplayAssetHashes = z.infer<typeof seasonReplayAssetHashesSchema>;
 

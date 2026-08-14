@@ -343,7 +343,7 @@ describe('postseason game ids (M2.6)', () => {
 
   it('rejects malformed postseason ids in command targets', () => {
     const base = {
-      schemaVersion: 9,
+      schemaVersion: 10,
       commandId: 'cmd-ps-1',
       runId: 'fixture-run-1',
       expectedStateRevision: 0,
@@ -550,7 +550,7 @@ describe('command log (M2.6, command-log-v1)', () => {
       runId: 'fixture-run-1',
       ordinal,
       command: {
-        schemaVersion: 9,
+        schemaVersion: 10,
         command: 'start-postseason',
         commandId: `cmd-ps-${String(ordinal)}`,
         runId: 'fixture-run-1',
@@ -609,7 +609,7 @@ describe('command log (M2.6, command-log-v1)', () => {
         runId: 'fixture-run-1',
         ordinal: 0,
         command: {
-          schemaVersion: 9,
+          schemaVersion: 10,
           command: 'start-postseason',
           commandId: 'cmd-ps-0',
           runId: 'other-run',

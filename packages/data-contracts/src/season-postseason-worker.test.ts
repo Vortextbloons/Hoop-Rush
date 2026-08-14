@@ -46,7 +46,13 @@ function fixtureEffects(run: ReturnType<typeof buildRun>): SeasonEffectsState {
       }
     }
   }
-  return { schemaVersion: 1, playerStates, pairStates };
+  return {
+    schemaVersion: 2,
+    playerStates,
+    inactivePlayerStates: [],
+    pairStates,
+    archivedPairs: [],
+  };
 }
 
 function baseRequest(overrides: Record<string, unknown> = {}): Record<string, unknown> {

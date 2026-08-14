@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
-import { SEASON_MINUTE_POLICY_VERSION, SEASON_ROTATION_VERSION } from './season-versions.ts';
+import {
+  SEASON_MINUTE_POLICY_VERSION,
+  SEASON_ROTATION_SIZE,
+  SEASON_ROTATION_VERSION,
+} from './season-versions.ts';
 
 /**
  * Season Run rotation contracts (spec/2.0/04, M2.2, season-rotation-v3). A
@@ -14,6 +18,12 @@ import { SEASON_MINUTE_POLICY_VERSION, SEASON_ROTATION_VERSION } from './season-
  * additionally freezes the versioned minute policy that produced its target
  * minutes; the preset value `tight` is preserved for compatibility and
  * labeled Starter-Heavy.
+ *
+ * M2.6.5 (spec/2.0/15): every rotation contains exactly
+ * `SEASON_ROTATION_SIZE` rostered players regardless of roster capacity
+ * (10-15); coverage, legal-five, contingency, minutes, closing-five,
+ * availability, and game validation apply to the rotation, never to
+ * inactive depth.
  */
 
 /** Minute-policy strategies (Starter-Heavy / Balanced / Bench-Heavy). */
@@ -43,7 +53,7 @@ export const seasonRotationSchema = z.object({
   /** Remaining five in deterministic bench order. */
   benchOrder: z.array(playerVersionIdSchema).length(5),
   /** Per-player target minutes; must total exactly 240. */
-  targetMinutes: z.array(seasonRotationTargetMinutesSchema).length(10),
+  targetMinutes: z.array(seasonRotationTargetMinutesSchema).length(SEASON_ROTATION_SIZE),
   /**
    * Ordered closing five (G, G, F, F, C), independently legal and possibly
    * different from the starters. Preferred in the final-five-minute/12-point

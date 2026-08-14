@@ -13,6 +13,14 @@ import { SEASON_INFLUENCE_VERSION } from './season-versions.ts';
  * with its source, block, command, and balance after, so balances always
  * reconcile: `balanceAfter === balanceBefore + appliedDelta`.
  *
+ * M2.6.5 (spec/2.0/15): free-agency signings debit the committed Influence
+ * through the same ledger with source `free-agent-signing`. The winning
+ * commitment is the only free-agency cost: lost, cancelled, skipped, stale,
+ * or rejected targets cost zero. Per-season free-agency spend (cap 6) and
+ * per-season signing counts (cap 3) live in `SeasonFreeAgencyState`; debt
+ * cannot fund a signing (available non-debt balance must cover the
+ * commitment).
+ *
  * Balance and debt NEVER modify possession odds or any gameplay mechanic.
  * No hook exists; tests assert the absence of such hooks.
  */
@@ -24,6 +32,7 @@ export const seasonInfluenceSourceSchema = z.enum([
   'objective-reward',
   'extra-trade-offer',
   'risky-rehab',
+  'free-agent-signing',
 ]);
 export type SeasonInfluenceSource = z.infer<typeof seasonInfluenceSourceSchema>;
 

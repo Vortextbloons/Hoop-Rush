@@ -325,40 +325,29 @@ describe('season trade grade derivation (trade-grade-v1)', () => {
     expect(grades.digest).toMatch(/^[0-9a-f]{32}$/);
   });
 
-  it('grades neutral below the five-game floor (small sample)', () => {
-    const { run } = runWithTrade();
-    // Only rounds 31-34 recorded: four post-trade team games < the floor.
-    const summaries = regularSeason(34);
-    const grades = deriveSeasonTradeGrades({
-      runId: run.runId,
-      run,
-      summaries,
-      postseasonSummaries: [],
-    });
-    for (const grade of grades.grades) {
-      expect(grade.neutral).toBe(true);
-      expect(grade.sample).toBe(4);
-      expect(grade.score).toBe(SEASON_TRADE_GRADE_NEUTRAL_SCORE);
-      expect(grade.label).toBe('C');
-      expect(grade.reasons[0]).toContain('neutral grade');
-    }
-  });
-
-  it('grades neutral with no post-trade games at all', () => {
-    const { run } = runWithTrade();
-    const grades = deriveSeasonTradeGrades({
-      runId: run.runId,
-      run,
-      summaries: [],
-      postseasonSummaries: [],
-    });
-    expect(grades.grades).toHaveLength(2);
-    for (const grade of grades.grades) {
-      expect(grade.neutral).toBe(true);
-      expect(grade.sample).toBe(0);
-      expect(grade.score).toBe(SEASON_TRADE_GRADE_NEUTRAL_SCORE);
-    }
-  });
+  it.each([
+    [34, 4],
+    [0, 0],
+  ] as const)(
+    'grades neutral below the five-game floor with %s post-trade games',
+    (rounds, expectedSample) => {
+      const { run } = runWithTrade();
+      const grades = deriveSeasonTradeGrades({
+        runId: run.runId,
+        run,
+        summaries: rounds === 0 ? [] : regularSeason(rounds),
+        postseasonSummaries: [],
+      });
+      expect(grades.grades).toHaveLength(2);
+      for (const grade of grades.grades) {
+        expect(grade.neutral).toBe(true);
+        expect(grade.sample).toBe(expectedSample);
+        expect(grade.score).toBe(SEASON_TRADE_GRADE_NEUTRAL_SCORE);
+        expect(grade.label).toBe('C');
+        expect(grade.reasons[0]).toContain('neutral grade');
+      }
+    },
+  );
 
   it('returns an empty log for a run without trade state', () => {
     const { run } = buildEconomyTestRun();

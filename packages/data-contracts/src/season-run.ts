@@ -29,6 +29,9 @@ import {
   SEASON_DRAFT_VERSION,
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_INDEX_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_VERSION,
   SEASON_GAME_COUNT,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
@@ -52,7 +55,7 @@ import {
   SEASON_ROSTER_RULES_VERSION,
   SEASON_ROSTER_TARGETS_V2,
   SEASON_ROSTER_TARGETS_VERSION,
-  SEASON_ROSTER_SIZE,
+  SEASON_DRAFT_SIZE,
   SEASON_ROTATION_PLANNER_VERSION,
   SEASON_ROTATION_VERSION,
   SEASON_RUN_SCHEMA_VERSION,
@@ -69,6 +72,7 @@ import {
   SEASON_TRADE_VERSION,
 } from './season-versions.ts';
 import { seasonRosterSchema, seasonOwnershipSchema } from './season-roster.ts';
+import { seasonFreeAgencyStateSchema } from './season-free-agency.ts';
 import {
   seasonAiAssignmentSchema,
   seasonAiPoolSchema,
@@ -79,15 +83,19 @@ import { seasonRotationSchema } from './season-rotation.ts';
 
 /**
  * Complete versioned Season Run persistence snapshot (spec/2.0/07). One
- * validated record covers the frozen league, ten-player rosters, ownership,
- * schedule reference, all scheduled game identities, the block cursor, the
- * explicit season `stage`, the postseason-v2 state, awards, and completion
- * state, plus the frozen material versions. Since schema 9 (M2.6
- * postseason-foundations) it carries `stage`, the validated v2 postseason
- * state, `awards`, and `completion`, and the M2.6 material versions
- * (tiebreaker, postseason summaries, awards, trade grades, command log,
- * almanac, replay exports, postseason targets); schema 8 runs cannot
- * continue. Since schema 6 (M2.4) it recorded the
+ * validated record covers the frozen league, 10-15-player rosters,
+ * ownership (300-450 rows), schedule reference, all scheduled game
+ * identities, the block cursor, the explicit season `stage`, the
+ * postseason-v2 state, awards, completion state, the free-agency state,
+ * plus the frozen material versions. Since schema 10 (M2.6.5
+ * roster-depth) rosters hold 10-15 distinct versions, ownership holds
+ * 300-450 unique rows, the run carries `freeAgency`, and the version set
+ * freezes the roster-v2 and free-agency material versions; schema 9 runs
+ * cannot continue. Since schema 9 (M2.6 postseason-foundations) it carried
+ * `stage`, the validated v2 postseason state, `awards`, and `completion`,
+ * and the M2.6 material versions (tiebreaker, postseason summaries,
+ * awards, trade grades, command log, almanac, replay exports, postseason
+ * targets). Since schema 6 (M2.4) it recorded the
  * roster-generation-v2/season-ai-v2/roster-targets-v2 versions and
  * `aiPools` (one 20-player pool per AI franchise); since schema 7 (M2.5) it
  * carries `health`, `transactions`, `influence`, `checkpointState`, and the
@@ -325,6 +333,12 @@ export const seasonRunVersionsSchema = z.object({
   replayExportVersion: z.literal(SEASON_REPLAY_EXPORT_VERSION),
   /** M2.6: frozen postseason calibration targets (postseason-targets-v1). */
   postseasonTargetsVersion: z.literal(SEASON_POSTSEASON_TARGETS_VERSION),
+  /** M2.6.5: free-agency market rules (season-free-agency-v1). */
+  freeAgencyVersion: z.literal(SEASON_FREE_AGENCY_VERSION),
+  /** M2.6.5: packaged free-agent eligibility index (free-agency-index-v1). */
+  freeAgencyIndexVersion: z.literal(SEASON_FREE_AGENCY_INDEX_VERSION),
+  /** M2.6.5: frozen free-agency calibration targets (free-agency-targets-v1). */
+  freeAgencyTargetsVersion: z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
 });
 export type SeasonRunVersions = z.infer<typeof seasonRunVersionsSchema>;
 
@@ -335,8 +349,13 @@ export const seasonRunSchema = z
     rootSeed: seedSchema,
     versions: seasonRunVersionsSchema,
     league: seasonLeagueSchema,
+    /** 30 rosters of 10-15 distinct versions (M2.6.5 roster-v2). */
     rosters: z.array(seasonRosterSchema).length(SEASON_TEAM_COUNT),
-    ownership: z.array(seasonOwnershipSchema).length(SEASON_TEAM_COUNT * SEASON_ROSTER_SIZE),
+    /** 300-450 unique ownership rows (M2.6.5). */
+    ownership: z
+      .array(seasonOwnershipSchema)
+      .min(SEASON_TEAM_COUNT * SEASON_DRAFT_SIZE)
+      .max(SEASON_TEAM_COUNT * 15),
     schedule: seasonScheduleReferenceSchema,
     /** All 1,230 league games; scheduled until played. */
     games: z.array(seasonGameSchema).length(SEASON_GAME_COUNT),
@@ -364,6 +383,8 @@ export const seasonRunSchema = z
     evaluations: z.array(seasonRosterEvaluationSchema).length(SEASON_TEAM_COUNT),
     /** M2.5: run-scoped trade-window state (null until the first window opens). */
     trade: seasonTradeStateSchema.nullable(),
+    /** M2.6.5: run-scoped free-agency market state. */
+    freeAgency: seasonFreeAgencyStateSchema,
     /** M2.5: run-scoped objective selections per block 0-7 (fixed catalog). */
     objectives: seasonObjectiveStateSchema,
     /**

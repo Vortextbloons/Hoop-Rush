@@ -573,6 +573,36 @@ describe('manifest contracts', () => {
     expect(hoopRushManifestSchema.safeParse(manifest).success).toBe(true);
   });
 
+  it('accepts a season section without M2.6.5 free-agency artifacts', () => {
+    const hash = 'a'.repeat(64);
+    const entry = { url: 'season/league.json', contentHash: hash };
+    const parsed = hoopRushManifestSchema.safeParse({
+      schemaVersion: 4,
+      dataVersion: 'm0.1',
+      modernFranchiseSlots: thirtySlots,
+      franchiseLineage: [],
+      eras: [],
+      pools: [],
+      availability: [],
+      eraSimulationProfiles: [],
+      season: {
+        league: entry,
+        schedule: { url: 'season/schedule.json', contentHash: hash },
+        draftCatalog: { url: 'season/draft-catalog.json', contentHash: hash },
+        rosterTargets: { url: 'season/roster-targets.json', contentHash: hash },
+      },
+      assets: {
+        headshotUrlTemplate: null,
+        headshotUrlTemplateSecondary: null,
+        logoUrlTemplate: null,
+        logoUrlTemplateSecondary: null,
+        source: 'example',
+        cacheVersion: 'v1',
+      },
+    });
+    expect(parsed.success).toBe(true);
+  });
+
   it('rejects a bad content hash', () => {
     const manifest = {
       schemaVersion: 3,

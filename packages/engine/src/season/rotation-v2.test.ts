@@ -226,47 +226,22 @@ describe('validateSeasonRotation (season-rotation-v2)', () => {
     ).toBe(true);
   });
 
-  it('rejects non-integer, out-of-range, and non-240 target minutes', () => {
-    const nonInteger = buildRotation();
-    nonInteger.targetMinutes = [
+  it.each([
+    [15.5, 'integer from 0-48'],
+    [49, '0-48'],
+    [-1, '0-48'],
+    [15, 'must total 240'],
+  ] as const)('rejects target minutes of %s', (minutes, expectedMessage) => {
+    const rotation = buildRotation();
+    rotation.targetMinutes = [
       ...STARTERS.map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
       ...BENCH.slice(0, 4).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
-      { playerVersionId: pv(10), minutes: 15.5 },
+      { playerVersionId: pv(10), minutes },
     ];
     expect(
-      validateSeasonRotation(nonInteger, MEMBER_PLAYABLE).some((f) =>
-        f.includes('integer from 0-48'),
+      validateSeasonRotation(rotation, MEMBER_PLAYABLE).some((failure) =>
+        failure.includes(expectedMessage),
       ),
-    ).toBe(true);
-
-    const tooHigh = buildRotation();
-    tooHigh.targetMinutes = [
-      ...STARTERS.map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
-      ...BENCH.slice(0, 4).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
-      { playerVersionId: pv(10), minutes: 49 },
-    ];
-    expect(validateSeasonRotation(tooHigh, MEMBER_PLAYABLE).some((f) => f.includes('0-48'))).toBe(
-      true,
-    );
-
-    const negative = buildRotation();
-    negative.targetMinutes = [
-      ...STARTERS.map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
-      ...BENCH.slice(0, 4).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
-      { playerVersionId: pv(10), minutes: -1 },
-    ];
-    expect(validateSeasonRotation(negative, MEMBER_PLAYABLE).some((f) => f.includes('0-48'))).toBe(
-      true,
-    );
-
-    const short = buildRotation();
-    short.targetMinutes = [
-      ...STARTERS.map((playerVersionId) => ({ playerVersionId, minutes: 32 })),
-      ...BENCH.slice(0, 4).map((playerVersionId) => ({ playerVersionId, minutes: 16 })),
-      { playerVersionId: pv(10), minutes: 15 },
-    ];
-    expect(
-      validateSeasonRotation(short, MEMBER_PLAYABLE).some((f) => f.includes('must total 240')),
     ).toBe(true);
   });
 

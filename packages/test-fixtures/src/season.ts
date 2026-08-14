@@ -87,6 +87,18 @@ function emptyHealth(): SeasonHealthState {
   };
 }
 
+/** M2.6.5 empty free-agency state: no windows, zero signings/spend (30 teams). */
+function emptyFreeAgency(): SeasonRun['freeAgency'] {
+  return {
+    schemaVersion: 1,
+    freeAgencyVersion: 'season-free-agency-v1',
+    windows: [],
+    canonicalCandidates: {},
+    signingCounts: Object.fromEntries(FRANCHISE_ORDER.map((franchiseId) => [franchiseId, 0])),
+    seasonSpend: Object.fromEntries(FRANCHISE_ORDER.map((franchiseId) => [franchiseId, 0])),
+  };
+}
+
 /**
  * M2.5 initial Influence state for the fixture league: every franchise at
  * +2 with its recorded `initial-grant` ledger entry (blockIndex/commandId
@@ -301,6 +313,9 @@ export function buildSeasonRunFixture(input: {
       almanacVersion: 'almanac-v1',
       replayExportVersion: 'replay-export-v1',
       postseasonTargetsVersion: 'postseason-targets-v1',
+      freeAgencyVersion: 'season-free-agency-v1',
+      freeAgencyIndexVersion: 'free-agency-index-v1',
+      freeAgencyTargetsVersion: 'free-agency-targets-v1',
     },
     league,
     rosters,
@@ -335,6 +350,7 @@ export function buildSeasonRunFixture(input: {
     // `buildInitialInfluence`; the fixed objective catalog from
     // SEASON_OBJECTIVE_CATALOG with no selections).
     trade: null,
+    freeAgency: emptyFreeAgency(),
     objectives: {
       schemaVersion: 1,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,

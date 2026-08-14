@@ -316,7 +316,7 @@ describe('SeasonHubState performance pass', () => {
     const external = createSeasonRunChannel();
     repo.setRevision(3);
     external.announce({ kind: 'commit', runId: RUN_ID, revision: 3, committedAt: Date.now() });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await expect.poll(() => hub.externalChange?.kind).toBe('commit');
 
     expect(hub.externalChange).not.toBeNull();
     expect(hub.externalChange?.kind).toBe('commit');
@@ -342,7 +342,7 @@ describe('SeasonHubState performance pass', () => {
     // The other tab already cleared the run before announcing.
     await repo.clearSeasonRun(RUN_ID);
     external.announce({ kind: 'clear', runId: null, committedAt: Date.now() });
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await expect.poll(() => runner.cancelCalls).toContain('req-1');
 
     expect(runner.cancelCalls).toContain('req-1');
     // The local run is gone: the hub reloaded the empty repository state.

@@ -8,15 +8,19 @@ import { commandIdSchema, franchiseIdSchema, idSchema } from './ids.ts';
  * append-only transaction entry. The log is run-scoped (not per-block), so
  * reload and replay reconstruct the full economic history exactly. Entries
  * are never mutated; corrections append new entries.
+ *
+ * M2.6.5 (spec/2.0/15): free-agency signings append immutable
+ * `free-agent-signing` entries linked to their ledger entries.
  */
 
-/** The five transaction kinds that can appear in the run-scoped log. */
+/** The six transaction kinds that can appear in the run-scoped log. */
 export const seasonTransactionTypeSchema = z.enum([
   'trade',
   'objective-reward',
   'block-grant',
   'influence-spend',
   'initial-grant',
+  'free-agent-signing',
 ]);
 export type SeasonTransactionType = z.infer<typeof seasonTransactionTypeSchema>;
 

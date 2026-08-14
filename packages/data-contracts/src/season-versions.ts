@@ -28,8 +28,17 @@
  * both validate; the change recorded itself through draft versions, never a
  * layout bump. Schema 7 continued to accept both draft-fact variants, and
  * schema 9 continues to.
+ *
+ * Bumped to 10 by the M2.6.5 roster-depth milestone: rosters carry 10-15
+ * distinct versions (ownership rows 300-450), each run carries the versioned
+ * free-agency state (`SeasonFreeAgencyState`), rotations stay exactly ten
+ * (`SEASON_ROTATION_SIZE`), and the run freezes the free-agency and
+ * roster-v2 material versions. Schema 9 runs (including the
+ * still-readable both-draft-fact union) are incompatible and load only
+ * through the explicit discard-and-restart recovery flow; they are never
+ * migrated, rewritten, or deleted.
  */
-export const SEASON_RUN_SCHEMA_VERSION = 9;
+export const SEASON_RUN_SCHEMA_VERSION = 10;
 
 /**
  * Stored Season Run draft record save-schema version (v3, M2.4): the single
@@ -40,14 +49,14 @@ export const SEASON_RUN_SCHEMA_VERSION = 9;
 export const SEASON_DRAFT_SAVE_SCHEMA_VERSION = 3;
 
 /**
- * Stored Season Run checkpoint row save-schema version (v6, M2.6
- * postseason-foundations): the current storage wrapper around a schema-9 run
- * snapshot (stage, postseason-v2 state, awards, completion, the extended
- * version set) plus the row-level mutable state. v1-v5 development rows
- * surface through the typed incompatibility flow; they are never read or
- * migrated.
+ * Stored Season Run checkpoint row save-schema version (v7, M2.6.5
+ * roster-depth): the current storage wrapper around a schema-10 run
+ * snapshot (expanded rosters, free-agency state, the extended version set)
+ * plus the row-level mutable state. v6 (M2.6 postseason-foundations) and
+ * earlier development rows surface through the typed incompatibility flow;
+ * they are never read or migrated.
  */
-export const SEASON_RUN_SAVE_SCHEMA_VERSION = 6;
+export const SEASON_RUN_SAVE_SCHEMA_VERSION = 7;
 
 /** Frozen 30-franchise league manifest version (conference/division alignment). */
 export const SEASON_LEAGUE_VERSION = 'league-v1';
@@ -184,8 +193,46 @@ export const SEASON_DRAFT_SAFE_MINIMUM = 3;
  */
 export const SEASON_OFFER_TARGETS_VERSION = 'offer-targets-v1';
 
-/** Pure ten-player Season Run roster legality rule set (game minimums). */
-export const SEASON_ROSTER_RULES_VERSION = 'season-roster-v1';
+/**
+ * M2.6.5 roster rules (spec/2.0/15, season-roster-v2): a Season Run roster
+ * contains 10-15 distinct player-season versions with unique real-player
+ * identities; coverage, legal-five, contingency, minutes, closing-five,
+ * availability, and game validation apply to its exactly-ten-member
+ * rotation (`SEASON_ROTATION_SIZE`). Drafts and AI generation still produce
+ * exactly `SEASON_DRAFT_SIZE` ten players. v1 (`season-roster-v1`, M2.1)
+ * stays the draft/generation compatibility authority; runtime
+ * roster-capacity validation uses the v2 bounds, never
+ * `SEASON_ROSTER_SIZE`.
+ */
+export const SEASON_ROSTER_RULES_VERSION = 'season-roster-v2';
+
+/**
+ * M2.6.5 free-agency market state machine (spec/2.0/15,
+ * season-free-agency-v1): deterministic shared markets after accepted
+ * checkpoints for blocks 2, 4, and 6, canonical identity selection,
+ * Declare/Skip/Resolve commands, the seven-step recorded resolution vector,
+ * per-franchise signing/spend caps, and atomic signing application.
+ */
+export const SEASON_FREE_AGENCY_VERSION = 'season-free-agency-v1';
+
+/**
+ * M2.6.5 packaged free-agent eligibility index artifact contract
+ * (free-agency-index-v1): a manifest-hashed compact index derived from the
+ * validated draft catalog, grouping eligible versions by real `playerId`
+ * with identity, positions, band, supported roles, minimum Influence cost,
+ * factual strengths/limitations, durability/availability facts, compact
+ * player-slice facts, catalog reference, derivation evidence, and exclusion
+ * evidence.
+ */
+export const SEASON_FREE_AGENCY_INDEX_VERSION = 'free-agency-index-v1';
+
+/**
+ * M2.6.5 frozen free-agency calibration targets (free-agency-targets-v1):
+ * market composition, universe exhaustion, identity stability, costs,
+ * signing/win/skip rates, roster sizes, spend, rationale accuracy, and
+ * quality exclusion; the artifact is committed through the CLI.
+ */
+export const SEASON_FREE_AGENCY_TARGETS_VERSION = 'free-agency-targets-v1';
 
 /**
  * M2.4 roster-generation-v2 (replaces roster-generation-v1): deterministic
@@ -316,8 +363,15 @@ export const SEASON_ROSTER_TARGETS_VERSION = 'roster-targets-v3';
  * v2 (M2.4) carried the effects state across the block in stable game-id
  * order, converting to compact summaries with effects rollups and folding
  * standings and aggregates.
+ *
+ * season-block-v4 (M2.6.5) carries the free-agency state across the block
+ * (windows open after accepted blocks 2, 4, 6; AI signings resolve
+ * deterministically at open), validates roster-v2 capacity/identity bounds,
+ * and rejects submission with `free-agency-unresolved` while a market
+ * window remains open. Game inputs stay exactly ten rotation players, so
+ * zero-signing game results are byte-identical to v3.
  */
-export const SEASON_BLOCK_VERSION = 'season-block-v3';
+export const SEASON_BLOCK_VERSION = 'season-block-v4';
 
 /**
  * Compact completed-game summary conversion (season-game-summary-v3,
@@ -328,7 +382,7 @@ export const SEASON_BLOCK_VERSION = 'season-block-v3';
 export const SEASON_GAME_SUMMARY_VERSION = 'season-game-summary-v3';
 
 /** Team/player aggregate folding and leaders (season-aggregates-v1). */
-export const SEASON_AGGREGATES_VERSION = 'season-aggregates-v1';
+export const SEASON_AGGREGATES_VERSION = 'season-aggregates-v2';
 
 /**
  * Block recap construction from saved game, aggregate, and effects facts
@@ -336,8 +390,12 @@ export const SEASON_AGGREGATES_VERSION = 'season-aggregates-v1';
  * trade, and influence evidence (`injuryEvidence`, `objectiveEvidence`,
  * `tradeEvidence`, `influenceBalance`). v2 (M2.4) added the block-level
  * effects evidence.
+ *
+ * season-recap-v4 (M2.6.5) adds the block-level free-agency evidence:
+ * signings by window/band, human Influence delta from free agency, and the
+ * human franchise's season signing/spend counts.
  */
-export const SEASON_RECAP_VERSION = 'season-recap-v3';
+export const SEASON_RECAP_VERSION = 'season-recap-v4';
 
 /** League leaders derivation, eligibility, and tie-breaking. */
 export const SEASON_LEADERS_VERSION = 'season-leaders-v1';
@@ -360,8 +418,13 @@ export const SEASON_HOME_COURT_VERSION = 'season-home-court-v1';
  * state. The digest is a pure function of the checkpoint's recorded facts, so
  * uninterrupted, cancelled/retried, terminated/reloaded, single-worker, and
  * CLI executions agree byte-for-byte.
+ *
+ * season-checkpoint-v4 (M2.6.5) adds the post-block free-agency state (open
+ * windows, canonical candidates, declarations, traces, signings, signing
+ * counts, season spend) to the candidate and the version set; rosters carry
+ * 10-15 players and player aggregates 300-450 rows.
  */
-export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v3';
+export const SEASON_CHECKPOINT_VERSION = 'season-checkpoint-v4';
 
 /**
  * Season Run stamina model (season-stamina-v2): the historical
@@ -381,8 +444,18 @@ export const SEASON_STAMINA_LEGACY_VERSION = 'season-stamina-v1';
  * M2.4 pair chemistry state rules (season-chemistry-v1): 45 canonical
  * playerVersionId pairs per ten-player roster (1,350 per league) that accrue
  * shared possessions only through recorded on-court play.
+ *
+ * season-chemistry-v2 (M2.6.5): chemistry stays rotation-scoped — exactly
+ * 1,350 ACTIVE canonical pairs (45 per locked ten-player rotation). Demotion
+ * freezes the player's recorded pair history into archived records that
+ * carry `franchiseId` and never count as active pairs; promotion restores
+ * prior same-franchise records with current rotation teammates, and
+ * never-paired relationships begin at zero. Inactive players own no active
+ * pairs; inactivity never decays or invents chemistry; trading or signing
+ * inactive depth does not change active pair state until the player enters
+ * a locked rotation.
  */
-export const SEASON_CHEMISTRY_VERSION = 'season-chemistry-v1';
+export const SEASON_CHEMISTRY_VERSION = 'season-chemistry-v2';
 
 /**
  * Season Run effect-size calibration targets (season-effect-targets-v2):
@@ -471,8 +544,17 @@ export const SEASON_HEALTH_VERSION = 'season-health-v1';
  * offers (windows open after accepted checkpoints for blocks 2, 4, 5),
  * value-band and legality evaluation, and the atomically applied ownership
  * transfer with chemistry reset.
+ *
+ * season-trade-v2 (M2.6.5): 1-for-1, 2-for-2, 1-for-2, and 2-for-1 offers
+ * are legal when both resulting rosters stay within 10-15 and retain a
+ * legal ten-player rotation subset. Value bands: 85-115% for 1-for-1,
+ * 80-120% for every multi-player or uneven package. Moving only inactive
+ * players leaves rotations and active effects unchanged; moving rotation
+ * players rebuilds affected rotations deterministically while preserving
+ * retained assignments/minutes where possible. Open free-agent targets are
+ * revalidated after every ownership change.
  */
-export const SEASON_TRADE_VERSION = 'season-trade-v1';
+export const SEASON_TRADE_VERSION = 'season-trade-v2';
 
 /**
  * M2.5 Influence economy contract (season-influence-v1): the +2 initial
@@ -501,8 +583,12 @@ export const SEASON_INJURY_TARGETS_VERSION = 'injury-targets-v1';
  * M2.5 frozen trade calibration targets (trade-targets-v1): 8-15 AI trades
  * per season, zero illegal or duplicate-ownership trades, value-band
  * compliance, deterministic offers, and chemistry invariants.
+ *
+ * trade-targets-v2 (M2.6.5): recalibrated for season-trade-v2 package mix
+ * (1-for-1, 2-for-2, 1-for-2, 2-for-1), the frozen 85-115 / 80-120 value
+ * bands, 10-15 roster legality, and rotation-subset retention.
  */
-export const SEASON_TRADE_TARGETS_VERSION = 'trade-targets-v1';
+export const SEASON_TRADE_TARGETS_VERSION = 'trade-targets-v2';
 
 /**
  * M2.5 frozen Influence calibration targets (influence-targets-v1):
@@ -566,7 +652,36 @@ export const SEASON_BLOCK_TEAM_GAMES = 10;
 /** Team games in the final block (rounds 81-82). */
 export const SEASON_FINAL_BLOCK_TEAM_GAMES = 2;
 
-/** Ten-player fantasy roster size. */
+/**
+ * Draft and AI-generation roster size: every Season Run draft produces
+ * exactly this many players and every AI-generated roster starts at this
+ * size (M2.6.5, spec/2.0/15). Drafts never grow with free agency.
+ */
+export const SEASON_DRAFT_SIZE = 10;
+
+/**
+ * Locked rotation size: every rotation contains exactly this many rostered
+ * players (five slot-assigned starters, five ordered reserves, target
+ * minutes totaling 240, and an ordered closing five). Coverage,
+ * legal-five, contingency, minutes, availability, and game validation apply
+ * to the rotation, never to inactive depth (M2.6.5, spec/2.0/15).
+ */
+export const SEASON_ROTATION_SIZE = 10;
+
+/** Minimum roster capacity: 10 distinct player-season versions (M2.6.5). */
+export const SEASON_ROSTER_MIN_SIZE = 10;
+
+/** Maximum roster capacity: 15 distinct player-season versions (M2.6.5). */
+export const SEASON_ROSTER_MAX_SIZE = 15;
+
+/**
+ * Deprecated ten-player roster size alias (M2.1-M2.6 draft and
+ * AI-generation compatibility). Retained so draft/AI-generation code keeps
+ * its historical constant, but it is REMOVED from runtime
+ * roster-capacity validation: capacity checks must use
+ * `SEASON_ROSTER_MIN_SIZE`/`SEASON_ROSTER_MAX_SIZE` (v2 bounds) and
+ * rotation checks `SEASON_ROTATION_SIZE`.
+ */
 export const SEASON_ROSTER_SIZE = 10;
 
 /**

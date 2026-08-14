@@ -43,6 +43,7 @@ export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   reduceSeasonStandings,
   seasonRotationSetDigest,
   seasonRosterPlayerVersionIds,
+  seasonRotationPlayerVersionIds,
   zeroSeasonEffectsState,
   seasonPairKey,
   seasonPairIsCanonical,
@@ -87,6 +88,22 @@ function seasonRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[
   ].sort();
 }
 
+/**
+ * M2.6.5 rotation-member union: the 300 ACTIVE players (ten per locked
+ * rotation). The v2 effects state's active load records and active pairs
+ * are exactly the rotation members, so the audit reconciles against this
+ * projection of the frozen rotation shape. Pure TypeScript on the
+ * data-contracts rotation contract (no engine import needed); the fixture
+ * stub mirrors it.
+ */
+function seasonRotationPlayerVersionIds(rotations: readonly SeasonRotation[]): string[] {
+  return [
+    ...new Set(
+      rotations.flatMap((rotation) => [...rotation.starters, ...rotation.benchOrder]),
+    ),
+  ].sort();
+}
+
 /** Canonical pair key: 'a\u0000b' with a < b (duplicate-detection convention). */
 function seasonPairKey(a: string, b: string): string {
   return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
@@ -97,10 +114,12 @@ function seasonPairIsCanonical(a: string, b: string): boolean {
 }
 
 /**
- * Zero effects state for a league: one fresh load state per rostered version
- * (zero fatigue, zero recent load, no completed round) and the canonical
- * 1,350 zero-shared-possession pairs (45 per ten-player roster). Validated
- * through the stored-effects schema before it can be persisted.
+ * Zero effects state for a league: one fresh ACTIVE load state per locked
+ * rotation member (zero fatigue, zero recent load, no completed round), no
+ * inactive depth, and the canonical 1,350 zero-shared-possession pairs (45
+ * per ten-player rotation). Validated through the stored-effects schema
+ * before it can be persisted. Draft promotion rosters are exactly ten
+ * players, so the roster union equals the rotation union at this boundary.
  */
 function zeroSeasonEffectsState(rosters: readonly SeasonRoster[]): SeasonEffectsState {
   const playerStates = seasonRosterPlayerVersionIds(rosters).map((playerVersionId) => ({
@@ -123,8 +142,10 @@ function zeroSeasonEffectsState(rosters: readonly SeasonRoster[]): SeasonEffects
     }
   }
   return seasonEffectsStateSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     playerStates,
+    inactivePlayerStates: [],
     pairStates,
+    archivedPairs: [],
   });
 }

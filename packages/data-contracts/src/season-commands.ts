@@ -2,11 +2,17 @@ import { z } from 'zod';
 import { commandIdSchema, franchiseIdSchema, seasonGameIdSchema } from './ids.ts';
 import {
   seasonDuplicateCommandRejectionSchema,
+  seasonFreeAgencyUnresolvedRejectionSchema,
   seasonRunMismatchRejectionSchema,
   seasonSubmitBlockCommandSchema,
 } from './season-block.ts';
 import { seasonRunCommandBaseSchema } from './season-command-base.ts';
 import { seasonCheckpointDigestSchema, seasonRotationSetDigestSchema } from './season-digests.ts';
+import {
+  seasonFreeAgencyRoleExpectationSchema,
+  seasonFreeAgencySigningSchema,
+  seasonFreeAgencyTargetSchema,
+} from './season-free-agency.ts';
 import { injuryIdSchema } from './season-health.ts';
 import { seasonInfluenceLedgerEntrySchema } from './season-influence.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
@@ -17,13 +23,14 @@ import { seasonRotationSchema } from './season-rotation.ts';
 import { seasonRunStageSchema } from './season-run.ts';
 
 /**
- * M2.5 typed Season Run commands (spec/2.0 M2.5, schema 7). Every command
- * shares one base shape — schema version, commandId, runId, and the
- * expected run state revision/digest the command asserts — so a handler can
- * validate run identity, state freshness (recomputed by the engine), and
- * commandId uniqueness uniformly before evaluating deterministic
- * preconditions. Handlers are PURE engine functions; this file owns the
- * wire shapes and the typed rejections only.
+ * M2.5 typed Season Run commands (spec/2.0 M2.5, schema 7; M2.6.5 schema 10
+ * adds the free-agency commands). Every command shares one base shape —
+ * schema version, commandId, runId, and the expected run state
+ * revision/digest the command asserts — so a handler can validate run
+ * identity, state freshness (recomputed by the engine), and commandId
+ * uniqueness uniformly before evaluating deterministic preconditions.
+ * Handlers are PURE engine functions; this file owns the wire shapes and
+ * the typed rejections only.
  */
 
 /** The base envelope every M2.5 run command composes (see season-command-base.ts). */
@@ -179,6 +186,316 @@ export const seasonGameMismatchRejectionSchema = z.object({
   pendingNextGameId: seasonGameIdSchema,
 });
 export type SeasonGameMismatchRejection = z.infer<typeof seasonGameMismatchRejectionSchema>;
+
+// ---------------------------------------------------------------------------
+// M2.6.5 free-agency commands and typed rejections (spec/2.0/15).
+// ---------------------------------------------------------------------------
+
+/**
+ * Re-exported from season-block.ts (the submit-block rejection union owns
+ * it; both surfaces share the literal): a block submission was attempted
+ * while a free-agency market window is still open.
+ */
+export {
+  seasonFreeAgencyUnresolvedRejectionSchema,
+  type SeasonFreeAgencyUnresolvedRejection,
+} from './season-block.ts';
+
+/** The named market window is not open (closed, resolved, or not yet opened). */
+export const seasonFreeAgencyWindowNotOpenRejectionSchema = z.object({
+  code: z.literal('free-agency-window-not-open'),
+  franchiseId: franchiseIdSchema.nullable(),
+  windowIndex: z.number().int().min(0).max(2),
+});
+export type SeasonFreeAgencyWindowNotOpenRejection = z.infer<
+  typeof seasonFreeAgencyWindowNotOpenRejectionSchema
+>;
+
+/** The named market window is already resolved; no further commands apply. */
+export const seasonFreeAgencyAlreadyResolvedRejectionSchema = z.object({
+  code: z.literal('free-agency-already-resolved'),
+  windowIndex: z.number().int().min(0).max(2),
+});
+export type SeasonFreeAgencyAlreadyResolvedRejection = z.infer<
+  typeof seasonFreeAgencyAlreadyResolvedRejectionSchema
+>;
+
+/** The franchise already declared or skipped this window (final once accepted). */
+export const seasonFreeAgencyAlreadyDeclaredRejectionSchema = z.object({
+  code: z.literal('free-agency-already-declared'),
+  franchiseId: franchiseIdSchema,
+  windowIndex: z.number().int().min(0).max(2),
+});
+export type SeasonFreeAgencyAlreadyDeclaredRejection = z.infer<
+  typeof seasonFreeAgencyAlreadyDeclaredRejectionSchema
+>;
+
+/** The named target is not a candidate of this window. */
+export const seasonFreeAgencyTargetIneligibleRejectionSchema = z.object({
+  code: z.literal('free-agency-target-ineligible'),
+  windowIndex: z.number().int().min(0).max(2),
+  playerVersionId: playerVersionIdSchema,
+});
+export type SeasonFreeAgencyTargetIneligibleRejection = z.infer<
+  typeof seasonFreeAgencyTargetIneligibleRejectionSchema
+>;
+
+/** The declared identity is already represented on a roster in the league. */
+export const seasonFreeAgencyDuplicateIdentityRejectionSchema = z.object({
+  code: z.literal('free-agency-duplicate-identity'),
+  playerId: z.string().min(1).max(64),
+  playerVersionId: playerVersionIdSchema,
+});
+export type SeasonFreeAgencyDuplicateIdentityRejection = z.infer<
+  typeof seasonFreeAgencyDuplicateIdentityRejectionSchema
+>;
+
+/** The two targets are the same version (a priority must order distinct targets). */
+export const seasonFreeAgencyInvalidPriorityRejectionSchema = z.object({
+  code: z.literal('free-agency-invalid-priority'),
+  playerVersionId: playerVersionIdSchema,
+});
+export type SeasonFreeAgencyInvalidPriorityRejection = z.infer<
+  typeof seasonFreeAgencyInvalidPriorityRejectionSchema
+>;
+
+/** The role expectation is not supported by the candidate. */
+export const seasonFreeAgencyUnsupportedRoleRejectionSchema = z.object({
+  code: z.literal('free-agency-unsupported-role'),
+  playerVersionId: playerVersionIdSchema,
+  roleExpectation: seasonFreeAgencyRoleExpectationSchema,
+  supportedRoles: z.array(seasonFreeAgencyRoleExpectationSchema),
+});
+export type SeasonFreeAgencyUnsupportedRoleRejection = z.infer<
+  typeof seasonFreeAgencyUnsupportedRoleRejectionSchema
+>;
+
+/** The committed Influence is below the candidate minimum or above 3. */
+export const seasonFreeAgencyInvalidInfluenceRejectionSchema = z.object({
+  code: z.literal('free-agency-invalid-influence'),
+  playerVersionId: playerVersionIdSchema,
+  influence: z.number().int(),
+  minimum: z.number().int().min(1).max(3),
+});
+export type SeasonFreeAgencyInvalidInfluenceRejection = z.infer<
+  typeof seasonFreeAgencyInvalidInfluenceRejectionSchema
+>;
+
+/** The franchise is already at the 15-player roster cap. */
+export const seasonFreeAgencyRosterCapRejectionSchema = z.object({
+  code: z.literal('free-agency-roster-cap'),
+  franchiseId: franchiseIdSchema,
+  rosterSize: z.number().int().min(10).max(15),
+});
+export type SeasonFreeAgencyRosterCapRejection = z.infer<
+  typeof seasonFreeAgencyRosterCapRejectionSchema
+>;
+
+/** The franchise already signed three free agents this season. */
+export const seasonFreeAgencySeasonSigningCapRejectionSchema = z.object({
+  code: z.literal('free-agency-season-signing-cap'),
+  franchiseId: franchiseIdSchema,
+  signingCount: z.number().int().min(0).max(3),
+});
+export type SeasonFreeAgencySeasonSigningCapRejection = z.infer<
+  typeof seasonFreeAgencySeasonSigningCapRejectionSchema
+>;
+
+/** The franchise already spent its 6-Influence free-agency season budget. */
+export const seasonFreeAgencySeasonInfluenceCapRejectionSchema = z.object({
+  code: z.literal('free-agency-season-influence-cap'),
+  franchiseId: franchiseIdSchema,
+  seasonSpend: z.number().int().min(0).max(6),
+});
+export type SeasonFreeAgencySeasonInfluenceCapRejection = z.infer<
+  typeof seasonFreeAgencySeasonInfluenceCapRejectionSchema
+>;
+
+/** The franchise's available non-debt balance cannot cover the commitment. */
+export const seasonFreeAgencyInsufficientBalanceRejectionSchema = z.object({
+  code: z.literal('free-agency-insufficient-balance'),
+  franchiseId: franchiseIdSchema,
+  balance: z.number().int(),
+  required: z.number().int().min(1).max(3),
+});
+export type SeasonFreeAgencyInsufficientBalanceRejection = z.infer<
+  typeof seasonFreeAgencyInsufficientBalanceRejectionSchema
+>;
+
+/** The franchise has not yet declared or skipped; resolution cannot run. */
+export const seasonFreeAgencyPendingDeclarationRejectionSchema = z.object({
+  code: z.literal('free-agency-pending-declaration'),
+  franchiseId: franchiseIdSchema,
+  windowIndex: z.number().int().min(0).max(2),
+});
+export type SeasonFreeAgencyPendingDeclarationRejection = z.infer<
+  typeof seasonFreeAgencyPendingDeclarationRejectionSchema
+>;
+
+/** An ownership or roster conflict would make the signing illegal. */
+export const seasonFreeAgencyOwnershipConflictRejectionSchema = z.object({
+  code: z.literal('free-agency-ownership-conflict'),
+  franchiseId: franchiseIdSchema,
+  playerVersionId: playerVersionIdSchema,
+  reason: z.string().min(1).max(256),
+});
+export type SeasonFreeAgencyOwnershipConflictRejection = z.infer<
+  typeof seasonFreeAgencyOwnershipConflictRejectionSchema
+>;
+
+/**
+ * Declare interest in one or two ordered targets of an open market window.
+ * Declarations are final once accepted; UI edits remain local until
+ * submission. Losing, cancelled, skipped, stale, or rejected targets cost
+ * zero; the winning commitment is debited at resolution.
+ */
+export const seasonDeclareFreeAgentInterestCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('declare-free-agent-interest'),
+  franchiseId: franchiseIdSchema,
+  windowIndex: z.number().int().min(0).max(2),
+  /** One or two ordered targets (first priority, then second). */
+  targets: z.array(seasonFreeAgencyTargetSchema).min(1).max(2),
+});
+export type SeasonDeclareFreeAgentInterestCommand = z.infer<
+  typeof seasonDeclareFreeAgentInterestCommandSchema
+>;
+
+/**
+ * Skip the open market window with no targets, no cost, and no penalty.
+ */
+export const seasonSkipFreeAgentMarketCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('skip-free-agent-market'),
+  franchiseId: franchiseIdSchema,
+  windowIndex: z.number().int().min(0).max(2),
+});
+export type SeasonSkipFreeAgentMarketCommand = z.infer<
+  typeof seasonSkipFreeAgentMarketCommandSchema
+>;
+
+/**
+ * Resolve the open market window. Accepted only after every human-controlled
+ * franchise declared or skipped; AI declarations were recorded
+ * deterministically when the window opened. Resolves first priorities
+ * simultaneously by candidate, then second priorities for franchises that
+ * did not sign; winners leave every remaining target list and at most one
+ * player signs per franchise.
+ */
+export const seasonResolveFreeAgentMarketCommandSchema = seasonRunCommandBaseSchema.extend({
+  command: z.literal('resolve-free-agent-market'),
+  windowIndex: z.number().int().min(0).max(2),
+});
+export type SeasonResolveFreeAgentMarketCommand = z.infer<
+  typeof seasonResolveFreeAgentMarketCommandSchema
+>;
+
+export const seasonDeclareFreeAgentInterestRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonFreeAgencyWindowNotOpenRejectionSchema,
+  seasonFreeAgencyAlreadyResolvedRejectionSchema,
+  seasonFreeAgencyAlreadyDeclaredRejectionSchema,
+  seasonFreeAgencyTargetIneligibleRejectionSchema,
+  seasonFreeAgencyDuplicateIdentityRejectionSchema,
+  seasonFreeAgencyInvalidPriorityRejectionSchema,
+  seasonFreeAgencyUnsupportedRoleRejectionSchema,
+  seasonFreeAgencyInvalidInfluenceRejectionSchema,
+  seasonFreeAgencyRosterCapRejectionSchema,
+  seasonFreeAgencySeasonSigningCapRejectionSchema,
+  seasonFreeAgencySeasonInfluenceCapRejectionSchema,
+  seasonFreeAgencyInsufficientBalanceRejectionSchema,
+  seasonFreeAgencyOwnershipConflictRejectionSchema,
+]);
+export type SeasonDeclareFreeAgentInterestRejection = z.infer<
+  typeof seasonDeclareFreeAgentInterestRejectionSchema
+>;
+
+export const seasonSkipFreeAgentMarketRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonFreeAgencyWindowNotOpenRejectionSchema,
+  seasonFreeAgencyAlreadyResolvedRejectionSchema,
+  seasonFreeAgencyAlreadyDeclaredRejectionSchema,
+]);
+export type SeasonSkipFreeAgentMarketRejection = z.infer<
+  typeof seasonSkipFreeAgentMarketRejectionSchema
+>;
+
+export const seasonResolveFreeAgentMarketRejectionSchema = z.discriminatedUnion('code', [
+  seasonRunMismatchRejectionSchema,
+  seasonStaleStateRejectionSchema,
+  seasonDuplicateCommandRejectionSchema,
+  seasonFreeAgencyWindowNotOpenRejectionSchema,
+  seasonFreeAgencyAlreadyResolvedRejectionSchema,
+  seasonFreeAgencyPendingDeclarationRejectionSchema,
+]);
+export type SeasonResolveFreeAgentMarketRejection = z.infer<
+  typeof seasonResolveFreeAgentMarketRejectionSchema
+>;
+
+export const seasonDeclareFreeAgentInterestResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonDeclareFreeAgentInterestRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    franchiseId: franchiseIdSchema,
+    windowIndex: z.number().int().min(0).max(2),
+    /** The recorded declaration (targets in priority order). */
+    declaration: seasonFreeAgencyTargetSchema.array(),
+  }),
+]);
+export type SeasonDeclareFreeAgentInterestResult = z.infer<
+  typeof seasonDeclareFreeAgentInterestResultSchema
+>;
+
+export const seasonSkipFreeAgentMarketResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonSkipFreeAgentMarketRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    franchiseId: franchiseIdSchema,
+    windowIndex: z.number().int().min(0).max(2),
+  }),
+]);
+export type SeasonSkipFreeAgentMarketResult = z.infer<typeof seasonSkipFreeAgentMarketResultSchema>;
+
+export const seasonResolveFreeAgentMarketResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('rejected'),
+    commandId: commandIdSchema,
+    rejection: seasonResolveFreeAgentMarketRejectionSchema,
+  }),
+  z.object({
+    status: z.literal('accepted'),
+    commandId: commandIdSchema,
+    windowIndex: z.number().int().min(0).max(2),
+    /** The recorded resolution trace(s) for the window. */
+    traces: z.array(
+      z.object({
+        seedPath: z.array(z.string()).min(1),
+        resolution: z.enum(['signed', 'no-signing']),
+        signingFranchiseId: franchiseIdSchema.nullable(),
+        signedPlayerVersionId: playerVersionIdSchema.nullable(),
+      }),
+    ),
+    /** The immutable signings applied by this resolution. */
+    signings: z.array(seasonFreeAgencySigningSchema),
+    /** Whether the human franchise signed in this window. */
+    humanSigned: z.boolean(),
+  }),
+]);
+export type SeasonResolveFreeAgentMarketResult = z.infer<
+  typeof seasonResolveFreeAgentMarketResultSchema
+>;
 
 // ---------------------------------------------------------------------------
 // M2.6 postseason commands and typed rejections (spec/2.0/02 Playoffs).
@@ -770,7 +1087,7 @@ export type SeasonFastForwardPostseasonResult = z.infer<
   typeof seasonFastForwardPostseasonResultSchema
 >;
 
-/** Every M2.5/M2.6 typed run command (submit-season-block lives in season-block.ts). */
+/** Every M2.5/M2.6/M2.6.5 typed run command (submit-season-block lives in season-block.ts). */
 export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonSelectBlockObjectiveCommandSchema,
   seasonSpendInfluenceCommandSchema,
@@ -784,6 +1101,9 @@ export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonSubmitPostseasonRotationCommandSchema,
   seasonSpectatePostseasonGameCommandSchema,
   seasonFastForwardPostseasonCommandSchema,
+  seasonDeclareFreeAgentInterestCommandSchema,
+  seasonSkipFreeAgentMarketCommandSchema,
+  seasonResolveFreeAgentMarketCommandSchema,
 ]);
 export type SeasonRunCommand = z.infer<typeof seasonRunCommandSchema>;
 
@@ -815,5 +1135,20 @@ export const seasonRunCommandRejectionSchema = z.discriminatedUnion('code', [
   seasonInsufficientRehabResourcesRejectionSchema,
   seasonInvalidSeriesStateRejectionSchema,
   seasonIntegrityFailureRejectionSchema,
+  seasonFreeAgencyUnresolvedRejectionSchema,
+  seasonFreeAgencyWindowNotOpenRejectionSchema,
+  seasonFreeAgencyAlreadyResolvedRejectionSchema,
+  seasonFreeAgencyAlreadyDeclaredRejectionSchema,
+  seasonFreeAgencyTargetIneligibleRejectionSchema,
+  seasonFreeAgencyDuplicateIdentityRejectionSchema,
+  seasonFreeAgencyInvalidPriorityRejectionSchema,
+  seasonFreeAgencyUnsupportedRoleRejectionSchema,
+  seasonFreeAgencyInvalidInfluenceRejectionSchema,
+  seasonFreeAgencyRosterCapRejectionSchema,
+  seasonFreeAgencySeasonSigningCapRejectionSchema,
+  seasonFreeAgencySeasonInfluenceCapRejectionSchema,
+  seasonFreeAgencyInsufficientBalanceRejectionSchema,
+  seasonFreeAgencyPendingDeclarationRejectionSchema,
+  seasonFreeAgencyOwnershipConflictRejectionSchema,
 ]);
 export type SeasonRunCommandRejection = z.infer<typeof seasonRunCommandRejectionSchema>;

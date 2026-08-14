@@ -10,6 +10,7 @@ import { seasonHealthStateSchema } from './season-health.ts';
 import { seasonInfluenceStateSchema } from './season-influence.ts';
 import { seasonObjectiveEvaluationSchema, seasonObjectiveIdSchema } from './season-objective.ts';
 import { seasonTransactionEntrySchema } from './season-transactions.ts';
+import { seasonFreeAgencyStateSchema } from './season-free-agency.ts';
 import {
   SEASON_AGGREGATES_VERSION,
   SEASON_BLOCK_VERSION,
@@ -17,6 +18,9 @@ import {
   SEASON_CHEMISTRY_VERSION,
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_INDEX_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -37,18 +41,22 @@ import {
 
 /**
  * Season Run candidate checkpoints and accepted-block history (spec/2.0/07
- * persistence, M2.5, season-checkpoint-v3). One block pipeline run returns
- * one candidate checkpoint; the application layer validates it, computes the
- * canonical digest, and commits it atomically or discards it. v3 (M2.5) adds
- * the authoritative post-block health, influence, and transaction facts plus
- * the locked objective evaluation, and ties the checkpoint to the mutable
- * run-state chain through `expectedStateRevision`/`expectedStateDigest`
- * (asserted pre-block) and `stateRevision`/`stateDigest` (computed
- * post-assembly). v2 (M2.4) added the frozen effects state (300 player loads
- * + 1,350 pair chemistries) to the candidate. The digest is a pure function
- * of recorded facts (see module docstring), so every execution path —
- * uninterrupted, cancelled/retried, terminated/reloaded, single worker, or
- * CLI — produces the same digest for the same cursor.
+ * persistence, M2.5, season-checkpoint-v3; M2.6.5 season-checkpoint-v4). One
+ * block pipeline run returns one candidate checkpoint; the application layer
+ * validates it, computes the canonical digest, and commits it atomically or
+ * discards it. v3 (M2.5) adds the authoritative post-block health,
+ * influence, and transaction facts plus the locked objective evaluation,
+ * and ties the checkpoint to the mutable run-state chain through
+ * `expectedStateRevision`/`expectedStateDigest` (asserted pre-block) and
+ * `stateRevision`/`stateDigest` (computed post-assembly). v2 (M2.4) added
+ * the frozen effects state (300 player loads + 1,350 pair chemistries) to
+ * the candidate. v4 (M2.6.5) adds the post-block free-agency state
+ * (windows, canonical candidates, declarations, traces, signings, signing
+ * counts, season spend) and the free-agency material versions; rosters hold
+ * 10-15 players and player aggregates 300-450 rows. The digest is a pure
+ * function of recorded facts (see module docstring), so every execution
+ * path — uninterrupted, cancelled/retried, terminated/reloaded, single
+ * worker, or CLI — produces the same digest for the same cursor.
  */
 
 /** Material versions that participate in block output and the digest. */
@@ -88,6 +96,12 @@ export const seasonCheckpointVersionsSchema = z.object({
   tradeTargetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
   /** M2.5: frozen Influence calibration targets (influence-targets-v1). */
   influenceTargetsVersion: z.literal(SEASON_INFLUENCE_TARGETS_VERSION),
+  /** M2.6.5: free-agency market rules (season-free-agency-v1). */
+  freeAgencyVersion: z.literal(SEASON_FREE_AGENCY_VERSION),
+  /** M2.6.5: packaged free-agent eligibility index (free-agency-index-v1). */
+  freeAgencyIndexVersion: z.literal(SEASON_FREE_AGENCY_INDEX_VERSION),
+  /** M2.6.5: frozen free-agency calibration targets (free-agency-targets-v1). */
+  freeAgencyTargetsVersion: z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
 });
 export type SeasonCheckpointVersions = z.infer<typeof seasonCheckpointVersionsSchema>;
 
@@ -127,8 +141,8 @@ export const seasonCandidateCheckpointSchema = z.object({
   standings: seasonStandingsSchema,
   /** Sorted by franchiseId ascending (30 rows). */
   teamAggregates: z.array(seasonTeamAggregateSchema).length(30),
-  /** Sorted by playerVersionId ascending (300 rows). */
-  playerAggregates: z.array(seasonPlayerAggregateSchema).length(300),
+  /** Sorted by playerVersionId ascending (300-450 rows; M2.6.5). */
+  playerAggregates: z.array(seasonPlayerAggregateSchema).min(300).max(450),
   gameSummaries: z.array(seasonGameSummarySchema).min(1).max(150),
   retainedDetails: z.array(seasonRetainedGameDetailSchema).max(10),
   recap: seasonBlockRecapSchema,
@@ -138,6 +152,8 @@ export const seasonCandidateCheckpointSchema = z.object({
   health: seasonHealthStateSchema,
   /** M2.5: post-block Influence state (includes this block's grants). */
   influence: seasonInfluenceStateSchema,
+  /** M2.6.5: post-block free-agency state (windows, declarations, traces, signings). */
+  freeAgency: seasonFreeAgencyStateSchema,
   /** M2.5: post-block transaction entries (grants etc.), append-only. */
   transactions: z.array(seasonTransactionEntrySchema),
   /**

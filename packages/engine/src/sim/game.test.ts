@@ -97,23 +97,6 @@ describe('game invariants over many seeds', () => {
     }
   });
 
-  it('a stronger lineup wins more often than it loses (directional)', () => {
-    const { strong, weak } = buildStrongWeakFixture();
-    let strongWins = 0;
-    let weakWins = 0;
-    for (let i = 0; i < 200; i += 1) {
-      const input = buildGameSimulationInput({
-        seed: seedFromString(`sw-${String(i)}`),
-        home: strong,
-        away: weak,
-      });
-      const result = simulateGame(input, ctx);
-      if (result.winner === 'home') strongWins += 1;
-      else weakWins += 1;
-    }
-    expect(strongWins).toBeGreaterThan(weakWins * 2);
-  });
-
   it('reports overtime facts on the golden overtime game', () => {
     const found = run('ot-v11-15');
     expect(found.overtimePeriods).toBeGreaterThan(0);
@@ -170,24 +153,54 @@ function ratingFixture(ratings: Partial<SimulationPlayer['ratings']>): Simulatio
 }
 
 describe('lineup strength across fixtures', () => {
-  it('medium opponents beat weak opponents (directional)', () => {
-    const { medium } = buildStrongMediumFixture();
-    const mediumDefense = buildLegalSimulationTeam({
-      teamId: 'fixture-medium',
-      players: medium.players,
-    });
-    const weak = ratingFixture({ insideScoring: 40, threePoint: 40, ballHandling: 40 });
-    let mediumWins = 0;
-    for (let i = 0; i < 150; i += 1) {
+  interface StrengthCase {
+    label: string;
+    buildHome: () => SimulationTeam;
+    buildAway: () => SimulationTeam;
+    seedPrefix: string;
+    runs: number;
+    assert: (homeWins: number, awayWins: number) => void;
+  }
+
+  const strengthCases: StrengthCase[] = [
+    {
+      label: 'a strong lineup beats a weak lineup decisively',
+      buildHome: () => buildStrongWeakFixture().strong,
+      buildAway: () => buildStrongWeakFixture().weak,
+      seedPrefix: 'sw',
+      runs: 200,
+      assert: (homeWins, awayWins) => { expect(homeWins).toBeGreaterThan(awayWins * 2); },
+    },
+    {
+      label: 'medium opponents beat weak opponents more often than not',
+      buildHome: () =>
+        buildLegalSimulationTeam({
+          teamId: 'fixture-medium',
+          players: buildStrongMediumFixture().medium.players,
+        }),
+      buildAway: () => ratingFixture({ insideScoring: 40, threePoint: 40, ballHandling: 40 }),
+      seedPrefix: 'mm',
+      runs: 150,
+      assert: (homeWins) => { expect(homeWins).toBeGreaterThan(75); },
+    },
+  ];
+
+  it.each(strengthCases)('$label', ({ buildHome, buildAway, seedPrefix, runs, assert }) => {
+    const home = buildHome();
+    const away = buildAway();
+    let homeWins = 0;
+    let awayWins = 0;
+    for (let i = 0; i < runs; i += 1) {
       const input = buildGameSimulationInput({
-        seed: seedFromString(`mm-${String(i)}`),
-        home: mediumDefense,
-        away: weak,
+        seed: seedFromString(`${seedPrefix}-${String(i)}`),
+        home,
+        away,
       });
       const result = simulateGame(input, ctx);
-      if (result.winner === 'home') mediumWins += 1;
+      if (result.winner === 'home') homeWins += 1;
+      else awayWins += 1;
     }
-    expect(mediumWins).toBeGreaterThan(75);
+    assert(homeWins, awayWins);
   });
 
   it('produces sane per-game totals for the 1990s fixture profile', () => {

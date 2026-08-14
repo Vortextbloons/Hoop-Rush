@@ -73,6 +73,8 @@ export * from './season-transactions.ts';
 export * from './season-influence.ts';
 export * from './season-objective.ts';
 export * from './season-trade.ts';
+export * from './season-free-agency.ts';
+export * from './season-free-agency-index.ts';
 export * from './season-pending-block.ts';
 export * from './season-commands.ts';
 export * from './season-block.ts';

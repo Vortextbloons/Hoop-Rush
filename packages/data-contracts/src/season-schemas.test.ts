@@ -714,13 +714,17 @@ describe('season run schema', () => {
     expect(run.stateDigest).toBe('0'.repeat(32));
   });
 
-  it('rejects duplicate ownership rows', () => {
+  it('accepts 300-450 ownership rows; uniqueness is an engine-level audit', () => {
     const run = buildRun();
     const duplicated = [...run.ownership];
     const first = duplicated[0];
     if (!first) throw new Error('no ownership rows');
-    duplicated.push({ ...first });
-    expect(() => seasonRunSchema.parse({ ...run, ownership: duplicated })).toThrow();
+    // The schema bounds the row count (300-450); duplicate-ownership
+    // uniqueness is enforced by the engine audit, not the shape.
+    expect(() =>
+      seasonRunSchema.parse({ ...run, ownership: [...duplicated, { ...first }] }),
+    ).not.toThrow();
+    expect(() => seasonRunSchema.parse({ ...run, ownership: duplicated.slice(0, 299) })).toThrow();
   });
 
   it('rejects malformed rosters', () => {
@@ -1749,10 +1753,10 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
     expect(seasonRosterTargetsSchema.safeParse(undefined).success).toBe(false);
   });
 
-  it('round-trips a schema-9 run with its aiPools and M2.5 state', () => {
+  it('round-trips a schema-10 run with its aiPools and M2.5 state', () => {
     const run = roundTrip(seasonRunSchema, buildRun());
-    expect(run.schemaVersion).toBe(9);
-    expect(run.versions.runSchemaVersion).toBe(9);
+    expect(run.schemaVersion).toBe(10);
+    expect(run.versions.runSchemaVersion).toBe(10);
     expect(run.versions.rosterGenerationVersion).toBe('roster-generation-v2');
     expect(run.versions.aiVersion).toBe('season-ai-v2');
     expect(run.versions.rosterTargetsVersion).toBe('roster-targets-v2');
@@ -2142,7 +2146,7 @@ describe('season pending block family (M2.5)', () => {
     expect(pending.teamAggregates).toHaveLength(0);
     expect(pending.playerAggregates).toHaveLength(0);
     expect(pending.nextGameId).toBe('s000001');
-    expect(pending.blockVersion).toBe('season-block-v3');
+    expect(pending.blockVersion).toBe('season-block-v4');
     expect(pending.objectiveId).toBeNull();
   });
 
@@ -2192,7 +2196,7 @@ describe('season pending block family (M2.5)', () => {
 
 describe('season commands (M2.5/M2.6, schema 9)', () => {
   const base = {
-    schemaVersion: 9,
+    schemaVersion: 10,
     commandId: 'cmd-1',
     runId: 'fixture-run-1',
     expectedStateRevision: 3,
@@ -2497,8 +2501,8 @@ describe('season commands (M2.5/M2.6, schema 9)', () => {
 
   it('parses submit-season-block with the M2.5 objective and state fields', () => {
     const command = {
-      schemaVersion: 9,
-      blockVersion: 'season-block-v3',
+      schemaVersion: 10,
+      blockVersion: 'season-block-v4',
       command: 'submit-season-block',
       commandId: 'cmd-submit-1',
       runId: 'fixture-run-1',
@@ -2564,7 +2568,8 @@ describe('season checkpoint M2.5 facts', () => {
     expect(checkpoint.expectedStateRevision).toBe(0);
     expect(checkpoint.stateDigest).toBe('0'.repeat(32));
     expect(checkpoint.versions.healthVersion).toBe('season-health-v1');
-    expect(checkpoint.versions.tradeTargetsVersion).toBe('trade-targets-v1');
+    expect(checkpoint.versions.tradeTargetsVersion).toBe('trade-targets-v2');
+    expect(checkpoint.freeAgency.windows).toEqual([]);
   });
 
   it('rejects a season-checkpoint-v2 candidate and missing M2.5 facts', () => {
@@ -2619,11 +2624,11 @@ describe('season checkpoint M2.5 facts', () => {
   });
 });
 
-describe('season worker wire v5 (M2.5)', () => {
+describe('season worker wire v6 (M2.6.5)', () => {
   function buildStartRequest() {
     const run = buildRun();
     return {
-      schemaVersion: 5,
+      schemaVersion: 6,
       type: 'season-block-start',
       requestId: 'req-1',
       runId: run.runId,
@@ -2690,14 +2695,14 @@ describe('season worker wire v5 (M2.5)', () => {
 
   it('round-trips complete messages with committed and interrupted results', () => {
     const committed = roundTrip(seasonWorkerCompleteMessageSchema, {
-      schemaVersion: 5,
+      schemaVersion: 6,
       type: 'season-block-complete',
       requestId: 'req-1',
       result: { status: 'committed', checkpoint: buildCheckpointFixture() },
     });
     expect(committed.result.status).toBe('committed');
     const interrupted = roundTrip(seasonWorkerCompleteMessageSchema, {
-      schemaVersion: 5,
+      schemaVersion: 6,
       type: 'season-block-complete',
       requestId: 'req-1',
       result: { status: 'interrupted', pending: buildPendingBlockFixture() },
@@ -2705,7 +2710,7 @@ describe('season worker wire v5 (M2.5)', () => {
     expect(interrupted.result.status).toBe('interrupted');
     expect(() =>
       seasonWorkerCompleteMessageSchema.parse({
-        schemaVersion: 5,
+        schemaVersion: 6,
         type: 'season-block-complete',
         requestId: 'req-1',
         result: { status: 'committed', pending: buildPendingBlockFixture() },
@@ -2774,7 +2779,7 @@ describe('season block recap M2.5 evidence', () => {
     const run = buildRun();
     const recap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v3',
+      recapVersion: 'season-recap-v4',
       runId: run.runId,
       blockIndex: 1,
       completedRounds: 10,
@@ -2818,12 +2823,20 @@ describe('season block recap M2.5 evidence', () => {
         },
       },
       tradeEvidence: { tradesAccepted: 1, influenceDelta: 2 },
+      freeAgencyEvidence: {
+        windowIndex: 0,
+        signings: [],
+        influenceDelta: 0,
+        seasonSignings: 0,
+        seasonSpend: 0,
+      },
       influenceBalance: { humanBalance: 5 },
     };
     const parsed = roundTrip(seasonBlockRecapSchema, recap);
     expect(parsed.injuryEvidence.bySeverity.major).toBe(1);
     expect(parsed.objectiveEvidence?.evaluationFacts.pointsAllowed).toBe(1050);
     expect(parsed.tradeEvidence.tradesAccepted).toBe(1);
+    expect(parsed.freeAgencyEvidence.windowIndex).toBe(0);
     expect(parsed.influenceBalance.humanBalance).toBe(5);
     expect(() => seasonBlockRecapSchema.parse({ ...recap, objectiveEvidence: null })).not.toThrow();
   });

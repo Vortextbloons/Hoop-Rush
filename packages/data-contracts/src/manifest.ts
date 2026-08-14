@@ -103,6 +103,17 @@ export const hoopRushManifestSchema = z.object({
       draftCatalog: seasonArtifactIndexEntrySchema,
       /** M2.1 frozen calibration targets for AI roster strength. */
       rosterTargets: seasonArtifactIndexEntrySchema,
+      /**
+       * M2.6.5 compact free-agent eligibility index
+       * (free-agency-index-v1), derived from the validated draft catalog.
+       * Optional so season manifests from before the packaged artifacts stay valid.
+       */
+      freeAgencyIndex: seasonArtifactIndexEntrySchema.optional(),
+      /**
+       * M2.6.5 frozen free-agency calibration targets (free-agency-targets-v1).
+       * Optional so season manifests from before the packaged artifacts stay valid.
+       */
+      freeAgencyTargets: seasonArtifactIndexEntrySchema.optional(),
     })
     .optional(),
   /** Projection milestone: the versioned projection model artifact

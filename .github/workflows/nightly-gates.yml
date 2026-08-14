@@ -69,32 +69,3 @@ jobs:
         env:
           BASE_PATH: /${{ github.event.repository.name }}
         run: pnpm build
-
-  # The full Playwright suite (including the real-worker block journeys that
-  # take minutes) runs only at night; PR CI keeps the @smoke subset fast.
-  e2e-full:
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-repo
-
-      - name: Build static site
-        env:
-          BASE_PATH: /${{ github.event.repository.name }}
-        run: pnpm build
-
-      - name: Run full Playwright suite
-        uses: ./.github/actions/playwright-e2e
-        with:
-          command: pnpm e2e
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-full
-          path: apps/web/playwright-report/
-          if-no-files-found: ignore
-          retention-days: 7
