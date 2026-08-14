@@ -59,21 +59,16 @@ function renderPoolBrowser(
 }
 
 describe('DraftPoolBrowser parity', () => {
-  it('ratings presentation shows only the Overall badge', () => {
-    const { getByTitle, queryByTitle } = renderPoolBrowser({ presentation: 'ratings' });
+  it.each(['ratings', 'sandbox'] as const)(
+    '%s presentation shows only the Overall badge',
+    (presentation) => {
+      const { getByTitle, queryByTitle } = renderPoolBrowser({ presentation });
 
-    expect(getByTitle('Overall').textContent).toBe('O 90');
-    expect(queryByTitle('Offense')).toBeNull();
-    expect(queryByTitle('Defense')).toBeNull();
-  });
-
-  it('sandbox presentation shows only the Overall badge', () => {
-    const { getByTitle, queryByTitle } = renderPoolBrowser({ presentation: 'sandbox' });
-
-    expect(getByTitle('Overall').textContent).toBe('O 90');
-    expect(queryByTitle('Offense')).toBeNull();
-    expect(queryByTitle('Defense')).toBeNull();
-  });
+      expect(getByTitle('Overall').textContent).toBe('O 90');
+      expect(queryByTitle('Offense')).toBeNull();
+      expect(queryByTitle('Defense')).toBeNull();
+    },
+  );
 
   it('ball-knowledge shows no rating badges', () => {
     const { queryByTitle, getByText } = renderPoolBrowser({ presentation: 'ball-knowledge' });

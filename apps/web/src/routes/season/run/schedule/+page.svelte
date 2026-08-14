@@ -10,6 +10,9 @@
   } from '$lib/season/season-shell-context';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import { boxScoreFromSummary } from '$lib/season/season-presentation';
+  import { postseasonSummaryRow } from '$lib/season/season-postseason-presentation';
+  import { getSeasonRunRepository } from '$lib/season/season-repo';
+  import type { SeasonPostseasonSummary } from '@hoop-rush/data-contracts';
   import {
     playedScheduleCount,
     scheduleBlockGroups,
@@ -18,13 +21,15 @@
   } from '$lib/season/season-schedule-view';
 
   /**
-   * Schedule tab (spec/2.0/11, M2.3.5): the human team's 82 games grouped
-   * into the nine blocks, with All/Played/Upcoming filters. Mobile renders
-   * opponent cards (logo, round, home/away, score, W/L state) and completed
-   * games expand into branded compact box scores; desktop renders a denser
-   * table in a scroll wrapper. Each completed block heading links to its
-   * checkpoint recap. Every fact derives from the run's schedule and the
-   * accepted summaries.
+   * Schedule tab (spec/2.0/11, M2.3.5, M2.6): the human team's 82 games
+   * grouped into the nine blocks, with All/Played/Upcoming filters, plus —
+   * once the postseason starts — the Play-In and playoff games loaded from
+   * the saved postseason summaries. Mobile renders opponent cards (logo,
+   * round, home/away, score, W/L state) and completed games expand into
+   * branded compact box scores; desktop renders a denser table in a scroll
+   * wrapper. Each completed block heading links to its checkpoint recap.
+   * Every fact derives from the run's schedule, the accepted summaries,
+   * and the recorded postseason summaries.
    */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
@@ -135,6 +140,45 @@
     if (row.forfeit) return row.won ? 'W · forfeit' : 'L · forfeit';
     return row.won ? 'W' : 'L';
   }
+
+  // -------------------------------------------------------------------------
+  // M2.6 postseason schedule: recorded Play-In + playoff summaries.
+  // -------------------------------------------------------------------------
+
+  let postseasonSummaries = $state<SeasonPostseasonSummary[] | null>(null);
+  let postseasonSummariesError = $state<string | null>(null);
+
+  $effect(() => {
+    const runId = shell.run?.runId ?? null;
+    const stage = shell.run?.stage ?? null;
+    if (runId === null || stage === null || stage === 'regular-season') {
+      postseasonSummaries = null;
+      postseasonSummariesError = null;
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const repo = await getSeasonRunRepository();
+        const summaries = await repo.loadPostseasonSummaries(runId);
+        if (!cancelled) postseasonSummaries = summaries;
+      } catch (error) {
+        if (!cancelled) {
+          postseasonSummariesError = error instanceof Error ? error.message : String(error);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  const postseasonRows = $derived(
+    (postseasonSummaries ?? []).map((summary) =>
+      postseasonSummaryRow(summary, humanFranchiseId ?? ''),
+    ),
+  );
+  const postseasonPlayed = $derived(postseasonRows.length);
 </script>
 
 <svelte:head>
@@ -364,6 +408,118 @@
           </section>
         {/each}
       </div>
+    {/if}
+
+    {#if postseasonSummariesError !== null}
+      <p
+        role="alert"
+        class="mt-6 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+      >
+        Could not load postseason results: {postseasonSummariesError}
+      </p>
+    {:else if postseasonSummaries === null && (shell.run?.stage ?? 'regular-season') !== 'regular-season'}
+      <p class="mt-6 font-mono text-sm text-muted-foreground">Loading postseason results…</p>
+    {:else if postseasonRows.length > 0}
+      <section aria-labelledby="postseason-schedule-heading" class="mt-8">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 sm:px-0">
+          <h2
+            id="postseason-schedule-heading"
+            class="font-display text-lg font-extrabold tracking-tight uppercase"
+          >
+            Postseason
+          </h2>
+          <span class="font-mono text-xs text-muted-foreground">
+            {postseasonPlayed} game{postseasonPlayed === 1 ? '' : 's'} played · Play-In and playoffs
+          </span>
+        </div>
+        <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
+          <table class="w-full min-w-[56rem] text-sm">
+            <caption class="sr-only">Postseason games — Play-In and playoffs</caption>
+            <thead>
+              <tr
+                class="border-b border-border/70 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
+              >
+                <th scope="col" class="px-4 py-2 text-left font-medium">Round</th>
+                <th scope="col" class="px-4 py-2 text-left font-medium">Matchup</th>
+                <th scope="col" class="px-4 py-2 text-right font-medium">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each postseasonRows as row (row.summary.gameId)}
+                <tr data-season-postseason-schedule-row class="border-b border-border/40">
+                  <td class="px-4 py-2 font-mono text-[10px] text-muted-foreground">
+                    {row.phaseLabel} · {row.roundLabel}
+                  </td>
+                  <td class="px-4 py-2">
+                    <span class="flex items-center gap-2">
+                      {#if identityOf(row.summary.awayFranchiseId)}
+                        <SeasonTeamLogo
+                          {manifest}
+                          franchiseId={row.summary.awayFranchiseId}
+                          teamExternalId={identityOf(row.summary.awayFranchiseId)!.teamExternalId}
+                          alt=""
+                          size="sm"
+                        />
+                      {/if}
+                      <span class="font-mono text-[10px] text-muted-foreground">at</span>
+                      {#if identityOf(row.summary.homeFranchiseId)}
+                        <SeasonTeamLogo
+                          {manifest}
+                          franchiseId={row.summary.homeFranchiseId}
+                          teamExternalId={identityOf(row.summary.homeFranchiseId)!.teamExternalId}
+                          alt=""
+                          size="sm"
+                        />
+                      {/if}
+                      <span class="truncate font-semibold">
+                        {shell.franchiseName(row.summary.awayFranchiseId)}
+                        <span class="font-normal text-muted-foreground">at</span>
+                        {shell.franchiseName(row.summary.homeFranchiseId)}
+                      </span>
+                    </span>
+                  </td>
+                  <td class="px-4 py-2 text-right">
+                    <span class="font-semibold {row.humanWon === true ? 'text-primary' : ''}">
+                      {row.humanGame ? (row.humanWon === true ? 'W' : 'L') : ''}
+                    </span>
+                    <span class="ml-2 font-mono text-[10px]">{row.scoreLabel}</span>
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        <ul class="mt-2 flex flex-col gap-0 md:hidden md:gap-2">
+          {#each postseasonRows as row (row.summary.gameId)}
+            <li
+              data-season-postseason-schedule-row
+              class="flex items-center gap-3 bg-surface-1 px-3 py-3 sm:rounded-xl"
+            >
+              <span class="w-16 shrink-0 font-mono text-[10px] text-muted-foreground">
+                {row.phaseLabel}
+                {row.roundLabel}
+              </span>
+              <span class="min-w-0 flex-1 truncate text-sm font-semibold">
+                {shell.franchiseName(row.summary.awayFranchiseId)}
+                <span class="font-normal text-muted-foreground">at</span>
+                {shell.franchiseName(row.summary.homeFranchiseId)}
+              </span>
+              <span class="shrink-0 text-right">
+                <span
+                  class="block font-mono text-xs font-bold {row.humanWon === true
+                    ? 'text-primary'
+                    : ''}"
+                >
+                  {row.humanGame ? (row.humanWon === true ? 'W' : 'L') : ''}
+                </span>
+                <span class="block font-mono text-[10px] text-muted-foreground">
+                  {row.scoreLabel}
+                </span>
+              </span>
+            </li>
+          {/each}
+        </ul>
+      </section>
     {/if}
 
     <p class="mt-6 px-3 font-mono text-xs text-muted-foreground sm:px-0">

@@ -401,6 +401,26 @@ export function createRotationEditor(
 }
 
 /**
+ * True when the cached editor was built before playable positions were
+ * available but the slice (or catalog top-up) now has them. The shell keeps
+ * pending rotation edits across tab switches; this is the narrow escape hatch
+ * that still rebuilds member playables once async slice data arrives.
+ */
+export function rotationEditorNeedsPositionRefresh(
+  editor: RotationEditor,
+  rosterPlayerVersionIds: readonly string[],
+  playableOf: (playerVersionId: string) => readonly Position[],
+): boolean {
+  for (const playerVersionId of rosterPlayerVersionIds) {
+    const loaded = playableOf(playerVersionId);
+    if (loaded.length === 0) continue;
+    const cached = editor.memberPlayable.get(playerVersionId) ?? [];
+    if (cached.length === 0) return true;
+  }
+  return false;
+}
+
+/**
  * Splits audit failure strings into per-player failures (messages that name
  * a playerVersionId) and global failures (totals, duplicates, structure).
  * The engine's failure strings embed ids positionally; parse them

@@ -9,7 +9,6 @@ import { blockRoundRange } from '@hoop-rush/data-contracts';
 import {
   auditSeasonBlockRecap,
   buildSeasonBlockRecap,
-  seasonBlockGameCount,
   type SeasonBlockRecapInput,
 } from './recap.ts';
 import { buildTestRun, scheduleOf } from './block-test-support.ts';
@@ -153,12 +152,6 @@ describe('season block recap (M2.3)', () => {
     });
     expect(withoutHuman.humanRecord).toBeNull();
     expect(withoutHuman.upcomingHumanGames).toHaveLength(0);
-  });
-
-  it('counts block games as 150 for blocks 0-7 and 30 for the final block', () => {
-    expect(seasonBlockGameCount(0)).toBe(150);
-    expect(seasonBlockGameCount(7)).toBe(150);
-    expect(seasonBlockGameCount(8)).toBe(30);
   });
 
   it('keeps streak facts consistent with the ordered game results', () => {

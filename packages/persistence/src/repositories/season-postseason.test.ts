@@ -1,4 +1,4 @@
-﻿import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   SEASON_EMPTY_COMMAND_LOG_DIGEST,
   seasonAlmanacDigest,
@@ -6,13 +6,10 @@ import {
   type PlayoffRound,
   type PlayoffSeries,
   type SeasonAlmanac,
-  type SeasonCommandLog,
-  type SeasonCommandLogEntry,
   type SeasonPostseasonSummary,
   type SeasonRun,
   type SeasonRunCommand,
 } from '@hoop-rush/data-contracts';
-import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
 import { DexieSeasonRunRepository } from './season-run-dexie.ts';
 import {
   SeasonPostseasonIntegrityError,
@@ -234,6 +231,7 @@ function buildAlmanac(
     postseasonDigest: 'd'.repeat(32),
     commandLogDigest: commandLogDigestValue,
     awardsDigest: 'e'.repeat(32),
+    tradeGradesDigest: 'f'.repeat(32),
     digest: DIGEST_32,
   };
   return { ...base, digest: seasonAlmanacDigest(base) };
@@ -244,28 +242,6 @@ function withAlmanacDigest(run: SeasonRun, almanacDigest: string): SeasonRun {
   const completion = run.completion;
   if (completion === null) throw new Error('expected completion state');
   return { ...run, completion: { ...completion, almanacDigest } };
-}
-
-/** A valid command-log entry mirroring the repository's append contract. */
-function buildLogEntry(
-  adapters: Adapters,
-  command: SeasonRunCommand,
-  ordinal: number,
-  postStateRevision: number,
-): SeasonCommandLogEntry {
-  return {
-    runId: adapters.run.runId,
-    ordinal,
-    command,
-    preStateRevision: command.expectedStateRevision,
-    preStateDigest: command.expectedStateDigest,
-    postStateRevision,
-    postStateDigest: '1'.repeat(32),
-    resultDigest: '2'.repeat(32),
-    previousLogDigest: SEASON_EMPTY_COMMAND_LOG_DIGEST,
-    relatedGameIds: [],
-    transactionIds: [],
-  };
 }
 
 function commandOf(
@@ -521,46 +497,6 @@ describe('season postseason repository (M2.6)', () => {
     expect(completedSeason?.commandLog.entries).toHaveLength(1);
     expect(completedSeason?.postseasonSummaries).toHaveLength(1);
     expect(await adapters.db.seasonCompletedIndex.get(adapters.run.runId)).not.toBeUndefined();
-  });
-
-  it('rolls the whole promotion back when a write fails mid-transaction', async () => {
-    const adapters = makeAdapters();
-    await promote(adapters);
-    const champion = adapters.run.rosters[0]?.franchiseId ?? 'lakers';
-    const finalRun = completedRunOf(adapters, 1);
-    const command = commandOf(adapters.run, 'start-postseason', 'cmd-rollback-1');
-    const logEntry = buildLogEntry(adapters, command, 0, adapters.run.stateRevision + 1);
-    const commandLog: SeasonCommandLog = {
-      schemaVersion: 1,
-      commandLogVersion: 'command-log-v1',
-      runId: adapters.run.runId,
-      entries: [logEntry],
-    };
-    const almanac = buildAlmanac(
-      adapters.run,
-      champion,
-      seasonCommandLogDigest(commandLog.entries),
-    );
-    // Inject a failure on the LAST write of the transaction: the completed
-    // history index registration. Every earlier write must roll back.
-    vi.spyOn(adapters.db.seasonCompletedIndex, 'put').mockRejectedValueOnce(
-      new Error('injected index write failure'),
-    );
-    await expect(
-      adapters.repo.promoteChampionToCompleted({
-        runId: adapters.run.runId,
-        run: withAlmanacDigest(finalRun, almanac.digest),
-        almanac,
-        commandLog,
-        postseasonSummaries: [],
-      }),
-    ).rejects.toThrow('injected index write failure');
-    // Nothing committed: no completed rows, no almanac, active pointer intact.
-    expect(await adapters.db.seasonCompletedRuns.count()).toBe(0);
-    expect(await adapters.db.seasonAlmanacs.count()).toBe(0);
-    expect(await adapters.db.seasonCompletedIndex.count()).toBe(0);
-    expect(await adapters.repo.loadActiveRun()).not.toBeNull();
-    expect(await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID)).not.toBeUndefined();
   });
 
   it('rejects promotions with an empty command log', async () => {

@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import type { SeasonGameSummary, SeasonRoster, SeasonRotation } from '@hoop-rush/data-contracts';
-import { seasonTeamDetail, type SeasonTeamDetail } from './season-team-detail-view';
+import {
+  normalizeTeamProjection,
+  rawSeasonTeamRatings,
+  seasonLeagueTeamProjections,
+  seasonTeamDetail,
+  type SeasonTeamDetail,
+} from './season-team-detail-view';
 
 /**
  * Season Run team detail view-model tests (M2.5 team drill-down): the
@@ -14,6 +20,11 @@ const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 const schedule = generateSeasonSchedule({ league, seed: SEED });
 const run = buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: 'lakers' });
+
+/** Zero raw projection for the (unreachable) no-minutes fallback path. */
+function zeroRawProjection() {
+  return { overall: 0, offense: 0, defense: 0 };
+}
 
 const rosterOf = (franchiseId: string): SeasonRoster => {
   const roster = run.rosters.find((r) => r.franchiseId === franchiseId);
@@ -97,6 +108,8 @@ function summary(home: SeasonRoster, away: SeasonRoster): SeasonGameSummary {
 const input = {
   roster: rosterOf('lakers'),
   rotation: rotationOf('lakers'),
+  rosters: run.rosters,
+  rotations: run.rotations,
   standings: run.standings,
   league: run.league,
   summaries: [] as SeasonGameSummary[],
@@ -175,9 +188,9 @@ describe('seasonTeamDetail', () => {
     }
   });
 
-  it('builds the minute-weighted 0-100 strip from the player ratings', () => {
+  it('builds the league-normalized 0-100 strip from the player ratings', () => {
     const detail = detailOf(input);
-    expect(detail.projection).toEqual({ overall: 80, offense: 82, defense: 74 });
+    expect(detail.projection).toEqual({ overall: 76, offense: 76, defense: 76 });
   });
 
   it('hides the strip when no rostered player ratings resolve', () => {
@@ -206,5 +219,97 @@ describe('seasonTeamDetail', () => {
         roster: { ...input.roster, franchiseId: 'nonexistent' },
       }),
     ).toBeNull();
+  });
+});
+
+describe('seasonLeagueTeamProjections', () => {
+  it('maps the weakest and strongest franchises to the display floor and ceiling', () => {
+    const ratings = new Map<
+      string,
+      { overallRating: number; offenseRating: number; defenseRating: number }
+    >();
+    for (const roster of run.rosters) {
+      const tier =
+        roster.franchiseId === 'lakers' ? 'high' : roster.franchiseId === 'celtics' ? 'low' : 'mid';
+      for (const entry of roster.players) {
+        ratings.set(entry.playerVersionId, {
+          overallRating: tier === 'high' ? 90 : tier === 'low' ? 68 : 78,
+          offenseRating: tier === 'high' ? 92 : tier === 'low' ? 66 : 76,
+          defenseRating: tier === 'high' ? 88 : tier === 'low' ? 70 : 80,
+        });
+      }
+    }
+    const summaryRatingsOf = (playerVersionId: string) => ratings.get(playerVersionId) ?? null;
+    const projections = seasonLeagueTeamProjections({
+      rosters: run.rosters,
+      rotations: run.rotations,
+      summaryRatingsOf,
+    });
+    expect(projections.get('lakers')).toEqual({ overall: 94, offense: 94, defense: 94 });
+    expect(projections.get('celtics')).toEqual({ overall: 58, offense: 58, defense: 58 });
+    const mids = [...projections.entries()]
+      .filter(([franchiseId]) => franchiseId !== 'lakers' && franchiseId !== 'celtics')
+      .map(([, projection]) => projection.overall);
+    for (const overall of mids) {
+      expect(overall).toBeGreaterThan(58);
+      expect(overall).toBeLessThan(94);
+    }
+  });
+
+  it('weights heavy-minute stars more than equal-minute benches on the same roster', () => {
+    const roster = input.roster;
+    const ratings = new Map<
+      string,
+      { overallRating: number; offenseRating: number; defenseRating: number }
+    >();
+    for (const entry of roster.players) {
+      ratings.set(entry.playerVersionId, {
+        overallRating: 70,
+        offenseRating: 70,
+        defenseRating: 70,
+      });
+    }
+    const star = roster.players[0];
+    const bench = roster.players[5];
+    if (star === undefined || bench === undefined)
+      throw new Error('fixture roster missing players');
+    ratings.set(star.playerVersionId, { overallRating: 95, offenseRating: 95, defenseRating: 95 });
+    ratings.set(bench.playerVersionId, { overallRating: 62, offenseRating: 62, defenseRating: 62 });
+    const summaryRatingsOf = (playerVersionId: string) => ratings.get(playerVersionId) ?? null;
+    const baselines = {
+      overall: { min: 70, max: 80 },
+      offense: { min: 70, max: 80 },
+      defense: { min: 70, max: 80 },
+    };
+
+    const starHeavy = normalizeTeamProjection(
+      rawSeasonTeamRatings({
+        roster,
+        rotation: {
+          ...input.rotation,
+          targetMinutes: roster.players.map((entry, index) => ({
+            playerVersionId: entry.playerVersionId,
+            minutes: index === 0 ? 40 : index === 5 ? 8 : 22,
+          })),
+        },
+        summaryRatingsOf,
+      }) ?? zeroRawProjection(),
+      baselines,
+    );
+    const balanced = normalizeTeamProjection(
+      rawSeasonTeamRatings({
+        roster,
+        rotation: {
+          ...input.rotation,
+          targetMinutes: roster.players.map((entry) => ({
+            playerVersionId: entry.playerVersionId,
+            minutes: 24,
+          })),
+        },
+        summaryRatingsOf,
+      }) ?? zeroRawProjection(),
+      baselines,
+    );
+    expect(starHeavy.overall).toBeGreaterThan(balanced.overall);
   });
 });

@@ -45,14 +45,11 @@ import { canonicalJson } from './checkpoint.ts';
  * canonically (recursively sorted), so parse-reordered records hash
  * identically.
  *
- * NOTE (trade/economy workstream): the M2.5 contract places this function in
- * the health-owned checkpoint.ts module ("or a sibling state-digest module in
- * the same directory"). It lives here (a new file in season/) so the
- * trade/economy modules compile and run before the health workstream lands;
- * the canonicalization is exactly the contract's. The lead reconciles the
- * final placement at integration; if the health workstream lands its own
- * `seasonRunStateDigest` in checkpoint.ts, delete one copy (both follow the
- * frozen canonicalization, so digests agree).
+ * NOTE (resolved at integration): the M2.5 contract allowed this function to
+ * live in checkpoint.ts "or a sibling state-digest module in the same
+ * directory". The final placement is this module (`season/state-digest.ts`);
+ * `checkpoint.ts` exports the checkpoint digest, a different function. Both
+ * follow the frozen canonicalization, so digests agree.
  *
  * Pure TypeScript: no Svelte, persistence, worker, or network code.
  */

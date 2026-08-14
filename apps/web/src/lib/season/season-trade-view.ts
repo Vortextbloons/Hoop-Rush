@@ -242,6 +242,9 @@ export function tradeOfferViewModel(
       []
     );
   };
+  // The view-model accepts partial run shapes (test fixtures and legacy
+  // rows can omit rotations); the frozen SeasonRun type says non-optional.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const rotation = run.rotations?.find((entry) => entry.franchiseId === offer.toFranchiseId);
   const minutesById = new Map(
     (rotation?.targetMinutes ?? []).map((entry) => [entry.playerVersionId, entry.minutes]),

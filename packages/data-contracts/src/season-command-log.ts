@@ -74,3 +74,26 @@ export const SEASON_EMPTY_COMMAND_LOG_DIGEST = seasonDigestHex(canonicalJson([])
 export function seasonCommandLogDigest(entries: readonly SeasonCommandLogEntry[]): string {
   return seasonDigestHex(canonicalJson(entries));
 }
+
+/**
+ * The canonical digest of one accepted command's result facts (M2.6): the
+ * command id, the advanced game ids (canonically sorted), and the result
+ * digests of the summaries the command produced (canonically sorted). This
+ * is the ONE construction shared by the persistence commit path, the web
+ * history export, and the CLI reproduce command, so the log's stored
+ * `resultDigest` and a replayed reproduction always agree. Commands that
+ * produce no summaries pass the empty summary-digest array.
+ */
+export function seasonCommandResultDigest(facts: {
+  commandId: string;
+  gameIds: readonly string[];
+  summaryDigests: readonly string[];
+}): string {
+  return seasonDigestHex(
+    canonicalJson({
+      commandId: facts.commandId,
+      gameIds: [...facts.gameIds].sort(),
+      summaryDigests: [...facts.summaryDigests].sort(),
+    }),
+  );
+}

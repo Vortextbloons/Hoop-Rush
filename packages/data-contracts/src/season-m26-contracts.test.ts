@@ -507,6 +507,7 @@ describe('awards, almanac, and replay exports (M2.6)', () => {
       postseasonDigest: 'b'.repeat(32),
       commandLogDigest: 'c'.repeat(32),
       awardsDigest: 'd'.repeat(32),
+      tradeGradesDigest: 'e'.repeat(32),
       digest: '0'.repeat(32),
     };
     const parsed = seasonAlmanacSchema.parse(almanac);

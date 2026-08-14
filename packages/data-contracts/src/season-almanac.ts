@@ -25,6 +25,12 @@ export const seasonAlmanacSchema = z.object({
   commandLogDigest: seasonCheckpointDigestSchema,
   /** Canonical digest of the derived awards. */
   awardsDigest: seasonCheckpointDigestSchema,
+  /**
+   * M2.6 integration: canonical digest of the derived trade grades
+   * (trade-grade-v1, computed from the recorded post-trade facts through the
+   * champion before promotion).
+   */
+  tradeGradesDigest: seasonCheckpointDigestSchema,
   /** Canonical 32-hex digest of the almanac facts (self-excluded). */
   digest: seasonCheckpointDigestSchema,
 });

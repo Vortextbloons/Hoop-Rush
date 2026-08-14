@@ -77,6 +77,7 @@ export * from './season-pending-block.ts';
 export * from './season-commands.ts';
 export * from './season-block.ts';
 export * from './season-worker.ts';
+export * from './season-postseason-worker.ts';
 export {
   buildEmptyHealth,
   buildInitialInfluence,

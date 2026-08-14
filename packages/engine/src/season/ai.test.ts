@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   seasonLeagueGenerationResultSchema,
   seasonRosterCalibrationRunSchema,
-  type SeasonDraftCatalog,
   type SeasonDraftCandidate,
   type SeasonLeagueGenerationResult,
   type SeasonRosterTargets,
@@ -456,33 +455,10 @@ describe('season AI bounded failure and calibration', () => {
       candidate.positions.primary = 'PG';
       candidate.positions.secondary = [];
     }
-    const modifiedCatalog: SeasonDraftCatalog = {
-      ...catalog,
-      candidates: catalog.candidates.map((c) => ({
-        ...c,
-        positions: { ...c.positions, playable: [...c.positions.playable] },
-      })),
-    };
-    for (const candidate of modifiedCatalog.candidates) {
-      candidate.positions.playable = [
-        'PG',
-        'SG',
-        'SF',
-        'PF',
-      ] as SeasonDraftCandidate['positions']['playable'];
-      candidate.positions.primary = 'PG';
-      candidate.positions.secondary = [];
-    }
-    expect(() =>
-      generateAiLeague({
-        ...soloInput(seedFromString('exhausted'), CATALOG, LEAGUE, 'lakers'),
-        catalog: modifiedCatalog,
-      }),
-    ).toThrow(SeasonAiGenerationError);
     try {
       generateAiLeague({
         ...soloInput(seedFromString('exhausted'), CATALOG, LEAGUE, 'lakers'),
-        catalog: modifiedCatalog,
+        catalog,
       });
       throw new Error('expected exhaustion');
     } catch (error) {

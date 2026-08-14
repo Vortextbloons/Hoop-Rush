@@ -264,6 +264,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       postseasonDigest: DIGEST_32,
       commandLogDigest: DIGEST_32,
       awardsDigest: DIGEST_32,
+      tradeGradesDigest: DIGEST_32,
       digest: DIGEST_32,
     });
     await legacy.table('seasonAlmanacs').put({
@@ -843,6 +844,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       postseasonDigest: DIGEST_32,
       commandLogDigest: DIGEST_32,
       awardsDigest: DIGEST_32,
+      tradeGradesDigest: DIGEST_32,
       digest: DIGEST_32,
     });
     await db.seasonAlmanacs.put({

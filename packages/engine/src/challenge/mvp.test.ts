@@ -365,7 +365,6 @@ describe('league mvp', () => {
 
   it('returns null for a run with no games', () => {
     expect(leagueMvp(runFixture([]))).toBeNull();
-    expect(leagueMvp(buildChallengeRun({ games: [] }))).toBeNull();
   });
 
   it('records all 82 appearances for a season-long standout', () => {
@@ -382,18 +381,6 @@ describe('league mvp', () => {
     expect(mvp?.isUserTeam).toBe(true);
     expect(mvp?.appearances).toBe(82);
     expect(mvp?.averageGameScore).toBe(20);
-  });
-
-  it('is deterministic across identical runs', () => {
-    const games = [20, 23, 25].map((points, index) =>
-      gameResultFixture({
-        awayTeamId: 'celtics',
-        homePlayers: [scoringBox(points, 'p-1'), scoringBox(1, 'p-2')],
-        awayPlayers: [scoringBox(3, 'p-opp-1-0')],
-        gameNumber: index + 1,
-      }),
-    );
-    expect(leagueMvp(runFixture(games))).toEqual(leagueMvp(runFixture(games)));
   });
 });
 

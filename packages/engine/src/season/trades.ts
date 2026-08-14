@@ -1414,18 +1414,14 @@ export function applySeasonTrade(
     }
   }
 
-  // New rosters (ten players each; entries carry their new franchiseId).
+  // New rosters (ten players each; version identity on each entry is unchanged).
   const toEntries = [
     ...toRoster.players.filter((player) => !outgoing.includes(player.playerVersionId)),
-    ...fromRoster.players
-      .filter((player) => incoming.includes(player.playerVersionId))
-      .map((player) => ({ ...player, franchiseId: toFranchiseId })),
+    ...fromRoster.players.filter((player) => incoming.includes(player.playerVersionId)),
   ];
   const fromEntries = [
     ...fromRoster.players.filter((player) => !incoming.includes(player.playerVersionId)),
-    ...toRoster.players
-      .filter((player) => outgoing.includes(player.playerVersionId))
-      .map((player) => ({ ...player, franchiseId: fromFranchiseId })),
+    ...toRoster.players.filter((player) => outgoing.includes(player.playerVersionId)),
   ];
   const toIdsAfter = toEntries.map((player) => player.playerVersionId);
   const fromIdsAfter = fromEntries.map((player) => player.playerVersionId);

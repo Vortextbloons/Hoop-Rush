@@ -4,6 +4,7 @@ import {
   SEASON_EFFECT_TARGETS_VERSION,
   SEASON_INFLUENCE_TARGETS_VERSION,
   SEASON_INJURY_TARGETS_VERSION,
+  SEASON_POSTSEASON_TARGETS_VERSION,
   SEASON_TRADE_TARGETS_VERSION,
   franchiseIdSchema,
   playerVersionIdSchema,
@@ -1255,3 +1256,128 @@ export const seasonInfluenceCalibrateReportSchema = z.object({
   durationMs: z.number().nonnegative(),
 });
 export type SeasonInfluenceCalibrateReport = z.infer<typeof seasonInfluenceCalibrateReportSchema>;
+
+/**
+ * M2.6 `season run reproduce` report payload: the replayed command count,
+ * the first-divergence facts (ordinal, command id, expected vs actual) when
+ * the log does not reproduce, and the final-state reconciliation facts.
+ */
+export const seasonRunReproduceReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season run reproduce'),
+  runId: z.string().min(1).max(64),
+  rootSeed: z.string().min(1).max(64),
+  eraId: z.string().min(1).max(64),
+  commandCount: z.number().int().nonnegative(),
+  replayedCount: z.number().int().nonnegative(),
+  blockCount: z.number().int().nonnegative(),
+  expectedCommandLogDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  expectedFinalStateDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  expectedAlmanacDigest: z.string().regex(/^[0-9a-f]{32}$/),
+  expectedChampionFranchiseId: z.string().min(1).max(64),
+  verifiedChainFacts: z.boolean(),
+  verifiedInitialRun: z.boolean(),
+  verifiedFinalStateDigest: z.boolean(),
+  verifiedAwards: z.boolean(),
+  verifiedChampion: z.boolean(),
+  firstDivergence: z
+    .object({
+      ordinal: z.number().int().nonnegative(),
+      commandId: z.string().min(1).max(64),
+      kind: z.enum([
+        'state-digest',
+        'result-digest',
+        'game-result',
+        'award-result',
+        'trade-grade-result',
+        'champion',
+        'chain-fact',
+        'rejected-command',
+      ]),
+      detail: z.string().min(1),
+    })
+    .nullable(),
+  divergences: z.array(z.string().min(1)).max(50),
+  pass: z.boolean(),
+});
+export type SeasonRunReproduceReport = z.infer<typeof seasonRunReproduceReportSchema>;
+
+/**
+ * M2.6 `season postseason audit` report payload: the bracket/play-in audit
+ * counts (duplicate/missing teams, invalid feeders, incorrect home court,
+ * games after clinching, inconsistent summaries, champion/completion
+ * mismatches) and the final pass flag.
+ */
+export const seasonPostseasonAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season postseason audit'),
+  runId: z.string().min(1).max(64),
+  championFranchiseId: z.string().nullable(),
+  gameCount: z.number().int().nonnegative(),
+  failures: z.array(z.string().min(1)).max(200),
+  counts: z.object({
+    duplicateTeams: z.number().int().nonnegative(),
+    missingTeams: z.number().int().nonnegative(),
+    invalidFeeders: z.number().int().nonnegative(),
+    incorrectHomeCourt: z.number().int().nonnegative(),
+    gamesAfterClinching: z.number().int().nonnegative(),
+    inconsistentSummaries: z.number().int().nonnegative(),
+    championCompletionMismatch: z.number().int().nonnegative(),
+    digestMismatch: z.number().int().nonnegative(),
+  }),
+  pass: z.boolean(),
+});
+export type SeasonPostseasonAuditReport = z.infer<typeof seasonPostseasonAuditReportSchema>;
+
+/**
+ * M2.6 `season postseason calibrate` report payload (postseason-targets-v1):
+ * the measured postseason facts per cohort (series length, upset rate, home
+ * advantage, advancement by relative strength, award plausibility, forfeits,
+ * integrity failures) plus the frozen cohort/held-out ranges and gate flags.
+ */
+export const seasonPostseasonCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season postseason calibrate'),
+  targetsVersion: z.literal(SEASON_POSTSEASON_TARGETS_VERSION),
+  calibrationSeeds: z.number().int().nonnegative(),
+  validationSeeds: z.number().int().nonnegative(),
+  seasonsSimulated: z.number().int().nonnegative(),
+  gamesPlayed: z.number().int().nonnegative(),
+  seriesCompleted: z.number().int().nonnegative(),
+  seriesLengthMean: z.number().nonnegative(),
+  upsetRate: z.number().min(0).max(1),
+  upsetGames: z.number().int().nonnegative(),
+  homeAdvantage: z.number().min(0).max(1),
+  homeGames: z.number().int().nonnegative(),
+  advancementByStrength: z.number().min(0).max(1),
+  strengthDecidedSeries: z.number().int().nonnegative(),
+  awardPlausibility: z.number().min(0).max(1).nullable(),
+  awardChecks: z.number().int().nonnegative(),
+  forfeits: z.number().int().nonnegative(),
+  integrityFailures: z.number().int().nonnegative(),
+  champions: z.number().int().nonnegative(),
+  duplicateTeamFailures: z.number().int().nonnegative(),
+  missingTeamFailures: z.number().int().nonnegative(),
+  bothInvalidGames: z.number().int().nonnegative(),
+  gates: z.object({
+    championPerSeason: z.boolean(),
+    zeroDuplicateTeams: z.boolean(),
+    zeroMissingTeams: z.boolean(),
+    zeroBothInvalidGames: z.boolean(),
+    seriesLength: z.boolean(),
+    upsetRate: z.boolean(),
+    homeAdvantage: z.boolean(),
+    advancementByStrength: z.boolean(),
+    awardPlausibility: z.boolean(),
+    forfeitRate: z.boolean(),
+    zeroIntegrityFailures: z.boolean(),
+    heldOut: z.boolean(),
+  }),
+  metrics: z.array(seasonM25GateSchema),
+  skippedGates: z.array(z.string().min(1)),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  durationMs: z.number().nonnegative(),
+  pass: z.boolean(),
+});
+export type SeasonPostseasonCalibrateReport = z.infer<typeof seasonPostseasonCalibrateReportSchema>;

@@ -486,7 +486,7 @@ describe('season run repository (dexie)', () => {
 
   it('a full nine-block season reloads with reconciled standings and aggregates', async () => {
     const adapters = makeAdapters();
-    const { repo, blocks, run } = adapters;
+    const { repo, blocks } = adapters;
     await promote(adapters);
     for (let blockIndex = 0; blockIndex < 9; blockIndex += 1) {
       await repo.commitSeasonBlock(commitInputFor(adapters, blockIndex));
@@ -506,7 +506,6 @@ describe('season run repository (dexie)', () => {
     const humanRow = blocks[8]?.standings.rows.find((row) => row.franchiseId === 'lakers');
     expect(index?.humanWins).toBe(humanRow?.wins);
     expect(index?.humanLosses).toBe(humanRow?.losses);
-    expect(run.runId).toBeTruthy();
   });
 
   it('the exported convenience function loads the full snapshot', async () => {

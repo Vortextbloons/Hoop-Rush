@@ -41,6 +41,8 @@
     return seasonTeamDetail({
       roster,
       rotation,
+      rosters: run.rosters,
+      rotations: run.rotations,
       standings: run.standings,
       league: run.league,
       summaries: shell.snapshot?.summaries ?? [],

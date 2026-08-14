@@ -18,7 +18,12 @@
   } from '$lib/season/season-block-submit';
   import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
   import { createProjectionRunner } from '$lib/season/season-projection-runner';
-  import { seasonTeamRatings } from '$lib/season/season-team-detail-view';
+  import {
+    buildLeagueProjectionBaselines,
+    normalizeTeamProjection,
+    rawSeasonTeamRatings,
+    seasonLeagueTeamProjections,
+  } from '$lib/season/season-team-detail-view';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
@@ -162,23 +167,62 @@
   /** Accepted summaries of the last block (last-game minutes per player). */
   let summaries: SeasonGameSummary[] = $state([]);
 
-  /** 0-100 team strip for the recorded locked rotation (pending editor
-   * edits stay on the editor's own projection panel): minute-weighted
-   * player ratings, same numbers as the team detail page. */
-  const teamProjection = $derived.by(() => {
+  /** Invalidates minute-weighted projections when the shell editor mutates in place. */
+  let rotationRevision = $state(0);
+
+  const ratingsOf = (playerVersionId: string) =>
+    summaryRatingsOfSlice(shell.playerSlice, playerVersionId);
+
+  const leagueProjectionBaselines = $derived.by(() => {
+    const run = shell.run;
+    if (run === null || !shell.playerSliceReady) return null;
+    return buildLeagueProjectionBaselines({
+      rosters: run.rosters,
+      rotations: run.rotations,
+      summaryRatingsOf: ratingsOf,
+    });
+  });
+
+  /** League-normalized strip from the last locked rotation (baseline for deltas). */
+  const lockedTeamProjection = $derived.by(() => {
     const run = shell.run;
     const humanId = shell.humanFranchiseId;
-    const slice = shell.playerSlice;
-    if (run === null || humanId === null || !shell.playerSliceReady) return null;
+    const baselines = leagueProjectionBaselines;
+    if (run === null || humanId === null || baselines === null) return null;
     const lockedRoster = run.rosters.find((entry) => entry.franchiseId === humanId);
     const lockedRotation = run.rotations.find((entry) => entry.franchiseId === humanId);
     if (lockedRoster === undefined || lockedRotation === undefined) return null;
-    return seasonTeamRatings({
+    const raw = rawSeasonTeamRatings({
       roster: lockedRoster,
       rotation: lockedRotation,
-      summaryRatingsOf: (playerVersionId) => summaryRatingsOfSlice(slice, playerVersionId),
+      summaryRatingsOf: ratingsOf,
     });
+    return raw === null ? null : normalizeTeamProjection(raw, baselines);
   });
+
+  /** League-normalized strip from the pending rotation editor state. */
+  const teamProjection = $derived.by(() => {
+    void rotationRevision;
+    const run = shell.run;
+    const humanId = shell.humanFranchiseId;
+    const editor = shell.editor;
+    if (run === null || humanId === null || editor === null || !shell.playerSliceReady) {
+      return null;
+    }
+    return (
+      seasonLeagueTeamProjections({
+        rosters: run.rosters,
+        rotations: run.rotations,
+        summaryRatingsOf: ratingsOf,
+        rotationOverrides: new Map([[humanId, editor.rotation]]),
+      }).get(humanId) ?? null
+    );
+  });
+
+  function projectionDelta(pending: number, locked: number | undefined): number | null {
+    if (locked === undefined || pending === locked) return null;
+    return pending - locked;
+  }
 
   $effect(() => {
     const hub = shell.hub;
@@ -217,6 +261,7 @@
   });
 
   const roleByVersion = $derived.by(() => {
+    void rotationRevision;
     const editor = shell.editor;
     if (editor === null) return null;
     const map = new SvelteMap<string, { role: string; minutes: number | string }>();
@@ -273,13 +318,24 @@
         </p>
       </div>
 
-      <!-- 0-100 team strip: minute-weighted player ratings from the recorded
-           locked rotation; pending editor edits are not included. -->
+      <!-- 0-100 team strip: minute-weighted player ratings from the pending rotation. -->
       {#if teamProjection !== null}
+        {@const overallDelta = projectionDelta(
+          teamProjection.overall,
+          lockedTeamProjection?.overall,
+        )}
+        {@const offenseDelta = projectionDelta(
+          teamProjection.offense,
+          lockedTeamProjection?.offense,
+        )}
+        {@const defenseDelta = projectionDelta(
+          teamProjection.defense,
+          lockedTeamProjection?.defense,
+        )}
         <dl
           class="grid grid-cols-3 gap-2"
           data-season-team-projection
-          aria-label="Team ratings from the locked rotation's player ratings"
+          aria-label="Team ratings from the pending rotation's player ratings"
         >
           <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
             <dt
@@ -289,6 +345,15 @@
             </dt>
             <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
               {teamProjection.overall}
+              {#if overallDelta !== null}
+                <span
+                  class="ml-1 font-mono text-[11px] font-bold {overallDelta > 0
+                    ? 'text-positive'
+                    : 'text-destructive'}"
+                >
+                  {overallDelta > 0 ? '+' : ''}{overallDelta}
+                </span>
+              {/if}
             </dd>
           </div>
           <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
@@ -299,6 +364,15 @@
             </dt>
             <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
               {teamProjection.offense}
+              {#if offenseDelta !== null}
+                <span
+                  class="ml-1 font-mono text-[11px] font-bold {offenseDelta > 0
+                    ? 'text-positive'
+                    : 'text-destructive'}"
+                >
+                  {offenseDelta > 0 ? '+' : ''}{offenseDelta}
+                </span>
+              {/if}
             </dd>
           </div>
           <div class="rounded-xl bg-surface-1 px-3 py-3 text-center">
@@ -309,11 +383,23 @@
             </dt>
             <dd class="font-display mt-1 text-2xl leading-none font-extrabold tracking-tight">
               {teamProjection.defense}
+              {#if defenseDelta !== null}
+                <span
+                  class="ml-1 font-mono text-[11px] font-bold {defenseDelta > 0
+                    ? 'text-positive'
+                    : 'text-destructive'}"
+                >
+                  {defenseDelta > 0 ? '+' : ''}{defenseDelta}
+                </span>
+              {/if}
             </dd>
           </div>
         </dl>
         <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">
-          1–100 from the locked rotation · minute-weighted player ratings
+          1–100 vs the league · star-heavy minute weighting
+          {#if overallDelta !== null || offenseDelta !== null || defenseDelta !== null}
+            · deltas vs last locked rotation
+          {/if}
         </p>
       {/if}
 
@@ -329,8 +415,7 @@
         {overallByVersion}
         {optimize}
         onchange={() => {
-          // The editor is shell-owned; reactive deriveds above already
-          // mirror its state. Submission happens at block time.
+          rotationRevision += 1;
         }}
       />
 

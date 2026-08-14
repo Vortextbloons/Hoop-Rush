@@ -1180,25 +1180,14 @@ describe('finals series and champion consistency (M2.6 postseason-v2)', () => {
 });
 
 describe('determinism (M2.6 postseason-v2)', () => {
-  it('building the same bracket twice from the same inputs yields identical ids', () => {
+  it('builders are stable for a seed and sensitive to seed changes', () => {
     const a = buildFullBracket(EAST_SEEDS, WEST_SEEDS);
     const b = buildFullBracket(EAST_SEEDS, WEST_SEEDS);
     expect(b).toEqual(a);
     expect(allPostseasonGameIds(b).join(',')).toBe(allPostseasonGameIds(a).join(','));
-    const states = [
-      buildCompletedPostseason({ seed: SEED }),
-      buildCompletedPostseason({ seed: SEED }),
-    ];
-    expect(states[1]).toEqual(states[0]);
-  });
-
-  it('buildPostseason(seed) is stable and seed-sensitive', () => {
     expect(buildPostseason(SEED)).toEqual(buildPostseason(SEED));
     expect(buildPostseason(SEED).seed).toBe(buildPostseason(SEED).seed);
     expect(buildPostseason('f'.repeat(32)).seed).not.toBe(buildPostseason(SEED).seed);
-  });
-
-  it('the seeded helpers derive identically from the same seed', () => {
     expect(seededRanking('east', SEED)).toEqual(seededRanking('east', SEED));
     expect(seededRanking('west', SEED)).toEqual(seededRanking('west', SEED));
     expect(seededRanking('east', SEED)).not.toEqual(seededRanking('east', 'f'.repeat(32)));
@@ -1206,34 +1195,5 @@ describe('determinism (M2.6 postseason-v2)', () => {
     const other = buildCompletedPostseason({ seed: 'f'.repeat(32) });
     expect(other).not.toEqual(state);
     expect(other.bracket?.east.seeds).not.toEqual(state.bracket?.east.seeds);
-  });
-});
-
-describe('exported deterministic builders (reusable by later phases)', () => {
-  it('every exported builder produces a parse-valid artifact', () => {
-    const east = RANKING.east;
-    expect(playInStateSchema.safeParse(buildFullPlayInState('east', east)).success).toBe(true);
-    expect(
-      playInStateSchema.safeParse(
-        buildPlayInState('east', east, { sevenEight: { status: 'final', winner: 'away' } }),
-      ).success,
-    ).toBe(true);
-    const series = buildCompletedSeries('east-first-round-1', 'a-team', 'b-team', {
-      round: 'first-round',
-      conference: 'east',
-      higherSeed: 1,
-      lowerSeed: 8,
-      winnerSide: 'home',
-      homeCourtWins: 4,
-      challengerWins: 3,
-    });
-    expect(playoffSeriesSchema.safeParse(series).success).toBe(true);
-    expect(playoffBracketSchema.safeParse(buildFullBracket(EAST_SEEDS, WEST_SEEDS)).success).toBe(
-      true,
-    );
-    expect(
-      seasonPostseasonStateSchema.safeParse(buildCompletedPostseason({ seed: SEED })).success,
-    ).toBe(true);
-    expect(allSeriesMasks()).toHaveLength(70);
   });
 });

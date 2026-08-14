@@ -8,6 +8,7 @@ import {
   seasonCommandLogEntrySchema,
   seasonCommandLogSchema,
   seasonPostseasonSummarySchema,
+  seasonEffectsStateSchema,
   seasonReplayExportDigest,
   seasonReplayExportSchema,
   seasonRunCommandSchema,
@@ -1513,7 +1514,10 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           teamAggregates: checkpoint.teamAggregates,
           playerAggregates: checkpoint.playerAggregates,
           recap: checkpoint.recap,
-          effects: checkpoint.effects,
+          effects:
+            input.effects !== undefined
+              ? seasonEffectsStateSchema.parse(input.effects)
+              : checkpoint.effects,
           updatedAtIso: new Date().toISOString(),
           health: validatedRun.health,
           transactions: validatedRun.transactions,

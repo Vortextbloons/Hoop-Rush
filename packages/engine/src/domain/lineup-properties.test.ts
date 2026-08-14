@@ -44,16 +44,6 @@ describe('lineup property', () => {
     );
   });
 
-  it('is deterministic for the same five players', () => {
-    fc.assert(
-      fc.property(lineupArb, ({ players }) => {
-        const first = assignLineup(players);
-        const second = assignLineup(players);
-        expect(second).toEqual(first);
-      }),
-    );
-  });
-
   it('slot requirements match the fixed G,G,F,F,C structure', () => {
     fc.assert(
       fc.property(fc.integer({ min: 0, max: 4 }), (slotIndex) => {

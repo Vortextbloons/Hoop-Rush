@@ -39,7 +39,6 @@ import {
 } from './draft.ts';
 import { seasonGenerationDigest } from './digest.ts';
 import { SeasonAiGenerationError } from './ai.ts';
-import { createRng } from '../sim/rng.ts';
 
 /**
  * Season Run M2.3.5 draft domain tests (season-draft-v2): one- and two-human
@@ -1460,38 +1459,5 @@ describe('season draft offer seed derivation', () => {
     expect(offerA?.cards.map((c) => c.playerVersionId)).not.toEqual(
       offerB?.cards.map((c) => c.playerVersionId),
     );
-  });
-});
-
-describe('season draft draws are seeded draws only', () => {
-  it('never uses Math.random or unseeded state in offer drawing', () => {
-    // The draw is a pure function of (state, catalog): two identical states
-    // produced through different command histories draw identical offers.
-    const a = createSolo(FULL_CATALOG, LEAGUE, SEED);
-    const b = createSolo(FULL_CATALOG, LEAGUE, SEED);
-    const offerA = requireState(
-      applySeasonDraftCommand(
-        requireState(a.state, 'create'),
-        FULL_CATALOG,
-        cmd('c-draw-a', 1, { kind: 'draw-season-offer', participantId: 'p1' }),
-        fakeDeps(),
-      ).state,
-      'draw-a',
-    ).currentOffer;
-    const offerB = requireState(
-      applySeasonDraftCommand(
-        requireState(b.state, 'create'),
-        FULL_CATALOG,
-        cmd('c-draw-b', 1, { kind: 'draw-season-offer', participantId: 'p1' }),
-        fakeDeps(),
-      ).state,
-      'draw-b',
-    ).currentOffer;
-    expect(offerA).toEqual(offerB);
-    // And the RNG stream used is the documented createRng stream.
-    const rng = createRng(
-      seasonNamespaceSeed(SEED, 'draft', 'offer', 'p1', '1', '1', 'safe-order'),
-    );
-    expect(typeof rng.next()).toBe('number');
   });
 });

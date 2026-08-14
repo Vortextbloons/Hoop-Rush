@@ -1279,6 +1279,8 @@ function postseasonFixture(
       standings: SeasonRun['standings'];
       seed: string;
     }) => { east: string[]; west: string[] };
+    /** The recorded regular-season summaries seam (awards derivation). */
+    regularSeasonSummaries?: SeasonGameSummary[];
   } = {},
 ): SeasonRunCommandContext & {
   run: SeasonRun;
@@ -1297,6 +1299,7 @@ function postseasonFixture(
     catalog,
     effects: zeroEffectsOf(run),
     profile: buildEraSimulationProfile(),
+    regularSeasonSummaries: options.regularSeasonSummaries,
     rankings:
       options.rankings ??
       (({ league }) => ({
@@ -1309,6 +1312,80 @@ function postseasonFixture(
       })),
     postseasonGameResolver: options.resolver ?? forcedPostseasonResolver(homeTeamWinsEveryGame),
   };
+}
+
+/**
+ * Schema-valid regular-season summaries over the fixture league's round-1
+ * games (all 30 franchises appear once): every roster player gets a minimal
+ * line, so the awards derivation has recorded facts to fold.
+ */
+function regularSeasonSummariesOf(run: SeasonRun): SeasonGameSummary[] {
+  const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
+  const linesOf = (franchiseId: string) => {
+    const roster = rosterByFranchise.get(franchiseId);
+    if (roster === undefined) throw new Error(`no roster for ${franchiseId}`);
+    return roster.players.map((player, index) => ({
+      playerVersionId: player.playerVersionId,
+      seconds: 2880 - index * 120,
+      started: index < 5,
+      points: 20 - index,
+      fieldGoalsMade: 8 - index,
+      fieldGoalsAttempted: 16 - index,
+      threePointersMade: 2,
+      threePointersAttempted: 5,
+      freeThrowsMade: 4,
+      freeThrowsAttempted: 5,
+      offensiveRebounds: 1,
+      defensiveRebounds: 5 - Math.floor(index / 3),
+      assists: 6 - Math.floor(index / 2),
+      steals: 1,
+      blocks: 1,
+      turnovers: 2,
+      fouls: 2,
+    }));
+  };
+  return run.games
+    .filter((game) => game.round === 1)
+    .map((game) => {
+      const homePlayers = linesOf(game.homeFranchiseId);
+      const awayPlayers = linesOf(game.awayFranchiseId);
+      const boxOf = (franchiseId: string, players: ReturnType<typeof linesOf>) => ({
+        franchiseId,
+        points: players.reduce((sum, line) => sum + line.points, 0),
+        fieldGoalsMade: players.reduce((sum, line) => sum + line.fieldGoalsMade, 0),
+        fieldGoalsAttempted: players.reduce((sum, line) => sum + line.fieldGoalsAttempted, 0),
+        threePointersMade: players.reduce((sum, line) => sum + line.threePointersMade, 0),
+        threePointersAttempted: players.reduce((sum, line) => sum + line.threePointersAttempted, 0),
+        freeThrowsMade: players.reduce((sum, line) => sum + line.freeThrowsMade, 0),
+        freeThrowsAttempted: players.reduce((sum, line) => sum + line.freeThrowsAttempted, 0),
+        offensiveRebounds: players.reduce((sum, line) => sum + line.offensiveRebounds, 0),
+        defensiveRebounds: players.reduce((sum, line) => sum + line.defensiveRebounds, 0),
+        assists: players.reduce((sum, line) => sum + line.assists, 0),
+        steals: players.reduce((sum, line) => sum + line.steals, 0),
+        blocks: players.reduce((sum, line) => sum + line.blocks, 0),
+        turnovers: players.reduce((sum, line) => sum + line.turnovers, 0),
+        fouls: players.reduce((sum, line) => sum + line.fouls, 0),
+        possessions: 100,
+      });
+      return {
+        schemaVersion: 1,
+        summaryVersion: 'season-game-summary-v3',
+        gameId: game.gameId,
+        round: game.round,
+        homeFranchiseId: game.homeFranchiseId,
+        awayFranchiseId: game.awayFranchiseId,
+        status: 'final' as const,
+        overtimePeriods: 0,
+        homeScore: boxOf(game.homeFranchiseId, homePlayers).points,
+        awayScore: boxOf(game.awayFranchiseId, awayPlayers).points,
+        forfeitLoserFranchiseId: null,
+        injuryEvents: [],
+        homeBox: boxOf(game.homeFranchiseId, homePlayers),
+        awayBox: boxOf(game.awayFranchiseId, awayPlayers),
+        homePlayers,
+        awayPlayers,
+      } satisfies SeasonGameSummary;
+    });
 }
 
 /** The human's saved rotation with minutes redistributed off injured players. */
@@ -1484,6 +1561,38 @@ describe('advance-postseason command', () => {
     expect(result.advancedGameIds).toContain('pi-west-seven-eight');
     expect(result.advancedGameIds).toContain(playoffGameIdOf('finals', 1));
     expect(output.run.stage).toBe('completed');
+    expectSchemaValidRun(output.run);
+  });
+
+  it('derives the season awards from the recorded summaries when the tournament completes', () => {
+    const context = postseasonFixture({
+      seed: TEST_SEED,
+      resolver: forcedPostseasonResolver(humanWinsEveryGame),
+      regularSeasonSummaries: regularSeasonSummariesOf(postseasonFixture().run),
+    });
+    const start = handleSeasonRunCommand(
+      commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
+      context,
+    );
+    if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
+    const output = handleSeasonRunCommand(
+      commandOf(start.run, { command: 'advance-postseason', commandId: 'adv-1' }),
+      { ...context, run: start.run },
+    );
+    const outputResult = output.result;
+    if (outputResult.command !== 'advance-postseason') throw new Error('unexpected command');
+    const result = outputResult.result;
+    if (result.status !== 'accepted') throw new Error('expected acceptance');
+    expect(result.stage).toBe('completed');
+    // The awards were derived BEFORE the digest was recomputed, so the run
+    // digest covers them and the stored run is self-consistent.
+    const awards = output.run.awards;
+    expect(awards).not.toBeNull();
+    expect(awards?.runId).toBe(output.run.runId);
+    expect(awards?.allLeagueFirstTeam).toHaveLength(5);
+    const leagueFranchises = new Set(output.run.league.teams.map((team) => team.franchiseId));
+    expect(leagueFranchises.has(awards?.mvp.franchiseId ?? '')).toBe(true);
+    expect(output.run.completion?.championFranchiseId).toBe(HUMAN);
     expectSchemaValidRun(output.run);
   });
 

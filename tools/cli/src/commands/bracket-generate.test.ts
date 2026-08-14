@@ -9,12 +9,8 @@ import { bracketGenerate } from './bracket-generate.ts';
  */
 
 describe('bracketGenerate', () => {
-  it('rejects a non-hex seed', () => {
-    expect(() => bracketGenerate({ seed: 'not-hex' })).toThrow(UsageError);
-  });
-
-  it('rejects a too-short hex seed', () => {
-    expect(() => bracketGenerate({ seed: 'ab' })).toThrow(UsageError);
+  it.each(['not-hex', 'ab'])('rejects a malformed seed (%s)', (seed) => {
+    expect(() => bracketGenerate({ seed })).toThrow(UsageError);
   });
 
   // Full regeneration (30 franchises x 32 proposals, 32 benchmark games

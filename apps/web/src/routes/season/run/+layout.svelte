@@ -31,8 +31,17 @@
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
-  import { buildVersionFaceIndex, type SeasonVersionTuple } from '$lib/season/season-branding';
-  import { createRotationEditor } from '$lib/season/season-rotation-editor';
+  import { buildVersionFaceIndex, versionTupleOfRosterEntry } from '$lib/season/season-branding';
+  import { catalogCandidateMap } from '$lib/season/season-catalog-index';
+  import {
+    createRotationEditor,
+    rotationEditorNeedsPositionRefresh,
+  } from '$lib/season/season-rotation-editor';
+  import {
+    hasPostseasonHubMethods,
+    idlePostseasonProgress,
+    POSTSEASON_ORCHESTRATION_UNAVAILABLE,
+  } from '$lib/season/season-postseason-presentation';
   import { isNavItemActive, type NavItem } from '$lib/nav-items';
   import {
     playablePositionsOfSlice,
@@ -69,6 +78,20 @@
     { id: 'leaders', label: 'Leaders', href: '/season/run/leaders', icon: BarChart3 },
   ];
 
+  /** M2.6: the bracket tab appears once the postseason begins (Play-In
+   * through the champion); the shell keeps the other five tabs intact. */
+  const postseasonNavItems: NavItem[] = [
+    ...seasonNavItems,
+    { id: 'postseason', label: 'Postseason', href: '/season/run/postseason', icon: Trophy },
+  ];
+
+  const navItems = $derived.by(() => {
+    const stage = shell.run?.stage ?? null;
+    return stage === 'play-in' || stage === 'playoffs' || stage === 'completed'
+      ? postseasonNavItems
+      : seasonNavItems;
+  });
+
   const shell = new SeasonRunShell();
   setContext(SEASON_RUN_SHELL_CONTEXT, shell);
 
@@ -83,6 +106,7 @@
   let faceIndexKey = '';
   let rostersRef: unknown = null;
   let faceRunId = '';
+  let catalogRef: SeasonRunShellData['catalog'] = null;
 
   function cloneTradeState(trade: NonNullable<SeasonRunShellData['trade']>) {
     return {
@@ -123,34 +147,32 @@
     }
   }
 
-  /** Rebuilds the players-index face join only when the index has loaded
-   * (lazy, post-first-paint) AND the run rosters changed. */
+  /** Rebuilds the players-index face join when the index has loaded (lazy,
+   * post-first-paint) and the run rosters or packaged catalog change. */
   function rebuildFacesIfNeeded(run: NonNullable<SeasonRunShellData['run']>): void {
     if (playersIndex === null) return;
-    if (run.runId !== faceRunId || run.rosters !== rostersRef) {
-      faceRunId = run.runId;
-      rostersRef = run.rosters;
-      const key = `${run.runId}:${run.rosters
-        .map(
-          (roster) =>
-            `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`,
-        )
-        .join('|')}`;
-      if (key !== faceIndexKey) {
-        const tuples: SeasonVersionTuple[] = run.rosters.flatMap((roster) =>
-          roster.players.map((entry) => ({
-            playerVersionId: entry.playerVersionId,
-            playerId: entry.playerId,
-            franchiseId: entry.franchiseId,
-            eraId: entry.eraId,
-            seasonKey: entry.seasonKey,
-            displayName: entry.displayName,
-          })),
-        );
-        shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
-        faceIndexKey = key;
-      }
+    const catalog = shell.catalog;
+    if (run.runId === faceRunId && run.rosters === rostersRef && catalog === catalogRef) {
+      return;
     }
+    faceRunId = run.runId;
+    rostersRef = run.rosters;
+    catalogRef = catalog;
+    const key = `${run.runId}:${run.rosters
+      .map(
+        (roster) =>
+          `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`,
+      )
+      .join('|')}:${catalog === null ? 'no-catalog' : 'catalog'}`;
+    if (key === faceIndexKey) return;
+    const candidates = catalog === null ? null : catalogCandidateMap(catalog);
+    const tuples = run.rosters.flatMap((roster) =>
+      roster.players.map((entry) =>
+        versionTupleOfRosterEntry(entry, candidates?.get(entry.playerVersionId) ?? null),
+      ),
+    );
+    shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
+    faceIndexKey = key;
   }
 
   /** Keeps the current editor (and its pending edits) across tab switches;
@@ -167,7 +189,17 @@
     const roster = run.rosters.find((r) => r.franchiseId === franchiseId);
     if (rotation === undefined || roster === undefined) return { editor: null, key: null };
     const key = `${run.runId}:${rotation.starters.join(',')}:${rotation.closingFive.join(',')}`;
-    if (shell.editorKey === key && shell.editor !== null) {
+    const rosterIds = roster.players.map((entry) => entry.playerVersionId);
+    if (
+      shell.editorKey === key &&
+      shell.editor !== null &&
+      !rotationEditorNeedsPositionRefresh(
+        shell.editor,
+        rosterIds,
+        (playerVersionId) =>
+          playablePositionsOfSlice(shell.playerSlice, playerVersionId) as readonly Position[],
+      )
+    ) {
       return { editor: shell.editor, key };
     }
     const members = roster.players.map((entry) => ({
@@ -190,6 +222,8 @@
     shell.snapshot = hub.snapshot;
     shell.index = hub.index;
     shell.block = hub.block;
+    // M2.6 postseason orchestration mirror (Track A's progress surface).
+    shell.postseason = hasPostseasonHubMethods(hub) ? hub.postseason : shell.postseason;
     // M2.5 interruption/pending mirrors + the last typed command rejection.
     shell.pending = hub.pending;
     shell.interruption = hub.interruption;
@@ -393,9 +427,9 @@
         missing.push({
           playerVersionId: entry.playerVersionId,
           playerId: entry.playerId,
-          franchiseId: entry.franchiseId,
-          eraId: entry.eraId,
-          seasonKey: entry.seasonKey,
+          franchiseId: candidate.franchiseId,
+          eraId: candidate.eraId,
+          seasonKey: candidate.seasonKey,
           displayName: entry.displayName,
           positionsPlayable: [...candidate.positions.playable],
           summaryRatings: { ...candidate.summaryRatings },
@@ -438,6 +472,10 @@
   shell.acceptTradeOffer = async (input) => {
     await shell.hub?.acceptTradeOffer(input);
     mirrorHub();
+    if (shell.catalog !== null) {
+      await topUpPlayerSliceFromCatalog(shell.catalog);
+      mirrorHub();
+    }
   };
   shell.declineTradeOffer = async (input) => {
     await shell.hub?.declineTradeOffer(input);
@@ -450,6 +488,76 @@
   shell.resumeBlock = async () => {
     await shell.hub?.resumeBlock();
     mirrorHub();
+  };
+
+  /**
+   * M2.6 postseason actions bound to the frozen Cross-track API contract.
+   * Track A implements the hub surface; when it is not present in this
+   * build the action surfaces a typed, actionable error instead of a silent
+   * no-op (the run itself is untouched and safe).
+   */
+  function postseasonUnavailable(): void {
+    shell.postseason = {
+      ...idlePostseasonProgress(),
+      phase: 'failed',
+      error: { code: 'unavailable', message: POSTSEASON_ORCHESTRATION_UNAVAILABLE },
+    };
+  }
+  shell.startPostseason = async () => {
+    const hub = shell.hub;
+    if (hub === null) return;
+    if (!hasPostseasonHubMethods(hub)) {
+      postseasonUnavailable();
+      return;
+    }
+    await hub.startPostseason();
+    mirrorHub();
+  };
+  shell.advancePostseason = async (input) => {
+    const hub = shell.hub;
+    if (hub === null) return;
+    if (!hasPostseasonHubMethods(hub)) {
+      postseasonUnavailable();
+      return;
+    }
+    await hub.advancePostseason(input);
+    mirrorHub();
+  };
+  shell.submitPostseasonRotation = async (input) => {
+    const hub = shell.hub;
+    if (hub === null) return;
+    if (!hasPostseasonHubMethods(hub)) {
+      postseasonUnavailable();
+      return;
+    }
+    await hub.submitPostseasonRotation(input);
+    mirrorHub();
+  };
+  shell.spectatePostseasonGame = async (input) => {
+    const hub = shell.hub;
+    if (hub === null) return;
+    if (!hasPostseasonHubMethods(hub)) {
+      postseasonUnavailable();
+      return;
+    }
+    await hub.spectatePostseasonGame(input);
+    mirrorHub();
+  };
+  shell.fastForwardPostseason = async (input) => {
+    const hub = shell.hub;
+    if (hub === null) return;
+    if (!hasPostseasonHubMethods(hub)) {
+      postseasonUnavailable();
+      return;
+    }
+    await hub.fastForwardPostseason(input);
+    mirrorHub();
+  };
+  shell.cancelPostseason = () => {
+    const hub = shell.hub;
+    if (hub !== null && hasPostseasonHubMethods(hub)) {
+      hub.cancelPostseason();
+    }
   };
   shell.playerName = (playerVersionId: string): string => {
     for (const roster of shell.run?.rosters ?? []) {
@@ -491,6 +599,10 @@
 
   const incompatible = $derived(shell.hub?.incompatible ?? null);
 
+  /** M2.6: history routes render without an active run (the champion was
+   * promoted to completed history and the active-run pointer removed). */
+  const isHistoryRoute = $derived(routeId?.startsWith('/season/run/history') ?? false);
+
   const showBrokenResume = $derived(
     shell.ready &&
       seasonLoadError === null &&
@@ -507,7 +619,8 @@
       shell.hub !== null &&
       shell.snapshot === null &&
       shell.index === null &&
-      !showBrokenResume,
+      !showBrokenResume &&
+      !isHistoryRoute,
   );
 
   let discardOpen = $state(false);
@@ -733,7 +846,7 @@
       class="sticky top-0 z-30 mt-4 hidden border-y border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85 md:block"
     >
       <div class="mx-auto flex w-full max-w-6xl items-center gap-1 px-4 sm:px-6">
-        {#each seasonNavItems as item (item.id)}
+        {#each navItems as item (item.id)}
           {@const active = isNavItemActive(item, routeId)}
           <a
             href={resolve(item.href as RouteId)}
@@ -754,7 +867,7 @@
     </main>
   </div>
 
-  <BottomNav items={seasonNavItems} label="Season navigation" />
+  <BottomNav items={navItems} label="Season navigation" />
 
   <Dialog.Root
     open={quitOpen}

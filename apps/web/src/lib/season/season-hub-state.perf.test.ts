@@ -9,7 +9,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import { SeasonHubState } from './season-hub-state';
 import { clearCachedSeasonSnapshot, getCachedSeasonSnapshot } from './season-state-cache';
-import type { SeasonBlockRunner, SeasonBlockStartInput, SeasonRunnerEvent } from './season-block-runner';
+import type {
+  SeasonBlockRunner,
+  SeasonBlockStartInput,
+  SeasonRunnerEvent,
+} from './season-block-runner';
 import { createSeasonRunChannel } from './season-cross-tab';
 
 /**
@@ -164,7 +168,6 @@ function startEnvelope(run: SeasonRun, effects: SeasonEffectsState) {
   // The fixture run is a runtime cast (minimalSnapshot); eslint's type info
   // resolves it as an error-typed value, but the hub never validates the
   // start input shape.
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   return { command, start };
 }
 
@@ -209,6 +212,17 @@ function repoWith(initial: SeasonRunSnapshot | null, indexRevision: number) {
     applySeasonRunCommand: vi.fn(() => Promise.resolve()),
     loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),
     upsertSeasonRunPlayerSlice: vi.fn(() => Promise.resolve()),
+    // M2.6 postseason repository surface (unused by these tests).
+    commitPostseasonAdvancement: vi.fn(() => Promise.resolve()),
+    loadPostseasonSummaries: vi.fn(() => Promise.resolve([])),
+    loadPostseasonSummary: vi.fn(() => Promise.resolve(null)),
+    loadPostseasonDetails: vi.fn(() => Promise.resolve([])),
+    loadCommandLog: vi.fn(() => Promise.resolve(null)),
+    promoteChampionToCompleted: vi.fn(() => Promise.resolve()),
+    loadCompletedSeason: vi.fn(() => Promise.resolve(null)),
+    listCompletedSeasonRuns: vi.fn(() => Promise.resolve([])),
+    deleteCompletedSeason: vi.fn(() => Promise.resolve()),
+    buildReplayExport: vi.fn(() => Promise.resolve(null)),
     /** Test hook: advances the persisted index revision (external commit). */
     setRevision(next: number): void {
       revision = next;

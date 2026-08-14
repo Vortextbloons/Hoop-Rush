@@ -534,6 +534,7 @@ describe('cross-track postseason integration (M2.6)', () => {
       postseasonDigest: seasonDigestHex(canonicalJson(run.postseason)),
       commandLogDigest: seasonCommandLogDigest(commandLog.entries),
       awardsDigest: seasonDigestHex(canonicalJson(run.awards)),
+      tradeGradesDigest: seasonDigestHex(canonicalJson(null)),
       digest: DIGEST_32,
     };
     const almanac = { ...almanacFacts, digest: seasonAlmanacDigest(almanacFacts) };

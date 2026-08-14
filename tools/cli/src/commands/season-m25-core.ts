@@ -21,6 +21,7 @@ import {
   type SeasonCheckpointState,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
+  type SeasonGameSummary,
   type SeasonHealthState,
   type SeasonInfluenceState,
   type SeasonObjectiveState,
@@ -164,6 +165,8 @@ export interface SeasonM25SeasonFacts {
   effects: SeasonEffectsState;
   /** The packaged catalog (playable positions for the legality audits). */
   catalog: SeasonDraftCatalog;
+  /** Every regular-season compact summary of the season, in game-id order. */
+  summaries: SeasonGameSummary[];
 }
 
 export interface SeasonM25DriverOptions {
@@ -304,5 +307,6 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
     balanceSnapshots,
     effects: state.effects,
     catalog: state.catalog,
+    summaries: state.summaries,
   };
 }

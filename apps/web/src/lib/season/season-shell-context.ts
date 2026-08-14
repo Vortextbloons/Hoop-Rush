@@ -9,6 +9,7 @@ import type {
   SeasonObjectiveId,
   SeasonObjectiveState,
   SeasonPendingBlockCandidate,
+  SeasonPostseasonRotationPayload,
   SeasonRun,
   SeasonSchedule,
   SeasonTeam,
@@ -22,6 +23,7 @@ import type {
   SeasonRunCommandError,
   SeasonSpendInfluencePurpose,
 } from './season-hub-state';
+import type { HubPostseasonProgress } from './season-postseason-presentation';
 import type { SeasonFaceRef } from './season-branding';
 import type { RotationEditor } from './season-rotation-editor';
 
@@ -134,6 +136,21 @@ export interface SeasonRunShellData {
   forfeitInterruptedGame: () => Promise<void>;
   /** M2.5: resumes an interrupted block from its pending candidate. */
   resumeBlock: () => Promise<void>;
+  /**
+   * M2.6 postseason actions (frozen Cross-track API contract — Track A
+   * implements the hub side; the shell routes through the same typed
+   * command path). `postseason` mirrors the hub's orchestration progress.
+   */
+  startPostseason: () => Promise<void>;
+  advancePostseason: (input?: { targetGameId?: string }) => Promise<void>;
+  submitPostseasonRotation: (input: {
+    targetGameId: string;
+    rotation: SeasonPostseasonRotationPayload;
+  }) => Promise<void>;
+  spectatePostseasonGame: (input: { targetGameId: string }) => Promise<void>;
+  fastForwardPostseason: (input?: { targetGameId?: string }) => Promise<void>;
+  cancelPostseason: () => void;
+  postseason: HubPostseasonProgress;
 }
 
 export function initialSeasonRunShellData(): SeasonRunShellData {
@@ -195,5 +212,19 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     declineTradeOffer: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
+    startPostseason: () => Promise.resolve(),
+    advancePostseason: () => Promise.resolve(),
+    submitPostseasonRotation: () => Promise.resolve(),
+    spectatePostseasonGame: () => Promise.resolve(),
+    fastForwardPostseason: () => Promise.resolve(),
+    cancelPostseason: () => undefined,
+    postseason: {
+      phase: 'idle',
+      gamesCompleted: 0,
+      gamesTotal: 0,
+      latestGameId: null,
+      latestResult: null,
+      error: null,
+    },
   };
 }

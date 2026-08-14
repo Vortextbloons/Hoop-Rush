@@ -610,6 +610,48 @@ const COMMANDS: Record<string, CommandEntry> = {
         }),
     };
   }),
+  'season run reproduce': command(async () => {
+    const { seasonRunReproduce, SEASON_RUN_REPRODUCE_OPTIONS } =
+      await import('./commands/season-reproduce.ts');
+    return {
+      options: SEASON_RUN_REPRODUCE_OPTIONS,
+      run: (args) =>
+        seasonRunReproduce({
+          input: getOptionString(args, 'input') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          profile: getOptionString(args, 'profile') ?? null,
+        }),
+    };
+  }),
+  'season postseason audit': command(async () => {
+    const { seasonPostseasonAudit, SEASON_POSTSEASON_AUDIT_OPTIONS } =
+      await import('./commands/season-postseason-audit.ts');
+    return {
+      options: SEASON_POSTSEASON_AUDIT_OPTIONS,
+      run: (args) =>
+        seasonPostseasonAudit({
+          input: getOptionString(args, 'input') ?? null,
+        }),
+    };
+  }),
+  'season postseason calibrate': command(async () => {
+    const { seasonPostseasonCalibrate, SEASON_POSTSEASON_CALIBRATE_OPTIONS } =
+      await import('./commands/season-postseason-calibrate.ts');
+    return {
+      options: SEASON_POSTSEASON_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonPostseasonCalibrate({
+          input: getOptionString(args, 'input') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+          write: hasOption(args, 'write'),
+        }),
+    };
+  }),
   'season benchmark block': command(async () => {
     const { seasonBenchmarkBlock, SEASON_BENCHMARK_OPTIONS } =
       await import('./commands/season-benchmark.ts');

@@ -103,6 +103,20 @@ function minimalShell(): SeasonRunShellData {
     declineTradeOffer: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
+    startPostseason: () => Promise.resolve(),
+    advancePostseason: () => Promise.resolve(),
+    submitPostseasonRotation: () => Promise.resolve(),
+    spectatePostseasonGame: () => Promise.resolve(),
+    fastForwardPostseason: () => Promise.resolve(),
+    cancelPostseason: () => undefined,
+    postseason: {
+      phase: 'idle',
+      gamesCompleted: 0,
+      gamesTotal: 0,
+      latestGameId: null,
+      latestResult: null,
+      error: null,
+    },
   };
 }
 

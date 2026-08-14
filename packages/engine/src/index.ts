@@ -375,6 +375,19 @@ export {
   WINDOW_BLOCK_INDEX_TO_INDEX,
   type SeasonWindowOpenResult,
 } from './season/trades.ts';
+// Season Run (2.0 M2.6) trade grades (trade-grade-v1, Track C): one grade
+// per side of every accepted trade, derived from recorded post-trade facts
+// (regular-season + postseason summaries through the champion) with the
+// frozen 55/15/15/15 component weights, the five-game small-sample floor,
+// and the A/B/C/D/F display labels.
+export {
+  deriveSeasonTradeGrades,
+  seasonTradeGradeLabelOf,
+  SEASON_TRADE_GRADE_MIN_SAMPLE,
+  SEASON_TRADE_GRADE_NEUTRAL_SCORE,
+  SEASON_TRADE_GRADE_WEIGHTS,
+  type SeasonTradeGradesInput,
+} from './season/trade-grades.ts';
 // Classic draft exports live under the `classic` namespace: the module's
 // `slotRequirement` would otherwise collide with domain/lineup.js.
 export * as classic from './modes/classic/draft.ts';

@@ -6,6 +6,7 @@
   import type { SeasonTeamAggregate } from '@hoop-rush/data-contracts';
   import StandingsTable from '$lib/components/season/StandingsTable.svelte';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
+  import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
@@ -15,16 +16,21 @@
     franchiseStreaks,
     pointDifferential,
   } from '$lib/season/season-presentation';
+  import {
+    postseasonRankingsOf,
+    rankedEntriesOf,
+  } from '$lib/season/season-postseason-presentation';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import { oneDecimal } from '$lib/format';
 
   /**
-   * League tab (spec/2.0/11, M2.3.5): conference-switched provisional
-   * standings and a league-wide team-stats table, both derived from the
-   * snapshot (standings rows + the aggregate fold of accepted summaries).
-   * The human franchise is highlighted without implying the ordering is the
-   * M2.6 postseason tiebreak. Standings ordering is wins, point
-   * differential, franchise id — provisional only.
+   * League tab (spec/2.0/11, M2.3.5, M2.6): conference-switched standings
+   * ordered by the ENGINE's authoritative tiebreak ranking
+   * (`rankSeasonPostseason`) with its recorded tiebreak explanations, plus
+   * the league-wide team-stats table folded from accepted summaries.
+   * Explanations come from the run's frozen postseason resolutions once the
+   * stage passes the regular season; earlier they mirror the current
+   * snapshot's recorded resolutions.
    */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
@@ -39,6 +45,20 @@
   const manifest = $derived(shell.manifest);
   const run = $derived(shell.run);
   const standings = $derived(run?.standings ?? null);
+
+  /** M2.6: authoritative engine ranking (tiebreak sequence) of the current
+   * standings; ordering + resolutions are the engine's, never the UI's. */
+  const rankings = $derived(run !== null ? postseasonRankingsOf(run) : null);
+  const rankedEntries = $derived(
+    rankings !== null && standings !== null ? rankedEntriesOf(rankings, standings) : null,
+  );
+  /** Frozen recorded resolutions from postseason qualification, or the
+   * current snapshot's recorded resolutions before that. */
+  const tiebreakResolutions = $derived.by(() => {
+    const recorded = run?.postseason.tiebreakResolutions ?? [];
+    if (recorded.length > 0) return recorded;
+    return rankings !== null ? [...rankings.east.resolutions, ...rankings.west.resolutions] : [];
+  });
 
   /** Streak facts computed in one pass over the summaries (once per change). */
   const streaksByFranchise = $derived.by(() => {
@@ -225,6 +245,14 @@
           {streakOf}
           {conference}
           {manifest}
+          rankedOrder={rankedEntries}
+        />
+      </div>
+      <div class="mt-6">
+        <TiebreakExplanations
+          resolutions={tiebreakResolutions}
+          franchiseName={shell.franchiseName}
+          {conference}
         />
       </div>
     {:else}

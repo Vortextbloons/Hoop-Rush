@@ -52,46 +52,175 @@ export interface SeasonSummaryRatings {
 }
 
 export interface SeasonTeamProjection {
-  /** Minute-weighted mean of the roster's player Overall ratings, 0-100. */
+  /** League-relative Overall rating on the 0-100 display scale. */
   overall: number;
-  /** Minute-weighted mean of the roster's player Offense ratings, 0-100. */
+  /** League-relative Offense rating on the 0-100 display scale. */
   offense: number;
-  /** Minute-weighted mean of the roster's player Defense ratings, 0-100. */
+  /** League-relative Defense rating on the 0-100 display scale. */
   defense: number;
 }
 
+/** Unscaled minute-weighted roster ratings before league normalization. */
+export interface SeasonTeamProjectionRaw {
+  overall: number;
+  offense: number;
+  defense: number;
+}
+
+export interface LeagueProjectionBaselines {
+  overall: { min: number; max: number };
+  offense: { min: number; max: number };
+  defense: { min: number; max: number };
+}
+
+/** Display range for league-normalized team strips. */
+const TEAM_PROJECTION_DISPLAY_FLOOR = 58;
+const TEAM_PROJECTION_DISPLAY_CEILING = 94;
+const TEAM_PROJECTION_MINUTE_EXPONENT = 1.4;
+
+function minuteProjectionWeight(minutes: number): number {
+  return Math.pow(minutes, TEAM_PROJECTION_MINUTE_EXPONENT);
+}
+
+function statRange(values: readonly number[]): { min: number; max: number } {
+  if (values.length === 0) return { min: 0, max: 0 };
+  return { min: Math.min(...values), max: Math.max(...values) };
+}
+
+function mapStatToDisplay(raw: number, range: { min: number; max: number }): number {
+  if (range.max <= range.min) {
+    return Math.round((TEAM_PROJECTION_DISPLAY_FLOOR + TEAM_PROJECTION_DISPLAY_CEILING) / 2);
+  }
+  const scaled =
+    TEAM_PROJECTION_DISPLAY_FLOOR +
+    ((raw - range.min) / (range.max - range.min)) *
+      (TEAM_PROJECTION_DISPLAY_CEILING - TEAM_PROJECTION_DISPLAY_FLOOR);
+  return Math.max(
+    TEAM_PROJECTION_DISPLAY_FLOOR,
+    Math.min(TEAM_PROJECTION_DISPLAY_CEILING, Math.round(scaled)),
+  );
+}
+
+/** Minute-weighted roster ratings before league normalization. */
+export function rawSeasonTeamRatings(input: {
+  roster: SeasonRoster;
+  rotation: SeasonRotation;
+  summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
+}): SeasonTeamProjectionRaw | null {
+  const minutes = new Map(
+    input.rotation.targetMinutes.map((target) => [target.playerVersionId, target.minutes]),
+  );
+  const acc = { overall: 0, offense: 0, defense: 0 };
+  let totalWeight = 0;
+  for (const entry of input.roster.players) {
+    const rating = input.summaryRatingsOf(entry.playerVersionId);
+    const minutesPlayed = minutes.get(entry.playerVersionId) ?? 0;
+    if (rating === null || minutesPlayed <= 0) continue;
+    const weight = minuteProjectionWeight(minutesPlayed);
+    totalWeight += weight;
+    acc.overall += rating.overallRating * weight;
+    acc.offense += rating.offenseRating * weight;
+    acc.defense += rating.defenseRating * weight;
+  }
+  if (totalWeight <= 0) return null;
+  return {
+    overall: acc.overall / totalWeight,
+    offense: acc.offense / totalWeight,
+    defense: acc.defense / totalWeight,
+  };
+}
+
+/** Min/max raw projections across the league's locked rotations. */
+export function buildLeagueProjectionBaselines(input: {
+  rosters: readonly SeasonRoster[];
+  rotations: readonly SeasonRotation[];
+  summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
+}): LeagueProjectionBaselines | null {
+  const rotationByFranchise = new Map(
+    input.rotations.map((rotation) => [rotation.franchiseId, rotation]),
+  );
+  const rawProjections: SeasonTeamProjectionRaw[] = [];
+  for (const roster of input.rosters) {
+    const rotation = rotationByFranchise.get(roster.franchiseId);
+    if (rotation === undefined) continue;
+    const raw = rawSeasonTeamRatings({
+      roster,
+      rotation,
+      summaryRatingsOf: input.summaryRatingsOf,
+    });
+    if (raw !== null) rawProjections.push(raw);
+  }
+  if (rawProjections.length === 0) return null;
+  return {
+    overall: statRange(rawProjections.map((row) => row.overall)),
+    offense: statRange(rawProjections.map((row) => row.offense)),
+    defense: statRange(rawProjections.map((row) => row.defense)),
+  };
+}
+
+export function normalizeTeamProjection(
+  raw: SeasonTeamProjectionRaw,
+  baselines: LeagueProjectionBaselines,
+): SeasonTeamProjection {
+  return {
+    overall: mapStatToDisplay(raw.overall, baselines.overall),
+    offense: mapStatToDisplay(raw.offense, baselines.offense),
+    defense: mapStatToDisplay(raw.defense, baselines.defense),
+  };
+}
+
+export function seasonLeagueTeamProjections(input: {
+  rosters: readonly SeasonRoster[];
+  rotations: readonly SeasonRotation[];
+  summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
+  rotationOverrides?: ReadonlyMap<string, SeasonRotation>;
+}): Map<string, SeasonTeamProjection> {
+  const baselines = buildLeagueProjectionBaselines({
+    rosters: input.rosters,
+    rotations: input.rotations,
+    summaryRatingsOf: input.summaryRatingsOf,
+  });
+  if (baselines === null) return new Map();
+  const rotationByFranchise = new Map(
+    input.rotations.map((rotation) => [rotation.franchiseId, rotation]),
+  );
+  const projections = new Map<string, SeasonTeamProjection>();
+  for (const roster of input.rosters) {
+    const rotation =
+      input.rotationOverrides?.get(roster.franchiseId) ??
+      rotationByFranchise.get(roster.franchiseId);
+    if (rotation === undefined) continue;
+    const raw = rawSeasonTeamRatings({
+      roster,
+      rotation,
+      summaryRatingsOf: input.summaryRatingsOf,
+    });
+    if (raw === null) continue;
+    projections.set(roster.franchiseId, normalizeTeamProjection(raw, baselines));
+  }
+  return projections;
+}
+
 /**
- * Team rating strip (0-100): the locked rotation's ten players weighted by
- * their target minutes. Same packaged player ratings as the per-player OVR
- * chips — never invented here. Returns null when no rostered player has
- * catalog ratings or the rotation carries no minutes.
+ * Team rating strip (0-100): league-normalized minute-weighted player ratings.
  */
 export function seasonTeamRatings(input: {
   roster: SeasonRoster;
   rotation: SeasonRotation;
   summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
+  leagueBaselines?: LeagueProjectionBaselines | null;
 }): SeasonTeamProjection | null {
-  const minutes = new Map(
-    input.rotation.targetMinutes.map((target) => [target.playerVersionId, target.minutes]),
-  );
-  const acc = { overall: 0, offense: 0, defense: 0 };
-  let totalMinutes = 0;
-  for (const entry of input.roster.players) {
-    const rating = input.summaryRatingsOf(entry.playerVersionId);
-    const minutesPlayed = minutes.get(entry.playerVersionId) ?? 0;
-    if (rating === null || minutesPlayed <= 0) continue;
-    totalMinutes += minutesPlayed;
-    acc.overall += rating.overallRating * minutesPlayed;
-    acc.offense += rating.offenseRating * minutesPlayed;
-    acc.defense += rating.defenseRating * minutesPlayed;
-  }
-  if (totalMinutes <= 0) return null;
-  const weighted = (value: number): number => Math.round(value / totalMinutes);
-  return {
-    overall: weighted(acc.overall),
-    offense: weighted(acc.offense),
-    defense: weighted(acc.defense),
-  };
+  const raw = rawSeasonTeamRatings(input);
+  if (raw === null) return null;
+  const baselines =
+    input.leagueBaselines ??
+    buildLeagueProjectionBaselines({
+      rosters: [input.roster],
+      rotations: [input.rotation],
+      summaryRatingsOf: input.summaryRatingsOf,
+    });
+  if (baselines === null) return null;
+  return normalizeTeamProjection(raw, baselines);
 }
 
 export interface SeasonTeamDetail {
@@ -117,6 +246,8 @@ export interface SeasonTeamDetail {
 export function seasonTeamDetail(input: {
   roster: SeasonRoster;
   rotation: SeasonRotation;
+  rosters: readonly SeasonRoster[];
+  rotations: readonly SeasonRotation[];
   standings: SeasonStandings;
   league: SeasonLeague;
   summaries: readonly SeasonGameSummary[];
@@ -124,7 +255,7 @@ export function seasonTeamDetail(input: {
   summaryRatingsOf: (playerVersionId: string) => SeasonSummaryRatings | null;
   playablePositions: (playerVersionId: string) => readonly string[];
 }): SeasonTeamDetail | null {
-  const { roster, rotation, standings, league, summaries } = input;
+  const { roster, rotation, rosters, rotations, standings, league, summaries } = input;
   const standingsRow = standings.rows.find((row) => row.franchiseId === roster.franchiseId);
   if (standingsRow === undefined) return null;
   const conference =
@@ -202,10 +333,11 @@ export function seasonTeamDetail(input: {
     closingFive,
     minutesTotal: rotation.targetMinutes.reduce((sum, target) => sum + target.minutes, 0),
     hasStats: summaries.length > 0,
-    projection: seasonTeamRatings({
-      roster,
-      rotation,
-      summaryRatingsOf: input.summaryRatingsOf,
-    }),
+    projection:
+      seasonLeagueTeamProjections({
+        rosters,
+        rotations,
+        summaryRatingsOf: input.summaryRatingsOf,
+      }).get(roster.franchiseId) ?? null,
   };
 }

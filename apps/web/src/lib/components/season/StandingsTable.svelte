@@ -10,6 +10,7 @@
     streakLabel,
     winPct,
   } from '$lib/season/season-presentation';
+  import type { SeasonStandingsRow } from '@hoop-rush/data-contracts';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
 
@@ -34,6 +35,7 @@
     streakOf,
     conference = null,
     manifest = null,
+    rankedOrder = null,
   }: {
     standings: SeasonStandings;
     league: SeasonLeague;
@@ -44,9 +46,21 @@
     conference?: 'east' | 'west' | null;
     /** Packaged manifest; when present rows render franchise logos. */
     manifest?: HoopRushManifest | null;
+    /**
+     * M2.6 authoritative ordering: pre-ranked `{row, rank, conference}`
+     * entries (e.g. `rankSeasonPostseason` output). When set, the table
+     * renders exactly this order and labels it official instead of
+     * provisional.
+     */
+    rankedOrder?: Array<{
+      row: SeasonStandingsRow;
+      rank: number;
+      conference: 'east' | 'west';
+    }> | null;
   } = $props();
 
-  const ranked = $derived(provisionalRanking(standings, league));
+  const ranked = $derived(rankedOrder ?? provisionalRanking(standings, league));
+  const authoritative = $derived(rankedOrder !== null);
   const conferences = $derived.by(() => {
     const sections: Array<{ title: string; entries: typeof ranked }> = [];
     if (conference === null || conference === 'east') {
@@ -95,7 +109,7 @@
       id={`standings-${section.title.toLowerCase()}-heading`}
       class="font-display px-3 text-sm font-extrabold uppercase tracking-tight sm:px-0"
     >
-      {section.title} · provisional
+      {section.title} · {authoritative ? 'official' : 'provisional'}
     </h3>
 
     {#if desktopViewport !== true}
@@ -185,7 +199,9 @@
       <div class="mt-2 hidden overflow-x-auto rounded-xl bg-surface-1 md:block">
         <table class="w-full min-w-[42rem] text-sm">
           <caption class="sr-only">
-            {section.title} conference standings — provisional ordering
+            {section.title} conference standings — {authoritative
+              ? 'official NBA tiebreak'
+              : 'provisional'} ordering
           </caption>
           <thead>
             <tr
@@ -267,6 +283,11 @@
 {/each}
 
 <p class="mt-2 font-mono text-[10px] text-muted-foreground">
-  Provisional ordering only: wins, point differential, franchise id. The M2.6 postseason tiebreak is
-  not applied.
+  {#if authoritative}
+    Official NBA tiebreak sequence: head-to-head, division, conference, and league-wide criteria in
+    published order; ties resolve with recorded evidence.
+  {:else}
+    Provisional ordering only: wins, point differential, franchise id. The M2.6 postseason tiebreak
+    is not applied.
+  {/if}
 </p>

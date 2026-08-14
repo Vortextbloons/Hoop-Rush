@@ -22,6 +22,7 @@ import type {
   SeasonForfeitInterruptedGameRejection,
   SeasonForfeitInterruptedGameResult,
   SeasonGameMismatchRejection,
+  SeasonGameSummary,
   SeasonInjuryNotActiveRejection,
   SeasonInsufficientBalanceRejection,
   SeasonInsufficientRehabResourcesRejection,
@@ -107,6 +108,7 @@ import {
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
 import { validateSeasonRotation, seasonRotationSetDigest } from './rotation.ts';
+import { deriveSeasonAwards } from './awards.ts';
 import { seasonRunStateDigest } from './state-digest.ts';
 import {
   applySeasonTrade,
@@ -182,6 +184,14 @@ export interface SeasonRunCommandContext {
    * Defaults to the real Season game controller.
    */
   postseasonGameResolver?: SeasonPostseasonGameResolver;
+  /**
+   * M2.6: the recorded regular-season compact summaries (all 82 rounds).
+   * The simulating handlers derive the season awards (awards-v1) from these
+   * facts when the advance reaches the playoffs or completion; a missing
+   * seam leaves `run.awards` null (documented fallback for tests and
+   * partial-facts replay contexts).
+   */
+  regularSeasonSummaries?: readonly SeasonGameSummary[];
 }
 
 export type SeasonRunCommandResult =
@@ -271,6 +281,34 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
 function advanceRunState(run: SeasonEconomyRun): SeasonRun {
   const next = { ...run, stateRevision: run.stateRevision + 1, stateDigest: '' };
   return { ...next, stateDigest: seasonRunStateDigest(runStateDigestFactsOf(next)) };
+}
+
+/**
+ * M2.6: derives the season awards (awards-v1) from the recorded
+ * regular-season summaries the moment the tournament reaches the playoffs
+ * (or completes in the same advance). Awards are regular-season facts only
+ * and freeze at that point; the derivation runs BEFORE the state digest is
+ * recomputed, so the digest and the command-log entry cover the awards. A
+ * missing summaries seam (tests, partial-facts replay contexts) leaves
+ * `awards` null — the run schema permits it and the load audit digests the
+ * stored facts as-is.
+ */
+function deriveAwardsIfNeeded(
+  run: SeasonEconomyRun,
+  context: SeasonRunCommandContext,
+  stage: SeasonRunStage,
+): SeasonEconomyRun {
+  if (run.awards !== null || (stage !== 'playoffs' && stage !== 'completed')) return run;
+  const summaries = context.regularSeasonSummaries ?? [];
+  if (summaries.length === 0) return run;
+  return {
+    ...run,
+    awards: deriveSeasonAwards({
+      runId: run.runId,
+      rosters: run.rosters,
+      summaries: [...summaries],
+    }),
+  };
 }
 
 /**
@@ -1241,7 +1279,8 @@ function handleAdvancePostseason(
           finalizedAtStateRevision: run.stateRevision + 1,
         }
       : null;
-  const nextRun = advanceRunState({ ...current, stage, completion });
+  const withAwards = deriveAwardsIfNeeded(current, context, stage);
+  const nextRun = advanceRunState({ ...withAwards, stage, completion });
   const after = seasonPostseasonNextGame(nextRun.postseason);
   const nextGameIdAfter = after.kind === 'game' ? after.gameId : null;
   const humanNext =
@@ -1426,7 +1465,7 @@ function handleSubmitPostseasonRotation(
   const rehabInjuryId = payload.riskyRehabInjuryId;
   if (rehabInjuryId !== undefined) {
     const injury = run.health.injuries.find((entry) => entry.injuryId === rehabInjuryId);
-    // Rejection mapping (documented, flagged for the lead): the M2.6 submit
+    // Rejection mapping (frozen decision at integration): the M2.6 submit
     // union has no injury-not-active / already-rehabbed codes, so an invalid
     // rehab reference rejects with integrity-failure and a precise reason.
     const active =
@@ -1613,7 +1652,8 @@ function handleSpectatePostseasonGame(
           finalizedAtStateRevision: run.stateRevision + 1,
         }
       : null;
-  const nextRun = advanceRunState({ ...current, stage, completion });
+  const withAwards = deriveAwardsIfNeeded(current, context, stage);
+  const nextRun = advanceRunState({ ...withAwards, stage, completion });
   const after = seasonPostseasonNextGame(nextRun.postseason);
   const nextGameIdAfter = after.kind === 'game' ? after.gameId : null;
   const humanNext =
@@ -1659,7 +1699,7 @@ function rejectedFastForward(
  * fixed AI rotations through the champion and completes the run. Requires
  * the human franchise to be eliminated (an active human would be skipping
  * lineup decisions; the union has no better code, so the rejection is
- * integrity-failure — flagged for the lead). The optional target is
+ * integrity-failure — frozen decision at integration). The optional target is
  * validated as an upcoming game; the accepted result is always stage
  * `completed` with the champion.
  */
@@ -1765,7 +1805,8 @@ function handleFastForwardPostseason(
     almanacDigest: POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
     finalizedAtStateRevision: run.stateRevision + 1,
   };
-  const nextRun = advanceRunState({ ...current, stage: 'completed', completion });
+  const withAwards = deriveAwardsIfNeeded(current, context, 'completed');
+  const nextRun = advanceRunState({ ...withAwards, stage: 'completed', completion });
   return {
     result: {
       command: 'fast-forward-postseason',

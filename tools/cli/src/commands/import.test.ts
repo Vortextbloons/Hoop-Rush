@@ -9,14 +9,22 @@ import { importManifest, importOpponent, importPools, importRunAll } from './imp
  * exercised by the pipeline itself, not here.
  */
 
-describe('importPools', () => {
-  it('rejects a malformed pool target with a usage report (not a stack)', async () => {
-    const report = await importPools({ pools: 'lakers' });
-    expect(report.ok).toBe(false);
-    expect(report.exitCode).toBe(EXIT_USAGE_OR_DATA_ERROR);
-    expect(report.failures[0]).toContain("invalid pool target 'lakers'");
-  });
+describe('pool target parsing (shared by importPools and importRunAll)', () => {
+  it.each([
+    ['importPools', importPools],
+    ['importRunAll', importRunAll],
+  ] as const)(
+    '%s rejects a malformed pool target with a usage report (not a stack)',
+    async (_name, command) => {
+      const report = await command({ pools: 'lakers' });
+      expect(report.ok).toBe(false);
+      expect(report.exitCode).toBe(EXIT_USAGE_OR_DATA_ERROR);
+      expect(report.failures[0]).toContain("invalid pool target 'lakers'");
+    },
+  );
+});
 
+describe('importPools', () => {
   it('rejects a target without an era id', async () => {
     const report = await importPools({ pools: 'lakers/' });
     expect(report.ok).toBe(false);
@@ -25,13 +33,6 @@ describe('importPools', () => {
 });
 
 describe('importRunAll', () => {
-  it('rejects a malformed pool target with a usage report', async () => {
-    const report = await importRunAll({ pools: 'lakers' });
-    expect(report.ok).toBe(false);
-    expect(report.exitCode).toBe(EXIT_USAGE_OR_DATA_ERROR);
-    expect(report.failures[0]).toContain("invalid pool target 'lakers'");
-  });
-
   it('rejects an empty pool target list', async () => {
     const report = await importRunAll({ pools: 'lakers/,celtics/1980s' });
     expect(report.ok).toBe(false);

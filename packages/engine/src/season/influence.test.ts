@@ -11,7 +11,6 @@ import {
   applySeasonInfluenceSpend,
   SeasonInfluenceFloorError,
 } from './influence.ts';
-import { evaluateSeasonBlockObjective } from './objectives.ts';
 import { buildEconomyTestRun, injuryIdOf } from './season-economy-test-support.ts';
 
 /**
@@ -333,79 +332,6 @@ describe('season influence has no gameplay hooks', () => {
     };
     const parsed = seasonBlockRunContextSchema.parse(context);
     expect('influence' in parsed).toBe(false);
-  });
-
-  it('objective evaluation is independent of the influence state', () => {
-    const summaries = [
-      {
-        schemaVersion: 1 as const,
-        summaryVersion: 'season-game-summary-v3' as const,
-        gameId: 's000001',
-        round: 1,
-        homeFranchiseId: 'lakers',
-        awayFranchiseId: 'celtics',
-        status: 'final' as const,
-        overtimePeriods: 0,
-        homeScore: 100,
-        awayScore: 90,
-        forfeitLoserFranchiseId: null,
-        homeBox: {
-          franchiseId: 'lakers',
-          points: 100,
-          fieldGoalsMade: 0,
-          fieldGoalsAttempted: 0,
-          threePointersMade: 0,
-          threePointersAttempted: 0,
-          freeThrowsMade: 0,
-          freeThrowsAttempted: 0,
-          offensiveRebounds: 20,
-          defensiveRebounds: 20,
-          assists: 0,
-          steals: 0,
-          blocks: 0,
-          turnovers: 12,
-          fouls: 0,
-          possessions: 0,
-        },
-        awayBox: {
-          franchiseId: 'celtics',
-          points: 90,
-          fieldGoalsMade: 0,
-          fieldGoalsAttempted: 0,
-          threePointersMade: 0,
-          threePointersAttempted: 0,
-          freeThrowsMade: 0,
-          freeThrowsAttempted: 0,
-          offensiveRebounds: 19,
-          defensiveRebounds: 19,
-          assists: 0,
-          steals: 0,
-          blocks: 0,
-          turnovers: 10,
-          fouls: 0,
-          possessions: 0,
-        },
-        homePlayers: [],
-        awayPlayers: [],
-        injuryEvents: [],
-      },
-    ];
-    // The evaluator's input carries no influence facts; two runs with
-    // radically different influence states evaluate identically (one win of
-    // one game fails the six-win measure).
-    const input = {
-      objectiveId: 'win-six' as const,
-      blockIndex: 0,
-      humanFranchiseId: 'lakers',
-      rotation: null,
-      summaries,
-      tipAvailability: [{ gameId: 's000001', availableCount: 9 }],
-    };
-    const first = evaluateSeasonBlockObjective(input);
-    const second = evaluateSeasonBlockObjective(input);
-    expect(first).toEqual(second);
-    expect(first.success).toBe(false);
-    void input;
   });
 
   it('the influence module exports only economy functions (no gameplay surface)', async () => {

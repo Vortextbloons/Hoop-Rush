@@ -62,6 +62,7 @@ test.describe('m3: draft to 82-game season journey', () => {
       await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Per game' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
       const strip = page.getByLabel('82-game strip');
       await expect(strip.locator('li')).toHaveCount(82);
@@ -230,19 +231,6 @@ test.describe('m3: accessibility and mobile', () => {
     await expect(page.getByRole('heading', { name: 'Playing the season' })).toBeVisible();
     await expectSeasonReport(page, 'sandbox');
     await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
-  });
-
-  test('screen reader: key regions carry labelled landmarks', async ({ page }) => {
-    await reachPlaying(page);
-    await expectSeasonReport(page, 'sandbox');
-    await expect(page.getByRole('heading', { name: 'League MVP' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Your five · season' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Season facts' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Per game' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Totals' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Retry with same team' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Run again' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Edit team' })).toBeVisible();
   });
 
   test('image fallbacks never block the challenge flow', async ({ page }) => {

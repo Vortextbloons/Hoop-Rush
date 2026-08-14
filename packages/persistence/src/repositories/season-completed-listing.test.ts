@@ -354,6 +354,7 @@ function buildAlmanac(
     postseasonDigest: 'd'.repeat(32),
     commandLogDigest: commandLogDigestValue,
     awardsDigest,
+    tradeGradesDigest: 'f'.repeat(32),
     digest: DIGEST_32,
   };
   return { ...base, digest: seasonAlmanacDigest(base) };

@@ -165,6 +165,20 @@ function minimalShell(): SeasonRunShellData {
     declineTradeOffer: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
+    startPostseason: () => Promise.resolve(),
+    advancePostseason: () => Promise.resolve(),
+    submitPostseasonRotation: () => Promise.resolve(),
+    spectatePostseasonGame: () => Promise.resolve(),
+    fastForwardPostseason: () => Promise.resolve(),
+    cancelPostseason: () => undefined,
+    postseason: {
+      phase: 'idle',
+      gamesCompleted: 0,
+      gamesTotal: 0,
+      latestGameId: null,
+      latestResult: null,
+      error: null,
+    },
   };
 }
 
@@ -185,7 +199,8 @@ function firstRowName(container: HTMLElement, tableIndex: number): string | null
   const row = container.querySelectorAll('table')[tableIndex]?.querySelector('tbody tr th');
   if (row === null || row === undefined) return null;
   const name = row.querySelector('span.font-semibold');
-  return name?.textContent?.trim() ?? null;
+  const text = name?.textContent ?? null;
+  return text === null ? null : text.trim();
 }
 describe('SeasonPlayerStats', () => {
   it('renders the empty state before any block is accepted', () => {

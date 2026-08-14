@@ -10,9 +10,7 @@ import {
   seasonPostseasonStateSchema,
   seasonRunCompletionSchema,
   seasonRunSchema,
-  seasonTiebreakKindSchema,
   seasonTiebreakResolutionSchema,
-  seasonTiebreakRuleSchema,
   type SeasonAwards,
   type SeasonPostseasonState,
   type SeasonRun,
@@ -244,38 +242,6 @@ export function buildCompletedRunWithAwards(champion = 'lakers'): SeasonRun {
 }
 
 describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
-  it('round-trips every tiebreak rule value', () => {
-    for (const rule of seasonTiebreakRuleSchema.options) {
-      const parsed = seasonTiebreakResolutionSchema.parse(
-        buildTiebreakResolution({
-          rule,
-          // A deterministic draw records its saved draw seed; every other
-          // rule carries none (the coupling is enforced at parse time).
-          drawSeed: rule === 'random-draw' ? SEED : null,
-        }),
-      );
-      expect(parsed.rule).toBe(rule);
-    }
-    expect(seasonTiebreakRuleSchema.options).toHaveLength(10);
-  });
-
-  it('accepts every kind with 2- and 3-team ties in decided order', () => {
-    for (const kind of seasonTiebreakKindSchema.options) {
-      for (const size of [2, 3]) {
-        const three = size === 3;
-        const parsed = seasonTiebreakResolutionSchema.parse(
-          buildTiebreakResolution({
-            kind,
-            teams: three ? ['team-7', 'team-8', 'team-9'] : ['team-7', 'team-8'],
-            slots: three ? [7, 8, 9] : [7, 8],
-          }),
-        );
-        expect(parsed.kind).toBe(kind);
-        expect(parsed.teams).toHaveLength(size);
-      }
-    }
-  });
-
   it('enforces teams (2-3), slots (1-10, 1-3 entries), and evidence bounds', () => {
     const schema = seasonTiebreakResolutionSchema;
     expect(schema.safeParse(buildTiebreakResolution({ teams: ['team-7'] })).success).toBe(false);

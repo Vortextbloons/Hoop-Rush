@@ -58,6 +58,7 @@ function shellWithRun(run: SeasonRun): SeasonRunShell {
       pairStates: [],
     },
   };
+  shell.run = run;
   shell.index = {
     runId: run.runId,
     rootSeed: run.rootSeed,

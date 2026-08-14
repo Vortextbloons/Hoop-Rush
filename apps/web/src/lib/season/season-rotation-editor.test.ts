@@ -12,6 +12,7 @@ import {
   failurePlayerVersionId,
   indexRotationFailures,
   presetLabel,
+  rotationEditorNeedsPositionRefresh,
   rotationRoleOf,
   strategyLabel,
   SLOT_GROUPS,
@@ -117,6 +118,11 @@ describe('RotationEditor', () => {
       tight: 37,
       'bench-heavy': 29,
     };
+    const expectedStrategies: Record<(typeof ROTATION_PRESETS)[number], string> = {
+      balanced: 'balanced',
+      tight: 'starter-heavy',
+      'bench-heavy': 'bench-heavy',
+    };
     for (const preset of ROTATION_PRESETS) {
       const failures = e.applyPreset(preset);
       expect(failures).toEqual([]);
@@ -126,20 +132,8 @@ describe('RotationEditor', () => {
         throw new Error('fixture rotation has no starters');
       }
       expect(e.minutesFor(starter)).toBe(expectedStarters[preset]);
-    }
-  });
-
-  it('records the matching minute-policy strategy when a preset applies', () => {
-    const e = editor();
-    const expected: Record<(typeof ROTATION_PRESETS)[number], string> = {
-      balanced: 'balanced',
-      tight: 'starter-heavy',
-      'bench-heavy': 'bench-heavy',
-    };
-    for (const preset of ROTATION_PRESETS) {
-      expect(e.applyPreset(preset)).toEqual([]);
       expect(e.rotation.minutePolicy.policyVersion).toBe('minute-policy-v1');
-      expect(e.rotation.minutePolicy.strategy).toBe(expected[preset]);
+      expect(e.rotation.minutePolicy.strategy).toBe(expectedStrategies[preset]);
     }
   });
 
@@ -532,5 +526,24 @@ describe('indexRotationFailures', () => {
     const index = indexRotationFailures(e.validate());
     expect(index.byPlayer.size).toBe(0);
     expect(index.global).toEqual([]);
+  });
+});
+
+describe('rotationEditorNeedsPositionRefresh', () => {
+  it('returns true when the slice gains positions the cached editor lacks', () => {
+    const emptyPlayables = members().map((member) => ({ ...member, playable: [] as const }));
+    const cached = createRotationEditor(rotation(), emptyPlayables);
+    const rosterIds = members().map((member) => member.playerVersionId);
+    expect(rotationEditorNeedsPositionRefresh(cached, rosterIds, (id) => playableOf(id))).toBe(
+      true,
+    );
+  });
+
+  it('returns false when the editor already has loaded playables', () => {
+    const cached = editor();
+    const rosterIds = members().map((member) => member.playerVersionId);
+    expect(rotationEditorNeedsPositionRefresh(cached, rosterIds, (id) => playableOf(id))).toBe(
+      false,
+    );
   });
 });

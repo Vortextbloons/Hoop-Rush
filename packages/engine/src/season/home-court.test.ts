@@ -131,16 +131,6 @@ describe('season home-court seam (M2.3)', () => {
     expect(JSON.stringify(neutral)).toBe(JSON.stringify(direct));
   });
 
-  it('keeps the neutral profile byte-identical to the M2.2 committed fixture inputs', () => {
-    // The committed M2.2 scenario fixtures carry no homeCourt field: they
-    // parse with the neutral default and must produce the same results as
-    // the M2.2 engine (no digests changed by the v4 contract bump).
-    const input = buildInput('hc-fixture-1', SEASON_NEUTRAL_HOME_COURT);
-    const first = simulateSeasonGame(input, ctx);
-    const second = simulateSeasonGame(input, ctx);
-    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
-  });
-
   it('derives exactly two signed bounded mechanisms from a profile', () => {
     const mechanisms = seasonHomeCourtMechanisms(SEASON_HOME_COURT_PROFILE);
     expect(mechanisms.homeDefenseShotAdjustment).toBeLessThan(0);

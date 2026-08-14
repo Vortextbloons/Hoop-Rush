@@ -2,6 +2,7 @@ import type {
   SeasonAlmanac,
   SeasonCommandLog,
   SeasonCommandLogEntry,
+  SeasonEffectsState,
   SeasonPostseasonSummary,
   SeasonReplayExport,
   SeasonRun,
@@ -46,6 +47,14 @@ export interface CommitPostseasonAdvancementInput {
    * SAME transaction as the run state, summaries, and command log.
    */
   details?: SeasonPostseasonDetail[];
+  /**
+   * The post-advance effects state the engine computed (the state digest
+   * covers it; the engine attaches it to the command output run as an
+   * extra property). Stored in the checkpoint row so the reload audit's
+   * digest reconciliation holds; defaults to the stored checkpoint effects
+   * for zero-transition advances (the M2.5 `applySeasonRunCommand` seam).
+   */
+  effects?: SeasonEffectsState;
   /** The typed command that produced the advance (validated + recorded). */
   command: SeasonRunCommand;
   /** The run state chain position the command asserted. */

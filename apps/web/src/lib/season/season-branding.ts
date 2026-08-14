@@ -4,6 +4,7 @@ import {
   type HoopRushManifest,
   type PlayersIndexAltIds,
   type PlayersIndexEntry,
+  type SeasonDraftCandidate,
 } from '@hoop-rush/data-contracts';
 
 /**
@@ -33,6 +34,21 @@ export interface SeasonVersionTuple {
   eraId: string;
   seasonKey: string;
   displayName: string;
+}
+
+/** Roster entry joined to the catalog when available (authoritative version identity). */
+export function versionTupleOfRosterEntry(
+  entry: SeasonVersionTuple,
+  catalogCandidate?: Pick<SeasonDraftCandidate, 'franchiseId' | 'eraId' | 'seasonKey'> | null,
+): SeasonVersionTuple {
+  return {
+    playerVersionId: entry.playerVersionId,
+    playerId: entry.playerId,
+    franchiseId: catalogCandidate?.franchiseId ?? entry.franchiseId,
+    eraId: catalogCandidate?.eraId ?? entry.eraId,
+    seasonKey: catalogCandidate?.seasonKey ?? entry.seasonKey,
+    displayName: entry.displayName,
+  };
 }
 
 /** Modern franchise slot facts for the masthead and team pages. */

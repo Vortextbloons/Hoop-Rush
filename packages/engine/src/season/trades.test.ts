@@ -589,6 +589,15 @@ describe('season applySeasonTrade', () => {
       { franchiseId: HUMAN, added: [incomingId], removed: [outgoingId] },
       { franchiseId: 'celtics', added: [outgoingId], removed: [incomingId] },
     ]);
+
+    const incomingBefore = aiRoster.players.find((player) => player.playerVersionId === incomingId);
+    const incomingAfter = humanAfter?.players.find(
+      (player) => player.playerVersionId === incomingId,
+    );
+    expect(incomingBefore).toBeDefined();
+    expect(incomingAfter).toBeDefined();
+    expect(incomingAfter?.franchiseId).toBe(incomingBefore?.franchiseId);
+    expect(incomingAfter?.franchiseId).not.toBe(HUMAN);
   });
 
   it('moves injury records with their players', () => {

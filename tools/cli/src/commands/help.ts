@@ -210,9 +210,30 @@ Commands:
                          run; fail when any digest diverges.
                          --out <path> --input <run.json>
   season benchmark persistence
-                         Run the persistence package's Season Run benchmark
-                         harness (commit/reload p95, storage size).
-                         --samples N --out <path>
+                          Run the persistence package's Season Run benchmark
+                          harness (commit/reload p95, storage size).
+                          --samples N --out <path>
+  season run reproduce   Rebuild a completed Season Run from a full-run replay
+                          export (replay-export-v1) and fail at the FIRST
+                          divergence: ordinal, command id, state digest, result
+                          digest, game result, awards, trade grades, or champion.
+                          --input <export.json> --manifest <path>
+                          --profile <eraId> --format <format>
+  season postseason audit
+                          Audit a completed postseason (export or fixture):
+                          duplicate/missing teams, invalid feeders, incorrect
+                          home court, games after clinching, inconsistent
+                          summaries, champion/completion mismatches.
+                          --input <export.json|fixture.json> --format <format>
+  season postseason calibrate
+                          Measure the postseason cohort against the frozen
+                          postseason-targets-v1 gates (series length, upsets,
+                          home advantage, advancement by strength, award
+                          plausibility, forfeits, integrity failures) and freeze
+                          the artifact with --write.
+                          --seed-from N --seed-to N --out <path>
+                          --manifest <path> --validate <path> --write
+                          --workers N --input <run.json> --format <format>
   import ratings         Derive ratings/tendencies/traits/contracts from fetched
                          raw-data roster + season-stats (Python stays the fetch
                          layer only). --seasons 2024-25,2023-24 (comma-separated)

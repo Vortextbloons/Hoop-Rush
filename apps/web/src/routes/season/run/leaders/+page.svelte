@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { SeasonLeaderCategory, SeasonRosterEntry } from '@hoop-rush/data-contracts';
+  import AwardsSection from '$lib/components/season/AwardsSection.svelte';
   import LeadersTable from '$lib/components/season/LeadersTable.svelte';
   import {
     SEASON_RUN_SHELL_CONTEXT,
@@ -10,13 +11,15 @@
   import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
 
   /**
-   * Leaders tab (spec/2.0/11, M2.3.5): per-category league leaders folded
-   * from accepted summaries, ordered with the ENGINE's authoritative
+   * Leaders tab (spec/2.0/11, M2.3.5, M2.6): per-category league leaders
+   * folded from accepted summaries, ordered with the ENGINE's authoritative
    * tie-break (per-game desc, value desc, playerVersionId asc) — not the
-   * value-first order of the frozen web `leaderTables` helper. Every entry is
-   * a distinct player-season version and shows its historical source logo
-   * and season. Mobile renders one category at a time with a headshot-led
-   * first-place card; desktop renders all categories as leader columns.
+   * value-first order of the frozen web `leaderTables` helper. Every entry
+   * is a distinct player-season version and shows its historical source
+   * logo and season. Mobile renders one category at a time with a
+   * headshot-led first-place card; desktop renders all categories as leader
+   * columns. From the playoffs on, the recorded season awards (MVP, DPOY,
+   * Sixth Man, All-League First Team) lead the page.
    */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
@@ -39,6 +42,7 @@
   });
 
   const manifest = $derived(shell.manifest);
+  const awards = $derived(shell.run?.awards ?? null);
 </script>
 
 <svelte:head>
@@ -86,6 +90,18 @@
         {/each}
       </div>
     </div>
+
+    {#if awards !== null}
+      <div class="mt-6">
+        <AwardsSection
+          {awards}
+          playerName={shell.playerName}
+          franchiseName={shell.franchiseName}
+          {manifest}
+          faces={shell.facesByVersion}
+        />
+      </div>
+    {/if}
 
     {#if !leaders}
       <p class="mt-8 rounded-xl bg-surface-1 p-6 text-sm text-muted-foreground">

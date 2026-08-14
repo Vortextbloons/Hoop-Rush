@@ -114,15 +114,6 @@ describe('game invariants over many seeds', () => {
     expect(strongWins).toBeGreaterThan(weakWins * 2);
   });
 
-  it('every player plays the full game with no bench', () => {
-    for (const result of runMany('minutes', 30)) {
-      const expected = 48 + result.overtimePeriods * 5;
-      for (const player of [...result.home.players, ...result.away.players]) {
-        expect(player.minutes).toBe(expected);
-      }
-    }
-  });
-
   it('reports overtime facts on the golden overtime game', () => {
     const found = run('ot-v11-15');
     expect(found.overtimePeriods).toBeGreaterThan(0);

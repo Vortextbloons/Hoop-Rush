@@ -301,6 +301,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         );
         if (this.cancelled) return;
         const committed = this.committedFacts(startInput, checkpoint, pending.commandId);
+        const prior = await loadCurrentSnapshot(this.scheduleOf(startInput)).catch(() => null);
         await this.commitCheckpoint(startInput, pending.commandId, checkpoint, {
           health: pending.health,
           influence: this.fakeInfluenceFor(startInput, input.blockIndex),
@@ -310,11 +311,12 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           stateDigest: committed.stateDigest,
           window: committed.window,
         });
-        const committedView = await this.committedSnapshot(
+        const committedView = this.committedSnapshot(
           startInput,
           checkpoint,
           pending.commandId,
           committed,
+          prior,
         );
         this.emit({ type: 'complete', requestId, checkpoint, snapshot: committedView });
       } catch (error) {
@@ -539,6 +541,11 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       stateDigest: string;
       window: SeasonWindowOpenResult | null;
     } | null = null;
+    // The prior accepted state is read BEFORE the commit: the committed
+    // snapshot must fold the pre-commit facts, or the just-committed block
+    // would be counted twice (duplicate accepted-block rows and doubled
+    // summaries in the emitted snapshot).
+    const prior = await loadCurrentSnapshot(this.scheduleOf(input)).catch(() => null);
     try {
       committed = this.committedFacts(input, checkpoint, input.commandId);
       await this.commitCheckpoint(input, input.commandId, checkpoint, {
@@ -568,7 +575,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     // catch, so the null guard stays.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (this.isCancelled() || committed === null) return;
-    const snapshot = await this.committedSnapshot(input, checkpoint, input.commandId, committed);
+    const snapshot = this.committedSnapshot(input, checkpoint, input.commandId, committed, prior);
     this.emit({ type: 'complete', requestId, checkpoint, snapshot });
   }
 
@@ -577,7 +584,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
    * also emits (mirror of `assembleCommittedSnapshot` over the fake's own
    * committed facts), so the hub renders immediately after the commit.
    */
-  private async committedSnapshot(
+  private committedSnapshot(
     input: SeasonBlockStartInput,
     checkpoint: SeasonCandidateCheckpoint,
     commandId: string,
@@ -587,16 +594,10 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       stateDigest: string;
       window: SeasonWindowOpenResult | null;
     },
-  ): Promise<SeasonRunSnapshot> {
+    prior: SeasonRunSnapshot | null,
+  ): SeasonRunSnapshot {
     const schedule = this.scheduleOf(input);
-    // The prior-state read is best effort: without a repository (unit tests,
-    // pre-promotion states) the snapshot still assembles over an empty prior.
-    let current: SeasonRunSnapshot | null = null;
-    try {
-      current = await loadCurrentSnapshot(schedule);
-    } catch {
-      current = null;
-    }
+    const current = prior;
     return assembleCommittedSnapshot({
       run: input.run,
       rotations: input.rotations,

@@ -136,7 +136,7 @@
       </div>
     </dl>
     <p class="mt-1 font-mono text-[9px] text-muted-foreground/70">
-      1–100 from the locked rotation · minute-weighted player ratings
+      1–100 vs the league · star-heavy minute weighting
     </p>
   {/if}
 

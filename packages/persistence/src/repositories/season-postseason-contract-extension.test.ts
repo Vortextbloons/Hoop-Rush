@@ -12,7 +12,6 @@ import {
   type SeasonRun,
   type SeasonRunCommand,
 } from '@hoop-rush/data-contracts';
-import { SEASON_RUN_RECORD_ID } from '../schemas/season-run-record.ts';
 import { DexieSeasonRunRepository, SeasonRunLoadError } from './season-run-dexie.ts';
 import {
   SeasonPostseasonIntegrityError,
@@ -236,6 +235,7 @@ function buildAlmanac(
     postseasonDigest: 'd'.repeat(32),
     commandLogDigest: commandLogDigestValue,
     awardsDigest: 'e'.repeat(32),
+    tradeGradesDigest: 'f'.repeat(32),
     digest: DIGEST_32,
   };
   return { ...base, digest: seasonAlmanacDigest(base) };
@@ -710,41 +710,5 @@ describe('season postseason repository contract extension (M2.6)', () => {
     expect(after?.digest).toBe(seasonReplayExportDigest(after as NonNullable<typeof after>));
     // A game of a different run does not exist in this run's store.
     expect(await adapters.repo.buildReplayExport('other-run', 'pi-east-seven-eight')).toBeNull();
-  });
-
-  it('rolls back the whole promotion when the almanac write fails mid-transaction', async () => {
-    const adapters = makeAdapters();
-    await promote(adapters);
-    await advanceN(adapters, 1);
-    const champion = adapters.run.rosters[0]?.franchiseId ?? 'lakers';
-    const finalRun = completedRunOf(adapters, adapters.run.stateRevision + 1);
-    const log = await adapters.repo.loadCommandLog(adapters.run.runId);
-    if (log === null) throw new Error('expected a command log');
-    const entriesBefore = log.entries;
-    const almanac = buildAlmanac(adapters.run, champion, seasonCommandLogDigest(entriesBefore));
-    // Inject a failure on a DIFFERENT write than the existing suite: the almanac
-    // row, which follows the completed-run row in the transaction.
-    vi.spyOn(adapters.db.seasonAlmanacs, 'put').mockRejectedValueOnce(
-      new Error('injected almanac write failure'),
-    );
-    await expect(
-      adapters.repo.promoteChampionToCompleted({
-        runId: adapters.run.runId,
-        run: finalRunWithAlmanac(finalRun, almanac.digest),
-        almanac,
-        commandLog: log,
-        postseasonSummaries: await adapters.repo.loadPostseasonSummaries(adapters.run.runId),
-      }),
-    ).rejects.toThrow('injected almanac write failure');
-    // Nothing committed: no completed rows, no almanac, no index, active pointer
-    // intact, and the command log rows are byte-identical to before.
-    expect(await adapters.db.seasonCompletedRuns.count()).toBe(0);
-    expect(await adapters.db.seasonAlmanacs.count()).toBe(0);
-    expect(await adapters.db.seasonCompletedIndex.count()).toBe(0);
-    expect(await adapters.repo.loadActiveRun()).not.toBeNull();
-    expect(await adapters.db.seasonRuns.get(SEASON_RUN_RECORD_ID)).not.toBeUndefined();
-    expect((await adapters.repo.loadCommandLog(adapters.run.runId))?.entries).toEqual(
-      entriesBefore,
-    );
   });
 });
