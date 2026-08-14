@@ -12,17 +12,6 @@
   } from '$lib/season/season-draft-flow';
   import { formatPositions } from '$lib/player-positions';
 
-  /**
-   * The Season Run ten-round draft board (spec/2.0/11 live draft board,
-   * M2.3.5, season-draft-v2): seeded franchise assignment, snake order and
-   * current turn, the current turn's deterministic global eight-card offer,
-   * every previously drawn offer, every selected player-season version, and
-   * the remaining 4G/4F/3C coverage needs. Feasibility-safe cards are
-   * distinguishable from disabled cards, and every disabled card states its
-   * coverage reason. The board is presentational: every command flows through
-   * the page into the engine.
-   */
-
   let {
     flow,
     catalog,
@@ -37,7 +26,7 @@
     flow: SeasonDraftFlowState;
     catalog: SeasonDraftCatalog;
     manifest: HoopRushManifest;
-    /** playerVersionId -> branded face refs for every card and pick. */
+
     faces: Map<string, SeasonFaceRef>;
     busy: boolean;
     error: string | null;

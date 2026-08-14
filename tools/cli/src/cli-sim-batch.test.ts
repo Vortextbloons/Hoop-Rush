@@ -3,12 +3,6 @@ import { simBatch } from './commands/sim.ts';
 import { simBatchReportSchema } from './report-schemas.ts';
 import { jsonPayload, runCli } from './cli-test-helpers.ts';
 
-/**
- * Worker independence and seed-range additivity are pure functions of the
- * (fixture, seed, profile) triple, so both behaviors are exercised in
- * process through the authoritative `simBatch` command (the subprocess
- * suite's slow path). One real CLI boot stays for the --workers plumbing.
- */
 describe('cli: sim batch worker independence', () => {
   it('produces identical aggregates with 1 and 4 workers', async () => {
     const runWith = async (workers: string) => {

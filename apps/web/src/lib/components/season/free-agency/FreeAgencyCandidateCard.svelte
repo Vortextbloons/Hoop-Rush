@@ -7,6 +7,7 @@
   } from '@hoop-rush/data-contracts';
   import { formatPositions } from '$lib/player-positions';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import { initialsOf } from '$lib/season/season-branding';
   import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
   import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
   import {
@@ -14,17 +15,6 @@
     FREE_AGENCY_BAND_LABEL,
     ROLE_EXPECTATION_LABEL,
   } from './free-agency-view';
-
-  /**
-   * One free-agency candidate card (spec/2.0/15): identity + eligible
-   * positions, the market band, the supported role expectations, factual
-   * strengths/limitations (bounded lists), availability + durability facts,
-   * minutes per game, fit facts (need tier + opportunity) when the roster is
-   * known, the Influence minimum + selectable commitment (minimum through
-   * 3), and the franchises with recorded interest (human first). The card
-   * also hosts the declaration controls: priority picker, role expectation,
-   * and Influence stepper. Presentation facts only — no selection logic.
-   */
 
   const MAX_STRENGTHS = 4;
   const MAX_LIMITATIONS = 3;
@@ -50,24 +40,24 @@
     onInfluenceChange,
   }: {
     candidate: SeasonFreeAgencyCandidate;
-    /** Recorded roster/campaign fit facts (need tier + opportunity). */
+
     fit?: CandidateFitFacts | null;
-    /** Presentation-order highlight only (never reserves the player). */
+
     isBestFit?: boolean;
-    /** Franchises with recorded interest, human first. */
+
     interested?: InterestedTeam[];
     franchiseName: (franchiseId: string) => string;
     face?: SeasonFaceRef | null;
     overallRating?: number | null;
     manifest?: HoopRushManifest | null;
-    /** 0 = not targeted; 1 = first priority; 2 = second priority. */
+
     priority?: 0 | 1 | 2;
     role?: SeasonFreeAgencyRoleExpectation | null;
     influence?: number | null;
-    /** False once the declaration is submitted (immutable). */
+
     editable?: boolean;
     disabled?: boolean;
-    /** False when two other players already fill the declaration. */
+
     canAddTarget?: boolean;
     onToggleTarget: () => void;
     onPriorityChange: (priority: 0 | 1 | 2) => void;
@@ -77,10 +67,15 @@
 
   const selected = $derived(priority !== 0);
   const effectiveInfluence = $derived(influence ?? candidate.minimumInfluence);
+  const displayFace = $derived<SeasonFaceRef>(
+    face ?? {
+      playerId: candidate.playerId,
+      playerExternalId: '',
+      altIds: null,
+      initials: initialsOf(candidate.displayName),
+    },
+  );
 
-  /** Raw typed text while the Influence input is being edited (null shows
-   * the committed value). Committed on change/blur so the input always
-   * reflects state after an edit. */
   let influenceDraft: string | null = $state(null);
 
   function onInputValue(raw: string) {
@@ -116,8 +111,8 @@
     : ''}"
 >
   <div class="flex min-w-0 items-start gap-2.5">
-    {#if manifest !== null && face !== null}
-      <SeasonPlayerFace {face} {manifest} size="sm" />
+    {#if manifest !== null}
+      <SeasonPlayerFace face={displayFace} {manifest} size="sm" />
     {:else}
       <span
         class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"

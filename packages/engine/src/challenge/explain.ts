@@ -6,22 +6,13 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { usageOf } from '../sim/recorder.ts';
 
-/**
- * Season explanation evidence (spec/01 feedback, spec/03 outputs). Derives
- * opponent season totals and thresholded comparisons purely from recorded
- * game results and the run's accepted aggregates — no invented narratives,
- * no persistence changes. The UI owns human-readable wording; this module
- * emits numbers only.
- */
-
 export const EXPLAIN_THRESHOLDS = {
-  /** Both sides must attempt at least this many zone shots to compare zones. */
   minimumZoneAttempts: 60,
-  /** A zone is the "advantage zone" only when its make-rate edge reaches this. */
+
   minimumZoneEdge: 0.02,
-  /** A usage leader is named only at or above this share of team usage. */
+
   usageShare: 0.28,
-  /** Opponent offensive-rebound rate above this marks weak defensive glass. */
+
   opponentOffensiveReboundRate: 0.3,
 } as const;
 
@@ -39,7 +30,6 @@ export interface OpponentSeasonTotals {
   reboundOpportunities: number;
 }
 
-/** Folds the away side of every accepted game into season totals. */
 export function opponentSeasonTotals(run: ChallengeRun): OpponentSeasonTotals {
   const zoneTotals = new Map<ShotZone, { attempts: number; makes: number }>();
   const totals: OpponentSeasonTotals = {
@@ -93,12 +83,12 @@ export interface ZoneComparison {
   zone: ShotZone;
   attempts: number;
   makes: number;
-  /** User make rate 0-1 for the zone. */
+
   pct: number;
   opponentAttempts: number;
   opponentMakes: number;
   opponentPct: number;
-  /** pct minus opponentPct (positive favors the user). */
+
   edge: number;
 }
 
@@ -110,19 +100,18 @@ export interface UsageLeader {
 }
 
 export interface SeasonExplanation {
-  /** Games the user's five won the turnover battle (fewer turnovers). */
   turnoverBattleWins: number;
-  /** Games the opponent won the turnover battle. */
+
   turnoverBattleLosses: number;
-  /** Net points per 100 possessions, from recorded team possessions. */
+
   netRatingPer100: number;
-  /** The zone where the user's make-rate edge was largest, when meaningful. */
+
   zoneAdvantage: ZoneComparison | null;
-  /** Opponent offensive rebounds as a share of opponent reboundable misses. */
+
   opponentOffensiveReboundRate: number;
-  /** User defensive rebounds as a share of user-DReb + opponent-OReb. */
+
   defensiveReboundPct: number;
-  /** The user player with the highest usage share, when meaningful. */
+
   usageLeader: UsageLeader | null;
 }
 
@@ -130,12 +119,6 @@ function pct(made: number, attempted: number): number {
   return attempted <= 0 ? 0 : made / attempted;
 }
 
-/**
- * Explains the season from recorded data: opponent totals folded from
- * `run.games`, the user side read from the accepted aggregates. Everything
- * returned is a direct aggregation or a thresholded comparison of recorded
- * numbers.
- */
 export function explainSeason(run: ChallengeRun): SeasonExplanation {
   const team = run.aggregates.team;
   const opponents = opponentSeasonTotals(run);
@@ -151,7 +134,6 @@ export function explainSeason(run: ChallengeRun): SeasonExplanation {
   const userPossessions = Math.max(1, team.possessions);
   const netRatingPer100 = ((team.points - opponents.points) / userPossessions) * 100;
 
-  // Zone comparison: user zones from the recorded home shotZones.
   const userZoneTotals = new Map<ShotZone, { attempts: number; makes: number }>();
   for (const game of run.games) {
     for (const zone of game.home.shotZones) {

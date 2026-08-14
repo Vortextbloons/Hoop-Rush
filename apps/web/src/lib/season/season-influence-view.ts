@@ -13,28 +13,18 @@ import {
 import { seasonObjectiveChoicesForBlock } from '@hoop-rush/engine';
 import { SEASON_ROUND_COUNT } from '@hoop-rush/data-contracts';
 
-/**
- * M2.5 Influence + objective presentation (season-influence-v1,
- * season-objective-v1). Pure display derivations: the human balance with
- * cap/floor facts, the recent ledger entries (authoritative reconciliation
- * source), the spend affordances per open trade window and per active
- * injury, and the objective picker view model (the block's deterministic
- * three-choice set, the recorded selection, and its recorded evaluation).
- * Balance and debt never modify gameplay; this module only renders.
- */
-
 export interface InfluenceSpendAffordance {
   purpose: 'extra-trade-offer' | 'risky-rehab';
   cost: number;
   windowIndex: number | null;
   injuryId: string | null;
-  /** The injured player for risky-rehab spends (from the health record). */
+
   playerVersionId: string | null;
-  /** True when the spend was already recorded for this window/injury. */
+
   spent: boolean;
-  /** True when the balance allows the spend (floor enforced by validation). */
+
   affordable: boolean;
-  /** The recorded rehab outcome for risky-rehab spends (null when pending). */
+
   rehabOutcome: SeasonInfluenceRehabOutcome | null;
 }
 
@@ -44,21 +34,12 @@ export interface InfluenceViewModel {
   floor: number;
   atCap: boolean;
   atFloor: boolean;
-  /** The human's most recent ledger entries, newest first. */
+
   recentEntries: SeasonInfluenceLedgerEntry[];
-  /** Spend affordances the UI can offer right now. */
+
   affordances: InfluenceSpendAffordance[];
 }
 
-/**
- * Spend affordances: one `extra-trade-offer` per tracked trade window (once
- * per franchise per window) and one `risky-rehab` per ACTIVE injury of the
- * human franchise (at most once per injury; `state.rehabs` records the spend
- * and its seeded outcome). `health` supplies the active injuries; without it
- * the rehab affordances are limited to already-recorded rehabs. `openWindow`
- * (the run's open trade window) supplies the extra-offer affordance when the
- * engine has not yet recorded the human's window state.
- */
 export function influenceViewModel(
   state: SeasonInfluenceState,
   humanFranchiseId: string,
@@ -151,19 +132,14 @@ export interface ObjectiveChoiceViewModel {
 }
 
 export interface ObjectiveChoicesViewModel {
-  /** The current playable block (0-7); null when none remains or the season is complete. */
   blockIndex: number | null;
-  /** The block's deterministic three-choice set (empty when no block remains). */
+
   choices: ObjectiveChoiceViewModel[];
-  /** The recorded selection for the block, when already made. */
+
   selectedObjectiveId: SeasonObjectiveId | null;
-  /** The recorded evaluation for the selection, when the block assembled. */
+
   success: boolean | null;
-  /**
-   * The most recent recorded evaluation of a completed block (the picker's
-   * own selection evaluates only after the block commits, when the picker
-   * has already moved on).
-   */
+
   lastEvaluation: {
     blockIndex: number;
     objectiveId: SeasonObjectiveId;
@@ -172,13 +148,6 @@ export interface ObjectiveChoicesViewModel {
   } | null;
 }
 
-/**
- * The objective picker facts for the current playable block: the three
- * deterministic choices (engine `seasonObjectiveChoicesForBlock`), the
- * recorded selection, and its recorded evaluation once the block committed.
- * Block 8 (the final two-game block) never selects. The picker stays on the
- * current block after a selection until that block is simulated.
- */
 export function objectiveChoicesViewModel(run: SeasonRun): ObjectiveChoicesViewModel {
   const blockIndex = currentObjectiveBlock(run);
   const definitions = new Map(SEASON_OBJECTIVE_CATALOG.map((entry) => [entry.objectiveId, entry]));

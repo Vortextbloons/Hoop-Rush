@@ -9,29 +9,14 @@ import { deriveAttemptSeed } from '../../challenge/seeds.ts';
 import { simulateGame } from '../../sim/game.ts';
 import type { EngineContext } from '../../sim/context.ts';
 
-/**
- * Sandbox whole-run best-of-N selection (spec/01 sandbox loop). Sandbox
- * simulates every attempt of the complete 82-game challenge from seeds
- * derived deterministically from the run seed, then keeps the attempt with
- * the best record. The chosen attempt's seed becomes the authoritative run
- * seed, so per-game seed derivation, replay, resume, and result validation
- * all continue to work on the single accepted run.
- *
- * The comparison is wins first, then total point differential, then the
- * lower attempt index. The rule is deterministic under the run seed: the
- * chosen seed is a pure function of the run seed.
- */
-
-/** Number of whole-run attempts sandbox simulates and compares. */
 export const BEST_OF_ATTEMPTS = 2;
 
 export interface RunScore {
   wins: number;
-  /** Season point differential: user points minus opponent points. */
+
   differential: number;
 }
 
-/** Exact comparison score of a finished run (never estimates). */
 export function scoreRun(run: ChallengeRun): RunScore {
   let differential = 0;
   for (const game of run.games) {
@@ -40,7 +25,6 @@ export function scoreRun(run: ChallengeRun): RunScore {
   return { wins: run.aggregates.team.wins, differential };
 }
 
-/** Wins first, then differential; ties resolve to the earlier attempt. */
 function isBetterScore(candidate: RunScore, current: RunScore): boolean {
   const winsBetter = candidate.wins > current.wins;
   const winsTied = candidate.wins === current.wins;
@@ -48,7 +32,6 @@ function isBetterScore(candidate: RunScore, current: RunScore): boolean {
   return winsBetter || (winsTied && differentialBetter);
 }
 
-/** Returns the run with the highest score; ties resolve to the earlier attempt. */
 export function chooseBestRun(runs: readonly ChallengeRun[]): ChallengeRun {
   const [first, ...rest] = runs;
   if (!first) {
@@ -66,12 +49,6 @@ export function chooseBestRun(runs: readonly ChallengeRun[]): ChallengeRun {
   return best;
 }
 
-/**
- * Creates the run, simulates `attempts` complete seasons from derived attempt
- * seeds (BEST_OF_ATTEMPTS by default), and returns the chosen attempt's
- * finished run. All attempts always finish; the returned run is a normal
- * accepted ChallengeRun whose runSeed is the chosen attempt seed.
- */
 export function simulateChallengeBestOf(
   creation: ChallengeCreation,
   profile: EraSimulationProfile,
@@ -96,13 +73,6 @@ export interface BestOfChoice {
   chosenDifferential: number;
 }
 
-/**
- * Whole-run best-of selection for the challenge worker: simulates every
- * attempt of the complete 82-game season from derived attempt seeds and
- * reports the chosen attempt's seed and record. Games are not recorded (the
- * main thread re-saves the chosen seed before the paced reveal), so the rule
- * is identical to chooseBestRun (spec/01) without materializing 82 results.
- */
 export function chooseBestRunSeed(
   run: ChallengeRun,
   profile: EraSimulationProfile,

@@ -8,13 +8,6 @@
   import FreeAgencyCandidateCard from './FreeAgencyCandidateCard.svelte';
   import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
 
-  /**
-   * The open market's up-to-12 candidate cards (spec/2.0/15). Cards render
-   * recorded facts only; the ~five highlighted "best fits" are a
-   * presentation order derived from recorded roster/campaign facts and
-   * never reserve players.
-   */
-
   export interface FreeAgencyCardView {
     candidate: SeasonFreeAgencyCandidate;
     fit: CandidateFitFacts | null;
@@ -23,9 +16,9 @@
     priority: 0 | 1 | 2;
     role: SeasonFreeAgencyRoleExpectation | null;
     influence: number | null;
-    /** Headshot ref resolved from the packaged catalog (null -> initials). */
+
     face?: SeasonFaceRef | null;
-    /** Packaged summary Overall (report field only; never a ranking rule). */
+
     overallRating?: number | null;
   }
 

@@ -7,14 +7,6 @@ import { validateBracketContent } from '../challenge/commands.ts';
 import { evaluateLineupBalance } from '../challenge/lineup-eval.ts';
 import { scheduleInvariants } from './schedule.ts';
 
-/**
- * Bracket generation tests (spec/01, spec/06): unchanged opening opponent,
- * balance constraints, strength bands, schedule distribution, and metadata
- * over the shared deterministic fixture bracket. The independent
- * regeneration tests live in generator-regeneration.test.ts so the two
- * multi-second generations run on a separate worker.
- */
-
 describe('generateBracket (propose-review-freeze)', () => {
   it('generates a validated 30-team bracket with the fixed 82-game schedule', () => {
     const bracket = fixtureBracket();

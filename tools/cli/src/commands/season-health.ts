@@ -32,23 +32,6 @@ import {
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
-/**
- * `season health calibrate` (spec/2.0 M2.5, contract §17): freezes
- * `injury-targets-v1` from a season cohort (blocks 0-8 through the engine
- * health pipeline) plus a roll-level risk probe. The cohort observes
- * incidence (bp), severity shares, per-severity recovery means, same-game
- * return, season-ending rate, and the strong-vs-weak standings gap; its
- * mean risk sits a few bp above the 80 bp base because the additive risk
- * inputs are positive on average in the fixture — the frozen ±15 bp
- * envelope accommodates that by design. The roll-level probe isolates the
- * formula's sensitivity (season sim does not expose per-exposure inputs):
- * monotonicity (minutes↑/fatigue↑/durability↓ ⇒ incidence↑) and a frozen
- * absolute recurrence gap of ≥15 bp (a ratio gate would be unattainable at
- * this baseline; 15 bp is a measurable floor at the cohort sizes used).
- * Cohort: 16 calibration + 4 held-out seasons (~3,000 injuries); the
- * runner is in-process (a worker variant is deferred).
- */
-
 export const SEASON_HEALTH_CALIBRATE_OPTIONS: Record<string, boolean> = {
   input: true,
   'seed-from': true,
@@ -65,12 +48,10 @@ export const DEFAULT_INJURY_TARGETS = resolve(DEFAULT_SEASON_DIR, 'injury-target
 export const SEASON_HEALTH_CALIBRATION_SEED_COUNT = 16;
 export const SEASON_HEALTH_VALIDATION_SEED_COUNT = 4;
 
-/** Minimum exposures before an incidence/severity gate evaluates. */
 export const SEASON_HEALTH_MIN_EXPOSURES = 50_000;
-/** Minimum injuries before the duration-means gates evaluate. */
+
 export const SEASON_HEALTH_MIN_INJURIES = 300;
 
-/** Frozen §5 profile constants the gates compare against. */
 export const SEASON_HEALTH_BASE_RISK_BP = 80;
 export const SEASON_HEALTH_RISK_ENVELOPE_BP = 15;
 export const SEASON_HEALTH_SEVERITY_TARGETS = {
@@ -80,22 +61,20 @@ export const SEASON_HEALTH_SEVERITY_TARGETS = {
   seasonEnding: 0.02,
 } as const;
 export const SEASON_HEALTH_SEVERITY_TOLERANCE_PP = 3;
-/** Recovery-range midpoints: minor 1-2, moderate 3-6, major 7-18. */
+
 export const SEASON_HEALTH_DURATION_TARGETS = { minor: 1.5, moderate: 4.5, major: 12.5 } as const;
 export const SEASON_HEALTH_DURATION_TOLERANCE_GAMES = 1;
 export const SEASON_HEALTH_SAME_GAME_RETURN_TARGET = 0.35;
 export const SEASON_HEALTH_SAME_GAME_RETURN_TOLERANCE_PP = 5;
 export const SEASON_HEALTH_SEASON_ENDING_TOLERANCE_PP = 1;
-/** Frozen absolute recurrence gap (documented choice, see module docstring). */
+
 export const SEASON_HEALTH_RECURRENCE_MIN_GAP_BP = 15;
-/** Frozen standings-independence gap (documented choice: ~3 sigma at the
- * cohort's ~180k exposures per group; the model has zero standings inputs). */
+
 export const SEASON_HEALTH_STANDINGS_MAX_GAP_BP = 8;
-/** Exposures per arm of the roll-level monotonicity/recurrence probes. */
+
 export const SEASON_HEALTH_PROBE_EXPOSURES = 200_000;
 export const SEASON_HEALTH_PROBE_MIN_EXPOSURES = 100_000;
 
-/** The targets artifact frozen by `season health calibrate`. */
 export const seasonInjuryTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   targetsVersion: z.literal(SEASON_INJURY_TARGETS_VERSION),
@@ -210,7 +189,6 @@ function franchiseExposures(run: SeasonRun, franchiseId: string): number {
   return exposed * 82;
 }
 
-/** Season-level injury facts measured from the recorded health state. */
 export interface SeasonHealthFacts {
   exposures: number;
   injuries: SeasonInjuryRecord[];
@@ -261,11 +239,6 @@ export function severitySharesOf(injuries: readonly SeasonInjuryRecord[]): {
   };
 }
 
-/**
- * Per-severity recovery means in missed games. Same-game returns (0 missed
- * games by definition) and season-ending injuries (the 10,000 sentinel) are
- * excluded; the targets are the recovery-range midpoints (1.5 / 4.5 / 12.5).
- */
 export function durationMeansOf(injuries: readonly SeasonInjuryRecord[]): {
   minor: number;
   moderate: number;
@@ -284,7 +257,6 @@ export function durationMeansOf(injuries: readonly SeasonInjuryRecord[]): {
   };
 }
 
-/** Same-game-return rate: minor-before-halftime injuries with the 35% roll. */
 export function sameGameReturnRateOf(injuries: readonly SeasonInjuryRecord[]): number {
   const eligible = injuries.filter(
     (injury) => injury.severity === 'minor' && injury.occurredBeforeHalftime,
@@ -292,11 +264,6 @@ export function sameGameReturnRateOf(injuries: readonly SeasonInjuryRecord[]): n
   return share(eligible.filter((injury) => injury.sameGameReturn).length, eligible.length);
 }
 
-/**
- * The roll-level risk probe: one arm of exposures through the engine's
- * seeded injury roll with fixed inputs, returning the observed occurrence
- * count. The probe uses a deterministic game id so every call reproduces.
- */
 export function runInjuryRollProbe(
   rootSeed: string,
   input: Omit<SeasonInjuryRollInput, 'rootSeed' | 'gameId' | 'playerVersionId' | 'franchiseId'>,
@@ -316,7 +283,6 @@ export function runInjuryRollProbe(
   return occurred;
 }
 
-/** Measured calibration facts for one season cohort. */
 export interface SeasonHealthCohortFacts {
   seasonsSimulated: number;
   exposures: number;
@@ -541,7 +507,6 @@ export interface SeasonHealthArgs {
   format?: string | null;
 }
 
-/** Runs the calibration cohort (in-process; worker counts never change facts). */
 export function runSeasonHealthCohort(
   args: SeasonHealthArgs,
   seedIndices: number[],
@@ -690,16 +655,12 @@ export function validateSeasonInjuryTargets(args: SeasonHealthArgs, outPath: str
     schema: seasonInjuryTargetsSchema,
     command: 'season health calibrate --validate',
     extraChecks: () => ({
-      details: [
-        // The schema literal already pins the base risk to 80 bp.
-        `base risk matches the frozen ${String(SEASON_HEALTH_BASE_RISK_BP)} bp profile`,
-      ],
+      details: [`base risk matches the frozen ${String(SEASON_HEALTH_BASE_RISK_BP)} bp profile`],
       failures: [],
     }),
   });
 }
 
-/** `season health calibrate`: runs the gates and freezes injury-targets-v1. */
 export function seasonHealthCalibrate(args: SeasonHealthArgs): CliReport {
   const started = Date.now();
   const { from, to } = parseSeedRange(args, SEASON_HEALTH_CALIBRATION_SEED_COUNT - 1);

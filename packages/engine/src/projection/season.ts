@@ -33,14 +33,6 @@ import {
 } from './rotation-trace.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
 
-/**
- * Season projection (projection milestone): composes the base projector over
- * a ten-player roster, a legal rotation, representative units, target
- * minutes, contingency scenarios, and matchup archetypes. Every unique legal
- * five is projected through the base projector (cached by canonical key);
- * Season code never recreates lineup-performance formulas.
- */
-
 const SLOT_ORDER = ['G1', 'G2', 'F1', 'F2', 'C'] as const;
 
 export interface SeasonProjectionOptions {
@@ -59,7 +51,6 @@ function unitKeyOf(players: readonly string[]): string {
   return [...players].sort().join(',');
 }
 
-/** Maps a planner five (ordered legal G,G,F,F,C) to the base projection input. */
 export function projectUnit(input: {
   players: readonly string[];
   byVersion: ReadonlyMap<string, SimulationPlayer>;
@@ -102,8 +93,6 @@ function missingPlayer(versionId: string): SimulationPlayer {
 
 type BaseFiveProjectionInputTuple = BaseFiveProjectionInput['lineup'];
 
-/** Blends the normal and close traces by the artifact's close-scenario weight.
- * The blended unit keeps the normal trace's slot-ordered five. */
 function blendedTrace(
   normal: RotationTraceResult,
   close: RotationTraceResult,
@@ -126,16 +115,6 @@ function blendedTrace(
   return blended;
 }
 
-/**
- * Minute-policy plan facts (minute-policy-v1) for one projection: the
- * rotation's own target minutes projected forward over the upcoming-block
- * horizon against the supplied per-player load. The risk-adjusted score uses
- * the neutral quality 0.5 because these facts describe a SINGLE rotation,
- * not three competing plans — relative quality normalization needs a plan
- * set, and the three-card comparisons in the optimizer flow
- * (optimizeSeasonRotation) override per-plan scores with projected net
- * ratings.
- */
 function planFactsOf(input: {
   rotation: SeasonProjectionInput['rotation'];
   allVersions: readonly string[];
@@ -212,10 +191,6 @@ function planFactsOf(input: {
   };
 }
 
-/**
- * Projects one ten-player roster with a legal rotation. Pure, seedless,
- * deterministic.
- */
 export function projectSeasonRoster(
   input: SeasonProjectionInput,
   options: SeasonProjectionOptions = {},
@@ -288,7 +263,6 @@ export function projectSeasonRoster(
     });
   }
 
-  // Bench-heavy as a separate valid scenario (never silently substituted).
   const benchHeavyRotation = applySeasonRotationPreset(input.rotation, 'bench-heavy');
   const benchHeavyContext = traceContext({
     rotation: benchHeavyRotation,
@@ -329,7 +303,6 @@ export function projectSeasonRoster(
     });
   }
 
-  // Contingency units: every single-player removal plus capped pair removals.
   const allVersions = members.map((member) => member.playerVersionId);
   let legalSingleRemovals = 0;
   for (const removed of allVersions) {
@@ -375,7 +348,6 @@ export function projectSeasonRoster(
     }
   }
 
-  // Matchup robustness: the starting five against every archetype reference.
   const startersDraft = draft.find((unit) => unit.unitId === 'starters');
   for (const reference of archetypeReferences(input.model, input.eraProfile.eraId)) {
     const five = startersDraft?.players ?? input.rotation.starters;
@@ -464,7 +436,6 @@ export function projectSeasonRoster(
   const singleRemovalCount = allVersions.length;
   const contingencyDepth = (legalSingleRemovals / Math.max(1, singleRemovalCount)) * 100;
 
-  // Foul resilience: coverage after removing the highest-foul-exposure player.
   const highestFoul = [...players].sort((a, b) => b.tendencies.foulRate - a.tendencies.foulRate)[0];
   const foulResilience =
     highestFoul !== undefined
@@ -479,7 +450,6 @@ export function projectSeasonRoster(
     matchupNets.length > 0 ? matchupNets.reduce((s, v) => s + v, 0) / matchupNets.length : 0;
   const matchupWorstCase = matchupNets.length > 0 ? Math.min(...matchupNets) : 0;
 
-  // Role redundancy: second-best unit relative to best for key roles.
   const secondBest = (picker: (unit: SeasonProjectionUnit) => number) => {
     const values = units.map((unit) => picker(unit)).sort((a, b) => b - a);
     const best = values[0];

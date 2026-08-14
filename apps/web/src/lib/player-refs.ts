@@ -1,14 +1,6 @@
 import type { HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
 import { getPool } from '$lib/data';
 
-/**
- * Resolves index/draft refs (playerId + franchise/era provenance) to full
- * packaged peak player-seasons in slot order, loading each distinct
- * franchise-era pool at most once (pools are cached by the data layer
- * anyway). Shared by the sandbox draft and the classic run creation so the
- * two modes never diverge on pool resolution.
- */
-
 export interface PlayerRef {
   playerId: string;
   franchiseId: string;

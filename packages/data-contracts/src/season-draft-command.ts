@@ -5,30 +5,13 @@ import { playerVersionIdSchema } from './season-identity.ts';
 import { seasonLeagueSchema } from './season-league.ts';
 import { SEASON_DRAFT_VERSION } from './season-versions.ts';
 
-/**
- * Authoritative Season Run draft command envelopes and their accepted or
- * rejected records (spec/2.0/07). Every meaningful transition — create, draw
- * an eight-card offer, pick, finalize, and AI league generation — flows
- * through one typed command with a `commandId` and the `expectedRevision` of
- * the state it was issued against. Duplicate command ids are idempotent;
- * stale revisions are rejected. Replaying the initial state plus the exact
- * command sequence reproduces every offer, pick, rejection, and the final
- * digest.
- *
- * M2.3.5 (season-draft-v2): the franchise-era reveal/claim commands are
- * removed from the current draft; the payload union keeps them as legacy
- * members so stored season-draft-v1 records (which embed their command logs)
- * continue to parse. The current engine rejects legacy commands with
- * `UNSUPPORTED_COMMAND`.
- */
-
 export const seasonDraftCommandKindSchema = z.enum([
   'create-season-draft',
   'draw-season-offer',
   'select-draft-player',
   'finalize-human-rosters',
   'generate-ai-league',
-  // Legacy season-draft-v1 commands (recovery reads only).
+
   'reveal-draft-roll',
   'claim-draft-pool',
 ]);
@@ -39,7 +22,7 @@ export const createSeasonDraftPayloadSchema = z.object({
   runId: z.string().min(1).max(64),
   rootSeed: seedSchema,
   league: seasonLeagueSchema,
-  /** One or two human participants; franchise assignments are seeded. */
+
   humanParticipantIds: z.array(z.string().min(1).max(64)).min(1).max(2),
   catalogVersion: z.literal(SEASON_DRAFT_VERSION),
 });
@@ -63,7 +46,6 @@ export const generateAiLeaguePayloadSchema = z.object({
   kind: z.literal('generate-ai-league'),
 });
 
-/** Legacy season-draft-v1 command payloads (stored-record reads only). */
 export const revealDraftRollPayloadSchema = z.object({
   kind: z.literal('reveal-draft-roll'),
   participantId: z.string().min(1).max(64),
@@ -89,13 +71,12 @@ export type SeasonDraftCommandPayload = z.infer<typeof seasonDraftCommandPayload
 
 export const seasonDraftCommandSchema = z.object({
   commandId: z.string().min(1).max(64),
-  /** Revision of the draft state this command was issued against. */
+
   expectedRevision: z.number().int().nonnegative(),
   payload: seasonDraftCommandPayloadSchema,
 });
 export type SeasonDraftCommand = z.infer<typeof seasonDraftCommandSchema>;
 
-/** Typed rejection codes; the domain never relaxes a rule to avoid one. */
 export const seasonDraftErrorCodeSchema = z.enum([
   'STALE_REVISION',
   'WRONG_TURN',
@@ -107,7 +88,7 @@ export const seasonDraftErrorCodeSchema = z.enum([
   'INVALID_CATALOG',
   'GENERATION_EXHAUSTED',
   'UNSUPPORTED_COMMAND',
-  // Legacy season-draft-v1 rejection code (recovery reads only).
+
   'UNAVAILABLE_POOL',
 ]);
 export type SeasonDraftErrorCode = z.infer<typeof seasonDraftErrorCodeSchema>;
@@ -117,7 +98,7 @@ export const seasonDraftAcceptedRecordSchema = z.object({
   commandId: z.string().min(1).max(64),
   revisionBefore: z.number().int().nonnegative(),
   revisionAfter: z.number().int().nonnegative(),
-  /** Canonical digest of the full state after this command. */
+
   stateDigest: seasonCheckpointDigestSchema,
   command: seasonDraftCommandSchema,
 });
@@ -126,7 +107,7 @@ export type SeasonDraftAcceptedRecord = z.infer<typeof seasonDraftAcceptedRecord
 export const seasonDraftRejectedRecordSchema = z.object({
   status: z.literal('rejected'),
   commandId: z.string().min(1).max(64),
-  /** Rejected commands never change the state or its revision. */
+
   revision: z.number().int().nonnegative(),
   errorCode: seasonDraftErrorCodeSchema,
   message: z.string().min(1).max(512),

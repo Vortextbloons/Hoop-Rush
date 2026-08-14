@@ -1,8 +1,3 @@
-/**
- * Presentation tiers for completed 82-game sandbox seasons.
- * Breakpoints mirror NBA-style win bands on an 82-game schedule.
- */
-
 export type SeasonTier = 'perfect' | 'contender' | 'playoff' | 'lottery' | 'tanking';
 
 export interface SeasonTierInfo {

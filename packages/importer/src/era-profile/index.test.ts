@@ -46,10 +46,8 @@ describe('deriveLeagueAggregatesFromStints', () => {
 
     const a = deriveLeagueAggregatesFromStints(stints);
 
-    // player_games / 10 approximates league team-games.
     expect(a.teamGames).toBe(14);
 
-    // possessions = fga + 0.44 * fta - oreb + tov
     expect(a.possessions).toBe(100 + 50 + 0.44 * (30 + 10) - (10 + 5) + (12 + 6));
     expect(a.possessions).toBeCloseTo(170.6, 10);
 
@@ -76,9 +74,9 @@ describe('deriveLeagueAggregatesFromStints', () => {
     ]);
     expect(a.fga).toBe(0);
     expect(a.points).toBe(10);
-    // team_games = max(1, player_games / 10) floors at one team-game.
+
     expect(a.teamGames).toBe(1.0);
-    // Absent families stay null; present ones sum.
+
     expect(a.oreb).toBeNull();
     expect(a.possessions).toBeNull();
     expect(a.tpa).toBeNull();
@@ -121,15 +119,12 @@ describe('computePoolShotMix', () => {
 
     const mix = computePoolShotMix(players, 0.15);
 
-    // Rescaled mix still sums to one.
     const sum = mix.rim + mix.shortMid + mix.longMid + mix.cornerThree + mix.aboveBreakThree;
     expect(sum).toBeCloseTo(1.0, 4);
 
-    // The three-point component is normalized to the league 3PA rate.
     const threeShare = mix.cornerThree + mix.aboveBreakThree;
     expect(threeShare).toBeCloseTo(0.15, 4);
 
-    // Values are rounded to 4 decimals.
     for (const value of Object.values(mix)) {
       expect(value).toBe(Math.round(value * 10000) / 10000);
     }

@@ -6,7 +6,6 @@ import { starterStats } from './ratings-test-support.ts';
 
 const stats = starterStats();
 
-/** Base profile input for the v3 fixtures; overrides apply onto the base stats. */
 function recordFor(statsOver: Record<string, unknown> = {}) {
   return derivePlayerRecord({
     season: '1996-97',
@@ -61,10 +60,7 @@ describe('Ratings v3 profile', () => {
         points: 2_028,
         rebounds: 429,
         assists: 374,
-        // Strengthened stock totals (62 -> 78 steals, 70 -> 86 blocks): after
-        // BPM left the defensive ratings, the original counts fell one point
-        // below the 87 band; the boosted defense restores the sustained
-        // two-way wing without loosening the band.
+
         steals: 78,
         blocks: 86,
         turnovers: 249,
@@ -90,23 +86,20 @@ describe('Ratings v3 profile', () => {
     const record = recordFor();
     const profile = record.ratingProfile;
     expect(profile.schemaVersion).toBe(2);
-    // rawOverallScore is the pre-canonicalCurve raw (rounded to 2dp): the
-    // production-weighted blend of base score and production score plus the
-    // calibrated adjustment. No elite-evidence lift applies to this fixture.
+
     const recomputed =
       profile.baseScore * (1 - profile.production.weight) +
       profile.production.score * profile.production.weight +
       profile.calibratedImpact.adjustment;
     expect(profile.rawOverallScore).toBe(Math.round(recomputed * 100) / 100);
-    // The raw score is a diagnostic, not the packaged Overall.
+
     expect(profile.rawOverallScore).not.toBe(profile.canonicalOverall);
   });
 
   it('reports the same offense/defense through computeSummaryRatings and the profile', () => {
     const record = recordFor();
     const summary = computeSummaryRatings(record.ratings, record.tendencies);
-    // summary.ts delegates to the authoritative computeOffenseDefense, so all
-    // surfaces must agree.
+
     expect(summary.offenseRating).toBe(record.ratingProfile.offenseRating);
     expect(summary.defenseRating).toBe(record.ratingProfile.defenseRating);
     expect(summary.offenseRating).toBe(record.summaryRatings.offenseRating);
@@ -119,8 +112,7 @@ describe('Ratings v3 profile', () => {
     const tendenciesBefore = { ...record.tendencies };
     const offenseBefore = record.ratingProfile.offenseRating;
     const defenseBefore = record.ratingProfile.defenseRating;
-    // Pool packaging overwrites the packaged summary overall with the cohort
-    // percentile; that cosmetic overwrite must not leak into anything else.
+
     record.summaryRatings.overallRating = 42;
     expect(record.summaryRatings.overallRating).toBe(42);
     expect(record.ratings).toEqual(ratingsBefore);
@@ -134,12 +126,11 @@ describe('Ratings v3 profile', () => {
   it('overall is a provisional 55/45 blend while the packaged Overall comes from the profile', () => {
     const record = recordFor();
     const summary = computeSummaryRatings(record.ratings, record.tendencies);
-    // summary.ts documents its overallRating as provisional: a clamped 55/45
-    // blend of offense and defense, never fed into packaging.
+
     expect(summary.overallRating).toBe(
       Math.trunc(0.55 * summary.offenseRating + 0.45 * summary.defenseRating),
     );
-    // The packaged Overall source is the profile's canonical curve.
+
     expect(record.summaryRatings.overallRating).toBe(record.ratingProfile.canonicalOverall);
     expect(record.summaryRatings.overallRating).not.toBe(summary.overallRating);
   });

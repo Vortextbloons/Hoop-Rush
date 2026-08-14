@@ -56,20 +56,10 @@ function seedFor(playerId: string, context: string, index: number): string {
   return fixtureSeed(`${RATINGS_VERSION}|${playerId}|${context}`, index);
 }
 
-/**
- * Calibration confidence for one context: the fraction of the confidence
- * target reached by the actual samples used. The target is a declared
- * artifact property, never the previous artifact's sample count.
- */
 export function calibrationConfidence(samples: number, confidenceTarget: number): number {
   return Math.min(1, samples / confidenceTarget);
 }
 
-/**
- * Assemble the next artifact from the loaded one: versions advance, the
- * actual samples used are recorded, and the confidence target carries
- * through from the loaded artifact (never recomputed from samples).
- */
 export function buildRatingsModelArtifact(input: {
   artifact: RatingsModelArtifact;
   playerAdjustments: NonNullable<RatingsModelArtifact['playerAdjustments']>;

@@ -28,21 +28,6 @@ import { rosterCalibrationSeed } from './season-rosters.ts';
 import { percentile } from '../stats.ts';
 import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
 
-/**
- * `season draft calibrate` (spec/2.0 M2.3.5): freezes `offer-targets-v1`
- * from a 256+64-seed cohort of complete season-draft-v2 drafts. Every seed
- * plays create -> ten rounds (draw + best-selectable pick) -> finalize ->
- * AI generation through the authoritative engine, and the cohort freezes
- * candidate variety, safe-choice availability, positional coverage of
- * selectable cards, exact-version uniqueness, AI generation success, and
- * roster strength distributions.
- *
- * Gates: every offer keeps at least SEASON_DRAFT_SAFE_MINIMUM selectable
- * cards, no exact version is ever duplicated across offers+picks, AI
- * generation never fails, and at least 95% of held-out drafts fall inside
- * the frozen calibration envelopes.
- */
-
 export const SEASON_DRAFT_CALIBRATE_OPTIONS: Record<string, boolean> = {
   workers: true,
   'calibration-seeds': true,
@@ -54,26 +39,21 @@ export const SEASON_DRAFT_CALIBRATE_OPTIONS: Record<string, boolean> = {
 
 export const DEFAULT_OFFER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'offer-targets.json');
 
-/** One completed calibration draft and its measured metrics. */
 export interface SeasonDraftCalibrationRun {
   seed: string;
-  /** Distinct playerVersionIds across the ten drawn offers. */
+
   variety: number;
-  /** Minimum selectable cards across the drawn offers. */
+
   minSafePerOffer: number;
-  /** Share of drawn offers whose selectable cards cover G, F, and C. */
+
   selectableGroupCoverageShare: number;
-  /** True when any version id repeats across offers+picks. */
+
   duplicateVersion: boolean;
-  /**
-   * True when a draw was rejected with NO_FEASIBLE_GLOBAL_OFFER (the
-   * pickBestSelectable policy dead-ended the draft; the engine never
-   * relaxes a rule).
-   */
+
   draftFailed: boolean;
-  /** True when AI generation threw SeasonAiGenerationError. */
+
   generationFailed: boolean;
-  /** Per-band strength scores of the generated AI teams. */
+
   bands: Record<'contender' | 'playoff' | 'average' | 'weaker', number[]>;
 }
 
@@ -102,7 +82,6 @@ function apply(
   return { state: result.state, generation: result.generation };
 }
 
-/** Measures a partially-played draft (used when the policy dead-ends). */
 function measureDraft(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -134,10 +113,7 @@ function measureDraft(
     }
     return (mask & 1) !== 0 && (mask & 2) !== 0 && (mask & 4) !== 0;
   }).length;
-  // Exact-version uniqueness (spec/2.0/03): a selected version never appears
-  // in an offer drawn after its pick. Offers and picks are both
-  // append-ordered, so offer i maps to pick i. Unpicked cards MAY be
-  // re-offered later (ownership is keyed by selection, not by appearance).
+
   const pickedBefore = new Set<string>();
   let duplicateVersion = false;
   state.offers.forEach((offer, index) => {
@@ -165,7 +141,6 @@ function measureDraft(
   };
 }
 
-/** Plays one complete season-draft-v2 draft for a seed and measures it. */
 export function playSeasonDraftCalibrationSeed(
   seed: string,
   catalog: SeasonDraftCatalog,
@@ -214,9 +189,6 @@ export function playSeasonDraftCalibrationSeed(
       { generate: (input) => generateAiLeague({ ...input, targets }) },
     );
     if (drawn.record.status !== 'accepted' || drawn.state === null) {
-      // NO_FEASIBLE_GLOBAL_OFFER: the policy dead-ended the draft. The
-      // engine never relaxes a rule; record the failure and stop. The state
-      // stays at the last accepted snapshot (the rejection changed nothing).
       draftFailed = true;
       break;
     }
@@ -319,7 +291,6 @@ export function playSeasonDraftCalibrationSeed(
   };
 }
 
-/** Runs a chunk of seeds through the authoritative draft path. */
 export function runSeasonDraftCalibrationSeeds(args: {
   seeds: string[];
   catalog: SeasonDraftCatalog;
@@ -331,11 +302,6 @@ export function runSeasonDraftCalibrationSeeds(args: {
   );
 }
 
-/**
- * Index-based lower median; kept local because the frozen
- * `offer-targets-v1` variety medians were authored with it (regeneration
- * must stay byte-identical; see `stats.ts` for the canonical median).
- */
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -358,7 +324,6 @@ function distribution(values: readonly number[]): {
   };
 }
 
-/** Local targets artifact schema (offer-targets-v1); frozen by this command. */
 const offerTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   targetsVersion: z.literal(SEASON_OFFER_TARGETS_VERSION),
@@ -508,16 +473,10 @@ export async function seasonDraftCalibrate(args: {
   );
   const selectableGroupCoverageShare = allOffers === 0 ? 0 : coveredOffers / allOffers;
 
-  // Gates on the calibration cohort (frozen: spec/2.0/03 + offer-targets-v1).
   const minSafeGate = safeAvailabilityShare === 1 && minSafe >= SEASON_DRAFT_SAFE_MINIMUM;
   const zeroDuplicates = duplicateDrafts === 0;
   const zeroGenerationFailures = generationFailures === 0;
 
-  // Held-out pass shares against the frozen calibration envelopes. Variety,
-  // safe-choice availability, and selectable group coverage are draft-level
-  // checks (a dead-ended held-out draft fails all three); roster strength is
-  // a per-team check over completed drafts, mirroring the roster
-  // calibration's held-out gate.
   const withinVariety = (run: SeasonDraftCalibrationRun): boolean =>
     !run.draftFailed && run.variety >= variety.range[0] && run.variety <= variety.range[1];
   const withinCoverage = (run: SeasonDraftCalibrationRun): boolean =>
@@ -651,10 +610,6 @@ export async function seasonDraftCalibrate(args: {
     `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
   ];
   if (draftFailures > 0) {
-    // Policy finding, not a frozen gate: the greedy pickBestSelectable policy
-    // can dead-end a draft with NO_FEASIBLE_GLOBAL_OFFER (the engine never
-    // relaxes a rule; a feasibility-aware human can always complete). The
-    // artifact and all frozen gates still pass.
     details.push(
       `${String(draftFailures)} drafts dead-ended with NO_FEASIBLE_GLOBAL_OFFER under the greedy pick policy (finding; not a frozen gate)`,
     );

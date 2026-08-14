@@ -7,15 +7,6 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { clamp } from '../domain/math.ts';
 
-/**
- * AI roster scoring (season-ai-v1, M2.1). Role scores are pure functions of
- * the recorded possession inputs — detailed ratings and tendencies — never of
- * Overall. The six decision identities alter ONLY the weights applied to the
- * eight role scores; franchise identity never changes ratings, odds, or
- * player eligibility, and Overall has no pick authority (it appears only as
- * a report field).
- */
-
 export const ROSTER_ROLES: readonly SeasonRosterRole[] = [
   'primary-creation',
   'secondary-creation',
@@ -27,10 +18,8 @@ export const ROSTER_ROLES: readonly SeasonRosterRole[] = [
   'defensive-rebounding',
 ];
 
-/** A role is covered when the roster's best member scores at least this. */
 export const ROLE_COVERAGE_THRESHOLD = 35;
 
-/** Versioned identity weight tables (1.0 = balanced). */
 export const IDENTITY_ROLE_WEIGHTS: Record<SeasonAiIdentity, Record<SeasonRosterRole, number>> = {
   'star-chaser': {
     'primary-creation': 1.6,
@@ -94,7 +83,6 @@ export const IDENTITY_ROLE_WEIGHTS: Record<SeasonAiIdentity, Record<SeasonRoster
   },
 };
 
-/** Soft band preference added to selection scores (never a hard filter). */
 export const BAND_SELECTION_BIAS: Record<SeasonStrengthBand, number> = {
   contender: 10,
   playoff: 4,
@@ -102,11 +90,6 @@ export const BAND_SELECTION_BIAS: Record<SeasonStrengthBand, number> = {
   weaker: -8,
 };
 
-/**
- * Soft per-band score ceilings: candidates above the target pay a penalty so
- * weaker teams gravitate toward mid-pack players while legality and role
- * coverage always stay reachable. The penalty never excludes a candidate.
- */
 export const BAND_SCORE_CEILINGS: Record<SeasonStrengthBand, number> = {
   contender: 100,
   playoff: 92,
@@ -119,7 +102,7 @@ export const BAND_CEILING_PENALTY = 1.6;
 export interface SeasonScoreMember {
   detailedRatings: SimulationRatings;
   tendencies: SimulationTendencies;
-  /** Packaged summary overall (0-100); report-only, never a pick authority. */
+
   overall?: number;
 }
 
@@ -157,24 +140,15 @@ export function identityScore(
   return total / weightTotal;
 }
 
-/** Mean of the packaged summary overall ratings (report-only). */
 export function overallReportOf(members: readonly SeasonScoreMember[]): number | null {
   const withOverall = members.filter((member) => member.overall !== undefined);
   if (withOverall.length === 0) return null;
   return withOverall.reduce((sum, member) => sum + (member.overall ?? 0), 0) / withOverall.length;
 }
 
-/**
- * Roster-generation-v2 tiering (M2.4). Percentile tiers are nearest-rank
- * thresholds computed per role over the canonically sorted (playerVersionId
- * ascending) non-human candidate population. Tiers are pure functions of the
- * possession-input role scores; Overall never participates.
- */
-
 export const TIER_ORDER = ['elite', 'strong', 'useful', 'depth'] as const;
 export type PercentileTier = (typeof TIER_ORDER)[number];
 
-/** Fixed percentiles behind each tier (p90 / p75 / p50 of a role). */
 export const TIER_PERCENTILES: Record<'elite' | 'strong' | 'useful', number> = {
   elite: 0.9,
   strong: 0.75,
@@ -187,10 +161,6 @@ export interface RoleThresholds {
   useful: number;
 }
 
-/**
- * Nearest-rank threshold: threshold(p) = sortedAsc[Math.ceil(p * n) - 1].
- * A candidate tied at a threshold belongs to that tier (callers compare >=).
- */
 export function nearestRankThreshold(sortedAsc: readonly number[], percentile: number): number {
   if (sortedAsc.length === 0) return 0;
   if (percentile <= 0) return sortedAsc[0] ?? 0;
@@ -199,11 +169,6 @@ export function nearestRankThreshold(sortedAsc: readonly number[], percentile: n
   return sortedAsc[Math.min(sortedAsc.length - 1, Math.max(0, index))] ?? 0;
 }
 
-/**
- * Per-role tier thresholds over the canonical candidate population. Callers
- * pass the population sorted by playerVersionId ascending; the sort is
- * explicit so the caller controls what "canonical" means.
- */
 export function rolePercentileThresholds(
   canonicalScores: readonly Record<SeasonRosterRole, number>[],
 ): Record<SeasonRosterRole, RoleThresholds> {
@@ -235,7 +200,6 @@ export function rolePercentileThresholds(
   return thresholds;
 }
 
-/** Per-role tier of one candidate: elite >= p90, strong >= p75, useful >= p50. */
 export function percentileTierOf(
   roleScores: Record<SeasonRosterRole, number>,
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
@@ -257,7 +221,6 @@ export function percentileTierOf(
   return tiers;
 }
 
-/** A player's pool tier is its highest tier across all eight roles. */
 export function playerPercentileTier(
   roleTiers: Record<SeasonRosterRole, PercentileTier>,
 ): PercentileTier {

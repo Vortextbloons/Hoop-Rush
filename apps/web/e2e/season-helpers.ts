@@ -1,5 +1,5 @@
-/// <reference types="node" />
 import { expect, type Page } from '@playwright/test';
+import type {} from '@types/node';
 import {
   seasonDraftCatalogSchema,
   type SeasonDraftCatalog,
@@ -7,27 +7,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import { rosterFeasible, type SeasonRosterMemberInput } from '@hoop-rush/engine';
 
-/**
- * Shared Season Run e2e scaffolding (season.spec.ts): the packaged draft
- * catalog (lazy-loaded once per worker so a fetch or data-schema drift fails
- * tests with a clear message instead of failing collection at module scope),
- * the feasibility-safe DraftPlanner, offer readers, and one draft round.
- * Full-draft, AI-generation, and block-submission journeys are covered by
- * engine and persistence unit tests.
- */
-
-/** The base URL mirrors the web app's own asset loading (the preview server). */
 const seasonDraftBaseUrl = (): string =>
   process.env.HOOP_RUSH_E2E_BASE_URL ?? 'http://localhost:4173';
 
 let catalogPromise: Promise<SeasonDraftCatalog> | null = null;
 
-/**
- * Fetches and zod-validates the packaged draft catalog, once per worker. The
- * preview server must be up by the time the draft helpers first run, never at
- * module (collection) time; call it from beforeAll or let first use trigger
- * it lazily.
- */
 export function loadDraftCatalog(): Promise<SeasonDraftCatalog> {
   catalogPromise ??= (async () => {
     const url = `${seasonDraftBaseUrl()}/data/season/draft-catalog.json`;
@@ -56,11 +40,6 @@ export function loadDraftCatalog(): Promise<SeasonDraftCatalog> {
   return catalogPromise;
 }
 
-/**
- * Mirrors the engine's pick feasibility probe so the e2e always selects a
- * candidate that keeps the 4G/4F/3C completion targets feasible — the engine
- * rejects picks that would dead-end the draft, and a dead end is permanent.
- */
 export class DraftPlanner {
   private picked: SeasonRosterMemberInput[] = [];
 
@@ -68,7 +47,6 @@ export class DraftPlanner {
     this.picked = [];
   }
 
-  /** Chooses the first pool candidate the engine's feasibility probe accepts. */
   async choose(candidates: SeasonDraftCandidate[]): Promise<SeasonDraftCandidate> {
     const catalog = await loadDraftCatalog();
     const pickedIds = new Set(this.picked.map((p) => p.playerVersionId));
@@ -103,7 +81,6 @@ export class DraftPlanner {
   }
 }
 
-/** Reads the drawn offer's eight cards (name + season + positions) from the board. */
 export async function offerCardCandidates(page: Page): Promise<SeasonDraftCandidate[]> {
   const catalog = await loadDraftCatalog();
   const section = page.locator('section[aria-labelledby="season-offer-heading"]');
@@ -126,7 +103,6 @@ export async function offerCardCandidates(page: Page): Promise<SeasonDraftCandid
   return result;
 }
 
-/** Drafts one round: draw the eight-card offer, then pick a feasibility-safe card. */
 export async function draftOneRound(page: Page, planner: DraftPlanner) {
   await page.getByRole('button', { name: /^Draw round \d+ offer$/ }).click();
   await expect(page.getByText(/^Offer · pick \d+$/)).toBeVisible();

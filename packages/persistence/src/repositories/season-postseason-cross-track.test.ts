@@ -47,16 +47,6 @@ import {
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
 
-/**
- * M2.6 cross-track integration: the REAL engine tiebreakers rank the saved
- * regular-season standings (recording tie resolutions), the REAL postseason
- * command handlers construct the Play-In and bracket from those rankings,
- * every accepted advancement commits atomically through the repository, the
- * run reloads identically between stages, and the champion promotion
- * produces the completed-history entry. All three M2.6 tracks (tiebreakers +
- * awards, postseason engine, persistence) meet here.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const RUN_ID = 'cross-track-run';
 const HUMAN = 'lakers';
@@ -68,7 +58,6 @@ interface TeamSpec {
   h2h?: Record<string, number>;
 }
 
-/** Distinct east records; a west 7-8 tie between clippers and lakers. */
 function standingsSpec(): Record<string, TeamSpec> {
   const league = buildFixtureLeague(HUMAN);
   const spec: Record<string, TeamSpec> = {};
@@ -98,7 +87,6 @@ function standingsSpec(): Record<string, TeamSpec> {
   return spec;
 }
 
-/** 30-row standings table from the spec (head-to-head arrays complete). */
 function standingsOf(spec: Record<string, TeamSpec>): SeasonStandings {
   const league = buildFixtureLeague(HUMAN);
   const teamIds = league.teams.map((team) => team.franchiseId);
@@ -134,7 +122,6 @@ function standingsOf(spec: Record<string, TeamSpec>): SeasonStandings {
   };
 }
 
-/** Playable positions by roster slot: a legal G,G,F,F,C five in slots 0-4. */
 const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -148,7 +135,6 @@ const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['C'],
 ];
 
-/** A v3-layout catalog covering every fixture roster version. */
 function catalogOf(rosters: ReturnType<typeof buildFixtureRosters>): SeasonDraftCatalog {
   const candidates: SeasonDraftCandidate[] = rosters.flatMap((roster) =>
     roster.players.map((player, slot) => {
@@ -199,7 +185,6 @@ function catalogOf(rosters: ReturnType<typeof buildFixtureRosters>): SeasonDraft
   };
 }
 
-/** The run at the end of the regular season with the crafted standings. */
 function runAtPostseasonBoundary(): SeasonRun {
   const run = buildFixtureRun({ seed: SEED, runId: RUN_ID });
   return {
@@ -228,7 +213,6 @@ function commandOf(
   } as SeasonRunCommand;
 }
 
-/** A forced completed game result over the game input (no RNG consumed). */
 function forcedCompletedResult(
   gameInput: SeasonGameSimulationInput,
   homeScore: number,
@@ -314,7 +298,6 @@ function forcedCompletedResult(
   };
 }
 
-/** Home team wins; the human wins whenever it participates. */
 function humanWinsResolver(): SeasonPostseasonGameResolver {
   return ({ gameInput, pregameEffects }) => {
     const home = gameInput.home.franchiseId;
@@ -349,9 +332,7 @@ async function makeFlow(): Promise<FlowContext> {
     schedule: buildFixtureSchedule(SEED),
     seam,
   });
-  // The promotion computes the initial checkpoint digest over the INITIAL
-  // facts (empty health, initial influence, no transactions); the engine
-  // run must carry the same facts so its command digests reconcile.
+
   const health = seasonHealthStateSchema.parse({
     schemaVersion: 1,
     healthVersion: SEASON_HEALTH_VERSION,
@@ -390,7 +371,6 @@ async function makeFlow(): Promise<FlowContext> {
   return { db, repo, run: aligned, catalog, effects };
 }
 
-/** Commits one accepted command through the repository. */
 async function commit(
   repo: DexieSeasonRunRepository,
   nextRun: SeasonRun,
@@ -426,7 +406,6 @@ describe('cross-track postseason integration (M2.6)', () => {
     const { db, repo, run: initial, catalog, effects } = await makeFlow();
     let run = initial;
 
-    // --- Track A: the authoritative tiebreakers rank the standings ---
     const rankings = rankSeasonPostseason(run.league, run.standings, run.rootSeed);
     const westTie = rankings.west.resolutions.find(
       (entry) => entry.teams.includes('clippers') && entry.teams.includes(HUMAN),
@@ -437,7 +416,6 @@ describe('cross-track postseason integration (M2.6)', () => {
     expect(westTie?.slots).toEqual([7, 8]);
     expect(rankings.west.playInSeeds.slice(0, 2)).toEqual(['clippers', HUMAN]);
 
-    // --- Track B: the postseason commands consume the ranking ---
     const contextOf = (current: SeasonRun) => ({
       run: current,
       pending: null,
@@ -456,7 +434,6 @@ describe('cross-track postseason integration (M2.6)', () => {
     expect(run.postseason.playIn.west.ranking).toEqual(rankings.west.topTen);
     await commit(repo, run, startCommand, [], []);
 
-    // --- Track C: advance, submit human rotations, commit, and reload ---
     let guard = 0;
     let totalSummaries = 0;
     while (run.stage !== 'completed' && guard < 40) {
@@ -498,8 +475,6 @@ describe('cross-track postseason integration (M2.6)', () => {
         throw new Error(`advance not accepted: ${JSON.stringify(accepted)}`);
       }
 
-      // Reload from storage and resume from the reloaded state: the engine
-      // must accept commands built against the reconstructed run.
       const reloaded = await repo.loadActiveRun();
       expect(reloaded).not.toBeNull();
       if (reloaded !== null) {
@@ -515,7 +490,6 @@ describe('cross-track postseason integration (M2.6)', () => {
     expect(run.completion?.championFranchiseId).toBe(champion);
     expect(totalSummaries).toBeGreaterThan(0);
 
-    // --- Track C: promotion to completed history ---
     const postseasonSummaries = await repo.loadPostseasonSummaries(RUN_ID);
     expect(postseasonSummaries.length).toBe(totalSummaries);
     const commandLog = await repo.loadCommandLog(RUN_ID);
@@ -549,7 +523,6 @@ describe('cross-track postseason integration (M2.6)', () => {
       postseasonSummaries,
     });
 
-    // Active-run pointers removed; completed history registered.
     expect(await repo.loadActiveRun()).toBeNull();
     expect(await repo.loadActiveRunIndex()).toBeNull();
     const completed = await repo.loadCompletedSeason(RUN_ID);
@@ -562,18 +535,17 @@ describe('cross-track postseason integration (M2.6)', () => {
       true,
     );
 
-    // Every committed summary round-trips through the validated schema.
     for (const summary of postseasonSummaries) {
       expect(() => seasonPostseasonSummarySchema.parse(summary)).not.toThrow();
     }
-    // Replay export on the first committed game.
+
     const firstGame = postseasonSummaries[0]?.gameId;
     if (firstGame !== undefined) {
       const exportArtifact = await repo.buildReplayExport(RUN_ID, firstGame);
       expect(exportArtifact).not.toBeNull();
       expect(exportArtifact?.digest).toMatch(/^[0-9a-f]{32}$/);
     }
-    // Regular-season pointers are gone with the active run.
+
     expect(await db.seasonRuns.get(SEASON_RUN_RECORD_ID)).toBeUndefined();
   });
 

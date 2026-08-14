@@ -21,57 +21,22 @@ import {
 import { offCourtRecoveryBp, onCourtFatigueBp, recentLoadAfterGame } from './stamina.ts';
 import { halftimeRemovalBp } from './stamina.ts';
 
-/**
- * M2.4 stamina and chemistry effects (spec/2.0/04, spec/2.0/05,
- * season-stamina-v1 + season-chemistry-v1). The effects hook sits on the
- * possession pipeline exactly like the home-court profile: when absent every
- * adjustment is exactly +0, no additional RNG draw exists, and results stay
- * byte-identical to the M2.3 engine. The zero profile skips every effect
- * code path.
- *
- * Only six bounded probability adjustments exist:
- *
- * | Mechanism               | Adjustment                                   | Cap    |
- * |-------------------------|----------------------------------------------|--------|
- * | shooter-fatigue         | make probability -= 5.0pp x shooter fatigue  | 5.0 pp |
- * | handler-fatigue         | turnover probability += 3.5pp x handler fat. | 3.5 pp |
- * | defensive-unit-fatigue  | opponent make probability += 2.5pp x mean fat| 2.5 pp |
- * | turnover-security       | turnover probability -= 1.0pp x unit chem    | 1.0 pp |
- * | assist-conversion       | assist probability += 3.5pp x unit chem      | 3.5 pp |
- * | help-defense            | make probability -= 0.8pp x defense chem     | 0.8 pp |
- *
- * All adjustments are applied BEFORE the existing probability clamps, and
- * every application is recorded as integer-millionths evidence so recaps and
- * calibration audits read recorded facts instead of narrative.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
-/** Maximum shooter-fatigue make-probability reduction (percentage points). */
 export const SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP = 5;
 
-/** Maximum handler-fatigue turnover-probability increase (pp). */
 export const SEASON_EFFECTS_HANDLER_FATIGUE_MAX_PP = 3.5;
 
-/** Maximum defensive-unit-fatigue opponent make-probability increase (pp). */
 export const SEASON_EFFECTS_DEFENSE_FATIGUE_MAX_PP = 2.5;
 
-/** Maximum chemistry turnover-security probability reduction (pp). */
 export const SEASON_EFFECTS_TURNOVER_SECURITY_MAX_PP = 1.0;
 
-/** Maximum chemistry assist-conversion probability increase (pp). */
 export const SEASON_EFFECTS_ASSIST_CONVERSION_MAX_PP = 3.5;
 
-/** Maximum chemistry help-defense make-probability reduction (pp). */
 export const SEASON_EFFECTS_HELP_DEFENSE_MAX_PP = 0.8;
 
-/** Basis-point scale (10,000 = 100%). */
 const BP_SCALE = 10_000;
 
-/** Integer-millionths scale (1,000,000 = 100%). */
 const PP_TO_MILLIONTHS = 10_000;
 
-/** Per-mechanism delta caps in integer millionths. */
 export const SEASON_EFFECTS_MECHANISM_CAPS: Record<SeasonMechanism, number> = {
   'shooter-fatigue': Math.round(SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP * PP_TO_MILLIONTHS),
   'handler-fatigue': Math.round(SEASON_EFFECTS_HANDLER_FATIGUE_MAX_PP * PP_TO_MILLIONTHS),
@@ -81,63 +46,46 @@ export const SEASON_EFFECTS_MECHANISM_CAPS: Record<SeasonMechanism, number> = {
   'help-defense': Math.round(SEASON_EFFECTS_HELP_DEFENSE_MAX_PP * PP_TO_MILLIONTHS),
 };
 
-/** Percentage-point x fraction -> integer millionths (signed). */
 function ppDeltaMillionths(pp: number, fraction: number): number {
   return Math.round(pp * PP_TO_MILLIONTHS * fraction);
 }
 
-/** Per-trip facts the possession pipeline reports at trip completion. */
 export interface SeasonEffectsTripFacts {
-  /** Active five of each side during the trip (version ids). */
   homeUnit: readonly string[];
   awayUnit: readonly string[];
-  /** The trip's ball handler (offense initiator). */
+
   handler: string;
-  /** The shot taker when a shot resolved this trip. */
+
   shooter?: string;
-  /** The primary defender picked when a shot resolved this trip. */
+
   defender?: string;
-  /** Rebound opportunities recorded per side during the trip. */
+
   reboundContestCounts: readonly [number, number];
 }
 
-/**
- * The possession-pipeline-facing effects hook. Every adjustment query
- * returns integer millionths (may be negative) and records its mechanism
- * evidence internally; every recording method consumes no RNG. The hook is
- * absent for Classic and neutral Season games, so all queries must behave as
- * exact +0 and no method may ever be called when absent.
- */
 export interface SeasonEffectsHook {
-  /** Composite make-probability adjustment (shooter + defense + help). */
   makeAdjustment(facts: {
     shooterVersion: string;
     offenseSide: SideIndex;
     defenseSide: SideIndex;
   }): number;
-  /** Composite turnover-probability adjustment (handler + security). */
+
   turnoverAdjustment(facts: { handlerVersion: string; offenseSide: SideIndex }): number;
-  /** Assist-conversion adjustment for a credited assist opportunity. */
+
   assistAdjustment(facts: { offenseSide: SideIndex }): number;
-  /** Active-unit facts (called by the controller on every unit change). */
+
   setActiveUnits(homeUnit: readonly string[], awayUnit: readonly string[]): void;
-  /** Stint interval bookkeeping (on-court accumulation / off-court recovery). */
+
   recordStintSeconds(side: SideIndex, seconds: number, activeVersions: readonly string[]): void;
-  /** Completed-trip bookkeeping: role bonuses and pair increments. */
+
   recordTrip(facts: SeasonEffectsTripFacts): void;
-  /** Halftime recovery; must be called exactly once per game. */
+
   halftime(): void;
 }
 
-/** The authoritative per-game buffer and its postgame accessor. */
 export interface SeasonEffectsBuffer {
   hook: SeasonEffectsHook;
-  /**
-   * Produces the game's delta facts: postgame load states for all 300
-   * players (recent load updated from the regulation-minute share), the
-   * canonical pair increments, and the recorded mechanism evidence. Called
-   * exactly once after the last stint of the game.
-   */
+
   finishGame(
     homeRegulationSeconds: ReadonlyMap<string, number>,
     awayRegulationSeconds: ReadonlyMap<string, number>,
@@ -483,12 +431,6 @@ class EffectsBufferImpl implements SeasonEffectsBuffer {
   }
 }
 
-/**
- * Builds the authoritative per-game effects buffer. `pregame` is the carried
- * league effects state (300 players, 1,350 pairs); `homeStamina`/`awayStamina`
- * cover the game's twenty players. Every adjustment of a zero state is
- * exactly 0 and the hook consumes no RNG.
- */
 export function createSeasonEffectsBuffer(
   pregame: SeasonEffectsState,
   homeStamina: ReadonlyMap<string, SeasonStaminaInput>,
@@ -500,12 +442,6 @@ export function createSeasonEffectsBuffer(
   return new EffectsBufferImpl(pregameByVersion, homeStamina, awayStamina, pregame.pairStates);
 }
 
-/**
- * The initial league effects state: exactly 300 zero load states and 1,350
- * canonical zero pairs. `playerStaminaInputs` must be exactly 300 entries
- * grouped as 30 consecutive ten-player rosters (draft order); each roster's
- * 45 canonical pairs are created from its ten versions.
- */
 export function createSeasonEffectsState(
   playerStaminaInputs: readonly SeasonStaminaInput[],
 ): SeasonEffectsState {
@@ -549,12 +485,6 @@ export function createSeasonEffectsState(
   };
 }
 
-/**
- * Folds one game's transition into the authoritative next effects state.
- * Validates identity (the same 300 players), canonical add-only pair
- * increments, and range rules; the result is the state the block pipeline
- * carries to the next game.
- */
 export function applySeasonGameEffectsTransition(
   previous: SeasonEffectsState,
   transition: SeasonGameEffectsTransition,
@@ -609,36 +539,14 @@ export function applySeasonGameEffectsTransition(
   };
 }
 
-/** The rotation-lock reconciliation inputs (M2.6.5, spec/2.0/15). */
 export interface SeasonEffectsReconcileInput {
-  /** The effects state carried from the previous block boundary. */
   previous: SeasonEffectsState;
-  /** All 30 rosters (10-15 players each, unique identities). */
+
   rosters: readonly SeasonRoster[];
-  /** All 30 locked rotations (exactly ten members each). */
+
   rotations: readonly SeasonRotation[];
 }
 
-/**
- * M2.6.5 pure effects reconciliation at block lock (spec/2.0/15,
- * season-chemistry-v2). Rotation changes take effect only at the next block
- * lock; this function rebuilds the rotation-scoped effects state from the
- * locked rotations:
- *
- * - demoted players' load records freeze into `inactivePlayerStates` and
- *   their previous active pairs freeze into `archivedPairs` (carrying the
- *   franchise id);
- * - promoted players restore their prior same-franchise load records and
- *   prior archived pairs with current rotation teammates;
- * - never-active signings enter with zero load and zero pair state;
- * - unchanged active state is preserved exactly;
- * - the result always proves 300 active loads and 1,350 active pairs, with
- *   at most 150 inactive loads and at most 1,350 archived pairs.
- *
- * Inactivity never decays or invents chemistry; archived records of players
- * who left the league entirely are dropped (trades delete them explicitly).
- * Pure TypeScript: consumes no RNG, mutates nothing.
- */
 export function reconcileSeasonEffects(input: SeasonEffectsReconcileInput): SeasonEffectsState {
   const { previous, rosters, rotations } = input;
   if (rosters.length !== 30 || rotations.length !== 30) {
@@ -696,7 +604,6 @@ export function reconcileSeasonEffects(input: SeasonEffectsReconcileInput): Seas
     lastCompletedRound: 0,
   });
 
-  // Active loads: preserve, restore from frozen, or create zero state.
   const playerStates: SeasonPlayerLoadState[] = [];
   for (const ids of rotationIdsByFranchise.values()) {
     for (const id of ids) {
@@ -716,7 +623,6 @@ export function reconcileSeasonEffects(input: SeasonEffectsReconcileInput): Seas
     );
   }
 
-  // Inactive loads: freeze demoted players, keep never-promoted players frozen.
   const inactivePlayerStates: SeasonPlayerLoadState[] = [];
   for (const [id, state] of previousActive) {
     if (!activeIds.has(id)) inactivePlayerStates.push({ ...state });
@@ -730,7 +636,6 @@ export function reconcileSeasonEffects(input: SeasonEffectsReconcileInput): Seas
     );
   }
 
-  // Active pairs: preserve, restore archived same-franchise pairs, or zero.
   const previousPairByKey = new Map(
     previous.pairStates.map((pair) => [seasonPairKey(pair.a, pair.b), pair]),
   );
@@ -768,8 +673,6 @@ export function reconcileSeasonEffects(input: SeasonEffectsReconcileInput): Seas
     );
   }
 
-  // Archived pairs: freeze demoted same-franchise relationships; drop
-  // archived records of players who left the league entirely.
   const archivedPairs: SeasonArchivedPairChemistryState[] = [];
   const archivedKeys = new Set<string>();
   for (const archived of previous.archivedPairs) {

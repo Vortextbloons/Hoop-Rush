@@ -46,43 +46,6 @@ import {
   seasonPostseasonWireRequestOf,
 } from './season-postseason-simulation';
 
-/**
- * Season Run postseason runner contract (spec/2.0/07, M2.6). The main-thread
- * runner owns request ids, stale-message rejection, cancellation, worker
- * lifecycle, atomic commits, and champion promotion. It simulates and
- * commits ONE game per atomic commit for the advance loop (target = the
- * current next game), continues AI-only games until the next human rotation
- * decision or stage completion, and chunks an eliminated-run fast-forward at
- * at most EIGHT games per atomic commit (target = the Nth upcoming game).
- * After EVERY commit the authoritative snapshot is re-read; committed work
- * survives reload, cancellation, stale-state rejection, duplicate command
- * ids (idempotent retry), and cross-tab mutation.
- *
- * ## Recovered failure modes (frozen)
- *
- * - reload / termination: every loop iteration re-reads the repository, so
- *   a fresh hub starts from the accepted state (no in-flight request).
- * - stale revision/digest or run-mismatch at the commit: another tab moved
- *   the run between the re-read and the commit — the runner reloads the
- *   authoritative state (through the fresh re-read) and stops with a typed
- *   error so the hub's cross-tab recovery can take over.
- * - duplicate command id: the same commandId was already committed (retry
- *   after a crash/reload) — the runner re-reads and continues.
- * - cancellation: observed at every boundary (between games AND mid-chunk);
- *   committed chunks are retained and the uncommitted chunk is discarded.
- * - engine rejections (wrong-game, invalid-stage, integrity-failure) are
- *   VALID outcomes of a well-formed request and surface as typed `rejected`
- *   events, never as errors.
- *
- * ## Effects/digest scope (resolved at integration)
- *
- * The engine state digest covers the post-advance effects state; the commit
- * carries the post-command effects (`postseasonPostCommandEffects` over the
- * engine's output run) so the stored checkpoint row reconciles with the
- * digest the reload audit recomputes (mirrors the M2.5 applySeasonRunCommand
- * effects seam; zero-transition advances fall back to the prior state).
- */
-
 export type SeasonPostseasonMode = 'advance' | 'spectate' | 'fast-forward';
 
 export type SeasonPostseasonEvent =
@@ -91,7 +54,7 @@ export type SeasonPostseasonEvent =
       requestId: string;
       mode: SeasonPostseasonMode;
       targetGameId: string | null;
-      /** Estimated remaining tournament games at session start (or 0). */
+
       gamesTotal: number;
     }
   | {
@@ -106,26 +69,22 @@ export type SeasonPostseasonEvent =
       type: 'committed';
       requestId: string;
       runId: string;
-      /** Games committed by this atomic commit, in play order. */
+
       gameIds: string[];
-      /** The authoritative re-read snapshot after the commit. */
+
       snapshot: SeasonRunSnapshot;
     }
   | {
       type: 'complete';
       requestId: string;
       runId: string;
-      /**
-       * The authoritative post-commit snapshot at the end of the
-       * orchestration; null when the champion was promoted (no active run
-       * remains).
-       */
+
       snapshot: SeasonRunSnapshot | null;
       stage: SeasonRunStage;
       nextDecision: 'rotation' | 'none';
       nextGameId: string | null;
       aiNextGameId: string | null;
-      /** True when the champion was promoted to completed history. */
+
       promoted: boolean;
     }
   | {
@@ -147,84 +106,60 @@ export type SeasonPostseasonEvent =
 
 export interface SeasonPostseasonRunInput {
   runId: string;
-  /** The FIRST commit's command id (idempotent retry after reload/crash). */
+
   commandId: string;
-  /**
-   * Optional terminal goal of the session: advance commits one game at a
-   * time until this game is committed; spectate requires it (the engine
-   * validates it is the current next game); fast-forward uses it as the
-   * first chunk's target (must be among the first 8 upcoming games).
-   */
+
   targetGameId?: string;
-  /** The human franchise; null in a pure AI context. */
+
   humanFranchiseId: string | null;
 }
 
-/**
- * The engine simulation seam: given the schema-validated wire request,
- * returns the worker's complete/error outcome. The production binding posts
- * to the worker; tests and e2e inject the direct engine simulator so the
- * exact same runner loop runs without a Worker.
- */
 export type SeasonPostseasonSimulatorFn = (
   request: SeasonPostseasonWorkerStartRequest,
   onProgress: (progress: SeasonPostseasonWorkerProgressMessage) => void,
 ) => Promise<SeasonPostseasonWorkerCompleteMessage | SeasonPostseasonWorkerErrorMessage>;
 
 export interface SeasonPostseasonRunner {
-  /** Advances one game per atomic commit until a human rotation is needed,
-   * the optional terminal target is committed, or the tournament completes. */
   advancePostseason(input: SeasonPostseasonRunInput): string;
-  /** Simulates exactly the named game (engine-validated) and commits it. */
+
   spectatePostseasonGame(input: SeasonPostseasonRunInput & { targetGameId: string }): string;
-  /** Chunks the remaining tournament at ≤ 8 games per atomic commit through
-   * the champion, then promotes it to completed history. Requires the human
-   * franchise to be eliminated. */
+
   fastForwardPostseason(input: SeasonPostseasonRunInput): string;
-  /** Requests cancellation; committed chunks are retained. */
+
   cancel(requestId: string): void;
-  /** Tears down the worker immediately (route change / full abort). */
+
   terminate(): void;
-  /** Prewarms the worker's packaged asset caches (idempotent, best effort). */
+
   prewarm(): void;
   subscribe(listener: (event: SeasonPostseasonEvent) => void): () => void;
 }
 
-/** @internal Factory dependencies for tests and the e2e seam. */
 export interface SeasonPostseasonRunnerDeps {
   repository?: SeasonRunRepository & SeasonPostseasonRepository;
   schedule?: SeasonSchedule;
-  /** Overrides the packaged worker entry (tests). */
+
   workerUrl?: string;
-  /** Overrides asset resolution (tests). */
+
   artifacts?: () => Promise<SeasonArtifactUrls>;
-  /** Overrides the engine simulation seam (tests/e2e direct simulator). */
+
   simulate?: SeasonPostseasonSimulatorFn;
 }
 
-/** The maximum games one fast-forward chunk may commit atomically. */
 export const SEASON_POSTSEASON_CHUNK_MAX_GAMES = 8;
 
-/**
- * Main-thread postseason runner (spec/2.0/07, M2.6). One loop per session:
- * re-read the authoritative snapshot, derive the commit target, simulate
- * through the engine (worker or injected simulator), commit atomically
- * through the repository, re-read, decide the continuation, and finally
- * promote the champion when the stage completes. Nothing is persisted before
- * acceptance; cancelled or crashed work leaves the accepted commits intact.
- */
 export function createSeasonPostseasonRunner(
   deps: SeasonPostseasonRunnerDeps = {},
 ): SeasonPostseasonRunner {
   const listeners = new Set<(event: SeasonPostseasonEvent) => void>();
   let worker: Worker | null = null;
   let currentRequestId: string | null = null;
-  /** The wire request id of the in-flight engine request (cancel routing). */
+  const requestActive = () => currentRequestId !== null;
+
   let currentWireRequestId: string | null = null;
   let cancelled = false;
   let warmRequestId: string | null = null;
   let warmed = false;
-  /** In-flight engine request resolvers, keyed by wire request id. */
+
   const pending = new Map<
     string,
     (message: SeasonPostseasonWorkerCompleteMessage | SeasonPostseasonWorkerErrorMessage) => void
@@ -258,8 +193,6 @@ export function createSeasonPostseasonRunner(
             type: 'module',
           });
     worker.addEventListener('error', (event) => {
-      // A worker load/execution failure resolves every in-flight request as
-      // a typed internal error; the loop surfaces it and stops.
       const failure: SeasonPostseasonWorkerErrorMessage = {
         schemaVersion: 1,
         type: 'season-postseason-error',
@@ -299,8 +232,7 @@ export function createSeasonPostseasonRunner(
         resolve(message);
         return;
       }
-      // The message union is narrowed here: the only remaining type is the
-      // season-postseason-error message.
+
       const resolve = pending.get(message.requestId);
       if (resolve === undefined) return;
       pending.delete(message.requestId);
@@ -309,11 +241,6 @@ export function createSeasonPostseasonRunner(
     return worker;
   }
 
-  /**
-   * Simulates one engine advance: the production binding posts the validated
-   * wire request to the worker and awaits the routed outcome; the injected
-   * simulator runs the same request through the direct engine core.
-   */
   function simulate(
     request: SeasonPostseasonWorkerStartRequest,
   ): Promise<SeasonPostseasonWorkerCompleteMessage | SeasonPostseasonWorkerErrorMessage> {
@@ -364,8 +291,7 @@ export function createSeasonPostseasonRunner(
 
       for (;;) {
         if (requestAborted(requestId)) return;
-        // Authoritative re-read before every commit: reload recovery,
-        // cross-tab recovery, and idempotent retry all start here.
+
         const snapshot = await repository.loadActiveRun();
         if (snapshot === null) {
           fail(requestId, 'internal', 'no active season run to advance', null);
@@ -507,10 +433,7 @@ export function createSeasonPostseasonRunner(
           return;
         }
         const accepted = outcome.result;
-        // A zero-game advance is VALID: the engine stops at a human rotation
-        // wait (the saved rotation cannot play the current next game) and
-        // still records the decision-point command + state bump. The commit
-        // follows the cross-track reference flow (empty summaries/ids).
+
         const command: SeasonRunCommand = {
           schemaVersion: SEASON_RUN_SCHEMA_VERSION,
           command: 'advance-postseason',
@@ -524,9 +447,7 @@ export function createSeasonPostseasonRunner(
           runId: run.runId,
           run: accepted.run,
           summaries: accepted.summaries,
-          // The state digest covers the post-advance effects; store them so
-          // the reload audit's digest reconciliation holds (mirrors the M2.5
-          // applySeasonRunCommand effects seam).
+
           effects: postseasonPostCommandEffects(accepted.run, snapshot.effects),
           command,
           preStateRevision: command.expectedStateRevision,
@@ -543,18 +464,12 @@ export function createSeasonPostseasonRunner(
           await repository.commitPostseasonAdvancement(commitInput);
         } catch (error) {
           if (error instanceof SeasonRunCommandDuplicateError) {
-            // Idempotent retry: a previous attempt already committed this
-            // command (crash/reload between commit and acknowledgement).
-            // Re-read and continue from the authoritative state.
             continue;
           }
           if (
             error instanceof SeasonRunCommandStaleStateError ||
             error instanceof SeasonRunCommandRunMismatchError
           ) {
-            // Another tab moved the run between the re-read and the commit:
-            // the loop's next re-read loads the authoritative state; stop so
-            // the hub's cross-tab recovery can take over.
             fail(
               requestId,
               'internal',
@@ -573,7 +488,7 @@ export function createSeasonPostseasonRunner(
           );
           return;
         }
-        // Authoritative re-read after EVERY commit (frozen contract).
+
         const after = await repository.loadActiveRun();
         if (after === null) {
           fail(requestId, 'internal', 'the active run disappeared after the commit', run.rootSeed);
@@ -650,8 +565,6 @@ export function createSeasonPostseasonRunner(
     }
   }
 
-  /** True when the session was cancelled or superseded (guard helper keeps
-   * the flow analyzable for the lint's no-unnecessary-condition pass). */
   function requestAborted(requestId: string): boolean {
     return cancelled || currentRequestId !== requestId;
   }
@@ -780,9 +693,7 @@ export function createSeasonPostseasonRunner(
             deps.artifacts !== undefined
               ? await deps.artifacts()
               : await import('./season-assets').then((module) => module.seasonArtifactUrls());
-          // A session can start while the warm artifacts resolve; re-check.
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          if (currentRequestId !== null) return;
+          if (requestActive()) return;
           const target = createWorker();
           const requestId = `warm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
           warmRequestId = requestId;
@@ -822,16 +733,6 @@ export function createSeasonPostseasonRunner(
   }
 }
 
-/**
- * Atomic champion promotion (frozen reference flow: the persistence
- * cross-track test builds the almanac over `{schemaVersion, almanacVersion,
- * runId, rootSeed, championFranchiseId, postseasonDigest, commandLogDigest,
- * awardsDigest, tradeGradesDigest}` and replaces the run's placeholder
- * `completion.almanacDigest` with the real digest — the run `stateDigest` is
- * never recomputed). The command log and postseason summaries load from the
- * repository after the final advance commit; the trade grades derive from
- * the recorded facts (trade-grade-v1) right before promotion.
- */
 export async function promoteSeasonChampion(
   repository: SeasonPostseasonRepository,
   run: SeasonRun,
@@ -879,7 +780,6 @@ export async function promoteSeasonChampion(
   return almanac;
 }
 
-/** Human-readable explanation of an advance rejection (runner-side alert). */
 function describeAdvanceRejection(rejection: SeasonAdvancePostseasonRejection): string {
   switch (rejection.code) {
     case 'invalid-stage':
@@ -901,11 +801,6 @@ function describeAdvanceRejection(rejection: SeasonAdvancePostseasonRejection): 
   }
 }
 
-/**
- * Deep plain snapshot of worker-boundary payload slices (mirror of the block
- * runner's helper): Svelte $state Proxy-backed values are de-proxied without
- * a whole-payload JSON round trip.
- */
 function deepClonePlain<T>(value: T): T {
   if (Array.isArray(value)) {
     const items = value as unknown[];
@@ -921,7 +816,6 @@ function deepClonePlain<T>(value: T): T {
   return value;
 }
 
-/** Singleton runner for the application (lazy deps; e2e may inject a fake). */
 export function getSeasonPostseasonRunner(): SeasonPostseasonRunner {
   if (typeof window !== 'undefined' && window.__HOOP_RUSH_SEASON_POSTSEASON_RUNNER__) {
     return window.__HOOP_RUSH_SEASON_POSTSEASON_RUNNER__;

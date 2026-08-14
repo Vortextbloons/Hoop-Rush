@@ -25,22 +25,6 @@ import type {
   GenerationWorkerResponse,
 } from './season-generation-wire.ts';
 
-/**
- * Season Run solo draft flow (spec/2.0/03, M2.3.5, season-draft-v2): the
- * UI-side state machine that wraps the authoritative engine commands
- * (`applySeasonDraftCommand`) and the persisted Season draft record. Business
- * rules stay in the engine; this module only issues typed commands against
- * the live revision, persists each accepted record, and exposes the
- * presentation facts the board needs.
- *
- * A stored record from an older save-schema family (pre-v3, development
- * saves) is cleared automatically by the repository on load, so the flow
- * always resumes from a current record or null.
- *
- * AI league generation runs in a dedicated web worker so the draft board
- * stays responsive while the bounded roster-selection search executes.
- */
-
 export const SOLO_PARTICIPANT_ID = 'human';
 
 export const COVERAGE_TARGETS = { guards: 4, forwards: 4, centers: 3 } as const;
@@ -48,11 +32,10 @@ export const COVERAGE_TARGETS = { guards: 4, forwards: 4, centers: 3 } as const;
 export type SeasonDraftFlowPhase = 'idle' | 'drafting' | 'finalized' | 'generating' | 'complete';
 
 export interface SeasonDraftFlowState {
-  /** Authoritative draft snapshot (null until a draft is created/loaded). */
   draft: SeasonDraftState | null;
-  /** Completed league generation, once a generate command was accepted. */
+
   generation: SeasonLeagueGenerationResult | null;
-  /** Last executed command record (accepted or rejected), for inline errors. */
+
   lastRecord: SeasonDraftCommandRecord | null;
   phase: SeasonDraftFlowPhase;
 }
@@ -120,11 +103,6 @@ export class SeasonDraftFlow {
     return this.catalogRef;
   }
 
-  /**
-   * Loads a persisted draft. Returns true when a stored record exists.
-   * Older save-schema records were already cleared by the repository on
-   * load, so any stored record here is current.
-   */
   async load(): Promise<boolean> {
     const stored = await this.repo.loadSeasonDraft();
     if (stored) {
@@ -196,14 +174,6 @@ export class SeasonDraftFlow {
     return this.apply({ kind: 'finalize-human-rosters' }, this.revision());
   }
 
-  /**
-   * Runs the bounded AI league generation in a worker when roster targets
-   * were supplied at construction. Yields to the event loop first so the
-   * pending state paints, then persists the stored record atomically.
-   * NOTE: the projection shadow pass (per-pool candidate search) is an
-   * offline CLI evaluation (`projection ai-shadow`); it must NOT ride the
-   * app's generation worker, where it would take minutes per league.
-   */
   async generate(): Promise<SeasonLeagueGenerationResult | null> {
     if (this.draft?.status !== 'finalized') {
       throw new Error('generate requires finalized human rosters');
@@ -316,11 +286,6 @@ export class SeasonDraftFlow {
   }
 }
 
-/**
- * Production AI generation deps: the worker precomputes the generation result
- * and `apply()` replays it through the authoritative draft command without
- * running the heavy generator on the main thread.
- */
 export function engineGenerationDeps(bridge: {
   precomputed: SeasonLeagueGenerationResult | null;
 }): SeasonAiGenerationDeps {

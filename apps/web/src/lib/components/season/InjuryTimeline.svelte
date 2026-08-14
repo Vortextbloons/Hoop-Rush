@@ -5,13 +5,6 @@
     type InjuryTimelinePlayer,
   } from '$lib/season/season-health-view';
 
-  /**
-   * Injury timeline (M2.5, roster tab): per-player history of recorded
-   * injuries — type, severity band, the occurrence game, and the return
-   * facts (missed games, actual return round, recurrence window). A plain
-   * non-interactive list driven by the recorded health state.
-   */
-
   let {
     players,
   }: {

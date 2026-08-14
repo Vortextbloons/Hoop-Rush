@@ -1,9 +1,3 @@
-/**
- * Generates the committed CLI fixture files under `src/fixtures/`. Run with
- * `pnpm --filter @hoop-rush/cli gen-fixtures`. Fixture teams use the shared
- * test-fixture builders so engine tests and CLI fixtures stay in sync.
- */
-
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -169,9 +163,6 @@ function main(): void {
     variantParameters: { league3PARate: 0.35 },
   });
 
-  // Role-differentiated lineup for the player-role calibration gates
-  // (spec/06): one primary creator, one floor spacer, one secondary
-  // creator, one post presence, and one rim runner.
   const roleTeam = buildRolesTeam();
 
   write('roles.json', {

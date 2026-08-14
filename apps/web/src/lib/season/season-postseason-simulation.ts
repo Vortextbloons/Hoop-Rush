@@ -21,29 +21,6 @@ import {
   type SeasonPostseasonGameResolver,
 } from '@hoop-rush/engine';
 
-/**
- * The shared engine-advance core of the postseason orchestration (M2.6).
- * One pure function folds a validated simulation request into ONE
- * `advance-postseason` engine command and returns the accepted commit facts
- * (run, summaries, advanced game ids, next-decision facts) or the typed
- * engine rejection. The basketball rules live ONLY in the engine's
- * `handleSeasonRunCommand`; this module never re-implements simulation.
- *
- * Used by:
- * - the postseason worker (`season-postseason-worker.ts`) — the wire
- *   boundary over this core (progress + error mapping),
- * - the direct simulator seam (`fake-season-postseason-runner.ts`) — the
- *   deterministic e2e/test path that runs the SAME core without a worker,
- * - the runner's commit-side facts (result digest, transaction ids).
- *
- * Invariants (frozen for this wave): one request == one engine command ==
- * one atomic commit on the main thread. The worker never touches IndexedDB;
- * the commit-side digest helpers are pure functions of the accepted facts so
- * the worker, the direct simulator, and the CLI produce identical result
- * digests for identical accepted outputs.
- */
-
-/** The per-request simulation facts (subset of the wire request). */
 export interface SeasonPostseasonSimulationRequest {
   commandId: string;
   runId: string;
@@ -55,27 +32,17 @@ export interface SeasonPostseasonSimulationRequest {
   profile: EraSimulationProfile;
   run: SeasonRun;
   effects: SeasonEffectsState;
-  /**
-   * The recorded regular-season compact summaries: the engine derives the
-   * season awards from them when an advance reaches the playoffs or
-   * completes (the state digest and command log cover the awards).
-   */
+
   regularSeasonSummaries: readonly SeasonGameSummary[];
-  /**
-   * Test/CLI seam: the per-game simulation resolver. The production worker
-   * path never carries one (functions do not cross the worker wire) and the
-   * engine defaults to the real Season game controller; the direct
-   * simulator threads it so deterministic fixtures force winners.
-   */
+
   resolver?: SeasonPostseasonGameResolver;
 }
 
-/** The accepted advance facts the commit side persists (one atomic commit). */
 export interface SeasonPostseasonSimulationAccepted {
   run: SeasonRun;
-  /** The advance's compact summaries, in play order. */
+
   summaries: SeasonPostseasonSummary[];
-  /** Games advanced by the command, in play order. */
+
   advancedGameIds: string[];
   stage: SeasonRunStage;
   nextDecision: 'rotation' | 'none';
@@ -90,13 +57,6 @@ export type SeasonPostseasonSimulationOutcome =
 export { SeasonPostseasonInvariantError };
 export type { SeasonPostseasonGameResolver };
 
-/**
- * Folds one simulation request into the typed `advance-postseason` command
- * and runs it through the authoritative engine handler. Accepted outputs
- * carry the post-advance run (committed verbatim), the chunk summaries, and
- * the next-decision facts; rejected outputs carry the typed rejection.
- * Engine invariant failures throw (the caller decides the wire code).
- */
 export function simulateSeasonPostseasonCommand(
   request: SeasonPostseasonSimulationRequest,
 ): SeasonPostseasonSimulationOutcome {
@@ -141,7 +101,6 @@ export function simulateSeasonPostseasonCommand(
   };
 }
 
-/** The compact scoreline of a postseason summary (progress payloads). */
 export function seasonPostseasonScorelineOf(summary: SeasonPostseasonSummary): SeasonScoreline {
   return {
     gameId: summary.gameId,
@@ -152,12 +111,6 @@ export function seasonPostseasonScorelineOf(summary: SeasonPostseasonSummary): S
   };
 }
 
-/**
- * The post-advance effects state when the engine attached it to the command
- * output run (an extra property beside the schema); falls back to the prior
- * state for zero-transition advances. Mirrors the hub's private helper so
- * the runner and the hub agree on one convention.
- */
 export function postseasonPostCommandEffects(
   run: SeasonRun,
   prior: SeasonEffectsState,
@@ -166,12 +119,6 @@ export function postseasonPostCommandEffects(
   return withEffects.effects ?? prior;
 }
 
-/**
- * The canonical result digest of one accepted advancement (frozen shape:
- * the persistence cross-track test's `commit` helper digest — commandId +
- * sorted game ids + sorted summary digests). A pure function of the accepted
- * facts, so worker, direct simulator, and CLI agree.
- */
 export function seasonPostseasonCommitResultDigest(
   commandId: string,
   relatedGameIds: readonly string[],
@@ -186,20 +133,12 @@ export function seasonPostseasonCommitResultDigest(
   );
 }
 
-/** Transaction ids a command produced (submit-with-rehab records one). */
 export function seasonPostseasonTransactionIdsOf(run: SeasonRun, commandId: string): string[] {
   return run.transactions
     .filter((entry) => entry.commandId === commandId)
     .map((entry) => entry.transactionId);
 }
 
-/**
- * Builds the schema-validated wire start request the worker boundary
- * parses. The run and effects ride the wire as the authoritative snapshot
- * slices; the worker re-validates them with `seasonRunSchema` at its side.
- * The packaged catalog/profile ride as URLs only (the worker fetches and
- * hash-verifies them itself).
- */
 export function seasonPostseasonWireRequestOf(
   request: Omit<SeasonPostseasonSimulationRequest, 'catalog' | 'profile'> & {
     requestId: string;

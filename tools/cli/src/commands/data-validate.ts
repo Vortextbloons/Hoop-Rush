@@ -23,14 +23,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { sha256Hex } from '../io.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
 
-/**
- * `hoop-rush data validate`: validates the v2 manifest and every referenced
- * artifact: schema/hash/version consistency, the 30-slot lineage model, the
- * complete availability matrix, strict engine fields, lineage ownership,
- * cross-slot duplicates, legal lineup coverage, and peak reproducibility
- * (spec/09, spec/12).
- */
-
 export const DATA_VALIDATE_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
@@ -43,7 +35,6 @@ interface AuditResult {
   failures: string[];
 }
 
-/** Exactly 30 modern slots; lineage segments owned by one slot, non-overlapping. */
 function auditLineage(manifest: HoopRushManifest): AuditResult {
   const failures: string[] = [];
   const details: string[] = [];
@@ -132,7 +123,6 @@ function auditEras(manifest: HoopRushManifest): AuditResult {
   return { ok: failures.length === 0, details, failures };
 }
 
-/** The availability matrix must be complete: exactly one entry per slot x era. */
 function auditAvailability(manifest: HoopRushManifest): AuditResult {
   const failures: string[] = [];
   const details: string[] = [];
@@ -195,7 +185,7 @@ async function auditPools(
   const keys = new Set<string>();
   const slotIds = new Set(manifest.modernFranchiseSlots.map((s) => s.franchiseId));
   const eraIds = new Set(manifest.eras.map((e) => e.eraId));
-  // Cross-slot duplication: one (playerExternalId, seasonKey) at most once.
+
   const playerSeasons = new Map<string, string>();
 
   for (const pool of manifest.pools) {
@@ -235,13 +225,6 @@ async function auditPools(
   return { ok: failures.length === 0, details, failures };
 }
 
-/**
- * Content audits for a pool asset (spec/12 identity, provenance, lineup, and
- * reproducibility gates): schema validity, unique player ids, era membership,
- * 40-game eligibility, strict engine fields, complete provenance, historical
- * identity, legal G,G,F,F,C coverage, cross-slot duplication, and reproducible
- * peak selection.
- */
 function auditPoolContent(
   content: Buffer,
   index: HoopRushManifest['pools'][number],
@@ -303,14 +286,12 @@ function auditPoolContent(
       failures.push(`pools: ${key} ${player.displayName} summary rating out of range`);
     }
 
-    // Strict engine contracts: every required rating/tendency key present.
     for (const ratingKey of REQUIRED_RATING_KEYS) {
       if (!(ratingKey in player.detailedRatings)) {
         failures.push(`pools: ${key} ${player.displayName} missing rating ${ratingKey}`);
       }
     }
 
-    // Historical identity: the team that owned the season, with lineage version.
     if (
       player.historicalTeamIdentity.seasonKey !== player.seasonKey ||
       !player.historicalTeamIdentity.lineageRuleVersion
@@ -318,7 +299,6 @@ function auditPoolContent(
       failures.push(`pools: ${key} ${player.displayName} missing historical team identity`);
     }
 
-    // Field-level provenance on required engine fields.
     const engineFields = [
       ...Object.keys(player.detailedRatings),
       ...Object.keys(player.tendencies),
@@ -329,7 +309,6 @@ function auditPoolContent(
       }
     }
 
-    // Pre-1979 seasons never carry three-point observations.
     if (player.seasonKey < '1979-80') {
       if (player.stats.threesAttempted !== null || player.stats.threesMade !== null) {
         failures.push(
@@ -338,9 +317,6 @@ function auditPoolContent(
       }
     }
 
-    // A player may legitimately appear in multiple franchise pools during
-    // one season after a trade. The uniqueness boundary is the packaged
-    // franchise player-season, not the league-wide player-season.
     const psKey = `${player.franchiseId}/${player.playerExternalId}/${player.seasonKey}`;
     const owner = playerSeasons.get(psKey);
     if (owner !== undefined && owner !== key) {
@@ -349,7 +325,6 @@ function auditPoolContent(
     playerSeasons.set(psKey, key);
   }
 
-  // Legal G,G,F,F,C lineup coverage from packaged playable positions.
   const guards = pool.players.filter((p) => playableSlotGroups(p.positions.playable).includes('G'));
   const forwards = pool.players.filter((p) =>
     playableSlotGroups(p.positions.playable).includes('F'),
@@ -363,10 +338,6 @@ function auditPoolContent(
     );
   }
 
-  // Detailed position record (position-v3): reviewed primary, secondary
-  // positions, the career-wide playable union, source labels, and the
-  // normalization version. The schema enforces the enum and bounds; these
-  // audits assert the record is internally consistent.
   for (const player of pool.players) {
     const { primary, secondary, playable, sourceLabels, normalizationVersion } = player.positions;
     if (!POSITIONS.includes(primary)) {
@@ -403,9 +374,6 @@ function auditPoolContent(
     }
   }
 
-  // Peak reproducibility: selectionScore recomputed from packaged fields
-  // under the current selection-score version. Reuse the importer fallback
-  // so legacy rows with only canonicalOverall are handled consistently.
   for (const player of pool.players) {
     const rawOverall = pools.rawOverallScoreFor(player, player.summaryRatings);
     const recomputed = pools.selectionScore(
@@ -434,10 +402,7 @@ function auditPoolContent(
   details.push(
     `pools: ${key} fallback coverage ${String(withFallback)}/${String(pool.players.length)} · band ${pool.coverageSummary.coverageBand} · lowConfidence ${String(pool.coverageSummary.lowConfidenceShare)}`,
   );
-  // Every player must carry an explicit CDN availability marker whenever a
-  // primary headshot template exists: without it, the UI requests the CDN URL
-  // first and gets stuck on the generic silhouette, never reaching the
-  // secondary/photo backups (regression: pools built with --no-assets).
+
   if (manifest.assets.headshotUrlTemplate) {
     const missingMarker = pool.players.filter((p) => p.altIds?.nbaHeadshotAvailable == null);
     if (missingMarker.length > 0) {
@@ -449,10 +414,6 @@ function auditPoolContent(
   details.push(`pools: ${key} ${String(pool.players.length)} players audited`);
 }
 
-/**
- * Audits era simulation profiles: schema validity, hash verification, and
- * that the referenced era exists in the manifest.
- */
 async function auditEraSimulationProfiles(
   manifest: HoopRushManifest,
   manifestDir: string,
@@ -500,10 +461,6 @@ async function auditEraSimulationProfiles(
   return { ok: failures.length === 0, details, failures };
 }
 
-/**
- * Audits the frozen opponent bracket: schema validity, hash verification,
- * legal balanced lineups, internal duplicates, and the fixed schedule.
- */
 async function auditBracket(
   manifest: HoopRushManifest,
   manifestDir: string,
@@ -587,13 +544,6 @@ function auditAssets(manifest: HoopRushManifest): AuditResult {
   return { ok: failures.length === 0, details, failures };
 }
 
-/**
- * Global draft-index and roster-details assets: file presence, content-hash
- * match, schema validity, unique composite keys, and a one-to-one
- * correspondence between the two assets. Composite keys are the draft row
- * identity (playerId + franchiseId + eraId + seasonKey): the same playerId
- * can legitimately peak in several franchise/era contexts.
- */
 async function auditGlobalAssets(
   manifest: HoopRushManifest,
   manifestDir: string,
@@ -602,8 +552,6 @@ async function auditGlobalAssets(
   const failures: string[] = [];
   const details: string[] = [];
 
-  // Small manifest fixtures used by focused validator tests intentionally omit
-  // packaged global assets. Production manifests advertise both together.
   if (manifest.playersIndex === undefined && manifest.rosterDetails === undefined) {
     return { ok: true, details, failures };
   }
@@ -701,14 +649,6 @@ async function auditGlobalAssets(
   return { ok: failures.length === 0, details, failures };
 }
 
-/**
- * Audits the M2.6.5 free-agent eligibility index (free-agency-index-v1):
- * file presence, content-hash match against the manifest entry, schema
- * validity (including the grouped-versions identity superRefine), and the
- * cross-artifact pin: the index's `catalogRef.contentHash` must equal the
- * manifest's `season.draftCatalog` content hash, so a stale index derived
- * from an older catalog is caught here.
- */
 async function auditSeasonFreeAgencyIndex(
   manifest: HoopRushManifest,
   manifestDir: string,

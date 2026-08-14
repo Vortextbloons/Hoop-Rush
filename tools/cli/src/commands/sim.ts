@@ -21,13 +21,6 @@ import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.t
 
 export { UsageError };
 
-/**
- * `sim game` and `sim batch` (spec/09). Commands call the authoritative
- * engine with the packaged era profile; fixtures are static JSON files.
- * Seed assignment depends only on the requested seed range and the fixture
- * id, never on worker scheduling.
- */
-
 export const SIM_OPTIONS: Record<string, boolean> = {
   input: true,
   seed: true,
@@ -79,16 +72,10 @@ export function listFixtureIds(): string[] {
   ];
 }
 
-/** Derives the game seed for a fixture and sample index (worker-independent). */
 export function fixtureSeed(fixtureId: string, index: number): string {
   return hex32(fnv1a32(`${fixtureId}-${String(index)}`)).repeat(4);
 }
 
-/**
- * Partitions the inclusive seed range [from..to] into worker-sized chunks.
- * Every game is a pure function of (fixture, seed, profile), so chunking
- * never changes results or seed assignment (spec/09).
- */
 export function chunkRange(
   from: number,
   to: number,
@@ -203,9 +190,6 @@ export async function simBatch(args: {
     ? loadProfileFile(args.profile)
     : new PackagedData(packaged.manifest, packaged.dir).eraProfile();
 
-  // Partition the seed range into worker-sized chunks; every game is a pure
-  // function of (fixture, seed, profile), so worker counts never change
-  // results or seed assignment. Chunks run as interleaved microtasks.
   const chunks = chunkRange(seedFrom, seedTo, workers);
 
   const aggregate = {

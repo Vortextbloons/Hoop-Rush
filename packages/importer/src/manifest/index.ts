@@ -1,14 +1,3 @@
-/**
- * Regenerates the v2 manifest from packaged artifacts and the authoritative
- * lineage table (spec/12). The manifest is the only artifact that carries the
- * 30 modern franchise slots, the historical lineage segments, and the
- * complete franchise-era availability matrix; the browser never discovers
- * availability by scanning records.
- *
- * Preserved across runs: asset config, eras, and the frozen bracket. Rebuilt
- * every run: pools index, availability matrix (from the persisted coverage
- * report), and era simulation profiles.
- */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PUBLIC_DATA } from '../config.ts';
@@ -78,13 +67,6 @@ function sortedJsonFiles(dir: string): string[] {
   }
 }
 
-/**
- * Rebuilds players-index.json (compact draft rows) from schema-valid packaged
- * pools and returns the manifest index entry (url + content hash). Skips
- * invalid pool files with a warning instead of failing the whole build.
- * `preloaded` maps file name -> raw parsed pool; when present, pools are not
- * re-read from disk.
- */
 export function rebuildPlayersIndex(
   dataDir = PUBLIC_DATA,
   preloaded?: ReadonlyMap<string, unknown>,
@@ -117,13 +99,6 @@ export function rebuildPlayersIndex(
   };
 }
 
-/**
- * Rebuilds roster-details.json (season statistics and height/weight behind
- * every draft row) and returns the manifest index entry. Only the Roster
- * screen loads this asset, so sandbox and classic never parse it.
- * `preloaded` maps file name -> raw parsed pool; when present, pools are not
- * re-read from disk.
- */
 export function rebuildRosterDetails(
   dataDir = PUBLIC_DATA,
   preloaded?: ReadonlyMap<string, unknown>,
@@ -171,7 +146,6 @@ export function refreshPlayersIndexInManifest(dataDir = PUBLIC_DATA): void {
   );
 }
 
-/** Cache-busting version for the historical logo asset set (m7 branding). */
 export const ASSET_CACHE_VERSION = '2026-08-03-historical-logos-v1';
 
 export function run(dataDir = PUBLIC_DATA): void {
@@ -206,9 +180,6 @@ export function run(dataDir = PUBLIC_DATA): void {
     },
   };
 
-  // Pools index + availability matrix from packaged pool assets. Each pool is
-  // read once: the raw text feeds the content hash and the parsed value feeds
-  // the index/availability passes (previously re-read ~3x per pool).
   const poolsDir = join(dataDir, 'pools');
   const poolFiles = sortedJsonFiles(poolsDir);
   const poolByKey = new Map<string, Pool>();
@@ -247,9 +218,6 @@ export function run(dataDir = PUBLIC_DATA): void {
     manifest['rosterDetails'] = rosterDetailsEntry;
   }
 
-  // Complete availability matrix: every slot x era combination, from the
-  // persisted coverage report (truthful reasons) with cheap classification
-  // for combinations the last build did not attempt.
   const manifestCore = loadManifest();
   const coverage = new Map(
     loadCoverageReport().map((entry) => [`${entry.franchiseId}/${entry.eraId}`, entry]),
@@ -303,7 +271,6 @@ export function run(dataDir = PUBLIC_DATA): void {
   }
   manifest['eraSimulationProfiles'] = profiles;
 
-  // Frozen bracket (the fixed 30-opponent schedule).
   const opponentsDir = join(dataDir, 'opponents');
   if (fileExists(join(opponentsDir, 'bracket.json'))) {
     manifest['bracket'] = {
@@ -312,10 +279,6 @@ export function run(dataDir = PUBLIC_DATA): void {
     };
   }
 
-  // Season Run artifacts (2.0): league, schedule, draft catalog, roster
-  // targets, and the M2.6.5 free-agency index/targets hashes when the
-  // packaged season assets exist (optional so 1.0 manifests stay valid; the
-  // season generators update these entries in place).
   const seasonDir = join(dataDir, 'season');
   const seasonRefs: Record<string, { url: string; contentHash: string }> = {};
   for (const [key, name] of [

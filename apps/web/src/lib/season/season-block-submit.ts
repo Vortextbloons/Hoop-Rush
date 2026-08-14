@@ -13,24 +13,6 @@ import type { SubmitBlockEnvelope } from './season-hub-state';
 import type { SeasonRunShellData } from './season-shell-context';
 import type { SeasonBlockStartInput } from './season-block-runner';
 
-/**
- * Season Run block submission (M2.3.5 hub, M2.5): builds the typed
- * `SubmitBlockEnvelope` (command + runner start input) from the live shell
- * state. This is the UI's single path into `SeasonHubState.startBlock` —
- * every can-submit condition is checked here and reported as a typed
- * failure, so the Hub renders concrete, actionable rejections instead of a
- * generic disabled button. The envelope mirrors the pre-shell league hub's
- * builder exactly (frozen command schema, engine rotation-set digest,
- * packaged artifact URLs for the worker).
- *
- * M2.5: the submit command gains the locked `objectiveId` (null for the
- * final two-game block 8; a selection is REQUIRED for blocks 0-7 — the
- * engine rejects with `invalid-objective` otherwise) and the expected run
- * state facts (`expectedStateRevision`/`expectedStateDigest` asserted by
- * every command). The runner start input carries the locked objective; the
- * runner derives the pre-block health and state facts from the snapshot.
- */
-
 export type SubmitBlockFailureCode =
   | 'no-run'
   | 'no-human-team'
@@ -55,11 +37,6 @@ export function blockPhaseAllowsSubmit(phase: string): boolean {
   return phase === 'idle' || phase === 'complete' || phase === 'cancelled' || phase === 'failed';
 }
 
-/**
- * Validates the shell state and builds the submit command + runner start
- * input. The command is idempotent per `commandId` (a fresh id each call;
- * retry re-issues the same command from `shell.block`).
- */
 export async function buildSubmitBlockEnvelope(
   shell: SeasonRunShellData,
 ): Promise<BuildSubmitBlockEnvelopeResult> {
@@ -94,9 +71,6 @@ export async function buildSubmitBlockEnvelope(
     );
   }
 
-  // M2.5: the objective is locked into the submit command. Blocks 0-7
-  // require a recorded selection (the engine rejects otherwise); the final
-  // two-game block 8 must carry null.
   const objectiveId: SeasonObjectiveId | null =
     nextBlockIndex >= 8 ? null : selectedObjectiveIdOf(run, nextBlockIndex);
   if (objectiveId === null && nextBlockIndex < 8) {
@@ -106,10 +80,6 @@ export async function buildSubmitBlockEnvelope(
     );
   }
 
-  // M2.6.5: an open free-agency market blocks the next rotation lock (the
-  // engine's authoritative gate; the worker wire carries no pre-block
-  // free-agency state, so the shell gates before submission). The window
-  // must be explicitly resolved on the free-agency screen.
   const unresolvedWindowIndex = freeAgencyUnresolvedWindowIndex(run.freeAgency);
   if (unresolvedWindowIndex !== null) {
     return fail(

@@ -16,7 +16,7 @@ import { seasonBlockRecapCanonical } from './recap.ts';
 import { buildTestRun, scheduleOf } from './block-test-support.ts';
 import { simulateSeasonBlock } from './block.ts';
 import { pipelineInput } from './block-test-support.ts';
-/** A real 1,230-game schedule with the three interesting games extracted. */
+
 function tinySchedule(): SeasonSchedule {
   return scheduleOf(buildTestRun().run);
 }
@@ -154,8 +154,6 @@ describe('season game reconstruction (M2.3)', () => {
 });
 
 describe('season checkpoint digest (M2.3)', () => {
-  // Block 0 simulation costs ~10s; all five tests consume the same simulated
-  // checkpoint, and the digest functions only read from it.
   let checkpoint: SeasonCandidateCheckpoint;
   let run: SeasonRun;
 
@@ -170,7 +168,6 @@ describe('season checkpoint digest (M2.3)', () => {
     expect(digest).toMatch(/^[0-9a-f]{32}$/);
     expect(digest).toBe(checkpoint.digest);
 
-    // Shuffle every canonical-sorted array; the digest must not change.
     const shuffled: SeasonCandidateCheckpoint = {
       ...checkpoint,
       teamAggregates: [...checkpoint.teamAggregates].reverse(),
@@ -201,14 +198,13 @@ describe('season checkpoint digest (M2.3)', () => {
   it('excludes the digest field itself from the serialization', () => {
     const withoutDigest = { ...checkpoint, digest: '' };
     expect(seasonCheckpointDigest(withoutDigest)).toBe(seasonCheckpointDigest(checkpoint));
-    // The canonical serialization never contains the digest string.
+
     expect(seasonCheckpointCanonical(checkpoint)).not.toContain(checkpoint.digest);
   });
 
   it('is stable across runtime parsing (object key reordering)', () => {
     const digest = seasonCheckpointDigest(checkpoint);
-    // JSON round-trip + zod parsing reorder object keys; the canonical
-    // serialization sorts keys recursively, so the digest is unchanged.
+
     const reparsed = seasonCandidateCheckpointSchema.parse(
       JSON.parse(JSON.stringify(checkpoint)) as unknown,
     );

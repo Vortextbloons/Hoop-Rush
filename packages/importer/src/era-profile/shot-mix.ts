@@ -1,11 +1,3 @@
-/**
- * Pool shot-mix priors and rating anchors for era profiles (port of
- * `pool_shot_mix_and_anchors` from scripts/import-nba/compute_era_sim_profile.py).
- *
- * The packaged Lakers pool for the era provides population anchor ratings and
- * a usage-weighted zone-mix prior; the three-point component is normalized to
- * the league 3PA rate derived from the packaged stints.
- */
 import { join } from 'node:path';
 import { PUBLIC_DATA } from '../config.ts';
 import { fileExists, readJson } from '../json.ts';
@@ -41,11 +33,6 @@ export interface PoolPlayerLike {
 
 const round4 = (value: number): number => Math.round(value * 10000) / 10000;
 
-/**
- * Usage-weighted zone mix over the pool population. Each player's zone
- * frequencies are weighted by their usage tendency, so high-usage players
- * dominate the population shot mix.
- */
 export function computePoolShotMix(
   players: readonly PoolPlayerLike[],
   leagueThreeRate: number,
@@ -77,12 +64,6 @@ export function computePoolShotMix(
     aboveBreakThree: weightedAbove / total,
   };
 
-  // The pool mix's three-point share reflects rating-derived tendency
-  // priors for one franchise, not the league's actual three-point volume.
-  // Normalize the three-point component to the league 3PA rate (from the
-  // packaged stints) so the zone-mix gates stay consistent with the
-  // league three-point-rate parameter. Two-point ratios are preserved and
-  // rescaled so the mix still sums to one.
   const poolThree = mix.cornerThree + mix.aboveBreakThree;
   if (poolThree > 0) {
     const threeScale = leagueThreeRate / poolThree;
@@ -117,8 +98,6 @@ export function poolShotMixAndAnchors(eraId: string, leagueThreeRate: number): S
   const players = pool.players;
   const mix = computePoolShotMix(players, leagueThreeRate);
 
-  // Population-mean anchor ratings: a player at the anchor converts at the
-  // league rate, and deviations move outcomes (see eraSimulationParametersSchema).
   const ftMean =
     players.reduce((sum, p) => sum + (p.detailedRatings.freeThrow ?? 50), 0) / players.length;
   const passMean =

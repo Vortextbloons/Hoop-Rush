@@ -9,13 +9,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { deriveSeasonAwards } from './awards.ts';
 
-/**
- * Season awards derivation tests (M2.6, awards-v1): appearance/start facts,
- * traded-player aggregation, eligibility gates, the availability factor,
- * the transparent MVP/DPOY/Sixth Man composites, All-League First Team,
- * tie-break chains, the eligibility fallback, and digest determinism.
- */
-
 function ver(n: number): string {
   return `pv-${String(n).padStart(32, '0')}`;
 }
@@ -37,7 +30,6 @@ interface LineSpec {
   pf?: number;
 }
 
-/** One compact line with deterministic defaults (neutral ~10 pts/game). */
 function line(versionId: string, spec: LineSpec = {}): SeasonCompactPlayerLine {
   const fgm = spec.fgm ?? 4;
   const fga = spec.fga ?? 9;
@@ -90,7 +82,6 @@ function boxOf(franchiseId: string, lines: readonly SeasonCompactPlayerLine[]): 
 const LAKERS = 'lakers';
 const CELTICS = 'celtics';
 
-/** Ten filler versions per franchise (always appear, neutral production). */
 function fillerOf(franchiseId: string, startIndex: number): string[] {
   return Array.from({ length: 10 }, (_, index) => ver(startIndex + index));
 }
@@ -115,18 +106,16 @@ function rostersOf(): SeasonRoster[] {
 interface GameSpec {
   homeLines?: Record<string, LineSpec>;
   awayLines?: Record<string, LineSpec>;
-  /** Winners receive the points bump; craft scores from lines otherwise. */
+
   homeScore?: number;
   awayScore?: number;
   forfeit?: boolean;
 }
 
-/** One regular-season summary: lakers host; 10 lines per side by default. */
 function summary(round: number, spec: GameSpec = {}): SeasonGameSummary {
   const homeIds = fillerOf(LAKERS, 50);
   const awayIds = fillerOf(CELTICS, 70);
-  // Spec keys always become lines (traded players appear on both sides);
-  // filler versions fill the remaining slots to exactly ten per side.
+
   const lineupOf = (
     filler: string[],
     overrides?: Record<string, LineSpec>,
@@ -198,7 +187,6 @@ function games(count: number, spec: GameSpec = {}): SeasonGameSummary[] {
 const STAR = ver(1);
 const SECOND = ver(2);
 
-/** A star per-game line: 40 points on efficient volume with defense/playmaking. */
 const STAR_LINE: LineSpec = {
   seconds: 2400,
   started: true,
@@ -235,7 +223,6 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
     const inefficient = ver(4);
     const spec: GameSpec = {
       homeLines: {
-        // 20 points on 10 shots (ts 1.0) beats 20 points on 20 shots (ts 0.5).
         [efficient]: { seconds: 2400, started: true, pts: 20, fgm: 10, fga: 10, tov: 1 },
         [inefficient]: { seconds: 2400, started: true, pts: 20, fgm: 10, fga: 20, tov: 1 },
       },
@@ -271,8 +258,7 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
       },
     };
     const awards = deriveSeasonAwards({ runId: 'run-1', rosters, summaries: games(10, spec) });
-    // Identical production: the starter has 10 starts, the benched player 0,
-    // so the benched player qualifies as Sixth Man and the starter does not.
+
     expect(awards.sixthManOfYear.playerVersionId).toBe(benched);
     expect(awards.sixthManOfYear.franchiseId).toBe(LAKERS);
   });
@@ -283,7 +269,7 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
     const spec: GameSpec = {
       homeLines: { [traded]: STAR_LINE },
     };
-    // Six home (lakers) appearances, four away (celtics) appearances.
+
     const summaries = [
       ...Array.from({ length: 6 }, (_, index) => summary(index + 1, spec)),
       ...Array.from({ length: 4 }, (_, index) =>
@@ -312,7 +298,7 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
       ),
     ];
     const awards = deriveSeasonAwards({ runId: 'run-1', rosters, summaries });
-    // 5-5 appearances; lakers saw 5 starts, celtics 0 -> lakers is primary.
+
     expect(awards.mvp.playerVersionId).toBe(traded);
     expect(awards.mvp.franchiseId).toBe(LAKERS);
   });
@@ -321,8 +307,7 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
     const rosters = rostersOf();
     const full = ver(10);
     const partial = ver(11);
-    // Full: 7 of 10 games (>= ceil(0.7*10)=7) with 30 points; partial: 6 of
-    // 10 with 45 points. The partial player is ineligible despite scoring more.
+
     const spec: GameSpec = {
       homeLines: { [full]: { seconds: 2400, started: true, pts: 30, fgm: 15, fga: 28 } },
       awayLines: { [partial]: { seconds: 2400, started: true, pts: 45, fgm: 20, fga: 30 } },
@@ -351,7 +336,7 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
       ),
     ];
     const awards = deriveSeasonAwards({ runId: 'run-1', rosters, summaries });
-    // Identical per-game numbers; the full-availability season wins.
+
     expect(awards.mvp.playerVersionId).toBe(full);
   });
 
@@ -394,7 +379,7 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
     const identical: LineSpec = { seconds: 2400, started: true, pts: 25, fgm: 12, fga: 24 };
     const spec: GameSpec = { homeLines: { [a]: identical, [b]: identical } };
     const awards = deriveSeasonAwards({ runId: 'run-1', rosters, summaries: games(10, spec) });
-    // Scores and primary components tie; seconds tie; lower version id wins.
+
     expect(awards.mvp.playerVersionId).toBe(a);
 
     const c = ver(18);
@@ -412,7 +397,7 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
     const shuffled = [...summaries].reverse();
     const second = deriveSeasonAwards({ runId: 'run-1', rosters, summaries: shuffled });
     expect(second).toEqual(first);
-    // A forfeit summary contributes no appearances at all.
+
     const withForfeit = [...summaries.slice(0, 9), summary(10, { forfeit: true })];
     const third = deriveSeasonAwards({ runId: 'run-1', rosters, summaries: withForfeit });
     expect(third.mvp.playerVersionId).toBe(STAR);
@@ -448,7 +433,7 @@ describe('season awards derivation (M2.6, awards-v1)', () => {
     const different: GameSpec = { homeLines: { [SECOND]: STAR_LINE } };
     const other = deriveSeasonAwards({ runId: 'run-1', rosters, summaries: games(10, different) });
     expect(other.digest).not.toBe(awards.digest);
-    // Digest is stable when only the digest field itself is altered.
+
     expect(seasonAwardsDigest({ ...awards, digest: 'f'.repeat(32) })).toBe(awards.digest);
   });
 

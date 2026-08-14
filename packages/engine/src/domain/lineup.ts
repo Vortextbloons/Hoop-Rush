@@ -8,15 +8,6 @@ import type {
 import { LINEUP_STRUCTURE } from '@hoop-rush/data-contracts';
 import { canPlay } from './positions.ts';
 
-/**
- * Lineup legality: exactly two Guards, two Forwards, and one Center. Slots are
- * G/G/F/F/C requirements resolved through the detailed position map: a player
- * fills a slot when any detailed position in their union maps to the slot's
- * group (spec/01, spec/03). This module is the single authoritative
- * implementation of the rule.
- */
-
-/** Slot-group requirement for a slot index in the fixed G,G,F,F,C structure. */
 export function slotRequirement(slotIndex: SlotIndex): SlotGroup {
   const requirement = LINEUP_STRUCTURE[slotIndex];
   if (requirement === undefined) {
@@ -25,7 +16,6 @@ export function slotRequirement(slotIndex: SlotIndex): SlotGroup {
   return requirement;
 }
 
-/** Whether a player's career union satisfies a slot requirement. */
 export function canFillSlot(positions: PositionUnion, slotIndex: SlotIndex): boolean {
   return canPlay(positions, slotRequirement(slotIndex));
 }
@@ -42,11 +32,6 @@ export interface LineupValidation {
   issues: LineupIssue[];
 }
 
-/**
- * Validates a five-assignment lineup against the fixed structure. Assignments
- * must cover every slot exactly once with five distinct players, each eligible
- * for their slot's position requirement.
- */
 export function validateLineup(lineup: Lineup): LineupValidation {
   const issues: LineupIssue[] = [];
 
@@ -111,10 +96,6 @@ export function validateLineup(lineup: Lineup): LineupValidation {
   return { ok: issues.length === 0, issues };
 }
 
-/**
- * Builds a legal assignment list for five distinct players, mapping each to an
- * open slot it can fill. Returns null when no complete legal assignment exists.
- */
 export function assignLineup(
   players: ReadonlyArray<{ playerId: string; positions: PositionUnion }>,
 ): LineupAssignment[] | null {

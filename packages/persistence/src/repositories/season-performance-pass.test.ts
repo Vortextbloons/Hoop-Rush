@@ -35,13 +35,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { buildClassicDraftState } from '@hoop-rush/test-fixtures';
 
-/**
- * Season Run performance pass (Dexie v9) tests: the migration reset (Season
- * Run rows only; Challenge/Classic preserved), the centralized run-scoped
- * deletion paths, the [runId+blockIndex] summary index, the trade-window
- * health commit regression, and the compact per-run player slice.
- */
-
 const DIGEST_32 = '0'.repeat(32);
 
 function makeAdapters() {
@@ -65,7 +58,6 @@ function buildClassicDraftRecord(): StoredClassicDraft {
   });
 }
 
-/** Reconciliation-correct standings/aggregates for a block's summaries. */
 function blockFactsFor(
   seam: ReturnType<typeof buildStubSeasonEngineSeam>,
   run: SeasonRun,
@@ -92,7 +84,6 @@ describe('Season Run performance pass (dexie v9)', () => {
   });
 
   it('migration v9 clears every Season Run table and preserves Challenge/Classic saves', async () => {
-    // Build the v8-era database exactly like the shipped chain before v9.
     const legacy = new Dexie('hoop-rush-saves');
     legacy.version(1).stores({ active: 'recordId', completed: 'recordId', history: 'recordId' });
     legacy.version(2).stores({
@@ -287,8 +278,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       commandLogDigest: DIGEST_32,
       completedAtIso: '2026-01-01T00:00:00.000Z',
     });
-    // Challenge + Classic saves that MUST survive the reset (raw rows: the
-    // reset is a byte-level wipe of the Season Run tables only).
+
     await legacy.table('active').put({
       recordId: 'active',
       saveSchemaVersion: 2,
@@ -301,7 +291,6 @@ describe('Season Run performance pass (dexie v9)', () => {
     await legacy.table('classicDrafts').put(buildClassicDraftRecord());
     legacy.close();
 
-    // Open the shipped v9 database: the upgrade hook runs and resets.
     const upgraded = new HoopRushDatabase();
     await upgraded.open();
     for (const table of [
@@ -319,7 +308,7 @@ describe('Season Run performance pass (dexie v9)', () => {
     ]) {
       expect(await upgraded.table(table).count(), table).toBe(0);
     }
-    // Challenge and Classic stores are untouched by the reset.
+
     expect(await upgraded.table('active').count()).toBe(1);
     expect(await upgraded.table('activeGames').count()).toBe(0);
     expect(await upgraded.table('classicDrafts').count()).toBe(1);
@@ -347,8 +336,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         updatedAtIso: '2026-01-01T00:00:00.000Z',
       })),
     );
-    // A "completed" run's rows with the same block indexes must never leak
-    // into the active run's block summary query.
+
     await db.seasonRunSummaries.bulkPut(
       summaries.map((summary) => ({
         runId: 'other-completed-run',
@@ -432,12 +420,11 @@ describe('Season Run performance pass (dexie v9)', () => {
 
     const rows = await repo.loadBlockSummaries(run.runId, 0);
     expect(rows.map((row) => row.gameId)).toEqual(summaries.map((row) => row.gameId));
-    // The other run's rows survive untouched (the delete is run-scoped).
+
     expect(await db.seasonRunSummaries.where('runId').equals('other-completed-run').count()).toBe(
       150,
     );
-    // And the full validated reload reconciles (the commit stored the real
-    // standings/aggregates/digest facts).
+
     expect(await repo.loadActiveRunWithSchedule(schedule)).not.toBeNull();
   });
 
@@ -490,8 +477,6 @@ describe('Season Run performance pass (dexie v9)', () => {
       ],
     };
 
-    // Blocks 0 and 1 commit cleanly (no window), each with a digest over the
-    // exact facts the commit stores, so the reload audit's chain checks pass.
     let priorStateRevision = 0;
     let priorStateDigest = run.stateDigest;
     const priorSummaries: SeasonGameSummary[] = [];
@@ -594,9 +579,6 @@ describe('Season Run performance pass (dexie v9)', () => {
       priorSummaries.push(...blockSummaries);
     }
 
-    // Block 2 opens the trade window: the WINDOW health (with the rehab
-    // injury) diverges from the candidate health and must be what the commit
-    // persists — the window stateDigest covers the window health.
     const blockIndex = 2;
     const blockSummaries = allSummaries.filter(
       (summary) => summary.round >= 21 && summary.round <= 30,
@@ -688,9 +670,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         influenceBalance: { humanBalance: 2 },
       },
       effects,
-      // The candidate health deliberately omits the window's rehab injury:
-      // the commit must persist the WINDOW health, or the reload digest
-      // recomputation fails.
+
       health: buildFixtureHealthState(),
       transactions: [],
       influence: run.influence,
@@ -705,8 +685,6 @@ describe('Season Run performance pass (dexie v9)', () => {
       freeAgency: run.freeAgency,
     });
 
-    // Full validated reload: before the fix this threw SeasonRunLoadError
-    // ("stored stateDigest does not recompute over the stored mutable state").
     const snapshot = await repo.loadActiveRunWithSchedule(schedule);
     expect(snapshot).not.toBeNull();
     expect(
@@ -917,7 +895,6 @@ describe('Season Run performance pass (dexie v9)', () => {
     await repo.clearSeasonRun(run.runId);
     await expectAllEmpty();
 
-    // Force-clear also wipes unidentifiable leftovers.
     await repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run);
     await db.seasonRunSummaries.put({
       runId: run.runId,
@@ -981,7 +958,6 @@ describe('Season Run performance pass (dexie v9)', () => {
     await repo.forceClearActiveSeasonRun();
     await expectAllEmpty();
 
-    // Replacement promotion removes the superseded run's rows.
     await repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run);
     await db.seasonRunSummaries.put({
       runId: run.runId,
@@ -1065,7 +1041,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       runId: 'perf-run-replacement',
     });
     await repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(replacement), replacement);
-    // Every superseded row is gone; the new run's checkpoint/index remain.
+
     for (const table of scopedTables) {
       expect(await db.table(table).count(), table).toBe(0);
     }
@@ -1122,14 +1098,12 @@ describe('Season Run performance pass (dexie v9)', () => {
         .overallRating,
     ).toBe(80);
 
-    // Invalid entries are rejected at the boundary.
     await expect(
       repo.upsertSeasonRunPlayerSlice(run.runId, [
         seasonRunPlayerSliceEntrySchema.parse(slice[0]),
       ] as never),
     ).resolves.toBeUndefined();
 
-    // Teardown removes the slice row too.
     await repo.clearSeasonRun(run.runId);
     expect(await repo.loadSeasonRunPlayerSlice(run.runId)).toBeNull();
   });

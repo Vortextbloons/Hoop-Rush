@@ -16,15 +16,6 @@
   import ChallengeOverlay from './ChallengeOverlay.svelte';
   import AsyncState from './AsyncState.svelte';
 
-  /**
-   * Challenge progress (spec/08): the full-screen dialog driven by the paced
-   * runner, shared by the Sandbox and Classic challenge routes. The 82-cell
-   * strip fills left to right; the currently revealed opponent, game number,
-   * score, and live record sit directly above it. Assistive technology hears
-   * bounded progress announcements, never one per game. Cancel pauses at the
-   * last persisted prefix; reload resumes.
-   */
-
   let {
     mode,
     modeLabelFor,
@@ -122,12 +113,6 @@
     retryCount += 1;
   }
 
-  // Worker + persistence boundary: one runner per loaded session. The runner
-  // is intentionally NON-reactive (a plain variable): the effect must not
-  // re-run when it changes, or Svelte would reschedule the effect in a loop,
-  // disposing and recreating the worker every cycle. The session snapshot is
-  // set once by the load effect; display state (`run`) is separate so updates
-  // never re-trigger this boundary.
   let runner: ChallengeRunner | null = null;
   let session = $state.raw<{ run: ChallengeRun; profile: EraSimulationProfile } | null>(null);
   $effect(() => {
@@ -175,8 +160,7 @@
     const currentRun = run;
     const m = manifest;
     if (!browser || !currentRun || !m) return;
-    // `run` reassigns on every paced reveal; the pool map is already built, so
-    // bail out early instead of re-resolving pools per reveal.
+
     if (byId !== null) return;
     let cancelled = false;
     loadRunPlayersById(currentRun, m).then(

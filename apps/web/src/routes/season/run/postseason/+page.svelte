@@ -9,14 +9,6 @@
   import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
   import PostseasonBracket from '$lib/components/season/PostseasonBracket.svelte';
 
-  /**
-   * Postseason bracket (M2.6): the live tournament — Play-In through the
-   * Finals — rendered as round columns on desktop and ordered series cards
-   * on mobile (see PostseasonBracket). The tab appears in the shell nav
-   * only once the stage warrants it; a direct visit before then redirects
-   * the user back to the hub.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   const run = $derived(shell.run);

@@ -45,8 +45,7 @@ function rowFromPlayer(player: PeakPlayerSeason): OverallRow {
     eraId: player.eraId,
     seasonKey: player.seasonKey,
     positions: player.positions.playable.join('/'),
-    // The strict engine contract carries no summary `overall` key; the
-    // packaged summary rating is the UI-facing overall.
+
     detailedOverall: null,
     summaryOverall: player.summaryRatings.overallRating,
     selectionScore: player.selectionScore,
@@ -61,7 +60,6 @@ function parseLimit(raw: string | undefined): number | null {
   return limit;
 }
 
-/** Lists packaged player Overalls without recalculating or duplicating rating rules. */
 export function dataOveralls(options: DataOverallsOptions): CliReport {
   const limit = parseLimit(options.limit);
   const input = {

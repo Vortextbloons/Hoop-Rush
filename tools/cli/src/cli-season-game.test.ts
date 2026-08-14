@@ -31,13 +31,6 @@ import {
 } from './report-schemas.ts';
 import { jsonPayload, REPO_ROOT, runCli, withTmpDir } from './cli-test-helpers.ts';
 
-/**
- * M2.2 `season game` CLI tests: committed fixture validity, unit tests with
- * injected engine doubles (argument parsing, output rendering, report
- * schemas, calibrate gate math, worker-count independence), and end-to-end
- * `runCli` journeys against the real engine runtime.
- */
-
 const FIXTURES_DIR = join(REPO_ROOT, 'tools/cli/src/fixtures');
 const ALL_FIXTURE_IDS = [
   'season-game-balanced',
@@ -81,7 +74,7 @@ describe('cli: committed season game fixtures', () => {
       for (const player of allPlayers) {
         expect(player.playerVersionId).toMatch(/^pv-[0-9a-f]{32}$/);
       }
-      // Availability covers every rostered version exactly once.
+
       expect(input.availability).toHaveLength(20);
       const availableIds = input.availability.map((entry) => entry.playerVersionId);
       expect(new Set(availableIds).size).toBe(20);
@@ -335,7 +328,7 @@ describe('season game simulate (unit, injected doubles)', () => {
     expect(payload.playerMinutes).toHaveLength(20);
     expect(payload.gameVersion).toBe('season-game-v4');
     expect(payload.rotationVersion).toBe('season-rotation-v3');
-    // The double received the overridden seed, not the fixture placeholder.
+
     expect(simulate.mock.calls[0]?.[0].seed).toBe('ab'.repeat(16));
     expect(report.details[0]).toContain('Home Team 100 - 95 Away Team');
     expect(report.details.some((line) => line.includes('min actual/target'))).toBe(true);
@@ -461,8 +454,6 @@ function presetFact(fixtureId: string, seedIndex: number): SeasonGameGameFacts {
   };
 }
 
-/** Chunked runner with the same chunking as the real worker path; optionally
- * perturbs single-chunk (workers === 1) runs to exercise the probe. */
 function fakeRunner(
   factory: (fixtureId: string, seedIndex: number) => SeasonGameGameFacts,
   options: { perturbSingleChunk?: (fact: SeasonGameGameFacts) => SeasonGameGameFacts } = {},
@@ -541,7 +532,7 @@ describe('season game calibrate (unit, injected doubles)', () => {
       expect(targets.gates.starterOrdering).toBe(true);
       expect(targets.calibration.calibrationSeedCount).toBe(SEASON_GAME_CALIBRATION_SEED_COUNT);
       expect(targets.calibration.validationSeedCount).toBe(SEASON_GAME_VALIDATION_SEED_COUNT);
-      // A --out override must not touch the committed manifest.
+
       const manifestAfter = readFileSync(
         join(REPO_ROOT, 'apps/web/static/data/manifest.json'),
         'utf8',
@@ -777,7 +768,7 @@ describe('cli: season game calibrate (end-to-end, real engine)', () => {
         '--format',
         'json',
       ]);
-      // 8 calibration seeds with no held-out seeds: the held-out gate fails.
+
       expect(code).toBe(1);
       const payload = seasonGameCalibrateReportSchema.parse(jsonPayload(stdout, stderr));
       expect(payload.fixtures).toHaveLength(3);

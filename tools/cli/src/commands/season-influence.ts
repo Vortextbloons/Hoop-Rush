@@ -25,33 +25,6 @@ import {
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
-/**
- * `season influence calibrate` (spec/2.0 M2.5, contract §17): freezes
- * `influence-targets-v1` from seasons that open trade windows (AI spends
- * happen at window open, §13) and select the deterministic first offered
- * objective per block (documented policy: the cohort measures the objective
- * outcome distribution under a fixed, skill-free policy; the human franchise
- * performs no Influence spends in the cohort).
- *
- * Gates (frozen):
- * - ledger reconciliation: every franchise balance equals the sum of its
- *   recorded ledger applied deltas (checked at every block boundary).
- * - income identity: every franchise balance equals
- *   `2 + acceptedBlocks + net non-grant deltas` (objective-reward,
- *   extra-trade-offer, risky-rehab).
- * - debt frequency: share of (franchise, block boundary) snapshots with a
- *   negative balance within the frozen envelope [0, 10%].
- * - zero cap violations: no balance exceeds the +8 cap at any boundary.
- * - objective success rate within the frozen envelope (LEAD DECISION
- *   expectation, measured then frozen).
- * - spend rates within envelopes: extra-trade-offer spend share [0, 50%]
- *   of tracked window entries; risky-rehab spend share [0, 40%] of recorded
- *   injuries.
- *
- * Cohort: 12 calibration + 4 held-out seasons (~96 objective evaluations);
- * the runner is in-process (a worker variant is deferred).
- */
-
 export const SEASON_INFLUENCE_CALIBRATE_OPTIONS: Record<string, boolean> = {
   input: true,
   'seed-from': true,
@@ -71,26 +44,19 @@ export const SEASON_INFLUENCE_VALIDATION_SEED_COUNT = 4;
 export const SEASON_INFLUENCE_INITIAL_GRANT = 2;
 export const SEASON_INFLUENCE_BLOCK_GRANT = 1;
 
-/** Frozen debt-frequency envelope (documented expectation ~0-10%). */
 export const SEASON_INFLUENCE_DEBT_FREQUENCY_MAX = 0.1;
-/**
- * Frozen objective success envelope (measured ~79% at integration, then
- * re-frozen): [0.65, 0.95] catches evaluation regressions (always-fail /
- * always-succeed) rather than prescribing a target rate.
- */
+
 export const SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MIN = 0.65;
 export const SEASON_INFLUENCE_OBJECTIVE_SUCCESS_MAX = 0.95;
-/** Frozen spend-rate envelopes (documented choices, see module docstring). */
+
 export const SEASON_INFLUENCE_EXTRA_OFFER_SPEND_MAX = 0.5;
 export const SEASON_INFLUENCE_REHAB_SPEND_MAX = 0.4;
 
-/** Minimum sample sizes before envelope gates evaluate. */
 export const SEASON_INFLUENCE_MIN_BOUNDARY_SAMPLE = 500;
 export const SEASON_INFLUENCE_MIN_OBJECTIVE_SAMPLE = 30;
 export const SEASON_INFLUENCE_MIN_WINDOW_SAMPLE = 10;
 export const SEASON_INFLUENCE_MIN_INJURY_SAMPLE = 20;
 
-/** The targets artifact frozen by `season influence calibrate`. */
 export const seasonInfluenceTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   targetsVersion: z.literal(SEASON_INFLUENCE_TARGETS_VERSION),
@@ -157,14 +123,6 @@ export const seasonInfluenceTargetsSchema = z.object({
 });
 export type SeasonInfluenceTargets = z.infer<typeof seasonInfluenceTargetsSchema>;
 
-/**
- * Income identity: every franchise's balance equals the initial grant plus
- * the APPLIED block-grant deltas plus the net non-grant deltas, and exactly
- * one block-grant entry exists per accepted block. The applied deltas model
- * the +8 cap (a grant at cap records appliedDelta 0), so the identity holds
- * for capped franchises too; the ledger is the single source of truth
- * (mirror of the persistence reload audit).
- */
 export function incomeIdentityFailuresOf(season: SeasonM25SeasonFacts): number {
   const run = season.run;
   const acceptedBlocks = season.checkpoints.length;
@@ -196,7 +154,6 @@ export function incomeIdentityFailuresOf(season: SeasonM25SeasonFacts): number {
   return failures;
 }
 
-/** Ledger reconciliation: every balance equals the sum of its applied deltas. */
 export function reconciliationFailuresOf(season: SeasonM25SeasonFacts): number {
   const run = season.run;
   const sumByFranchise = new Map<string, number>();
@@ -216,7 +173,6 @@ export function reconciliationFailuresOf(season: SeasonM25SeasonFacts): number {
   return failures;
 }
 
-/** One season's influence facts measured from the recorded economy state. */
 export interface SeasonInfluenceFacts {
   balanceChecks: number;
   reconciliationFailures: number;
@@ -251,10 +207,6 @@ export function seasonInfluenceFactsOf(season: SeasonM25SeasonFacts): SeasonInfl
       ? null
       : share(evaluated.filter((selection) => selection.success === true).length, evaluated.length);
 
-  // Extra-offer spend share: the spend opportunity set is every franchise x
-  // every opened window (the recorded `windows` state only carries entries
-  // for franchises that actually spent, so the denominator must come from
-  // the opened window count, not the recorded entries).
   let extraOfferSpent = 0;
   const extraOfferWindows = season.windows.length * run.league.teams.length;
   for (const windowEntries of Object.values(run.influence.windows)) {
@@ -470,14 +422,12 @@ export function validateSeasonInfluenceTargets(
     schema: seasonInfluenceTargetsSchema,
     command: 'season influence calibrate --validate',
     extraChecks: () => ({
-      // The schema literals already pin the cap/floor to +8/-3.
       details: ['cap/floor match the frozen +8/-3 bounds'],
       failures: [],
     }),
   });
 }
 
-/** `season influence calibrate`: runs the gates and freezes influence-targets-v1. */
 export function seasonInfluenceCalibrate(args: SeasonInfluenceArgs): CliReport {
   const started = Date.now();
   const { from, to } = parseSeedRange(args, SEASON_INFLUENCE_CALIBRATION_SEED_COUNT - 1);

@@ -25,17 +25,6 @@
   } from '$lib/season/season-presentation';
   import { availabilityStripRows } from '$lib/season/season-health-view';
 
-  /**
-   * Checkpoint detail (spec/2.0/11, M2.3.5): one accepted block's recap,
-   * reached at /season/run/checkpoint?block=N (0-based) with a default to
-   * the last accepted block. The recap derives entirely from saved facts via
-   * `deriveBlockRecap` (standings movement, notable performances, streaks,
-   * version spotlights, next opponents) and the human team's games render as
-   * branded box scores. Out-of-range or not-yet-accepted block parameters
-   * surface an error state with a link back to the Hub. All language comes
-   * from accepted saved facts — no invented narrative.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   let blockSummaries = $state<SeasonGameSummary[]>([]);
@@ -43,10 +32,6 @@
   let blockDetails = $state<SeasonRetainedGameDetail[]>([]);
   let loadError = $state<string | null>(null);
 
-  /**
-   * Box scores render only after their <details> first opens; the BoxScore
-   * chunk itself is lazy-loaded on first open.
-   */
   let openedBoxScores = $state.raw(new Set<string>());
   function onBoxScoreToggle(event: Event, gameId: string) {
     if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
@@ -97,7 +82,6 @@
   const manifest = $derived(shell.manifest);
 
   const playerNames = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, string>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
@@ -105,7 +89,6 @@
     return map;
   });
   const playable = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, readonly string[]>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) {
@@ -115,7 +98,6 @@
     return map;
   });
   const rosterByVersion = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, SeasonRosterEntry>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry);
@@ -180,7 +162,6 @@
 
   const effectsEvidence = $derived(aggregateMechanismEvidence(blockDetails));
 
-  /** Per-player availability rows for the checkpoint health strip. */
   const healthRows = $derived.by(() => {
     if (!run || !humanFranchiseId) return [];
     const roster = run.rosters.find((r) => r.franchiseId === humanFranchiseId);

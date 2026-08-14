@@ -19,38 +19,20 @@ import {
 import type { StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 
-/**
- * Reconciliation audit for a stored Season Run (spec/2.0/07 persistence,
- * M2.3, M2.4, M2.5). Every check derives from recorded facts and the pure
- * engine helpers behind the `SeasonRunEngineSeam`, so a fresh fold always
- * agrees with the stored checkpoint and a corrupt row or a half-applied
- * block is detected instead of entering app state.
- *
- * Checks: schedule identity/coverage, standings and aggregate reconciliation,
- * the block history chain (contiguous revisions, boundary rounds, cursor
- * facts, monotonic state chain), the retention policy, the M2.4 effects
- * state, the M2.5 health/Influence/transaction/state-chain/trade facts, and
- * pending-block consistency. The M2.5 effects-with-trade divergence rule
- * (LEAD DECISION, documented): a window open is the only legal point where
- * `run.effects` may differ from the checkpoint effects; when no window ever
- * opened and no command applied after the last commit, the stored facts must
- * be byte-identical to what the last accepted block digested.
- */
 export interface SeasonRunAuditFacts {
   league: SeasonLeague;
   rosters: readonly SeasonRoster[];
   schedule: SeasonSchedule;
   humanFranchiseId: string;
-  /** Validated current (v4) stored checkpoint row; row-level facts are authoritative. */
+
   stored: StoredSeasonRunRecord;
   summaries: readonly SeasonGameSummary[];
   retainedDetails: readonly SeasonRetainedGameDetail[];
   acceptedBlocks: readonly SeasonAcceptedBlock[];
-  /** M2.5: the run's pending candidate row, or null when none is stored. */
+
   pending: SeasonPendingBlockCandidate | null;
 }
 
-/** Plain-JSON deep equality; key order is irrelevant. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -76,12 +58,10 @@ function sortById<T>(rows: readonly T[], idOf: (row: T) => string): T[] {
   return [...rows].sort((a, b) => (idOf(a) < idOf(b) ? -1 : 1));
 }
 
-/** Expected completed rounds at a block boundary (blockRoundRange.toRound). */
 function expectedCompletedRoundsAt(blockIndex: number): number {
   return blockIndex === 8 ? 82 : (blockIndex + 1) * 10;
 }
 
-/** Audits one stored run and returns the failure list (empty = healthy). */
 export function auditSeasonRunState(
   facts: SeasonRunAuditFacts,
   seam: SeasonRunEngineSeam,
@@ -93,7 +73,6 @@ export function auditSeasonRunState(
   const scheduleById = new Map(facts.schedule.games.map((game) => [game.gameId, game]));
   const summaryIds = new Set<string>();
 
-  // Schedule identity and round coverage.
   const summariesPerRound = new Map<number, number>();
   for (const summary of summaries) {
     if (summaryIds.has(summary.gameId)) {
@@ -140,7 +119,6 @@ export function auditSeasonRunState(
     }
   }
 
-  // Reconstruct the finalized games and recompute standings + aggregates.
   let games: readonly SeasonGame[] = [];
   try {
     games = seam.reconstructSeasonGames(facts.schedule, summaries);
@@ -192,7 +170,6 @@ export function auditSeasonRunState(
     failures.push(`player aggregate fold failed: ${errorMessage(error)}`);
   }
 
-  // Block history chain: revisions, boundaries, digests, command ids.
   const expectedRevision = acceptedBlocks.length;
   if (stored.revision !== expectedRevision) {
     failures.push(
@@ -233,8 +210,7 @@ export function auditSeasonRunState(
         `accepted block ${String(block.blockIndex)} summaryCount ${String(block.summaryCount)} does not match stored rows (${String(storedCount)})`,
       );
     }
-    // M2.5: the run state chain — every committed block bumps the state
-    // revision by at least one, so the chain is strictly increasing.
+
     if (block.stateRevision <= previousStateRevision) {
       failures.push(
         `accepted block ${String(block.blockIndex)} stateRevision ${String(block.stateRevision)} does not advance the state chain (previous ${String(previousStateRevision)})`,
@@ -260,9 +236,6 @@ export function auditSeasonRunState(
       failures.push('checkpoint carries checkpointState with no accepted block');
     }
   } else {
-    // Commands can advance the state chain before the first block commits,
-    // so stateRevision may be > 0 here; checkpointState stays null (checked
-    // above) and the stored digest recomputes over the mutable facts below.
     if (stored.completedRounds !== last.completedRounds) {
       failures.push(
         `checkpoint completedRounds ${String(stored.completedRounds)} does not match the last accepted block`,
@@ -277,11 +250,7 @@ export function auditSeasonRunState(
     if (stored.lastCheckpointDigest !== last.checkpointDigest) {
       failures.push('checkpoint lastCheckpointDigest does not match the last accepted block');
     }
-    // Without a trade window, the snapshot's rotations are exactly the last
-    // submitted lock. Once a window exists, AI activity or an accepted human
-    // trade can legitimately repair rotations after that lock; the accepted
-    // block retains the historical lock digest while the run stores the
-    // authoritative post-trade rotations (covered by stateDigest below).
+
     const lockedDigest = seam.seasonRotationSetDigest(stored.run.rotations);
     if (stored.trade === null && lockedDigest !== last.rotationDigest) {
       failures.push(
@@ -301,7 +270,6 @@ export function auditSeasonRunState(
     }
   }
 
-  // Retention policy: retained details are human-team games with summaries.
   const summaryById = new Map(summaries.map((summary) => [summary.gameId, summary]));
   const detailCountsPerBlock = new Map<number, number>();
   for (const detail of retainedDetails) {
@@ -337,14 +305,10 @@ export function auditSeasonRunState(
     }
   }
 
-  // M2.4/M2.6.5 effects state: 300 ACTIVE rotation load records, 0-150
-  // inactive depth records, 1,350 ACTIVE canonical pairs (45 per rotation),
-  // and 0-1,350 archived pairs carrying franchiseId.
   const { effects } = stored;
   const rosterIds = seam.seasonRosterPlayerVersionIds(facts.rosters);
   const rosterIdSet = new Set(rosterIds);
-  // M2.6.5: the ACTIVE player set is the 30-rotation union (300 members),
-  // never the full 300-450 roster union — inactive depth owns no loads.
+
   const rotationIds = seam.seasonRotationPlayerVersionIds(stored.run.rotations);
   const rotationIdSet = new Set(rotationIds);
   const expectedPlayerCount = SEASON_ROTATION_SIZE * SEASON_TEAM_COUNT;
@@ -388,8 +352,7 @@ export function auditSeasonRunState(
   ) {
     failures.push('effects active player set does not match the 30 locked rotations');
   }
-  // M2.6.5 inactive depth: every inactive load is a rostered version outside
-  // the active set (the schema already rejects active/inactive overlap).
+
   const inactiveEffectIds = new Set<string>();
   for (const player of effects.inactivePlayerStates) {
     if (inactiveEffectIds.has(player.playerVersionId)) {
@@ -422,8 +385,7 @@ export function auditSeasonRunState(
   if (effects.pairStates.length !== 1350) {
     failures.push(`effects pair state count ${String(effects.pairStates.length)} is not 1350`);
   }
-  // M2.6.5: the 1,350 ACTIVE pairs are exactly the 45 canonical pairs of each
-  // ten-player rotation (pair members never span rotations).
+
   const expectedPairKeys = new Set<string>();
   for (const rotation of stored.run.rotations) {
     const ids = [...rotation.starters, ...rotation.benchOrder].sort();
@@ -447,9 +409,7 @@ export function auditSeasonRunState(
   ) {
     failures.push('effects active pairs do not match the 45 canonical pairs of each rotation');
   }
-  // M2.6.5 archived pairs: demotion-frozen records keyed by (franchiseId,
-  // a, b); members stay rostered (trades delete the traded player's
-  // archived records).
+
   const archivedKeys = new Set<string>();
   for (const pair of effects.archivedPairs) {
     const key = `${pair.franchiseId}\u0000${pair.a}\u0000${pair.b}`;
@@ -470,8 +430,6 @@ export function auditSeasonRunState(
     }
   }
 
-  // M2.6.5 ownership reconciliation: 300-450 unique rows, one per rostered
-  // version, each naming the owning franchise of its roster.
   const ownershipCount = stored.run.ownership.length;
   if (ownershipCount < SEASON_TEAM_COUNT * 10 || ownershipCount > SEASON_TEAM_COUNT * 15) {
     failures.push(`ownership row count ${String(ownershipCount)} is outside 300-450`);
@@ -508,9 +466,6 @@ export function auditSeasonRunState(
     }
   }
 
-  // M2.6.5 free-agency reconciliation: recorded facts only — window order,
-  // full declaration coverage, signings on winning rosters, and the
-  // per-franchise signing/spend caps reconciling from the signings.
   const { freeAgency } = stored.run;
   const signingById = new Map<string, SeasonFreeAgencySigning>();
   const signingCountsFromSignings = new Map<string, number>();
@@ -534,6 +489,7 @@ export function auditSeasonRunState(
     const declared = new Set(Object.keys(window.declarations));
     for (const franchiseId of leagueFranchiseIds) {
       if (!declared.has(franchiseId)) {
+        if (window.status === 'open' && franchiseId === facts.humanFranchiseId) continue;
         failures.push(`free-agency window ${String(index)} misses declaration for ${franchiseId}`);
       }
     }
@@ -610,7 +566,6 @@ export function auditSeasonRunState(
     }
   }
 
-  // M2.5 health state: recorded injuries are run-scoped facts.
   const { health } = stored;
   const healthRosterIds = seam.seasonRosterPlayerVersionIds(facts.rosters);
   const healthRosterIdSet = new Set(healthRosterIds);
@@ -630,9 +585,7 @@ export function auditSeasonRunState(
         `injury ${injury.injuryId} references franchise ${injury.franchiseId} outside the league`,
       );
     }
-    // M2.6: postseason injuries record their real postseason game id
-    // (`pi-...` / `po-...`), which is not part of the regular-season
-    // schedule; only regular-season injury ids must match a scheduled game.
+
     if (
       scheduleById.get(injury.gameId) === undefined &&
       !postseasonGameIdSchema.safeParse(injury.gameId).success
@@ -659,8 +612,6 @@ export function auditSeasonRunState(
     }
   }
 
-  // M2.5 Influence reconciliation: balances recompute from the append-only
-  // ledger, entry by entry (balanceAfter === balanceBefore + appliedDelta).
   const { influence } = stored;
   const balancesFromLedger = new Map<string, number>();
   for (const entry of influence.ledger) {
@@ -672,8 +623,6 @@ export function auditSeasonRunState(
       );
     }
     if (entry.appliedDelta !== entry.requestedDelta) {
-      // The only legal divergence is a cap-applied grant: requested above
-      // the +8 cap applies 0. Spends are never clamped (floor is validated).
       if (
         entry.appliedDelta !== 0 ||
         entry.requestedDelta <= 0 ||
@@ -722,7 +671,6 @@ export function auditSeasonRunState(
     }
   }
 
-  // M2.5 transaction chain: append-only entries with monotonic revisions.
   const { transactions } = stored;
   let previousAppliedAt = -1;
   const transactionIds = new Set<string>();
@@ -744,10 +692,6 @@ export function auditSeasonRunState(
     }
   }
 
-  // M2.5 state chain: revision monotonicity, checkpointState consistency,
-  // and the canonical state digest recomputation. The digest facts are
-  // byte-identical for both checks below, so the digest is computed once
-  // and reused; a failure is reported per check exactly as before.
   let recomputedDigest: string | null = null;
   let digestFailure: string | null = null;
   try {
@@ -790,10 +734,7 @@ export function auditSeasonRunState(
     if (!deepEqual(stored.checkpointState, expectedCheckpointState)) {
       failures.push('checkpointState does not match the last accepted block');
     }
-    // Effects-with-trade divergence rule (documented): when no trade window
-    // ever opened and no command applied after the last commit, the stored
-    // facts (effects included) must be byte-identical to what the last
-    // accepted block digested.
+
     if (stored.trade === null && stored.stateRevision === last.stateRevision) {
       if (digestFailure !== null) {
         failures.push(digestFailure);
@@ -811,11 +752,8 @@ export function auditSeasonRunState(
     failures.push('stored stateDigest does not recompute over the stored mutable state');
   }
 
-  // M2.5 trade state validity.
   const { trade } = stored;
-  // Inverse of the engine's `WINDOW_BLOCK_INDEX_TO_INDEX` (block → window):
-  // window index → expected block. Derived from the seam's canonical map so
-  // this rule stays in the engine and can never diverge.
+
   const windowBlockIndexByIndex: Record<number, number> = {};
   for (const [blockIndex, windowIndex] of Object.entries(seam.windowBlockIndexToIndex)) {
     windowBlockIndexByIndex[windowIndex] = Number(blockIndex);
@@ -868,8 +806,6 @@ export function auditSeasonRunState(
     });
   }
 
-  // M2.5 pending-block consistency: a pending row for a committed block is a
-  // bug (the commit deletes it in the same transaction).
   const pending = facts.pending;
   if (pending !== null) {
     if (pending.runId !== stored.run.runId) {

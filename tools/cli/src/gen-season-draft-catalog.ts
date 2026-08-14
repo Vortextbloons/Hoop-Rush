@@ -1,37 +1,3 @@
-/**
- * Derives the packaged Season Run draft catalog (spec/2.0 M2.1, M2.4, M2.5)
- * from the validated franchise-era pool artifacts and updates the manifest
- * hashes. Run with `pnpm --filter @hoop-rush/cli gen-season-draft-catalog`
- * AFTER the pools exist (they are committed under apps/web/static/data/pools).
- *
- * The catalog contains one deduplicated candidate record per
- * playerVersionId with every identity, position, summary, physical,
- * simulation-rating, tendency, and — since season-draft-catalog-v2 (M2.4) —
- * stamina field roster scoring needs. The stamina profile derives from the
- * pool's recorded `stats` (season-stamina-v1):
- *
- *   historicalMpg = stats.minutes / max(1, stats.gamesPlayed ?? 0)
- *   staminaRating = round(clamp(45, 95, 45 + 1.25 * historicalMpg))
- *
- * Since season-draft-catalog-v3 (M2.5) each candidate also carries the
- * build-time durability profile (durability-v1) from the recorded
- * `stats.gamesPlayed` and the eligibility `teamGames`:
- *
- *   durabilityRating = round(clamp(45, 95, 45 + 50 * gamesPlayed / max(1, teamGames)))
- *
- * Since season-draft-catalog-v4 (projection milestone) each candidate also
- * carries the validated observed `anchors` and the optional
- * `reconstructedThreePoint` profile from the packaged pool record. These
- * fields are projection-ready inputs only; the Season game adapter does not
- * consume them, so Season simulation outcomes are unchanged.
- *
- * Records without usable stats or eligibility derive the floor profile
- * (rating 45) deterministically, mirroring the stamina floor. Conflicting
- * records that derive the same playerVersionId with different content are
- * rejected; the catalog is validated by the seasonDraftCatalogSchema before
- * it is written.
- */
-
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,13 +27,6 @@ interface PoolEntry {
   playerVersionIds: string[];
 }
 
-/**
- * The M2.5 durability rating (durability-v1):
- * `round(clamp(45, 95, 45 + 50 * gamesPlayed / max(1, teamGames)))` from the
- * recorded `stats.gamesPlayed` and the eligibility `teamGames`. Unusable
- * inputs (missing stats/eligibility or non-positive counts) derive the floor
- * profile 45, mirroring the stamina floor treatment.
- */
 export function durabilityRatingFrom(
   gamesPlayed: number | null | undefined,
   teamGames: number | null | undefined,
@@ -85,7 +44,6 @@ export function durabilityRatingFrom(
   return Math.round(Math.min(95, Math.max(45, 45 + (50 * gamesPlayed) / Math.max(1, teamGames))));
 }
 
-/** The durability profile (rating + derivation version) for one pool player. */
 export function durabilityProfileOf(
   gamesPlayed: number | null | undefined,
   teamGames: number | null | undefined,
@@ -185,15 +143,12 @@ function main(): void {
           historicalMpg,
           derivationVersion: SEASON_STAMINA_VERSION,
         },
-        // M2.5: build-time durability profile (durability-v1) from recorded
-        // games played and the eligibility team games; floor 45 when unusable.
+
         durability: durabilityProfileOf(
           player.stats?.gamesPlayed ?? null,
           player.eligibility?.teamGames ?? null,
         ),
-        // Projection milestone (v4): copy the validated observed anchors and
-        // the optional reconstructed three-point profile verbatim from the
-        // packaged pool record (never recomputed; missing stays missing).
+
         anchors: player.anchors,
         reconstructedThreePoint: player.reconstructedThreePoint,
       };

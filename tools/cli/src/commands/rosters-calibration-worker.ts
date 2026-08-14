@@ -15,19 +15,6 @@ import {
   type SeasonStrengthBand,
 } from '@hoop-rush/data-contracts';
 import { poolLegalFailuresOf, roleTierThresholdsOf, tierOfPool } from './season-data.ts';
-/**
- * Roster-calibration worker (M2.4 roster-generation-v2). Each worker loads
- * the packaged catalog and league itself, parses the serialized targets
- * artifact from workerData, and runs a seed chunk through the authoritative
- * `generateAiLeague` seam. Worker counts never change seed assignment or
- * results.
- *
- * The worker calls `generateAiLeague` directly (instead of the
- * `runSeasonRosterCalibrationSeeds` reducer) because the cohort also needs
- * the per-league pool facts (legality, anchors, tiers), selected-roster
- * legality, and digests that the reducer's run records do not carry; the
- * reducer is a thin map over the same authoritative function.
- */
 
 export interface RosterCalibrationWorkerRun {
   seed: string;
@@ -44,13 +31,13 @@ export interface RosterCalibrationWorkerRun {
   nodesVisited: number;
   failed: boolean;
   digest: string;
-  /** League-level pool legality failures (pool + anchor + exclusivity). */
+
   poolFailures: string[];
-  /** League-level selected-roster legality failures. */
+
   selectionFailures: string[];
   anchorsTotal: number;
   extraEliteTeams: number;
-  /** Sum over pools of max(0, guaranteedAnchors[band] − anchors.length). */
+
   guaranteedAnchorShortfall: number;
   tierCounts: Record<
     SeasonStrengthBand,
@@ -212,7 +199,6 @@ function runRosterSeeds(input: WorkerInput): RosterCalibrationWorkerRun[] {
   });
 }
 
-/** Order invariance: identical digests under reversed and rotated inputs. */
 function runOrderInvarianceSeeds(input: WorkerInput): Array<{ seed: string; digests: string[] }> {
   const catalog = seasonDraftCatalogSchema.parse(readJson(input.catalogPath));
   const league = seasonLeagueSchema.parse(readJson(input.leaguePath));
@@ -237,8 +223,6 @@ function runOrderInvarianceSeeds(input: WorkerInput): Array<{ seed: string; dige
         digests.push(generation.digest);
       } catch (error) {
         if (error instanceof SeasonAiGenerationError) {
-          // A failed generation cannot match the other variants' digests; it
-          // counts as an order-invariance failure (the gate wants 0).
           digests.push(`failed:${seed}`);
         } else {
           throw error;

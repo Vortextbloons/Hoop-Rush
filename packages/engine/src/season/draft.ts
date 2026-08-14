@@ -31,24 +31,6 @@ import {
 
 export type { SeasonAiGenerationInput, SeasonLeagueGenerationResult };
 
-/**
- * Authoritative Season Run human draft commands (spec/2.0/03, season-draft-v2,
- * M2.3.5). One typed command path covers creating a one- or two-human draft,
- * drawing the current turn's deterministic global eight-card offer, selecting
- * one legal player version, finalizing human rosters, and generating the
- * remaining AI league. Commands are pure: every offer derives from stable
- * seeds keyed by participant, round, and pick ordinal (see draft-offers.ts),
- * and the state is a pure function of (create inputs, seed, command
- * sequence). Duplicate command ids are idempotent; stale revisions are
- * rejected; every result is an accepted or rejected record.
- *
- * The legacy M2.1-M2.3 franchise-era roll draft (season-draft-v1) is not
- * playable through this engine: its reveal/claim commands are rejected with
- * `UNSUPPORTED_COMMAND`, and unfinished v1 drafts surface an explicit
- * recovery screen at the persistence/UI boundary.
- */
-
-/** Named seed keys for the draft namespace (spec/2.0/07 seed tree). */
 const DRAFT_SEED_KEYS = {
   franchiseAssignment: 'franchise-assignment',
   firstPick: 'first-pick',
@@ -62,7 +44,6 @@ function participantIdsOf(state: SeasonDraftState): string[] {
   return [...state.participants.map((p) => p.participantId)].sort();
 }
 
-/** Snake order for a round: first pick participant first on odd rounds. */
 function participantOrder(state: SeasonDraftState, round: number): string[] {
   const sorted = participantIdsOf(state);
   const base = [
@@ -96,11 +77,6 @@ function membersOf(
   return members;
 }
 
-/**
- * Canonical digest of the full draft state (deterministic facts only: turn,
- * offers, picks, status, revision, and the command log). Two states are
- * replay-identical exactly when their digests match.
- */
 export function seasonDraftStateDigest(state: SeasonDraftState): string {
   return seasonDigestHex(seasonDraftStateCanonical(state));
 }
@@ -196,7 +172,7 @@ function createDraft(command: SeasonDraftCommand, catalog: SeasonDraftCatalog): 
       `catalog has ${String(catalog.candidates.length)} candidates; need at least ${String(MIN_CATALOG_CANDIDATES)} to draw a global eight-card offer`,
     );
   }
-  // Distinct seeded franchise assignments for the human participants.
+
   const assignmentRng = createRng(
     seasonNamespaceSeed(payload.rootSeed, 'draft', DRAFT_SEED_KEYS.franchiseAssignment),
   );
@@ -236,7 +212,6 @@ function createDraft(command: SeasonDraftCommand, catalog: SeasonDraftCatalog): 
   return { state, record, generation: null };
 }
 
-/** Next turn after a successful pick; null current turn when everyone is full. */
 function advanceTurn(state: SeasonDraftState): {
   round: number;
   currentTurnParticipantId: string | null;
@@ -297,7 +272,6 @@ function drawOffer(
     };
   }
   if (state.currentOffer !== null) {
-    // The current turn already has a drawn offer; draw is an accepted no-op.
     const nextState: SeasonDraftState = { ...state, revision: state.revision + 1 };
     const record = acceptedAgainst(nextState, command, state.revision);
     return { state: withLog(nextState, record), record, generation: null };
@@ -446,7 +420,7 @@ function selectPlayer(
     ...ownedMembers,
     { playerVersionId: candidate.playerVersionId, playable: candidate.positions.playable },
   ];
-  // The candidate itself is no longer available for future picks.
+
   const available = catalog.candidates
     .filter((c) => !ownedVersionIds(state).has(c.playerVersionId))
     .filter((c) => c.playerVersionId !== candidate.playerVersionId)
@@ -609,31 +583,9 @@ function generateAiLeague(
 }
 
 export interface SeasonAiGenerationDeps {
-  /**
-   * Deterministic AI league generation without the roster-targets artifact.
-   * Targets are injected through the deps closure so the production wiring
-   * is the single authority for which `SeasonRosterTargets` artifact a run
-   * uses: `(input) => generateAiLeague({ ...input, targets })`. Throws
-   * `SeasonAiGenerationError` (code GENERATION_EXHAUSTED) with full
-   * diagnostics on budget exhaustion and rejects mismatched targets
-   * versions through the generation guard; it never relaxes a constraint.
-   * Wired to the authoritative engine implementation (season/ai.ts) at the
-   * application boundary.
-   */
   generate: (input: Omit<SeasonAiGenerationInput, 'targets'>) => SeasonLeagueGenerationResult;
 }
 
-/**
- * Applies one command to the draft state (null state only accepts the create
- * command) and returns the resulting state (null while nothing has been
- * created), its accepted or rejected record, and the completed generation
- * result when an accepted generate-ai-league command produced one. The
- * generation deps are injected so tests can substitute a fake generator;
- * production callers wire the authoritative AI seam.
- *
- * Legacy season-draft-v1 commands (reveal-draft-roll, claim-draft-pool) are
- * rejected with `UNSUPPORTED_COMMAND`; this engine never plays the v1 draft.
- */
 export function applySeasonDraftCommand(
   state: SeasonDraftState | null,
   catalog: SeasonDraftCatalog,
@@ -681,7 +633,6 @@ export function applySeasonDraftCommand(
   }
   const validatedState = parsedState.data;
 
-  // Idempotency: a previously executed commandId returns its stored record.
   const prior = validatedState.commandLog.find((record) => record.commandId === command.commandId);
   if (prior !== undefined) {
     return { state: validatedState, record: prior, generation: null };

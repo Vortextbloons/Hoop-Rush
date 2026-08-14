@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
@@ -13,15 +11,6 @@ import { mockSvelteKitApp } from '../../../test/svelte-testing';
 import SeasonRunShellWrapper from '../../../test/SeasonRunShellWrapper.svelte';
 
 mockSvelteKitApp();
-
-/**
- * M2.6 hub behavior per season stage: the regular-season block workflow
- * keeps its submit affordance, the completed regular season offers the
- * Start-postseason action, the play-in/playoffs stages render the matchup
- * card and the human lineup decision (with typed rejection copy and the
- * risky-rehab option at its 2-Influence cost), the eliminated stage offers
- * spectate and fast-forward, and the completed stage shows the champion.
- */
 
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 
@@ -47,8 +36,6 @@ function snapshotOf(run: SeasonRun): SeasonRunSnapshot {
   };
 }
 
-/** A play-in state whose west seven-eight game is the human's next game
- * (the east play-in is fully resolved so the canonical order reaches west). */
 function playInPostseason(run: SeasonRun): SeasonRun['postseason'] {
   const state = buildInitialPostseasonState(run.rootSeed);
   state.playIn.east.ranking = [
@@ -115,7 +102,6 @@ function activeInjuryRun(run: SeasonRun, playerVersionId: string): SeasonRun {
   return run;
 }
 
-/** Builds a shell and lets the caller mutate the fixture run (narrowed). */
 function withRun(mutate: (run: SeasonRun) => void): SeasonRunShellData {
   const shell = baseShell();
   const run = shell.run;
@@ -360,8 +346,7 @@ describe('hub: eliminated stage', () => {
         `${conference}8`,
       ];
     }
-    // One in-progress series the human is NOT part of; the next game is
-    // that series' game 3.
+
     postseason.bracket = {
       schemaVersion: 1,
       postseasonVersion: 'postseason-v2',
@@ -562,7 +547,6 @@ describe('hub: eliminated stage', () => {
     await fireEvent.click(container.querySelector('[data-season-fast-forward]') as HTMLElement);
     expect(fastForward).toHaveBeenCalledTimes(1);
 
-    // In-flight progress mirrors with cancel + cancellation state.
     shell.postseason = {
       phase: 'running',
       gamesCompleted: 1,

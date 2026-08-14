@@ -3,7 +3,6 @@ import { sha256Hex, verifySha256 } from './verify-hash.ts';
 
 const KNOWN_SHA256 = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
 
-/** TextEncoder result is a fresh exact-sized buffer, safe for ArrayBuffer APIs. */
 const abcBuffer = (): ArrayBuffer => new TextEncoder().encode('abc').buffer;
 
 describe('sha256Hex', () => {

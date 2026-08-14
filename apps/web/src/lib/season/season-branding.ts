@@ -4,29 +4,20 @@ import {
   type HoopRushManifest,
   type PlayersIndexAltIds,
   type PlayersIndexEntry,
+  type SeasonDraftCatalog,
   type SeasonDraftCandidate,
+  type SeasonFreeAgencyCandidate,
+  type SeasonFreeAgencyState,
 } from '@hoop-rush/data-contracts';
-
-/**
- * Season Run branding index (M2.3.5). Fantasy franchises use their assigned
- * modern identity and logo; player-season cards use the historical identity
- * and logo of the franchise/era that owned that version. Version cards join
- * the global players index by the exact (playerId, franchiseId, eraId,
- * seasonKey) tuple so `SeasonPlayerFace` receives the full headshot fallback
- * chain (NBA CDN, bbref, photoUrl). This module never invents franchise
- * colors: Hoop Rush orange/gold remain the UI accent and logos carry team
- * identity.
- */
 
 export interface SeasonFaceRef {
   playerId: string;
   playerExternalId: string;
   altIds: PlayersIndexAltIds;
-  /** Initials for the fallback face. */
+
   initials: string;
 }
 
-/** Identity facts a roster entry needs to join the players index. */
 export interface SeasonVersionTuple {
   playerVersionId: string;
   playerId: string;
@@ -36,7 +27,6 @@ export interface SeasonVersionTuple {
   displayName: string;
 }
 
-/** Roster entry joined to the catalog when available (authoritative version identity). */
 export function versionTupleOfRosterEntry(
   entry: SeasonVersionTuple,
   catalogCandidate?: Pick<SeasonDraftCandidate, 'franchiseId' | 'eraId' | 'seasonKey'> | null,
@@ -51,7 +41,75 @@ export function versionTupleOfRosterEntry(
   };
 }
 
-/** Modern franchise slot facts for the masthead and team pages. */
+export function catalogCandidateOfFreeAgency(
+  catalog: SeasonDraftCatalog,
+  candidate: SeasonFreeAgencyCandidate,
+): SeasonDraftCandidate | null {
+  const { catalogRef } = candidate;
+  if (
+    catalog.catalogVersion === catalogRef.catalogVersion &&
+    catalog.dataVersion === catalogRef.dataVersion
+  ) {
+    const byIndex = catalog.candidates[catalogRef.candidateIndex];
+    if (
+      byIndex !== undefined &&
+      byIndex.playerVersionId === candidate.playerVersionId &&
+      byIndex.playerId === candidate.playerId
+    ) {
+      return byIndex;
+    }
+  }
+  return (
+    catalog.candidates.find((entry) => entry.playerVersionId === candidate.playerVersionId) ?? null
+  );
+}
+
+export function freeAgencyVersionTuples(
+  freeAgency: SeasonFreeAgencyState | null | undefined,
+  catalog: SeasonDraftCatalog | null,
+): SeasonVersionTuple[] {
+  if (freeAgency === null || freeAgency === undefined || catalog === null) return [];
+  const tuples: SeasonVersionTuple[] = [];
+  for (const window of freeAgency.windows) {
+    for (const candidate of window.candidates) {
+      const catalogCandidate = catalogCandidateOfFreeAgency(catalog, candidate);
+      if (catalogCandidate === null) continue;
+      tuples.push({
+        playerVersionId: candidate.playerVersionId,
+        playerId: catalogCandidate.playerId,
+        franchiseId: catalogCandidate.franchiseId,
+        eraId: catalogCandidate.eraId,
+        seasonKey: catalogCandidate.seasonKey,
+        displayName: catalogCandidate.displayName,
+      });
+    }
+  }
+  return tuples;
+}
+
+export function mergeFreeAgencyFaces(
+  playersIndex: readonly PlayersIndexEntry[] | null,
+  catalog: SeasonDraftCatalog | null,
+  freeAgency: SeasonFreeAgencyState | null | undefined,
+  rosterFaces: ReadonlyMap<string, SeasonFaceRef>,
+): Map<string, SeasonFaceRef> {
+  if (
+    playersIndex === null ||
+    catalog === null ||
+    freeAgency === null ||
+    freeAgency === undefined
+  ) {
+    return new Map(rosterFaces);
+  }
+  const tuples = freeAgencyVersionTuples(freeAgency, catalog);
+  if (tuples.length === 0) return new Map(rosterFaces);
+  const merged = new Map(rosterFaces);
+  for (const [playerVersionId, face] of buildVersionFaceIndex(playersIndex, tuples)) {
+    merged.set(playerVersionId, face);
+  }
+  return merged;
+}
+
 export interface SeasonFranchiseIdentity {
   franchiseId: string;
   displayName: string;
@@ -59,12 +117,6 @@ export interface SeasonFranchiseIdentity {
   teamExternalId: string;
 }
 
-/**
- * Builds `playerVersionId -> face ref` by joining roster entries to the
- * global players index on the exact version tuple. Entries missing from the
- * index receive an empty playerExternalId so faces fall back to initials
- * without a doomed network request; the map always contains every entry.
- */
 export function buildVersionFaceIndex(
   playersIndex: readonly PlayersIndexEntry[],
   rosterEntries: readonly SeasonVersionTuple[],
@@ -106,7 +158,6 @@ export function franchiseIdentityOf(
   };
 }
 
-/** Historical era-scoped identity for a player-season card (null when modern). */
 export function eraIdentityOf(
   manifest: HoopRushManifest,
   franchiseId: string,

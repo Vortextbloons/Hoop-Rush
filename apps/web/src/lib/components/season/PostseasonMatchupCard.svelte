@@ -7,13 +7,6 @@
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
 
-  /**
-   * Current postseason matchup card (M2.6 hub): the next scheduled game's
-   * two teams with their seeds, the live series (or Play-In) score, and the
-   * consequence line. Pure display of recorded postseason facts; the human
-   * team is highlighted.
-   */
-
   let {
     series = null,
     playInCard = null,

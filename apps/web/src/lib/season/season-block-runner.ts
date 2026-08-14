@@ -45,25 +45,6 @@ import type {
 import type { SeasonSchedule } from '@hoop-rush/data-contracts';
 import type { SeasonArtifactUrls } from './season-assets';
 
-/**
- * Season block runner contract (spec/2.0/07, M2.3, M2.5). The main-thread
- * runner owns request ids, stale-message rejection, cancellation, validation,
- * canonical acceptance, and persistence; cancelled or crashed work leaves the
- * accepted checkpoint untouched. The 'complete' message is a union —
- * 'committed' carries the candidate checkpoint, 'interrupted' the uncommitted
- * pending candidate of an 'invalid-roster' interruption. `resumeBlock`
- * reloads the pending candidate and re-ships it so the block resumes without
- * replaying completed games.
- *
- * ## M2.5 SEAMS awaiting the engine workstreams
- *
- * - `completeSeasonBlockCommit` — engine-owned (health workstream; the lead
- *   wires the export). Produces the post-block checkpoint state facts and
- *   the optional trade-window open.
- * - `seasonFranchiseLegalFiveFacts` — engine-owned (health workstream);
- *   reconstructs `unavailablePlayerVersionIds` from the pending health.
- */
-
 export type SeasonRunnerEvent =
   | { type: 'started'; requestId: string; blockIndex: number }
   | {
@@ -79,13 +60,7 @@ export type SeasonRunnerEvent =
       type: 'complete';
       requestId: string;
       checkpoint: SeasonCandidateCheckpoint;
-      /**
-       * Performance pass: the authoritative in-memory committed snapshot
-       * (post-commit run, summaries, retained details, accepted blocks,
-       * effects). Built from the exact facts the IndexedDB transaction
-       * stored, so the hub can render immediately without a full
-       * `loadActiveRun()` reload + reconciliation audit.
-       */
+
       snapshot: SeasonRunSnapshot;
     }
   | {
@@ -109,17 +84,17 @@ export type SeasonRunnerEvent =
 
 export interface SeasonBlockStartInput {
   run: SeasonRun;
-  /** Authoritative effects state, including chemistry changes from trades. */
+
   effects: SeasonEffectsState;
-  /** The rotations locked for this block (pending, not yet committed). */
+
   rotations: SeasonRotation[];
   blockIndex: number;
   expectedRevision: number;
   rotationDigest: string;
   commandId: string;
-  /** Human franchise (retained detail policy); null in pure AI contexts. */
+
   humanFranchiseId: string | null;
-  /** Locked block objective (blocks 0-7), or null for the final block 8. */
+
   objectiveId: SeasonObjectiveId | null;
   homeCourt: SeasonHomeCourtProfile;
   catalogUrl: string;
@@ -133,11 +108,11 @@ export interface SeasonBlockResumeInput {
   blockIndex: number;
   expectedRevision: number;
   rotationDigest: string;
-  /** The SAME command id as the interrupted submission (idempotency). */
+
   commandId: string;
-  /** The rotations locked at submission (never change mid-block). */
+
   rotations: SeasonRotation[];
-  /** Human franchise (retained detail policy); null in pure AI contexts. */
+
   humanFranchiseId: string | null;
   homeCourt: SeasonHomeCourtProfile;
   catalogUrl: string;
@@ -148,50 +123,34 @@ export interface SeasonBlockResumeInput {
 
 export interface SeasonBlockRunner {
   startBlock(input: SeasonBlockStartInput): string;
-  /**
-   * M2.5: resumes an interrupted block from its persisted pending candidate,
-   * validated against runId/blockIndex/expectedRevision/rotationDigest.
-   */
+
   resumeBlock(input: SeasonBlockResumeInput): string;
-  /** Requests cancellation; the worker stops between games. */
+
   cancel(requestId: string): void;
-  /** Tears down the worker immediately (route change / full abort). */
+
   terminate(): void;
-  /**
-   * Performance pass: prewarms the persistent worker's packaged asset
-   * caches (catalog + era profile) so the first block start pays no
-   * download/parse time. Idempotent and non-blocking; safe to call from an
-   * idle callback after the shell is interactive. Never starts a block.
-   */
+
   prewarm(): void;
   subscribe(listener: (event: SeasonRunnerEvent) => void): () => void;
 }
 
-/** @internal Factory dependencies for tests and the e2e seam. */
 export interface SeasonBlockRunnerDeps {
   repository?: SeasonRunRepository;
   schedule?: SeasonSchedule;
-  /** Overrides the packaged worker entry (tests). */
+
   workerUrl?: string;
-  /** Overrides asset resolution (tests). */
+
   artifacts?: () => Promise<SeasonArtifactUrls>;
 }
 
-/**
- * Main-thread block runner (spec/2.0/07, M2.3, M2.5). Accepts a candidate only
- * after every check (schema, digest, cursor facts, expected state facts), then
- * commits it in one IndexedDB transaction; nothing is persisted before
- * acceptance, so cancelled/crashed work leaves the accepted checkpoint
- * untouched. M2.5 interruptions are persisted as pending candidates (never as
- * accepted checkpoints) and resumed through `resumeBlock`.
- */
 export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): SeasonBlockRunner {
   const listeners = new Set<(event: SeasonRunnerEvent) => void>();
   let worker: Worker | null = null;
   let currentRequestId: string | null = null;
-  /** Performance pass: the in-flight prewarm request id (warm-ack matching). */
+  const requestActive = () => currentRequestId !== null;
+
   let warmRequestId: string | null = null;
-  /** Performance pass: prewarm only runs once per worker lifetime. */
+
   let warmed = false;
   let current: {
     blockIndex: number;
@@ -200,38 +159,32 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     commandId: string;
     rotations: SeasonRotation[];
     input: SeasonBlockStartInput;
-    /** M2.5: the pending candidate a resumed block continues from. */
+
     resumePending: SeasonPendingBlockCandidate | null;
   } | null = null;
 
-  /**
-   * Authoritative cursor state for the active run, kept in memory after every
-   * accepted commit so block starts validate without a full repository load.
-   * The guarded IndexedDB commit still rejects revision regressions and
-   * duplicate command ids atomically.
-   */
   let runState: {
     runId: string;
     revision: number;
     completedRounds: number;
     commandIds: Set<string>;
     summaries: SeasonGameSummary[];
-    /** Accepted blocks of every commit (revision ascending). */
+
     blocks: SeasonAcceptedBlock[];
-    /** Retained details of every commit (gameId ascending). */
+
     retainedDetails: SeasonRetainedGameDetail[];
-    /** Authoritative pre-block effects state for the next block. */
+
     effects: SeasonEffectsState | null;
-    /** Authoritative pre-block health state for the next block. */
+
     health: SeasonHealthState | null;
-    /** Run state chain facts at the last accepted boundary. */
+
     stateRevision: number;
     stateDigest: string;
   } | null = null;
-  /** The compact summaries the live worker already holds (per run). */
+
   let workerSummaryRunId: string | null = null;
   let workerSummaryCount = 0;
-  /** Roster context cached by the live worker; a trade requires a full reset. */
+
   let workerRosterKey: string | null = null;
 
   const repositoryPromise = deps.repository !== undefined ? Promise.resolve(deps.repository) : null;
@@ -253,10 +206,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     for (const listener of [...listeners]) listener(event);
   }
 
-  /**
-   * M2.5: the packaged draft catalog the commit path needs to open trade
-   * windows; the worker fetches its own copy, the runner caches one per asset.
-   */
   let catalogCache: { url: string; hash: string; catalog: SeasonDraftCatalog } | null = null;
   async function resolveCatalog(input: SeasonBlockStartInput): Promise<SeasonDraftCatalog | null> {
     if (
@@ -276,14 +225,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
   }
 
-  /**
-   * M2.6.5: the packaged free-agency index + roster-targets policy the
-   * commit path needs to open market windows on blocks 2/4/6. The engine
-   * throws on window blocks without the index, so a failed load here
-   * surfaces as an internal error rather than silently skipping a market.
-   * `loadSeasonFreeAgencyTargets` is the roster-targets policy, not the
-   * free-agency-targets-v1 calibration artifact.
-   */
   async function resolveFreeAgencyAssets(): Promise<{
     freeAgencyIndex: SeasonFreeAgencyIndex;
     freeAgencyTargets: SeasonRosterTargets;
@@ -298,10 +239,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
 
   function createWorker(): Worker {
     if (worker !== null) return worker;
-    // Vite bundles `new Worker(new URL(...))` only when the URL literal is
-    // statically visible in the `new Worker` call; a variable indirection
-    // would emit the source .ts as a raw asset and the worker would fail to
-    // load in production builds.
+
     worker =
       deps.workerUrl !== undefined
         ? new Worker(deps.workerUrl, { type: 'module' })
@@ -327,8 +265,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     worker.addEventListener('message', (event: MessageEvent<unknown>) => {
       const parsed = seasonWorkerMessageSchema.safeParse(event.data);
       if (!parsed.success) return;
-      // Performance pass: a warm-ack confirms the worker cached the packaged
-      // assets; it carries its own request id and never touches block state.
+
       if (parsed.data.type === 'season-block-warm-ack') {
         if (parsed.data.requestId === warmRequestId) warmRequestId = null;
         return;
@@ -397,9 +334,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     const state = current;
     if (requestId === null || state === null) return;
     const failures: string[] = [];
-    // The candidate was already validated against the frozen checkpoint
-    // schema as part of the wire message at the boundary; the gates below
-    // are the real acceptance checks (digest, identity, expected facts).
+
     if (seasonCheckpointDigest(checkpoint) !== checkpoint.digest) {
       failures.push('candidate digest does not verify');
     }
@@ -411,9 +346,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     if (checkpoint.rotationDigest !== state.rotationDigest) {
       failures.push('candidate rotationDigest mismatch');
     }
-    // M2.5: the candidate asserted the pre-block run state facts; they
-    // must match the authoritative submitted run (the worker sources them
-    // from a seam, so mismatches are rejected here, never committed).
+
     assertExpectedState(checkpoint, state.input, failures);
     if (failures.length > 0) {
       emit({
@@ -431,33 +364,15 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
     try {
       const repository = await resolveRepository();
-      // M2.6.5: the worker wire carries no pre-block free-agency state (the
-      // run context slice omits it), so the worker's candidate would fall
-      // back to the empty state and the committed run would LOSE resolved
-      // windows, canonical identities, and signings. The runner owns
-      // canonical acceptance: it replaces the candidate's free-agency
-      // carrier with the authoritative pre-block state from the submitted
-      // run. The checkpoint digest does not cover free agency (frozen
-      // digest scope), so the worker's digest stays valid.
+
       const authoritative = { ...checkpoint, freeAgency: state.input.run.freeAgency };
-      // M2.5: the engine derives the post-block run state facts (checkpoint
-      // state, state chain, and the optional trade-window open) from the
-      // submitted run and the accepted candidate. Window blocks (2/4/5)
-      // need the packaged catalog for the deterministic offer generation;
-      // a failed catalog load surfaces as an internal error rather than
-      // silently skipping a trade window. Free-agency window blocks (2/4/6)
-      // need the packaged free-agency index + roster-targets policy.
+
       const catalog = await resolveCatalog(state.input);
       const freeAgencyAssets =
         state.blockIndex === 2 || state.blockIndex === 4 || state.blockIndex === 6
           ? await resolveFreeAgencyAssets()
           : null;
       const committed = completeSeasonBlockCommit({
-        // The digest must cover the EXACT rotation set the commit stores:
-        // the locked rotations (the human team's pending rotation included),
-        // not the run snapshot's pre-submission rotations. Without this
-        // merge any rotation edit would make the stored stateDigest fail to
-        // recompute over the stored facts on reload.
         run: { ...state.input.run, rotations: state.rotations },
         candidate: authoritative,
         commandId: state.commandId,
@@ -469,9 +384,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         freeAgencyTargets: freeAgencyAssets?.freeAgencyTargets,
       });
       const window: SeasonWindowOpenResult | null = committed.window;
-      // M2.5: a resumed block's pending retained details (games completed
-      // before the interruption) merge into the commit; the candidate's own
-      // details cover the resumed games only. Deduped by game id.
+
       const retainedDetails = dedupeByGameId([
         ...(state.resumePending?.retainedDetails ?? []),
         ...checkpoint.retainedDetails,
@@ -492,9 +405,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         recap: authoritative.recap,
         rotations: state.rotations,
         effects: window !== null ? window.effects : authoritative.effects,
-        // M2.6.5: the post-block free-agency state (a window opened by this
-        // block supersedes the carried pre-block state; otherwise the
-        // carried state is stored unchanged).
+
         freeAgency: committed.freeAgency,
         health: authoritative.health,
         transactions: window !== null ? window.transactions : authoritative.transactions,
@@ -508,9 +419,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         expectedStateDigest: state.input.run.stateDigest,
         window,
       });
-      // The commit is authoritative: keep the in-memory cursor and the
-      // worker's summary accumulator in sync so the next block starts and
-      // ships deltas without a repository load.
+
       const priorSummaries = runState?.runId === checkpoint.runId ? runState.summaries : [];
       const priorAcceptedBlocks = runState?.runId === checkpoint.runId ? runState.blocks : [];
       const priorRetainedDetails =
@@ -541,8 +450,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       workerSummaryRunId = checkpoint.runId;
       workerSummaryCount = runState.summaries.length;
       workerRosterKey = JSON.stringify(state.input.run.rosters);
-      // Performance pass: assemble the authoritative committed snapshot from
-      // the exact stored facts so the hub renders without a full reload.
+
       const snapshot = assembleCommittedSnapshot({
         run: state.input.run,
         rotations: state.rotations,
@@ -599,8 +507,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (state.input.humanFranchiseId === null) {
         throw new Error('invalid-roster interruption without a human franchise');
       }
-      // The engine derives the unavailable players from the pending health
-      // (the health state entering the interrupted game).
+
       const availability = seasonFranchiseLegalFiveFacts(
         state.input.run,
         state.input.humanFranchiseId,
@@ -651,16 +558,10 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     const rosterKey = JSON.stringify(state.input.run.rosters);
     const workerContextMatches =
       workerSummaryRunId === state.input.run.runId && workerRosterKey === rosterKey;
-    // Exactly one of priorSummaries/newSummaries is sent (the frozen wire
-    // refine); the arrays may be empty (block 0) â€” only undefined is omitted.
+
     let priorSummaries: SeasonGameSummary[] | undefined;
     let newSummaries: SeasonGameSummary[] | undefined;
     if (state.resumePending !== null) {
-      // Resume: the partial block summaries ship as the accumulator seed.
-      // A persistent worker appends them; a fresh worker (terminated
-      // between interruption and resume) receives them inside the full
-      // prior set â€” the worker re-seeds its block list from the
-      // accumulator, so both paths assemble the full block.
       const partial = state.resumePending.summaries;
       if (workerContextMatches && workerSummaryCount <= summaries.length) {
         newSummaries = partial;
@@ -677,12 +578,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     } else {
       priorSummaries = summaries;
     }
-    // The worker boundary requires every nested value to be
-    // structured-cloneable, and Svelte's reactive shell can leave
-    // Proxy-backed values anywhere in a submitted run. Each slice the
-    // request carries is extracted to a plain snapshot here, so the wire
-    // payload is never a whole-request JSON round trip (the delta path
-    // ships no schedule or league context at all).
+
     const plainRotations = deepClonePlain(state.rotations);
     const plainCommon = {
       requestId,
@@ -698,40 +594,29 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       profileHash: artifacts.profileHash,
       ...(priorSummaries !== undefined ? { priorSummaries: deepClonePlain(priorSummaries) } : {}),
       ...(newSummaries !== undefined ? { newSummaries: deepClonePlain(newSummaries) } : {}),
-      // M2.4: the authoritative pre-block effects state rides the full
-      // reset (fresh worker or resume); the delta path keeps the worker's
-      // accumulated effects state. A resume ships the pending candidate's
-      // mid-block effects as the reset (the worker's accumulated state is
-      // the pre-block state for interrupted work, which would be stale).
+
       ...(state.resumePending !== null
         ? { priorEffects: deepClonePlain(state.resumePending.effects) }
         : priorSummaries !== undefined
           ? { priorEffects: deepClonePlain(state.input.effects) }
           : {}),
-      // M2.5: the health state follows the same convention; a resume ships
-      // the pending candidate's mid-block health as the reset.
+
       ...(state.resumePending !== null
         ? { priorHealth: deepClonePlain(state.resumePending.health) }
         : priorSummaries !== undefined
           ? { priorHealth: deepClonePlain(state.input.run.health) }
           : {}),
-      // M2.5: resume mid-block from the pending candidate's next game.
+
       startGameId: state.resumePending?.nextGameId ?? null,
       objectiveId: state.input.objectiveId,
-      // M2.5: the authoritative pre-block Influence economy, run-scoped
-      // transaction log, and the asserted run state chain facts (the worker
-      // folds the block's grants on top of the economy and emits the full
-      // append-only log inside the candidate).
+
       priorInfluence: deepClonePlain(state.input.run.influence),
       priorTransactions: deepClonePlain(state.input.run.transactions),
       expectedStateRevision: state.input.run.stateRevision,
       expectedStateDigest: state.input.run.stateDigest,
       humanFranchiseId: state.input.humanFranchiseId,
     };
-    // Wire v5: when the persistent worker already holds the run context
-    // (the delta path), only the per-block deltas travel. A priorSummaries
-    // reset implies a worker without state for this run, which receives the
-    // full context again.
+
     if (newSummaries !== undefined) {
       return seasonWorkerContinueRequestSchema.parse({
         schemaVersion: 6,
@@ -743,10 +628,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     return seasonWorkerStartRequestSchema.parse({
       schemaVersion: 6,
       type: 'season-block-start',
-      // The worker simulates with the LOCKED rotation set; the wire carries
-      // only the run context the block pipeline reads (the scheduled games,
-      // standings, draft, and other persisted facts never cross the worker
-      // boundary).
+
       run: deepClonePlain({
         schemaVersion: state.input.run.schemaVersion,
         runId: state.input.run.runId,
@@ -880,7 +762,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               : import('./season-assets').then((module) => module.seasonArtifactUrls()),
           ]);
           if (currentRequestId !== requestId) return;
-          // A pending row for a committed block fails the reload audit.
+
           const snapshot = await repository.loadActiveRun();
           if (snapshot === null) throw new Error('no active season run to resume');
           if (snapshot.run.runId !== input.runId) {
@@ -916,8 +798,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
               stateDigest: snapshot.run.stateDigest,
             };
           }
-          // Reuses the interrupted submission's identity facts; the run
-          // context comes from the reloaded snapshot.
+
           const startInput: SeasonBlockStartInput = {
             run: snapshot.run,
             effects: snapshot.effects,
@@ -984,19 +865,12 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       current = null;
       warmRequestId = null;
       warmed = false;
-      // A fresh worker holds no summary state; the next start re-sends the
-      // full prior summaries. The in-memory run cursor survives (keyed by
-      // runId) so resumed blocks still avoid a repository load.
+
       workerSummaryRunId = null;
       workerSummaryCount = 0;
       workerRosterKey = null;
     },
 
-    /**
-     * Performance pass: prewarms the persistent worker's packaged asset
-     * caches from an idle callback. Safe to call any time; no-ops while a
-     * block is running, once already warmed, or when assets are missing.
-     */
     prewarm(): void {
       if (currentRequestId !== null || warmed) return;
       warmed = true;
@@ -1006,10 +880,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             deps.artifacts !== undefined
               ? await deps.artifacts()
               : await import('./season-assets').then((module) => module.seasonArtifactUrls());
-          // A block can start while the warm artifacts resolve; re-check (the
-          // type-level narrowing is stale across the await).
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          if (currentRequestId !== null) return;
+          if (requestActive()) return;
           const target = createWorker();
           const requestId = `warm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
           warmRequestId = requestId;
@@ -1025,7 +896,6 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
             }),
           );
         } catch {
-          // Warm is best-effort; the first block start re-attempts the loads.
           warmRequestId = null;
         }
       })();
@@ -1051,46 +921,32 @@ function dedupeByGameId(details: SeasonRetainedGameDetail[]): SeasonRetainedGame
   return result;
 }
 
-/**
- * Performance pass: assembles the authoritative post-commit snapshot from
- * the EXACT facts the IndexedDB commit stored (locked rotations, window
- * mutations, committed state chain), plus the reconstructed finalized game
- * records from the schedule. Both the real runner and the e2e fake runner
- * emit it inside the `complete` event so the hub renders immediately after
- * the successful transaction instead of re-reading the whole run.
- */
 export function assembleCommittedSnapshot(input: {
   run: SeasonRun;
-  /** The rotations locked by this block (the human's pending set included). */
+
   rotations: SeasonRotation[];
   checkpoint: SeasonCandidateCheckpoint;
   commandId: string;
   rotationDigest: string;
   window: SeasonWindowOpenResult | null;
-  /**
-   * M2.6.5: the authoritative post-block free-agency state the commit
-   * stored (the committed candidate's carried state, plus any market window
-   * this block opened).
-   */
+
   freeAgency: SeasonFreeAgencyState;
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
   schedule: SeasonSchedule;
-  /** Summaries of every earlier block (excludes this block's). */
+
   priorSummaries: SeasonGameSummary[];
-  /** Accepted blocks of every earlier commit (excludes this one). */
+
   priorAcceptedBlocks: SeasonAcceptedBlock[];
-  /** Retained details of earlier blocks; the block's own are merged in. */
+
   priorRetainedDetails: SeasonRetainedGameDetail[];
 }): SeasonRunSnapshot {
   const { run, rotations, checkpoint, window, schedule } = input;
   const objectives = objectivesWithSuccess(run, checkpoint);
   const postCommitRun: SeasonRun = {
     ...run,
-    // The commit stores the window-mutated roster/ownership when a window
-    // opened, else the snapshot's own; rotations are always the locked set
-    // (window repairs notwithstanding).
+
     rosters: window !== null ? window.rosters : run.rosters,
     ownership: window !== null ? window.ownership : run.ownership,
     rotations: window !== null ? window.rotations : rotations,
@@ -1100,9 +956,7 @@ export function assembleCommittedSnapshot(input: {
     influence: window !== null ? window.influence : checkpoint.influence,
     transactions: window !== null ? window.transactions : checkpoint.transactions,
     trade: window !== null ? window.trade : run.trade,
-    // M2.6.5: the committed free-agency state (the block's carried state,
-    // plus any market window it opened) rides the run snapshot so the
-    // in-memory view matches the reloaded audit exactly.
+
     freeAgency: input.freeAgency,
     objectives,
     checkpointState: input.checkpointState,
@@ -1137,9 +991,6 @@ export function assembleCommittedSnapshot(input: {
   };
 }
 
-/** The engine's per-block objective-success fold (mirror of the commit path;
- * a missing selection keeps the objectives unchanged, matching the engine's
- * `objectivesWithBlockSuccess` so fake-runner checkpoints assemble too). */
 function objectivesWithSuccess(
   run: SeasonRun,
   checkpoint: SeasonCandidateCheckpoint,
@@ -1156,13 +1007,6 @@ function objectivesWithSuccess(
   };
 }
 
-/**
- * Deep plain snapshot of worker-boundary payload slices. Walks arrays and
- * objects and rebuilds them from their own enumerable keys, so Svelte $state
- * Proxy-backed values are de-proxied without a whole-payload JSON round trip.
- * Wire values are all plain JSON (Zod-validated at both ends): no Date, Map,
- * or class instances cross the boundary.
- */
 function deepClonePlain<T>(value: T): T {
   if (Array.isArray(value)) {
     const items = value as unknown[];
@@ -1178,7 +1022,6 @@ function deepClonePlain<T>(value: T): T {
   return value;
 }
 
-/** Singleton runner for the application (lazy deps; e2e may inject a fake). */
 export function getSeasonBlockRunner(): SeasonBlockRunner {
   if (typeof window !== 'undefined' && window.__HOOP_RUSH_SEASON_BLOCK_RUNNER__) {
     return window.__HOOP_RUSH_SEASON_BLOCK_RUNNER__;

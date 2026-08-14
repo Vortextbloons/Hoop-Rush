@@ -17,24 +17,6 @@ import {
   simulateSeasonPostseasonCommand,
 } from '../lib/season/season-postseason-simulation';
 
-/**
- * Season Run postseason worker entry (spec/2.0/07, M2.6). Runs ONE engine
- * advance per start request through the authoritative command handler — the
- * same code the CLI and the main-thread runner execute — with per-game
- * granularity for the one-game-per-commit advance loop or chunk granularity
- * for the eliminated-run fast-forward (target = the Nth upcoming game,
- * N ≤ 8). Never touches IndexedDB: commits happen on the main thread through
- * the repository. The worker fetches and hash-verifies the content-addressed
- * draft catalog and era profile itself, checks cancellation at the request
- * boundary, throttles progress to at most four messages per second, and
- * returns either the accepted commit facts (post-chunk run + summaries) or
- * the typed engine rejection. Invariant failures carry seed/game diagnostics.
- *
- * Wire family: `season-postseason-*` under
- * `SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION` (sibling of the block wire,
- * which stays untouched).
- */
-
 let currentRequestId: string | null = null;
 let cancelled = false;
 
@@ -63,8 +45,6 @@ function post(
     | SeasonPostseasonWorkerErrorMessage
     | SeasonPostseasonWorkerWarmAckMessage,
 ): void {
-  // The main thread parses every message at its boundary, so the worker
-  // does not re-parse the complete message it just assembled.
   self.postMessage(message);
 }
 
@@ -87,7 +67,6 @@ function postError(
   self.postMessage(payload);
 }
 
-/** Worker-local cancellation signal; thrown at request boundaries. */
 class SeasonPostseasonCancelled extends Error {
   constructor() {
     super('season postseason cancelled');
@@ -95,8 +74,6 @@ class SeasonPostseasonCancelled extends Error {
   }
 }
 
-/** Observes a cancel request at a request boundary (helper keeps the flow
- * analyzable for the lint's no-unnecessary-condition pass). */
 function throwIfCancelled(): void {
   if (cancelled) {
     throw new SeasonPostseasonCancelled();
@@ -132,8 +109,7 @@ async function runPostseason(request: SeasonPostseasonWorkerStartRequest): Promi
     effects: request.effects,
     regularSeasonSummaries: request.regularSeasonSummaries,
   });
-  // A cancel observed mid-request: the uncommitted result is discarded by
-  // the main-thread runner (committed chunks are retained).
+
   throwIfCancelled();
   if (outcome.kind === 'rejected') {
     post({
@@ -183,8 +159,6 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   }
   const request = parsed.data;
   if (request.type === 'season-postseason-warm') {
-    // Performance pass: preload and cache the packaged catalog and era
-    // profile so the first start request pays no download/parse time.
     void (async () => {
       try {
         await Promise.all([
@@ -208,7 +182,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     }
     return;
   }
-  // A new start supersedes any stale work (the main thread never starts two).
+
   currentRequestId = request.requestId;
   cancelled = false;
   void runPostseason(request).catch((error: unknown) => {

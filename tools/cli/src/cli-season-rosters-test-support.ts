@@ -6,13 +6,6 @@ import {
   type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Shared `season rosters` test fixtures: the frozen `roster-targets-v2`
- * literal used by the calibrate doubles suite, the real calibrate sentinel,
- * and the subprocess journeys. One copy avoids drift between the split test
- * files.
- */
-
 export const ROLES: readonly SeasonRosterRole[] = [
   'primary-creation',
   'secondary-creation',
@@ -24,7 +17,6 @@ export const ROLES: readonly SeasonRosterRole[] = [
   'defensive-rebounding',
 ];
 
-/** Schema-valid hand-built `roster-targets-v2` artifact (frozen literal policy). */
 export function handBuiltTargets(): SeasonRosterTargets {
   const bandRange = (range: [number, number]): { range: [number, number]; median: number } => ({
     range,

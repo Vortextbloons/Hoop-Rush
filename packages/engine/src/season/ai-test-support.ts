@@ -11,13 +11,6 @@ import { buildSeasonDraftCatalog, buildSeasonLeague } from '@hoop-rush/test-fixt
 import { ROSTER_ROLES } from './ai-scoring.ts';
 import type { SeasonRosterMemberInput } from './roster-rules.ts';
 
-/**
- * Shared fixtures for the AI league generation tests (ai.test.ts and
- * ai-generation-v2.test.ts): the packaged-shape targets artifact, the
- * fixture catalog and league, a legal ten-version human roster, and the
- * solo-input builder. One copy avoids drift between the two suites.
- */
-
 const ALL_ROLES = [...ROSTER_ROLES];
 
 export function buildTestTargets(): SeasonRosterTargets {
@@ -127,11 +120,6 @@ export const CATALOG = buildSeasonDraftCatalog({
 });
 export const LEAGUE = buildSeasonLeague();
 
-/**
- * Ten versions from one pool covering G4 F4 C3 with a legal five when the
- * pool is full-sized; any ten distinct versions otherwise (scarcity
- * fixtures only need distinct, known versions).
- */
 export function humanRoster(
   catalog: SeasonDraftCatalog,
   franchiseId: string,

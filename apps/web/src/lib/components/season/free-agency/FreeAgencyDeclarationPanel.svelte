@@ -7,15 +7,6 @@
     ROLE_EXPECTATION_LABEL,
   } from './free-agency-view';
 
-  /**
-   * Declaration step (spec/2.0/15): up to TWO ordered targets with a
-   * supported role expectation and an Influence commitment per target
-   * (candidate minimum through 3). Shows the season caps (3 signings,
-   * 6 Influence) and the available balance; local edits stay pending until
-   * an explicit submit. Submission is a typed command; the engine's
-   * authoritative rejection copy surfaces on the route.
-   */
-
   let {
     candidates,
     targets,
@@ -28,7 +19,7 @@
     onSkip,
   }: {
     candidates: readonly SeasonFreeAgencyCandidate[];
-    /** Ordered draft targets (0-2), first priority first. */
+
     targets: readonly DeclarationDraftTarget[];
     balance: number;
     seasonSpend: number;

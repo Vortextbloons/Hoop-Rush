@@ -6,13 +6,6 @@ import {
   type SeasonRunMutation,
 } from './season-cross-tab';
 
-/**
- * Cross-tab coordination tests (performance pass): two channels on the same
- * BroadcastChannel name exchange mutation announcements; the sender never
- * receives its own announcement (source filter), invalid payloads are
- * dropped, and closing unsubscribes cleanly.
- */
-
 describe('Season Run cross-tab channel', () => {
   it('delivers announcements to other channels and filters the sender', async () => {
     const sender = createSeasonRunChannel();
@@ -44,14 +37,12 @@ describe('Season Run cross-tab channel', () => {
     channel.subscribe((mutation) => {
       received.push(mutation);
     });
-    // Raw postMessage of garbage (the channel's onmessage must ignore it).
+
     const raw = new BroadcastChannel(SEASON_RUN_CHANNEL_NAME);
     raw.postMessage({ kind: 'bogus' });
     raw.postMessage(null);
     raw.postMessage({ kind: 'clear', committedAt: 'not-a-number', sourceId: 'x' });
-    // The probe commit is queued behind the garbage on the same broadcast
-    // bus: once it arrives, the garbage was already processed and dropped.
-    // (Sent from a separate channel: a channel ignores its own announces.)
+
     const probeChannel = createSeasonRunChannel();
     probeChannel.announce({ kind: 'commit', runId: 'probe', revision: 1, committedAt: 2 });
     await expect.poll(() => received.map((mutation) => mutation.kind)).toContain('commit');

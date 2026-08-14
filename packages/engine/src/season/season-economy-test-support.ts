@@ -52,22 +52,8 @@ import { buildMinimalRotation } from './rotation.ts';
 import { validateSeasonRoster, type SeasonRosterMemberInput } from './roster-rules.ts';
 import { createInitialSeasonInfluenceState } from './influence.ts';
 
-/**
- * Deterministic M2.5 Season Run fixtures for the trade/economy tests
- * (season-economy test support). Builds a schema-7 run (health, influence,
- * transactions, trade, objectives, checkpointState, stateRevision,
- * stateDigest) over the compact fixture catalog: every franchise's ten-player
- * roster is a pre-verified LEGAL pick from its own pool (fixed index
- * patterns that satisfy the 4/4/3 coverage targets, chosen per franchise by
- * a hash so value profiles vary), rotations are the deterministic minimal
- * rotations, and the effects state is the canonical zero state (300 loads,
- * 1,350 zero pairs). The whole snapshot parses with `seasonRunSchema`.
- */
-
-/** Seed used by the fixtures; callers override with their own hex seed. */
 export const ECONOMY_TEST_SEED = 'b1d2e3f405162738495a6b7c8d9e0f11';
 
-/** M2.6 schema-9 version set for the fixture runs. */
 export const SEASON_VERSIONS_M25: SeasonRun['versions'] = {
   runSchemaVersion: SEASON_RUN_SCHEMA_VERSION,
   leagueVersion: 'league-v1',
@@ -117,13 +103,6 @@ export const SEASON_VERSIONS_M25: SeasonRun['versions'] = {
   freeAgencyTargetsVersion: 'free-agency-targets-v1',
 };
 
-/**
- * Pre-verified legal ten-player index patterns into a two-cycle (40
- * candidate) pool. Every pattern covers 4+ guard-, 4+ forward-, and 3+
- * center-capable players (the roster-generation completion targets, which
- * imply every single-removal legal-five rule), so any pattern is a legal
- * roster; the builder asserts this before use.
- */
 const LEGAL_ROSTER_PATTERNS: readonly (readonly number[])[] = [
   [0, 1, 2, 3, 4, 5, 6, 7, 17, 18],
   [1, 2, 6, 7, 8, 9, 16, 17, 18, 19],
@@ -132,7 +111,6 @@ const LEGAL_ROSTER_PATTERNS: readonly (readonly number[])[] = [
   [1, 2, 3, 5, 6, 7, 8, 9, 17, 18],
 ];
 
-/** Deterministic pattern index per franchise (stable across calls). */
 function patternIndexOf(franchiseId: string): number {
   const hash = seasonNamespaceSeed('0'.repeat(32), 'economy-test-patterns', franchiseId);
   return Number.parseInt(hash.slice(0, 8), 16) % LEGAL_ROSTER_PATTERNS.length;
@@ -163,7 +141,6 @@ function rosterOf(catalog: SeasonDraftCatalog, franchiseId: string): SeasonRoste
   });
 }
 
-/** The fixture effects state: 300 zero loads + 1,350 zero canonical pairs. */
 export function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
   const playerStates = run.rosters
     .flatMap((roster) =>
@@ -206,12 +183,6 @@ export function economyTestCatalog(): SeasonDraftCatalog {
   });
 }
 
-/**
- * Builds a schema-valid M2.5 run fixture. The catalog must be the 30-team
- * fixture catalog (it carries the candidates the rosters reference). The run
- * starts at revision 0 with the placeholder digest (fixtures do not run the
- * reload audit); command/trade tests advance the chain themselves.
- */
 export function buildEconomyTestRun(
   input: {
     seed?: string;
@@ -230,7 +201,6 @@ export function buildEconomyTestRun(
     players: rosterOf(catalog, team.franchiseId),
   }));
 
-  // Fail fast: every fixture roster must be a legal ten-player roster.
   for (const roster of rosterRows) {
     const members: SeasonRosterMemberInput[] = roster.players.map((player) => ({
       playerVersionId: player.playerVersionId,
@@ -375,7 +345,6 @@ export function withInjury(
   };
 }
 
-/** The injury id derived from a seed path (matches the /^inj-.../ contract). */
 export function injuryIdOf(seed: string): `inj-${string}` {
   return `inj-${seasonNamespaceSeed(seed, 'injuries', 'test')}`;
 }
@@ -396,7 +365,6 @@ export function aiTradeCountOf(run: SeasonRun, humanFranchiseId: string): number
   return count;
 }
 
-/** A minimal final-game summary helper for objective tests. */
 export function fixtureSummary(
   gameId: string,
   homeFranchiseId: string,

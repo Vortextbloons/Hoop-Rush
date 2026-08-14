@@ -30,20 +30,11 @@ import { seasonPlayerAvailable } from './injuries.ts';
 import { matchStartingFive } from './rotation.ts';
 import { zeroSeasonGameTransition, type SeasonPostseasonGameResolver } from './postseason.ts';
 
-/**
- * M2.5 typed run command tests (spec/2.0/07 M2.5 §8): the typed handlers, their
- * deterministic preconditions and typed rejections, state-chain advancement
- * (revision +1 + recomputed digest), and replay determinism. The health
- * seams (risky-rehab outcome rolls, forfeit summaries, pending advancement)
- * are stubbed to their contract semantics so these tests stay hermetic.
- */
-
 vi.mock('./injuries.ts', async (importOriginal) => {
   const original = await importOriginal<typeof import('./injuries.ts')>();
   return {
     ...original,
-    // Contract-conformant stubs: success shortens recovery by one game
-    // (minimum one), failure lengthens it by one.
+
     rollSeasonRehabOutcome: () => 'success' as const,
     applyRiskyRehabOutcome: (
       health: SeasonRun['health'],
@@ -75,7 +66,7 @@ vi.mock('./health.ts', async (importOriginal) => {
   };
   return {
     ...original,
-    // Official 2-0 forfeit summary with the human as the loser.
+
     seasonForfeitSummaryForGame: (
       run: SeasonRun,
       gameId: string,
@@ -138,7 +129,7 @@ vi.mock('./health.ts', async (importOriginal) => {
         injuryEvents: [],
       };
     },
-    // Advances the pending candidate to the next game in block order.
+
     advancePendingAfterForfeit: (
       pending: SeasonPendingBlockCandidate,
       forfeitedGameId: string,
@@ -152,7 +143,6 @@ vi.mock('./health.ts', async (importOriginal) => {
 const HUMAN = 'lakers';
 const TEST_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 
-/** A fresh run with window 0 open (accepted block 2), revision 1. */
 function windowedFixture(seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a'): {
   run: SeasonRun;
   effects: SeasonEffectsState;
@@ -190,7 +180,6 @@ function windowedFixture(seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a'): {
   };
 }
 
-/** Every run command without its shared base fields (discrimination kept). */
 type SeasonRunCommandFragment = {
   [K in SeasonRunCommand['command']]: Omit<
     Extract<SeasonRunCommand, { command: K }>,
@@ -208,7 +197,6 @@ function commandOf(run: SeasonRun, command: SeasonRunCommandFragment): SeasonRun
   };
 }
 
-/** A run whose window `windowIndex` is closed (offers preserved). */
 function withClosedWindow(run: SeasonRun, windowIndex: number): SeasonRun {
   const trade = run.trade;
   if (trade === null) throw new Error('no trade state');
@@ -302,7 +290,6 @@ describe('select-block-objective command', () => {
     if (runMismatch.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(runMismatch.result.result.rejection.code).toBe('run-mismatch');
 
-    // A commandId recorded in the run's transaction history is a duplicate.
     const transactionCommandId = run.transactions.find(
       (entry) => entry.commandId !== null,
     )?.commandId;
@@ -319,7 +306,6 @@ describe('select-block-objective command', () => {
     if (duplicate.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(duplicate.result.result.rejection.code).toBe('duplicate-command');
 
-    // A commandId recorded in the influence ledger is also a duplicate.
     const ledgerCommandId = run.influence.ledger.find(
       (entry) => entry.commandId !== null,
     )?.commandId;
@@ -754,7 +740,6 @@ describe('accept-trade-offer command', () => {
     if (unknown.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(unknown.result.result.rejection.code).toBe('offer-unknown');
 
-    // Window 0 exists but is closed: window-not-open (offer found, window shut).
     const closedTrade = withClosedWindow(run, 0);
     const notOpen = handleSeasonRunCommand(
       commandOf(closedTrade, {
@@ -829,8 +814,7 @@ describe('accept-trade-offer command', () => {
     );
     if (centerCapable.length < 2) throw new Error('fixture human roster needs two centers');
     const outgoing = centerCapable.slice(0, 2).map((player) => player.playerVersionId);
-    // Incoming players must be non-center-capable so the human roster loses
-    // both centers with no center replacement (roster-illegal swap).
+
     const nonCenters = celticsRoster.players.filter(
       (player) => !playableOf(player.playerVersionId).includes('C'),
     );
@@ -901,7 +885,7 @@ describe('decline-trade-offer command', () => {
       (entry) => entry.offerId === offer.offerId,
     );
     expect(recorded?.status).toBe('declined');
-    // No roster or ownership change.
+
     expect(output.run.rosters).toEqual(run.rosters);
     expect(output.run.ownership).toEqual(run.ownership);
   });
@@ -921,7 +905,6 @@ describe('decline-trade-offer command', () => {
     if (unknown.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(unknown.result.result.rejection.code).toBe('offer-unknown');
 
-    // Window 0 exists but is closed: window-not-open.
     const closedTrade = withClosedWindow(run, 0);
     const notOpen = handleSeasonRunCommand(
       commandOf(closedTrade, {
@@ -1128,20 +1111,12 @@ describe('command replay determinism', () => {
     const first = handleSeasonRunCommand(command, context);
     const second = handleSeasonRunCommand(command, context);
     expect(first).toEqual(second);
-    // Rejected paths return the context run untouched (the engine-facing
-    // view attaches the context effects state alongside the snapshot).
+
     expect(first.run).toEqual({ ...run, effects: context.effects });
     expect(first.result.result.status).toBe('rejected');
     void offer;
   });
 });
-
-// ---------------------------------------------------------------------------
-// M2.6 postseason commands (spec/2.0/02 playoffs). The fixture run sits at
-// the end of the regular season (cursor 82); the rankings seam places the
-// human at west seed 7; the documented resolver seam forces winners while
-// the machine (summaries, health, bracket advancement) stays real.
-// ---------------------------------------------------------------------------
 
 function forcedCompletedResult(
   gameInput: SeasonGameSimulationInput,
@@ -1244,7 +1219,6 @@ function forcedPostseasonResolver(
   };
 }
 
-/** The human wins every game it plays; the home side wins otherwise. */
 function humanWinsEveryGame(home: string, away: string): 'home' | 'away' {
   if (home === HUMAN) return 'home';
   if (away === HUMAN) return 'away';
@@ -1270,7 +1244,6 @@ function westTopTenWithout(league: SeasonRun['league'], excluded: string): strin
     .slice(0, 10);
 }
 
-/** The postseason fixture: a completed regular season over the economy run. */
 function postseasonFixture(
   options: {
     seed?: string;
@@ -1280,7 +1253,7 @@ function postseasonFixture(
       standings: SeasonRun['standings'];
       seed: string;
     }) => { east: string[]; west: string[] };
-    /** The recorded regular-season summaries seam (awards derivation). */
+
     regularSeasonSummaries?: SeasonGameSummary[];
   } = {},
 ): SeasonRunCommandContext & {
@@ -1315,11 +1288,6 @@ function postseasonFixture(
   };
 }
 
-/**
- * Schema-valid regular-season summaries over the fixture league's round-1
- * games (all 30 franchises appear once): every roster player gets a minimal
- * line, so the awards derivation has recorded facts to fold.
- */
 function regularSeasonSummariesOf(run: SeasonRun): SeasonGameSummary[] {
   const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
   const linesOf = (franchiseId: string) => {
@@ -1389,7 +1357,6 @@ function regularSeasonSummariesOf(run: SeasonRun): SeasonGameSummary[] {
     });
 }
 
-/** The human's saved rotation with minutes redistributed off injured players. */
 function restedRotation(run: SeasonRun, franchiseId: string, catalog: SeasonDraftCatalog) {
   const saved = run.rotations.find((rotation) => rotation.franchiseId === franchiseId);
   if (saved === undefined) throw new Error(`no rotation for ${franchiseId}`);
@@ -1500,7 +1467,7 @@ describe('start-postseason command', () => {
     const badRankings = postseasonFixture({
       rankings: ({ league }) => ({
         east: eastTopTen(league),
-        // An east team inside the west top ten breaks the conference rule.
+
         west: [...westTopTenWithout(league, HUMAN).slice(0, 9), ...eastTopTen(league).slice(0, 1)],
       }),
     });
@@ -1535,8 +1502,6 @@ describe('start-postseason command', () => {
 
 describe('advance-postseason command', () => {
   it('runs the whole tournament when the human rotation stays valid', () => {
-    // TEST_SEED keeps the human healthy through the full run (no rotation
-    // stops), so the carried rotation simulates every human game.
     const context = postseasonFixture({
       seed: TEST_SEED,
       resolver: forcedPostseasonResolver(humanWinsEveryGame),
@@ -1554,8 +1519,7 @@ describe('advance-postseason command', () => {
     if (outputResult.command !== 'advance-postseason') throw new Error('unexpected command');
     const result = outputResult.result;
     if (result.status !== 'accepted') throw new Error('expected acceptance');
-    // The east play-in is AI-only; the human's carried rotation stays valid,
-    // so the single advance simulates every remaining game.
+
     expect(result.stage).toBe('completed');
     expect(result.nextDecision).toBe('none');
     expect(result.advancedGameIds).toContain('pi-east-seven-eight');
@@ -1585,8 +1549,7 @@ describe('advance-postseason command', () => {
     const result = outputResult.result;
     if (result.status !== 'accepted') throw new Error('expected acceptance');
     expect(result.stage).toBe('completed');
-    // The awards were derived BEFORE the digest was recomputed, so the run
-    // digest covers them and the stored run is self-consistent.
+
     const awards = output.run.awards;
     expect(awards).not.toBeNull();
     expect(awards?.runId).toBe(output.run.runId);
@@ -1663,7 +1626,7 @@ describe('advance-postseason command', () => {
       commandOf(firstAdvance.run, {
         command: 'advance-postseason',
         commandId: 'adv-wrong',
-        // The 7/8 game is already played: not an upcoming target.
+
         targetGameId: 'pi-east-seven-eight',
       }),
       { ...context, run: firstAdvance.run },
@@ -1691,7 +1654,6 @@ describe('advance-postseason command', () => {
 });
 
 describe('submit-postseason-rotation command', () => {
-  /** Injures two human players so the advance stops at the human's game. */
   function humanInjuredRun(context: SeasonRunCommandContext): SeasonRun {
     const humanRoster = context.run.rosters.find((roster) => roster.franchiseId === HUMAN);
     if (humanRoster === undefined) throw new Error('no human roster');
@@ -1726,9 +1688,7 @@ describe('submit-postseason-rotation command', () => {
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    // Two injured players: the carried rotation plans minutes for them, so
-    // the first advance runs the east play-in and stops at the human's west
-    // 7/8 game with a rotation decision.
+
     const injured = humanInjuredRun({ ...context, run: start.run });
     const advance = handleSeasonRunCommand(
       commandOf(injured, { command: 'advance-postseason', commandId: 'adv-1' }),
@@ -1833,7 +1793,6 @@ describe('submit-postseason-rotation command', () => {
     const { context, run } = advancedToHumanGame();
     const rotation = restedRotation(run, HUMAN, context.catalog);
 
-    // Wrong target: the current next game is the human's west 7/8 game.
     const wrongTarget = handleSeasonRunCommand(
       commandOf(run, {
         command: 'submit-postseason-rotation',
@@ -1846,7 +1805,6 @@ describe('submit-postseason-rotation command', () => {
     if (wrongTarget.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(wrongTarget.result.result.rejection.code).toBe('wrong-game');
 
-    // Invalid rotation: a duplicated starter breaks the partition.
     const broken: SeasonRotation = {
       ...rotation,
       starters: [
@@ -1867,7 +1825,6 @@ describe('submit-postseason-rotation command', () => {
     if (invalidRotation.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(invalidRotation.result.result.rejection.code).toBe('invalid-rotation');
 
-    // Unavailable player: planned minutes on an injured rostered player.
     const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
     if (humanRoster === undefined) throw new Error('no human roster');
     const player = humanRoster.players[0];
@@ -1895,8 +1852,7 @@ describe('submit-postseason-rotation command', () => {
         'occurrence',
       ],
     });
-    // The submitted rotation plans minutes for the injured player (the saved
-    // rotation, not the rested one): unavailable-player rejection.
+
     const saved = run.rotations.find((entry) => entry.franchiseId === HUMAN);
     if (saved === undefined) throw new Error('no human rotation');
     const unavailable = handleSeasonRunCommand(
@@ -1911,8 +1867,6 @@ describe('submit-postseason-rotation command', () => {
     if (unavailable.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(unavailable.result.result.rejection.code).toBe('unavailable-player');
 
-    // Insufficient rehab resources: a balance below the floor after the spend
-    // (the run still carries the active injury).
     const poor = {
       ...withInjuryRun,
       influence: {
@@ -1937,7 +1891,6 @@ describe('submit-postseason-rotation command', () => {
     expect(insufficient.result.result.rejection.code).toBe('insufficient-rehab-resources');
     expect(insufficient.result.result.rejection).toMatchObject({ required: 2 });
 
-    // Duplicate commandId after a rehab spend (the ledger records it).
     const rehabRun = withInjury(run, {
       injuryId: injuryIdOf('postseason-duplicate'),
       playerVersionId: player.playerVersionId,
@@ -1993,8 +1946,7 @@ describe('spectate-postseason-game command', () => {
       context,
     );
     if (start.result.result.status !== 'accepted') throw new Error('expected acceptance');
-    // The human loses every game it plays, so the targeted advance through
-    // the west final eliminates them and stops at the first playoff game.
+
     const advance = handleSeasonRunCommand(
       commandOf(start.run, {
         command: 'advance-postseason',
@@ -2006,7 +1958,7 @@ describe('spectate-postseason-game command', () => {
     const advanceResult = advance.result;
     if (advanceResult.command !== 'advance-postseason') throw new Error('unexpected command');
     if (advanceResult.result.status !== 'accepted') throw new Error('expected acceptance');
-    // The wrong-game rejections: not the current game, and a human game.
+
     const wrongTarget = handleSeasonRunCommand(
       commandOf(advance.run, {
         command: 'spectate-postseason-game',
@@ -2077,7 +2029,7 @@ describe('fast-forward-postseason command', () => {
         west: westTopTenWithout(league, HUMAN).slice(0, 10),
       }),
     });
-    // The human is not in the rankings: every game is AI-only.
+
     const start = handleSeasonRunCommand(
       commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
       context,
@@ -2104,8 +2056,7 @@ describe('fast-forward-postseason command', () => {
 
   it('rejects an active human, an invalid stage, and a bad target', () => {
     const context = postseasonFixture({ resolver: forcedPostseasonResolver(humanWinsEveryGame) });
-    // The human is alive in the play-in: fast-forward must not skip their
-    // decisions, so the started run rejects with integrity-failure.
+
     const activeStart = handleSeasonRunCommand(
       commandOf(context.run, { command: 'start-postseason', commandId: 'start-1' }),
       context,
@@ -2121,14 +2072,14 @@ describe('fast-forward-postseason command', () => {
     );
     if (activeHuman.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(activeHuman.result.result.rejection.code).toBe('integrity-failure');
-    // A regular-season run fails the stage before anything else.
+
     const wrongStage = handleSeasonRunCommand(
       commandOf(context.run, { command: 'fast-forward-postseason', commandId: 'ff-stage' }),
       context,
     );
     if (wrongStage.result.result.status !== 'rejected') throw new Error('expected rejection');
     expect(wrongStage.result.result.rejection.code).toBe('invalid-stage');
-    // A target that is no longer upcoming rejects with integrity-failure.
+
     const aiOnly = postseasonFixture({
       rankings: (input) => ({
         east: eastTopTen(input.league),

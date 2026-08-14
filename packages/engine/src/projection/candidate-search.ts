@@ -35,16 +35,6 @@ import {
   type RejectedCandidate,
 } from './ranking.ts';
 
-/**
- * Bounded deterministic candidate search (projection milestone). A beam/DFS
- * search with deterministic canonical ordering explores partial rosters
- * (pruned cheaply by lens scores and completion feasibility), completes legal
- * tens, generates bounded rotation options per roster, projects every unique
- * legal five through the shared cache, and ranks complete candidates through
- * hard gates, Pareto filtering, and the composite policy. The seed only
- * orders candidates and resolves ties; it never changes projection math.
- */
-
 export type SearchLens =
   | 'offense'
   | 'defense'
@@ -68,33 +58,22 @@ export const SEARCH_LENSES: readonly SearchLens[] = [
 
 export interface RosterRotationSearchInput {
   catalog: SeasonDraftCatalog;
-  /** Already-selected playerVersionIds (preserved verbatim). */
+
   locked: readonly string[];
-  /** Selectable playerVersionIds (owned versions, excluding locked). */
+
   available: readonly string[];
   seed: string;
   eraProfile: EraSimulationProfile;
   model: ProjectionModelArtifact;
   lens?: SearchLens;
-  /** Gate overrides; unspecified gates default to passing. */
+
   gates?: Partial<RankingGates>;
-  /**
-   * Per-call budget caps (defaults to the artifact's search policy). Callers
-   * that evaluate many pools (AI shadow mode) pass tight caps: evidence does
-   * not need exhaustive search, and the base projection cost makes the full
-   * policy multi-minute per pool.
-   */
+
   caps?: {
     completeCandidates?: number;
     rotationsPerRoster?: number;
   };
-  /**
-   * Optional per-player minute-plan load for autofill (minute-policy-v1):
-   * stamina/durability ratings for the optimizer plans. Absent players fall
-   * back to the catalog member's build-time profile, then the neutral 70.
-   * Fatigue and recent-load are always zero: autofill evaluates fresh
-   * rosters.
-   */
+
   load?: ReadonlyMap<string, { staminaRating: number; durability: number }>;
 }
 
@@ -132,12 +111,10 @@ export interface HumanRosterBuildResult {
   feasibilityFailure: { code: string; message: string } | null;
 }
 
-/** Candidate record with its rotation (the search attaches it to ranking). */
 export interface SearchedCandidate extends RankedCandidate {
   rotation: SeasonRotation;
 }
 
-/** Pre-ranking search record. */
 interface SearchableCandidate {
   candidateId: string;
   projection: RankedCandidate['projection'];
@@ -149,13 +126,12 @@ interface CatalogMember {
   playerVersionId: string;
   playable: readonly Position[];
   player: SimulationPlayer;
-  /** Build-time stamina rating (neutral 70 when the candidate lacks a profile). */
+
   staminaRating: number;
-  /** Build-time durability rating (neutral 70 when the candidate lacks a profile). */
+
   durability: number;
 }
 
-/** Seeded deterministic ordering rank for one version id (FNV-1a based). */
 function orderRank(seed: string, namespace: string, versionId: string): number {
   const digest = seasonDigestHex(`${namespace}\u0000${seed}\u0000${versionId}`);
   return (
@@ -166,7 +142,6 @@ function orderRank(seed: string, namespace: string, versionId: string): number {
   );
 }
 
-/** Cheap lens score for partial pruning (ratings/tendencies only). */
 function lensScoreOf(member: CatalogMember, lens: SearchLens): number {
   const r = member.player.ratings;
   const t = member.player.tendencies;
@@ -232,7 +207,6 @@ function rosterInputMembers(
   return out;
 }
 
-/** Bench-order variants for one roster (canonical, lens-driven, seeded). */
 function benchOrdersOf(input: {
   roster: readonly string[];
   starters: readonly string[];
@@ -334,14 +308,6 @@ function benchMember(versionId: string): CatalogMember {
   };
 }
 
-/** Generates the bounded rotation set for one complete roster: for each
- * starter/closing/bench-order structure, the minute-policy optimizer builds
- * one plan per strategy (capped by `minuteTemplatesCap`), so rotations are
- * dynamic — driven by projected quality, stamina, and durability — instead
- * of fixed templates. The per-player load comes from the caller's optional
- * `load` map, the catalog member's build-time profile, or the neutral 70;
- * fatigue and recent-load are always zero (autofill evaluates fresh
- * rosters). */
 function rotationsFor(input: {
   roster: readonly string[];
   members: ReadonlyMap<string, CatalogMember>;
@@ -374,7 +340,6 @@ function rotationsFor(input: {
   });
   if (benchOrders.length === 0) return [];
 
-  // One optimizer plan per strategy; `minuteTemplatesCap` caps the set.
   const planCount = Math.min(3, input.minuteTemplatesCap);
   const playerOf = (id: string) => members.get(id)?.player ?? benchMember(id).player;
   const rotations: SeasonRotation[] = [];
@@ -384,15 +349,10 @@ function rotationsFor(input: {
     for (const closer of closers) {
       for (const benchOrder of benchOrders) {
         if (rotations.length >= structureBound) break;
-        // The bench order derives from the FIRST starter five, so later
-        // starter fives can overlap it: skip structures whose partition does
-        // not cover the ten rostered players (their plans could not be legal).
+
         if (new Set([...starter, ...benchOrder]).size !== roster.length) continue;
         const orderedRoster = [...starter, ...benchOrder];
-        // Structure-only rotation for the quality weights: the placeholder
-        // target minutes are never used (projectedQualityWeights reads only
-        // starters/closingFive/benchOrder and rewrites the bench-heavy
-        // preset before tracing); the optimizer produces real minutes.
+
         const structureRotation: SeasonRotation = {
           franchiseId: 'roster',
           starters: starter,
@@ -449,11 +409,6 @@ function rotationsFor(input: {
   return rotations;
 }
 
-/**
- * Searches complete roster+rotation candidates under the projection ranking
- * policy. Deterministic for identical inputs and worker counts; the seed only
- * orders candidates and tie-breaks.
- */
 export function searchRosterRotationCandidates(
   input: RosterRotationSearchInput,
 ): RosterRotationSearchResult {
@@ -487,7 +442,6 @@ export function searchRosterRotationCandidates(
   let nodeCount = 0;
   const partialBeamsCap = input.model.search.partialBeamsPerLens;
 
-  // Deterministic candidate ordering under the search seed.
   const rankOf = new Map<string, number>();
   for (const id of available) {
     rankOf.set(id, orderRank(input.seed, seedNamespace, id));
@@ -496,7 +450,6 @@ export function searchRosterRotationCandidates(
     (a, b) => (rankOf.get(a) ?? 0) - (rankOf.get(b) ?? 0) || (a < b ? -1 : 1),
   );
 
-  // Beam over partial rosters.
   let beams: string[][] = [locked];
   const complete = new Map<string, string[]>();
   for (let size = locked.length; size < 10; size += 1) {
@@ -527,7 +480,7 @@ export function searchRosterRotationCandidates(
       }
     }
     if (nodeCount > budget) break;
-    // Keep the highest-scoring beams under the lens.
+
     const scored = [...next.values()]
       .map((state) => ({
         state,
@@ -544,7 +497,6 @@ export function searchRosterRotationCandidates(
     .sort((a, b) => (a.join(',') < b.join(',') ? -1 : 1))
     .slice(0, input.caps?.completeCandidates ?? input.model.search.completeCandidates);
 
-  // Build and project rotations for each complete roster.
   const searched: SearchableCandidate[] = [];
   let rotationsEvaluated = 0;
   const rotationBudget = input.model.search.nodeBudgets.rotation;
@@ -580,8 +532,7 @@ export function searchRosterRotationCandidates(
       cache,
       load: input.load,
     });
-    // Minute-plan load rows for the candidate projections: fatigue and
-    // recent-load are always zero because autofill evaluates fresh rosters.
+
     const minutePlanLoad = roster.map((id) => {
       const member = members.get(id) ?? benchMember(id);
       const load = input.load?.get(id);
@@ -642,7 +593,6 @@ export function searchRosterRotationCandidates(
     model: input.model,
   });
 
-  // Attach rotations to the ranked survivors.
   const byId = new Map(searched.map((candidate) => [candidate.candidateId, candidate]));
   const ranked: SearchedCandidate[] = result.ranked
     .map((candidate) => {
@@ -688,14 +638,6 @@ function emptyAudit(seed: string, seedNamespace: string, lens: SearchLens): Sear
   };
 }
 
-/**
- * Human roster autofill (season-roster-autofill-v1): preserves every locked
- * pick, enforces exact ownership and player-version uniqueness, the 4/4/3
- * completion targets, legal fives and future feasibility, searches multiple
- * complete roster paths and rotations, and selects the projection-ranked
- * best. Never relaxes a constraint: no legal completion returns the typed
- * feasibility failure.
- */
 export function buildHumanSeasonRoster(input: HumanRosterBuildInput): HumanRosterBuildResult {
   const result = searchRosterRotationCandidates(input);
   if (result.feasibilityFailure !== null) {

@@ -24,8 +24,6 @@ describe('deriveGameSeed (spec/01 per-game seeds)', () => {
   });
 
   it('is unique across a range of run seeds and every game (property)', () => {
-    // Uniqueness within every run is the invariant that makes interrupted
-    // and uninterrupted execution agree byte-for-byte.
     for (const runSeed of [
       '00000000000000000000000000000000',
       'ffffffffffffffffffffffffffffffff',
@@ -49,8 +47,7 @@ describe('deriveGameSeed (spec/01 per-game seeds)', () => {
 
   it('the derivation version participates in the seed material', () => {
     const runSeed = 'abcd1234abcd1234abcd1234abcd1234' as const;
-    // A different version constant would change every derived seed; this
-    // test pins the current version so a version bump is intentional.
+
     expect(SEED_DERIVATION_VERSION).toBe('seed-v1');
     const derived = deriveGameSeed(runSeed, 7);
     expect(derived).toHaveLength(16);

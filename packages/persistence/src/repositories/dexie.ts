@@ -35,15 +35,6 @@ import type {
   StoredSeasonSummaryRow,
 } from '../schemas/season-run-record.ts';
 
-/**
- * Concrete IndexedDB challenge repository (spec/04, spec/07 reduced reuse).
- * The active run is append-only: one checkpoint row plus one row per accepted
- * game, so per-game persistence never rewrites the growing run. Completed
- * runs keep the full record plus a compact history index. Classic mode keeps
- * exactly one active draft row. Reads validate every record through the
- * stored schemas; the active-to-completed promotion is one atomic transaction.
- */
-
 const ACTIVE_RECORD_ID = 'active';
 const CLASSIC_DRAFT_RECORD_ID = 'classic-draft';
 
@@ -54,31 +45,31 @@ export class HoopRushDatabase extends Dexie {
   history!: EntityTable<CompletedRunIndex, 'recordId'>;
   classicDrafts!: EntityTable<StoredClassicDraft, 'recordId'>;
   seasonDrafts!: EntityTable<StoredSeasonDraft, 'recordId'>;
-  /** Season Run (M2.3) active checkpoint row; single row at 'season-run'. */
+
   seasonRuns!: EntityTable<StoredSeasonRunRecord, 'recordId'>;
-  /** One compact summary per completed league game, keyed [runId+gameId]. */
+
   seasonRunSummaries!: Table<StoredSeasonSummaryRow, [string, string]>;
-  /** One retained detail per human-team game, keyed [runId+gameId]. */
+
   seasonRunDetails!: Table<StoredSeasonDetailRow, [string, string]>;
-  /** One accepted block per commit, keyed [runId+blockIndex]. */
+
   seasonRunBlocks!: Table<StoredSeasonAcceptedBlockRow, [string, number]>;
-  /** Active-run index row; single row at 'season-run'. */
+
   seasonRunIndex!: EntityTable<StoredSeasonActiveRunIndex, 'recordId'>;
-  /** M2.5: one interrupted-block pending candidate per run, keyed by runId. */
+
   seasonPendingBlocks!: EntityTable<StoredSeasonPendingBlockRow, 'runId'>;
-  /** M2.6: one postseason game summary per row, keyed [runId+gameId]. */
+
   seasonPostseasonSummaries!: Table<StoredSeasonPostseasonSummaryRow, [string, string]>;
-  /** M2.6: one retained postseason game detail per row, keyed [runId+gameId]. */
+
   seasonPostseasonDetails!: Table<StoredSeasonPostseasonDetailRow, [string, string]>;
-  /** M2.6: one accepted command per row, append-only, keyed [runId+ordinal]. */
+
   seasonCommandLog!: Table<StoredSeasonCommandLogRow, [string, number]>;
-  /** M2.6: one promoted almanac per completed season, keyed by runId. */
+
   seasonAlmanacs!: EntityTable<StoredSeasonAlmanacRow, 'runId'>;
-  /** M2.6: one final run snapshot per completed season, keyed by runId. */
+
   seasonCompletedRuns!: EntityTable<StoredSeasonCompletedRunRow, 'runId'>;
-  /** M2.6: completed-season history index, keyed by runId. */
+
   seasonCompletedIndex!: EntityTable<StoredSeasonCompletedIndex, 'recordId'>;
-  /** Performance pass: one compact per-run player presentation/simulation slice, keyed by runId. */
+
   seasonRunPlayerSlices!: EntityTable<StoredSeasonPlayerSliceRow, 'runId'>;
 
   constructor() {
@@ -96,8 +87,6 @@ export class HoopRushDatabase extends Dexie {
         history: 'recordId',
       })
       .upgrade(async (tx) => {
-        // Legacy v1 active row: split the full run into a checkpoint plus one
-        // game row per accepted game.
         const legacy = await tx.table<StoredRunRecord, string>('active').get(ACTIVE_RECORD_ID);
         if (legacy === undefined) return;
         const validated = storedRunRecordSchema.parse(legacy);
@@ -123,12 +112,11 @@ export class HoopRushDatabase extends Dexie {
     this.version(4).stores({
       classicDrafts: 'recordId',
     });
-    // v4 is additive (one new table); existing saves remain valid.
+
     this.version(5).stores({
       seasonDrafts: 'recordId',
     });
-    // v5 is additive (one new self-contained table); older saves stay untouched,
-    // so no upgrade hook is needed.
+
     this.version(6).stores({
       seasonRuns: 'recordId',
       seasonRunSummaries: '[runId+gameId], runId, blockIndex',
@@ -136,14 +124,11 @@ export class HoopRushDatabase extends Dexie {
       seasonRunBlocks: '[runId+blockIndex], runId',
       seasonRunIndex: 'recordId',
     });
-    // v6 is additive (five new M2.3 Season Run tables); older saves stay
-    // untouched, so no upgrade hook is needed.
+
     this.version(7).stores({
       seasonPendingBlocks: 'runId',
     });
-    // v7 is additive (one new M2.5 pending-block table); older saves stay
-    // untouched, so no upgrade hook is needed. Save-schema-v3 rows (M2.4 runs)
-    // surface through the typed incompatibility flow; they are never migrated.
+
     this.version(8).stores({
       seasonPostseasonSummaries: '[runId+gameId], runId',
       seasonCommandLog: '[runId+ordinal], runId',
@@ -151,16 +136,11 @@ export class HoopRushDatabase extends Dexie {
       seasonCompletedRuns: 'runId',
       seasonCompletedIndex: 'recordId, completedAtIso',
     });
-    // v8 is additive (five new M2.6 postseason-foundations tables); older
-    // saves stay untouched, so no upgrade hook is needed. Save-schema-v1-v5
-    // rows (pre-M2.6 runs) surface through the typed incompatibility flow;
-    // they are never migrated.
+
     this.version(9)
       .stores({
         seasonRuns: 'recordId',
-        // Performance pass: summary rows gain the [runId+blockIndex] composite
-        // index (block summary reads and block-scoped deletes no longer scan);
-        // runId indexes remain for lifecycle cleanup.
+
         seasonRunSummaries: '[runId+gameId], [runId+blockIndex], runId, blockIndex',
         seasonRunDetails: '[runId+gameId], runId',
         seasonRunBlocks: '[runId+blockIndex], runId',
@@ -171,16 +151,10 @@ export class HoopRushDatabase extends Dexie {
         seasonAlmanacs: 'runId',
         seasonCompletedRuns: 'runId',
         seasonCompletedIndex: 'recordId, completedAtIso',
-        // Performance pass: one compact per-run player presentation slice.
+
         seasonRunPlayerSlices: 'runId',
       })
       .upgrade(async (tx) => {
-        // Performance pass reset: Season Run rows written before this schema
-        // were assembled with different runtime assumptions (eager catalog
-        // joins, per-block summary scans, no player slice). All Season Run
-        // tables are cleared atomically so old saves cannot leak partial rows;
-        // Challenge (`active`/`activeGames`/`completed`/`history`) and Classic
-        // (`classicDrafts`) stores are untouched.
         await tx.table('seasonRuns').clear();
         await tx.table('seasonRunSummaries').clear();
         await tx.table('seasonRunDetails').clear();
@@ -202,7 +176,7 @@ export class HoopRushDatabase extends Dexie {
         seasonRunIndex: 'recordId',
         seasonPendingBlocks: 'runId',
         seasonPostseasonSummaries: '[runId+gameId], runId',
-        // M2.6: one retained postseason game detail per row, keyed [runId+gameId].
+
         seasonPostseasonDetails: '[runId+gameId], runId',
         seasonCommandLog: '[runId+ordinal], runId',
         seasonAlmanacs: 'runId',
@@ -211,12 +185,6 @@ export class HoopRushDatabase extends Dexie {
         seasonRunPlayerSlices: 'runId',
       })
       .upgrade(async (tx) => {
-        // Postseason-details reset: Season Run rows written before this schema
-        // predate the retained postseason detail rows (and their runtime
-        // assumptions), so the full Season Run set — INCLUDING the new details
-        // table — is cleared atomically, mirroring the v9 reset. Old saves
-        // cannot leak partial rows into the new detail store; Challenge and
-        // Classic stores are untouched.
         await tx.table('seasonRuns').clear();
         await tx.table('seasonRunSummaries').clear();
         await tx.table('seasonRunDetails').clear();
@@ -276,7 +244,7 @@ export class DexieChallengeRepository implements ChallengeRepository {
     const checkpoint = await this.db.active.get(ACTIVE_RECORD_ID);
     if (checkpoint === undefined) return null;
     const validatedCheckpoint = activeRunCheckpointSchema.parse(checkpoint);
-    // The [runId+gameNumber] index returns rows ascending per runId.
+
     const rows = await this.db.activeGames
       .where('runId')
       .equals(validatedCheckpoint.runId)

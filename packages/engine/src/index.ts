@@ -1,12 +1,3 @@
-/**
- * Domain model and possession engine for Hoop Rush. Pure TypeScript: no
- * Svelte, no persistence, no DOM, no clocks, no platform randomness. Types
- * come from the validated @hoop-rush/data-contracts schemas.
- *
- * This entry exports only the surface consumed by the web app and CLI; the
- * sim plumbing (possession, shooting, fouls, rebounding, usage, recorder,
- * facts, timing, constants, seeds) stays internal to the package.
- */
 export { canPlay, type SlotGroup } from './domain/positions.ts';
 export { slotRequirement, validateLineup } from './domain/lineup.ts';
 export { classifyArchetype } from './domain/archetypes.ts';
@@ -45,9 +36,7 @@ export {
   chooseBestRunSeed,
   simulateChallengeBestOf,
 } from './modes/sandbox/selection.ts';
-// Season Run (2.0 M2.0) league skeleton: league membership, the deterministic
-// schedule generator and auditor, pure standings reduction, and the
-// Play-In/playoff state machine.
+
 export {
   conferenceOf,
   divisionOf,
@@ -62,8 +51,7 @@ export {
   type GenerateSeasonScheduleInput,
 } from './season/schedule.ts';
 export { reduceSeasonStandings, auditSeasonStandings } from './season/standings.ts';
-// FROZEN postseason-v1 state machine (M2.6 replaced the v1 contract with
-// postseason-v2; the v1 machine stays readable for legacy v1 artifacts).
+
 export {
   setPlayInRankings,
   submitPlayInGame,
@@ -75,19 +63,13 @@ export {
   type PlayInGameResult,
   type PlayoffGameResult,
 } from './season/postseason-legacy.ts';
-// Season Run (2.0 M2.6) authoritative regular-season tiebreak ranking:
-// ranks all 15 teams of both conferences from the saved standings facts
-// with the published NBA tiebreak sequence and records every applied
-// criterion as a deterministic tie-resolution trace.
+
 export {
   rankSeasonPostseason,
   type SeasonConferenceRanking,
   type SeasonPostseasonRankings,
 } from './season/tiebreakers.ts';
-// Season Run (2.0 M2.6) postseason-v2 state machine: Play-In resolution,
-// the fixed 16-team best-of-seven bracket with 2-2-1-1-1 home pattern, the
-// deterministic Finals home-court decision, per-game postseason summaries,
-// and the injury/rehab/forfeit paths.
+
 export {
   SEASON_POSTSEASON_RISKY_REHAB_COST,
   POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
@@ -115,18 +97,14 @@ export {
   type SeasonPostseasonGameOutcome,
   type SeasonPostseasonGameSimulationInput,
 } from './season/postseason.ts';
-// Season Run (2.0 M2.6) awards: MVP, Defensive Player of the Year, Sixth
-// Man of the Year, and All-League First Team, derived from recorded
-// regular-season facts with the transparent composite and availability
-// factor, plus the deterministic self-consistent digest.
+
 export {
   deriveSeasonAwards,
   SEASON_AWARD_MIN_GAME_SHARE,
   SEASON_AWARD_FULL_SEASON_GAMES,
   type SeasonAwardsInput,
 } from './season/awards.ts';
-// Season Run (2.0 M2.1) ten-player draft, roster legality, AI generation,
-// rotations, and generation digests.
+
 export {
   SEASON_ROSTER_RULES,
   groupMaskOf,
@@ -209,9 +187,7 @@ export {
   type PercentileTier,
   type RoleThresholds,
 } from './season/ai-scoring.ts';
-// M2.3 full-league blocks: home-court profile, compact summaries, aggregate
-// folding, game reconstruction, checkpoint digests, block recaps, and the
-// authoritative block pipeline shared by the worker and the CLI.
+
 export {
   SEASON_HOME_COURT_DEFENSE_MAX_ADJUSTMENT,
   SEASON_HOME_COURT_TURNOVER_MAX_ADJUSTMENT,
@@ -226,9 +202,7 @@ export {
   seasonEffectsRollupFromEvidence,
   seasonEffectsEvidenceOf,
 } from './season/game-summary.ts';
-// M2.4 stamina and chemistry effects: fixed-point fatigue transitions,
-// canonical pair chemistry, the neutral effects hook, and the effects state
-// helpers the block pipeline and calibration use.
+
 export {
   SEASON_STAMINA_RATING_FLOOR,
   SEASON_STAMINA_RATING_CEIL,
@@ -312,9 +286,7 @@ export {
   type SeasonBlockGameOutcome,
 } from './season/block.ts';
 export { seasonRotationSetDigest } from './season/rotation.ts';
-// Projection milestone minute-policy contract (minute-policy-v1): the
-// risk-adjusted minute-plan optimizer, its facts, and the engine-authoritative
-// fatigue bands consumed by the web app's projection worker and effects view.
+
 export {
   buildMinutePlanCandidates,
   fatigueBandOf,
@@ -331,9 +303,7 @@ export {
   type MinutePlanPlayerInput,
   type MinutePlanStructure,
 } from './season/minute-plan.ts';
-// Season Run (2.0 M2.5) health, influence, objectives, trades, command
-// dispatch, and state digests consumed by the web app, persistence seam, and
-// CLI calibration commands.
+
 export { seasonFranchiseLegalFiveFacts, assembleSeasonPendingBlock } from './season/health.ts';
 export {
   seasonGameHealthSeam,
@@ -378,9 +348,7 @@ export {
   type SeasonTradePackageKind,
   type SeasonWindowOpenResult,
 } from './season/trades.ts';
-// M2.6.5 free-agency market (spec/2.0/15): canonical identity selection,
-// window composition and opening, declaration/skip validation, the recorded
-// seven-step resolution, signing application, and the block gating helper.
+
 export {
   SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,
   SEASON_FREE_AGENCY_WINDOW_COMPOSITION,
@@ -400,15 +368,9 @@ export {
   type SeasonFreeAgencyWindowOpenResult,
   type SeasonFreeAgencyResolutionResult,
 } from './season/free-agency.ts';
-// M2.6.5 effects reconciliation (season-chemistry-v2): the pure block-lock
-// rotation-scoped rebuild (demotion freeze, promotion restore, zero-state
-// new pairs, 300/1,350 invariants).
+
 export { reconcileSeasonEffects, type SeasonEffectsReconcileInput } from './season/effects.ts';
-// Season Run (2.0 M2.6) trade grades (trade-grade-v1, Track C): one grade
-// per side of every accepted trade, derived from recorded post-trade facts
-// (regular-season + postseason summaries through the champion) with the
-// frozen 55/15/15/15 component weights, the five-game small-sample floor,
-// and the A/B/C/D/F display labels.
+
 export {
   deriveSeasonTradeGrades,
   seasonTradeGradeLabelOf,
@@ -417,12 +379,9 @@ export {
   SEASON_TRADE_GRADE_WEIGHTS,
   type SeasonTradeGradesInput,
 } from './season/trade-grades.ts';
-// Classic draft exports live under the `classic` namespace: the module's
-// `slotRequirement` would otherwise collide with domain/lineup.js.
+
 export * as classic from './modes/classic/draft.ts';
-// Projection milestone: deterministic, calculation-only base and Season
-// projections over the possession engine's pure probability functions.
-// Seedless; no Overall-derived value is used.
+
 export {
   projectBaseFive,
   projectExpectedLedger,

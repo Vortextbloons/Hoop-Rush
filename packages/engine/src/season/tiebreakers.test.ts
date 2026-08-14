@@ -10,13 +10,6 @@ import {
 import { franchisesInConference } from './league.ts';
 import { rankSeasonPostseason, type SeasonConferenceRanking } from './tiebreakers.ts';
 
-/**
- * Authoritative tiebreak ranking tests (M2.6, tiebreaker-v1): every two-team
- * criterion, the multi-team restart behavior, division-winner precedence,
- * the postseason-eligible boundary, the deterministic draw, input-order
- * independence, and full determinism.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 
 const league = buildLeague();
@@ -30,15 +23,10 @@ interface TeamSpec {
   divL?: number;
   pf?: number;
   pa?: number;
-  /** Head-to-head wins per opponent. */
+
   h2h?: Record<string, number>;
 }
 
-/**
- * A conference spec where the tied teams share one record and every other
- * team holds a distinct record (`aboveCount` teams strictly better, the
- * rest strictly worse), so only the named teams can tie.
- */
 function conferenceWithTie(
   conference: 'east' | 'west',
   tied: readonly string[],
@@ -65,12 +53,10 @@ function conferenceWithTie(
   return spec;
 }
 
-/** Distinct records for every team of the other conference (no ties). */
 function clearConference(conference: 'east' | 'west'): Record<string, TeamSpec> {
   return conferenceWithTie(conference, [], { w: 0, l: 0 }, 0);
 }
 
-/** Builds a 30-row standings table from a per-team record spec. */
 function standingsOf(spec: Record<string, TeamSpec>): SeasonStandings {
   const teamIds = league.teams.map((team) => team.franchiseId);
   const rows = teamIds.map((franchiseId) => {
@@ -109,7 +95,6 @@ function standingsOf(spec: Record<string, TeamSpec>): SeasonStandings {
   };
 }
 
-/** East ranking for a full league spec (west gets distinct records). */
 function eastRanking(eastSpec: Record<string, TeamSpec>): SeasonConferenceRanking {
   const spec = { ...clearConference('west'), ...eastSpec };
   return rankSeasonPostseason(league, standingsOf(spec), SEED).east;
@@ -143,7 +128,7 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     const east = franchisesInConference(league, 'east');
     const a = east[0] ?? 'a';
     const b = east[1] ?? 'b';
-    // A: 50-30 (62.5%), B: 55-40 (57.9%): A ranks above despite fewer wins.
+
     const spec = overrides(conferenceWithTie('east', [], { w: 0, l: 0 }, 0), {
       [a]: { w: 50, l: 30 },
       [b]: { w: 55, l: 40 },
@@ -171,8 +156,8 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
 
   it('resolves a two-team tie by division-champion status', () => {
     const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a'; // hawks (southeast) leads its weak division
-    const b = east[1] ?? 'b'; // celtics (atlantic): nets holds the division lead
+    const a = east[0] ?? 'a';
+    const b = east[1] ?? 'b';
     const nets = east.find((id) => id === 'nets') ?? b;
     const spec = overrides(conferenceWithTie('east', [a, b], { w: 40, l: 42 }, 0), {
       [nets]: { w: 45, l: 37 },
@@ -184,8 +169,8 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
 
   it('resolves a two-team tie by division record when both share the division', () => {
     const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a'; // hawks
-    const b = east.find((id) => id === 'hornets') ?? 'b'; // hornets share southeast
+    const a = east[0] ?? 'a';
+    const b = east.find((id) => id === 'hornets') ?? 'b';
     const spec = overrides(conferenceWithTie('east', [a, b], { w: 40, l: 42 }, 0), {
       [a]: { divW: 10, divL: 6 },
       [b]: { divW: 8, divL: 8 },
@@ -284,7 +269,7 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     );
     expect(first.resolutions).toEqual(second.resolutions);
     expect(first.ranked).toEqual(second.ranked);
-    // Different root seeds can change the drawn order (checked over several).
+
     const orders = new Set<string>();
     for (let i = 0; i < 12; i += 1) {
       const seed = seasonNamespaceSeed(SEED, 'probe', String(i));
@@ -295,12 +280,10 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
 
   it('resolves a multi-team tie with partial separation and restart', () => {
     const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a'; // hawks (southeast)
-    const b = east[1] ?? 'b'; // celtics (atlantic)
-    const c = east[4] ?? 'c'; // bulls (central)
+    const a = east[0] ?? 'a';
+    const b = east[1] ?? 'b';
+    const c = east[4] ?? 'c';
     const spec = overrides(conferenceWithTie('east', [a, b, c], { w: 40, l: 42 }, 0), {
-      // Record among tied teams: A 4-2, B 2-3, C 2-3 -> A separates; B vs C
-      // restarts (two-team list) and splits on conference record.
       [a]: { h2h: { [b]: 2, [c]: 2 } },
       [b]: { h2h: { [a]: 1, [c]: 1 }, confW: 10, confL: 2 },
       [c]: { h2h: { [a]: 1, [b]: 1 }, confW: 8, confL: 4 },
@@ -309,8 +292,7 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     expect(ranking.ranked.slice(0, 3)).toEqual([a, b, c]);
     const first = ranking.resolutions[0];
     expect(first?.rule).toBe('head-to-head');
-    // The record-among criterion separated `a` from the still-tied pair;
-    // the boundary pair names the adjacent teams in final order.
+
     expect(first?.teams).toEqual([a, c]);
     expect(first?.evidence[0]?.label).toContain('record among tied teams');
     const second = ranking.resolutions[1];
@@ -320,9 +302,9 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
 
   it('prefers division champions in a multi-team tie', () => {
     const east = franchisesInConference(league, 'east');
-    const a = east[0] ?? 'a'; // hawks: division champion
-    const b = east[1] ?? 'b'; // celtics: nets leads atlantic
-    const c = east[4] ?? 'c'; // bulls: cavaliers leads central
+    const a = east[0] ?? 'a';
+    const b = east[1] ?? 'b';
+    const c = east[4] ?? 'c';
     const spec = overrides(conferenceWithTie('east', [a, b, c], { w: 40, l: 42 }, 0), {
       nets: { w: 45, l: 37 },
       cavaliers: { w: 44, l: 38 },
@@ -332,8 +314,7 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     const ranking = eastRanking(spec);
     expect(ranking.ranked.indexOf(a)).toBeLessThan(ranking.ranked.indexOf(b));
     expect(ranking.ranked.indexOf(b)).toBeLessThan(ranking.ranked.indexOf(c));
-    // Division-champion separated the champion `a` from the non-champion
-    // pair; the pair restarted and its head-to-head decided it.
+
     expect(ranking.resolutions[0]?.rule).toBe('division-champion');
     expect(ranking.resolutions[0]?.teams).toEqual([a, c]);
     expect(ranking.resolutions[1]?.rule).toBe('head-to-head');
@@ -382,7 +363,7 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
     const first = eastRanking(spec);
     const second = eastRanking(spec);
     expect(first.ranked).toEqual(second.ranked);
-    // Slots beyond 10 are not recorded (contract bounds slots to 1-10).
+
     for (const resolution of first.resolutions) {
       expect(resolution.slots.every((slot) => slot >= 1 && slot <= 10)).toBe(true);
     }
@@ -449,7 +430,7 @@ describe('tiebreak ranking (M2.6, tiebreaker-v1)', () => {
       expect(resolution.drawSeed).toBeDefined();
       expect(resolution.teams.length).toBeGreaterThanOrEqual(2);
     }
-    // The full order is reproducible from the same inputs.
+
     expect(eastRanking(spec).ranked).toEqual(ranking.ranked);
   });
 });

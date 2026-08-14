@@ -72,7 +72,6 @@ const FAKE_PLAN_RESULT = {
   recommended: 'balanced',
 } as unknown as MinutePlanOptimizationResult;
 
-/** Ten-members fixture rotation for the optimize-rotation request. */
 function fixtureRotation(franchiseId = 'lakers'): SeasonRotation {
   const versionId = (n: number) => `pv-${String(n).padStart(32, '0')}`;
   const players = [
@@ -200,11 +199,7 @@ describe('createProjectionRunner', () => {
     expect(request.load).toEqual(load);
     expect(request.horizon).toBe(10);
     expect(request.seed).toBe('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
-    // The wire is type-only and the structure arrives from a `$state` proxy
-    // editor; the runner must rebuild the request from plain, validated
-    // objects so `postMessage` never sees a proxy ("Proxy object could not
-    // be cloned"). Fresh references prove no input object crossed the
-    // boundary.
+
     expect(request.structure).not.toBe(rotation);
     expect(request.roster).not.toBe(rotation.starters);
     for (const [index, row] of (request.load as unknown[]).entries()) {

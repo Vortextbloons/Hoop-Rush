@@ -22,14 +22,6 @@ import {
 import { DEFAULT_MANIFEST, REPO_ROOT } from './data-loader.ts';
 import { readJson, sha256Hex } from '../io.ts';
 
-/**
- * `season schedule` (spec/2.0 M2.0): generate the deterministic Season Run
- * schedule from the frozen league manifest, and audit the packaged league
- * and schedule artifacts. `generate` requires an explicit `--out` path for
- * writes and otherwise returns a preview/hash report; `audit` defaults to
- * the packaged artifacts and cross-checks the manifest hashes.
- */
-
 export const SEASON_SCHEDULE_GENERATE_OPTIONS: Record<string, boolean> = {
   out: true,
   league: true,
@@ -51,7 +43,6 @@ export const DEFAULT_SEASON_SCHEDULE = resolve(
   'apps/web/static/data/season/schedule.json',
 );
 
-/** Serialization of the committed schedule artifact; byte-identical everywhere. */
 function serializeSchedule(schedule: SeasonSchedule): string {
   return `${JSON.stringify(schedule)}\n`;
 }

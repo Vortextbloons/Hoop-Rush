@@ -53,16 +53,6 @@ import {
   buildSeasonRotation,
 } from './season-draft.ts';
 
-/**
- * Deterministic Season Run fixture builders (spec/2.0 M2.0, M2.1). Every
- * builder returns schema-valid records so engine tests and CLI fixtures can
- * rely on the frozen contracts. Rosters are synthetic: ten peak
- * player-versions per team with derived, unique playerVersionIds, plus the
- * M2.1 draft facts, AI assignments, rotations, evaluations, and audit fields.
- */
-
-/** Accepted NBA conference/division alignment (league-v1, canonical in
- * `@hoop-rush/data-contracts`). The record keeps the canonical team order. */
 const ALIGNMENT: Record<
   string,
   {
@@ -78,7 +68,6 @@ const ALIGNMENT: Record<
 
 const FRANCHISE_ORDER = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
 
-/** M2.5 empty health state: no injury records yet (schema-valid). */
 function emptyHealth(): SeasonHealthState {
   return {
     schemaVersion: 1,
@@ -87,7 +76,6 @@ function emptyHealth(): SeasonHealthState {
   };
 }
 
-/** M2.6.5 empty free-agency state: no windows, zero signings/spend (30 teams). */
 function emptyFreeAgency(): SeasonRun['freeAgency'] {
   return {
     schemaVersion: 1,
@@ -99,12 +87,6 @@ function emptyFreeAgency(): SeasonRun['freeAgency'] {
   };
 }
 
-/**
- * M2.5 initial Influence state for the fixture league: every franchise at
- * +2 with its recorded `initial-grant` ledger entry (blockIndex/commandId
- * null), no windows, no rehabs (mirror of the data-contracts fixture
- * builder `buildInitialInfluence`).
- */
 function initialInfluence(league: SeasonLeague): SeasonInfluenceState {
   const balances: Record<string, number> = {};
   const ledger: SeasonInfluenceState['ledger'] = [];
@@ -134,7 +116,6 @@ function initialInfluence(league: SeasonLeague): SeasonInfluenceState {
   };
 }
 
-/** The frozen league: 30 teams; one human franchise (default lakers), rest AI. */
 export function buildSeasonLeague(
   overrides: Partial<SeasonLeague> = {},
   options: { humanFranchiseId?: string } = {},
@@ -157,10 +138,6 @@ export function buildSeasonLeague(
   };
 }
 
-/**
- * Deterministic ten-player rosters for every team: playerVersionIds derived
- * from synthetic identity fields, unique across the league.
- */
 export function buildSeasonRosters(league: SeasonLeague, seed: string): SeasonRoster[] {
   const seeded = seasonNamespaceSeed(seed, SEASON_SEED_NAMESPACES.aiRosters);
   return league.teams.map((team, teamIndex) => ({
@@ -222,36 +199,14 @@ function emptyPostseason(rootSeed: string): SeasonRun['postseason'] {
   return buildInitialPostseasonState(rootSeed);
 }
 
-/**
- * Complete 30-team Season Run snapshot: committed schedule (caller-supplied
- * schedule — use the packaged artifact or regenerate it with
- * SEASON_COMMITTED_SCHEDULE_SEED), empty results, initial standings, block
- * cursor at round 0, postseason-ready derived seeds, and schema-v7 M2.5
- * fields (synthetic draft facts, assignments, roster-generation-v2 AI
- * pools, rotations, evaluations, the generation audit, the frozen
- * block/summary/aggregates/recap/leaders/home-court/checkpoint/stamina/
- * chemistry/effect-targets versions plus the seven new M2.5 material
- * versions, and the M2.5 mutable run state: empty health, initial
- * Influence, empty transaction log, null trade state, fixed objective
- * catalog, null checkpoint state, and stateRevision 0).
- *
- * The `stateDigest` parameter defaults to the zero digest (32 zeros) and is
- * documented for callers that run the persistence reload audit: the audit
- * recomputes the digest through the engine seam, so such callers must pass
- * the real digest (`seam.seasonRunStateDigest` over the initial facts).
- */
 export function buildSeasonRunFixture(input: {
   schedule: SeasonSchedule;
   league?: SeasonLeague;
   seed?: string;
   humanFranchiseId?: string;
-  /** SHA-256 of the schedule artifact; fixtures default to a placeholder. */
+
   scheduleContentHash?: string;
-  /**
-   * M2.5 run state digest. Defaults to '0'.repeat(32) for callers that do
-   * not run the reload audit; persistence callers must pass the digest the
-   * engine seam computes over the initial mutable state.
-   */
+
   stateDigest?: string;
 }): SeasonRun {
   const seed = input.seed ?? 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
@@ -345,10 +300,7 @@ export function buildSeasonRunFixture(input: {
     rotations,
     generationAudit: buildFixtureGenerationAudit(seed),
     evaluations: buildFixtureEvaluations(rosters, aiAssignments),
-    // M2.5 mutable run state: promotion-time initial values (mirror of the
-    // data-contracts fixture builders `buildEmptyHealth` /
-    // `buildInitialInfluence`; the fixed objective catalog from
-    // SEASON_OBJECTIVE_CATALOG with no selections).
+
     trade: null,
     freeAgency: emptyFreeAgency(),
     objectives: {

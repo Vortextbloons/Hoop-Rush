@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
 import type { SeasonAcceptedBlock, SeasonGameSummary } from '@hoop-rush/data-contracts';
@@ -7,13 +5,6 @@ import SeasonTape from '$lib/components/season/SeasonTape.svelte';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
 mockSvelteKitApp();
-
-/**
- * SeasonTape component tests (M2.3.5 hub): the nine checkpoint segments and
- * their states (completed / current / upcoming), W-L per completed block
- * from the accepted summaries, navigation targets for completed segments,
- * and the current-segment aria-current marker.
- */
 
 const HUMAN = 'lakers';
 
@@ -32,7 +23,6 @@ function acceptedBlock(blockIndex: number): SeasonAcceptedBlock {
   };
 }
 
-/** Minimal summary shape; the tape only reads round/franchises/result. */
 function summary(
   gameId: string,
   round: number,
@@ -79,7 +69,7 @@ describe('SeasonTape', () => {
     expect(segs[0]?.getAttribute('aria-current')).toBe('step');
     for (let index = 1; index < 9; index += 1) {
       expect(segs[index]?.getAttribute('aria-current')).toBeNull();
-      // Upcoming segments are not navigable.
+
       expect(segs[index]?.tagName).toBe('SPAN');
     }
     expect(segs[0]?.getAttribute('aria-label')).toContain('next decision');
@@ -89,12 +79,12 @@ describe('SeasonTape', () => {
     const { container } = renderTape({
       acceptedBlocks: [acceptedBlock(0)],
       nextBlockIndex: 1,
-      // 2 wins + 1 loss for the human team inside rounds 1-10.
+
       summaries: [
         summary('g1', 1, 110, 90),
         summary('g2', 4, 98, 105),
         summary('g3', 9, 120, 100),
-        // A round-11 game belongs to block 1, not block 0.
+
         summary('g4', 11, 99, 98),
       ],
     });
@@ -141,7 +131,7 @@ describe('SeasonTape', () => {
       expect(seg?.tagName).toBe('A');
       expect(seg?.getAttribute('href')).toContain(`block=${String(blockIndex)}`);
     }
-    // All nine accepted: nothing is current or upcoming.
+
     expect(segs.some((seg) => seg.getAttribute('aria-current') !== null)).toBe(false);
   });
 

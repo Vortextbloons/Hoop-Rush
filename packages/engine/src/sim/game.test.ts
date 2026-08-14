@@ -13,7 +13,6 @@ import { fnv1a32 } from './rng.ts';
 import { simulateGame } from './game.ts';
 import { createEngineContext } from './context.ts';
 
-/** Ambient env access for the perf gate (engine has no Node type defs). */
 declare const process: { env: Record<string, string | undefined> };
 
 const ctx = createEngineContext();
@@ -30,8 +29,7 @@ function runMany(seedPrefix: string, count: number) {
 describe('game determinism and golden replay', () => {
   it('is stable across identical inputs (golden digest)', () => {
     const result = run('golden-1');
-    // Regenerated against the current engine; changing engine rules breaks
-    // this test intentionally until a new golden baseline is regenerated.
+
     expect(fnv1a32(gameResultDigest(result))).toBe(GOLDEN_EQUAL_FIXTURE_V11_HASH);
   });
 
@@ -62,8 +60,7 @@ describe('game determinism and golden replay', () => {
     if (homeMirror === undefined || awayMirror === undefined) {
       throw new Error('mirror players missing from box scores');
     }
-    // Both sides track their own copies: identical players still produce
-    // independent (usually different) lines under the same seed.
+
     expect(homeMirror.points).toBeGreaterThanOrEqual(0);
     expect(awayMirror.points).toBeGreaterThanOrEqual(0);
     expect(homeMirror.turnovers).toBeGreaterThanOrEqual(0);
@@ -108,15 +105,10 @@ describe('game invariants over many seeds', () => {
   });
 });
 
-// The 10 ms target is a CI-acceptance goal; the strict bounds run only with
-// HOOP_RUSH_PERF_STRICT=1 because the CPU contention of the full parallel
-// package gate historically flaked this test (the engine config documents
-// that). The former non-strict branch asserted nothing, so the suite is
-// skipped entirely unless the strict gate is requested.
 describe.skipIf(process.env.HOOP_RUSH_PERF_STRICT !== '1')('game performance goal', () => {
   it('simulates a game well under the 10 ms desktop goal', () => {
     const input = buildGameSimulationInput({ seed: seedFromString('perf-1') });
-    // Warm up.
+
     simulateGame(input, ctx);
     const samples: number[] = [];
     for (let i = 0; i < 100; i += 1) {
@@ -218,10 +210,9 @@ describe('lineup strength across fixtures', () => {
   });
 });
 
-// Golden digests, regenerated from the current engine (spec/06 byte-equivalent replay).
 const GOLDEN_EQUAL_FIXTURE_V11_HASH = 1261523216;
 const GOLDEN_STRONG_WEAK_V11_HASH = 3245389012;
-// Retain the pre-v11 byte-level fixtures below as migration evidence.
+
 const GOLDEN_EQUAL_FIXTURE =
   '{"seed":"45ca740e45ca740e45ca740e45ca740e","winner":"home","overtimePeriods":1,"homeScore":131,"awayScore":120,"periodScores":{"home":[30,22,26,33,20],"away":[17,30,22,42,9]},"homeBox":["54/94","8/15","15/20","18+32+5","31","2","0","14","24","95"],"awayBox":["50/100","7/21","13/16","16+20+7","33","2","1","9","28","95"],"homePlayers":[["p-fixture-1","53","32","13/23","2/3","4/6","0+12","10","1","0","3","5"],["p-fixture-2","53","24","9/18","1/2","5/8","6+1","5","0","0","0","5"],["p-fixture-3","53","20","8/16","1/3","3/3","3+6","5","0","0","3","4"],["p-fixture-4","53","13","6/13","0/2","1/1","5+4","7","0","0","5","5"],["p-fixture-5","53","42","18/24","4/5","2/2","4+9","4","1","0","3","5"]],"awayPlayers":[["p-fixture-1","53","25","9/17","3/4","4/4","3+4","5","0","0","3","8"],["p-fixture-2","53","26","12/21","1/4","1/1","2+6","4","0","0","0","5"],["p-fixture-3","53","13","6/23","0/7","1/2","3+5","6","0","1","2","3"],["p-fixture-4","53","25","11/20","1/2","2/3","3+3","11","0","0","0","5"],["p-fixture-5","53","31","12/19","2/4","5/6","5+2","7","2","0","4","7"]]}';
 const GOLDEN_STRONG_WEAK =

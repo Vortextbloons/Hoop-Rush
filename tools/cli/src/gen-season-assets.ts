@@ -1,16 +1,3 @@
-/**
- * Generates the committed Season Run assets (spec/2.0 M2.0/M2.1): the frozen
- * league artifact, the complete 30-team fixture under `src/fixtures/` built
- * through the authoritative ten-player draft and AI league generation, the
- * committed draft-commands reproduction fixture, and the manifest `season`
- * hash references. Run with
- * `pnpm --filter @hoop-rush/cli gen-season-assets` AFTER the schedule
- * artifact exists (`hoop-rush season schedule generate --out
- * apps/web/static/data/season/schedule.json`); the script refuses to touch
- * the manifest when the schedule artifact is missing so hashes always match
- * the committed bytes.
- */
-
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -105,14 +92,6 @@ function cmd(
   return { commandId, expectedRevision, payload };
 }
 
-/**
- * Plays the committed one-human draft to completion through real commands:
- * create -> per round: draw the global eight-card offer, pick the best
- * selectable card -> finalize -> generate the AI league. All commands are
- * recorded so the reproduction fixture replays them byte-for-byte. The AI
- * generation consumes the verified `roster-targets-v2` artifact from the
- * packaged season directory.
- */
 function playCommittedDraft(
   catalog: ReturnType<typeof seasonDraftCatalogSchema.parse>,
   league: SeasonLeague,
@@ -186,7 +165,6 @@ function playCommittedDraft(
   return { state, commands, generation };
 }
 
-/** Builds the v7 Season Run snapshot from the committed draft + generation. */
 function buildRun(
   schedule: SeasonSchedule,
   league: SeasonLeague,
@@ -203,9 +181,7 @@ function buildRun(
     })),
   };
   const franchiseIds = correctedLeague.teams.map((team) => team.franchiseId);
-  // M2.5: the initial objective state freezes the fixed six-entry catalog
-  // with no selections (the engine's `seasonObjectiveCatalog` is the same
-  // data-contracts constant).
+
   const objectives = seasonObjectiveStateSchema.parse({
     schemaVersion: 1,
     objectiveVersion: SEASON_OBJECTIVE_VERSION,
@@ -245,7 +221,7 @@ function buildRun(
       staminaVersion: SEASON_STAMINA_VERSION,
       chemistryVersion: SEASON_CHEMISTRY_VERSION,
       effectsTargetsVersion: SEASON_EFFECT_TARGETS_VERSION,
-      // M2.5: the seven new material versions.
+
       healthVersion: SEASON_HEALTH_VERSION,
       tradeVersion: SEASON_TRADE_VERSION,
       influenceVersion: SEASON_INFLUENCE_VERSION,
@@ -253,7 +229,7 @@ function buildRun(
       injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
       tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
       influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
-      // M2.6: postseason-foundations material versions.
+
       tiebreakVersion: SEASON_TIEBREAK_VERSION,
       postseasonSummaryVersion: SEASON_POSTSEASON_SUMMARY_VERSION,
       awardsVersion: SEASON_AWARDS_VERSION,
@@ -262,7 +238,7 @@ function buildRun(
       almanacVersion: SEASON_ALMANAC_VERSION,
       replayExportVersion: SEASON_REPLAY_EXPORT_VERSION,
       postseasonTargetsVersion: SEASON_POSTSEASON_TARGETS_VERSION,
-      // M2.6.5: free-agency material versions (roster-depth milestone).
+
       freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
       freeAgencyIndexVersion: SEASON_FREE_AGENCY_INDEX_VERSION,
       freeAgencyTargetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
@@ -357,10 +333,7 @@ function buildRun(
       diagnostics: generation.diagnostics,
     },
     evaluations: generation.evaluations,
-    // M2.5: a fresh run carries an empty health state, an empty transaction
-    // log, the initial Influence economy (+2 per franchise via the engine),
-    // null trade state, initial objectives, no checkpoint, and the state
-    // chain at revision 0 with the canonical state digest.
+
     trade: null,
     objectives,
     health: {
@@ -368,8 +341,7 @@ function buildRun(
       healthVersion: SEASON_HEALTH_VERSION,
       injuries: [],
     },
-    // M2.6.5: a fresh run carries the empty free-agency state (no windows,
-    // no canonical candidates, every franchise at zero signings/spend).
+
     freeAgency: seasonFreeAgencyStateSchema.parse({
       schemaVersion: 1,
       freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
@@ -384,10 +356,7 @@ function buildRun(
     stateRevision: 0,
     stateDigest: '0'.repeat(32),
   };
-  // The state digest covers the mutable run facts including the initial
-  // zero effects state (the same 300-player zero state the block runner
-  // starts from); the stateDigest field is excluded from its own
-  // computation, mirroring the checkpoint digest.
+
   const expanded = expandSeasonRunRosters(run, catalog);
   const staminaInputs = [...expanded.values()].map((player) => {
     if (player.stamina === undefined) {
@@ -470,8 +439,6 @@ function main(): void {
   );
   console.log(`wrote ${resolve(FIXTURES_DIR, 'season-draft-finalized.json')}`);
 
-  // Legacy builders stay available for tests; the committed fixture now
-  // reflects the real pipeline.
   void buildSeasonRunFixture;
   void seasonDraftStateSchema;
 

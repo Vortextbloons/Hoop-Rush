@@ -1,10 +1,3 @@
-/**
- * Player-grouped holdout validation for the reconstruction models
- * (spec/12). Folds split by player identity (FNV-1a hash), never by season,
- * so no player appears in both train and holdout — the holdout is
- * pseudo-historical: the three-point record is treated as unknown exactly as
- * it is for pre-1979 players.
- */
 import { type ReconstructionMetrics } from '@hoop-rush/data-contracts';
 import { fnv1a32, fitBinomialLogistic, type FittedBinomial } from './math.ts';
 import { posteriorPrediction, round6 } from './predict.ts';
@@ -18,7 +11,6 @@ import {
 
 export type ReconstructionModel = 'accuracy' | 'attemptRate';
 
-/** Binary-search-free deterministic fold assignment by player id hash. */
 export function foldOf(playerExternalId: string, foldCount: number): number {
   return fnv1a32(`reconstruct-v1:${playerExternalId}`) % foldCount;
 }
@@ -30,7 +22,6 @@ export interface PriorInput {
   attemptRatePriorTrials: number;
 }
 
-/** Eligibility + trial counts per model: accuracy needs 3PA > 0; attempt needs FGA > 0. */
 export function eligibleRows(
   rows: readonly ReconstructionRow[],
   model: ReconstructionModel,
@@ -39,7 +30,6 @@ export function eligibleRows(
   return rows.filter((row) => row.fga !== null && row.fga > 0);
 }
 
-/** Observed rate for a row under a model (0 when ineligible). */
 export function observedRateFor(row: ReconstructionRow, model: ReconstructionModel): number | null {
   if (model === 'accuracy') {
     if (row.tpa === null || row.tpa <= 0) return null;
@@ -58,20 +48,12 @@ export interface Normalization {
   std: number[];
 }
 
-/**
- * Standardizes raw feature vectors with the given cohort mean/std. For
- * fold training the normalization is computed over the training rows; for
- * the final artifact it is computed over the full cohort and stored.
- */
 export function standardize(raw: readonly number[][], normalization: Normalization): number[][] {
   return raw.map((row) =>
     row.map((value, j) => (value - (normalization.mean[j] ?? 0)) / (normalization.std[j] ?? 1)),
   );
 }
 
-/** Features kept in raw units (dummy indicators). Standardizing sparse 0/1
- * columns amplifies their z-scores enormously and explodes ridge-shrunk
- * coefficients; raw units keep their effect as a bounded log-odds shift. */
 export const RAW_UNIT_FEATURES = new Set(['isGuard', 'isCenter']);
 
 export function computeNormalization(raw: readonly number[][]): Normalization {
@@ -100,15 +82,8 @@ export interface FittedModel {
   normalization: Normalization;
 }
 
-/**
- * Ridge multiplier for sparse dummy features (isGuard/isCenter). They sit on
- * subsets of rows, so heavy shrinkage keeps weak evidence from manufacturing
- * shooting; missing-data indicators are not modeled as features at all —
- * their role is the confidence band, driven by `missingFeatureCount`.
- */
 export const DUMMY_FEATURE_PENALTY_MULTIPLIER = 4;
 
-/** Fits one model over the given rows with the early-era prior pseudo-observations. */
 export function fitModel(
   rows: readonly ReconstructionRow[],
   context: FeatureContext,
@@ -180,17 +155,6 @@ export interface AttemptTranslation {
   caps: { G: number; F: number; C: number };
 }
 
-/**
- * Validates the conservative modern translation against a modern cohort:
- * the early-cohort attempt model (fitted coefficients and normalization)
- * predicts each modern player-season's conservative rate, the translation
- * scales it, and the attempt-weighted bias is measured against the modern
- * observed rate. The modern cohort is era-disjoint from the fit cohort, so
- * no player appears in both fit and validation. The non-positive-bias gate
- * on this metric is the acceptance criterion for the translation:
- * translated volume must never exceed what comparable modern players
- * actually did.
- */
 export function validateTranslatedAttemptRate(
   modernRows: readonly ReconstructionRow[],
   context: FeatureContext,
@@ -222,11 +186,6 @@ const FP_FN: Record<
   attemptRate: { threshold: 0.1, lowerBound: 0.05, upperBound: 0.15 },
 };
 
-/**
- * Runs player-grouped K-fold validation: fits on the training folds (with
- * the early-era prior pseudo-observations) and predicts every held-out
- * row's conservative quantile. Returns attempt-weighted metrics.
- */
 export function runGroupedHoldout(
   rows: readonly ReconstructionRow[],
   context: FeatureContext,
@@ -353,20 +312,14 @@ function bandMetrics(
   };
 }
 
-/** Minutes evidence bands for the report. */
 export function evidenceBandOf(minutes: number): string {
   if (minutes < 500) return 'under-500-min';
   if (minutes < 1500) return '500-1499-min';
   return '1500-plus-min';
 }
 
-/** Deterministic lambda grid tried during calibration. */
 export const LAMBDA_GRID = [0.5, 1, 2, 4] as const;
 
-/**
- * Picks the ridge lambda minimizing grouped-holdout MAE per model.
- * Deterministic: the grid and fold assignment are fixed.
- */
 export function pickLambda(
   rows: readonly ReconstructionRow[],
   context: FeatureContext,

@@ -20,23 +20,10 @@ import type {
   SeasonGameSideResult,
 } from '@hoop-rush/data-contracts';
 
-/**
- * CLI tests for `season home-court calibrate` (spec/2.0/02, M2.3). The
- * command-level tests run with injected engine doubles and the in-process
- * cohort runner; the committed artifact is validated directly.
- */
-
-/**
- * A deterministic fake engine: the neutral adapter splits mirror games at
- * 50% and the tuned profile raises the home rate linearly with the profile
- * constants. The per-seed decision is a pure function of the seed index, so
- * cohort folding is stable.
- */
 function fakeSimulateSeasonGame(input: SeasonGameSimulationInput): SeasonGameSimulationResult {
   const homeCourt = input.homeCourt;
   const tuned = homeCourt.homeDefensiveCommunication > 0 || homeCourt.awayTurnoverPressure > 0;
-  // The seed is a 32-hex zero-padded index; the trailing 8 hex chars carry
-  // the index for cohorts up to 2^32.
+
   const index = Number.parseInt(input.seed.slice(24, 32), 16) || 0;
   const homeRate = tuned
     ? 0.5 + (homeCourt.homeDefensiveCommunication + homeCourt.awayTurnoverPressure) * 0.1
@@ -188,7 +175,7 @@ describe('cli: season home-court calibrate (injected doubles)', () => {
         fakeDeps,
       );
       expect(report.failures.length).toBeGreaterThan(0);
-      // The artifact must not be written on a failed calibration.
+
       expect(report.payload).toMatchObject({ targetsWritten: false });
     });
   }, 60_000);

@@ -17,12 +17,6 @@ const g = (id: string, ...positions: string[]): SeasonRosterMemberInput => ({
   playable: positions as SeasonRosterMemberInput['playable'],
 });
 
-/**
- * Season Run M2.1 shared-seam tests: ten-player legality, the stricter
- * completion target, feasibility search, the deterministic legal-five
- * matching, the 240-minute rotation, and the canonical generation digest.
- */
-
 describe('season roster legality (season-roster-v1)', () => {
   it('accepts a legal ten-player roster', () => {
     const roster = [
@@ -66,7 +60,6 @@ describe('season roster legality (season-roster-v1)', () => {
   });
 
   it('catches the greedy-matching counterexample for the legal five', () => {
-    // Greedy G-first would take the G/F player and fail; exact DP succeeds.
     const members = [
       g('pv-a', 'PG', 'SF'),
       g('pv-b', 'PF', 'C'),
@@ -75,8 +68,7 @@ describe('season roster legality (season-roster-v1)', () => {
       g('pv-e', 'C'),
     ];
     expect(legalFiveExists(members)).toBe(true);
-    // Greedy picks PG/SF and PG for guards, then PF/C for a forward and
-    // cannot find the second forward; the exact DP still finds G,G,F,F,C.
+
     const bad = [
       g('pv-a', 'PG', 'SF'),
       g('pv-b', 'PF', 'C'),
@@ -85,7 +77,7 @@ describe('season roster legality (season-roster-v1)', () => {
       g('pv-e', 'C'),
     ];
     expect(legalFiveExists(bad)).toBe(true);
-    // No center at all: not legal.
+
     const noCenter = [
       g('pv-a', 'PG'),
       g('pv-b', 'SG'),
@@ -127,15 +119,13 @@ describe('season roster feasibility', () => {
       g('pv-9', 'C'),
       g('pv-10', 'PF', 'C'),
     ];
-    // 8 more picks reach 4G/4F/3C: two guards, three forwards, two centers,
-    // and the PF/C covering the fourth forward and third center.
+
     expect(rosterFeasible(owned, available, 8)).toBe(true);
-    // Only three more picks: cannot reach 4/4/3.
+
     expect(rosterFeasible(owned, available, 3)).toBe(false);
   });
 
   it('is exact for overlapping multi-position candidates', () => {
-    // All candidates cover G and F but none cover C; completion is impossible.
     const owned: SeasonRosterMemberInput[] = [];
     const available = [
       g('pv-1', 'PG', 'SF'),

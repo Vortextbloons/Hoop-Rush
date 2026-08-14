@@ -26,7 +26,6 @@
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import AsyncState from '$lib/components/AsyncState.svelte';
 
-  /** The slot-picker dialog chunk loads only when a player is selected. */
   let slotPickerModule: Promise<
     typeof import('$lib/components/draft/SlotPickerDialog.svelte')
   > | null = null;
@@ -56,14 +55,10 @@
 
   let starting = $state(false);
 
-  /** False once this component starts being destroyed (see below). */
   let mounted = true;
   $effect(() => {
     mounted = true;
     return () => {
-      // Post-destroy async callbacks (pool loads, bits-ui dismissal timers)
-      // must never write reactive state on a torn-down tree; that can
-      // cascade into an update-depth error during navigation away.
       mounted = false;
     };
   });
@@ -73,7 +68,7 @@
   let pickerPlayer = $state<IndexRow | null>(null);
   let pickerTrigger = $state<HTMLElement | null>(null);
   let pickerFallbackId = $state<string | null>(null);
-  /** Empty string means no filter (show all teams/decades). */
+
   let franchiseFilter = $state('');
   let eraFilter = $state('');
 
@@ -109,7 +104,6 @@
 
   $effect(() => loadSandboxData());
 
-  /** Resolve full profiles for the contextual fit panel; this never feeds the simulator. */
   $effect(() => {
     const m = manifest;
     const refs = slots
@@ -142,12 +136,6 @@
     loadSandboxData();
   }
 
-  /**
-   * Restores a draft carried in the URL (five player selections plus an
-   * optional seed) so "edit lineup" returns to the exact same draft. The
-   * selections are re-validated against the manifest and the players index;
-   * the underlying pools are loaded so full records are available for Play.
-   */
   function restoreUrlState(m: HoopRushManifest, ix: PlayersIndex) {
     if (slots.some((p) => p !== null)) return;
     if (typeof window === 'undefined') return;
@@ -167,9 +155,7 @@
         slots = filled;
         pickerPlayer = null;
       },
-      () => {
-        // Invalid draft state falls back to an empty board.
-      },
+      () => {},
     );
   }
 
@@ -178,11 +164,6 @@
   );
   const era = $derived(manifest?.eras.find((e) => e.eraId === eraFilter) ?? null);
 
-  /**
-   * Era-scoped historical identity for the selected franchise+decade. When
-   * both filters are set the pool header, select trigger, and logos show the
-   * historical team(s); franchise-only contexts keep the modern slot.
-   */
   const eraIdentity = $derived(
     manifest && franchise && era
       ? resolveEraTeamIdentity(manifest, franchise.franchiseId, era.eraId)
@@ -234,11 +215,6 @@
     eraFilter = id;
   }
 
-  /**
-   * Place the player at a slot, moving any movable incumbent out of the way.
-   * The placed player's pool is prefetched (fire-and-forget; getPool is
-   * memoized) so Play's resolve completes without a network wait.
-   */
   function placePlayer(subject: IndexRow, slotIndex: number) {
     const subjectSlot = slots.findIndex((p) => p !== null && p.playerId === subject.playerId);
     const incumbent = slots[slotIndex];

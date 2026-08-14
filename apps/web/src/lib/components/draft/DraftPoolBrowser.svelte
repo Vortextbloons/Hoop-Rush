@@ -62,10 +62,6 @@
 
   const eraLabel = $derived(new Map(manifest.eras.map((e) => [e.eraId, e.label])));
 
-  /**
-   * Historical team label for one draft row's franchise/era context, falling
-   * back to the modern slot abbreviation when the era has no lineage.
-   */
   function teamLabelFor(player: IndexRow): string {
     const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
     return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);
@@ -97,12 +93,6 @@
   const hasMore = $derived(filteredRows.length > visibleCount);
   const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
 
-  // Reset the draft's local filters whenever the pool scope or editability
-  // changes so a new rolled pool (Classic) or a new franchise/era scope
-  // (Sandbox) always starts with an unfiltered, fresh list. The effect's
-  // dependency set stays [rows, filtersEditable]: the value comparisons are
-  // untracked reads, and every write is value-guarded so an unchanged scope
-  // never invalidates state or schedules a second effect cycle.
   $effect(() => {
     void [rows, filtersEditable];
     const input = untrack(() => searchInput);
@@ -119,15 +109,10 @@
 
   type PoolCardInfo = {
     state: PoolCardState;
-    /** Who gets moved and where when this card's take-over is used. */
+
     displace: { incumbent: IndexRow; targetSlot: number } | null;
   };
 
-  /**
-   * Eligibility shown on the pool card itself, before any click. A player is
-   * "place" whenever any eligible slot is open; the displace highlight is
-   * reserved for the case where displacement is the only option.
-   */
   function poolCardInfoFor(player: IndexRow): PoolCardInfo {
     if (slots.some((p) => p !== null && p.playerId === player.playerId)) {
       return { state: 'lineup', displace: null };
@@ -147,12 +132,6 @@
       : { state: 'blocked', displace: null };
   }
 
-  /**
-   * Card eligibility keyed by playerId, built once per slot/pool change.
-   * poolCardInfoFor only reads the lineup slots and each player's positions,
-   * so the map is computed over the whole scoped pool (a superset of the
-   * visible rows) and never rebuilt for search keystrokes or pagination.
-   */
   const poolCardInfo = $derived.by(
     (): ReadonlyMap<string, PoolCardInfo> =>
       new Map(rows.map((player) => [player.playerId, poolCardInfoFor(player)])),

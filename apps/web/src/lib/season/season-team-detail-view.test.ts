@@ -10,18 +10,11 @@ import {
   type SeasonTeamDetail,
 } from './season-team-detail-view';
 
-/**
- * Season Run team detail view-model tests (M2.5 team drill-down): the
- * roster/rotation join, minutes accounting (240), closing-five marking,
- * folded player stats, and OVR/position lookups — all from recorded facts.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 const schedule = generateSeasonSchedule({ league, seed: SEED });
 const run = buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: 'lakers' });
 
-/** Zero raw projection for the (unreachable) no-minutes fallback path. */
 function zeroRawProjection() {
   return { overall: 0, offense: 0, defense: 0 };
 }

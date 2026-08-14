@@ -43,22 +43,6 @@ import { seasonPlayerAvailable } from './injuries.ts';
 import { seasonTransactionEntry } from './transactions.ts';
 import { SEASON_INFLUENCE_FLOOR } from './influence.ts';
 
-/**
- * M2.6.5 free-agency market engine (spec/2.0/15, season-free-agency-v1).
- * Deterministic shared markets after accepted checkpoints for blocks 2, 4,
- * 6. This module owns: the runtime eligible universe, canonical identity
- * selection, window composition, AI declarations, the seven-step resolution
- * vector, signing application, and the influence/roster/identity rules.
- *
- * All randomness derives from the frozen `free-agency` seed namespace;
- * candidate and franchise iteration use canonical ids. No standings, recent
- * wins, rubber-banding, or hidden ratings modifier may affect candidate
- * quality or simulation.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
-/** Season signing caps by original strength band (contender/playoff/average/weaker). */
 export const SEASON_FREE_AGENCY_BAND_SIGNING_CAPS: Record<string, number> = {
   contender: 1,
   playoff: 2,
@@ -66,7 +50,6 @@ export const SEASON_FREE_AGENCY_BAND_SIGNING_CAPS: Record<string, number> = {
   weaker: 3,
 };
 
-/** Frozen fallback band pool score caps (mirror of roster-targets-v3 policy). */
 const FALLBACK_BAND_POOL_SCORE_CAPS: Record<string, number> = {
   contender: 100,
   playoff: 92,
@@ -74,10 +57,8 @@ const FALLBACK_BAND_POOL_SCORE_CAPS: Record<string, number> = {
   weaker: 74,
 };
 
-/** Frozen fallback max roster strength outliers (mirror of roster-targets-v3 policy). */
 const FALLBACK_MAX_ROSTER_STRENGTH_OUTLIERS = 2;
 
-/** Per-window composition target: 1 featured, 5 role, 3 development, 3 emergency. */
 export const SEASON_FREE_AGENCY_WINDOW_COMPOSITION: Record<SeasonFreeAgencyBand, number> = {
   featured: 1,
   role: 5,
@@ -85,52 +66,36 @@ export const SEASON_FREE_AGENCY_WINDOW_COMPOSITION: Record<SeasonFreeAgencyBand,
   emergency: 3,
 };
 
-/** The market can never exceed 12 unique identities. */
 export const SEASON_FREE_AGENCY_WINDOW_MAX_CANDIDATES = 12;
 
-/** Window block indexes: windows open after accepted blocks 2, 4, 6. */
 export const SEASON_FREE_AGENCY_WINDOW_BLOCK_INDEXES: readonly number[] = [2, 4, 6];
 
-/** The named free-agency sub-seed for a key path (mirror of the trade stream). */
 export function freeAgencySeed(rootSeed: string, ...keys: string[]): string {
   return seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.freeAgency, ...keys);
 }
 
-/** The catalog-backed score member (identity carried for ranking). */
 export interface SeasonFreeAgencyScoreMember extends SeasonScoreMember {
   playerVersionId: string;
 }
 
-/** The runtime free-agency module context. */
 export interface SeasonFreeAgencyContext {
   run: SeasonRun;
   effects: SeasonEffectsState;
-  /** Packaged draft catalog (positions, ratings, stamina, durability). */
+
   catalog: SeasonDraftCatalog;
-  /** Packaged free-agency eligibility index (free-agency-index-v1). */
+
   index: SeasonFreeAgencyIndex;
-  /** Frozen roster-targets policy (band caps, identity roles); optional seam. */
+
   targets?: SeasonRosterTargets;
-  /** The human franchise, when one controls the run. */
+
   humanFranchiseId: string | null;
 }
 
-/** The window-opening result: the new state plus the window record. */
 export interface SeasonFreeAgencyWindowOpenResult {
   freeAgency: SeasonFreeAgencyState;
   window: SeasonFreeAgencyWindowState;
 }
 
-// ---------------------------------------------------------------------------
-// Runtime universe and canonical identity selection
-// ---------------------------------------------------------------------------
-
-/**
- * The current eligible universe (spec/2.0/15): every indexed identity group
- * minus versions whose identity is already represented on a roster, versions
- * already owned, and versions signed earlier in the run. Groups are keyed by
- * real `playerId`; each group lists its still-eligible indexed versions.
- */
 export function seasonFreeAgencyUniverseOf(
   run: SeasonRun,
   index: SeasonFreeAgencyIndex,
@@ -162,13 +127,6 @@ export function seasonFreeAgencyUniverseOf(
   return universe;
 }
 
-/**
- * Selects (or reuses) the run-canonical version of one identity. On first
- * admission the choice is deterministic: recorded completeness first, then
- * eligible band order (featured > role > development > emergency), role
- * coverage breadth, availability, the named seed
- * `free-agency/{window}/canonical/{playerId}`, then playerVersionId.
- */
 export function canonicalFreeAgencyIdentity(
   rootSeed: string,
   windowIndex: number,
@@ -215,16 +173,6 @@ export function canonicalFreeAgencyIdentity(
   return best.entry;
 }
 
-// ---------------------------------------------------------------------------
-// Window composition
-// ---------------------------------------------------------------------------
-
-/**
- * Composes the window's up-to-12 unique canonical identities (1 featured,
- * 5 role, 3 development, 3 emergency). When the eligible universe cannot
- * support a band target, the market records the smaller valid set; it never
- * duplicates identities, relaxes quality limits, or invents players.
- */
 export function composeSeasonFreeAgencyWindow(
   context: SeasonFreeAgencyContext,
   windowIndex: number,
@@ -274,7 +222,6 @@ export function composeSeasonFreeAgencyWindow(
   return candidates;
 }
 
-/** Maps an indexed entry to its window candidate card. */
 function entryToCandidate(entry: SeasonFreeAgencyIndexEntry): SeasonFreeAgencyCandidate {
   return {
     playerVersionId: entry.playerVersionId,
@@ -295,17 +242,6 @@ function entryToCandidate(entry: SeasonFreeAgencyIndexEntry): SeasonFreeAgencyCa
   };
 }
 
-// ---------------------------------------------------------------------------
-// Window open (records canonical choices + AI declarations)
-// ---------------------------------------------------------------------------
-
-/**
- * Opens the market window for `windowIndex` atomically: selects the canonical
- * identities (persisting every first admission into market history), records
- * the deterministic AI declarations, and returns the updated state. The
- * following block submission is rejected with `free-agency-unresolved` until
- * the window is explicitly resolved.
- */
 export function openSeasonFreeAgencyWindow(
   context: SeasonFreeAgencyContext,
   windowIndex: number,
@@ -320,7 +256,6 @@ export function openSeasonFreeAgencyWindow(
   }
   const candidates = composeSeasonFreeAgencyWindow(context, windowIndex);
 
-  // Persist every first-admission canonical choice.
   const canonicalCandidates: Record<string, SeasonFreeAgencyCanonical> = {
     ...run.freeAgency.canonicalCandidates,
   };
@@ -335,7 +270,6 @@ export function openSeasonFreeAgencyWindow(
     };
   }
 
-  // Deterministic AI declarations for every non-human franchise.
   const declarations: Record<string, SeasonFreeAgencyDeclaration> = {};
   for (const team of run.league.teams) {
     if (team.franchiseId === context.humanFranchiseId) continue;
@@ -366,7 +300,6 @@ export function openSeasonFreeAgencyWindow(
   };
 }
 
-/** The open window blocking the next submission, when one exists. */
 export function freeAgencyUnresolvedWindowIndex(freeAgency: SeasonFreeAgencyState): number | null {
   for (const window of freeAgency.windows) {
     if (window.status === 'open') return window.windowIndex;
@@ -374,18 +307,6 @@ export function freeAgencyUnresolvedWindowIndex(freeAgency: SeasonFreeAgencyStat
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// AI policy
-// ---------------------------------------------------------------------------
-
-/**
- * Deterministic AI declaration for one franchise (spec/2.0/15 AI policy):
- * signing caps by original strength band (1/2/3/3), the existing band
- * strength ceilings and one-outlier hard budget from the recorded AI
- * identity score, affordable commitments bounded by the per-window one
- * signing and six-point season rules. Never driven by standings, recent
- * wins, or hidden ratings modifiers.
- */
 function aiDeclarationOf(
   context: SeasonFreeAgencyContext,
   windowIndex: number,
@@ -481,12 +402,10 @@ function aiDeclarationOf(
   };
 }
 
-/** Deterministic synthetic command id for AI declarations (never accepted). */
 function syntheticCommandId(rootSeed: string, windowIndex: number, franchiseId: string): string {
   return `fa-ai-${freeAgencySeed(rootSeed, String(windowIndex), 'ai', franchiseId).slice(0, 32)}`;
 }
 
-/** The declared expectation an AI franchise records for a candidate. */
 function supportedExpectationFor(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -505,7 +424,6 @@ function supportedExpectationFor(
   return 'depth';
 }
 
-/** True when adding the candidate keeps a legal rotation subset available. */
 function rosterLegalWithCandidate(
   context: SeasonFreeAgencyContext,
   roster: SeasonRosterLike | undefined,
@@ -521,7 +439,6 @@ interface SeasonRosterLike {
   players: SeasonRosterEntry[];
 }
 
-/** All roster members as legality inputs (playable positions from the catalog). */
 function rosterMembers(
   context: SeasonFreeAgencyContext,
   roster: SeasonRosterLike | undefined,
@@ -540,7 +457,6 @@ function rosterMembers(
   return members;
 }
 
-/** The catalog candidate lookup (by version id) the module uses. */
 function catalogCandidateIndex(
   context: SeasonFreeAgencyContext,
 ): Map<string, { positions: SeasonDraftCatalog['candidates'][number]['positions'] }> {
@@ -554,7 +470,6 @@ function catalogCandidateIndex(
   return map;
 }
 
-/** Builds a legality member for one indexed candidate. */
 function memberOfCandidate(
   context: SeasonFreeAgencyContext,
   candidate: SeasonFreeAgencyCandidate,
@@ -572,12 +487,6 @@ function memberOfCandidate(
   };
 }
 
-/**
- * AI strength ceiling (recorded AI identity score): the post-signing roster
- * strength must stay within the band pool score cap, with the existing
- * one-outlier hard budget — the first signing of the season may exceed the
- * cap only while the roster stays within the max-outlier allowance.
- */
 function aiWithinStrengthCeiling(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -605,7 +514,6 @@ function aiWithinStrengthCeiling(
   return rosterOutliers + (candidateOutlier ? 1 : 0) <= maxOutliers;
 }
 
-/** Builds score members for every roster player from the catalog. */
 function scoreMembersOf(
   context: SeasonFreeAgencyContext,
   roster: SeasonRosterLike | undefined,
@@ -627,7 +535,6 @@ function scoreMembersOf(
   return members;
 }
 
-/** The identity-weighted score of a roster's max-per-role coverage. */
 function maxRoleCoverageIdentityScore(
   members: readonly SeasonFreeAgencyScoreMember[],
   identity: Parameters<typeof identityScore>[1],
@@ -651,7 +558,6 @@ function maxRoleCoverageIdentityScore(
   return identityScore(coverage, identity);
 }
 
-/** Builds a score member for one candidate (via its catalog reference). */
 function membershipToMember(
   membership: SeasonRosterMemberInput,
   context: SeasonFreeAgencyContext,
@@ -670,11 +576,6 @@ function membershipToMember(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Resolution facts (need, identity fit, opportunity, emergency repair)
-// ---------------------------------------------------------------------------
-
-/** The candidate's roster role coverage (>= threshold roles the roster lacks). */
 function needTierOf(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -695,7 +596,6 @@ function needTierOf(
   return 'low';
 }
 
-/** Max-per-role coverage of the current roster from catalog facts. */
 function rosterRoleCoverage(
   context: SeasonFreeAgencyContext,
   roster: SeasonRosterLike | undefined,
@@ -719,7 +619,6 @@ function rosterRoleCoverage(
   return coverage;
 }
 
-/** The candidate's detailed-role scores (existing scorer, catalog facts). */
 function candidateRoleScores(
   context: SeasonFreeAgencyContext,
   candidate: SeasonFreeAgencyCandidate,
@@ -738,7 +637,6 @@ function candidateRoleScores(
   });
 }
 
-/** AI identity fit: how many of the identity's priority roles the candidate covers. */
 function identityFitOf(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -757,7 +655,6 @@ function identityFitOf(
   return 'misfit';
 }
 
-/** Recorded identity priority roles (targets policy, fallback table). */
 function priorityRolesOf(
   context: SeasonFreeAgencyContext,
   identity: string,
@@ -779,12 +676,6 @@ function priorityRolesOf(
   return fallback[identity] ?? ROSTER_ROLES;
 }
 
-/**
- * Playing opportunity: top-eight in the best legal candidate-containing
- * rotation ranks `immediate`, top-ten `available`, otherwise `crowded`. The
- * rotation is the ten highest-value roster+candidate members by the
- * identity-weighted score; legality is enforced separately.
- */
 function opportunityOf(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -812,7 +703,6 @@ function opportunityOf(
   return 'crowded';
 }
 
-/** True when the current rotation is availability-invalid and the candidate repairs it. */
 function emergencyRepairsRotation(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -826,11 +716,6 @@ function emergencyRepairsRotation(
   return candidate.availability.healthy;
 }
 
-// ---------------------------------------------------------------------------
-// Declaration / skip validation (used by the command handlers)
-// ---------------------------------------------------------------------------
-
-/** Validates and records a human declaration (final once accepted). */
 export function applyFreeAgencyDeclaration(
   run: SeasonRun,
   windowIndex: number,
@@ -955,7 +840,6 @@ export function applyFreeAgencyDeclaration(
   };
 }
 
-/** Records the human skip (no cost, no penalty, final once accepted). */
 export function applyFreeAgencySkip(
   run: SeasonRun,
   windowIndex: number,
@@ -965,7 +849,6 @@ export function applyFreeAgencySkip(
   return applyFreeAgencyDeclaration(run, windowIndex, franchiseId, commandId, []);
 }
 
-/** The typed rejection wrapper the command layer converts to the wire shape. */
 export class FreeAgencyValidationRejection extends Error {
   readonly rejection: SeasonFreeAgencyRejectionLike;
   constructor(rejection: SeasonFreeAgencyRejectionLike) {
@@ -977,11 +860,6 @@ export class FreeAgencyValidationRejection extends Error {
 
 type SeasonFreeAgencyRejectionLike = { code: string } & Record<string, unknown>;
 
-// ---------------------------------------------------------------------------
-// Resolution
-// ---------------------------------------------------------------------------
-
-/** The resolution result: traces, signings, and the mutated run facts. */
 export interface SeasonFreeAgencyResolutionResult {
   freeAgency: SeasonFreeAgencyState;
   signings: SeasonFreeAgencySigning[];
@@ -989,20 +867,12 @@ export interface SeasonFreeAgencyResolutionResult {
   effects: SeasonEffectsState;
   influence: SeasonInfluenceState;
   transactions: SeasonTransactionEntry[];
-  /** The run rosters after the signings (each gains its signed player). */
+
   rosters: SeasonRun['rosters'];
-  /** The run ownership after the signings (each gains its signed row). */
+
   ownership: SeasonOwnership[];
 }
 
-/**
- * Resolves one window (spec/2.0/15): first priorities resolve simultaneously
- * by candidate, then second priorities for franchises that did not sign. At
- * most one player signs per franchise; winners leave every remaining target
- * list. The recorded seven-step vector decides contested candidates:
- * legality, role credibility, need tier, identity fit, opportunity,
- * committed Influence, named-seed draw.
- */
 export function resolveSeasonFreeAgencyWindow(
   context: SeasonFreeAgencyContext,
   windowIndex: number,
@@ -1049,7 +919,6 @@ export function resolveSeasonFreeAgencyWindow(
   const secondTargetOf = (franchiseId: string): SeasonFreeAgencyTarget | undefined =>
     declarations[franchiseId]?.targets[1];
 
-  // Pass 1: first priorities, candidate by candidate (canonical order).
   for (const candidate of [...candidates].sort((a, b) =>
     a.playerVersionId < b.playerVersionId ? -1 : 1,
   )) {
@@ -1085,7 +954,6 @@ export function resolveSeasonFreeAgencyWindow(
     }
   }
 
-  // Pass 2: second priorities for franchises that did not sign.
   const remaining = Object.keys(declarations)
     .filter((franchiseId) => !signedFranchises.has(franchiseId))
     .sort();
@@ -1134,10 +1002,9 @@ export function resolveSeasonFreeAgencyWindow(
     resolution: signings.length > 0 ? 'signed' : 'no-signing',
   };
 
-  // Apply signings to the run facts atomically.
   let effects = context.effects;
   let influence = context.run.influence;
-  const transactions = [...context.run.transactions];
+  let transactions = [...context.run.transactions];
   let freeAgency = {
     ...context.run.freeAgency,
     signingCounts: { ...context.run.freeAgency.signingCounts },
@@ -1156,7 +1023,7 @@ export function resolveSeasonFreeAgencyWindow(
     );
     effects = outcome.effects;
     influence = outcome.influence;
-    transactions.push(...outcome.transactions);
+    transactions = outcome.transactions;
     freeAgency = outcome.freeAgency;
     rosters = rosters.map((roster) =>
       roster.franchiseId === signing.franchiseId
@@ -1189,10 +1056,6 @@ export function resolveSeasonFreeAgencyWindow(
   };
 }
 
-/**
- * The recorded seven-step vector. Returns the winning franchise id (or null
- * when no claim is legal). Every comparison records categorical steps.
- */
 function pickWinner(
   context: SeasonFreeAgencyContext,
   windowIndex: number,
@@ -1211,12 +1074,11 @@ function pickWinner(
     if (comparison > 0) winner = franchiseId;
   }
   if (winner === null) return null;
-  // Final legality guard for the winning claim.
+
   if (!claimLegal(context, winner, candidate, [])) return null;
   return winner;
 }
 
-/** Legality: roster capacity, identity uniqueness, legal rotation subset. */
 function claimLegal(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -1251,7 +1113,6 @@ function claimLegal(
   return reasons.length === 0;
 }
 
-/** The lexicographic vector over two claims; positive means `b` wins. */
 function compareClaims(
   context: SeasonFreeAgencyContext,
   windowIndex: number,
@@ -1260,7 +1121,6 @@ function compareClaims(
   b: string,
   steps: SeasonFreeAgencyTraceStep[],
 ): number {
-  // 1. Legality (both legal -> tie).
   const aLegal = claimLegal(context, a, candidate, steps);
   const bLegal = claimLegal(context, b, candidate, steps);
   if (aLegal !== bLegal) {
@@ -1274,7 +1134,6 @@ function compareClaims(
     return bLegal ? 1 : -1;
   }
 
-  // 2. Role credibility.
   const aRole = roleCredibilityOf(context, a, candidate);
   const bRole = roleCredibilityOf(context, b, candidate);
   const roleRank = (credibility: string) =>
@@ -1294,7 +1153,6 @@ function compareClaims(
   });
   if (roleRank(bRole) !== roleRank(aRole)) return roleRank(bRole) < roleRank(aRole) ? 1 : -1;
 
-  // 3. Need tier.
   const aNeed = needTierOf(context, a, candidate);
   const bNeed = needTierOf(context, b, candidate);
   const needRank = (tier: string) => (tier === 'high' ? 0 : tier === 'medium' ? 1 : 2);
@@ -1307,7 +1165,6 @@ function compareClaims(
   });
   if (needRank(bNeed) !== needRank(aNeed)) return needRank(bNeed) < needRank(aNeed) ? 1 : -1;
 
-  // 4. AI identity / campaign fit.
   const aIdentity = assignmentIdentityOf(context, a);
   const bIdentity = assignmentIdentityOf(context, b);
   const aFit = identityFitOf(context, a, aIdentity, candidate);
@@ -1322,7 +1179,6 @@ function compareClaims(
   });
   if (fitRank(bFit) !== fitRank(aFit)) return fitRank(bFit) < fitRank(aFit) ? 1 : -1;
 
-  // 5. Playing opportunity.
   const aOpportunity = opportunityOf(context, a, aIdentity, candidate);
   const bOpportunity = opportunityOf(context, b, bIdentity, candidate);
   const oppRank = (opportunity: string) =>
@@ -1338,7 +1194,6 @@ function compareClaims(
     return oppRank(bOpportunity) < oppRank(aOpportunity) ? 1 : -1;
   }
 
-  // 6. Committed Influence (higher wins).
   const aCommit = committedInfluenceOf(context, a, candidate);
   const bCommit = committedInfluenceOf(context, b, candidate);
   steps.push({
@@ -1350,7 +1205,6 @@ function compareClaims(
   });
   if (bCommit !== aCommit) return bCommit > aCommit ? 1 : -1;
 
-  // 7. Named-seed draw.
   const aDraw = freeAgencySeed(
     context.run.rootSeed,
     String(windowIndex),
@@ -1376,7 +1230,6 @@ function compareClaims(
   return a < b ? -1 : 1;
 }
 
-/** The recorded role credibility of a claim (rotation/depth/emergency). */
 function roleCredibilityOf(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -1411,7 +1264,6 @@ function assignmentIdentityOf(context: SeasonFreeAgencyContext, franchiseId: str
   );
 }
 
-/** The committed Influence on the claim's target within the CURRENT window. */
 function committedInfluenceOf(
   context: SeasonFreeAgencyContext,
   franchiseId: string,
@@ -1430,11 +1282,6 @@ function committedInfluenceOf(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Signing application (atomic facts)
-// ---------------------------------------------------------------------------
-
-/** The per-signing accounting facts applied atomically at resolution. */
 interface SeasonSigningFacts {
   effects: SeasonEffectsState;
   influence: SeasonInfluenceState;
@@ -1442,7 +1289,6 @@ interface SeasonSigningFacts {
   freeAgency: SeasonFreeAgencyState;
 }
 
-/** Builds the immutable signing record (no state mutation yet). */
 function applySigning(
   context: SeasonFreeAgencyContext,
   blockIndex: number,
@@ -1476,7 +1322,6 @@ function applySigning(
   };
 }
 
-/** Applies one signing's facts (ownership, roster, ledger, transaction). */
 function applySigningFacts(
   context: SeasonFreeAgencyContext,
   effects: SeasonEffectsState,
@@ -1585,7 +1430,6 @@ function applySigningFacts(
   };
 }
 
-/** The roster entry for a signed player (from the catalog candidate). */
 function rosterEntryOf(
   context: SeasonFreeAgencyContext,
   signing: SeasonFreeAgencySigning,
@@ -1604,7 +1448,6 @@ function rosterEntryOf(
   };
 }
 
-/** Resolves the signing's catalog index from the candidate card reference. */
 function signingCatalogIndexOf(
   context: SeasonFreeAgencyContext,
   signing: SeasonFreeAgencySigning,
@@ -1618,7 +1461,6 @@ function signingCatalogIndexOf(
   return -1;
 }
 
-/** The block index that opened a window (2, 4, 6). */
 function windowBlockIndexOf(windowIndex: number): number {
   return SEASON_FREE_AGENCY_WINDOW_BLOCK_INDEXES[windowIndex] ?? 2;
 }

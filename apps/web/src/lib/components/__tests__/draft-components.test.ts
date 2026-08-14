@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import type { PlayersIndexEntry } from '@hoop-rush/data-contracts';
@@ -162,9 +160,7 @@ describe('DraftPoolBrowser parity', () => {
 
   it('with allowDisplacement=false a displace-only pool card shows the blocked state instead', () => {
     const subject = row({ playerId: 'sub', displayName: 'Subject One', positionsPlayable: ['PG'] });
-    // The only slot Subject One can fill (PG) is occupied, and the swing player
-    // there is the only one who could move (to the open SF slot). That makes
-    // this displace-only: blocked without displacement, "Moves …" with it.
+
     const filledSlots = [
       row({ playerId: 'g1', displayName: 'Guard One', positionsPlayable: ['PG'] }),
       row({ playerId: 'g2', displayName: 'Swing Two', positionsPlayable: ['PG', 'SF'] }),
@@ -328,9 +324,6 @@ describe('LineupCourt allowRemove', () => {
   });
 
   it('announces a placement once and does not re-announce for a fresh array with identical ids', async () => {
-    // Regression: previousSlots is a non-reactive snapshot. A reactive
-    // snapshot re-triggers the effect after every slot reallocation, which
-    // produced effect_update_depth_exceeded under parallel test runs.
     const manifest = buildManifest();
     const a = row({ playerId: 'a', displayName: 'Aaron A' });
     const b = row({ playerId: 'b', displayName: 'Barry B' });
@@ -348,8 +341,6 @@ describe('LineupCourt allowRemove', () => {
     const status = container.querySelector('[role="status"]');
     expect(status?.textContent).toBe('Placed Barry B at SG.');
 
-    // Same ids, freshly allocated array: the snapshot must prevent a repeat
-    // announcement (and any effect loop).
     await rerender({ ...props, slots: [null, b, null, null, null] });
     expect(status?.textContent).toBe('Placed Barry B at SG.');
   });

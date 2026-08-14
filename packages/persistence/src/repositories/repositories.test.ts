@@ -23,15 +23,6 @@ import {
   testDatabaseName,
 } from '../testing/repo-test-support.ts';
 
-/**
- * Repository contract tests: both adapters must validate every read, promote
- * active runs atomically, and surface corrupt records instead of silently
- * accepting them. Dexie tests run against fake-indexeddb with one fresh
- * database per test. The active run is append-only: a checkpoint plus one
- * game row per accepted game, reconstructed in order on load. Classic mode
- * adds a single active draft row that promotion clears atomically.
- */
-
 function draftRecord(
   draft: StoredClassicDraft['draft'] = buildClassicDraftState(),
 ): StoredClassicDraft {
@@ -72,7 +63,6 @@ function indexFor(runId = 'run-1'): CompletedRunIndex {
   };
 }
 
-/** Schema-valid game result for append fixtures; game 1 wins, game 2 loses. */
 function buildGameResult(gameNumber: number): GameResult {
   const side = (teamId: string, displayName: string): GameResult['home'] => ({
     teamId,
@@ -129,7 +119,6 @@ function buildGameResult(gameNumber: number): GameResult {
   };
 }
 
-/** Zeroed aggregates shaped like the checkpoint requires, with a record. */
 function aggregatesFor(gamesPlayed: number, wins: number, losses: number): RunAggregates {
   const zero = () => ({ made: 0, attempted: 0 });
   return {
@@ -167,7 +156,6 @@ function aggregatesFor(gamesPlayed: number, wins: number, losses: number): RunAg
   };
 }
 
-/** Fresh Dexie-backed repository with one isolated database per test. */
 function makeAdapter(): { repo: ChallengeRepository; db: TestDatabase } {
   const db = new TestDatabase(testDatabaseName('repositories'));
   return { repo: new DexieChallengeRepository(db), db };

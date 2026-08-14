@@ -4,16 +4,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { REPO_ROOT } from './data-loader.ts';
 import { UsageError } from '../args.ts';
 
-/**
- * `combine docs`: merges every markdown file under a docs directory into a
- * single combined file. The output and an optional exception list live in the
- * docs root, outside the subfolders that hold the sources.
- *
- * Relative markdown links inside embedded sections are rewritten so they still
- * resolve from the docs root once the sections are concatenated into the
- * combined file. Links inside fenced code blocks are left untouched.
- */
-
 export const COMBINE_DOCS_OPTIONS: Record<string, boolean> = {
   input: true,
   output: true,
@@ -25,18 +15,10 @@ export const DEFAULT_DOCS_DIR = resolve(REPO_ROOT, 'Docs');
 export const DEFAULT_EXCEPTIONS_FILE = 'combine-exceptions.txt';
 export const DEFAULT_COMBINED_OUTPUT = 'combined.md';
 
-/** Relative paths use forward slashes so exclusion matching is platform-stable. */
 function toSlashPath(path: string): string {
   return path.replaceAll('\\', '/');
 }
 
-/**
- * Rewrites `[text](target)` links in `content` so they resolve from the docs
- * root. `sourceRelDir` is the directory of the source file relative to the
- * docs root (e.g. `architecture`); each link target is resolved against it and
- * re-emitted relative to the docs root. Links inside fenced code blocks and
- * links that are already absolute, fragment-only, or external are preserved.
- */
 export function rewriteLinksForRoot(
   content: string,
   sourceRelDir: string,
@@ -75,7 +57,6 @@ export function rewriteLinksForRoot(
   return rewritten.join('\n');
 }
 
-/** One relative path per line; blank lines and `#` comments are ignored. */
 export function readExceptionList(path: string): string[] {
   if (!existsSync(path)) return [];
   return [

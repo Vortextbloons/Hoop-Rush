@@ -31,22 +31,11 @@ import {
   zeroEffectsOf,
 } from './season-economy-test-support.ts';
 
-/**
- * M2.5 trade window tests (season-trade-v1, engine side): deterministic
- * window generation and replay, value bands, offer shapes, AI-to-AI season
- * totals (8-15), unique ownership + legal rosters + chemistry invariants as
- * a property over seeds, atomic application, deadline expiry, and the
- * influence-purchased fourth offer. The risky-rehab AI path is stubbed to
- * the contract semantics (the health workstream owns the real seams).
- */
-
 vi.mock('./injuries.ts', async (importOriginal) => {
   const original = await importOriginal<typeof import('./injuries.ts')>();
   return {
     ...original,
-    // Deterministic contract-conformant stubs until the health workstream
-    // lands the real rehab seams: success shortens remaining absence by one
-    // game (minimum one), failure lengthens it by one.
+
     rollSeasonRehabOutcome: () => 'success' as const,
     applyRiskyRehabOutcome: (
       health: SeasonRun['health'],
@@ -112,7 +101,6 @@ function applyWindowResult(
   };
 }
 
-/** Runs the three windows of one season in order on a fresh run. */
 function seasonWindows(seed: string): { run: SeasonRun; results: SeasonWindowOpenResult[] } {
   const { run: base, catalog } = fixture(seed);
   let run: SeasonRun & { effects: SeasonEffectsState } = { ...base, effects: zeroEffectsOf(base) };
@@ -125,8 +113,6 @@ function seasonWindows(seed: string): { run: SeasonRun; results: SeasonWindowOpe
   return { run, results };
 }
 
-// The default-seed season is deterministic; several window-shape tests
-// consume the same three-window run, so it is generated once and shared.
 let sharedSeasonRun: ReturnType<typeof seasonWindows> | null = null;
 function sharedSeason(): ReturnType<typeof seasonWindows> {
   if (sharedSeasonRun === null) {
@@ -216,7 +202,7 @@ describe('season trade window opening', () => {
       expect(offer.incomingHealth).toHaveLength(offer.incomingPlayerVersionIds.length);
       expect(offer.projectedRotationChanges.length).toBeLessThanOrEqual(512);
     }
-    // The three base offers come from distinct AI franchises.
+
     const fromFranchises = new Set(baseOffers.map((offer) => offer.fromFranchiseId));
     expect(fromFranchises.size).toBe(3);
   });
@@ -301,7 +287,7 @@ describe('season trade window opening', () => {
       expect(offer.toFranchiseId).not.toBe(HUMAN);
       expect(offer.fromFranchiseId).not.toBe(HUMAN);
       expect(offer.toFranchiseId).not.toBe(offer.fromFranchiseId);
-      // AI acceptances are mutually within the frozen band (v2 kinds).
+
       const kind =
         offer.outgoingPlayerVersionIds.length === 1 && offer.incomingPlayerVersionIds.length === 1
           ? ('1-1' as const)
@@ -334,15 +320,14 @@ describe('season trade window opening', () => {
     for (const entry of spendLedger) {
       expect(entry.requestedDelta).toBe(-1);
       expect(entry.appliedDelta).toBe(-1);
-      // Ledger reconciliation: balanceAfter === sum of applied deltas up to
-      // and including this entry (initial +2 grant included).
+
       const priorDeltas = result.influence.ledger
         .filter(
           (prior) => prior.franchiseId === entry.franchiseId && prior.entryId <= entry.entryId,
         )
         .reduce((sum, prior) => sum + prior.appliedDelta, 0);
       expect(entry.balanceAfter).toBe(priorDeltas);
-      // windows tracking recorded the spend
+
       const windows = result.influence.windows[entry.franchiseId];
       expect(windows?.some((window) => window.windowIndex === 0 && window.extraOfferSpent)).toBe(
         true,
@@ -389,7 +374,6 @@ describe('season AI trade season totals', () => {
   });
 
   it('never exceeds 15 even when prior windows record their maximum', () => {
-    // Season cap: force a high early count and verify window 2 respects it.
     const { run: base, catalog } = fixture('b1d2e3f405162738495a6b7c8d9e0f11');
     let run: SeasonRun & { effects: SeasonEffectsState } = {
       ...base,
@@ -418,7 +402,7 @@ describe('season trade invariants (property over seeds)', () => {
         for (const blockIndex of [2, 4, 5]) {
           const result = openWindow(run, catalog, blockIndex);
           run = applyWindowResult(run, result);
-          // Unique ownership: 300 distinct versions, each owned once.
+
           const owned = run.ownership.map((row) => row.playerVersionId);
           expect(new Set(owned).size).toBe(300);
           for (const row of run.ownership) {
@@ -426,7 +410,7 @@ describe('season trade invariants (property over seeds)', () => {
               run.rosters.find((roster) => roster.franchiseId === row.ownerFranchiseId),
             ).toBeDefined();
           }
-          // Legal ten-player rosters.
+
           const facts = seasonTradeCatalogFactsOf(catalog);
           for (const roster of run.rosters) {
             const members: SeasonRosterMemberInput[] = roster.players.map((player) => ({
@@ -435,7 +419,7 @@ describe('season trade invariants (property over seeds)', () => {
             }));
             expect(validateSeasonRoster(members)).toEqual([]);
           }
-          // Legal rotations referencing exactly their rosters.
+
           for (const rotation of run.rotations) {
             const roster = run.rosters.find((entry) => entry.franchiseId === rotation.franchiseId);
             const playable = new Map<string, readonly Position[]>();
@@ -447,7 +431,7 @@ describe('season trade invariants (property over seeds)', () => {
             }
             expect(validateSeasonRotation(rotation, playable)).toEqual([]);
           }
-          // Effects: 300 loads + 1,350 canonical pairs over the rosters.
+
           expect(run.effects.playerStates).toHaveLength(300);
           expect(run.effects.pairStates).toHaveLength(1350);
           const pairSet = new Set(run.effects.pairStates.map((pair) => `${pair.a}\u0000${pair.b}`));
@@ -481,7 +465,7 @@ describe('season trade chemistry zero-state', () => {
     const pairsByKey = new Map(
       result.effects.pairStates.map((pair) => [`${pair.a}\u0000${pair.b}`, pair]),
     );
-    // Every pair that contains a moved player must be a NEW pair (zero state).
+
     for (const [key, pair] of pairsByKey) {
       const [a, b] = key.split('\u0000');
       if (a !== undefined && b !== undefined && (moved.has(a) || moved.has(b))) {
@@ -534,7 +518,6 @@ describe('season applySeasonTrade', () => {
       commandId: 'cmd-accept-1',
     });
 
-    // Unique ownership: the two versions swapped owners and appear once.
     expect(next.ownership.find((row) => row.playerVersionId === outgoingId)?.ownerFranchiseId).toBe(
       'celtics',
     );
@@ -547,7 +530,6 @@ describe('season applySeasonTrade', () => {
     }
     for (const count of ownedCount.values()) expect(count).toBe(1);
 
-    // Rosters updated and legal.
     const humanAfter = next.rosters.find((roster) => roster.franchiseId === HUMAN);
     expect(humanAfter?.players.map((player) => player.playerVersionId)).toContain(incomingId);
     expect(humanAfter?.players.map((player) => player.playerVersionId)).not.toContain(outgoingId);
@@ -560,7 +542,6 @@ describe('season applySeasonTrade', () => {
       expect(validateSeasonRoster(members)).toEqual([]);
     }
 
-    // Rotations repaired: legal, referencing the new rosters, minutes preserved.
     for (const rotation of next.rotations) {
       const roster = next.rosters.find((entry) => entry.franchiseId === rotation.franchiseId);
       const playable = new Map<string, readonly Position[]>();
@@ -571,21 +552,19 @@ describe('season applySeasonTrade', () => {
       const total = rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0);
       expect(total).toBe(240);
     }
-    // The incoming player inherited the outgoing player's minutes.
+
     const humanRotation = next.rotations.find((rotation) => rotation.franchiseId === HUMAN);
     const incomingMinutes = humanRotation?.targetMinutes.find(
       (entry) => entry.playerVersionId === incomingId,
     );
     expect(incomingMinutes?.minutes).toBe(32);
 
-    // Effects: 1,350 pairs, loads follow the versions.
     expect(next.effects.playerStates).toHaveLength(300);
     expect(next.effects.pairStates).toHaveLength(1350);
     expect(
       next.effects.playerStates.find((player) => player.playerVersionId === incomingId),
     ).toBeDefined();
 
-    // Transaction entry + offer status.
     const tradeEntry = next.transactions[next.transactions.length - 1];
     expect(tradeEntry?.type).toBe('trade');
     expect(tradeEntry?.commandId).toBe('cmd-accept-1');
@@ -687,7 +666,7 @@ describe('season applySeasonTrade', () => {
       status: 'open',
     };
     const effects = zeroEffectsOf(run);
-    // Incoming player not on the stated roster.
+
     expect(() =>
       applySeasonTrade(
         { ...run, effects },
@@ -695,7 +674,7 @@ describe('season applySeasonTrade', () => {
         catalog,
       ),
     ).toThrow(SeasonTradeInvariantError);
-    // Same-franchise trade.
+
     expect(() =>
       applySeasonTrade(
         { ...run, effects },
@@ -703,7 +682,7 @@ describe('season applySeasonTrade', () => {
         catalog,
       ),
     ).toThrow(SeasonTradeInvariantError);
-    // Missing catalog.
+
     expect(() => applySeasonTrade({ ...run, effects }, baseOffer)).toThrow(SeasonTradeFactsError);
   });
 
@@ -711,8 +690,7 @@ describe('season applySeasonTrade', () => {
     const { run, catalog } = fixture('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
     const first = openWindow(run, catalog, 2);
     const second = openWindow(run, catalog, 2);
-    // Deterministic application: identical window results on identical runs
-    // (AI trade applications, rotation repairs, and all).
+
     expect(first.trade).toEqual(second.trade);
     const run2 = applyWindowResult(run, first);
     const run3 = applyWindowResult(run, second);
@@ -741,7 +719,7 @@ describe('season trade deadlines', () => {
 
     const closed = expireTradeOffersForBlock(trade, 3);
     expect(closed?.windows[0]?.status).toBe('closed');
-    // Open offers expire; already-resolved offers keep their status.
+
     for (const offer of closed?.windows[0]?.offers ?? []) {
       if (offer.status === 'expired') continue;
       expect(['accepted', 'declined']).toContain(offer.status);
@@ -752,7 +730,6 @@ describe('season trade deadlines', () => {
     expect(expiredAfter.length).toBe(openBefore.length);
     expect(expiredAfter.length).toBeGreaterThan(0);
 
-    // Null-safe and idempotent.
     expect(expireTradeOffersForBlock(null, 3)).toBeNull();
     const again = expireTradeOffersForBlock(closed, 3);
     expect(again).toEqual(closed);
@@ -859,7 +836,7 @@ describe('season contextual player value', () => {
     };
     const injured = seasonTradePlayerValue(version, { ...context, run: injuredRun });
     expect(injured).toBeLessThan(healthy);
-    // Heavy recent load lowers the value (bounded workload factor, max 15%).
+
     const effects: SeasonEffectsState = {
       ...run.effects,
       playerStates: run.effects.playerStates.map((player) =>
@@ -882,7 +859,7 @@ describe('season contextual player value', () => {
     expect(ratioMutuallyWithinBand(834, '2-2')).toBe(true);
     expect(ratioMutuallyWithinBand(1200, '2-2')).toBe(true);
     expect(ratioMutuallyWithinBand(1201, '2-2')).toBe(false);
-    // Uneven packages use the 80-120 band like every multi-player package.
+
     expect(ratioMutuallyWithinBand(834, '1-2')).toBe(true);
     expect(ratioMutuallyWithinBand(1200, '2-1')).toBe(true);
     expect(ratioMutuallyWithinBand(833, '1-2')).toBe(false);
@@ -892,7 +869,7 @@ describe('season contextual player value', () => {
 describe('season AI risky-rehab spends (health seam stubbed)', () => {
   it('records seeded rehabs in ledgers, transactions, and the health state', () => {
     const { run: base, catalog } = fixture('a1b2c3d4e5f60718293a4b5c6d7e8f9a');
-    // Injure one player on each AI franchise so the seeded decisions fire.
+
     let run: SeasonRun & { effects: SeasonEffectsState } = {
       ...base,
       effects: zeroEffectsOf(base),
@@ -937,12 +914,12 @@ describe('season AI risky-rehab spends (health seam stubbed)', () => {
       expect(payload.outcome).toBe('success');
       expect(result.influence.rehabs[payload.injuryId ?? '']).toBeDefined();
       expect(result.influence.rehabs[payload.injuryId ?? '']?.outcome).toBe('success');
-      // The stub shortens recovery by one game: the injury record reflects it.
+
       const record = result.health.injuries.find((injury) => injury.injuryId === payload.injuryId);
       expect(record?.missedGamesRemaining).toBe(1);
       expect(record?.rehabModifier).toBe(-1);
     }
-    // Every rehabbed injury belongs to the AI franchise that paid for it.
+
     for (const [injuryId, state] of Object.entries(result.influence.rehabs)) {
       expect(state.franchiseId).not.toBe(HUMAN);
       expect(

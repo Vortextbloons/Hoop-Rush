@@ -11,13 +11,6 @@ import {
 import { NBA_ROOT, ratings, resolveHistoricalIdentity } from '@hoop-rush/importer';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 
-/**
- * `hoop-rush data derive`: reproduces one player-season's complete derivation
- * trace: source inputs, the field-method registry, priors, shrinkage,
- * unclamped values, final values, and every version boundary (spec/09,
- * spec/12). Reads the cached raw snapshot only; never fetches.
- */
-
 export const DATA_DERIVE_OPTIONS: Record<string, boolean> = {
   player: true,
   season: true,
@@ -45,9 +38,9 @@ interface DeriveTracePayload {
   };
   seasonContext: ratings.SeasonContext;
   inputs: Record<string, unknown>;
-  /** Method chosen per final field (rating/tendency/anchor keys). */
+
   methods: Record<string, string>;
-  /** Unclamped diagnostic values per final field. */
+
   unclamped: Record<string, number>;
   final: {
     ratings: Record<string, number>;

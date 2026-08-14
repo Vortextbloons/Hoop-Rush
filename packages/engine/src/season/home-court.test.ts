@@ -118,9 +118,6 @@ describe('season home-court seam (M2.3)', () => {
   });
 
   it('defaults omitted homeCourt fields to the neutral adapter at the schema boundary', () => {
-    // The M2.2 committed fixture inputs carry no homeCourt field: the zod
-    // default applies the neutral profile, so they parse and simulate
-    // unchanged (the M2.2 fixture regression gate).
     const base = buildInput('hc-schema-1', SEASON_NEUTRAL_HOME_COURT);
     const withoutHomeCourt = { ...base };
     delete (withoutHomeCourt as { homeCourt?: unknown }).homeCourt;
@@ -144,7 +141,7 @@ describe('season home-court seam (M2.3)', () => {
     const neutral = seasonHomeCourtMechanisms(SEASON_NEUTRAL_HOME_COURT);
     expect(neutral.homeDefenseShotAdjustment).toBe(0);
     expect(neutral.awayTurnoverPressureAdjustment).toBe(0);
-    // Monotonic in the constants.
+
     const higher = seasonHomeCourtMechanisms({
       schemaVersion: 1,
       profileVersion: 'season-home-court-v1',
@@ -156,13 +153,12 @@ describe('season home-court seam (M2.3)', () => {
     expect(higher.awayTurnoverPressureAdjustment).toBeGreaterThan(
       mechanisms.awayTurnoverPressureAdjustment,
     );
-    // The engine constant is a valid profile with the frozen target.
+
     expect(seasonHomeCourtProfileSchema.safeParse(SEASON_HOME_COURT_PROFILE).success).toBe(true);
     expect(SEASON_HOME_COURT_PROFILE.targetHomeWinRate).toBe(SEASON_HOME_WIN_RATE_TARGET);
   });
 
   it('moves the home win rate toward the target with small effects', () => {
-    // Small held-out-style subset: 60 mirror matchups on both adapters.
     const neutralWins = (): number => {
       let wins = 0;
       for (let i = 0; i < 60; i += 1) {
@@ -191,19 +187,12 @@ describe('season home-court seam (M2.3)', () => {
     };
     const neutralRate = neutralWins() / 60;
     const homeRate = homeWins() / 60;
-    // The tuned profile must move the rate toward 0.575 and away from the
-    // neutral baseline; on a 60-game subset the effect direction is the
-    // stable assertion (the ±0.01 tolerance gate lives in the calibration
-    // cohort, not a 60-game subset).
+
     expect(homeRate).toBeGreaterThan(neutralRate);
     expect(Math.abs(homeRate - SEASON_HOME_WIN_RATE_TARGET)).toBeLessThan(0.2);
   });
 
   it('keeps possession extremes within the neutral band', () => {
-    // Compare possession counts on the same 24 seeds: the home-court
-    // mechanisms touch turnover and conversion, not pace, so the per-game
-    // possession range stays inside the neutral envelope plus a small
-    // allowance.
     const possessions = (homeCourt: SeasonGameSimulationInput['homeCourt']): number[] => {
       const counts: number[] = [];
       for (let i = 0; i < 24; i += 1) {

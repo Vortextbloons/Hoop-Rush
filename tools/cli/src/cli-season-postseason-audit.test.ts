@@ -19,14 +19,6 @@ import {
 } from './commands/season-postseason-audit.ts';
 import { loadSeasonRunFixture } from './commands/season-block.ts';
 
-/**
- * M2.6 `season postseason audit` tests (postseason-v2): every frozen
- * failure class — duplicate/missing teams, invalid play-in feeders,
- * incorrect home court, games after clinching, inconsistent summaries,
- * champion/completion mismatches — plus the clean-path audit and the CLI
- * end-to-end exit codes.
- */
-
 const EAST: { seeds: string[]; firstRound: Array<{ home: string; away: string }> } = {
   seeds: [
     'lakers',
@@ -187,7 +179,6 @@ function baseSummary(facts: {
   return { ...summary, resultDigest: seasonPostseasonSummaryDigest(summary) };
 }
 
-/** A best-of-seven series sweep: 4 games, winner = homeCourt side. */
 function sweep(
   seriesId: string,
   round: SeasonPostseasonSummary['round'],
@@ -220,7 +211,6 @@ function sweep(
   return games;
 }
 
-/** A fully consistent postseason: play-ins, sweeps, and a finals champion. */
 function validPostseason(): SeasonPostseasonSummary[] {
   const summaries: SeasonPostseasonSummary[] = [];
   for (const conference of ['east', 'west'] as const) {
@@ -319,7 +309,6 @@ function validPostseason(): SeasonPostseasonSummary[] {
   return summaries;
 }
 
-/** A schema-valid completed run whose postseason names the given champion. */
 function runWithChampion(champion: string) {
   const run = loadSeasonRunFixture(join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json'));
   const opponent = champion === 'lakers' ? 'warriors' : 'lakers';
@@ -527,7 +516,7 @@ describe('season postseason audit (postseason-v2)', () => {
     });
     expect(failures).toEqual([]);
     expect(counts.championCompletionMismatch).toBe(0);
-    // The export path detects a champion mismatch against the almanac.
+
     const mismatched = auditSeasonPostseasonFacts({
       summaries,
       championFranchiseId: 'warriors',
@@ -552,8 +541,7 @@ describe('season postseason audit (postseason-v2)', () => {
     const index = summaries.findIndex((summary) => summary.gameId === 'pi-east-final');
     const final = summaries[index];
     if (final === undefined) throw new Error('missing final');
-    // Re-pairing the eliminated nine-ten loser (hornets) in place of the
-    // winner trips both the seven-eight feeder and re-pair diagnostics.
+
     summaries[index] = { ...final, awayFranchiseId: 'hornets', loserFranchiseId: 'hornets' };
     const { failures, counts } = auditOf(summaries);
     expect(counts.invalidFeeders).toBeGreaterThan(0);

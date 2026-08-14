@@ -3,15 +3,6 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REPO_ROOT } from './cli-test-helpers.ts';
 
-/**
- * Architectural dependency check (spec/2.0/07, M2.0 exit gate): Season Run
- * domain modules must stay pure TypeScript. No Svelte, persistence, worker,
- * browser, or network imports may appear in `packages/engine/src/season/`
- * implementation files. The engine package is environment-free by design,
- * so the scan lives in the CLI where Node is available; the same boundary is
- * enforced statically by the engine's eslint `no-restricted-imports` rule.
- */
-
 const SEASON_DIR = join(REPO_ROOT, 'packages/engine/src/season');
 
 const FORBIDDEN_SPECIFIER_FRAGMENTS = [

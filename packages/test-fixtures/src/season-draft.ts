@@ -24,15 +24,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { buildSeasonLeague } from './season.ts';
 
-/**
- * Deterministic Season Run M2.1 fixture builders (spec/2.0 M2.1): a compact
- * draft catalog with position variety (so legality and feasibility are
- * exercisable), rotation builders, AI assignments, and synthetic
- * generation results. Engine tests, persistence tests, and CLI tests share
- * these so the contracts stay in sync.
- */
-
-/** Position archetypes cycled across candidates so every pool covers G/F/C. */
 const POSITION_ARCHETYPES: Array<{
   playable: Array<'PG' | 'SG' | 'SF' | 'PF' | 'C'>;
   primary: 'PG' | 'SG' | 'SF' | 'PF' | 'C';
@@ -77,10 +68,6 @@ function candidateRating(
   return Math.min(96, Math.max(25, base + boost));
 }
 
-/**
- * One deterministic draft candidate. The archetype index shapes the ratings so
- * scoring functions and feasibility searches see real variation.
- */
 export function buildSeasonDraftCandidate(input: {
   franchiseId: string;
   eraId: string;
@@ -175,22 +162,18 @@ export function buildSeasonDraftCandidate(input: {
       blockAttemptRate: 6 + ((index * 2) % 14),
       crashOffensiveGlassRate: 8 + ((index * 2) % 18),
     },
-    // M2.4: build-time stamina profile (season-stamina-v1); 45..95 rating.
+
     stamina: {
       rating: 45 + ((index * 7) % 51),
       historicalMpg: 20 + ((index * 5) % 41),
       derivationVersion: SEASON_STAMINA_VERSION,
     },
-    // M2.5: build-time durability profile (durability-v1); fixed synthetic
-    // ratings in the 45..95 contract range (the persistence/trade engines
-    // consume the rating, never the derivation facts).
+
     durability: {
       rating: 45 + ((index * 7) % 51),
       derivationVersion: SEASON_DURABILITY_VERSION,
     },
-    // Projection milestone (season-draft-catalog-v4): validated observed
-    // anchors. Fixed synthetic values in the contract ranges so projection
-    // fixtures exercise the observed-anchor paths.
+
     anchors: {
       gamesPlayed: 60 + ((index * 3) % 21),
       minutesPerGame: 24 + ((index * 2) % 20),
@@ -211,11 +194,6 @@ export function buildSeasonDraftCandidate(input: {
   };
 }
 
-/**
- * Compact deterministic draft catalog. `playersPerPool` candidates per pool
- * cycle through the position archetypes, so every pool contains G/F/C variety
- * and completion targets stay feasible.
- */
 export function buildSeasonDraftCatalog(
   input: {
     franchiseIds?: string[];
@@ -350,7 +328,6 @@ export function fixtureGenerationDigest(material: string): string {
   return seasonDigestHex(material).slice(0, 32);
 }
 
-/** Synthetic M2.3.5 global-eight draft facts for fixture runs. */
 export function buildFixtureSeasonDraftFacts(): SeasonRun['draft'] {
   return {
     draftVersion: SEASON_DRAFT_VERSION,
@@ -422,13 +399,6 @@ export function buildFixtureSeasonDraftFacts(): SeasonRun['draft'] {
   };
 }
 
-/**
- * Synthetic roster-generation-v2 pools for fixture runs: one 20-player pool
- * per AI franchise (29 pools for a 30-team league; the human franchise gets
- * none), each with ten selections and one allocation seed path per
- * selection. Pool versions are synthetic (never on a roster); the block
- * pipeline consumes final rosters only, so the pools are recorded facts.
- */
 export function buildSeasonAiPools(
   assignments: SeasonAiAssignment[],
   humanFranchiseId: string,
@@ -473,12 +443,6 @@ const ALL_ROSTER_ROLES = [
   'defensive-rebounding',
 ] as const;
 
-/**
- * The frozen `roster-targets-v2` artifact values for fixture runs (M2.4).
- * Matches the committed seasonRosterTargetsSchema policy exactly; the
- * `measured` facts are synthetic calibration-style values (fixtures never
- * run real calibration).
- */
 export function buildFixtureRosterTargets(): SeasonRosterTargets {
   return {
     schemaVersion: 2,
@@ -639,11 +603,6 @@ export function buildFixtureEvaluations(
   });
 }
 
-/**
- * Valid draft-state fixture for persistence and CLI tests (season-draft-v2).
- * The state is schema-valid (mid-drafting with one drawn eight-card offer and
- * one pick); tests that need specific shapes pass shallow overrides.
- */
 export function buildSeasonDraftState(
   overrides: Partial<SeasonDraftState> & { rootSeed?: string; revision?: number } = {},
 ): SeasonDraftState {

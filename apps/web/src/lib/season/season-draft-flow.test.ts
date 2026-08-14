@@ -19,12 +19,6 @@ import {
 } from '@hoop-rush/test-fixtures';
 import { SOLO_PARTICIPANT_ID, SeasonDraftFlow, coverageNeeds } from './season-draft-flow';
 
-/**
- * M2.3.5 draft flow unit tests (season-draft-v2): the UI state machine over
- * the authoritative engine commands and the persisted Season draft record
- * (spec/2.0/03), plus legacy season-draft-v1 detection and explicit discard.
- */
-
 class InMemorySeasonDraftRepository implements SeasonDraftRepository {
   private stored: StoredSeasonDraft | null = null;
   saveSeasonDraft(record: StoredSeasonDraft): Promise<void> {
@@ -91,7 +85,6 @@ function makeFlow(repo: SeasonDraftRepository) {
   return new SeasonDraftFlow(repo, CATALOG, { generate: () => fakeGeneration() });
 }
 
-/** Picks the highest-selectable card of the drawn offer until accepted. */
 async function pickBestFromOffer(flow: SeasonDraftFlow): Promise<void> {
   const state = flow.draft;
   if (state === null) throw new Error('expected a draft state');
@@ -242,7 +235,6 @@ describe('SeasonDraftFlow', () => {
     expect(completedDraft.status).toBe('complete');
     expect(generation.rosters).toHaveLength(30);
 
-    // The persisted record carries the completed generation.
     const stored = await repo.loadSeasonDraft();
     expect(stored).not.toBeNull();
     expect(stored?.generation).not.toBeNull();
@@ -304,9 +296,7 @@ describe('SeasonDraftFlow', () => {
     const draw = await flow.draw();
     expect(draw.status).toBe('accepted');
     const offerBefore = flow.draft?.currentOffer;
-    // A second draw of the same turn is an accepted no-op (the flow issues a
-    // fresh command id, so the engine's own accepted-no-op path keeps the
-    // same offer and never appends a second one).
+
     const secondDraw = await flow.draw();
     expect(secondDraw.status).toBe('accepted');
     expect(flow.draft?.currentOffer).toEqual(offerBefore);

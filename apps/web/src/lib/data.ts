@@ -35,12 +35,8 @@ function cacheBustedUrl(url: string): string {
 
 export function getManifest(): Promise<HoopRushManifest> {
   if (!manifestPromise) {
-    // Normal browser caching: a reload reuses the HTTP-cached manifest (the
-    // app.html preload also serves it). Stale deployments recover through
-    // `reloadManifest`'s cache-busted request below; the retry stays bounded
-    // to one reload per asset.
     manifestPromise = loadManifest(manifestUrl());
-    // A failed load must not poison the cache: the next request retries.
+
     manifestPromise.catch(() => {
       manifestPromise = null;
     });
@@ -66,12 +62,6 @@ function parseObservedContentHash(error: unknown): string | null {
   return match?.[2] ?? null;
 }
 
-/**
- * Recover from a stale-manifest mismatch: packaged assets were regenerated
- * after this page loaded, so refresh the manifest and retry the asset once
- * against the freshly published content hash. When the manifest fetch is still
- * cached, retry against the hash observed from the fetched bytes.
- */
 async function retryWithFreshManifest<T>(
   original: unknown,
   expectedHash: string,
@@ -105,7 +95,7 @@ export function getPool(entry: PoolIndexEntry): Promise<FranchiseEraPool> {
   if (!promise) {
     promise = loadPoolForKey(entry.franchiseId, entry.eraId, key);
     poolCache.set(key, promise);
-    // A failed load must not poison the cache: the next request retries.
+
     promise.catch(() => {
       poolCache.delete(key);
     });
@@ -215,7 +205,6 @@ export function getPlayersIndex(): Promise<PlayersIndex> {
   return playersIndexPromise;
 }
 
-/** Warm the players index during idle or on hover/focus intent. Never throws. */
 export function warmPlayersIndex(): void {
   if (typeof window === 'undefined') return;
   void getPlayersIndex().catch(() => {});
@@ -227,8 +216,7 @@ async function loadPlayersIndexFor(): Promise<PlayersIndex> {
   if (!entry) {
     throw new Error('The global players index is unavailable.');
   }
-  // The index is immutable and content-addressed; a validated copy in
-  // IndexedDB spares a ~4.7 MB re-download and re-parse on every reload.
+
   const cached = await readCachedAsset(entry.contentHash, parsePlayersIndex);
   if (cached !== null) return cached;
   const load = (url: string, contentHash: string, bustCache = false) =>
@@ -269,8 +257,7 @@ async function loadRosterDetailsFor(): Promise<RosterDetails> {
   if (!entry) {
     throw new Error('Roster details are unavailable.');
   }
-  // The roster-details asset is immutable and content-addressed; a validated
-  // copy in IndexedDB spares a ~6.5 MB re-download and re-parse per reload.
+
   const cached = await readCachedAsset(entry.contentHash, parseRosterDetails);
   if (cached !== null) return cached;
   const load = (url: string, contentHash: string, bustCache = false) =>
@@ -293,7 +280,6 @@ async function loadRosterDetailsFor(): Promise<RosterDetails> {
   }
 }
 
-/** @internal Resets memoized loaders between unit tests. */
 export function clearDataLoaderCaches(): void {
   manifestPromise = null;
   poolCache.clear();

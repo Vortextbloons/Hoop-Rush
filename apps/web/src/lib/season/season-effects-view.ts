@@ -9,15 +9,6 @@ import type {
   SeasonRetainedGameDetail,
 } from '@hoop-rush/data-contracts';
 
-/**
- * M2.4 effects presentation (season-stamina-v2 + season-chemistry-v1).
- * Fatigue bands and chemistry facts derived from the recorded effects state
- * frozen in the accepted checkpoint. The UI presents projections as
- * projections and shared possessions as evidence, never as a precise future
- * outcome. The fatigue-band thresholds live in the engine
- * (`fatigueBandOf`); the web keeps only the presentation labels.
- */
-
 export type FatigueBand = 'fresh' | 'ready' | 'tired' | 'heavy';
 
 export const fatigueBand = fatigueBandOf;
@@ -91,8 +82,6 @@ export function projectedFatigueBand(
   staminaRating: number,
   games = 10,
 ): FatigueBand {
-  // Deterministic projection: per-game accumulation at the player's
-  // workload, one recovery tick between games, no role bonuses.
   let fatigue = currentFatigueBp;
   for (let i = 0; i < games; i += 1) {
     const seconds = minutesPerGame * 60;
@@ -104,12 +93,6 @@ export function projectedFatigueBand(
   return fatigueBand(Math.min(10_000, fatigue));
 }
 
-/**
- * One block-level mechanism row: aggregated evidence from the block's
- * retained details (human-team games). `avgInputFraction` is the recorded
- * average mechanism input (fatigue or chemistry as a 0..1 fraction) over the
- * opportunities, and the deltas are integer millionths.
- */
 export interface BlockMechanismEvidenceRow {
   mechanism: SeasonMechanismEvidence['mechanism'];
   side: SeasonMechanismEvidence['side'];

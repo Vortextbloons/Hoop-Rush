@@ -13,27 +13,12 @@ import {
   type ActionType,
 } from './usage.ts';
 
-/**
- * Zone skill, defender selection, perimeter/interior pressure, and era
- * efficiency resolve shots and blocks (spec/03 pipeline stages 4-6). Era
- * baselines come from the profile; player skill and defensive contest move
- * the league base the same way for both teams. Lineup spacing and play-type
- * shot quality shift two-point conversion so lineup and action context
- * measurably matter.
- */
-
 export interface ShotPrep {
-  /** Lineup spacing (0..1) of the offensive team, precomputed per game. */
   spacing: number;
-  /** Two-point anchor factor for the shooter, precomputed per game (null when unanchored). */
+
   twoPointAnchor: number | null;
 }
 
-/**
- * Team spacing (0..1): three-point skill weighted by three-point volume
- * across the five-man lineup. High-spacing lineups open the paint; this is
- * the explicit lineup-interaction input into shot quality.
- */
 export function teamSpacing(team: SimulationTeam): number {
   return (
     team.players.reduce((sum, p) => {
@@ -44,7 +29,6 @@ export function teamSpacing(team: SimulationTeam): number {
   );
 }
 
-/** Play-type conversion bonus for a two-point attempt (0 when undefined). */
 export function shotQualityBonus(action: ActionType, zone: ShotZone): number {
   const table = (
     ENGINE_CONSTANTS.shotQuality as Partial<Record<ActionType, Partial<Record<ShotZone, number>>>>
@@ -52,14 +36,6 @@ export function shotQualityBonus(action: ActionType, zone: ShotZone): number {
   return table?.[zone] ?? 0;
 }
 
-/**
- * Defensive contest adjustment for a shooter, zone-aware: interior pressure on
- * rim/close shots, perimeter pressure on threes, a blend in between. The
- * adjustment is zero-centered at the population-mean contest rating, so an
- * average defender leaves the anchored conversion intact, elite defenders
- * subtract, and weak defenders add. A strictly negative contest silently
- * dragged every anchored player below their own observed season rate.
- */
 export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): number {
   let contest: number;
   if (zone === 'rim' || zone === 'shortMid') {
@@ -85,15 +61,6 @@ export function contestPenalty(defender: SimulationPlayer, zone: ShotZone): numb
   return ratio * ENGINE_CONSTANTS.contestMax;
 }
 
-/**
- * Observed two-point make rate from the season anchors (null when the
- * anchors cannot support a split). Derived from field-goal percentage with
- * the three-point share removed, clamped to a plausible band. Players with a
- * conservative reconstructed three-point profile (pre-1979 / missing
- * records) split their field-goal percentage using the conservative
- * reconstructed attempt rate and accuracy, so their two-point efficiency
- * stays anchored instead of silently dropping out.
- */
 export function observedTwoPointPct(shooter: SimulationPlayer): number | null {
   const anchors = shooter.anchors;
   if (!anchors) return null;
@@ -108,17 +75,6 @@ export function observedTwoPointPct(shooter: SimulationPlayer): number | null {
   return Math.min(0.62, Math.max(0.32, twoPct));
 }
 
-/**
- * Soft two-point efficiency anchor (null when the player has no reliable
- * season data). The ratio of the player's observed two-point percentage to
- * the expected conversion at the zone bases for their *actual* blended shot
- * mix. The expected mix is the same era-blended mix pickZone produces, so
- * the factor pins overall two-point efficiency to the real season instead of
- * drifting to the era mix (which previously dragged rim-reliant interior
- * scorers below their own observed rate). Zone differentiation stays intact
- * because every zone scales by the same factor; the factor is clamped so
- * context still matters.
- */
 export function twoPointAnchorFactor(
   shooter: SimulationPlayer,
   profile: EraSimulationProfile,
@@ -149,7 +105,6 @@ export function twoPointAnchorFactor(
   );
 }
 
-/** Probability a shot is blocked, by zone and defender (V1 revalidated). */
 export function blockProbability(
   defender: SimulationPlayer,
   zone: ShotZone,
@@ -192,15 +147,6 @@ export function blockProbability(
   );
 }
 
-/**
- * Make probability for one shot attempt (clamped to basketball plausibility).
- *
- * Three-point resolution order (spec/12): an observed season percentage
- * anchors the shot (blended toward the era target); a conservative
- * reconstructed profile pins the shot at its own accuracyConservative (no
- * skill residual, no generic historical era penalty, profile-level zone
- * floors); otherwise the unanchored zone base applies.
- */
 export function makeProbability(
   shooter: SimulationPlayer,
   defender: SimulationPlayer,
@@ -242,8 +188,7 @@ export function makeProbability(
     anchoredTwo || hasObservedThree || hasReconstructed
       ? 0
       : (profile.parameters.leagueTsPct - 0.55) * ENGINE_CONSTANTS.eraEfficiencyWeight;
-  // Lineup spacing raises two-point conversion for spaced teams and
-  // compresses it for clogged ones; three-pointers are unaffected.
+
   const spacing = threePointZone ? 0 : (prep.spacing - 0.5) * ENGINE_CONSTANTS.spacingBonusScale;
   const quality = threePointZone ? 0 : shotQualityBonus(action, zone);
   const latePenalty =
@@ -262,9 +207,7 @@ export function makeProbability(
     calibration +
     homeCourtAdjustment +
     effectsAdjustment;
-  // Reconstructed three-point shots floor at the profile's per-zone
-  // conservative floors (corner/above-break only) instead of the generic
-  // zone floors; the profile pins both accuracy and its own uncertainty.
+
   const floor =
     threePointZone && hasReconstructed
       ? zone === 'cornerThree'

@@ -1,12 +1,3 @@
-/**
- * Parity harness: read-only comparison of TS-computed artifacts against the
- * committed artifacts under apps/web/static/data.
- *
- * Eligibility counts and peak-selection ordering must match exactly (they are
- * deterministic rules over the same inputs). Era-sim parameters must match
- * within rounding tolerance (same stint aggregates). Ratings are pure
- * deterministic derivations, so top-5 selection ordering must also match.
- */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,8 +17,6 @@ interface CommittedPool {
   players: CommittedPoolPlayer[];
 }
 
-// Eras with packaged raw-data seasons can be recomputed; the snapshot covers
-// 1960-61 onward after the M3.5 import.
 const TARGETS = [
   ['lakers', '1990s'],
   ['celtics', '1990s'],
@@ -59,8 +48,7 @@ describe('parity: pools vs committed artifacts', () => {
   for (const [franchiseId, eraId] of TARGETS) {
     it(
       `${franchiseId}/${eraId} eligibility and top-5 selection match`,
-      // The real-data recompute scans raw-data season files; under a fully
-      // parallel gate a cold cache can exceed the 5s default vitest budget.
+
       { timeout: 30_000 },
       () => {
         const manifest = loadManifest();
@@ -81,13 +69,11 @@ describe('parity: pools vs committed artifacts', () => {
   }
 });
 
-/** The Python fetch layer's config.py, read at test time (never imported). */
 const PYTHON_CONFIG = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '../../../scripts/import-nba/config.py',
 );
 
-/** Extracts the DEFAULT_SEASONS list literal from the Python config source. */
 function parsePythonSeasons(source: string): string[] {
   const match = source.match(/DEFAULT_SEASONS = \[\n((?:\s*"[0-9-]+",\n)*)\s*\]/);
   const group = match?.[1];
@@ -113,7 +99,7 @@ describe('parity: DEFAULT_SEASONS vs the Python fetch layer', () => {
 describe('parity: era profiles vs committed artifacts', () => {
   it(
     'all era parameters match the committed profiles within rounding tolerance',
-    // The real-data recompute reads every packaged era's stint files.
+
     { timeout: 30_000 },
     () => {
       const eras = erasWithData();
@@ -130,7 +116,7 @@ describe('parity: era profiles vs committed artifacts', () => {
         for (const key of PARAM_KEYS) {
           const expected = committedProfile.parameters[key] ?? 0;
           const actual = profile.parameters[key];
-          // Both sides round from the same stint aggregates; allow float noise.
+
           expect(Math.abs(actual - expected)).toBeLessThanOrEqual(0.0015);
         }
       }

@@ -16,13 +16,6 @@ import { challengeRepository } from '$lib/challenge-repo';
 import { randomUUID } from '$lib/random-id';
 import { FIXED_SANDBOX_ERA, loadRunPreamble } from '$lib/run-preamble';
 
-/**
- * The single authoritative path from a resolved five-player lineup to an
- * active saved sandbox run (spec/01 sandbox loop). The draft page picks any
- * five peak player-seasons from the global index; the run always simulates
- * in the fixed '2010s' environment era.
- */
-
 export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): Promise<void> {
   if (players.length !== 5) {
     throw new Error('A lineup needs exactly five players.');
@@ -62,9 +55,7 @@ export async function startSandboxRun(players: PeakPlayerSeason[], seed: Seed): 
     profile,
     bracket,
   };
-  // The run is saved with the base run seed and no games; the challenge page
-  // asks the worker to simulate the whole-run best-of and re-saves the chosen
-  // attempt seed before the paced reveal starts (spec/01 sandbox loop).
+
   const run = createChallenge({ ...creation, runSeed: seed });
   await challengeRepository.saveActiveRun({
     recordId: 'active',

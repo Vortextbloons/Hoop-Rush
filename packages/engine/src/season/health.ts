@@ -16,34 +16,13 @@ import { rollSeasonInjuryForPlayer, seasonPlayerAvailable } from './injuries.ts'
 import { chooseInitialUnit, type PlannerRotationContext } from './rotation-planner.ts';
 import { reduceSeasonStandings } from './standings.ts';
 
-/**
- * M2.5 health availability and interruption seams (season-health-v1, engine
- * side). Availability is DERIVED from the recorded injuries, never stored.
- * The human franchise with no legal five before a game produces a typed
- * `invalid-roster` interruption and an uncommitted pending candidate; AI
- * franchises with no legal five forfeit 2-0 through the ordinary game path.
- *
- * `SeasonInvalidRosterInterruption` is the data-contracts type (season-
- * pending-block.ts); it is re-exported here so engine consumers keep one
- * import surface.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 export type { SeasonInvalidRosterInterruption } from '@hoop-rush/data-contracts';
 
-/**
- * The run facts the health seams read: identity, league, rosters,
- * rotations, and versions. Both the full `SeasonRun` (runner, command
- * layer) and the `SeasonBlockRunContext` the block pipeline carries satisfy
- * this shape.
- */
 export type HealthRunView = Pick<
   SeasonRun,
   'runId' | 'rootSeed' | 'league' | 'rosters' | 'rotations' | 'versions'
 >;
 
-/** Regulation target seconds for one rostered version (target minutes x 60). */
 function targetSecondsOf(
   rotation: SeasonRun['rotations'][number],
   playerVersionId: string,
@@ -52,14 +31,6 @@ function targetSecondsOf(
   return (entry?.minutes ?? 0) * 60;
 }
 
-/**
- * Legal-five availability for one franchise (roster + positions + health).
- * The human pipeline check passes the expanded position facts (catalog-
- * derived); the runner-side reconstruction (no catalog in scope) falls back
- * to the lock-time-legal starters witness, then the availability-count
- * approximation — the authoritative legality decision always happens in the
- * pipeline, where the expanded positions are available.
- */
 export function seasonFranchiseLegalFiveFacts(
   run: HealthRunView,
   franchiseId: string,
@@ -92,11 +63,6 @@ export function seasonFranchiseLegalFiveFacts(
     const context: PlannerRotationContext = { rotation, members, targets };
     legal = chooseInitialUnit(context, unavailable) !== null;
   } else {
-    // No position facts in scope (runner-side reconstruction): the rotation
-    // lock validated the starters as a legal ordered five, so all starters
-    // available is a sound legality witness; otherwise approximate with the
-    // available-count rule (the pipeline's authoritative check uses the
-    // full planner enumeration).
     const startersAvailable = rotation.starters.every(
       (playerVersionId) => !unavailable.has(playerVersionId),
     );
@@ -105,11 +71,6 @@ export function seasonFranchiseLegalFiveFacts(
   return { legal, unavailablePlayerVersionIds };
 }
 
-/**
- * The pregame availability map for a set of rostered versions, derived from
- * health only (no rolls): used when a game is forfeit-pending (no player is
- * exposed, so no injuries roll) and by the runner-side reconstruction.
- */
 export function seasonPregameAvailabilityOf(
   health: SeasonHealthState,
   players: readonly { playerVersionId: string }[],
@@ -121,15 +82,6 @@ export function seasonPregameAvailabilityOf(
   return map;
 }
 
-/**
- * One game's availability/removal/return seam facts, derived from health
- * plus the seeded injury rolls for that game (engine-side seam builder the
- * block pipeline consumes). `pregame` covers all 20 rostered versions of
- * the two teams; exposed players (rotation target minutes > 0 and available)
- * roll against the frozen risk profile with durability from the catalog
- * and fatigue/recent load from the pregame effects state. All rolls are
- * named-seed pure functions, so replay and retry reproduce the exact seam.
- */
 export function seasonGameHealthSeam(
   run: HealthRunView,
   health: SeasonHealthState,
@@ -140,9 +92,9 @@ export function seasonGameHealthSeam(
     homeFranchiseId: string;
     awayFranchiseId: string;
     targetMinutesByPlayer: ReadonlyMap<string, number>;
-    /** M2.5: catalog durability rating per player (45..95); 45 when absent. */
+
     durabilityByPlayer?: ReadonlyMap<string, number>;
-    /** M2.5: the pregame effects state (fatigue + recent load per player). */
+
     effects?: SeasonEffectsState;
   },
 ): {
@@ -166,8 +118,7 @@ export function seasonGameHealthSeam(
     fatigueOf.set(player.playerVersionId, player.fatigueBasisPoints);
     loadOf.set(player.playerVersionId, player.recentLoadBasisPoints);
   }
-  // The recurrence bonus applies while ANY of the player's injuries has an
-  // open window (the highest open window is the active risk input).
+
   const recurrenceOf = new Map<string, number>();
   for (const record of health.injuries) {
     const current = recurrenceOf.get(record.playerVersionId) ?? 0;
@@ -198,8 +149,7 @@ export function seasonGameHealthSeam(
       const available = seasonPlayerAvailable(health, player.playerVersionId);
       pregame.set(player.playerVersionId, available);
       const targetMinutes = input.targetMinutesByPlayer.get(player.playerVersionId) ?? 0;
-      // Exposed = rotation target minutes > 0; an unavailable player never
-      // rolls (they cannot take the floor).
+
       if (targetMinutes <= 0 || !available) continue;
       const roll = rollSeasonInjuryForPlayer({
         rootSeed: input.rootSeed,
@@ -246,16 +196,6 @@ function partialGamesOf(summaries: readonly SeasonGameSummary[]): SeasonRun['gam
   }));
 }
 
-/**
- * Assembles the uncommitted partial-block candidate after an interruption:
- * completed summaries/details, effects, health, partial standings and
- * aggregates (the fold covers the completed block games; the authoritative
- * full fold is recomputed at final assembly), and the exact next game. The
- * pending candidate's standings fold covers the completed games available
- * to this seam — the worker/runner supply the run context without the
- * schedule or prior-block summaries, so a caller that has them can pass
- * `priorSummaries`/`schedule` for a fuller fold.
- */
 export function assembleSeasonPendingBlock(input: {
   run: HealthRunView;
   commandId: string;
@@ -295,7 +235,6 @@ export function assembleSeasonPendingBlock(input: {
   };
 }
 
-/** Zero team box used on forfeits (official 2-0 result, no statistics). */
 function zeroTeamBox(franchiseId: string): SeasonTeamBox {
   return {
     franchiseId,
@@ -317,13 +256,6 @@ function zeroTeamBox(franchiseId: string): SeasonTeamBox {
   };
 }
 
-/**
- * The official 2-0 forfeit summary for a game (`human-interruption-forfeit`):
- * the human franchise loses 2-0 with empty player statistics and zero boxes,
- * mirroring the existing forfeit summary builder. The game identity comes
- * from the run's scheduled games array (the forfeit command layer always
- * holds a full run).
- */
 export function seasonForfeitSummaryForGame(
   run: SeasonRun,
   gameId: string,
@@ -354,15 +286,6 @@ export function seasonForfeitSummaryForGame(
   };
 }
 
-/**
- * Advances the pending candidate past a forfeited game in block order:
- * `nextGameId` becomes the next game of the block (stable game ids are
- * sequential in schedule order). The pending's summaries already include
- * the forfeit summary (the caller appends it); standings/aggregates are
- * refreshed at final assembly, so they are left as recorded here. A forfeit
- * of the block's last game completes the block — there is no next game to
- * advance to, which is a typed error the caller must surface.
- */
 export function advancePendingAfterForfeit(
   pending: SeasonPendingBlockCandidate,
   forfeitedGameId: string,

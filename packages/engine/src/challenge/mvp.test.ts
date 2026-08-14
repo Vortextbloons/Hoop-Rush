@@ -8,10 +8,6 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { gameScore, leagueMvp, mvpValue } from './mvp.ts';
 
-/**
- * A full box score with known values: 25 pts, 10/20 FG, 5/6 FT, 4 ORB, 6 DRB,
- * 3 AST, 2 STL, 1 BLK, 2 TOV, 3 PF (Game Score 20.8 hand-computed).
- */
 function playerBox(overrides: Partial<PlayerBoxScore> = {}): PlayerBoxScore {
   return {
     playerId: 'p-1',
@@ -30,7 +26,6 @@ function playerBox(overrides: Partial<PlayerBoxScore> = {}): PlayerBoxScore {
   };
 }
 
-/** Bare scoring box: gameScore equals points exactly. */
 function scoringBox(points: number, playerId = 'p-1'): PlayerBoxScore {
   return playerBox({
     playerId,
@@ -126,7 +121,6 @@ function gameResultFixture(args: {
   };
 }
 
-/** A challenge run with fixture players/bracket and the given games. */
 function runFixture(games: GameResult[]): ChallengeRun {
   return buildChallengeRun({ games });
 }
@@ -270,8 +264,6 @@ describe('league mvp', () => {
   });
 
   it('separates equal game scores with the defense bonus', () => {
-    // Both candidates carry a 20 Game Score; p-2's steals earn a defense
-    // bonus, so the composite (not a tie-break) decides.
     const games = [
       gameResultFixture({
         awayTeamId: 'hawks',
@@ -304,8 +296,6 @@ describe('league mvp', () => {
   });
 
   it('breaks full ties by team then player identity', () => {
-    // Alternating winners give both sides one win and one loss, so the
-    // team-context bonus cancels and every ranking key ties.
     const acrossTeams = leagueMvp(
       runFixture([
         gameResultFixture({
@@ -387,10 +377,7 @@ describe('league mvp', () => {
 describe('mvp composite', () => {
   it('adds efficiency, defense, playmaking, and win bonuses to game score', () => {
     const box = playerBox();
-    // Game Score 20.8 (hand-computed). True shooting = 25/(2*(20 + 0.44*6))
-    // ≈ 0.5521, so the efficiency bonus with baseline 0.5 on 22.64 shots is
-    // ≈ 1.18. Defense 0.6*2 + 0.6*1 + 0.15*6 = 2.7, playmaking 0.5*3 = 1.5,
-    // and the win bonus 0.75.
+
     expect(mvpValue(box, 0.5, true)).toBeCloseTo(20.8 + 1.18 + 2.7 + 1.5 + 0.75, 2);
   });
 
@@ -411,8 +398,7 @@ describe('mvp composite', () => {
         contestedShots: 5,
       },
     });
-    // Same composite as above: loss bonus (−0.75 instead of +0.75), plus
-    // 0.25*4 created assists and 0.04*5 contests.
+
     expect(mvpValue(box, 0.5, false)).toBeCloseTo(20.8 + 1.18 + 2.7 + 1.5 - 0.75 + 1 + 0.2, 2);
   });
 
@@ -480,9 +466,7 @@ describe('mvp composite', () => {
             fouls: 0,
           }),
         ],
-        // An inefficient away shooter drags the league baseline to 0.4375,
-        // so p-2's 62.5% shooting earns an efficiency bonus on top of the
-        // defense and playmaking terms.
+
         awayPlayers: [
           playerBox({
             playerId: 'p-opp-1-0',
@@ -584,8 +568,7 @@ describe('mvp composite', () => {
     if (inEfficient === null || inInefficient === null) {
       throw new Error('expected league mvp candidates');
     }
-    // The 62.5% shooter earns a larger bonus when the rest of the run drags
-    // the league baseline down, while keeping the same raw box score.
+
     expect(inEfficient.playerId).toBe('p-1');
     expect(inInefficient.playerId).toBe('p-1');
     expect(inInefficient.mvpScore).toBeGreaterThan(inEfficient.mvpScore);

@@ -1,14 +1,6 @@
 <script lang="ts">
   import type { LockPreview } from '$lib/season/season-lock-preview';
 
-  /**
-   * "What changed?" lock preview (spec/2.0/11 block lock preview, M2.3).
-   * States exactly what will lock (10 games, or 2 in the final block), the
-   * upcoming human games, and the per-player rotation changes vs the saved
-   * baseline. A set-level digest comparison reports whether the pending
-   * rotations are identical to what the last accepted block locked.
-   */
-
   let {
     preview,
     franchiseName,

@@ -183,7 +183,6 @@ describe('observed player anchors', () => {
   });
 });
 
-/** A league-average defense team (every rating at the population mean). */
 function averageDefenseTeam(): SimulationTeam {
   const base = buildLegalSimulationTeam();
   const first = base.players[0];
@@ -261,12 +260,6 @@ function sampleFieldGoalPct(
 
 describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
   it('pins a rim-reliant interior scorer to his observed two-point percentage', () => {
-    // Shaq's observed FG% is 0.573 with no three-point attempts. Before the
-    // anchor mix fix the era-blended shot mix dragged this to ~0.52; the
-    // anchor must now be computed against the exact mix the sim shoots.
-    // The opponent is a league-average defense (all ratings at the
-    // population mean), so the zero-centered contest leaves the anchored
-    // conversion intact.
     const team = anchoredCenterTeam();
     const { fieldGoalPct } = sampleFieldGoalPct(
       'shaquille-anchor',
@@ -348,17 +341,14 @@ describe('observed player anchors pin efficiency (m3-engine-v5)', () => {
       away,
       300,
     );
-    // Observed FG% is 0.486 overall (0.374 from three). The anchor blend must
-    // hold the aggregate near the recorded season, not the era mean.
+
     expect(fieldGoalPct).toBeGreaterThan(0.451);
     expect(fieldGoalPct).toBeLessThan(0.521);
     expect(threePointPct).toBeGreaterThan(0.334);
     expect(threePointPct).toBeLessThan(0.414);
     expect(freeThrowPct).toBeGreaterThan(0.8);
     expect(freeThrowPct).toBeLessThan(0.88);
-    // Real MJ converts ~8.6% of his possessions into turnovers; the old
-    // era-anchored model pushed stars to the league mean (~11-12%). The
-    // observed-tendency blend must keep stars near their own rate.
+
     expect(turnoverRate).toBeLessThan(0.1);
     expect(turnoverRate).toBeGreaterThan(0.04);
   });

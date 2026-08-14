@@ -23,13 +23,6 @@ import {
 } from './block.ts';
 import { seasonCheckpointDigest } from './checkpoint.ts';
 
-/**
- * M2.5 health seams: availability derivation, legal-five facts, the game
- * availability/removal/return seam, the forfeit summary, pending-candidate
- * assembly, and the interruption -> resume accounting invariants (partial +
- * resume union equals the uninterrupted block, never duplicated).
- */
-
 function injuryRecord(overrides: Partial<SeasonInjuryRecord>): SeasonInjuryRecord {
   return {
     injuryId: 'inj-' + 'f'.repeat(32),
@@ -60,7 +53,6 @@ function healthWith(injuries: SeasonInjuryRecord[]): SeasonHealthState {
   };
 }
 
-/** The block's first synchronized round (the worker's tick-cadence anchor). */
 function fromRoundOf(input: SeasonBlockSimulationInput): number {
   const games = seasonBlockGamesOf(input.schedule, input.command.blockIndex);
   const first = games[0];
@@ -68,13 +60,6 @@ function fromRoundOf(input: SeasonBlockSimulationInput): number {
   return Math.floor((first.round - 1) / 10) * 10 + 1;
 }
 
-/**
- * Runs the per-game pipeline loop exactly like the block worker: recovery
- * tick cadence anchored at the block start, health/effects threading, and
- * the typed interruption marker on a human legality failure. `stopIndex`
- * stops the loop after that many games (before the interruption check of
- * game `stopIndex`), returning the exact effects/health state at that game.
- */
 function runGameLoop(
   input: SeasonBlockSimulationInput,
   startIndex: number,
@@ -131,8 +116,7 @@ describe('season player availability (M2.5 §4)', () => {
     expect(seasonPlayerAvailable(active, 'pv-2')).toBe(false);
     expect(seasonPlayerAvailable(active, 'pv-3')).toBe(true);
     expect(seasonPlayerAvailable(active, 'pv-4')).toBe(true);
-    // The same-game-return FLAG alone does not make a player available: the
-    // record stays active until the game resolves the return.
+
     expect(seasonPlayerAvailable(active, 'pv-5')).toBe(false);
     expect(seasonPlayerAvailable(active, 'pv-other')).toBe(true);
   });
@@ -190,11 +174,9 @@ describe('season franchise legal-five facts (M2.5 §9)', () => {
       healthWith(starterOut),
       positions,
     );
-    // The planner's full enumeration still finds a legal bench five.
+
     expect(withPositions.unavailablePlayerVersionIds).toHaveLength(5);
-    // Without position facts the starters-available witness is conservative:
-    // the bench five is the only legal five, so the availability-count
-    // approximation also reports legal.
+
     const withoutPositions = seasonFranchiseLegalFiveFacts(run, 'lakers', healthWith(starterOut));
     expect(withoutPositions.legal).toBe(true);
   });
@@ -296,7 +278,7 @@ describe('season forfeit and pending assembly (M2.5 §10)', () => {
     const advanced = advancePendingAfterForfeit(pending, first.gameId);
     expect(advanced.nextGameId).toBe(second.gameId);
     expect(advanced.summaries).toEqual([]);
-    // The last game of the block cannot advance.
+
     const last = games[games.length - 1];
     if (last === undefined) throw new Error('last game');
     expect(() => advancePendingAfterForfeit(pending, last.gameId)).toThrow(/last game/);
@@ -336,8 +318,7 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
     const { run, catalog } = buildTestRun();
     const schedule = scheduleOf(run);
     const games = seasonBlockGamesOf(schedule, 0);
-    // Inject an illegal-health for the human franchise: every lakers player
-    // is out, so the first lakers game of the block interrupts.
+
     const roster = run.rosters.find((entry) => entry.franchiseId === 'lakers');
     if (roster === undefined) throw new Error('lakers roster');
     const blocked = roster.players.map((player, index) =>
@@ -367,7 +348,6 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
     expect(firstRun.interruption?.nextGameId).toBe(games[interruptionIndex]?.gameId);
     expect(firstRun.summaries).toHaveLength(interruptionIndex);
 
-    // The pending candidate freezes the completed facts and the next game.
     const pending = assembleSeasonPendingBlock({
       run,
       commandId: interruptedInput.command.commandId,
@@ -388,17 +368,11 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
     expect(pending.summaries.map((summary) => summary.gameId)).toEqual(
       games.slice(0, interruptionIndex).map((game) => game.gameId),
     );
-    // The interrupted game itself is never included in the pending.
+
     expect(
       pending.summaries.some((summary) => summary.gameId === games[interruptionIndex]?.gameId),
     ).toBe(false);
 
-    // Resume with the legal-health variant from the interruption point: the
-    // games before the interruption are identical for both variants (the
-    // blocked players belong to the human team, which does not play before
-    // its first game), so the union (partial + resumed) covers the
-    // uninterrupted block exactly once — no duplicates, no gaps — and the
-    // assembled candidate reproduces the uninterrupted digest.
     const legalInput = pipelineInput(run, catalog, 0);
     const legalBefore = runGameLoop(
       legalInput,
@@ -408,14 +382,9 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
       interruptionIndex,
     );
     const legalFull = runGameLoop(legalInput, 0, legalInput.effects, legalInput.health);
-    // The pending's effects equal the legal variant's state at the
-    // interruption point (identical AI games before the first human game);
-    // the pending's health additionally carries the injected blocking
-    // records, which the resume replaces through the heal flow.
+
     expect(JSON.stringify(pending.effects)).toBe(JSON.stringify(legalBefore.effects));
-    // The resumed loop continues the recovery-tick cadence from the last
-    // simulated round (the engine's whole-block cadence: one tick per round
-    // advance), so the resumed segment reproduces the uninterrupted games.
+
     const lastSimulatedRound =
       pending.summaries.length > 0
         ? pending.summaries[pending.summaries.length - 1]?.round
@@ -434,8 +403,6 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
     expect(unionIds.sort()).toEqual(legalFull.summaries.map((summary) => summary.gameId).sort());
     expect(resumed.summaries).toHaveLength(games.length - interruptionIndex);
 
-    // The assembled candidate over the union reproduces the uninterrupted
-    // candidate's digest byte-for-byte.
     const candidate = assembleSeasonBlockCandidate(
       legalInput,
       union,
@@ -484,8 +451,6 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
         if (game === undefined) continue;
         const humanPlays = game.homeFranchiseId === 'lakers' || game.awayFranchiseId === 'lakers';
         if (humanPlays) {
-          // The human cannot field five (blocked health): the 2-0 forfeit
-          // appends and the pending advances to the next game in block order.
           summaries.push(seasonForfeitSummaryForGame(run, game.gameId, 'lakers'));
           const pending = assembleSeasonPendingBlock({
             run,
@@ -524,9 +489,7 @@ describe('interruption and resume accounting (M2.5 §10)', () => {
       const humanGameCount = games.filter(
         (game) => game.homeFranchiseId === 'lakers' || game.awayFranchiseId === 'lakers',
       ).length;
-      // The human's blocked games forfeit 2-0 with the human as the loser;
-      // AI games may ALSO forfeit through the ordinary game path (no legal
-      // five after injuries/foul-outs), so count only the human-loss ones.
+
       expect(
         summaries.filter((summary) => summary.forfeitLoserFranchiseId === 'lakers'),
       ).toHaveLength(humanGameCount);

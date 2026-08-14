@@ -8,13 +8,6 @@ import type { Rng } from './rng.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 import type { PositionResponsibilityModifiers } from './position-responsibilities.ts';
 
-/**
- * Rebound resolution (spec/03 pipeline stage 7). Every live miss resolves to
- * an offensive or defensive player; declared dead-ball misses become team
- * rebounds. The era offensive-rebound rate anchors the base chance so equal
- * rebounding teams land on the packaged league rate.
- */
-
 export function teamMean(team: SimulationTeam, rating: keyof SimulationPlayer['ratings']): number {
   return (
     team.players.reduce((sum, p) => {
@@ -26,17 +19,11 @@ export function teamMean(team: SimulationTeam, rating: keyof SimulationPlayer['r
 }
 
 export interface ReboundResult {
-  /** Whether the offense kept the ball (offensive rebound). */
   offensive: boolean;
-  /** Whether the rebound was a declared dead-ball team rebound. */
+
   team: boolean;
 }
 
-/**
- * Probability an offensive rebound follows a miss at the zone, anchored to the
- * era rate at equal team rebounding. The team mean ratings are precomputed per
- * game by the caller.
- */
 export function offensiveReboundProbability(
   offMean: number,
   defMean: number,
@@ -54,10 +41,6 @@ export function offensiveReboundProbability(
   return Math.min(0.45, Math.max(0.12, base));
 }
 
-/**
- * Resolves the miss. `deadBall` marks buzzer misses that become team rebounds
- * (no live rebound could occur); all other misses are live.
- */
 export function resolveRebound(
   rng: Rng,
   offMean: number,
@@ -72,12 +55,6 @@ export function resolveRebound(
   return { offensive: false, team: false };
 }
 
-/**
- * Rebound attribution weights for a team, in team index order. The assigned-
- * slot rebounding modifier scales attribution only (never the team-level
- * rebound rate, which stays anchored to the era profile), so the slot effect
- * is a soft 8-12% nudge on who grabs the board, not on how many there are.
- */
 export function rebounderWeights(
   team: SimulationTeam,
   offensive: boolean,

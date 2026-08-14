@@ -1,11 +1,3 @@
-/**
- * Deterministic possession projection (projection milestone): a seedless,
- * calculation-only evaluation layer that composes the possession engine's
- * pure probability functions into expected ledgers, base-five projections,
- * and Season roster projections. Pure engine modules only — no simulation
- * sampling, Svelte, persistence, browser APIs, Supabase, or workers.
- */
-
 export { projectBaseFive, type LedgerSide } from './base.ts';
 export { projectExpectedLedger, expectedStealShare } from './expected-ledger.ts';
 export {

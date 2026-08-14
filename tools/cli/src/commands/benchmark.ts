@@ -9,12 +9,6 @@ import { lineupForTeam, resolveUserTeam } from './challenge.ts';
 import { buildInput, chunkRange, fixtureSeed, loadFixture, runSingleGame } from './sim.ts';
 import { parseCount } from '../args.ts';
 
-/**
- * Measures pool loading, warm single-game, and complete 82-game throughput.
- * Baseline comparisons are deliberately conservative: a matched environment
- * must exceed both 125% of the stored value and the absolute noise floor.
- */
-
 export const BENCHMARK_OPTIONS: Record<string, boolean> = {
   fixture: true,
   samples: true,
@@ -161,7 +155,6 @@ export function benchmark(args: {
     poolCachedSamples.push(performance.now() - started);
   }
 
-  // Warm-up: JIT and module initialization settle before measurement.
   for (let i = 0; i < 20; i += 1) {
     void runSingleGame(buildInput(fixture, profile, fixtureSeed('bench-warm', i), false));
   }
@@ -176,7 +169,6 @@ export function benchmark(args: {
     }
   }
 
-  // Complete 82-game runs against the packaged bracket (always finishes 82).
   const userTeam = resolveUserTeam('challenge-user');
   const { lineup, players } = lineupForTeam(userTeam);
   const pool = data.pool('lakers', '1990s');
@@ -313,13 +305,6 @@ export function benchmark(args: {
     }
   }
 
-  // Match packages/engine game performance goal: the 10 ms figure is the
-  // desktop target (spec 03-simulation.md), but these gates run on shared
-  // GitHub runners that measure 10-11 ms medians with real-data fixtures and
-  // see p95 spikes past 25 ms under CPU contention. Gates are regression
-  // guards, not desktop benchmarks: median 15 ms / p95 40 ms catch real
-  // slowdowns while tolerating runner noise. Use --baseline for tight
-  // fingerprint-matched comparisons.
   if (payload.singleGame.medianMs >= 15) {
     failures.push(
       `warm single game median ${payload.singleGame.medianMs.toFixed(2)} ms exceeds the hard 15 ms gate`,

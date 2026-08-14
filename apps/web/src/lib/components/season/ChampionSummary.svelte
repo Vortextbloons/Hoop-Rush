@@ -4,12 +4,6 @@
   import type { HoopRushManifest, SeasonRunCompletion } from '@hoop-rush/data-contracts';
   import { postseasonStageLabel } from '$lib/season/season-postseason-presentation';
 
-  /**
-   * Champion summary (M2.6 hub, completed stage): the championship banner
-   * with the champion franchise, the completion facts, and the onward paths
-   * to the full bracket and the completed-history result.
-   */
-
   let {
     championFranchiseId,
     franchiseName,

@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import type { HoopRushManifest, PlayersIndex, PlayersIndexEntry } from '@hoop-rush/data-contracts';
@@ -60,14 +58,6 @@ vi.mock('$lib/sandbox-run', () => ({
 }));
 
 describe('sandbox teardown', () => {
-  /**
-   * Regression guard for navigation-away teardown (the browser reproduced
-   * effect_update_depth_exceeded when leaving Sandbox mid-draft). Mounting
-   * the real page, leaving the slot picker dialog open plus a pending search
-   * debounce, then unmounting must never throw: pending bits-ui dismissal
-   * timers and async pool callbacks must not write state on the torn-down
-   * tree.
-   */
   it('unmounting with the picker open and a pending debounce does not throw', async () => {
     const { container, unmount } = render(SandboxPage);
 
@@ -81,13 +71,11 @@ describe('sandbox teardown', () => {
     const cards = container.querySelectorAll('li button');
     expect(cards.length).toBeGreaterThan(0);
 
-    // Open the picker (dialog stays OPEN at unmount, like navigating away mid-draft).
     (cards[0] as HTMLButtonElement).click();
     await waitFor(() => {
       expect(document.body.querySelector('[aria-label^="Place "]')).not.toBeNull();
     });
 
-    // Leave a debounce timer pending, then unmount (navigation-away teardown).
     const searchbox = container.querySelector('input[type="search"]') as HTMLInputElement;
     await fireEvent.input(searchbox, { target: { value: 'First1' } });
     unmount();

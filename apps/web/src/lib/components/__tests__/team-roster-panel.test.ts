@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import { buildManifest, buildSeasonLeague, buildSeasonRosters } from '@hoop-rush/test-fixtures';

@@ -2,11 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { HoopRushManifest, FranchiseLineageEntry } from './index.ts';
 import { resolveEraTeamIdentity, resolveHistoricalIdentitySpans } from './historical-identity.ts';
 
-/**
- * Compact manifest builder for identity-resolution tests. The lineage set
- * mirrors the authoritative table (spec/12) for the franchises under test.
- */
-
 const logo = (url: string) => ({ url, source: 'sportslogos' });
 const cdn = (id: string) => ({
   url: `https://cdn.nba.com/logos/nba/${id}/global/L/logo.svg`,
@@ -76,7 +71,6 @@ function manifest(lineage: FranchiseLineageEntry[]): HoopRushManifest {
 }
 
 const FULL_LINEAGE: FranchiseLineageEntry[] = [
-  // Thunder: Seattle SuperSonics through 2007-08, Oklahoma City from 2008-09
   segment('thunder', 'Seattle SuperSonics', 'SEA', '1967-68', '2007-08', [
     logo('https://example.com/sea-1.png'),
     logo('https://example.com/sea-2.png'),
@@ -84,14 +78,14 @@ const FULL_LINEAGE: FranchiseLineageEntry[] = [
   segment('thunder', 'Oklahoma City Thunder', 'OKC', '2008-09', undefined, [
     logo('https://example.com/okc-1.png'),
   ]),
-  // Celtics: one identity for the whole era range
+
   segment('celtics', 'Boston Celtics', 'BOS', '1946-47', undefined),
-  // Grizzlies: Vancouver then Memphis
+
   segment('grizzlies', 'Vancouver Grizzlies', 'VAN', '1995-96', '2000-01', [
     logo('https://example.com/van-1.png'),
   ]),
   segment('grizzlies', 'Memphis Grizzlies', 'MEM', '2001-02', undefined),
-  // Kings: four identities across the 1970s
+
   segment('kings', 'Cincinnati Royals', 'CIN', '1957-58', '1971-72', [
     logo('https://example.com/cin-1.png'),
   ]),
@@ -102,7 +96,7 @@ const FULL_LINEAGE: FranchiseLineageEntry[] = [
     logo('https://example.com/kck-1.png'),
   ]),
   segment('kings', 'Sacramento Kings', 'SAC', '1985-86', undefined),
-  // Hornets: original era, suspension gap, Bobcats
+
   segment('hornets', 'Charlotte Hornets', 'CHH', '1988-89', '2001-02', [
     logo('https://example.com/chh-1.png'),
   ]),
@@ -246,11 +240,11 @@ describe('resolveEraTeamIdentity', () => {
     const m = manifest(FULL_LINEAGE);
     const first = resolveEraTeamIdentity(m, 'thunder', '2000s');
     const second = resolveEraTeamIdentity(m, 'thunder', '2000s');
-    // Identical inputs on the same manifest share the cached object.
+
     expect(second).toBe(first);
-    // A different franchise/era key resolves independently.
+
     expect(resolveEraTeamIdentity(m, 'kings', '1970s')).not.toBe(first);
-    // A different manifest instance computes fresh values.
+
     const other = manifest(FULL_LINEAGE);
     expect(resolveEraTeamIdentity(other, 'thunder', '2000s')).not.toBe(first);
     expect(resolveEraTeamIdentity(other, 'thunder', '2000s')).toEqual(first);

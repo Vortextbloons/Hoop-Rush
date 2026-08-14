@@ -1,8 +1,3 @@
-/**
- * Trait derivation (port of compute_ratings.py derive_traits, archetype-based).
- * Traits are roster metadata only and never enter the pool artifacts. They are
- * deterministic: no random jitter.
- */
 import { clamp, clampRating, safeFloat } from '../json.ts';
 import type { StatsRow } from './stats.ts';
 

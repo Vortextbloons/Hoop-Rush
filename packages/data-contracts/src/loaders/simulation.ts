@@ -4,12 +4,10 @@ import type { OpponentTeam } from '../opponent.ts';
 import { opponentTeamSchema } from '../opponent.ts';
 import { loadJsonAsset } from './load-json.ts';
 
-/** Validates an era simulation profile at a runtime boundary. */
 export function parseEraSimulationProfile(value: unknown): EraSimulationProfile {
   return eraSimulationProfileSchema.parse(value);
 }
 
-/** Fetches and hash-verifies an EraSimulationProfile artifact. */
 export function loadEraSimulationProfile(
   url: string,
   expectedHash?: string,
@@ -23,7 +21,6 @@ export function loadEraSimulationProfile(
   });
 }
 
-/** Validates an opponent-team artifact at a runtime boundary. */
 export function parseOpponentTeam(value: unknown): OpponentTeam {
   return opponentTeamSchema.parse(value);
 }

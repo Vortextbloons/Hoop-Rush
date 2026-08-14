@@ -6,8 +6,6 @@ import { MANIFEST_SCHEMA_VERSION } from '@hoop-rush/data-contracts';
 import { run, DATA_VERSION, ASSET_CACHE_VERSION } from './index.ts';
 import { sha256File, writeJson } from '../json.ts';
 
-// The availability-matrix classification scans packaged season dirs; allow
-// headroom for parallel-suite CPU contention.
 const TEST_TIMEOUT = 30_000;
 
 const tempRoots: string[] = [];
@@ -35,7 +33,6 @@ describe('manifest run', () => {
     () => {
       const root = makeTempRoot();
 
-      // Pre-existing manifest with eras and assets that must be preserved.
       writeJson(join(root, 'manifest.json'), {
         schemaVersion: 1,
         dataVersion: 'm1.7',
@@ -70,7 +67,6 @@ describe('manifest run', () => {
       writeJson(join(root, 'era-sim', '1990s.json'), { schemaVersion: 1, eraId: '1990s' });
       writeJson(join(root, 'opponents', 'bracket.json'), { bracket: true });
 
-      // Coverage report: lakers/1990s available, pelicans/1990s unattempted.
       writeJson(join(root, 'coverage-report.json'), [
         {
           franchiseId: 'lakers',
@@ -108,8 +104,6 @@ describe('manifest run', () => {
         bracket: ManifestEntry;
       };
 
-      // The manifest contract: 30 slots, lineage segments with historical
-      // logo candidates, preserved eras/assets, and the new cache version.
       expect(manifest.schemaVersion).toBe(MANIFEST_SCHEMA_VERSION);
       expect(manifest.dataVersion).toBe(DATA_VERSION);
       expect(manifest.modernFranchiseSlots).toHaveLength(30);
@@ -122,7 +116,6 @@ describe('manifest run', () => {
       expect(manifest.assets.source).toBe('NBA.com');
       expect(manifest.assets.cacheVersion).toBe(ASSET_CACHE_VERSION);
 
-      // Pools index recomputed with content hashes.
       expect(manifest.pools).toHaveLength(1);
       expect(manifest.pools[0]).toEqual({
         franchiseId: 'lakers',
@@ -131,7 +124,6 @@ describe('manifest run', () => {
         contentHash: sha256File(join(root, 'pools', 'lakers-1990s.json')),
       });
 
-      // Availability matrix covers every slot x era (30 x 1) with truthful reasons.
       expect(manifest.availability).toHaveLength(30);
       const lakers = manifest.availability.find(
         (entry) => entry['franchiseId'] === 'lakers' && entry['status'] === 'available',
@@ -143,7 +135,7 @@ describe('manifest run', () => {
       expect(pelicans['status'] ?? null).toBe('unavailable');
       expect(pelicans['reason'] ?? null).toBe('no-franchise-history');
       expect(pelicans['firstSupportedSeason'] ?? null).toBe('2002-03');
-      // Era profile and frozen bracket entries.
+
       expect(manifest.eraSimulationProfiles).toEqual([
         {
           eraId: '1990s',
@@ -156,7 +148,6 @@ describe('manifest run', () => {
         contentHash: sha256File(join(root, 'opponents', 'bracket.json')),
       });
 
-      // The rewritten manifest ends with a trailing newline like the Python output.
       expect(readFileSync(join(root, 'manifest.json'), 'utf8').endsWith('\n')).toBe(true);
     },
   );

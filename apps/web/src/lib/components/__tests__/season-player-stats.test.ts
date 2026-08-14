@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
@@ -11,12 +9,6 @@ import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
 mockSvelteKitApp();
-
-/**
- * Season Player stats section tests: the empty state before the first block,
- * the sortable full table defaulting to PPG desc, and the Per game/Totals
- * measurement toggle — jsdom renders the sortable stats table.
- */
 
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const MANIFEST: HoopRushManifest = buildManifest();
@@ -100,7 +92,6 @@ function summary(home: SeasonRoster, away: SeasonRoster): SeasonGameSummary {
   };
 }
 
-/** One played game with index 0 scoring/assisting most, index 1 rebounding most. */
 function playedGame(): SeasonGameSummary {
   const home = rosterOf('lakers');
   const away = rosterOf('celtics');

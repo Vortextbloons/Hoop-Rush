@@ -1,12 +1,3 @@
-/**
- * Main ratings entry (port of compute_ratings.py compute_for_season / run).
- *
- * Reads roster.json + season-stats.json, derives the strict engine ratings,
- * tendencies, packaged anchors, summary ratings, provenance, and unclamped
- * diagnostics through the versioned field-method registry (spec/12), and
- * writes the complete roster.json back. No random jitter: every value is a
- * pure function of versioned inputs.
- */
 import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
@@ -47,11 +38,6 @@ export interface RosterPlayer extends Record<string, unknown> {
   importMeta?: { snapshotSeason: string; statsSource: string; lastUpdated: string };
 }
 
-/**
- * Python's json.loads accepts bare `NaN` tokens produced by json.dumps of
- * pandas NaN values; JSON.parse rejects them. Replace the token with null
- * (equivalent behavior for the fields we consume).
- */
 export function parseJsonLoose(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
@@ -67,7 +53,6 @@ export function readJsonLoose(path: string): unknown {
   return parseJsonLoose(readFileSync(path, 'utf8'));
 }
 
-/** Source position-label normalization used when no override table entry exists. */
 const POS_MAP: Record<string, string> = {
   G: 'SG',
   F: 'SF',
@@ -87,20 +72,11 @@ function safeHeight(value: unknown): number | null {
   return Math.trunc(value);
 }
 
-/** League context for era-relative translation (versioned era table). */
 function seasonContext(season: string): SeasonContext {
   const era = getEra(season);
   return { leaguePpg: era.leaguePpg, league3PARate: era.league3PARate, pace: era.pace };
 }
 
-/**
- * Pooled season×position-group three-point and free-throw rates used as
- * shrinkage priors (made/attempted ratios summed over the whole season
- * cohort). Positions come from the roster with the same override-corrected
- * primary position the derivation loop uses, collapsed to G/F/C groups.
- * Cohorts without valid made/attempted pairs stay absent so derivePlayerRecord
- * falls back to the documented league defaults per field.
- */
 export function pooledRatePriors(
   roster: readonly RosterPlayer[],
   statsList: readonly StatsRow[],
@@ -157,10 +133,6 @@ export function computeForSeason(season: string, force = false): void {
     return;
   }
 
-  // Fast skip gate: the compute loop below writes the same importMeta onto
-  // every player, so a serialized statsSource marker means ratings are done.
-  // This avoids the full-buffer regex + parse on incremental runs; the parsed
-  // meta check below stays as the authoritative fallback for unusual files.
   const rosterText = readFileSync(rosterPath, 'utf8');
   if (
     !force &&
@@ -210,10 +182,7 @@ export function computeForSeason(season: string, force = false): void {
     );
     player.firstName = canonicalFirstName;
     player.lastName = canonicalLastName;
-    // Apply the reviewed override before derivation so ratings use the
-    // corrected primary; the corrected position and secondary positions are
-    // persisted back into roster.json, so the v5 career-labels cache and
-    // pool builds inherit the corrections.
+
     const override = positionOverrideFor(extId);
     const pos = override !== null ? override.primary : mapPosition(player.position ?? 'SF');
     player.position = pos;
@@ -299,13 +268,10 @@ export function computeForSeason(season: string, force = false): void {
 }
 
 export function defaultRatingsWorkers(): number {
-  // Unit tests mock config paths; real worker threads would read the real
-  // raw-data dirs, so the parallel default stays off under vitest.
   if (process.env.NODE_ENV === 'test') return 1;
   return Math.min(8, availableParallelism());
 }
 
-/** Splits a list into at most `workers` deterministic contiguous chunks. */
 function chunkList<T>(items: readonly T[], workers: number): T[][] {
   const count = Math.max(1, Math.trunc(workers));
   if (count <= 1 || items.length <= 1) {

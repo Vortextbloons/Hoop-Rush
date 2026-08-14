@@ -32,8 +32,12 @@
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
-  import { buildVersionFaceIndex, versionTupleOfRosterEntry } from '$lib/season/season-branding';
   import { catalogCandidateMap } from '$lib/season/season-catalog-index';
+  import {
+    buildVersionFaceIndex,
+    freeAgencyVersionTuples,
+    versionTupleOfRosterEntry,
+  } from '$lib/season/season-branding';
   import {
     createRotationEditor,
     rotationEditorNeedsPositionRefresh,
@@ -56,21 +60,6 @@
 
   let { children } = $props();
 
-  /**
-   * Season Run shell (M2.3.5, performance pass): owns the shared
-   * `SeasonHubState` for the lifetime of the active run. The layout instance
-   * survives tab navigation, so an in-flight block worker continues across
-   * tabs; it is torn down only when the user leaves the run group.
-   *
-   * Performance pass: the shell becomes interactive with the MINIMAL run
-   * shell only (manifest, league, schedule, active index/checkpoint, and the
-   * compact per-run player slice). The ~17 MB draft catalog, the global
-   * players index (faces), and the worker prewarm are deferred to an idle
-   * callback after first paint, so nothing eager parses big JSON on the
-   * critical path. Large immutable payloads live in `$state.raw` fields
-   * (never deep-proxied); only session-changing fields stay reactive.
-   */
-
   const seasonNavItems: NavItem[] = [
     { id: 'hub', label: 'Hub', href: '/season/run', icon: LayoutGrid },
     { id: 'team', label: 'Rotation', href: '/season/run/team', icon: ClipboardList },
@@ -79,9 +68,6 @@
     { id: 'leaders', label: 'Leaders', href: '/season/run/leaders', icon: BarChart3 },
   ];
 
-  /** The Free Agency tab appears once a market window has opened (windows
-   * stay reachable after resolution so signings and traces stay readable).
-   * The bracket tab appears once the postseason begins. */
   const freeAgencyNavItem: NavItem = {
     id: 'free-agency',
     label: 'Free Agency',
@@ -89,8 +75,6 @@
     icon: Gavel,
   };
 
-  /** The bracket tab appears once the postseason begins (Play-In
-   * through the champion); the shell keeps the other tabs intact. */
   const navItems = $derived.by(() => {
     const stage = shell.run?.stage ?? null;
     const freeAgencyVisible = (shell.run?.freeAgency.windows.length ?? 0) > 0;
@@ -108,16 +92,9 @@
 
   const routeId = $derived(page.route.id);
 
-  /** Global players index (faces). Loaded lazily after first paint. */
   let playersIndex: PlayersIndexEntry[] | null = null;
 
-  /** Identity key of the face index: run id + every roster's version list.
-   * Rosters never change during a block run, so the full-index rebuild only
-   * fires on an actual roster change (draft promotion or a trade). */
   let faceIndexKey = '';
-  let rostersRef: unknown = null;
-  let faceRunId = '';
-  let catalogRef: SeasonRunShellData['catalog'] = null;
 
   function cloneTradeState(trade: NonNullable<SeasonRunShellData['trade']>) {
     return {
@@ -158,38 +135,37 @@
     }
   }
 
-  /** Rebuilds the players-index face join when the index has loaded (lazy,
-   * post-first-paint) and the run rosters or packaged catalog change. */
   function rebuildFacesIfNeeded(run: NonNullable<SeasonRunShellData['run']>): void {
     if (playersIndex === null) return;
     const catalog = shell.catalog;
-    if (run.runId === faceRunId && run.rosters === rostersRef && catalog === catalogRef) {
-      return;
-    }
-    faceRunId = run.runId;
-    rostersRef = run.rosters;
-    catalogRef = catalog;
+    const freeAgencyKey =
+      run.freeAgency === null || run.freeAgency === undefined
+        ? 'no-fa'
+        : run.freeAgency.windows
+            .map((window) =>
+              window.candidates.map((candidate) => candidate.playerVersionId).join(','),
+            )
+            .join('|');
     const key = `${run.runId}:${run.rosters
       .map(
         (roster) =>
           `${roster.franchiseId}:${roster.players.map((p) => p.playerVersionId).join(',')}`,
       )
-      .join('|')}:${catalog === null ? 'no-catalog' : 'catalog'}`;
+      .join('|')}:${freeAgencyKey}:${catalog === null ? 'no-catalog' : 'catalog'}`;
     if (key === faceIndexKey) return;
     const candidates = catalog === null ? null : catalogCandidateMap(catalog);
-    const tuples = run.rosters.flatMap((roster) =>
-      roster.players.map((entry) =>
-        versionTupleOfRosterEntry(entry, candidates?.get(entry.playerVersionId) ?? null),
+    const tuples = [
+      ...run.rosters.flatMap((roster) =>
+        roster.players.map((entry) =>
+          versionTupleOfRosterEntry(entry, candidates?.get(entry.playerVersionId) ?? null),
+        ),
       ),
-    );
+      ...freeAgencyVersionTuples(run.freeAgency, catalog),
+    ];
     shell.facesByVersion = buildVersionFaceIndex(playersIndex, tuples);
     faceIndexKey = key;
   }
 
-  /** Keeps the current editor (and its pending edits) across tab switches;
-   * rebuilds only when the locked rotation changes after an accepted block.
-   * Playable positions come from the compact player slice, never the full
-   * catalog. */
   function rebuildRotationEditor(run: NonNullable<SeasonRunShellData['run']>): {
     editor: RotationEditor | null;
     key: string | null;
@@ -233,9 +209,9 @@
     shell.snapshot = hub.snapshot;
     shell.index = hub.index;
     shell.block = hub.block;
-    // Postseason orchestration mirror (Track A's progress surface).
+
     shell.postseason = hasPostseasonHubMethods(hub) ? hub.postseason : shell.postseason;
-    // Interruption/pending mirrors + the last typed command rejection.
+
     shell.pending = hub.pending;
     shell.interruption = hub.interruption;
     shell.commandError = hub.commandError;
@@ -315,13 +291,6 @@
     };
   });
 
-  /**
-   * Phase 1 (interactive): loads only the minimal run shell — manifest,
-   * league, schedule, repository, runner, the active index/checkpoint, and
-   * the compact per-run player slice. The heavy catalog and players index are
-   * deferred to an idle callback (see `scheduleLazyWork`), so the shell is
-   * interactive long before any big JSON parse.
-   */
   async function initShell(): Promise<void> {
     try {
       const [manifest, league, schedule] = await Promise.all([
@@ -350,8 +319,6 @@
     }
   }
 
-  /** Loads the compact per-run player presentation slice (fast IndexedDB
-   * read) so the rotation editor and every view render without the catalog. */
   async function loadPlayerSlice(): Promise<void> {
     const runId = shell.snapshot?.run.runId ?? null;
     if (runId === null) {
@@ -369,12 +336,6 @@
     }
   }
 
-  /**
-   * Phase 2 (idle, after first paint): loads the packaged catalog, tops up
-   * the player slice from it (traded-in players), loads the global players
-   * index for faces, and prewarms the simulation worker so the first
-   * "simulate block" click pays no catalog download/parse time.
-   */
   function scheduleLazyWork(): void {
     const run = () => {
       void lazyLoadAssets();
@@ -399,6 +360,7 @@
         shell.hub.catalog = catalog;
       }
       playersIndex = index.players;
+      shell.playersIndex = index.players;
       shell.facesReady = true;
       if (shell.run !== null) {
         rebuildFacesIfNeeded(shell.run);
@@ -412,16 +374,13 @@
     }
   }
 
-  /** Merges catalog facts for roster players missing from the slice (trades
-   * move players after promotion) so the editor never loses positions. */
   async function topUpPlayerSliceFromCatalog(
     catalog: NonNullable<SeasonRunShellData['catalog']>,
   ): Promise<void> {
     const run = shell.run;
     const hub = shell.hub;
     if (run === null || hub === null) return;
-    // Plain transient lookup map (never rendered); rebuilt per top-up.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+
     const byVersion = new Map<string, SeasonRunPlayerSliceEntry>();
     for (const entry of shell.playerSlice.values()) {
       byVersion.set(entry.playerVersionId, entry);
@@ -492,6 +451,22 @@
     await shell.hub?.declineTradeOffer(input);
     mirrorHub();
   };
+  shell.declareFreeAgentInterest = async (input) => {
+    await shell.hub?.declareFreeAgentInterest(input);
+    mirrorHub();
+  };
+  shell.skipFreeAgentMarket = async (input) => {
+    await shell.hub?.skipFreeAgentMarket(input);
+    mirrorHub();
+  };
+  shell.resolveFreeAgentMarket = async (input) => {
+    await shell.hub?.resolveFreeAgentMarket(input);
+    mirrorHub();
+    if (shell.catalog !== null) {
+      await topUpPlayerSliceFromCatalog(shell.catalog);
+      mirrorHub();
+    }
+  };
   shell.forfeitInterruptedGame = async () => {
     await shell.hub?.forfeitInterruptedGame();
     mirrorHub();
@@ -501,12 +476,6 @@
     mirrorHub();
   };
 
-  /**
-   * M2.6 postseason actions bound to the frozen Cross-track API contract.
-   * Track A implements the hub surface; when it is not present in this
-   * build the action surfaces a typed, actionable error instead of a silent
-   * no-op (the run itself is untouched and safe).
-   */
   function postseasonUnavailable(): void {
     shell.postseason = {
       ...idlePostseasonProgress(),
@@ -610,8 +579,6 @@
 
   const incompatible = $derived(shell.hub?.incompatible ?? null);
 
-  /** History routes render without an active run (the champion was
-   * promoted to completed history and the active-run pointer removed). */
   const isHistoryRoute = $derived(routeId?.startsWith('/season/run/history') ?? false);
 
   const showBrokenResume = $derived(

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-/** Ratings v3's intentionally multi-role player vocabulary. */
 export const ratingArchetypeSchema = z.enum([
   'primaryCreator',
   'secondaryCreator',
@@ -28,7 +27,6 @@ const archetypeMembershipFields = {
   defensiveAnchor: z.number().min(0).max(1),
 } as const;
 
-/** A normalized, soft multi-membership vector; no player has one forced label. */
 export const archetypeMembershipsSchema = z
   .object(archetypeMembershipFields)
   .strict()
@@ -78,11 +76,6 @@ export const calibratedImpactSchema = z.object({
 });
 export type CalibratedImpact = z.infer<typeof calibratedImpactSchema>;
 
-/**
- * Full profile loaded only for selected players; the index keeps its compact summary.
- * schemaVersion 2 adds the pre-percentile raw overall score and the packaged
- * cohort percentile fields written during pool packaging.
- */
 export const ratingProfileSchema = z.object({
   schemaVersion: z.literal(2),
   modelVersion: z.string().min(1).max(64),
@@ -100,18 +93,13 @@ export const ratingProfileSchema = z.object({
 });
 export type RatingProfile = z.infer<typeof ratingProfileSchema>;
 
-/** Frozen inputs and gates written by the deterministic ratings calibration CLI. */
 export const ratingsModelArtifactSchema = z.object({
   schemaVersion: z.literal(2),
   modelVersion: z.string().min(1).max(64),
   ratingsVersion: z.string().min(1).max(64),
   benchmarkVersion: z.string().min(1).max(64),
   seedVersion: z.string().min(1).max(64),
-  /**
-   * Confidence denominator: the sample count per context that yields full
-   * (1.0) calibration confidence. The generated artifact records the actual
-   * samples used under sampleCountPerContext.
-   */
+
   confidenceTargetSamplesPerContext: z.number().int().positive(),
   sampleCountPerContext: z.number().int().positive(),
   contexts: z.array(z.enum(['weak', 'average', 'strong', 'interior-heavy', 'perimeter-heavy'])),
@@ -125,7 +113,7 @@ export const ratingsModelArtifactSchema = z.object({
     impactPerShotQuality: z.number(),
     shrinkageGames: z.number().positive(),
   }),
-  /** Player-level paired-simulation results, keyed by stable player id. */
+
   playerAdjustments: z
     .record(
       z.string().min(1),

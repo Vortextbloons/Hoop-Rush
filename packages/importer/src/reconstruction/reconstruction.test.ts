@@ -1,10 +1,3 @@
-/**
- * Unit and integration tests for the conservative three-point reconstruction
- * module (spec/12): deterministic fitting, feature exclusion, FT prior
- * stabilization, relative 2P efficiency, missing-feature imputation,
- * posterior quantiles, confidence bands, early-era priors, grouped holdout
- * gates, and artifact determinism.
- */
 import { describe, expect, it } from 'vitest';
 import {
   buildFeatureContext,
@@ -49,12 +42,6 @@ function sampleRow(overrides: Partial<ReconstructionRow> = {}): ReconstructionRo
   };
 }
 
-/**
- * Shared real-data cohort and one fitted artifact. Fitting the full early-era
- * model takes seconds, so the expensive work runs once at module scope and
- * every test derives from these; determinism is still asserted by refitting
- * in the gates test below.
- */
 const COHORT = loadCohortRows();
 const RECONSTRUCTION = fitThreePointReconstruction(COHORT);
 
@@ -107,8 +94,7 @@ describe('reconstruction math primitives', () => {
     expect(sigmoid(withPrior.coefficients[0] ?? -5)).toBeGreaterThan(
       sigmoid(noPrior.coefficients[0] ?? -5),
     );
-    // Only the x=0 row carries observed zero trials (20), so the posterior
-    // intercept is dominated by the prior pseudo-observations: 320/820.
+
     expect(sigmoid(withPrior.coefficients[0] ?? -5)).toBeCloseTo(320 / 820, 1);
   });
 });
@@ -241,7 +227,7 @@ describe('posterior quantiles and profile assembly', () => {
     expect(complete.profile.evidence.missingFeatures).toBe(0);
     expect(missing.profile.attemptRateConservative).toBeLessThan(0.5);
     expect(missing.profile.accuracyConservative).toBeLessThan(0.6);
-    // Missing physicals can never raise confidence to the high band.
+
     expect(missing.profile.confidence).not.toBe('high');
   });
 });
@@ -306,8 +292,7 @@ describe('grouped holdout and gates', () => {
     expect(RECONSTRUCTION.artifact.floors.zoneFloors.cornerThree).toBeLessThan(0.34);
     expect(RECONSTRUCTION.artifact.holdout.foldCount).toBeGreaterThanOrEqual(3);
     expect(RECONSTRUCTION.holdout.accuracy.bias).toBeLessThanOrEqual(0);
-    // The attempt gate is the modern-translated bias (the translation
-    // intentionally predicts above early-era volume).
+
     expect(RECONSTRUCTION.holdout.translatedAttemptRateModern.bias).toBeLessThanOrEqual(0);
     expect(RECONSTRUCTION.holdout.accuracy.mae).toBeGreaterThan(0);
     expect(RECONSTRUCTION.holdout.attemptRate.mae).toBeGreaterThan(0);
@@ -349,11 +334,11 @@ describe('grouped holdout and gates', () => {
     expect(guard.profile.attemptRateConservative).toBeGreaterThan(0.02);
     expect(guard.profile.attemptRateConservative).toBeLessThanOrEqual(0.15);
     expect(center.profile.attemptRateConservative).toBeLessThanOrEqual(0.02);
-    // Ordering preserved: conservative <= mean after translation.
+
     expect(guard.profile.attemptRateConservative).toBeLessThanOrEqual(
       guard.profile.attemptRateMean,
     );
-    // Accuracy is never translated.
+
     expect(guard.profile.accuracyMean).toBeGreaterThan(guard.profile.accuracyConservative);
   });
 

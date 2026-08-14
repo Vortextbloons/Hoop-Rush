@@ -33,11 +33,6 @@ import {
 
 const context = createEngineContext();
 
-/**
- * Canonically ordered fixture catalog (franchiseId asc, then eraId asc) with
- * known position unions and enough era/franchise breadth that rerolls always
- * have alternatives at round 1.
- */
 function catalogFixture(): ClassicDraftCatalog {
   return [
     { franchiseId: 'bulls', eraId: '1990s', players: [{ playerId: 'p-7', positions: ['PG'] }] },
@@ -89,7 +84,6 @@ function draftFixture(variant: ClassicVariant = 'ratings'): ClassicDraftState {
   );
 }
 
-/** Drafts one legal pick from the current roll: first open slot, first fitting player. */
 function advanceOne(state: ClassicDraftState): ClassicDraftState {
   if (state.roll === null) {
     throw new Error('fixture cannot advance without a roll');
@@ -117,7 +111,6 @@ function advanceOne(state: ClassicDraftState): ClassicDraftState {
   throw new Error('fixture cannot advance: no legal pick');
 }
 
-/** Walks a draft through all five rounds to completion. */
 function draftFive(state: ClassicDraftState): ClassicDraftState {
   let current = state;
   while (current.status === 'drafting') {
@@ -164,7 +157,6 @@ function challengeEnvironment(
   };
 }
 
-/** A complete draft whose five picks form a legal G,G,F,F,C lineup. */
 function completeFixture(overrides: Partial<ClassicDraftState> = {}): ClassicDraftState {
   return {
     ...draftFixture(),
@@ -182,14 +174,6 @@ function completeFixture(overrides: Partial<ClassicDraftState> = {}): ClassicDra
   };
 }
 
-/**
- * Decoy catalog pinned to a lakers/1990s roll: lakers/1980s and lakers/2000s
- * share the franchise (era-reroll candidates only), bulls/1990s and
- * celtics/1990s share the era (franchise-reroll candidates only), and every
- * other pair changes both axes and must never be rerolled onto. Position
- * unions interact with the player filter: the same-era franchise candidates
- * are guard-only and the era candidates bracket the center-only open slot.
- */
 function decoyFixture(): ClassicDraftCatalog {
   return [
     {
@@ -245,7 +229,6 @@ function decoyFixture(): ClassicDraftCatalog {
   ];
 }
 
-/** Round-1 drafting state pinned to the lakers/1990s roll over the decoy catalog. */
 function decoyState(overrides: Partial<ClassicDraftState> = {}): ClassicDraftState {
   return {
     ...draftFixture(),
@@ -399,8 +382,6 @@ describe('classic draft rounds', () => {
 
 describe('classic rerolls', () => {
   it('franchise reroll changes the franchise, preserves the era, and spends once', () => {
-    // All alternative pairs share the 1990s era, so the era is guaranteed
-    // to be preserved while the franchise must change.
     const catalog: ClassicDraftCatalog = [
       {
         franchiseId: 'lakers',
@@ -449,8 +430,6 @@ describe('classic rerolls', () => {
   });
 
   it('era reroll changes the era, preserves the franchise, and spends once', () => {
-    // All alternative pairs share the lakers franchise, so the franchise is
-    // guaranteed to be preserved while the era must change.
     const catalog: ClassicDraftCatalog = [
       {
         franchiseId: 'lakers',
@@ -559,7 +538,7 @@ describe('classic rerolls', () => {
         { round: 4, playerId: 'p-3', franchiseId: 'lakers', eraId: '1990s', slotIndex: 3 },
       ],
     };
-    // Only slot 4 (C) is open and only the current pair fits it.
+
     expect(() => rerollClassicFranchise(narrowed, catalog, context)).toThrow(
       /no alternative franchise for era 1990s in round 5/,
     );
@@ -787,15 +766,14 @@ describe('classic reroll single-axis candidates', () => {
         },
       ],
     });
-    // Only slot 4 (C) is open: the guard-only same-era entries drop out, so
-    // the franchise reroll has no legal target and must not spend.
+
     const franchiseCandidates = classicRollCandidates(decoyFixture(), state, 'franchise-reroll');
     expect(franchiseCandidates).toEqual([]);
     expect(classicRerollAvailable(state, 'franchise', decoyFixture())).toBe(false);
     expect(() => rerollClassicFranchise(state, decoyFixture(), context)).toThrow(
       /no alternative franchise/,
     );
-    // The era reroll keeps lakers/2000s (a center) and drops lakers/1980s.
+
     const eraCandidates = classicRollCandidates(decoyFixture(), state, 'era-reroll');
     expect(eraCandidates.map((entry) => `${entry.franchiseId}/${entry.eraId}`)).toEqual([
       'lakers/2000s',
@@ -823,13 +801,13 @@ describe('classic candidate filtering and picks', () => {
     };
     const candidates = classicRollCandidates(catalogFixture(), state, 'initial');
     const keys = new Set(candidates.map((e) => `${e.franchiseId}/${e.eraId}`));
-    // Only slot 4 (C) is open; guard-only and forward-only entries drop out.
+
     expect(keys.has('bulls/1990s')).toBe(false);
     expect(keys.has('lakers/2010s')).toBe(false);
     expect(keys.has('bulls/2010s')).toBe(false);
-    expect(keys.has('lakers/1990s')).toBe(true); // p-3 C remains
-    expect(keys.has('celtics/2010s')).toBe(true); // p-10 C
-    expect(keys.has('heat/2000s')).toBe(true); // p-8 F/C
+    expect(keys.has('lakers/1990s')).toBe(true);
+    expect(keys.has('celtics/2010s')).toBe(true);
+    expect(keys.has('heat/2000s')).toBe(true);
   });
 
   it('rejects a player into a slot their positions cannot fill', () => {
@@ -997,19 +975,19 @@ describe('classic repositioning', () => {
       { playerId: 'p-3', slotIndex: 4 },
       context,
     );
-    // p-1 is a guard and cannot move to the center slot.
+
     expect(() =>
       repositionClassicPlayer(two, catalogFixture(), { playerId: 'p-1', slotIndex: 4 }),
     ).toThrow(/p-1 cannot play slot 4/);
-    // The center cannot swap into the occupied guard slot either.
+
     expect(() =>
       repositionClassicPlayer(two, catalogFixture(), { playerId: 'p-3', slotIndex: 0 }),
     ).toThrow(/p-3 cannot play slot 0/);
-    // Unknown players are rejected.
+
     expect(() =>
       repositionClassicPlayer(two, catalogFixture(), { playerId: 'p-404', slotIndex: 2 }),
     ).toThrow(/p-404 is not drafted/);
-    // Repositioning to the current slot is a no-op.
+
     const unchanged = repositionClassicPlayer(two, catalogFixture(), {
       playerId: 'p-1',
       slotIndex: 0,
@@ -1090,7 +1068,7 @@ describe('createClassicChallenge', () => {
         { round: 2, playerId: 'p-4', franchiseId: 'celtics', eraId: '1990s', slotIndex: 1 },
         { round: 3, playerId: 'p-6', franchiseId: 'lakers', eraId: '1980s', slotIndex: 2 },
         { round: 4, playerId: 'p-11', franchiseId: 'bulls', eraId: '2010s', slotIndex: 3 },
-        // p-7 is a guard; slot 4 requires a center.
+
         { round: 5, playerId: 'p-7', franchiseId: 'bulls', eraId: '1990s', slotIndex: 4 },
       ],
     });

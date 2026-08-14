@@ -11,11 +11,6 @@ import { simulateGame } from './game.ts';
 import { checkGameResult, gameResultDigest } from './invariants.ts';
 import { createEngineContext } from './context.ts';
 
-/**
- * Property-based accounting, determinism, and distribution invariants
- * (spec/06) over arbitrary legal lineups, ratings, and seeds.
- */
-
 const ctx = createEngineContext();
 const profile = buildEraSimulationProfile();
 
@@ -88,7 +83,6 @@ const playerArb: fc.Arbitrary<SimulationPlayer> = fc.record({
   tendencies: tendenciesArb,
 });
 
-/** A legal five with the fixed G,G,F,F,C structure and random ratings. */
 const teamArb: fc.Arbitrary<SimulationTeam> = fc
   .array(playerArb, { minLength: 5, maxLength: 5 })
   .map((players) => ({
@@ -175,8 +169,7 @@ describe('property: accounting and determinism', () => {
           expect(side.box.possessions).toBeLessThanOrEqual(150);
           expect(side.box.points).toBeGreaterThanOrEqual(30);
           expect(side.box.points).toBeLessThanOrEqual(180);
-          // Each trip ends in a shot, free throws, or a turnover; offensive
-          // rebounds continue a trip with up to four extra shot attempts.
+
           expect(side.box.fieldGoals.attempted).toBeLessThanOrEqual(side.box.possessions + 60);
         }
       }),

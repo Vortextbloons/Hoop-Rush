@@ -16,14 +16,6 @@ import {
 } from './trade-grades.ts';
 import { buildEconomyTestRun } from './season-economy-test-support.ts';
 
-/**
- * M2.6 trade-grade derivation tests (trade-grade-v1): the A/B/C/D/F label
- * boundaries, the frozen 55/15/15/15 component weights, the five-game
- * small-sample neutrality floor, traded-player and multi-window cases, and
- * digest determinism. Fixtures build a schema-valid economy run and hand
- * craft the recorded summaries (regular-season rounds + postseason).
- */
-
 const LAKERS = 'lakers';
 const CELTICS = 'celtics';
 
@@ -43,7 +35,6 @@ interface LineSpec {
   tov?: number;
 }
 
-/** One compact line with deterministic defaults (neutral ~10 pts/game). */
 function line(versionId: string, spec: LineSpec = {}): SeasonCompactPlayerLine {
   const fgm = spec.fgm ?? 4;
   const fga = spec.fga ?? 9;
@@ -91,7 +82,6 @@ function boxOf(franchiseId: string, lines: readonly SeasonCompactPlayerLine[]): 
   };
 }
 
-/** Ten filler versions per franchise (always appear, neutral production). */
 function fillerOf(franchiseId: string, startIndex: number): string[] {
   return Array.from({ length: 10 }, (_, index) => ver(startIndex + index));
 }
@@ -103,7 +93,6 @@ interface GameSpec {
   awayScore?: number;
 }
 
-/** One regular-season summary: lakers host celtics; 10 lines per side. */
 function summary(round: number, spec: GameSpec = {}): SeasonGameSummary {
   const homeIds = fillerOf(LAKERS, 50);
   const awayIds = fillerOf(CELTICS, 70);
@@ -148,7 +137,6 @@ function regularSeason(rounds: number, spec: GameSpec = {}): SeasonGameSummary[]
   return Array.from({ length: rounds }, (_, index) => summary(index + 1, spec));
 }
 
-/** One postseason summary (lakers host celtics); the shape matters, not digests. */
 function postseasonSummary(gameId: string, spec: GameSpec = {}): SeasonPostseasonSummary {
   const homeIds = fillerOf(LAKERS, 50);
   const awayIds = fillerOf(CELTICS, 70);
@@ -204,7 +192,6 @@ function postseasonSummary(gameId: string, spec: GameSpec = {}): SeasonPostseaso
 const STAR = ver(1);
 const SECOND = ver(2);
 
-/** A star per-game line: 40 points on efficient volume with defense/playmaking. */
 const STAR_LINE: LineSpec = {
   seconds: 2400,
   started: true,
@@ -217,7 +204,6 @@ const STAR_LINE: LineSpec = {
   tov: 2,
 };
 
-/** A bench-level line: ~8 points in ~16 minutes. */
 const BENCH_LINE: LineSpec = {
   seconds: 960,
   started: false,
@@ -259,7 +245,6 @@ function tradeState(windows: SeasonTradeState['windows']): SeasonTradeState {
   return { schemaVersion: 1, tradeVersion: 'season-trade-v2', windows };
 }
 
-/** A run with one accepted window-0 trade: lakers receive STAR for SECOND. */
 function runWithTrade(): {
   run: ReturnType<typeof buildEconomyTestRun>['run'];
   catalog: ReturnType<typeof buildEconomyTestRun>['catalog'];
@@ -294,7 +279,7 @@ describe('season trade grade labels (trade-grade-v1)', () => {
 describe('season trade grade derivation (trade-grade-v1)', () => {
   it('grades both sides of an accepted trade from recorded post-trade games', () => {
     const { run } = runWithTrade();
-    // Window 0 (block 2) opens after round 30: post-trade = rounds 31-82.
+
     const summaries = [
       ...regularSeason(30),
       ...regularSeason(52, { homeLines: { [STAR]: STAR_LINE } }),
@@ -312,8 +297,7 @@ describe('season trade grade derivation (trade-grade-v1)', () => {
     const celtics = grades.grades.find((grade) => grade.franchiseId === CELTICS);
     expect(lakers).toBeDefined();
     expect(celtics).toBeDefined();
-    // The lakers received the star; the celtics sent him away, so the
-    // lakers' production grade dominates.
+
     expect(lakers?.components.production ?? 0).toBeGreaterThan(
       celtics?.components.production ?? 100,
     );
@@ -386,8 +370,7 @@ describe('season trade grade derivation (trade-grade-v1)', () => {
 
   it('handles a player traded twice across windows without double counting', () => {
     const { run } = buildEconomyTestRun();
-    // Window 0: lakers receive STAR for SECOND. Window 1 (block 4 opens
-    // after round 50): lakers send STAR to celtics for a filler.
+
     const filler = ver(90);
     const trade = tradeState([
       {
@@ -403,8 +386,7 @@ describe('season trade grade derivation (trade-grade-v1)', () => {
         offers: [offer(1, LAKERS, CELTICS, [STAR], [filler], `off-1${'b'.repeat(31)}`)],
       },
     ]);
-    // Rounds 1-82; STAR produces for the lakers in rounds 31-50 and for the
-    // celtics in rounds 51-82.
+
     const summaries = regularSeason(82, { homeLines: { [STAR]: STAR_LINE } });
     const grades = deriveSeasonTradeGrades({
       runId: run.runId,
@@ -417,8 +399,7 @@ describe('season trade grade derivation (trade-grade-v1)', () => {
     const windowOne = grades.grades.filter((grade) => grade.windowIndex === 1);
     expect(windowZero).toHaveLength(2);
     expect(windowOne).toHaveLength(2);
-    // Window 1's lakers grade: STAR is SENT, so the received side (filler)
-    // should trail the production of the sent star.
+
     const lakersWindowOne = windowOne.find((grade) => grade.franchiseId === LAKERS);
     const celticsWindowOne = windowOne.find((grade) => grade.franchiseId === CELTICS);
     expect(celticsWindowOne?.components.production ?? 0).toBeGreaterThan(
@@ -447,9 +428,7 @@ describe('season trade grade derivation (trade-grade-v1)', () => {
     });
     expect(second).toEqual(first);
     expect(second.digest).toBe(first.digest);
-    // Reordered postseason summaries must not change the digest (canonical
-    // fold order is regular-season rounds then postseason play order, and
-    // the recorded game order only matters for ordinal facts, not folding).
+
     const reordered = deriveSeasonTradeGrades({
       runId: run.runId,
       run,
@@ -464,8 +443,7 @@ describe('season trade grade derivation (trade-grade-v1)', () => {
 
   it('credits the received side when production is realized through the champion', () => {
     const { run } = runWithTrade();
-    // STAR produces through rounds 31-82 AND the postseason; SECOND stays on
-    // the celtics but produces at bench level, so the lakers grade is A-level.
+
     const summaries = [
       ...regularSeason(30),
       ...regularSeason(52, {
@@ -489,7 +467,7 @@ describe('season trade grade derivation (trade-grade-v1)', () => {
     expect(lakers).toBeDefined();
     expect(lakers?.components.production).toBeGreaterThanOrEqual(90);
     expect(lakers?.label).toBe('A');
-    // Reasons carry the recorded production facts.
+
     const productionReason = lakers?.reasons.find((reason) =>
       reason.startsWith('received production'),
     );

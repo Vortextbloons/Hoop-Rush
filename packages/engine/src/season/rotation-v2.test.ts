@@ -18,16 +18,6 @@ import {
   validateSeasonRotation,
 } from './rotation.ts';
 
-/**
- * Season Run M2.2 rotation domain tests (season-rotation-v2): preset
- * application rewrites only target minutes, v2 validation accepts
- * independent closing fives and rejects every structural violation, and the
- * set-season-rotation command maps failures to the fixed rejection codes.
- * Player ids are schema-valid so accepted/rejected results can be checked
- * against seasonRotationCommandResultSchema.
- */
-
-/** Schema-valid playerVersionId (playerVersionIdSchema: pv- + 32 hex). */
 const pv = (n: number): string => `pv-${n.toString(16).padStart(32, '0')}`;
 
 const g = (id: string, ...positions: Position[]): SeasonRosterMemberInput => ({
@@ -35,7 +25,6 @@ const g = (id: string, ...positions: Position[]): SeasonRosterMemberInput => ({
   playable: positions,
 });
 
-/** Ten rostered versions with a legal G,G,F,F,C matching in several orders. */
 const MEMBERS = [
   g(pv(1), 'PG'),
   g(pv(2), 'SG'),
@@ -54,7 +43,6 @@ const MEMBER_PLAYABLE = new Map(MEMBERS.map((member) => [member.playerVersionId,
 const STARTERS = [pv(1), pv(2), pv(3), pv(4), pv(5)];
 const BENCH = [pv(6), pv(7), pv(8), pv(9), pv(10)];
 
-/** Balanced preset target minutes for the ten roster slots, in roster order. */
 const BALANCED_TARGET_MINUTES = [33, 33, 33, 33, 33, 21, 18, 15, 12, 9] as const;
 
 function buildRotation(overrides: Partial<SeasonRotation> = {}): SeasonRotation {

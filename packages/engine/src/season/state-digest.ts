@@ -18,62 +18,22 @@ import {
 } from '@hoop-rush/data-contracts';
 import { canonicalJson } from './checkpoint.ts';
 
-/**
- * M2.5/M2.6/M2.6.5 canonical run-state digest (spec/2.0/07, LEAD DECISION in
- * the M2.5 contract §3 and §20.2). The mutable Season Run state — the facts
- * every block commit and every typed run command advances — hashes to one
- * 32-hex digest that the state chain carries on the run snapshot
- * (`stateRevision` + `stateDigest`). The digest is a pure function of the
- * recorded facts, so every execution path (worker, CLI, reload, retry)
- * produces the same digest for the same facts.
- *
- * Scope (frozen): `{ stateRevision, stage, postseason, awards, completion,
- * checkpointState, health, influence, transactions, trade, freeAgency,
- * objectives, rosters, ownership, rotations, effects }`. M2.6 adds `stage`,
- * the postseason-v2 state, `awards`, and `completion` so authoritative
- * postseason and award facts ride the state chain; M2.6.5 adds `freeAgency`
- * (windows, canonical candidates, declarations, traces, signings, signing
- * counts, season spend). The run's stored `stateDigest` field is EXCLUDED
- * from its own computation (mirror of the checkpoint digest rule).
- *
- * Canonical ordering (frozen): rosters by franchiseId, ownership by
- * playerVersionId, rotations by franchiseId, effects per the existing
- * canonical ordering (player loads by playerVersionId, pairs by the
- * canonical a<b key), health injuries by injuryId, influence ledger by
- * entryId, transactions by transactionId, postseason tiebreak resolutions
- * by resolutionId (every other postseason array is positionally fixed by
- * its own invariants: rankings and seeds in seed order, series slots in
- * bracket order, series games by gameNumber), free-agency windows by
- * windowIndex, canonical candidates by playerId, signing counts and season
- * spend by franchiseId. Object keys serialize canonically (recursively
- * sorted), so parse-reordered records hash identically.
- *
- * NOTE (resolved at integration): the M2.5 contract allowed this function to
- * live in checkpoint.ts "or a sibling state-digest module in the same
- * directory". The final placement is this module (`season/state-digest.ts`);
- * `checkpoint.ts` exports the checkpoint digest, a different function. Both
- * follow the frozen canonicalization, so digests agree.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
-/** The mutable run-state facts the digest canonicalizes (self-excluding). */
 export interface SeasonRunStateDigestFacts {
   stateRevision: number;
-  /** M2.6: the explicit run stage. */
+
   stage: SeasonRunStage;
-  /** M2.6: the postseason-v2 state machine. */
+
   postseason: SeasonPostseasonState;
-  /** M2.6: derived season awards; null until postseason qualification. */
+
   awards: SeasonAwards | null;
-  /** M2.6: completion state; null until a champion is decided. */
+
   completion: SeasonRunCompletion | null;
   checkpointState: SeasonCheckpointState | null;
   health: SeasonHealthState;
   influence: SeasonInfluenceState;
   transactions: readonly SeasonTransactionEntry[];
   trade: SeasonTradeState | null;
-  /** M2.6.5: the free-agency market state. */
+
   freeAgency: SeasonFreeAgencyState;
   objectives: SeasonObjectiveState;
   rosters: readonly SeasonRoster[];
@@ -82,12 +42,10 @@ export interface SeasonRunStateDigestFacts {
   effects: SeasonEffectsState;
 }
 
-/** Canonical ordering helpers (frozen in the M2.5 contract). */
 function sortedBy<T>(items: readonly T[], keyOf: (item: T) => string): T[] {
   return [...items].sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
 }
 
-/** Canonical projection of the postseason state (tie resolutions ordered). */
 function postseasonCanonical(postseason: SeasonPostseasonState): unknown {
   return {
     schemaVersion: postseason.schemaVersion,
@@ -105,7 +63,6 @@ function postseasonCanonical(postseason: SeasonPostseasonState): unknown {
   };
 }
 
-/** Canonical 32-hex digest of the mutable run state (self-excluded). */
 export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
   const canonical = canonicalJson({
     stateRevision: facts.stateRevision,

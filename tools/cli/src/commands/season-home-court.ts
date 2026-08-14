@@ -28,16 +28,6 @@ import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
 import { DEFAULT_MANIFEST, DEFAULT_SEASON_DIR, readJsonFile } from './season-data.ts';
 import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
 
-/**
- * M2.3 `season home-court calibrate` (spec/2.0/02 home court). Measures the
- * tuned engine profile against the frozen 0.575 home-win-rate target over
- * the committed Balanced/Tight/Bench-Heavy fixtures: the calibration cohort
- * (seeds 0-1023) and the held-out cohort (seeds 1024-1279) each run every
- * fixture twice (neutral adapter and the engine profile). The artifact
- * `apps/web/static/data/season/home-court-targets.json` is calibration
- * evidence; `SEASON_HOME_COURT_PROFILE` in the engine is authoritative.
- */
-
 export const SEASON_HOME_COURT_CALIBRATE_OPTIONS: Record<string, boolean> = {
   fixture: true,
   'seed-from': true,
@@ -55,15 +45,8 @@ export const SEASON_HOME_COURT_VALIDATION_SEED_COUNT = 256;
 export const SEASON_HOME_COURT_SEED_TOTAL =
   SEASON_HOME_COURT_CALIBRATION_SEED_COUNT + SEASON_HOME_COURT_VALIDATION_SEED_COUNT;
 
-/** Frozen tolerance around the 0.575 held-out target. */
 export const SEASON_HOME_COURT_TOLERANCE = 0.01;
 
-/**
- * Binomial standard error of a home win rate over `n` games. The frozen
- * held-out cohort (256 seeds x 3 fixtures = 768 games) has a ~1.8pp SE, so
- * a fixed ±1pp point gate would fail on ordinary binomial noise; the gates
- * below combine the frozen point tolerance with the sample's standard error.
- */
 export function homeWinRateStandardError(n: number): number {
   if (n <= 0) return 0;
   return Math.sqrt((SEASON_HOME_WIN_RATE_TARGET * (1 - SEASON_HOME_WIN_RATE_TARGET)) / n);
@@ -77,7 +60,6 @@ export const SEASON_HOME_COURT_PRESET_FIXTURES = [
 
 export const DEFAULT_HOME_COURT_TARGETS = resolve(DEFAULT_SEASON_DIR, 'home-court-targets.json');
 
-/** The artifact written by `season home-court calibrate`. */
 export const seasonHomeCourtTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   profileVersion: z.literal(SEASON_HOME_COURT_VERSION),
@@ -102,14 +84,13 @@ export const seasonHomeCourtTargetsSchema = z.object({
 });
 export type SeasonHomeCourtTargets = z.infer<typeof seasonHomeCourtTargetsSchema>;
 
-/** Per-game facts posted by the calibration worker. */
 export interface SeasonHomeCourtGameFacts {
   fixtureId: string;
   seedIndex: number;
   neutralHomeWon: boolean;
   homeProfileHomeWon: boolean;
   completed: boolean;
-  /** Home-team possessions under the tuned profile (completed only). */
+
   homePossessions: number;
   awayPossessions: number;
 }
@@ -120,11 +101,6 @@ function homeWon(result: SeasonGameSimulationResult): boolean {
   return false;
 }
 
-/**
- * Simulates one calibration game twice (neutral adapter and the given
- * profile) and derives the facts. Shared by the worker (real engine) and
- * the in-process test runner (injected doubles).
- */
 export function simulateSeasonHomeCourtFacts(
   fixtureId: string,
   seedIndex: number,
@@ -151,7 +127,6 @@ export function simulateSeasonHomeCourtFacts(
   return facts;
 }
 
-/** The neutral zero adapter used as the calibration baseline. */
 export const SEASON_NEUTRAL_PROFILE: SeasonHomeCourtProfile = {
   schemaVersion: 1,
   profileVersion: SEASON_HOME_COURT_VERSION,
@@ -171,7 +146,6 @@ export type SeasonHomeCourtCohortRunner = (
   request: SeasonHomeCourtCohortRequest,
 ) => Promise<SeasonHomeCourtGameFacts[]>;
 
-/** Worker-based cohort runner: one worker per (fixture, seed-range chunk). */
 export async function runSeasonHomeCourtCohort(
   request: SeasonHomeCourtCohortRequest,
 ): Promise<SeasonHomeCourtGameFacts[]> {
@@ -196,7 +170,6 @@ export async function runSeasonHomeCourtCohort(
   return chunks.flat();
 }
 
-/** In-process cohort runner for tests with injected engine doubles. */
 export function runSeasonHomeCourtCohortInProcess(
   request: SeasonHomeCourtCohortRequest,
   deps: SeasonGameEngineDeps,
@@ -218,7 +191,6 @@ export function runSeasonHomeCourtCohortInProcess(
   return Promise.resolve(facts);
 }
 
-/** Aggregates home win rates over one cohort. */
 function foldWinRates(facts: readonly SeasonHomeCourtGameFacts[]): {
   neutralHomeWinRate: number;
   achievedHomeWinRate: number;
@@ -239,7 +211,6 @@ function foldWinRates(facts: readonly SeasonHomeCourtGameFacts[]): {
   };
 }
 
-/** Possession stability: the mean |home-away| delta over a cohort. */
 function possessionDelta(facts: readonly SeasonHomeCourtGameFacts[]): number {
   const deltas: number[] = [];
   for (const fact of facts) {
@@ -250,7 +221,6 @@ function possessionDelta(facts: readonly SeasonHomeCourtGameFacts[]): number {
   return deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length;
 }
 
-/** The profile carried by a `--constants a,b` override (dev tuning seam). */
 function profileOfConstants(constants: string | null | undefined): SeasonHomeCourtProfile {
   if (constants === null || constants === undefined) return SEASON_HOME_COURT_PROFILE;
   const parts = constants.split(',');
@@ -275,7 +245,6 @@ function profileOfConstants(constants: string | null | undefined): SeasonHomeCou
   };
 }
 
-/** Validates an existing artifact against the engine profile and versions. */
 export function validateSeasonHomeCourtTargets(path: string): string[] {
   const parsed = seasonHomeCourtTargetsSchema.safeParse(readJsonFile(path));
   if (!parsed.success) {
@@ -385,25 +354,17 @@ export async function seasonHomeCourtCalibrate(
   const neutralHomeWinRate = validation.neutralHomeWinRate;
   const gamesSimulated = calibration.games + validation.games;
 
-  // Gates. The frozen held-out cohort is a 768-game binomial sample (SE
-  // ~1.8pp), so the point tolerance is floored by the sample's standard
-  // error: the achieved rate must be within max(0.01, 2 sigma) of the
-  // target, and the neutral baseline within 3 sigma of 50%.
   const sampleStandardError = homeWinRateStandardError(validation.games);
   const targetTolerance = Math.max(SEASON_HOME_COURT_TOLERANCE, 2 * sampleStandardError);
   const baselineTolerance = Math.max(0.03, 3 * sampleStandardError);
   const neutralBaseline = Math.abs(neutralHomeWinRate - 0.5) <= baselineTolerance;
   const withinTolerance =
     Math.abs(achievedHomeWinRate - SEASON_HOME_WIN_RATE_TARGET) <= targetTolerance;
-  // The home-court mechanisms touch turnover and conversion, never pace:
-  // the mean home/away possession delta stays close to the neutral band.
+
   const neutralDelta = possessionDelta(calibrationFacts);
   const homeDelta = possessionDelta(validationFacts);
   const possessionStable = Math.abs(homeDelta - neutralDelta) <= 2;
 
-  // Empirical monotonicity on a fixed subset: halving both constants must
-  // not raise the home win rate beyond a small noise allowance. The exact
-  // mechanism monotonicity is unit-tested in the engine.
   const monotonic = await (async () => {
     if (args.constants !== null && args.constants !== undefined) return true;
     const lowProfile: SeasonHomeCourtProfile = {

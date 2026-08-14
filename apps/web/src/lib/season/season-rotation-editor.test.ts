@@ -25,12 +25,6 @@ import {
   rotationPlayableOf,
 } from './season-rotation-test-support';
 
-/**
- * M2.3 rotation editor unit tests: every mutation stays inside the engine
- * audit (spec/2.0/04 M2.2 contract), so the pending rotation can never drift
- * into a submission the engine would reject.
- */
-
 function members(): RotationMember[] {
   return rotationMembers();
 }
@@ -47,7 +41,6 @@ function editor() {
   return createRotationEditor(rotation(), members());
 }
 
-/** A bench player that can play a guard slot, if one exists. */
 function guardBenchPlayer(e: ReturnType<typeof editor>): string | null {
   return (
     e.rotation.benchOrder.find(
@@ -56,7 +49,6 @@ function guardBenchPlayer(e: ReturnType<typeof editor>): string | null {
   );
 }
 
-/** A bench player that can play a forward slot, if one exists. */
 function forwardBenchPlayer(e: ReturnType<typeof editor>): string | null {
   return (
     e.rotation.benchOrder.find(
@@ -65,7 +57,6 @@ function forwardBenchPlayer(e: ReturnType<typeof editor>): string | null {
   );
 }
 
-/** A player who can ONLY play center. */
 function centerOnlyPlayer(): string | null {
   const candidate = CANDIDATES.find(
     (c) => c.positions.playable.length === 1 && c.positions.playable[0] === 'C',
@@ -373,7 +364,7 @@ describe('RotationEditor.toggleClosing', () => {
       },
       players,
     );
-    // Every guard is closing, so the bench cannot fill a vacated guard slot.
+
     const failures = e.toggleClosing('g1');
     expect(failures.length).toBeGreaterThan(0);
     expect(failures[0]).toMatch(/cannot be removed/);
@@ -417,8 +408,7 @@ describe('RotationEditor.eligibleForSlot', () => {
       for (const id of e.eligibleForSlot(slotIndex).map((member) => member.playerVersionId)) {
         expect(canPlay(playableOf(id), group)).toBe(true);
       }
-      // The roster always has someone ineligible for the slot (the fixture
-      // covers the full position archetype cycle).
+
       const ineligible = members()
         .map((member) => member.playerVersionId)
         .find((id) => !canPlay(playableOf(id), group));

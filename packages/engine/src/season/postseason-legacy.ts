@@ -14,28 +14,10 @@ import {
 } from '@hoop-rush/data-contracts';
 import { franchisesInConference } from './league.ts';
 
-/**
- * FROZEN Season Run postseason state machine (spec/2.0/02, postseason-v1,
- * M2.0-M2.5). M2.6 postseason-foundations replaces the v1 CONTRACT with the
- * validated postseason-v2 contract (`season-postseason.ts`); this module is
- * the frozen v1 implementation kept for reference, artifact audit, and
- * legacy readability. It compiles against the legacy v1 types (aliased to
- * their v1 names here) and is never used by schema-9 runs; the v2 machine
- * arrives in a later M2.6 phase. The machine implements the exact 7/8,
- * 9/10, and final Play-In flow, fixed 1-8, 4-5, 3-6, 2-7 first-round
- * pairings, no reseeding, best-of-seven series ending immediately at four
- * wins, the 2-2-1-1-1 home pattern, and a caller-supplied Finals home-court
- * team. Every transition is a pure function of the current state and the
- * submitted result; nothing depends on call order or external randomness.
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 const CONFERENCES: readonly ConferenceId[] = ['east', 'west'];
 
-/** Home-court games of the 2-2-1-1-1 pattern (games 1, 2, 5, 7). */
 const HOME_COURT_GAMES = new Set([1, 2, 5, 7]);
 
-/** Fixed first-round index pairs: (higher seed index, lower seed index). */
 const FIRST_ROUND_PAIRS: ReadonlyArray<readonly [number, number]> = [
   [0, 7],
   [3, 4],
@@ -60,7 +42,6 @@ function isNonNegativeInteger(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
 }
 
-/** Resolves one scheduled Play-In game from its derived matchup and result. */
 function resolvePlayInGame(
   game: PlayInGame,
   home: string,
@@ -109,7 +90,6 @@ function resolvePlayInGame(
   };
 }
 
-/** Advances a conference's Play-In: pairs the final and resolves seeds 7-8. */
 function advanceConferencePlayIn(
   playIn: SeasonPostseasonState['playIn']['east'],
 ): SeasonPostseasonState['playIn']['east'] {
@@ -133,12 +113,6 @@ function advanceConferencePlayIn(
   return { ...playIn, playoffSeeds };
 }
 
-/**
- * Records the explicitly seeded top ten for each conference (M2.6 supplies
- * these from the regular-season ranking). Play-In matchups derive from the
- * ranking at submission time; all three games stay empty placeholders until
- * their results resolve.
- */
 export function setPlayInRankings(
   state: SeasonPostseasonState,
   league: SeasonLeague,
@@ -165,20 +139,12 @@ export function setPlayInRankings(
   return { ...state, playIn };
 }
 
-/** Maps a Play-In game id to its record key. */
 function playInKey(gameId: PlayInGameId): 'sevenEight' | 'nineTen' | 'final' {
   if (gameId === 'seven-eight') return 'sevenEight';
   if (gameId === 'nine-ten') return 'nineTen';
   return 'final';
 }
 
-/**
- * Submits one Play-In game result. Matchups derive from the ranking: seeds
- * 7 and 8 for the 7/8 game, 9 and 10 for the 9/10 game, and the 7/8 loser
- * hosting the 9/10 winner for the final. Only currently playable games are
- * accepted; winning is by score for finals and by forfeit loser for
- * forfeits.
- */
 export function submitPlayInGame(
   state: SeasonPostseasonState,
   conference: ConferenceId,
@@ -254,7 +220,6 @@ function pendingSeries(
   return seededSeries(seriesId, round, conference, null, null, null, null);
 }
 
-/** Builds one conference's bracket with first-round series and pending slots. */
 function buildConferenceBracket(
   conference: ConferenceId,
   seeds: readonly string[],
@@ -288,12 +253,6 @@ function buildConferenceBracket(
   };
 }
 
-/**
- * Creates the fixed playoff bracket once both conferences complete their
- * Play-In. The Finals home-court team is supplied by the caller until M2.6
- * resolves cross-conference tiebreaks; it must be one of the 16 playoff
- * teams.
- */
 export function createPlayoffBracket(
   state: SeasonPostseasonState,
   league: SeasonLeague,
@@ -334,7 +293,6 @@ export function createPlayoffBracket(
   return { ...state, bracket };
 }
 
-/** All series of a bracket in fixed order: east rounds, then west, then Finals. */
 function bracketSeriesOrder(bracket: PlayoffBracket): PlayoffSeries[] {
   return [
     ...bracket.east.firstRound,
@@ -347,7 +305,6 @@ function bracketSeriesOrder(bracket: PlayoffBracket): PlayoffSeries[] {
   ];
 }
 
-/** The one series whose next game may be submitted. */
 export function currentSeriesId(bracket: PlayoffBracket): string {
   const current = bracketSeriesOrder(bracket).find((series) => series.winnerFranchiseId === null);
   if (current === undefined) {
@@ -410,7 +367,6 @@ function replaceConferenceSeries(
   throw new Error(`unknown series ${seriesId}`);
 }
 
-/** The seed number of a completed series' winner, or null when unknown. */
 function winnerSeedOf(series: PlayoffSeries): number | null {
   const winner = series.winnerFranchiseId;
   if (winner === null || series.higherSeed === null || series.lowerSeed === null) {
@@ -419,7 +375,6 @@ function winnerSeedOf(series: PlayoffSeries): number | null {
   return winner === series.homeCourtFranchiseId ? series.higherSeed : series.lowerSeed;
 }
 
-/** Pairs a pending slot from its two advancing teams, home court to the higher seed. */
 function pairSeries(
   slot: PlayoffSeries,
   sideA: { team: string; seed: number | null },
@@ -437,7 +392,6 @@ function pairSeries(
   };
 }
 
-/** Advances a completed series' winner into its fixed next-round slot. */
 function advanceWinner(bracket: PlayoffBracket, seriesId: string, winner: string): PlayoffBracket {
   const conference = seriesId.startsWith('east-') ? 'east' : 'west';
   const confBracket = conference === 'east' ? bracket.east : bracket.west;
@@ -543,11 +497,6 @@ function advanceWinner(bracket: PlayoffBracket, seriesId: string, winner: string
   throw new Error(`cannot advance unknown series ${seriesId}`);
 }
 
-/**
- * Submits one playoff game. Only the current series may receive a result;
- * the series stops immediately at four wins, games follow the 2-2-1-1-1 home
- * pattern, and the winner advances into its fixed bracket slot.
- */
 export function submitPlayoffGame(
   state: SeasonPostseasonState,
   seriesId: string,
@@ -700,7 +649,6 @@ function auditPlayInConference(
   auditPlayInGame(conference, 'nine-ten', playIn.games.nineTen, failures);
   auditPlayInGame(conference, 'final', playIn.games.final, failures);
 
-  // Resolved games must match their ranking-derived matchups.
   const sevenEight = playIn.games.sevenEight;
   const nineTen = playIn.games.nineTen;
   const final = playIn.games.final;
@@ -1001,11 +949,6 @@ function auditBracket(
   }
 }
 
-/**
- * Audits a postseason state against the frozen postseason rules. Returns a
- * failure list; an empty list means every Play-In branch, pairing, series
- * score line, home pattern, advancement, and champion fact is consistent.
- */
 export function auditSeasonPostseason(
   state: SeasonPostseasonState,
   league: SeasonLeague,

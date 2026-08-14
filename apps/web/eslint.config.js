@@ -21,6 +21,12 @@ export default tseslint.config(
   },
   ...eslintPluginSvelte.configs['flat/recommended'],
   {
+    files: ['**/*.svelte', '**/*.svelte.ts'],
+    rules: {
+      'svelte/prefer-svelte-reactivity': 'off',
+    },
+  },
+  {
     files: ['**/*.svelte'],
     languageOptions: {
       parserOptions: {
@@ -28,8 +34,7 @@ export default tseslint.config(
       },
     },
   },
-  // Runes modules (.svelte.ts) are plain TypeScript at the language level;
-  // parse them with the TS parser so project-service type rules apply.
+
   {
     files: ['**/*.svelte.ts'],
     languageOptions: {

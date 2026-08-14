@@ -25,19 +25,6 @@ import {
 } from './season-run-record.ts';
 import { SEASON_DRAFT_RECORD_ID } from './season-draft-record.ts';
 
-/**
- * Stored-record schema tests for the M2.3/M2.4/M2.5 Season Run persistence:
- * the checkpoint row is the frozen snapshot minus the 1,230 scheduled game
- * records plus cursor facts, the M2.4 effects state, and the M2.5 mutable
- * run state; summary/detail/block/index/pending rows wrap the frozen
- * contracts. The record schema is the single save-schema-v5 row (projection
- * milestone) —
- * the v1-v3 development families are never read (the repository surfaces
- * them through the typed incompatibility flow), and this schema rejects
- * them. Every row validates at the storage boundary, so corrupt rows throw
- * instead of entering app state.
- */
-
 function checkpointRowFixture() {
   const run = buildFixtureRun({});
   return buildFixtureCheckpointRow(run);
@@ -285,8 +272,7 @@ describe('storedSeasonSummaryRowSchema', () => {
       round: 1,
       summary,
     };
-    // The stored schema validates each side; cross-field identity is enforced
-    // by the repository's reload audit, so this parses at the schema level.
+
     expect(
       storedSeasonSummaryRowSchema.safeParse({
         ...base,

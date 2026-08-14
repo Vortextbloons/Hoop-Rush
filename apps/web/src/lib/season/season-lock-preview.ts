@@ -12,16 +12,6 @@ import { rotationRoleOf } from './season-rotation-editor';
 import { seasonRotationSetDigest } from './season-rotation-digest';
 import { FATIGUE_BAND_LABEL, projectedFatigueBand } from './season-effects-view';
 
-/**
- * "What changed?" lock preview (spec/2.0/11 block lock preview, M2.3).
- * Before submitting a block the hub compares the pending rotation state with
- * the last accepted checkpoint: a set-level digest comparison (authoritative:
- * the checkpoint stores only the 32-hex rotation-set digest) plus a granular
- * per-player diff against the run's saved rotation baseline. It states
- * explicitly how many games will lock (10, or 2 in the final block) and lists
- * the upcoming human games from the committed schedule.
- */
-
 export interface RotationChange {
   playerVersionId: string;
   displayName: string;
@@ -40,41 +30,32 @@ export interface UpcomingGame {
   opponentFranchiseId: string;
 }
 
-/**
- * M2.4: continuity and fatigue-risk projection for one rostered player under
- * the pending rotation. Presented as a projection (deterministic workload
- * model), never as a precise future outcome.
- */
 export interface FatigueProjection {
   playerVersionId: string;
   displayName: string;
   minutesAfter: number | null;
   bandNow: string;
   bandAfterBlock: string;
-  /** Continuity: same role + same minutes as the locked baseline. */
+
   continuous: boolean;
 }
 
 export interface LockPreview {
-  /** Team games that will lock: 10 for blocks 0-7, 2 for block 8. */
   gamesToLock: number;
   roundRange: { fromRound: number; toRound: number };
-  /** Digest of the pending 30-rotation set. */
+
   pendingDigest: string;
-  /** Digest of the last accepted block's locked rotations (null pre-block). */
+
   lastLockedDigest: string | null;
-  /** True when the pending set digest matches the last accepted lock. */
+
   unchangedSinceLastLock: boolean;
-  /** Granular per-player changes vs the saved baseline rotation. */
+
   changes: RotationChange[];
-  /** The human team's games in the upcoming block. */
+
   upcomingGames: UpcomingGame[];
-  /** M2.4 fatigue-risk + continuity projections for pending starters/closing. */
+
   fatigueProjections: FatigueProjection[];
-  /**
-   * M2.5: the objective locked into the block submission (null for the
-   * final two-game block 8, or when no selection exists yet).
-   */
+
   objective: { objectiveId: string; name: string } | null;
 }
 
@@ -111,20 +92,20 @@ export function humanUpcomingGames(
 export function buildLockPreview(input: {
   pendingHumanRotation: SeasonRotation;
   baselineHumanRotation: SeasonRotation;
-  /** Digest of the pending full 30-rotation set (all franchises). */
+
   pendingSetDigest: string;
-  /** Digest of the last accepted block's rotation set; null before block 0. */
+
   lastLockedDigest: string | null;
   blockIndex: number;
   names: ReadonlyMap<string, string>;
   games: readonly SeasonGame[];
   humanFranchiseId: string;
-  /** M2.4: recorded load + stamina for the projection (null = skip). */
+
   fatigue?: {
     effects: SeasonEffectsState;
     staminaByVersion: ReadonlyMap<string, number>;
   } | null;
-  /** M2.5: the objective locked into this block submission (if any). */
+
   objective?: { objectiveId: string; name: string } | null;
 }): LockPreview {
   const {

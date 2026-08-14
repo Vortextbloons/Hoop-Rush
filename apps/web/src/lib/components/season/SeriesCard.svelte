@@ -4,14 +4,6 @@
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
 
-  /**
-   * One best-of-seven series card (M2.6 bracket). Renders the seeded
-   * matchup, the 2-2-1-1-1 home-court side, the series score as win pips,
-   * and the next scheduled game (with its host) or the final result. The
-   * human franchise is highlighted; winners are marked. Pure display of the
-   * recorded bracket facts.
-   */
-
   let {
     card,
     franchiseName,

@@ -339,7 +339,6 @@ export function evaluateContextualPlayerValue(
   };
 }
 
-/** Full-lineup matchup summary for pregame screens; focal player is the lineup average. */
 export function evaluateLineupMatchup(
   lineup: SimulationTeam,
   opponent: SimulationTeam,

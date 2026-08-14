@@ -40,19 +40,8 @@ import {
 import { seasonGenerationDigest } from './digest.ts';
 import { SeasonAiGenerationError } from './ai.ts';
 
-/**
- * Season Run M2.3.5 draft domain tests (season-draft-v2): one- and two-human
- * creation, seeded first pick, snake reversal, deterministic global
- * eight-card offers (exactly eight distinct cards, at least three
- * feasibility-safe, disabled cards visible with a stable reason), exact
- * version ownership, same-person/different-version legality, completion
- * feasibility, the typed NO_FEASIBLE_GLOBAL_OFFER rejection, AI exclusion of
- * selected versions, idempotency, stale revisions, rejected-command logging,
- * and byte-for-byte replay.
- */
-
 const CATALOG = buildSeasonDraftCatalog();
-/** Large catalog: enough candidates (1280) for two humans + AI. */
+
 const FULL_CATALOG = buildSeasonDraftCatalog({
   franchiseIds: ['lakers', 'celtics', 'bulls', 'warriors', 'heat', 'knicks', 'spurs', 'jazz'],
   eras: ['1980s', '1990s', '2000s', '2010s'],
@@ -88,24 +77,19 @@ function requireState(state: SeasonDraftState | null, what: string): SeasonDraft
   return state;
 }
 
-/** Canonical facts without the command log (rejected entries differ by design). */
 function canonicalFacts(state: SeasonDraftState): string {
   return seasonDraftStateCanonical({ ...state, commandLog: [] });
 }
 
-/** Fake generation dep that builds a deterministic valid result from the input. */
 function fakeDeps(): SeasonAiGenerationDeps {
   return { generate: (input) => buildFakeGeneration(input) };
 }
 
-/** Input arrives without the targets artifact (injected by the deps closure). */
 type FakeGenerationInput = Omit<SeasonAiGenerationInput, 'targets'>;
 
 function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGenerationResult {
   const owned = new Set<string>();
-  // Human rosters are owned before any AI team is generated, mirroring the
-  // authoritative generator (which seeds `unowned` from the full catalog
-  // minus every human-selected version up front).
+
   for (const roster of input.humanRosters) {
     for (const versionId of roster.playerVersionIds) owned.add(versionId);
   }
@@ -118,8 +102,7 @@ function buildFakeGeneration(input: FakeGenerationInput): SeasonLeagueGeneration
         : (() => {
             const available = input.catalog.candidates.filter((c) => !owned.has(c.playerVersionId));
             const picks = available.slice(0, 10).map((c) => c.playerVersionId);
-            // The private pool contains the ten selections plus ten more
-            // distinct unowned candidates (roster-generation-v2 shape).
+
             const poolMembers = [
               ...picks,
               ...available.slice(10, 20).map((c) => c.playerVersionId),
@@ -262,7 +245,6 @@ function createDuo(
   );
 }
 
-/** Deterministic pick policy: highest-overall selectable card, canonical tie-break. */
 function pickBestSelectable(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -299,7 +281,6 @@ function pickBestSelectable(
   return result.state;
 }
 
-/** Draws and picks the best selectable card for the current turn. */
 function drawAndPick(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -327,7 +308,6 @@ function drawAndPick(
   };
 }
 
-/** Plays a complete draft: draw + best selectable pick until finalized. */
 function playToFinalized(
   catalog: SeasonDraftCatalog,
   league: SeasonLeague,
@@ -389,10 +369,6 @@ function playFullDraft(
   };
 }
 
-/**
- * Custom catalog: each entry lists the playable positions of every candidate
- * in the pool (length 12), so per-candidate roles are controllable.
- */
 function customCatalog(
   entries: Array<{ franchiseId: string; eraId: string; positions: string[][] }>,
 ): SeasonDraftCatalog {
@@ -427,10 +403,6 @@ function customCatalog(
   return { ...buildSeasonDraftCatalog(), pools, candidates };
 }
 
-/**
- * Hand-builds a state with 9 picks: 4 guards, 3 forwards, 2 centers
- * (G4 F3 C2) with one pick left, drawn from pools B (guards) and C (forwards).
- */
 function stateWithNinePicks(catalog: SeasonDraftCatalog, rootSeed: string): SeasonDraftState {
   const created = createSolo(catalog, LEAGUE, rootSeed);
   expectAccepted(created.record);
@@ -608,11 +580,6 @@ describe('season draft create', () => {
   });
 });
 
-/**
- * Hand-builds an eight-card offer: the given leading cards padded with
- * distinct catalog candidates so the offer schema (exactly eight cards)
- * passes.
- */
 function handOffer(
   catalog: SeasonDraftCatalog,
   participantId: string,
@@ -666,7 +633,7 @@ describe('season draft offers', () => {
     expect(offer?.participantId).toBe('p1');
     expect(offer?.round).toBe(1);
     expect(offer?.pickOrdinal).toBe(1);
-    // The seed path is recorded verbatim on the offer.
+
     expect(offer?.seedPath).toEqual([
       'draft',
       'offer',
@@ -676,7 +643,7 @@ describe('season draft offers', () => {
       'safe-order',
       'sample-order',
     ]);
-    // The offer is appended to the state's offer list.
+
     expect(next.offers).toHaveLength(1);
     expect(next.offers[0]).toEqual(offer);
   });
@@ -752,17 +719,13 @@ describe('season draft offers', () => {
       ['p1'],
       'or2',
     );
-    // Command ids differ but the drawn offers must be identical.
+
     expect(first.state.offers).toEqual(second.state.offers);
     expect(first.state.picks).toEqual(second.state.picks);
     expect(canonicalFacts(first.state)).toBe(canonicalFacts(second.state));
   });
 
   it('rejects a draw with NO_FEASIBLE_GLOBAL_OFFER when fewer than three safe candidates remain', () => {
-    // Pool A: pure centers, pool B: pure guards, pool C: pure forwards. Nine
-    // owned picks (G4 F3 C2) leave one pick; no remaining single candidate
-    // can cover both the missing forward and the missing center, so no
-    // feasibility-safe candidate exists and the draw is a typed rejection.
     const catalog = customCatalog([
       {
         franchiseId: 'lakers',
@@ -790,13 +753,11 @@ describe('season draft offers', () => {
     expect(expectRejected(result.record).errorCode).toBe('NO_FEASIBLE_GLOBAL_OFFER');
     expect(result.state?.currentOffer).toBeNull();
     expect(result.state?.offers).toHaveLength(0);
-    // The rejection is logged without advancing the turn.
+
     expect(result.state?.revision).toBe(state.revision);
   });
 
   it('rejects a draw when fewer than eight unowned candidates remain', () => {
-    // A tiny catalog with exactly eight candidates: after one pick, only
-    // seven unowned candidates remain, so any draw is a typed rejection.
     const tiny = buildSeasonDraftCatalog({
       franchiseIds: ['lakers'],
       eras: ['1990s'],
@@ -910,8 +871,6 @@ describe('season draft picks', () => {
     );
     expect(expectRejected(outside.record).errorCode).toBe('UNAVAILABLE_POOL');
 
-    // OWNED_VERSION: hand-build a state where the current offer contains a
-    // version the participant already owns.
     const ownedTurn = seasonDraftStateSchema.parse({
       ...next,
       currentTurnParticipantId: first,
@@ -941,7 +900,6 @@ describe('season draft picks', () => {
     );
     expect(expectRejected(ownedAgain.record).errorCode).toBe('OWNED_VERSION');
 
-    // Disabled cards reject with UNCOMPLETABLE_ROSTER carrying the reason.
     const withDisabled = seasonDraftStateSchema.parse({
       ...next,
       currentOffer: {
@@ -980,9 +938,7 @@ describe('season draft picks', () => {
       walk = drawAndPick(walk, FULL_CATALOG, 'c', round).state;
     }
     expect(walk.picks.filter((p) => p.participantId === 'p1')).toHaveLength(9);
-    // Hand-build a full-roster state with an offer still drawn. The offer
-    // leads with a version the participant does NOT own, so the roster-full
-    // rejection (not OWNED_VERSION) is what fires.
+
     const extra = FULL_CATALOG.candidates.find(
       (c) => !walk.picks.some((p) => p.playerVersionId === c.playerVersionId),
     );
@@ -1046,8 +1002,7 @@ describe('season draft picks', () => {
       (c) => c.franchiseId === 'lakers' && c.eraId === '2000s',
     );
     if (!lakers90 || !lakers00) throw new Error('candidates missing');
-    // Rewrite the 2000s candidate to the SAME playerId as the 1990s one and
-    // keep the pool membership in sync with the new version id.
+
     lakers00.playerId = lakers90.playerId;
     lakers00.playerVersionId = `pv-${seasonDigestHex(`same-${lakers90.playerId}`)}`;
     const pool00 = catalog.pools.find((p) => p.franchiseId === 'lakers' && p.eraId === '2000s');
@@ -1057,8 +1012,7 @@ describe('season draft picks', () => {
       createSolo(catalog, LEAGUE, seedFromString('same-person')).state,
       'create',
     );
-    // Force an offer containing the 1990s version, pick it, then force an
-    // offer containing the 2000s version and pick it too.
+
     const withOffer1 = seasonDraftStateSchema.parse({
       ...state,
       currentOffer: handOffer(catalog, 'p1', 1, 1, [
@@ -1111,9 +1065,7 @@ describe('season draft exact version ownership', () => {
       ['p1', 'p2'],
       'ow',
     );
-    // Offers and picks are both append-ordered per draw; each offer maps to
-    // exactly one pick at the same index. A card offered in offer k must not
-    // be a version picked by any earlier offer.
+
     const picksByOffer = new Map(
       state.offers.map((offer, index) => {
         const pick = state.picks[index];
@@ -1135,7 +1087,7 @@ describe('season draft exact version ownership', () => {
       if (ownPick !== undefined) pickedBefore.add(ownPick.playerVersionId);
     });
     expect(pickedBefore.size).toBe(state.offers.length);
-    // Every offer carries eight distinct cards.
+
     for (const offer of state.offers) {
       expect(new Set(offer.cards.map((c) => c.playerVersionId)).size).toBe(SEASON_DRAFT_OFFER_SIZE);
     }
@@ -1298,8 +1250,7 @@ describe('season draft idempotency, revisions, and replay', () => {
     }, null);
     expect(canonicalFacts(requireState(replayed, 'replay'))).toBe(canonicalFacts(continuous.state));
     expect(replayed?.revision).toBe(continuous.state.revision);
-    // The command logs are byte-identical too: replaying accepted commands
-    // reproduces every record.
+
     expect(JSON.stringify(replayed?.commandLog)).toBe(JSON.stringify(continuous.state.commandLog));
   });
 
@@ -1361,13 +1312,13 @@ describe('season draft idempotency, revisions, and replay', () => {
     const firstPicker = state.picks.find((p) => p.round === 1)?.participantId;
     const round2First = state.picks.find((p) => p.round === 2)?.participantId;
     expect(round2First).not.toBe(firstPicker);
-    // Unique ownership across the whole league.
+
     const versions = state.picks.map((p) => p.playerVersionId);
     expect(new Set(versions).size).toBe(versions.length);
-    // Ten offers per participant; every offer has eight distinct cards.
+
     expect(state.offers.filter((o) => o.participantId === 'p1')).toHaveLength(10);
     expect(state.offers.filter((o) => o.participantId === 'p2')).toHaveLength(10);
-    // Every pick records the seed path of its offer.
+
     for (const pick of state.picks) {
       const offer = state.offers.find(
         (o) =>

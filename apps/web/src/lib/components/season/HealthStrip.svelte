@@ -1,14 +1,6 @@
 <script lang="ts">
   import type { AvailabilityStripRow } from '$lib/season/season-health-view';
 
-  /**
-   * Checkpoint health strip (M2.5 signature element): compact per-player
-   * availability rows — status (available / out / back), estimated return
-   * range, recurrence flag, and the next-game consequence. Pure display of
-   * recorded health facts; a plain non-interactive list, keyboard-accessible
-   * by nature, with a polite live region that announces only the summary.
-   */
-
   let {
     rows,
     title = 'Health',

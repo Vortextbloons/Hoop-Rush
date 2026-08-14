@@ -16,31 +16,17 @@ import { sameUnit, simulateSeasonGame } from './season-game.ts';
 const REGULATION_PLAYER_SECONDS = 5 * REGULATION_TOTAL_SECONDS;
 const OVERTIME_PLAYER_SECONDS = 5 * OVERTIME_PERIOD_SECONDS;
 
-/**
- * Audits a Season game result against its input: legality (no player plays
- * while unavailable/fouled out or for both teams), ownership, exact-seconds
- * reconciliation (14,400 per side in regulation plus 1,500 per overtime),
- * substitution timestamps on approved boundaries, player/team accounting,
- * unit-stint intervals, foul totals, deviation facts, and determinism
- * evidence. Returns failure strings; empty means valid.
- *
- * Note: this re-simulates the game with a fresh engine context as
- * determinism evidence, so it roughly doubles the cost of an already-simulated
- * game. Tests that call it pay that cost per case.
- */
 export function checkSeasonGameResult(
   result: SeasonGameSimulationResult,
   input: SeasonGameSimulationInput,
 ): string[] {
   const failures: string[] = [];
 
-  // Determinism evidence: the same input re-simulates to a byte-identical result.
   const replay = simulateSeasonGame(input, createEngineContext());
   if (JSON.stringify(replay) !== JSON.stringify(result)) {
     failures.push('determinism: re-running the same input produced a different result');
   }
 
-  // Cross-team ownership: playerVersionIds are disjoint across sides.
   const homeIds = new Set(input.home.players.map((p) => p.playerVersionId));
   const awayIds = new Set(input.away.players.map((p) => p.playerVersionId));
   for (const id of homeIds) {
@@ -85,7 +71,6 @@ export function checkSeasonGameResult(
     const players = side.players;
     const playerIds = players.map((p) => p.playerVersionId);
 
-    // Rostered identity: ten distinct results matching the input roster.
     if (players.length !== SEASON_ROSTER_SIZE) {
       failures.push(`${sideKey}: expected ten player results, got ${String(players.length)}`);
     }
@@ -100,7 +85,6 @@ export function checkSeasonGameResult(
       }
     }
 
-    // Exact-seconds reconciliation: 14,400 regulation + 1,500 per OT per side.
     const playerSeconds = players.reduce((sum, p) => sum + p.seconds, 0);
     if (playerSeconds !== expectedTotalSeconds) {
       failures.push(
@@ -138,7 +122,6 @@ export function checkSeasonGameResult(
       }
     }
 
-    // Opportunity diagnostics (same invariants as checkGameResult).
     if (!accounting.reboundOpportunitiesOk) {
       failures.push(`${sideKey}: rebound opportunities != misses`);
     }
@@ -195,7 +178,6 @@ export function checkSeasonGameResult(
     stintAudit(failures, sideKey, result, input);
   }
 
-  // Winner fact (a tie after the 12-period cap is decided by the seeded draw).
   const homeScore = result.home.score;
   const awayScore = result.away.score;
   if (homeScore !== awayScore && result.winner !== (homeScore > awayScore ? 'home' : 'away')) {
@@ -271,8 +253,7 @@ function stintAudit(
     }
   }
   const stintSeconds = stints.reduce((sum, stint) => sum + stint.durationSeconds, 0);
-  // Stint durations cover the game clock once per side (five players share
-  // the court), so they sum to the regulation + overtime game length.
+
   const expectedGameSeconds =
     REGULATION_TOTAL_SECONDS + OVERTIME_PERIOD_SECONDS * result.overtimePeriods;
   if (stintSeconds !== expectedGameSeconds) {
@@ -337,9 +318,7 @@ function substitutionAudit(
     if (unavailable.has(sub.playerIn)) {
       failures.push(`${sideKey}: substitution brings an unavailable player in`);
     }
-    // The substitution must land on a stint boundary with the resulting unit:
-    // a next-period stint for a period-end sub, or a same-period stint start
-    // otherwise (including the rare same-clock floor-zero edge).
+
     const atPeriodEnd = sub.secondsRemaining === 0;
     const matchingStint = stints.find((stint) => {
       if (
@@ -361,7 +340,7 @@ function substitutionAudit(
         `${sideKey}: substitution at (${String(sub.period)}, ${String(sub.secondsRemaining)}) has no matching unit stint`,
       );
     }
-    // The out player must belong to the unit that just finished.
+
     const previousUnit = stints.find((stint) => {
       if (atPeriodEnd) {
         return stint.period === sub.period && stint.endSecondsRemaining === 0;
@@ -371,11 +350,7 @@ function substitutionAudit(
     if (previousUnit !== undefined && !previousUnit.players.includes(sub.playerOut)) {
       failures.push(`${sideKey}: ${sub.playerOut} was not on the floor at the substitution`);
     }
-    // Event-driven reason linkage: the exit of a player who fouled out at a
-    // boundary must be recorded as a foul-out substitution at that boundary
-    // (the boundary's other rebalancing exits share the boundary reason).
-    // A foul-out at the game's final boundary needs no substitution: the
-    // controller stops planning when the game is decided.
+
     const finalPeriod = 4 + result.overtimePeriods;
     for (const event of result.foulOuts) {
       if (event.side !== sideKey) continue;
@@ -414,7 +389,6 @@ function substitutionAudit(
     }
   }
 
-  // Every unit change must be backed by at least one substitution record.
   for (let i = 1; i < stints.length; i += 1) {
     const prev = stints[i - 1];
     const cur = stints[i];
@@ -433,9 +407,6 @@ function substitutionAudit(
     }
   }
 
-  // Legality: no stint contains a player after their foul-out or removal
-  // clock, unless a same-game return re-enabled them at or before the
-  // stint's start (the M2.5 injury seam removes and returns players).
   const momentBefore = (
     a: { period: number; secondsRemaining: number },
     b: { period: number; secondsRemaining: number },
@@ -472,11 +443,7 @@ function substitutionAudit(
       );
     }
   }
-  // M2.5 legality mirror for returns: no stint overlapping the unavailable
-  // window — after the player's removal boundary and before the return
-  // boundary — contains them. A stint entirely before the removal (the
-  // player was available) or entirely at/after the return boundary is legal;
-  // a return without a removal is a no-op and never flags.
+
   for (const event of result[sideKey].returns) {
     const removal = result.removals.find(
       (entry) => entry.side === sideKey && entry.playerVersionId === event.playerVersionId,

@@ -23,16 +23,6 @@
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import { oneDecimal } from '$lib/format';
 
-  /**
-   * League tab (spec/2.0/11, M2.3.5, M2.6): conference-switched standings
-   * ordered by the ENGINE's authoritative tiebreak ranking
-   * (`rankSeasonPostseason`) with its recorded tiebreak explanations, plus
-   * the league-wide team-stats table folded from accepted summaries.
-   * Explanations come from the run's frozen postseason resolutions once the
-   * stage passes the regular season; earlier they mirror the current
-   * snapshot's recorded resolutions.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   type LeagueView = 'standings' | 'stats';
@@ -46,21 +36,17 @@
   const run = $derived(shell.run);
   const standings = $derived(run?.standings ?? null);
 
-  /** Authoritative engine ranking (tiebreak sequence) of the current
-   * standings; ordering + resolutions are the engine's, never the UI's. */
   const rankings = $derived(run !== null ? postseasonRankingsOf(run) : null);
   const rankedEntries = $derived(
     rankings !== null && standings !== null ? rankedEntriesOf(rankings, standings) : null,
   );
-  /** Frozen recorded resolutions from postseason qualification, or the
-   * current snapshot's recorded resolutions before that. */
+
   const tiebreakResolutions = $derived.by(() => {
     const recorded = run?.postseason.tiebreakResolutions ?? [];
     if (recorded.length > 0) return recorded;
     return rankings !== null ? [...rankings.east.resolutions, ...rankings.west.resolutions] : [];
   });
 
-  /** Streak facts computed in one pass over the summaries (once per change). */
   const streaksByFranchise = $derived.by(() => {
     const summaries = shell.snapshot?.summaries ?? [];
     const rows = shell.run?.standings.rows ?? [];
@@ -129,11 +115,6 @@
     { key: 'topg', label: 'TOPG' },
   ];
 
-  /**
-   * Responsive split: once the viewport is known, only the active variant of
-   * the stats list mounts. Null = unknown (SSR, jsdom, no matchMedia): both
-   * variants render, exactly like the historical markup.
-   */
   let desktopViewport = $state<boolean | null>(null);
   $effect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;

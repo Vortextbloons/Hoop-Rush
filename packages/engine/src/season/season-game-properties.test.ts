@@ -171,7 +171,7 @@ describe('season game properties (fast-check)', () => {
           expect(sub.unit).not.toContain(sub.playerOut);
           expect(sub.playerIn).not.toBe(sub.playerOut);
         }
-        // Consecutive stints of one side are contiguous within a period.
+
         for (const sideKey of ['home', 'away'] as const) {
           const stints = result.unitStints.filter((s) => s.side === sideKey);
           for (let i = 1; i < stints.length; i += 1) {
@@ -201,7 +201,6 @@ describe('season game properties (fast-check)', () => {
         for (const sideKey of ['home', 'away'] as const) {
           const side = result[sideKey];
           for (const player of side.players) {
-            // All balanced-preset targets are positive, so everyone plays.
             expect(player.seconds).toBeGreaterThan(0);
           }
         }

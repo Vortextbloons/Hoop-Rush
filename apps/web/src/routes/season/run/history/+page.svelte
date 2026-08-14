@@ -10,16 +10,6 @@
   } from '$lib/season/season-shell-context';
   import CompletedSeasonResult from '$lib/components/season/CompletedSeasonResult.svelte';
 
-  /**
-   * Completed-season history (M2.6, /season/run/history): every promoted
-   * champion run, newest first, with its champion, human team, and almanac
-   * digests. A `?runId=` search param renders that season's result detail
-   * (see CompletedSeasonResult) — the same route serves list and detail,
-   * following the `teams/?franchiseId=` convention. Loading, empty, and
-   * load-failure states are explicit; a corrupt completed row surfaces as
-   * a typed error instead of being silently dropped.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   const selectedRunId = $derived(page.url.searchParams.get('runId'));

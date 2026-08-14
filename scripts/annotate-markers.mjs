@@ -1,15 +1,3 @@
-/**
- * Resilient headshot-marker annotation for packaged pools.
- *
- * The Python reannotate_assets.py keeps dying in this environment and its
- * cold-cache CDN checks are slow. This script:
- *   - reads the shared CDN status cache (.raw_nba_cache/nba_headshot_status.json)
- *   - HEAD-checks uncached players with small concurrency
- *   - saves the cache after every 50 checks so a restart resumes cleanly
- *   - rewrites each pool only when all its players carry markers
- *
- * Usage: node scripts/annotate-markers.mjs [franchise-prefix...]
- */
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 

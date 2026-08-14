@@ -12,14 +12,6 @@ import { bracketAuditReportSchema } from '../report-schemas.ts';
 import { readJson, sha256Hex } from '../io.ts';
 import { median } from '../stats.ts';
 
-/**
- * `bracket audit` (spec/09 target): validates the fixed 30-team bracket and
- * shared 82-game schedule: schema/hash/version validity, 30 unique
- * franchises, legal balanced lineups, internal player duplicates, strength
- * percentiles and median, exact schedule counts, immediate repeats, and
- * deterministic schedule regeneration.
- */
-
 export const BRACKET_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
@@ -126,8 +118,7 @@ export function bracketAudit(
   const percentiles = bracket.opponents.map((o) => o.strength.percentile);
   const bracketMedian = median(percentiles);
   const openingEntry = bracket.opponents.find((o) => o.opponentId === 'lakers-1990s-opening');
-  // The band range applies to the generated entries; the fixed authored
-  // opening opponent is reported separately and informational.
+
   const generatedPercentiles = bracket.opponents
     .filter((o) => o.opponentId !== 'lakers-1990s-opening')
     .map((o) => o.strength.percentile);
@@ -150,9 +141,6 @@ export function bracketAudit(
     );
   }
 
-  // The opening opponent must be unchanged from the authored preview and be
-  // the game-one matchup. A missing preview is a data-load error, not a
-  // checked bracket failure.
   let openingFailures: string[];
   try {
     openingFailures = openingOpponentUnchanged(bracket, previewPath);
@@ -168,7 +156,6 @@ export function bracketAudit(
     failures.push('schedule game one must be the lakers-1990s-opening opponent');
   }
 
-  // Schedule regeneration with the committed seed must be byte-identical.
   const opponentIds = bracket.opponents.map((o) => o.opponentId);
   let regenerated: string[] | null = null;
   try {

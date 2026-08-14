@@ -7,29 +7,19 @@ import {
 } from '@hoop-rush/data-contracts';
 import { finalizeGameRecords, humanScheduleRows } from './season-presentation';
 
-/**
- * Schedule tab view model (M2.3.5): the human team's games joined to their
- * round and block index, with result state from accepted summaries. The
- * frozen `humanScheduleRows` helper carries no block info, so this module
- * re-derives the rows with block boundaries (`blockIndexForRound`) and groups
- * them into the nine block sections the Schedule tab renders. Every fact
- * (opponent, home/away, W/L, score, forfeit) derives from recorded games and
- * summaries — the UI never invents a result.
- */
-
 export interface ScheduleBlockRow {
   gameId: string;
-  /** Finalized game record (status/scores merged from summaries). */
+
   game: SeasonGame;
-  /** 1-based round. */
+
   round: number;
-  /** 0-based block index (0..8). */
+
   blockIndex: number;
   opponentFranchiseId: string;
   humanIsHome: boolean;
-  /** True once the game carries a result (final or forfeit). */
+
   played: boolean;
-  /** Null while scheduled; otherwise the human W/L result. */
+
   won: boolean | null;
   humanScore: number | null;
   opponentScore: number | null;
@@ -43,12 +33,6 @@ export interface ScheduleBlockGroup {
   rows: ScheduleBlockRow[];
 }
 
-/**
- * Joins the human team's games to their round and block, sorting by round.
- * Result state comes from the accepted summaries via `finalizeGameRecords`
- * (the same mirror the hub uses), so W/L, scores, and forfeits always agree
- * with the committed checkpoint.
- */
 export function scheduleBlockRows(
   games: readonly SeasonGame[],
   summaries: readonly SeasonGameSummary[],

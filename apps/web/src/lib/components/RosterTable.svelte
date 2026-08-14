@@ -15,13 +15,6 @@
   import { formatPositions } from '$lib/player-positions';
   import PlayerFace from './PlayerFace.svelte';
 
-  /**
-   * The Roster browser's data grid: a responsive desktop table plus mobile
-   * cards over the same flattened items, with sortable headers and the
-   * compare/selection affordances. The page owns the pipeline (filter, sort,
-   * group, paginate) and passes the resulting items here for presentation.
-   */
-
   let {
     items,
     columns,
@@ -62,15 +55,8 @@
 
   const sortArrow = $derived(sortId === 'none' ? '' : sortDir === 'asc' ? '↑' : '↓');
 
-  /** Player stat columns; the name column renders separately (line 224 uses this). */
   const dataColumns = $derived(columns.filter((c) => c.key !== 'player'));
 
-  /**
-   * Responsive split: once the viewport is known, only the active variant is
-   * mounted (the other stays out of the DOM instead of being CSS-hidden while
-   * fully iterated). Null = unknown (SSR, jsdom, or matchMedia unavailable):
-   * both variants render, exactly like the historical markup.
-   */
   let desktopViewport = $state<boolean | null>(null);
   $effect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -88,13 +74,11 @@
       ? `group:${item.franchiseId}/${item.eraId}`
       : `row:${item.player.franchiseId}/${item.player.eraId}/${item.player.playerId}`;
 
-  /** Historical display label for a franchise/era context, modern fallback. */
   function groupLabel(franchiseId: string, eraId: string): string {
     const identity = resolveEraTeamIdentity(manifest, franchiseId, eraId);
     return identity.displayLabel ?? franchiseAbbreviation(franchiseId);
   }
 
-  /** Historical abbreviation for one row's franchise/era context. */
   function teamLabelFor(player: RosterDetailRow): string {
     const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
     return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);

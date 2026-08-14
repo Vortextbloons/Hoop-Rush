@@ -29,17 +29,6 @@ import {
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
 
-/**
- * M2.6 postseason-foundations repository contract tests (spec/2.0/07
- * persistence): postseason advancement commits are atomic (run state,
- * summaries, and the append-only command log in ONE transaction), the
- * command log is append-only with a stable chain, and champion promotion is
- * one atomic transaction â€” save the final result, create the almanac, record
- * the champion, finalize the command log, register completed history, and
- * remove the active-run pointer â€” that rolls back completely on injected
- * failure.
- */
-
 const DIGEST_32 = '0'.repeat(32);
 
 interface Adapters {
@@ -63,7 +52,6 @@ async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
 }
 
-/** The engine-facing run after one advancement: stage play-in, revision + 1, recomputed digest. */
 function advancedRun(adapters: Adapters, stage: SeasonRun['stage']): SeasonRun {
   const next: SeasonRun = {
     ...adapters.run,
@@ -111,7 +99,6 @@ function stateDigestOf(adapters: Adapters, run: SeasonRun): string {
   });
 }
 
-/** A completed postseason state over the fixture league (validated shape). */
 function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun['postseason'] {
   const east = adapters.run.league.teams
     .filter((team) => team.conference === 'east')
@@ -199,7 +186,6 @@ function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun[
   };
 }
 
-/** The final engine-facing completed run over the fixture league. */
 function completedRunOf(adapters: Adapters, stateRevision: number): SeasonRun {
   const champion = adapters.run.rosters[0]?.franchiseId ?? 'lakers';
   const base: SeasonRun = {
@@ -217,7 +203,6 @@ function completedRunOf(adapters: Adapters, stateRevision: number): SeasonRun {
   return { ...base, stateDigest: stateDigestOf(adapters, base) };
 }
 
-/** A digest-reconciling almanac for the fixture run. */
 function buildAlmanac(
   run: SeasonRun,
   champion: string,
@@ -238,7 +223,6 @@ function buildAlmanac(
   return { ...base, digest: seasonAlmanacDigest(base) };
 }
 
-/** The run with the almanac digest patched into its completion state. */
 function withAlmanacDigest(run: SeasonRun, almanacDigest: string): SeasonRun {
   const completion = run.completion;
   if (completion === null) throw new Error('expected completion state');
@@ -383,7 +367,6 @@ describe('season postseason repository (M2.6)', () => {
       await adapters.repo.loadPostseasonSummary(adapters.run.runId, 'pi-east-nine-ten'),
     ).toBeNull();
 
-    // The active run reloads with the advanced stage and a passing audit.
     const snapshot = await adapters.repo.loadActiveRun();
     expect(snapshot).not.toBeNull();
     expect(snapshot?.run.stage).toBe('play-in');
@@ -486,10 +469,9 @@ describe('season postseason repository (M2.6)', () => {
       postseasonSummaries: await adapters.repo.loadPostseasonSummaries(adapters.run.runId),
     });
 
-    // Active-run pointer removed.
     expect(await adapters.repo.loadActiveRun()).toBeNull();
     expect(await adapters.repo.loadActiveRunIndex()).toBeNull();
-    // Completed history registered with the champion.
+
     const completedSeason = await adapters.repo.loadCompletedSeason(adapters.run.runId);
     expect(completedSeason).not.toBeNull();
     expect(completedSeason?.run.stage).toBe('completed');

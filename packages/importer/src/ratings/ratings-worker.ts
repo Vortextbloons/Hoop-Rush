@@ -1,8 +1,3 @@
-/**
- * Worker-thread entry for parallel ratings derivation (ratings/compute.ts
- * run()). Computes ratings for a season slice; each season writes its own
- * roster.json, so concurrent workers never touch the same file.
- */
 import { parentPort, workerData } from 'node:worker_threads';
 import { computeForSeason } from './compute.ts';
 

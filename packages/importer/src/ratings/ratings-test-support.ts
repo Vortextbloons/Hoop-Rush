@@ -1,10 +1,3 @@
-/**
- * Shared ratings-suite fixtures (ratings.test.ts + v3.test.ts): the modern
- * era context and the full modern-style season totals for a solid starter.
- * One copy avoids drift between the field-method registry suite and the v3
- * profile suite.
- */
-
 export const MODERN_ERA = { leaguePpg: 110, league3PARate: 0.36, pace: 99 };
 
 export function starterStats(over: Record<string, unknown> = {}): Record<string, unknown> {

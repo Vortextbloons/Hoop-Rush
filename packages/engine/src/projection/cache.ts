@@ -1,13 +1,6 @@
 import { seasonDigestHex } from '@hoop-rush/data-contracts';
 import type { BaseFiveProjection } from '@hoop-rush/data-contracts';
 
-/**
- * Canonical projection cache (projection milestone). Every unique legal five
- * is cached by canonical player set, slot assignment, era, model version,
- * and reference id, so the Season projector and candidate search never
- * recompute a base projection. Bounded by entry and byte budgets.
- */
-
 export interface ProjectionCacheStats {
   hits: number;
   misses: number;
@@ -28,7 +21,6 @@ export class ProjectionCache {
     this.maxBytes = maxBytes;
   }
 
-  /** Canonical cache key for one base projection. */
   static key(input: {
     eraId: string;
     modelVersion: string;
@@ -56,7 +48,7 @@ export class ProjectionCache {
       return undefined;
     }
     this.hits += 1;
-    // LRU refresh.
+
     this.entries.delete(key);
     this.entries.set(key, entry);
     return entry.value;

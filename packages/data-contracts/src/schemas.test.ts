@@ -21,11 +21,6 @@ import {
 } from './index.ts';
 import type { Lineup, LineupAssignment, PeakPlayerSeason } from './index.ts';
 
-/**
- * One minimal valid simulation player with the frozen ratings/tendencies
- * literal (19 ratings, 23 tendencies). Shared by the run, simulation, and
- * worker-message fixtures so the literal lives in exactly one place.
- */
 function makeSimulationPlayer(playerId: string, positions: string[]) {
   return {
     playerId,
@@ -81,10 +76,8 @@ function makeSimulationPlayer(playerId: string, positions: string[]) {
   };
 }
 
-/** The five roster slots in structure order (G, G, F, F, C). */
 const SLOT_POSITIONS: string[][] = [['PG', 'SG'], ['PG', 'SG'], ['SF', 'PF'], ['SF', 'PF'], ['C']];
 
-/** One minimal valid sandbox run: five players, 30 opponents, 82-game schedule. */
 function makeRun() {
   const five = ['p-1', 'p-2', 'p-3', 'p-4', 'p-5'];
   const fivePlayers = five.map((playerId, slotIndex) =>
@@ -424,9 +417,7 @@ describe('player-season contracts', () => {
     });
     expect(parsed.success).toBe(true);
     if (!parsed.success) return;
-    // The packaged-data contract permits repeated playerIds (a player can
-    // appear across seasons); deduplication is enforced by the draft and
-    // selection commands, not by this schema.
+
     expect(new Set(parsed.data.players.map((p) => p.playerId)).size).toBe(1);
     expect(new Set(parsed.data.players.map((p) => p.seasonKey)).size).toBe(2);
   });
@@ -782,7 +773,6 @@ describe('worker message contracts (M3)', () => {
   });
 });
 
-/** Minimal valid era profile used by worker request fixtures. */
 function eraProfileFixture() {
   return {
     schemaVersion: 1,
@@ -848,7 +838,6 @@ function eraProfileFixture() {
   };
 }
 
-/** Minimal valid game result used by worker message fixtures. */
 function gameResultFixture(gameNumber: number) {
   const side = (teamId: string, displayName: string) => ({
     teamId,
@@ -903,7 +892,6 @@ function gameResultFixture(gameNumber: number) {
   };
 }
 
-/** Minimal valid challenge run for worker request fixtures. */
 function buildMinimalRun() {
   return makeRun();
 }

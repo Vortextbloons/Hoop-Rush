@@ -34,13 +34,6 @@ import {
   SIMULATION_TENDENCIES,
 } from './season-schemas-fixtures.ts';
 
-/**
- * M2.4 stamina and chemistry contract tests: stamina inputs, load states,
- * canonical pair chemistry, the 300-player / 1,350-pair effects state, per
- * mechanism-side evidence and rollups, the per-game effects transition, and
- * the checkpoint / worker / recap / summary seams that carry them.
- */
-
 function playerId(index: number): string {
   return `pv-${String(index).padStart(32, '0')}`;
 }
@@ -54,7 +47,6 @@ function loadState(index: number): SeasonPlayerLoadState {
   };
 }
 
-/** Valid effects state: 300 player loads, 45 canonical pairs per 10-roster. */
 function buildEffectsState(): SeasonEffectsState {
   const playerStates = Array.from({ length: 300 }, (_, index) => loadState(index));
   const pairStates: SeasonPairChemistryState[] = [];

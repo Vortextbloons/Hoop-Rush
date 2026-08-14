@@ -6,12 +6,6 @@ import type {
   TeamAggregate,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Exact season aggregates (spec/03 outputs). Totals accumulate incrementally
- * from accepted game results; per-game values are always derived for display
- * from the actual number of games played, never stored separately.
- */
-
 function zeroMadeAttempted() {
   return { made: 0, attempted: 0 };
 }
@@ -68,7 +62,6 @@ export function zeroRunAggregates(players: readonly SimulationPlayer[]): RunAggr
   };
 }
 
-/** Adds one accepted game result (user team = home side) to the aggregates. */
 export function addGameToAggregates(aggregates: RunAggregates, result: GameResult): RunAggregates {
   const team = result.home.box;
   const boxByPlayerId = new Map(result.home.players.map((player) => [player.playerId, player]));
@@ -130,7 +123,6 @@ function addMa(
   return { made: left.made + right.made, attempted: left.attempted + right.attempted };
 }
 
-/** Per-game values for display; gamesPlayed is the actual number of games played. */
 export function perGamePlayer(aggregate: PlayerSeasonAggregate): PlayerSeasonAggregate {
   const games = Math.max(1, aggregate.gamesPlayed);
   return {

@@ -6,13 +6,6 @@
   import { clearClassicDraftState } from '$lib/classic-draft';
   import ResultPage from '$lib/components/ResultPage.svelte';
 
-  /**
-   * Classic challenge result: the shared SeasonReport record with classic
-   * mode identity and the League MVP spotlight. The single Run again action
-   * clears any draft state and returns to the Classic variant picker for a
-   * fresh seed and five new rounds.
-   */
-
   async function runAgain() {
     await clearClassicDraftState();
     void goto(resolve('/classic'));

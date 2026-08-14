@@ -21,18 +21,6 @@ import {
 import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
 import { createSeasonBlockRunner, type SeasonBlockStartInput } from './season-block-runner';
 
-/**
- * Season block runner unit tests (M2.5): the wire round-trip through the
- * frozen envelopes (start requests parse as schema 4 with the M2.5 fields,
- * complete messages accept committed and interrupted results), the cancel
- * schema-version fix, and the acceptance/commit orchestration (expected
- * state facts validated against the run, `completeSeasonBlockCommit` fold,
- * atomic commit input, interruption persistence). The engine module is
- * mocked because the health/economy workstreams have not landed their
- * exports yet; the mock returns the documented engine semantics so the
- * runner's orchestration is exercised end to end.
- */
-
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 
 vi.mock('@hoop-rush/engine', async (importOriginal) => ({
@@ -123,7 +111,6 @@ function makeRun(): SeasonRun {
   };
 }
 
-/** Schema-valid zero effects state (300 loads, 1,350 pairs; schema 2). */
 function buildZeroEffects(run: SeasonRun): {
   schemaVersion: 2;
   playerStates: Array<{
@@ -171,11 +158,17 @@ function buildZeroEffects(run: SeasonRun): {
   };
 }
 
-type MockRepository = SeasonRunRepository & {
+type MockRepositoryFns = {
   commitSeasonBlock: ReturnType<typeof vi.fn>;
   savePendingBlock: ReturnType<typeof vi.fn>;
   loadPendingBlock: ReturnType<typeof vi.fn>;
 };
+
+type MockRepository = SeasonRunRepository & MockRepositoryFns;
+
+function repositoryMocks(repository: MockRepository): MockRepositoryFns {
+  return repository;
+}
 
 function makeRepository(run: SeasonRun): MockRepository {
   const snapshot = {
@@ -495,10 +488,7 @@ describe('season block runner (M2.5 wire)', () => {
   beforeEach(() => {
     FakeWorker.instances = [];
     vi.stubGlobal('Worker', FakeWorker);
-    // The accept path resolves the packaged draft catalog through a real
-    // fetch (loadSeasonDraftCatalog); a rejecting stub keeps the commit
-    // orchestration deterministic and offline. The runner treats a failed
-    // catalog load as null, so no window opens in these tests.
+
     vi.stubGlobal('fetch', () => Promise.reject(new Error('fetch stubbed for runner tests')));
     schedule = generateSeasonSchedule({ league: LEAGUE, seed: 'a'.repeat(32) });
   });
@@ -525,7 +515,7 @@ describe('season block runner (M2.5 wire)', () => {
     expect(FakeWorker.instances).toHaveLength(1);
     const raw = FakeWorker.instances[0]?.posted[0];
     expect(raw).toBeDefined();
-    // The frozen wire envelope parses the posted payload (schema 4).
+
     const start = seasonWorkerStartRequestSchema.parse(raw);
     expect(start.schemaVersion).toBe(6);
     expect(start.runId).toBe(run.runId);
@@ -559,12 +549,10 @@ describe('season block runner (M2.5 wire)', () => {
     expect(warm.catalogUrl).toBe('u');
     expect(warm.profileUrl).toBe('p');
 
-    // Prewarm is idempotent while the worker is alive.
     runner.prewarm();
     await flush();
     expect(FakeWorker.instances[0]?.posted).toHaveLength(1);
 
-    // A terminated worker may be prewarmed again (fresh worker, fresh caches).
     runner.terminate();
     runner.prewarm();
     await flush();
@@ -583,9 +571,7 @@ describe('season block runner (M2.5 wire)', () => {
           type: 'initial-grant',
           blockIndex: null,
           appliedAtStateRevision: 0,
-          // Transaction payload values are intentionally open JSON. Zod
-          // validates them as unknown, so a Svelte $state proxy can retain
-          // its identity unless the complete wire request is snapshotted.
+
           payload: new Proxy({ balance: 5 }, {}),
           explanation: 'Initial Influence grant',
         },
@@ -678,7 +664,7 @@ describe('season block runner (M2.5 wire)', () => {
     await flush();
     const worker = FakeWorker.instances[0];
     expect(worker).toBeDefined();
-    // A schema-3 complete message must be dropped (stale wire family).
+
     worker?.emit({
       schemaVersion: 3,
       type: 'season-block-complete',
@@ -731,8 +717,6 @@ describe('season block runner (M2.5 wire)', () => {
     await flush();
     expect(events.some((event) => event.type === 'complete')).toBe(true);
 
-    // The stub repository never updates acceptedBlocks on commit, so the
-    // in-memory cursor advances while persistence still reports revision 0.
     runner.startBlock(startInput(run, { commandId: 'cmd-2' }));
     await flush();
     expect(events.filter((event) => event.type === 'started')).toHaveLength(2);
@@ -767,9 +751,7 @@ describe('season block runner (M2.5 wire)', () => {
     await flush();
 
     expect(events.some((event) => event.type === 'complete')).toBe(true);
-    // The repository stub's methods carry an implicit 	his (interface method); the mock reference is fine here.
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repository.commitSeasonBlock).toHaveBeenCalledTimes(1);
+    expect(repositoryMocks(repository).commitSeasonBlock).toHaveBeenCalledTimes(1);
     const input = repository.commitSeasonBlock.mock.calls[0]?.[0] as CommitSeasonBlockInput;
     expect(input).toMatchObject({
       runId: run.runId,
@@ -786,17 +768,11 @@ describe('season block runner (M2.5 wire)', () => {
     expect(input.transactions).toEqual([]);
     expect(input.objectives).toBeDefined();
     expect(input.checkpointState).toMatchObject({ runId: run.runId, blockIndex: 0 });
-    // M2.6.5: the commit stores the authoritative pre-block free-agency
-    // state (the runner's carrier seam; the worker wire carries none).
+
     expect(input.freeAgency).toEqual(run.freeAgency);
   });
 
   it('carries the authoritative pre-block free-agency state through the commit', async () => {
-    // The worker wire carries no free-agency state, so a naive candidate
-    // would fall back to the empty state and the committed run would lose
-    // resolved windows. The runner replaces the carrier with the submitted
-    // run's state before committing (the checkpoint digest does not cover
-    // free agency, so the worker's digest stays valid).
     const run = {
       ...makeRun(),
       freeAgency: {
@@ -835,8 +811,7 @@ describe('season block runner (M2.5 wire)', () => {
     expect(worker).toBeDefined();
     const started = events.find((event) => event.type === 'started');
     const requestId = started?.requestId ?? 'sb-1';
-    // The worker candidate carries the EMPTY fallback state (schema-valid
-    // checkpoint-v4 shape), as if the wire dropped the pre-block state.
+
     const candidate = makeCandidate(run, {
       freeAgency: {
         schemaVersion: 1,
@@ -867,9 +842,6 @@ describe('season block runner (M2.5 wire)', () => {
   });
 
   it('digests the LOCKED rotation set at commit, not the pre-submission run', async () => {
-    // A pending human rotation edit changes the locked set; the post-block
-    // state digest must cover exactly what the commit stores, or the reload
-    // audit reports "stored stateDigest does not recompute" after any edit.
     const run = makeRun();
     const repository = makeRepository(run);
     const runner = createSeasonBlockRunner({
@@ -950,8 +922,6 @@ describe('season block runner (M2.5 wire)', () => {
     await flush();
     expect(events.some((event) => event.type === 'complete')).toBe(true);
 
-    // Block 1: the persistent worker holds the run context (schedule, league,
-    // rosters), so only the per-block deltas travel � no run/schedule payload.
     runner.startBlock(startInput(run, { blockIndex: 1, expectedRevision: 1, commandId: 'cmd-2' }));
     await flush();
     const continuation = seasonWorkerContinueRequestSchema.parse(worker?.posted[1]);
@@ -1042,8 +1012,7 @@ describe('season block runner (M2.5 wire)', () => {
     });
     await flush();
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repository.commitSeasonBlock).not.toHaveBeenCalled();
+    expect(repositoryMocks(repository).commitSeasonBlock).not.toHaveBeenCalled();
     expect(events.some((event) => event.type === 'error')).toBe(true);
   });
 
@@ -1078,8 +1047,7 @@ describe('season block runner (M2.5 wire)', () => {
     });
     await flush();
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(repository.savePendingBlock).toHaveBeenCalledTimes(1);
+    expect(repositoryMocks(repository).savePendingBlock).toHaveBeenCalledTimes(1);
     const call = repository.savePendingBlock.mock.calls[0] ?? [];
     const savedPending = call[0] as { nextGameId: string };
     const interruption = call[1] as {
@@ -1102,7 +1070,7 @@ describe('season block runner (M2.5 wire)', () => {
     const interrupted = events.find((event) => event.type === 'interrupted');
     expect(interrupted).toBeDefined();
     expect(interrupted?.blockIndex).toBe(0);
-    // 'complete' is emitted only for committed blocks.
+
     expect(events.some((event) => event.type === 'complete')).toBe(false);
   });
 });

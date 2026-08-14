@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, waitFor } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
@@ -12,8 +10,6 @@ import SeasonHistoryResultWrapper from '../../../test/SeasonHistoryResultWrapper
 
 mockSvelteKitApp();
 
-// Hoisted mock so the component's own `$app/navigation` import observes the
-// spy (doMock inside mockSvelteKitApp applies only to later imports).
 vi.mock('$app/navigation', () => ({
   goto: vi.fn(() => Promise.resolve()),
   replaceState: vi.fn(),
@@ -26,7 +22,6 @@ vi.mock('$app/navigation', () => ({
 
 import { goto } from '$app/navigation';
 
-/** Minimal shell context for the result component (names only). */
 function resultShell(): SeasonRunShellData {
   return {
     ready: true,
@@ -107,8 +102,6 @@ function resultShell(): SeasonRunShellData {
   };
 }
 
-/** Shared observable of the fake repository's calls (vi.hoisted so the
- * mocked module and the tests see the same object). */
 const repoCalls = vi.hoisted(() => ({
   deletedRunIds: [] as string[],
   exportedGameIds: [] as string[],

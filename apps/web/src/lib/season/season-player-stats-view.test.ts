@@ -4,12 +4,6 @@ import { buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtur
 import type { SeasonGameSummary, SeasonRoster } from '@hoop-rush/data-contracts';
 import { humanSeasonPlayerStats, type SeasonPlayerStatsView } from './season-player-stats-view';
 
-/**
- * Season Run player stats view-model tests: the human roster joined to the
- * folded season aggregates — totals, per-game rates, shooting percentages,
- * OVR/position lookups, and the zero-game guard — all from recorded facts.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 const schedule = generateSeasonSchedule({ league, seed: SEED });

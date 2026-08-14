@@ -1,9 +1,3 @@
-/**
- * Platform CSPRNG helpers for client-side identity and seed generation.
- * `crypto.getRandomValues` is secure-context-friendly; the zero fallback only
- * ever runs during SSR, where gameplay seeds are never consumed.
- */
-
 export function randomBytes(bytes: number): Uint8Array {
   if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
     const buffer = new Uint8Array(bytes);

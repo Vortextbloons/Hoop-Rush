@@ -2,7 +2,6 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
 
-  /** Old Roster tab URL: the roster merged into the Team tab (M2.3.5). */
   if (!import.meta.env.SSR) {
     void goto(resolve('/season/run/team'));
   }

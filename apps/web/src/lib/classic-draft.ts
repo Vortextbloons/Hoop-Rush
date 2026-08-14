@@ -10,32 +10,15 @@ import { challengeRepository } from '$lib/challenge-repo';
 import { sortDraftRows, type DraftPresentation } from '$lib/draft-presentation';
 import { generateSeed } from '$lib/sandbox-url';
 
-/**
- * Classic draft adapters (spec/01 Classic game mode): building the compact
- * franchise-era catalog the engine rolls against, slicing the global players
- * index into a round's eligible pool, and persisting/resuming the authoritative
- * ClassicDraftState. The browser never scans a decade to determine peaks; the
- * index and the manifest pools are the whole surface.
- */
-
 function franchiseEraKey(franchiseId: string, eraId: string): string {
   return `${franchiseId}/${eraId}`;
 }
 
-/**
- * Memoized bucket maps keyed on the immutable index instance, so catalog and
- * pool-row builds never rescan the global index more than once per load.
- */
 const franchiseEraBucketCache = new WeakMap<
   PlayersIndex,
   ReadonlyMap<string, PlayersIndexEntry[]>
 >();
 
-/**
- * Single pass over the global players index grouping rows by their
- * franchise/era pair. Buckets preserve index order, which keeps the catalog
- * and pool rows identical to a per-pool filter. Memoized per index instance.
- */
 export function buildFranchiseEraBuckets(
   index: PlayersIndex,
 ): ReadonlyMap<string, PlayersIndexEntry[]> {

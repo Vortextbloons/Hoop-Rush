@@ -10,16 +10,6 @@ import type {
 import { foldSeasonAggregates, pointDifferential } from './season-presentation';
 import { rotationRoleOf } from './season-rotation-editor';
 
-/**
- * Season Run team detail view-model (M2.5 team drill-down): joins one
- * franchise's ten roster entries to its locked rotation and its folded
- * player aggregates, purely from recorded facts. AI rotations are frozen
- * for the run, so the locked rotation is authoritative; the human team's
- * pending rotation is not shown here (the Rotation tab owns that).
- *
- * Everything displayed derives from saved contracts — never invented here.
- */
-
 export interface SeasonTeamPlayerStats {
   gamesPlayed: number;
   minutesPerGame: number;
@@ -52,15 +42,13 @@ export interface SeasonSummaryRatings {
 }
 
 export interface SeasonTeamProjection {
-  /** League-relative Overall rating on the 0-100 display scale. */
   overall: number;
-  /** League-relative Offense rating on the 0-100 display scale. */
+
   offense: number;
-  /** League-relative Defense rating on the 0-100 display scale. */
+
   defense: number;
 }
 
-/** Unscaled minute-weighted roster ratings before league normalization. */
 export interface SeasonTeamProjectionRaw {
   overall: number;
   offense: number;
@@ -73,7 +61,6 @@ export interface LeagueProjectionBaselines {
   defense: { min: number; max: number };
 }
 
-/** Display range for league-normalized team strips. */
 const TEAM_PROJECTION_DISPLAY_FLOOR = 58;
 const TEAM_PROJECTION_DISPLAY_CEILING = 94;
 const TEAM_PROJECTION_MINUTE_EXPONENT = 1.4;
@@ -101,7 +88,6 @@ function mapStatToDisplay(raw: number, range: { min: number; max: number }): num
   );
 }
 
-/** Minute-weighted roster ratings before league normalization. */
 export function rawSeasonTeamRatings(input: {
   roster: SeasonRoster;
   rotation: SeasonRotation;
@@ -130,7 +116,6 @@ export function rawSeasonTeamRatings(input: {
   };
 }
 
-/** Min/max raw projections across the league's locked rotations. */
 export function buildLeagueProjectionBaselines(input: {
   rosters: readonly SeasonRoster[];
   rotations: readonly SeasonRotation[];
@@ -201,9 +186,6 @@ export function seasonLeagueTeamProjections(input: {
   return projections;
 }
 
-/**
- * Team rating strip (0-100): league-normalized minute-weighted player ratings.
- */
 export function seasonTeamRatings(input: {
   roster: SeasonRoster;
   rotation: SeasonRotation;
@@ -230,16 +212,16 @@ export interface SeasonTeamDetail {
   losses: number;
   gamesPlayed: number;
   diff: number;
-  /** Five starters in slot order (G, G, F, F, C). */
+
   starters: SeasonTeamPlayerRow[];
-  /** Five bench players in deterministic bench order. */
+
   bench: SeasonTeamPlayerRow[];
-  /** Ordered closing five (independent of the starters). */
+
   closingFive: SeasonTeamPlayerRow[];
-  /** Sum of the ten target minutes (always 240 for a legal rotation). */
+
   minutesTotal: number;
   hasStats: boolean;
-  /** 0-100 team strip from the locked rotation's player ratings. */
+
   projection: SeasonTeamProjection | null;
 }
 

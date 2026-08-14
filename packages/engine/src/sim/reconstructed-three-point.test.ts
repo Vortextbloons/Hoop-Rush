@@ -21,7 +21,6 @@ import { threePointTarget } from './usage.ts';
 
 const context = createEngineContext();
 
-/** Anchors with an unavailable (null) three-point record: pre-1979 style. */
 const nullThreeAnchors: SimulationAnchors = {
   gamesPlayed: 79,
   minutesPerGame: 36.2,
@@ -40,7 +39,6 @@ const nullThreeAnchors: SimulationAnchors = {
   freeThrowAttemptRate: 0.25,
 };
 
-/** Schema-valid conservative reconstructed three-point profile. */
 function reconstructedProfile(
   overrides: Partial<ReconstructedThreePointProfile> = {},
 ): ReconstructedThreePointProfile {
@@ -78,7 +76,6 @@ function averageDefender(): SimulationPlayer {
   });
 }
 
-/** Every player on a legal fixture team carries the reconstructed profile. */
 function reconstructedTeam(): SimulationTeam {
   const base = buildLegalSimulationTeam();
   return {
@@ -167,8 +164,7 @@ describe('makeProbability reconstructed three-point path (spec/12)', () => {
       ),
     );
     expect(result).toBeCloseTo(expected, 10);
-    // Distinctive accuracy must not be pulled toward the unanchored zone
-    // base make (0.43 corner / 0.40 above-break) or the era targets.
+
     expect(result).toBeLessThan(0.35);
     const unanchored = makeProbability(
       buildSimulationPlayer(),
@@ -329,9 +325,6 @@ describe('reconstructed team end-to-end (spec/12)', () => {
       }
     }
 
-    // With league3PARate 0 the era zone mix contributes no three-point
-    // weight, but the tendency blend still carries nonzero three weights and
-    // pickZone rescales toward the reconstructed conservative volume.
     expect(threePointAttempts).toBeGreaterThan(100);
     expect(threePointersMade).toBeLessThanOrEqual(threePointAttempts);
   });

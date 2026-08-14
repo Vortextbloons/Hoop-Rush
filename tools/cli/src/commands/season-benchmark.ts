@@ -13,15 +13,6 @@ import {
   type SeasonBlockRunnerState,
 } from './season-block.ts';
 
-/**
- * M2.3 `season benchmark` commands (spec/2.0/12 performance framework).
- * Measured on this machine; budgets are the documented desktop reference
- * numbers (normal block <= 3s, final block <= 1s, full season <= 30s).
- * `season benchmark persistence` runs the persistence package's benchmark
- * harness (the sibling agent's implementation) with the production engine
- * seam.
- */
-
 export const SEASON_BENCHMARK_OPTIONS: Record<string, boolean> = {
   input: true,
   manifest: true,
@@ -31,7 +22,6 @@ export const SEASON_BENCHMARK_OPTIONS: Record<string, boolean> = {
   format: true,
 };
 
-/** Desktop budgets (documented in spec/2.0/12 M2.3 baseline). */
 export const SEASON_BUDGET_NORMAL_BLOCK_MS = 3000;
 export const SEASON_BUDGET_FINAL_BLOCK_MS = 1000;
 export const SEASON_BUDGET_FULL_SEASON_MS = 30000;
@@ -70,8 +60,6 @@ export function seasonBenchmarkBlock(args: {
   perBlock.push({ blockIndex: 0, digest: normal.digest, durationMs: normal.durationMs });
   const normalWithinBudget = normal.durationMs <= SEASON_BUDGET_NORMAL_BLOCK_MS;
 
-  // Final block (8): roll forward to the last block first, then time only
-  // the final block's own simulation.
   rollForwardTo(state, SEASON_BLOCK_COUNT - 1);
   const finalStarted = performance.now();
   const final = timed(state, SEASON_BLOCK_COUNT - 1);
@@ -194,7 +182,6 @@ export function seasonBenchmarkDeterminism(args: {
   profile: string | null;
   out: string | null;
 }): CliReport {
-  // Path A: the command-handler runner (uninterrupted), twice.
   const runnerRun = (): { runId: string; digests: string[] } => {
     const state = createSeasonBlockRunner({
       runPath: args.input,
@@ -210,7 +197,6 @@ export function seasonBenchmarkDeterminism(args: {
   const first = runnerRun();
   const second = runnerRun();
 
-  // Path B: interrupted resume — cancel block 3 halfway, discard, re-run.
   const interrupted = (() => {
     const state = createSeasonBlockRunner({
       runPath: args.input,
@@ -229,7 +215,7 @@ export function seasonBenchmarkDeterminism(args: {
     if (!cancelled) {
       throw new Error('determinism benchmark: cancellation seam did not trigger');
     }
-    // Discard and re-run the whole block from the cursor.
+
     const checkpoint = simulateSeasonBlock(input);
     return [...first.digests.slice(0, 3), checkpoint.digest];
   })();
@@ -284,15 +270,6 @@ export async function seasonBenchmarkPersistence(args: {
     ReturnType<typeof import('@hoop-rush/persistence').benchmarkSeasonRunPersistence>
   >;
   try {
-    // Node has no IndexedDB; the harness runs against fake-indexeddb so the
-    // CLI measures the same repository code the browser runs. The package is
-    // a CLI-only dependency (never part of the web bundle). Both globals the
-    // Dexie environment reads (indexedDB and IDBKeyRange) are installed
-    // BEFORE Dexie loads. fake-indexeddb degrades transactions for every
-    // database opened after the first in a process, so each sample installs
-    // a fresh factory through Dexie's dependency seam (the same isolation
-    // the harness's own tests use); real-browser IndexedDB is faster,
-    // making this report a conservative lower bound.
     const { IDBFactory, IDBKeyRange } = await import('fake-indexeddb');
     const environment = globalThis as { indexedDB?: unknown; IDBKeyRange?: unknown };
     environment.indexedDB = new IDBFactory();
@@ -309,8 +286,6 @@ export async function seasonBenchmarkPersistence(args: {
       },
     });
   } catch (error) {
-    // The harness lives in the sibling persistence package; a runtime
-    // import failure must surface as a typed report, never a crash.
     const failedPayload = seasonBenchmarkReportSchema.parse({
       schemaVersion: 1,
       command: 'season benchmark persistence',

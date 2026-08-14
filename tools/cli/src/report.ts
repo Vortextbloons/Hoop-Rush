@@ -1,5 +1,3 @@
-/** Stable CLI report contracts and exit codes (spec/09). */
-
 export const EXIT_OK = 0;
 export const EXIT_CHECKS_FAILED = 1;
 export const EXIT_USAGE_OR_DATA_ERROR = 2;

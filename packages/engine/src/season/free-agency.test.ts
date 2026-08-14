@@ -23,20 +23,9 @@ import { buildEconomyTestRun } from './season-economy-test-support.ts';
 import { reconcileSeasonEffects } from './effects.ts';
 import { buildMinimalRotation } from './rotation.ts';
 
-/**
- * M2.6.5 free-agency engine properties (spec/2.0/15): deterministic markets
- * and resolution, identity uniqueness, canonical identity selection, the
- * frozen caps (band signing caps, six Influence, three signings, window
- * composition), effects reconciliation invariants (300 active loads / 1,350
- * active pairs after every lock, signing, or trade; demotion freeze,
- * promotion restore, new-pair zero state, inactive non-participation), and
- * invalid-command no-op semantics.
- */
-
 const HUMAN = 'lakers';
 const BAND_CYCLE: SeasonFreeAgencyBand[] = ['featured', 'role', 'role', 'development', 'emergency'];
 
-/** A fixture free-agency index derived from the economy catalog. */
 function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
   const candidates: SeasonFreeAgencyIndex['candidates'] = catalog.candidates.map(
     (candidate, index) => ({
@@ -81,7 +70,6 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
   };
 }
 
-/** The zero effects state for the fixture run (v2 shape). */
 function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
   return {
     schemaVersion: 2,
@@ -336,6 +324,33 @@ describe('free-agency resolution', () => {
     expect(resolved.freeAgency.windows[0]?.status).toBe('resolved');
   });
 
+  it('appends exactly one transaction per signing without duplicating prior entries', () => {
+    const { run, catalog, index } = fixture();
+    const context = contextOf(run, catalog, index);
+    const opened = openSeasonFreeAgencyWindow(context, 0, 2);
+    const target = opened.window.candidates[0];
+    if (target === undefined) throw new Error('no candidates');
+    const declared = applyFreeAgencyDeclaration(
+      { ...run, freeAgency: opened.freeAgency },
+      0,
+      HUMAN,
+      'cmd-d',
+      [{ playerVersionId: target.playerVersionId, roleExpectation: 'rotation', influence: 2 }],
+    );
+    const priorCount = run.transactions.length;
+    const resolved = resolveSeasonFreeAgencyWindow(
+      { ...context, run: { ...run, freeAgency: declared } },
+      0,
+      'cmd-r',
+    );
+    expect(resolved.transactions.length).toBe(priorCount + resolved.signings.length);
+    const transactionIds = resolved.transactions.map((entry) => entry.transactionId);
+    expect(new Set(transactionIds).size).toBe(transactionIds.length);
+    for (const signing of resolved.signings) {
+      expect(transactionIds.filter((id) => id === signing.transactionId)).toHaveLength(1);
+    }
+  });
+
   it('rejects resolution before the human declares or skips', () => {
     const { run, catalog, index } = fixture();
     const context = contextOf(run, catalog, index);
@@ -428,8 +443,7 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
 
   it('freezes a demoted player load into the inactive set', () => {
     const { run, catalog } = fixture();
-    // Give the human roster an 11th (inactive) player so a rotation member
-    // can be demoted below the ten.
+
     const humanRoster = run.rosters.find((roster) => roster.franchiseId === HUMAN);
     const humanPool = catalog.pools.find((pool) => pool.franchiseId === HUMAN);
     const humanRotation = run.rotations.find((rotation) => rotation.franchiseId === HUMAN);
@@ -489,7 +503,7 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
     expect(reconciled.playerStates.some((player) => player.playerVersionId === demoted)).toBe(
       false,
     );
-    // The promoted player entered with zero load and the pair history froze.
+
     const promotedLoad = reconciled.playerStates.find(
       (player) => player.playerVersionId === inactiveId,
     );
@@ -517,7 +531,7 @@ describe('effects reconciliation (season-chemistry-v2)', () => {
     const humanRoster = resolved.rosters.find((roster) => roster.franchiseId === HUMAN);
     const humanRotation = run.rotations.find((rotation) => rotation.franchiseId === HUMAN);
     if (humanRoster === undefined || humanRotation === undefined) throw new Error('fixture');
-    // Promote the signed player at the next lock (replace one rotation member).
+
     const ids = [...humanRotation.starters, ...humanRotation.benchOrder].slice(0, 9);
     ids.push(target.playerVersionId);
     const members = ids.map((id) => {

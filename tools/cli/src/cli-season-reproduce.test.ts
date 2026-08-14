@@ -31,14 +31,6 @@ function cachedFreeAgencyReplayDeps(): ReturnType<typeof freeAgencyReplayDeps> {
   return sharedFreeAgencyReplayDeps;
 }
 
-/**
- * M2.6 `season run reproduce` tests (replay-export-v1, full-run): the
- * authoritative replay over a real command sequence (trade window, accept,
- * objective selection, decline) driven through the engine, first-divergence
- * reporting (corrupted logs fail at the exact ordinal with expected-vs-actual
- * facts), chain-fact and schema rejection, and the CLI end-to-end path.
- */
-
 describe('season run reproduce (replay-export-v1)', () => {
   it('reproduces a real command sequence with no divergence', () => {
     const { exportArtifact } = buildReplayedRun();
@@ -133,7 +125,6 @@ describe('season run reproduce (replay-export-v1)', () => {
       expect(payload.verifiedChainFacts).toBe(true);
       expect(payload.verifiedInitialRun).toBe(true);
 
-      // Corrupt the last entry's post-state digest and reproduce again.
       const raw = JSON.parse(readFileSync(exportPath, 'utf8')) as {
         commandLog: { entries: SeasonCommandLogEntry[] };
         almanac: SeasonAlmanac;
@@ -166,7 +157,6 @@ describe('season run reproduce (replay-export-v1)', () => {
       expect(badPayload.firstDivergence?.kind).toBe('state-digest');
       expect(badPayload.firstDivergence?.detail).toContain('expected');
 
-      // A garbage input is a clean exit-2 data error.
       const garbagePath = join(dir, 'garbage.json');
       writeFileSync(garbagePath, '{"not":"an export"}');
       const garbage = await runCli([

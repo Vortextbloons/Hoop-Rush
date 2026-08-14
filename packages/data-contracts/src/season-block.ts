@@ -6,42 +6,23 @@ import { seasonRotationSetDigestSchema } from './season-digests.ts';
 import { seasonObjectiveIdSchema } from './season-objective.ts';
 import { SEASON_BLOCK_VERSION } from './season-versions.ts';
 
-/**
- * SubmitSeasonBlock command and its typed results (spec/2.0/07 required
- * command groups, M2.3, season-block-v1; M2.5 adds the locked objective and
- * the run state assertions; M2.6.5 adds the `free-agency-unresolved`
- * rejection while a market window remains open). Submitting a block locks
- * the submitted rotations for the block's games: the command carries the
- * canonical digest of the 30-rotation set so a stale or tampered lock is
- * rejected before any simulation runs. M2.5: the command also carries the
- * locked objective id (null for the final two-game block 8) and the
- * expected run state revision/digest the block assembles against. The
- * engine validates the cursor, revision, block boundary, command
- * duplication, run identity, rotation legality, objective binding, and — on
- * blocks that follow windows 2, 4, 6 — that no free-agency market remains
- * unresolved; it returns one candidate checkpoint or one typed rejection.
- */
-
 export const seasonSubmitBlockCommandSchema = seasonRunCommandBaseSchema.extend({
   blockVersion: z.literal(SEASON_BLOCK_VERSION),
   command: z.literal('submit-season-block'),
-  /** Must equal the run's accepted-block count; stale cursors are rejected. */
+
   expectedRevision: z.number().int().nonnegative(),
-  /** 0-based block index to simulate. */
+
   blockIndex: z.number().int().min(0).max(8),
-  /** Canonical digest of the 30 rotations being locked for this block. */
+
   rotationDigest: seasonRotationSetDigestSchema,
-  /**
-   * M2.5: the locked block objective (blocks 0-7), or null for the final
-   * two-game block 8. Must have been selected and offered for this block.
-   */
+
   objectiveId: seasonObjectiveIdSchema.nullable(),
 });
 export type SeasonSubmitBlockCommand = z.infer<typeof seasonSubmitBlockCommandSchema>;
 
 export const seasonStaleCursorRejectionSchema = z.object({
   code: z.literal('stale-cursor'),
-  /** The run's current accepted-block count. */
+
   currentRevision: z.number().int().nonnegative(),
   currentCompletedRounds: z.number().int().min(0).max(82),
 });
@@ -55,7 +36,7 @@ export type SeasonDuplicateCommandRejection = z.infer<typeof seasonDuplicateComm
 
 export const seasonInvalidRotationsRejectionSchema = z.object({
   code: z.literal('invalid-rotations'),
-  /** One entry per franchise with failing rotations. */
+
   franchiseFailures: z.array(
     z.object({
       franchiseId: franchiseIdSchema,
@@ -67,7 +48,7 @@ export type SeasonInvalidRotationsRejection = z.infer<typeof seasonInvalidRotati
 
 export const seasonNonBoundaryBlockRejectionSchema = z.object({
   code: z.literal('non-boundary-block'),
-  /** The block the run cursor actually expects next. */
+
   expectedBlockIndex: z.number().int().min(0).max(8),
   submittedBlockIndex: z.number().int().min(0).max(8),
 });
@@ -79,31 +60,18 @@ export const seasonRunMismatchRejectionSchema = z.object({
 });
 export type SeasonRunMismatchRejection = z.infer<typeof seasonRunMismatchRejectionSchema>;
 
-/**
- * M2.5: the submitted objective does not bind to this block. `expected` is
- * `required` when blocks 0-7 need the selected objective, `none` when block
- * 8 must carry null, and `not-offered` when the objective was never offered
- * for this block.
- */
 export const seasonInvalidObjectiveRejectionSchema = z.object({
   code: z.literal('invalid-objective'),
   expected: z.enum(['required', 'none', 'not-offered']),
-  /** The submitted objective id when one was present. */
+
   objectiveId: z.string().min(1).max(64).optional(),
   blockIndex: z.number().int().min(0).max(8),
 });
 export type SeasonInvalidObjectiveRejection = z.infer<typeof seasonInvalidObjectiveRejectionSchema>;
 
-/**
- * M2.6.5: a block submission was attempted while a free-agency market
- * window is still open. The market must be resolved (every human franchise
- * declared or skipped, and the window explicitly resolved) before the next
- * block's rotations can lock. There is no automatic skip or automatic
- * resolution of saved picks.
- */
 export const seasonFreeAgencyUnresolvedRejectionSchema = z.object({
   code: z.literal('free-agency-unresolved'),
-  /** The open window index that blocks submission. */
+
   windowIndex: z.number().int().min(0).max(2),
   blockIndex: z.number().int().min(0).max(8),
 });

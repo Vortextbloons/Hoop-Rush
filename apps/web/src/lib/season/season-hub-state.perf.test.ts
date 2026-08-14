@@ -16,14 +16,6 @@ import type {
 } from './season-block-runner';
 import { createSeasonRunChannel } from './season-cross-tab';
 
-/**
- * Season Hub performance pass tests: an accepted block updates the in-memory
- * snapshot from the runner's authoritative `complete` event WITHOUT a full
- * `loadActiveRun()` reload; a cold refresh still executes the full validated
- * load; and an external tab's commit/clear invalidates the cache, reloads,
- * and cancels stale local simulation.
- */
-
 const RUN_ID = 'run-hub-perf';
 
 function minimalSnapshot(overrides: Partial<SeasonRunSnapshot> = {}): SeasonRunSnapshot {
@@ -95,7 +87,7 @@ class EmittingRunner implements SeasonBlockRunner {
   cancelCalls: string[] = [];
   terminateCalls = 0;
   prewarmCalls = 0;
-  /** The event the next startBlock emits after 'started'. */
+
   completion: SeasonRunnerEvent | null = null;
 
   startBlock(): string {
@@ -167,9 +159,7 @@ function startEnvelope(run: SeasonRun, effects: SeasonEffectsState) {
     profileUrl: '',
     profileHash: '0'.repeat(64),
   };
-  // The fixture run is a runtime cast (minimalSnapshot); eslint's type info
-  // resolves it as an error-typed value, but the hub never validates the
-  // start input shape.
+
   return { command, start };
 }
 
@@ -214,7 +204,7 @@ function repoWith(initial: SeasonRunSnapshot | null, indexRevision: number) {
     applySeasonRunCommand: vi.fn(() => Promise.resolve()),
     loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),
     upsertSeasonRunPlayerSlice: vi.fn(() => Promise.resolve()),
-    // M2.6 postseason repository surface (unused by these tests).
+
     commitPostseasonAdvancement: vi.fn(() => Promise.resolve()),
     loadPostseasonSummaries: vi.fn(() => Promise.resolve([])),
     loadPostseasonSummary: vi.fn(() => Promise.resolve(null)),
@@ -225,7 +215,7 @@ function repoWith(initial: SeasonRunSnapshot | null, indexRevision: number) {
     listCompletedSeasonRuns: vi.fn(() => Promise.resolve([])),
     deleteCompletedSeason: vi.fn(() => Promise.resolve()),
     buildReplayExport: vi.fn(() => Promise.resolve(null)),
-    /** Test hook: advances the persisted index revision (external commit). */
+
     setRevision(next: number): void {
       revision = next;
     },
@@ -280,8 +270,6 @@ describe('SeasonHubState performance pass', () => {
     hub.startBlock(startEnvelope(initial.run, initial.effects));
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    // The hub holds the committed snapshot verbatim, the index advanced, the
-    // session cache is primed, and NO full validated reload happened.
     expect(hub.snapshot).toBe(committed);
     expect(hub.index?.revision).toBe(1);
     expect(getCachedSeasonSnapshot()).toBe(committed);
@@ -296,10 +284,10 @@ describe('SeasonHubState performance pass', () => {
     const runner = new EmittingRunner();
     const hub = new SeasonHubState(repo, runner);
     await hub.refresh();
-    // Nothing cached/in-memory at cold start: full validated load runs.
+
     expect(repo.loadActiveRun).toHaveBeenCalledTimes(1);
     expect(hub.snapshot).toBe(initial);
-    // A second refresh with a matching in-memory snapshot skips the reload.
+
     await hub.refresh();
     expect(repo.loadActiveRun).toHaveBeenCalledTimes(1);
     hub.destroy();
@@ -313,8 +301,6 @@ describe('SeasonHubState performance pass', () => {
     await hub.refresh();
     expect(hub.snapshot).toBe(initial);
 
-    // Another tab announces a commit; the hub's own channel is a different
-    // instance on the same BroadcastChannel name.
     const external = createSeasonRunChannel();
     repo.setRevision(3);
     external.announce({ kind: 'commit', runId: RUN_ID, revision: 3, committedAt: Date.now() });
@@ -322,7 +308,7 @@ describe('SeasonHubState performance pass', () => {
 
     expect(hub.externalChange).not.toBeNull();
     expect(hub.externalChange?.kind).toBe('commit');
-    // The cache was invalidated and the repository reloaded.
+
     expect(getCachedSeasonSnapshot()).toBeNull();
     expect(repo.loadActiveRun).toHaveBeenCalledTimes(2);
     hub.acknowledgeExternalChange();
@@ -341,13 +327,13 @@ describe('SeasonHubState performance pass', () => {
     expect(hub.block.phase).toBe('running');
 
     const external = createSeasonRunChannel();
-    // The other tab already cleared the run before announcing.
+
     await repo.clearSeasonRun(RUN_ID);
     external.announce({ kind: 'clear', runId: null, committedAt: Date.now() });
     await expect.poll(() => runner.cancelCalls).toContain('req-1');
 
     expect(runner.cancelCalls).toContain('req-1');
-    // The local run is gone: the hub reloaded the empty repository state.
+
     expect(hub.snapshot).toBeNull();
     expect(hub.externalChange?.kind).toBe('clear');
     hub.destroy();

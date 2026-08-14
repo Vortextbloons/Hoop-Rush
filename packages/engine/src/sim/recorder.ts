@@ -9,23 +9,9 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { SHOT_ZONES } from '../domain/zones.ts';
 
-/** Usage identity FGA + 0.44*FTA + TOV (spec/03 diagnostics, invariant-checked). */
 export function usageOf(fga: number, fta: number, tov: number): number {
   return fga + fta * 0.44 + tov;
 }
-
-/**
- * Authoritative box-score recorder (spec/03). Every possession event flows
- * through this single stream: period scores, team totals, shot-zone facts,
- * and explanations are all derived from what the recorder accumulated.
- *
- * Accounting is keyed by team side plus player slot, never by player ID alone,
- * so mirror matchups (the same playerId on both teams) stay correct.
- *
- * The recorder also tracks the event opportunities behind every credited
- * stat (shot-zone splits, assist opportunities, rebound chances, contested
- * shots) so role behavior can be diagnosed and calibrated, not just asserted.
- */
 
 export type SideIndex = 0 | 1;
 
@@ -35,7 +21,7 @@ export function createZoneCounters(): Record<ShotZone, number> {
 
 export interface RecorderPlayer {
   minutes: number;
-  /** Exact on-court seconds (Season Run; integer accumulation per stint). */
+
   seconds: number;
   points: number;
   fieldGoalMakes: number;
@@ -51,16 +37,16 @@ export interface RecorderPlayer {
   blocks: number;
   turnovers: number;
   fouls: number;
-  /** Field-goal attempts and makes by zone (diagnostics; free throws excluded). */
+
   zoneAttempts: Record<ShotZone, number>;
   zoneMakes: Record<ShotZone, number>;
-  /** Made field goals on a passed possession where this player created the pass. */
+
   assistOpportunities: number;
-  /** Missed shots while this player's team was on offense (OReb chance). */
+
   offensiveReboundChances: number;
-  /** Missed shots while this player's team was on defense (DREb chance). */
+
   defensiveReboundChances: number;
-  /** Field-goal attempts where this player was the primary defender. */
+
   contestedShots: number;
 }
 
@@ -85,9 +71,9 @@ export interface RecorderSide {
   periodPoints: number[];
   zoneAttempts: Record<ShotZone, number>;
   zoneMakes: Record<ShotZone, number>;
-  /** Made field goals on passed possessions (diagnostics). */
+
   assistedFieldGoals: number;
-  /** Made field goals on unassisted possessions (diagnostics). */
+
   unassistedFieldGoals: number;
 }
 
@@ -119,14 +105,9 @@ export function createRecorderSide(): RecorderSide {
 }
 
 export class GameRecorder {
-  /** Per-side roster records: five slots for Classic, ten for Season Run. */
   readonly players: [RecorderPlayer[], RecorderPlayer[]];
   readonly sides: [RecorderSide, RecorderSide];
-  /**
-   * Active-five translation (Season Run): `activeSlots[side][i]` is the
-   * roster index on the floor for active slot `i`. Classic keeps the identity
-   * mapping 0..4, so every event method behaves byte-identically.
-   */
+
   private readonly activeSlots: [number[], number[]];
 
   constructor(rosterSize: number | [number, number] = 5) {
@@ -160,16 +141,10 @@ export class GameRecorder {
     const identitySlots = (size: number): number[] => Array.from({ length: size }, (_, i) => i);
     this.players = [makePlayers(sizes[0]), makePlayers(sizes[1])];
     this.sides = [createRecorderSide(), createRecorderSide()];
-    // The active five is always five slots; Season Run re-points them per
-    // substitution, Classic keeps the identity mapping.
+
     this.activeSlots = [identitySlots(5), identitySlots(5)];
   }
 
-  /**
-   * Active-five translation (Season Run): rewires a side's five on-court
-   * slots to the given ten-roster indices. Classic never calls this, so the
-   * identity mapping stays and all accounting is byte-identical.
-   */
   setActiveFive(side: SideIndex, rosterIndices: readonly number[]): void {
     if (rosterIndices.length !== 5) {
       throw new Error(`recorder: active five must have exactly five slots`);
@@ -187,12 +162,10 @@ export class GameRecorder {
     this.activeSlots[side] = [...rosterIndices];
   }
 
-  /** Exact integer on-court seconds for one ten-roster record (Season Run). */
   playSeconds(side: SideIndex, rosterIndex: number, seconds: number): void {
     this.playerAtRosterIndex(side, rosterIndex).seconds += seconds;
   }
 
-  /** Slot access with an explicit invariant: five players per side at all times. */
   private playerAt(side: SideIndex, slot: number): RecorderPlayer {
     const active = this.activeSlots[side][slot];
     if (active === undefined) {
@@ -285,7 +258,6 @@ export class GameRecorder {
     this.playerAt(side, slot).assistOpportunities += 1;
   }
 
-  /** Every missed shot gives each player on the offensive side an OReb chance. */
   offensiveReboundChance(side: SideIndex): void {
     for (const active of this.activeSlots[side]) {
       const player = this.playerAtRosterIndex(side, active);
@@ -293,7 +265,6 @@ export class GameRecorder {
     }
   }
 
-  /** Every missed shot gives each player on the defensive side a DREb chance. */
   defensiveReboundChance(side: SideIndex): void {
     for (const active of this.activeSlots[side]) {
       const player = this.playerAtRosterIndex(side, active);
@@ -338,7 +309,6 @@ export class GameRecorder {
     this.sides[side].freeThrowTrips += 1;
   }
 
-  /** Advances to the next period; the last period's points are sealed. */
   nextPeriod(): void {
     this.sides[0].periodPoints.push(0);
     this.sides[1].periodPoints.push(0);
@@ -373,11 +343,6 @@ export class GameRecorder {
     };
   }
 
-  /**
-   * One ten-roster record line for Season Run (identity is added by the
-   * controller): counters and diagnostics for roster index `rosterIndex` on
-   * one side, including exact integer `seconds` and display `minutes`.
-   */
   seasonPlayerBox(
     side: SideIndex,
     rosterIndex: number,
@@ -422,10 +387,6 @@ export class GameRecorder {
     };
   }
 
-  /**
-   * Team box line for Season Run: identical accounting to `teamBox`, with
-   * the diagnostics block typed as present (the Season contract requires it).
-   */
   seasonTeamBox(
     side: SideIndex,
     teamId: string,

@@ -61,7 +61,6 @@
   import { parsePlayoffGameId } from '@hoop-rush/data-contracts';
   import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
 
-  /** The trade panel chunk loads only when a trade window is open. */
   let tradeOffersModule: Promise<
     typeof import('$lib/components/season/TradeOffersPanel.svelte')
   > | null = null;
@@ -71,15 +70,6 @@
     tradeOffersModule ??= import('$lib/components/season/TradeOffersPanel.svelte');
     return tradeOffersModule;
   }
-
-  /**
-   * Season Run hub tab (M2.3.5, M2.5, M2.6): the regular-season block
-   * workflow (season tape, next-decision panel, trade offers, Influence)
-   * and — from the Play-In onward — the postseason decision center: the
-   * current matchup, the human lineup decision (rotation editor + risky
-   * rehab), spectate/fast-forward actions once eliminated, live
-   * orchestration progress, and the champion summary at completion.
-   */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
@@ -106,8 +96,7 @@
   const openWindow = $derived(
     run?.trade !== null && run?.trade !== undefined ? openWindowOf(run.trade) : null,
   );
-  /** M2.6.5: the open free-agency market window (block submission is
-   * authoritatively gated while one is unresolved). */
+
   const openFreeAgencyWindow = $derived(
     shell.freeAgency?.windows.find((window) => window.status === 'open') ?? null,
   );
@@ -120,7 +109,7 @@
     const currentRun = shell.run;
     const franchiseId = shell.humanFranchiseId;
     if (currentRun === null || franchiseId === null) return [];
-    // stateRevision bumps on every between-block command (trades included).
+
     void currentRun.stateRevision;
     const offers = humanTradeOffersOf(currentRun.trade, franchiseId);
     return offers.map((offer) =>
@@ -148,8 +137,6 @@
   );
 
   const names = $derived.by(() => {
-    // A plain Map snapshot (not SvelteMap): rebuilt on every refresh.
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, string>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
@@ -157,7 +144,6 @@
     return map;
   });
 
-  /** The objective locked for the next block (shown in the lock preview). */
   const selectedObjective = $derived.by(() => {
     if (run === null || nextBlockIndex === null || nextBlockIndex >= 8) return null;
     const selection = run.objectives.selections[nextBlockIndex];
@@ -168,11 +154,9 @@
     return { objectiveId: selection.objectiveId, name };
   });
 
-  /** Build-time stamina ratings from the compact player slice
-   * (constant per run; the catalog is never parsed for this view). */
   const staminaByVersion = $derived.by(() => {
     const slice = shell.playerSlice;
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+
     const map = new Map<string, number>();
     for (const entry of slice.values()) {
       map.set(entry.playerVersionId, entry.staminaRating);
@@ -197,8 +181,7 @@
       snapshot !== null && snapshot.acceptedBlocks.length > 0
         ? (snapshot.acceptedBlocks[snapshot.acceptedBlocks.length - 1]?.rotationDigest ?? null)
         : null;
-    // Fatigue-risk projections need the recorded load state and the
-    // build-time stamina ratings (from the catalog).
+
     const effects = snapshot?.effects ?? null;
     return buildLockPreview({
       pendingHumanRotation: shell.editor.rotation,
@@ -326,7 +309,6 @@
 
   const postseasonBusy = $derived(shell.postseason.phase === 'running');
 
-  /** The last postseason action, so retry re-issues the same decision. */
   let lastPostseasonAction = $state<
     'start' | 'advance' | 'spectate' | 'fast-forward' | 'submit' | null
   >(null);
@@ -532,7 +514,6 @@
       </section>
     {:else if snapshot !== null}
       {#if blockPaused}
-        <!-- Interruption recovery: the block is paused with a pending candidate. -->
         <InterruptionPanel
           {interruption}
           {pending}
@@ -572,7 +553,6 @@
             </span>
           </div>
 
-          <!-- Objective picker (blocks 0-7) -->
           {#if objectiveVm !== null}
             {#if commandError !== null && commandError.command === 'select-block-objective'}
               <p
@@ -683,7 +663,6 @@
               </a>
             </div>
 
-            <!-- Fatigue risk + continuity (projection only) -->
             {#if preview !== null && preview.fatigueProjections.length > 0}
               <div class="rounded-lg bg-surface-2 p-3">
                 <h3

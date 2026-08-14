@@ -13,24 +13,15 @@ import {
   type TripContext,
 } from './possession.ts';
 
-/**
- * PossessionStepper decomposition properties (spec/2.0/04 M2.2): the
- * resumable step machine must produce exactly the same output, clock, and
- * recorder state as the monolithic `resolveTrip` driver, whether it runs to
- * completion in one pass or pauses at every legal dead-ball boundary (the
- * Season controller's cadence). The RNG call sequence is preserved across
- * pauses by construction; these tests lock the observable equivalence.
- */
-
 type DriveMode = 'resolve' | 'step' | 'pause';
 
 interface DriveResult {
   trips: number;
   secondsRemaining: number;
   sides: [RecorderSide, RecorderSide];
-  /** Per-trip step lists (the pause mode resumes trips across pauses). */
+
   tripSteps: PossessionStep[][];
-  /** Per-trip per-step cumulative side totals (points, FGA, FTA). */
+
   perTripTotals: Array<Array<{ points: number; fga: number; fta: number }>>;
 }
 
@@ -71,8 +62,6 @@ function driveGame(input: GameSimulationInput, mode: DriveMode): DriveResult {
       if (mode === 'resolve') {
         const result = resolveTrip(ctx, offense);
         if (!result.ended && result.secondsElapsed === 0 && state.secondsRemaining > 0) {
-          // Less than the minimum start time remains; the production driver
-          // seals the period on this stalled-clock guard.
           state.secondsRemaining = 0;
         }
         terminal = {
@@ -151,13 +140,10 @@ describe('PossessionStepper decomposition', () => {
           if (!step.pause) continue;
           if (step.periodEnded) continue;
           if (step.ended) {
-            // A terminal pause is the trip's final step.
             expect(index, `${seed} trip ${String(tripIndex)} step ${String(index)}`).toBe(
               steps.length - 1,
             );
           } else {
-            // An inbound-producing foul pauses mid-trip; the next step must
-            // be the non-pause inbound continuation, never a free throw.
             expect(index, `${seed} trip ${String(tripIndex)}`).toBeLessThan(steps.length - 1);
             expect(
               steps[index + 1]?.pause,
@@ -182,8 +168,7 @@ describe('PossessionStepper decomposition', () => {
         const last = totals[totals.length - 1];
         const first = totals[0];
         if (afterPause === undefined || last === undefined || first === undefined) continue;
-        // A made basket scored before the pause must never be followed by
-        // free throws after it (that would be a split and-one sequence).
+
         const scoredBeforePause = afterPause.points > first.points;
         const ftaGrewAfterPause = last.fta > afterPause.fta;
         expect(

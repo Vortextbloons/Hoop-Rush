@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { generateSeasonSchedule } from '@hoop-rush/engine';
@@ -13,7 +11,6 @@ import SeasonRunShellWrapper from '../../../test/SeasonRunShellWrapper.svelte';
 
 mockSvelteKitApp();
 
-/** Regression test: render the hub with a post-commit-shaped snapshot. */
 function runWithCommit(): SeasonRun {
   const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
   const schedule = generateSeasonSchedule({ league, seed: 'a1b2c3d4e5f60718293a4b5c6d7e8f9a' });

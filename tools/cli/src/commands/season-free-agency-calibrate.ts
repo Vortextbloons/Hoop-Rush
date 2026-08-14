@@ -77,31 +77,6 @@ import {
 } from './season-block.ts';
 import { m25FreshRun, m25RunStateFacts, M25_TRADE_WINDOW_BLOCKS } from './season-m25-core.ts';
 
-/**
- * M2.6.5 `season free-agency calibrate` (spec/2.0/15, free-agency-targets-v1):
- * runs seeded seasons through the block pipeline and the three shared market
- * windows (blocks 2/4/6) via the authoritative commit seam
- * (`completeSeasonBlockCommit` with the packaged free-agency index), records
- * the deterministic AI declarations at window open, applies the human skip
- * through the command layer (the calibration convention: the human never
- * acts), and resolves every window through `resolve-free-agent-market`.
- *
- * Measured facts: market composition and universe exhaustion, identity
- * uniqueness + canonical-version stability, interest/win/signing/skip rates
- * by band, roster-size distribution + three-signing season cap, Influence
- * cost/spend distribution + the tie-break ordering, categorical trace
- * accuracy, candidate quality vs drafted starters + elite-tier exclusion, AI
- * growth by strength band (caps 1/2/3/3, one-outlier ceiling, no
- * rich-get-richer), legal 10-15 rosters + legal ten-player rotations,
- * 300/1,350 effects invariants and 300-450 ownership rows, zero-signing
- * cohorts reproducing prior seeded game summaries byte-for-byte, and
- * byte-identical regeneration.
- *
- * Cohort convention (frozen): 8 calibration + 4 held-out seasons (seasons
- * are the expensive unit); the artifact `free-agency-targets.json` is
- * written only when every gate passes AND `--write` is given.
- */
-
 export const SEASON_FREE_AGENCY_CALIBRATE_OPTIONS: Record<string, boolean> = {
   input: true,
   'seed-from': true,
@@ -118,44 +93,30 @@ export const DEFAULT_FREE_AGENCY_TARGETS = resolve(DEFAULT_SEASON_DIR, 'free-age
 export const SEASON_FREE_AGENCY_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_FREE_AGENCY_VALIDATION_SEED_COUNT = 4;
 
-/** Frozen per-franchise season caps (three signings, six Influence). */
 export const SEASON_FREE_AGENCY_MAX_SIGNINGS = 3;
 export const SEASON_FREE_AGENCY_MAX_SEASON_SPEND = 6;
 
-/** Frozen ownership-row bounds of the widened roster state. */
 export const SEASON_FREE_AGENCY_OWNERSHIP_MIN = 300;
 export const SEASON_FREE_AGENCY_OWNERSHIP_MAX = 450;
 
-/**
- * Frozen envelope: share of signings above the drafted median overall.
- * Free-agency candidates are the market leftovers BELOW the drafted 300
- * (measured 0.0 at integration), so the envelope freezes a ceiling that
- * catches a regression into elite-tier signings while accepting the
- * measured zero.
- */
 export const SEASON_FREE_AGENCY_ABOVE_DRAFTED_MIN = 0;
 export const SEASON_FREE_AGENCY_ABOVE_DRAFTED_MAX = 0.5;
 
-/** Frozen sanity envelope: share of declarations that are explicit skips. */
 export const SEASON_FREE_AGENCY_SKIP_SHARE_MAX = 0.95;
 
-/** Minimum seasons before the mean-across-seeds gates evaluate. */
 export const SEASON_FREE_AGENCY_MIN_SEASONS = 4;
 
-/** The catalog facts the measurements need (versions by identity). */
 export interface SeasonFreeAgencyFactsCatalog {
   overallByVersion: Map<string, number>;
   playableByVersion: Map<string, readonly Position[]>;
 }
 
-/** One opened market window of a driven season. */
 export interface SeasonFreeAgencyOpenedWindow {
   blockIndex: number;
   windowIndex: number;
   window: SeasonFreeAgencyWindowState;
 }
 
-/** The recorded free-agency facts of one driven season. */
 export interface SeasonFreeAgencySeasonFacts {
   rootSeed: string;
   run: SeasonRun;
@@ -163,20 +124,13 @@ export interface SeasonFreeAgencySeasonFacts {
   catalog: SeasonFreeAgencyFactsCatalog;
   summaries: SeasonGameSummary[];
   windows: SeasonFreeAgencyOpenedWindow[];
-  /** The initial 300 drafted versions (the elite-exclusion reference). */
+
   draftedVersionIds: string[];
-  /** The final free-agency audit failures (empty = the season audited clean). */
+
   audit: { failures: string[]; counts: SeasonFreeAgencyAuditCounts };
   determinismProbe: { probed: boolean; identical: boolean };
 }
 
-/**
- * Simulates one full season through the block pipeline with the
- * free-agency markets driven at blocks 2/4/6. The human franchise never
- * declares interest: an explicit skip command is recorded so every window
- * resolves (the M2.5 calibration convention). Byte-identical across
- * retries by construction (all randomness is seeded).
- */
 export function simulateSeasonFreeAgencyFacts(options: {
   runPath?: string | null;
   manifestPath?: string | null;
@@ -224,10 +178,7 @@ export function simulateSeasonFreeAgencyFacts(options: {
 
   for (let blockIndex = 0; blockIndex < SEASON_BLOCK_COUNT; blockIndex += 1) {
     const command = runnerBlockCommand(state, blockIndex);
-    // The run's accepted transactions ride the pipeline input explicitly
-    // (the worker path's `priorTransactions` convention); the shared CLI
-    // runner leaves them off, which would drop the free-agency/trade
-    // transaction entries from every later checkpoint.
+
     const input: SeasonBlockSimulationInput = {
       ...runnerPipelineInput(state, command),
       transactions: state.run.transactions,
@@ -238,8 +189,6 @@ export function simulateSeasonFreeAgencyFacts(options: {
     state.acceptedCommandIds = [...state.acceptedCommandIds, command.commandId];
     state.health = checkpoint.health;
 
-    // Post-block state chain (the authoritative deriveSeasonPostBlockState
-    // path; the commit seam's no-window facts).
     const stateFacts = deriveSeasonPostBlockState({
       run: state.run,
       candidate: checkpoint,
@@ -259,10 +208,6 @@ export function simulateSeasonFreeAgencyFacts(options: {
     };
     let effects: SeasonEffectsState = checkpoint.effects;
 
-    // Trade windows open at blocks 2/4/5 (the M2.5 convention) — while every
-    // roster is still ten players. The engine trade economy has not been
-    // widened to 10-15 rosters (canonicalRosterPairs asserts exactly ten), so
-    // trade windows after free-agency signings are skipped (reported risk).
     let tradeOpened = false;
     if (
       (M25_TRADE_WINDOW_BLOCKS as readonly number[]).includes(blockIndex) &&
@@ -295,8 +240,6 @@ export function simulateSeasonFreeAgencyFacts(options: {
       }
     }
 
-    // Free-agency windows open at blocks 2/4/6 (commit-seam mirror: the
-    // window open advances the state chain by exactly one revision).
     let freeAgencyWindow: SeasonFreeAgencyWindowState | null = null;
     if (
       options.driveFreeAgency &&
@@ -384,13 +327,6 @@ export function simulateSeasonFreeAgencyFacts(options: {
   };
 }
 
-/**
- * Widened roster expansion (10-15 rosters, 300-450 versions): the engine's
- * `expandSeasonRunRosters` still asserts the pre-M2.6.5 300-version
- * invariant, so this module mirrors its catalog mapping exactly (same
- * fields, same shapes) while accepting the widened ownership bounds. The
- * authoritative game rules remain engine-owned; this is data assembly only.
- */
 export function expandRostersWidened(
   run: SeasonRun,
   catalog: import('@hoop-rush/data-contracts').SeasonDraftCatalog,
@@ -436,20 +372,6 @@ export function expandRostersWidened(
   return expanded;
 }
 
-/**
- * The engine's block pipeline still validates rotations with exact-cover
- * semantics (`seasonBlockRejection` -> `validateSeasonRotation`), which the
- * M2.6.5 10-15 rosters break once free-agency signings grow rosters beyond
- * the ten rotation members. This CLI driver therefore mirrors the engine's
- * pre-block rejection facts (cursor, free-agency-unresolved gate, rotation
- * set digest, rotation legality with rotation-scoped playable + subset
- * membership + legal five after any removal) and drives the AUTHORITATIVE
- * pipeline pieces (`seasonBlockGamesOf` -> `simulateSeasonBlockGame` ->
- * `assembleSeasonBlockCandidate`, the same composition the browser worker
- * uses for cancellation) — every game rule, digest, recap, and accounting
- * fact stays engine-owned. Integration risk: the engine gate should adopt
- * the same subset semantics (reported to the lead).
- */
 function assertBlockPreconditions(
   state: SeasonBlockRunnerState,
   command: SeasonSubmitBlockCommand,
@@ -519,7 +441,6 @@ function assertBlockPreconditions(
   }
 }
 
-/** The authoritative whole-block composition (engine pipeline pieces). */
 function simulateBlockGames(
   state: SeasonBlockRunnerState,
   input: SeasonBlockSimulationInput,
@@ -533,10 +454,7 @@ function simulateBlockGames(
   let previousRound = fromRound - 1;
   let effects = input.effects;
   let health = input.health;
-  // Game inputs remain exactly the ten rotation players (the frozen M2.6.5
-  // contract): signings sit on rosters but never in rotations, so the game
-  // view is the rotation-scoped roster of each franchise. The engine's
-  // effects buffer and rotation accounting require exactly ten per side.
+
   const rotationIdsByFranchise = new Map(
     state.run.rotations.map((rotation) => [
       rotation.franchiseId,
@@ -597,13 +515,11 @@ function simulateBlockGames(
   return assembleSeasonBlockCandidate(input, summaries, retainedDetails, effects, health);
 }
 
-/** Block round range (mirror of the engine's private helper). */
 function blockRoundRangeLocal(blockIndex: number): { fromRound: number; toRound: number } {
   const fromRound = blockIndex * 10 + 1;
   return { fromRound, toRound: fromRound + 9 };
 }
 
-/** Records the human skip and resolves one window through the command layer. */
 function runFreeAgencyCommands(
   state: SeasonBlockRunnerState,
   windowIndex: number,
@@ -673,11 +589,6 @@ function runFreeAgencyCommands(
   state.rosterPlayerIds = rosterPlayerIdsOf(state.run);
 }
 
-// ---------------------------------------------------------------------------
-// Measurement
-// ---------------------------------------------------------------------------
-
-/** One season's measured free-agency facts (recorded facts only). */
 export interface SeasonFreeAgencyMeasuredFacts {
   seasonsSimulated: number;
   windowsOpened: number;
@@ -738,22 +649,19 @@ function zeroStrengthRecord(): Record<SeasonStrengthBand, number> {
   return { contender: 0, playoff: 0, average: 0, weaker: 0 };
 }
 
-/** The drafted median overall of the initial 300 (nearest-rank lower mid). */
 export function medianOf(sorted: number[]): number {
   if (sorted.length === 0) return 0;
   const mid = Math.floor(sorted.length / 2);
   return sorted[mid] ?? 0;
 }
 
-/** One season's measured facts (pure fold of recorded facts). */
 export function seasonFreeAgencyFactsOf(
   season: SeasonFreeAgencySeasonFacts,
   draftedMedianOverall: number,
 ): SeasonFreeAgencyMeasuredFacts {
   const run = season.run;
   const freeAgency: SeasonFreeAgencyState = run.freeAgency;
-  // The FINAL run windows carry the recorded declarations, traces, and
-  // signings; the opened snapshots are captured before resolution.
+
   const windows = run.freeAgency.windows;
   const signings = windows.flatMap((window) => window.signings);
 
@@ -829,9 +737,7 @@ export function seasonFreeAgencyFactsOf(
     const overall = season.catalog.overallByVersion.get(signing.playerVersionId) ?? 0;
     return overall > draftedMedianOverall;
   }).length;
-  // Elite-tier exclusion: a signing may never be a version that was drafted
-  // (the universe excludes represented identities), and may never introduce
-  // an identity already represented anywhere else in the league.
+
   const draftedVersionIds = new Set(season.draftedVersionIds);
   const eliteExclusionFailures = signings.filter((signing) => {
     if (draftedVersionIds.has(signing.playerVersionId)) return true;
@@ -956,7 +862,6 @@ export function seasonFreeAgencyFactsOf(
   };
 }
 
-/** The roster/rotation legality + 300/1,350 accounting of the final facts. */
 function effectsAccountingOf(season: SeasonFreeAgencySeasonFacts): {
   rosterIllegal: number;
   rotationIllegal: number;
@@ -973,9 +878,7 @@ function effectsAccountingOf(season: SeasonFreeAgencySeasonFacts): {
       playable: season.catalog.playableByVersion.get(player.playerVersionId) ?? [],
     }));
     if (members.length < 10 || members.length > 15) rosterIllegal += 1;
-    // season-roster-v2 legality (the engine's `validateSeasonRoster` still
-    // asserts exactly ten — reported gap): distinct versions, group
-    // minimums, a legal G,G,F,F,C five, and a legal five after any removal.
+
     const counts = rosterGroupCounts(members);
     if (counts.guards < 3 || counts.forwards < 3 || counts.centers < 2) rosterIllegal += 1;
     if (!legalFiveExists(members)) rosterIllegal += 1;
@@ -1008,7 +911,6 @@ function effectsAccountingOf(season: SeasonFreeAgencySeasonFacts): {
   return { rosterIllegal, rotationIllegal, activeLoads, activePairs };
 }
 
-/** The zero-measured base for an empty cohort. */
 function emptyMeasured(): SeasonFreeAgencyMeasuredFacts {
   return {
     seasonsSimulated: 0,
@@ -1060,7 +962,6 @@ function emptyMeasured(): SeasonFreeAgencyMeasuredFacts {
   };
 }
 
-/** Folds per-season measured facts into cohort facts (pure). */
 export function foldFreeAgencyCohort(
   seasons: readonly SeasonFreeAgencySeasonFacts[],
   draftedMedianOverall: number,
@@ -1154,7 +1055,6 @@ export function foldFreeAgencyCohort(
   return folded;
 }
 
-/** The frozen gates of one cohort (skipped below the minimum sample). */
 export function evaluateFreeAgencyGates(
   calibration: SeasonFreeAgencyMeasuredFacts,
   heldOut: SeasonFreeAgencyMeasuredFacts,
@@ -1259,11 +1159,6 @@ export function evaluateFreeAgencyGates(
   return metrics;
 }
 
-// ---------------------------------------------------------------------------
-// Targets artifact
-// ---------------------------------------------------------------------------
-
-/** The targets artifact frozen by `season free-agency calibrate`. */
 export const seasonFreeAgencyTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   targetsVersion: z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
@@ -1414,7 +1309,6 @@ export const seasonFreeAgencyTargetsSchema = z.object({
 });
 export type SeasonFreeAgencyTargets = z.infer<typeof seasonFreeAgencyTargetsSchema>;
 
-/** The measured-facts object of one cohort (artifact shape). */
 export function freeAgencyMeasuredOf(
   facts: SeasonFreeAgencyMeasuredFacts,
 ): SeasonFreeAgencyTargets['measured']['calibration'] {
@@ -1495,16 +1389,11 @@ export function validateSeasonFreeAgencyTargets(
   });
 }
 
-/**
- * The real per-season driver seam: runs one seeded season through the block
- * pipeline and the free-agency windows.
- */
 export type SeasonFreeAgencySeasonRunner = (
   rootSeed: string,
   options: { driveFreeAgency: boolean; probeWindow: boolean },
 ) => SeasonFreeAgencySeasonFacts;
 
-/** The default driver (real engine pipeline over the packaged assets). */
 function defaultRunner(manifestPath: string): SeasonFreeAgencySeasonRunner {
   return (rootSeed, options) =>
     simulateSeasonFreeAgencyFacts({
@@ -1517,7 +1406,6 @@ function defaultRunner(manifestPath: string): SeasonFreeAgencySeasonRunner {
     });
 }
 
-/** The drafted median overall of one season's initial 300 players. */
 export function draftedMedianOverallOf(season: SeasonFreeAgencySeasonFacts): number {
   const overalls = season.draftedVersionIds
     .map((playerVersionId) => season.catalog.overallByVersion.get(playerVersionId) ?? 0)
@@ -1525,7 +1413,6 @@ export function draftedMedianOverallOf(season: SeasonFreeAgencySeasonFacts): num
   return medianOf(overalls);
 }
 
-/** `season free-agency calibrate`: runs the gates and freezes the artifact. */
 export function seasonFreeAgencyCalibrate(
   args: SeasonFreeAgencyArgs,
   deps: { runSeason?: SeasonFreeAgencySeasonRunner } = {},
@@ -1575,8 +1462,6 @@ export function seasonFreeAgencyCalibrate(
   const calibrationFacts = foldFreeAgencyCohort(calibration, draftedMedian);
   const heldOutFacts = foldFreeAgencyCohort(heldOut, draftedMedian);
 
-  // Zero-signing summary identity probe: the first zero-signing season must
-  // reproduce the no-free-agency drive's summaries byte-for-byte.
   const zeroSigning = calibration.find(
     (season) =>
       season.run.freeAgency.windows.reduce((sum, window) => sum + window.signings.length, 0) === 0,
@@ -1635,10 +1520,6 @@ export function seasonFreeAgencyCalibrate(
       schemaVersion: 1,
       targetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
       policy: {
-        // Frozen literals mirroring the engine constants
-        // (`SEASON_FREE_AGENCY_BAND_SIGNING_CAPS`, `SEASON_FREE_AGENCY_WINDOW_COMPOSITION`,
-        // `SEASON_FREE_AGENCY_WINDOW_MAX_CANDIDATES`); the schema parse below
-        // fails if the engine ever drifts from these frozen literals.
         bandSigningCaps: {
           contender: 1,
           playoff: 2,

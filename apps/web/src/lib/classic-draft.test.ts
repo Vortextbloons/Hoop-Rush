@@ -70,7 +70,7 @@ describe('buildClassicCatalog', () => {
         eraId: '1980s',
         positionsPlayable: ['C'],
       }),
-      // Decoy outside every manifest pool pair: must never appear.
+
       row({
         playerId: 'p-lal-80',
         franchiseId: 'lakers',

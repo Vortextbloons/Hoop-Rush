@@ -26,7 +26,7 @@ describe('json helpers', () => {
     expect(clamp(5, 0, 10)).toBe(5);
     expect(clamp(-1, 0, 10)).toBe(0);
     expect(clamp(11, 0, 10)).toBe(10);
-    // clampRating truncates like Python int(clamp(v, 0, 100))
+
     expect(clampRating(99.9)).toBe(99);
     expect(clampRating(-5)).toBe(0);
     expect(clampRating(120)).toBe(100);

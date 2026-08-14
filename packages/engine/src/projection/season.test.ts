@@ -157,7 +157,7 @@ describe('rotation trace', () => {
     expect(normal.totalMinutes).toBe(48);
     const unitMinutes = normal.units.reduce((sum, unit) => sum + unit.minutes, 0);
     expect(unitMinutes).toBe(48);
-    // Five players on court for 48 minutes: 240 player-minutes total.
+
     const playerMinutes = [...normal.actualMinutes.values()].reduce((sum, value) => sum + value, 0);
     expect(playerMinutes).toBe(240);
     for (const unit of normal.units) {
@@ -174,7 +174,7 @@ describe('rotation trace', () => {
     const normal = traceRotationNormal(context);
     const close = traceRotationClose(context);
     expect(traceRotationNormal(context).units).toEqual(normal.units);
-    // The close trace must exist and stay legal.
+
     expect(close.totalMinutes).toBe(48);
     const closeUnits = close.units.some((unit) =>
       unit.players.includes(rotation.closingFive[0] ?? ''),
@@ -309,7 +309,7 @@ describe('projectSeasonRoster plan facts', () => {
       (facts?.fatigueBands.tired ?? 0) +
       (facts?.fatigueBands.heavy ?? 0);
     expect(bandTotal).toBe(10);
-    // The output stays schema-valid with planFacts attached.
+
     expect(seasonProjectionSchema.parse(projection).planFacts).toEqual(facts);
   });
 
@@ -357,15 +357,13 @@ describe('projectSeasonRoster plan facts', () => {
       eraProfile: DEFAULT_ERA_SIM_PROFILE,
       model: buildModel(),
     };
-    // A one-game horizon keeps the initial-load difference visible: the
-    // between-game recovery tick would otherwise drive both end-of-block
-    // fatigues to the same minutes-insensitive equilibrium.
+
     const without = projectSeasonRoster(base);
     const fresh = projectSeasonRoster({ ...base, minutePlan: minutePlanLoad(0, 1) });
     const loaded = projectSeasonRoster({ ...base, minutePlan: minutePlanLoad(4_000, 1) });
     expect(fresh.planFacts).toBeDefined();
     expect(loaded.planFacts).toBeDefined();
-    // Different load rows change the plan facts but not the roster+rotation.
+
     expect(loaded.inputDigest).toBe(fresh.inputDigest);
     expect(loaded.planFacts?.starterStrainAfterBlock).toBeGreaterThan(
       fresh.planFacts?.starterStrainAfterBlock ?? 0,

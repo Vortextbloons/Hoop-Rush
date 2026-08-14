@@ -10,7 +10,7 @@ import { createEngineContext } from './context.ts';
 
 const ctx = createEngineContext();
 const PERMUTATIONS = buildSlotPermutationTeams();
-/** Seeds for attribution-sensitive assertions (usage share moves in small steps). */
+
 const SEEDS = 200;
 
 function at<T>(list: readonly T[], index: number): T {
@@ -20,7 +20,6 @@ function at<T>(list: readonly T[], index: number): T {
   return value;
 }
 
-/** Mirrored games of one permutation over shared seeds, with per-player accumulation by playerId. */
 function runPermutation(team: SimulationTeam, seeds: string[]) {
   const games: GameResult[] = seeds.map((seed) =>
     simulateGame(
@@ -105,9 +104,6 @@ function teamUsage(playerBoxes: Iterable<PlayerBoxScore>): number {
 
 describe('assigned-position responsibility across legal slot permutations', () => {
   it('shifts usage, rebound attribution, rim contests, and blocks by player ID', () => {
-    // Player-to-slot order per permutation (creator, shooter, wing, post, rim):
-    // P1 [0,1,2,3,4]  P2 [1,0,2,3,4]  P3 [0,1,3,2,4]  -> rim at C
-    // P4 [1,2,0,4,3]  P5 [1,2,3,4,0]  P6 [0,1,2,4,3]  -> rim at F (post at C)
     const seeds = Array.from({ length: SEEDS }, (_, i) => `slot-attr-${String(i)}`);
     const byPermutation = PERMUTATIONS.map((team) => runPermutation(team, seeds));
     const rimAtCenter = byPermutation.slice(0, 3);
@@ -126,15 +122,10 @@ describe('assigned-position responsibility across legal slot permutations', () =
       results.reduce((sum, result) => sum + pick(box(result.players, 'p-slot-rim')), 0) /
       results.length;
 
-    // Usage changes by player ID: the rim protector initiates more often from
-    // a forward slot (initiation 1.02 vs 0.92), so his usage share rises.
     const rimUsageCenter = avg(rimAtCenter, (p) => p.diagnostics?.usage ?? 0);
     const rimUsageForward = avg(rimAtForward, (p) => p.diagnostics?.usage ?? 0);
     expect(rimUsageForward).toBeGreaterThan(rimUsageCenter);
 
-    // Rebound attribution changes by player ID: the rim protector grabs more
-    // offensive and defensive boards from the center slot (rebounding 1.10 vs
-    // 1.04) than from a forward slot.
     const rimDrebCenter = avg(rimAtCenter, (p) => p.rebounds.defensive);
     const rimDrebForward = avg(rimAtForward, (p) => p.rebounds.defensive);
     expect(rimDrebCenter).toBeGreaterThan(rimDrebForward + 100);
@@ -142,17 +133,10 @@ describe('assigned-position responsibility across legal slot permutations', () =
     const rimOrebForward = avg(rimAtForward, (p) => p.rebounds.offensive);
     expect(rimOrebCenter).toBeGreaterThan(rimOrebForward);
 
-    // Defender assignments change by player ID: from a forward slot the rim
-    // protector draws the same-slot-group matchup bonus far more often, so
-    // his total contested shots rise.
     const rimContestsCenter = avg(rimAtCenter, (p) => p.diagnostics?.contestedShots ?? 0);
     const rimContestsForward = avg(rimAtForward, (p) => p.diagnostics?.contestedShots ?? 0);
     expect(rimContestsForward).toBeGreaterThan(rimContestsCenter + 200);
 
-    // Block totals are sparse and noisy even across this cohort. Keep the
-    // player-ID result within a tight directional-noise band; the exact
-    // center-vs-forward rim-protection coefficient is asserted directly in
-    // position-responsibilities.test.ts.
     const postBlocks = (players: Map<string, PlayerBoxScore>) => box(players, 'p-slot-post').blocks;
     const postAtCenter = [at(byPermutation, 3), at(byPermutation, 5)].reduce(
       (sum, result) => sum + postBlocks(result.players),
@@ -164,9 +148,6 @@ describe('assigned-position responsibility across legal slot permutations', () =
     );
     expect(postAtCenter / 2).toBeGreaterThan((postAtForward / 4) * 0.9);
 
-    // Usage shares visibly redistribute across the five players between the
-    // natural order and the creator-at-center order (creator initiation
-    // weight drops 0.92/1.08; feed compensation keeps each move bounded).
     const naturalUsage = teamUsage(byPermutation[0]?.players.values() ?? []);
     const centerUsage = teamUsage(creatorAtCenter.players.values());
     let usageRedistribution = 0;
@@ -184,8 +165,6 @@ describe('assigned-position responsibility across legal slot permutations', () =
     }
     expect(usageRedistribution).toBeGreaterThan(0.004);
 
-    // Responsibility visibly moves across the five players: no permutation's
-    // per-player attribution is identical to the natural order's.
     for (const [index, result] of byPermutation.entries()) {
       if (index === 0) continue;
       let differs = false;

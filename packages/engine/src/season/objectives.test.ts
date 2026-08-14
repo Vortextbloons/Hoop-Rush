@@ -11,13 +11,6 @@ import {
 } from './objectives.ts';
 import { fixtureSummary } from './season-economy-test-support.ts';
 
-/**
- * M2.5 block objective tests (season-objective-v1, engine side): the six
- * frozen measures evaluated from recorded summary facts only, the
- * null-safety of the unevaluated shape, and the deterministic three-choice
- * offers. All summaries are hand-built so every fact is controlled.
- */
-
 const HUMAN = 'lakers';
 const BLOCK = 3;
 
@@ -42,7 +35,6 @@ const ROTATION: SeasonRotation = {
   rotationVersion: SEASON_ROTATION_VERSION,
 };
 
-/** A human player line with exact seconds/turnovers (all other stats zero). */
 function humanLine(version: string, seconds: number, turnovers = 0) {
   return {
     playerVersionId: version,
@@ -64,7 +56,6 @@ function humanLine(version: string, seconds: number, turnovers = 0) {
   };
 }
 
-/** An opponent line with zero everything. */
 function opponentLine(version: string, seconds = 2400) {
   return {
     playerVersionId: version,
@@ -226,7 +217,7 @@ describe('season objective measures', () => {
     expect(success.success).toBe(true);
     expect(success.evaluation.facts.wins).toBe(6);
     expect(success.evaluation.facts.games).toBe(10);
-    // Flip one of the six wins into a loss: five wins fail the measure.
+
     const fiveWins = sixWins.map((summary, index) =>
       index === 0 ? game(summary.gameId, 90, 100) : summary,
     );
@@ -258,8 +249,7 @@ describe('season objective measures', () => {
       [...gamesList, forfeit, humanWonForfeit, ...gamesList.slice(0, 2)],
       TEN_TIPS,
     );
-    // 6 wins + a won forfeit (official 2-0) + 2 more wins = 9; the lost
-    // forfeit does not count.
+
     expect(result.success).toBe(true);
     expect(result.evaluation.facts.wins).toBe(9);
   });
@@ -312,7 +302,7 @@ describe('season objective measures', () => {
     const failure = evaluate('availability-eight', summaries, oneShort);
     expect(failure.success).toBe(false);
     expect(failure.evaluation.facts.tipsWithAtLeastEightAvailable).toBe(9);
-    // Forfeit games have no tipoff: they are excluded from the counted tips.
+
     const forfeitSummary = {
       ...game('s000003', 0, 0),
       status: 'forfeit' as const,
@@ -329,15 +319,13 @@ describe('season objective measures', () => {
   });
 
   it('bench-320: non-starter seconds count; starters identified by rotation', () => {
-    // Every line defaults to 1440s; the five bench players contribute
-    // 5 x 24 min per game, 10 games -> 1,200 bench minutes (>= 320).
     const summaries = Array.from({ length: 10 }, (_, index) =>
       game(`s${String(index + 1).padStart(6, '0')}`, 100, 90),
     );
     const result = evaluate('bench-320', summaries, TEN_TIPS);
     expect(result.evaluation.facts.benchMinutes).toBe(5 * 24 * 10);
     expect(result.success).toBe(true);
-    // Give the bench 32+ minutes each: 5 x 32 = 160 per game, 1600 for the block.
+
     const benchHeavy = summaries.map((summary) => ({
       ...summary,
       homePlayers: summary.homePlayers.map((line) =>
@@ -347,7 +335,7 @@ describe('season objective measures', () => {
     const heavy = evaluate('bench-320', benchHeavy, TEN_TIPS);
     expect(heavy.evaluation.facts.benchMinutes).toBe(5 * 32 * 10);
     expect(heavy.success).toBe(true);
-    // A bench that never plays fails the measure.
+
     const noBench = summaries.map((summary) => ({
       ...summary,
       homePlayers: summary.homePlayers.map((line) =>
@@ -383,7 +371,7 @@ describe('season objective measures', () => {
       [{ gameId: 's000001', availableCount: 9 }],
       zeroStarterRotation,
     );
-    // pv-a is in starters but has 0 target minutes -> counted as bench.
+
     expect(result.evaluation.facts.benchMinutes).toBe(6 * 24);
   });
 

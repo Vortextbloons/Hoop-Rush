@@ -9,14 +9,6 @@
   import SeasonTierBadge from '$lib/components/SeasonTierBadge.svelte';
   import { seasonTierFromWins } from '$lib/season-tier';
 
-  /**
-   * Compact completed-run history (spec/08), shared by Sandbox and Classic.
-   * Rows list lineup, mode identity, record, outcome, and completion time;
-   * each row reopens the stored summary. The active challenge, when one
-   * exists for this mode, is offered for continue. Sandbox rows keep their
-   * franchise/era title; classic rows identify the information variant.
-   */
-
   let {
     manifest,
     rows,

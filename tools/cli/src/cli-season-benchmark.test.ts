@@ -3,15 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { seasonBenchmarkReportSchema } from './report-schemas.ts';
 import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
-/**
- * CLI integration tests for the M2.3 `season benchmark` commands
- * (spec/2.0/12 performance framework): the block/full benchmarks report
- * measured times against the documented desktop budgets. Digest determinism
- * (repeated and interrupted runs) is proven in-process by the engine suite
- * (packages/engine/src/season/block-determinism.test.ts); these tests cover
- * the CLI command surface on top of it.
- */
-
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 
 describe('cli: season benchmark block and full', () => {
@@ -27,8 +18,7 @@ describe('cli: season benchmark block and full', () => {
       '--format',
       'json',
     ]);
-    // Budgets are reference-machine numbers: an over-budget report is a
-    // legitimate exit-1 outcome, so both codes are accepted here.
+
     expect([0, 1]).toContain(code);
     const payload = seasonBenchmarkReportSchema.parse(jsonPayload(stdout, stderr));
     expect(payload.command).toBe('season benchmark block');
@@ -48,8 +38,7 @@ describe('cli: season benchmark block and full', () => {
       '--format',
       'json',
     ]);
-    // The 30s budget is a reference-machine number; under CI load this
-    // machine can cross it, so both exit codes are accepted here.
+
     expect([0, 1]).toContain(code);
     const payload = seasonBenchmarkReportSchema.parse(jsonPayload(stdout, stderr));
     expect(payload.command).toBe('season benchmark full');
@@ -70,10 +59,7 @@ describe('cli: season benchmark persistence', () => {
       '--format',
       'json',
     ]);
-    // The harness lives in the sibling persistence package. A runnable
-    // harness exits 0 with the budgets; a harness failure must surface as a
-    // typed exit-1 report naming the failure — never a crash or a vacuous
-    // pass.
+
     expect([0, 1]).toContain(code);
     const payload = seasonBenchmarkReportSchema.parse(jsonPayload(stdout, stderr));
     expect(payload.command).toBe('season benchmark persistence');

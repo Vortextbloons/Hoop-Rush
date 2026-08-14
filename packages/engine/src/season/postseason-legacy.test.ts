@@ -17,14 +17,6 @@ import {
   submitPlayoffGame,
 } from './postseason-legacy.ts';
 
-/**
- * FROZEN Season Run postseason v1 tests (spec/2.0/02, postseason-v1): every
- * Play-In branch, arbitrary best-of-seven winner sequences, immediate
- * stopping at four wins, the 2-2-1-1-1 home pattern, fixed bracket paths,
- * and absence of duplicate or missing teams. The v1 contract was replaced
- * by postseason-v2 in M2.6; these tests keep the frozen machine green.
- */
-
 const league = buildSeasonLeague();
 const eastTeams = league.teams
   .filter((team) => team.conference === 'east')
@@ -87,7 +79,6 @@ function seriesOf(state: SeasonPostseasonState, seriesId: string): PlayoffSeries
   return series;
 }
 
-/** Completes both Play-In tournaments against seeded rankings. */
 function completedPlayIn(): SeasonPostseasonState {
   let state = rankedPostseason();
   for (const conference of ['east', 'west'] as const) {
@@ -110,15 +101,10 @@ function completedPlayIn(): SeasonPostseasonState {
   return state;
 }
 
-/** A bracket-ready state with the Finals home-court team supplied. */
 function startedBracket(): SeasonPostseasonState {
   return createPlayoffBracket(completedPlayIn(), league, eastTeams[0] ?? 'hawks');
 }
 
-/**
- * Plays one series from a pattern of series-level winners ('homeCourt' or
- * 'challenger'); stops early once a side reaches four wins.
- */
 function playSeries(
   state: SeasonPostseasonState,
   seriesId: string,
@@ -145,7 +131,6 @@ function playSeries(
   return current;
 }
 
-/** Plays a complete seeded tournament with deterministic random sequences. */
 function playFullTournament(
   state: SeasonPostseasonState,
   rng: ReturnType<typeof createRng>,

@@ -26,17 +26,8 @@ import { slotRequirement as lineupSlotRequirement, validateLineup } from '../../
 import type { EngineContext } from '../../sim/context.ts';
 import type { ClassicChallengeCreation } from '../../challenge/commands.ts';
 
-/**
- * Classic draft commands (spec/01 Classic game mode): the single authoritative
- * path from a validated franchise-era catalog to a completed five-player draft.
- * Every roll and reroll derives from the saved draft seed plus the round and
- * reroll kind, so drafts are reproducible byte-for-byte. Commands are pure:
- * all randomness flows through the injected EngineContext RNG factory.
- */
-
 export type ClassicRollKind = 'initial' | 'franchise-reroll' | 'era-reroll';
 
-/** Deterministic roll seed string: saved draft seed + roll version + kind + round. */
 export function classicRollSeed(
   seed: Seed,
   version: string,
@@ -46,7 +37,6 @@ export function classicRollSeed(
   return `${seed}:classic-roll:${version}:${kind}:${String(round)}`;
 }
 
-/** Canonically sorted copy of the catalog: franchiseId asc, then eraId asc. */
 export function sortClassicCatalog(catalog: ClassicDraftCatalog): ClassicDraftCatalog {
   return [...catalog].sort((a, b) =>
     a.franchiseId < b.franchiseId
@@ -61,7 +51,6 @@ export function sortClassicCatalog(catalog: ClassicDraftCatalog): ClassicDraftCa
   );
 }
 
-/** Slot requirement (slot group) for a slot index (domain/lineup authority). */
 export function slotRequirement(slotIndex: number): SlotGroup {
   if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 4) {
     throw new Error(`slot index must be an integer in 0..4 (got ${String(slotIndex)})`);
@@ -81,11 +70,6 @@ function catalogPlayer(
   return entry?.players.find((p) => p.playerId === playerId) ?? null;
 }
 
-/**
- * First open slot the incumbent can fill when vacating `targetSlot`, counting
- * `vacatingSlot` as open when the incoming player leaves it. Matches sandbox
- * displacement: move the occupant out of the way before placing the subject.
- */
 function displacementTargetFor(
   catalog: ClassicDraftCatalog,
   incumbent: ClassicPick,
@@ -112,14 +96,6 @@ function displacementTargetFor(
   return null;
 }
 
-/**
- * Candidate pairs for a roll, filtered to pairs containing a player who is
- * not yet drafted AND can legally fill an open slot, then sorted canonically.
- * Rerolls filter on a single axis (spec/01): a 'franchise-reroll' preserves
- * the current roll's era and requires a different eligible franchise; an
- * 'era-reroll' preserves the current roll's franchise and requires a
- * different eligible era. Pairs that differ on both axes are never eligible.
- */
 export function classicRollCandidates(
   catalog: ClassicDraftCatalog,
   state: ClassicDraftState,
@@ -159,7 +135,6 @@ export function classicRollCandidates(
   );
 }
 
-/** True when a reroll kind has an alternative candidate pair and is unspent. */
 export function classicRerollAvailable(
   state: ClassicDraftState,
   kind: 'franchise' | 'era',
@@ -172,7 +147,6 @@ export function classicRerollAvailable(
   return classicRollCandidates(catalog, state, rollKind).length > 0;
 }
 
-/** Rolls one pair from the given candidate entries via the context RNG. */
 export function rollClassicPair(
   seed: Seed,
   round: number,
@@ -379,13 +353,6 @@ export interface ClassicRepositionInput {
   slotIndex: SlotIndex;
 }
 
-/**
- * Moves a drafted player to another legal slot. When the target is occupied,
- * swaps when the incumbent can fill the vacated slot; otherwise displaces the
- * incumbent to the first open slot they can play (including the slot the
- * subject vacates). Never removes or replaces a player, and never changes
- * round, status, roll, or rerolls.
- */
 export function repositionClassicPlayer(
   state: ClassicDraftState,
   catalog: ClassicDraftCatalog,
@@ -457,25 +424,19 @@ export function repositionClassicPlayer(
 export interface ClassicChallengeEnvironment {
   runId: string;
   runSeed: Seed;
-  /** Five resolved SimulationPlayer snapshots in SLOT order 0..4. */
+
   players: SimulationPlayer[];
   dataVersion: string;
   ratingVersion: string;
   positionNormalizationVersion: string;
   engineVersion: string;
-  /** Era simulation profile (fixed '2010s' for every run). */
+
   profile: EraSimulationProfile;
   bracket: OpponentBracket;
   eraId: string;
   homeDisplayName: string;
 }
 
-/**
- * Turns a completed classic draft into a ClassicChallengeCreation whose lineup,
- * players, and selections agree exactly with the draft picks. The challenge
- * command layer re-validates the creation (mode, variant, classicDraft, and
- * every existing sandbox rule) before a run is accepted.
- */
 export function createClassicChallenge(
   draft: ClassicDraftState,
   env: ClassicChallengeEnvironment,

@@ -6,17 +6,6 @@ import type {
   ClassicPick,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Classic mode fixtures (M4). Deterministic builders for the Classic draft
- * contracts in packages/data-contracts/src/classic.ts: a mini franchise-era
- * catalog, picks, drafting/completed draft states, and the completed snapshot
- * persisted on classic runs. Builders follow the repo shallow-override
- * pattern (buildX(overrides) spreads overrides last) and always return
- * schema-valid records so downstream persistence and web tests can rely on
- * the shapes without parsing.
- */
-
-/** Fixed seed used by every classic fixture; 32 hex chars (seedSchema range). */
 const FIXTURE_CLASSIC_SEED = 'abc123abc123abc123abc123abc123ab' as const;
 
 const DEFAULT_CLASSIC_CATALOG: readonly ClassicCatalogEntry[] = [
@@ -78,11 +67,6 @@ const DEFAULT_CLASSIC_CATALOG: readonly ClassicCatalogEntry[] = [
   },
 ];
 
-/**
- * A deterministic mini-catalog: 8 entries across 5 franchises and 5 eras,
- * every player with the sorted detailed playable union. Pass `entries` to
- * replace the whole catalog (the array type has no meaningful partial).
- */
 export function buildClassicCatalog(
   entries: readonly ClassicCatalogEntry[] = DEFAULT_CLASSIC_CATALOG,
 ): ClassicDraftCatalog {
@@ -107,7 +91,6 @@ export function buildClassicPick(overrides: Partial<ClassicPick> = {}): ClassicP
   };
 }
 
-/** A drafting draft: round 1, an active Lakers-1990s roll, fresh rerolls, no picks. */
 export function buildClassicDraftState(
   overrides: Partial<ClassicDraftState> = {},
 ): ClassicDraftState {
@@ -126,11 +109,6 @@ export function buildClassicDraftState(
   };
 }
 
-/**
- * A completed draft snapshot with five distinct picks in rounds 1-5 and a
- * legal G,G,F,F,C slot assignment: p-lal-g@0, p-bos-g@1, p-lal-f@2,
- * p-chi-f@3, p-lal-c@4. Every picked playerId exists in the default catalog.
- */
 export function buildClassicCompletedDraft(
   overrides: Partial<ClassicCompletedDraft> = {},
 ): ClassicCompletedDraft {
@@ -174,7 +152,6 @@ export function buildClassicCompletedDraft(
   };
 }
 
-/** The full draft state of a completed draft: 5 picks, complete, rerolls spent, roll null. */
 export function buildCompletedDraftState(
   overrides: Partial<ClassicDraftState> = {},
 ): ClassicDraftState {

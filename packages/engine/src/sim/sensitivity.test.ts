@@ -14,17 +14,8 @@ import {
 import { simulateGame } from './game.ts';
 import { createEngineContext } from './context.ts';
 
-/**
- * Directional and magnitude sensitivity for every modeled rating family
- * (spec/06). Each test changes exactly one dimension between otherwise
- * identical fixtures and checks the expected direction plus a credible
- * magnitude across a seeded batch.
- */
-
 const ctx = createEngineContext();
-// 200 seeded games per side keep the magnitude gates stable: the zero-centered
-// v5 contest and lower zone bases make single-dimension bumps move totals by
-// ~2-4%, which is real but small enough that 200 seeds still clear the floors.
+
 const SEEDS = 200;
 
 function mutatePlayers(
@@ -66,7 +57,6 @@ function profileWith(
 
 type MetricSelect = (result: GameResult, side: 'home' | 'away') => number;
 
-/** One seeded batch, many metrics — avoids double-simulating the same pair. */
 function compareMany(
   name: string,
   baseTeam: SimulationTeam,
@@ -114,13 +104,7 @@ function expectDirection(
   minRelative = 0.03,
 ): void {
   const relative = (changed - base) / Math.max(1e-9, Math.abs(base));
-  // Direction must hold; magnitude must be a credible swing (>= 3% of base
-  // by default) but not an explosion for a one-dimension change (cap varies
-  // by stat). Role-based usage concentrates shots on high-usage players, so
-  // all-five skill bumps move totals a little less than flat-usage models.
-  // The m3-engine-v5 calibration softened the skill/contest slopes (to
-  // compress blowouts), so single-dimension +15 bumps move points ~2% and
-  // defense ~2%; callers pass tighter or looser floors per dimension.
+
   expect(
     relative,
     `${name}: base=${base.toFixed(2)} changed=${changed.toFixed(2)}`,
@@ -133,10 +117,7 @@ const baseTeam = buildLegalSimulationTeam({ teamId: 'sens-base', displayName: 'S
 describe('sensitivity: shooting and finishing', () => {
   it.concurrent('higher insideScoring increases points and field-goal percentage', () => {
     const changed = mutateAllRatings(baseTeam, 'insideScoring', 15);
-    // Both sides are measured: the home side of a paired seeded batch is
-    // systematically offset by RNG consumption order, so a one-sided
-    // selector makes the magnitude estimate noisy. Metrics share one batch
-    // so CI concurrent suites stay under the timeout budget.
+
     const [points, fg] = compareMany('inside', baseTeam, changed, [
       (r) => (r.home.box.points + r.away.box.points) / 2,
       (r) => {
@@ -207,7 +188,7 @@ describe('sensitivity: ball security', () => {
   it.concurrent('higher ballHandling reduces turnovers', () => {
     const changed = mutateAllRatings(baseTeam, 'ballHandling', 15);
     const tov = compare('handling', baseTeam, changed, (r) => r.home.box.turnovers);
-    // Fewer turnovers with better handling.
+
     expect(tov.changed, `base=${String(tov.base)} changed=${String(tov.changed)}`).toBeLessThan(
       tov.base * 0.97,
     );
@@ -217,9 +198,7 @@ describe('sensitivity: ball security', () => {
   it.concurrent('higher turnoverRate tendency increases turnovers', () => {
     const changed = mutateAllTendencies(baseTeam, 'turnoverRate', 15);
     const tov = compare('tov-tend', baseTeam, changed, (r) => r.home.box.turnovers);
-    // m3-engine-v5 made the observed turnover tendency the primary anchor
-    // (turnoverObservedBlend), so a +15 tendency bump (12 -> 27) moves the
-    // per-possession rate by ~0.10 and team turnovers by ~0.9 relative.
+
     expectDirection('turnovers', tov.base, tov.changed, 1, 1.2);
   });
 });
@@ -228,9 +207,7 @@ describe('sensitivity: defense', () => {
   it.concurrent('higher perimeterDefense lowers opponent points', () => {
     const changed = mutateAllRatings(baseTeam, 'perimeterDefense', 15);
     const oppPts = compare('perim', baseTeam, changed, (r) => r.away.box.points);
-    // The calibrated contest slope (m3-engine-v5, zero-centered) trades magnitude for
-    // compressed blowouts; a +15 perimeter bump still cuts ~2% off opponent
-    // scoring (the CLI sensitivity gate bumps interior too and shows -4%).
+
     expect(
       oppPts.changed,
       `base=${String(oppPts.base)} changed=${String(oppPts.changed)}`,
@@ -254,15 +231,14 @@ describe('sensitivity: defense', () => {
     ]);
     if (!steals || !oppTov) throw new Error('comparison did not produce both metrics');
     expectDirection('steals', steals.base, steals.changed, 1);
-    // The era-anchored turnover baseline is per-trip; steal feeds defensive
-    // pressure, so the swing is a bounded share of the era turnover rate.
+
     expectDirection('oppTurnovers', oppTov.base, oppTov.changed, 1, 0.6, 0.02);
   });
 
   it.concurrent('higher block raises blocks', () => {
     const changed = mutateAllRatings(baseTeam, 'block', 15);
     const blocks = compare('block', baseTeam, changed, (r) => r.home.box.blocks);
-    // Blocks are rare per game, so the relative swing is naturally large.
+
     expectDirection('blocks', blocks.base, blocks.changed, 1, 4);
   });
 });

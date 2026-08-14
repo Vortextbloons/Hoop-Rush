@@ -13,7 +13,6 @@ import {
   provisionalStandingOrder,
 } from './aggregates.ts';
 
-/** A minimal final summary; box fields must reconcile with player lines. */
 function finalSummary(overrides: Partial<SeasonGameSummary> = {}): SeasonGameSummary {
   const homeLine = (
     playerVersionId: string,
@@ -221,27 +220,26 @@ describe('season aggregate folding (M2.3)', () => {
     const summaries = [first, forfeit];
     const teams = foldSeasonTeamAggregates(summaries);
     const players = foldSeasonPlayerAggregates(summaries);
-    // One row per franchise, sorted by franchiseId.
+
     expect(teams.map((team) => team.franchiseId)).toEqual(['celtics', 'lakers']);
-    // Lakers: won the final (score), lost the forfeit 0-2; box points count.
+
     const lakers = teams.find((team) => team.franchiseId === 'lakers');
     const celtics = teams.find((team) => team.franchiseId === 'celtics');
     expect(lakers?.wins).toBe(1);
     expect(lakers?.losses).toBe(1);
     expect(celtics?.wins).toBe(1);
     expect(celtics?.losses).toBe(1);
-    // Forfeit boxes are zero, so the forfeit winner's box points stay 0.
+
     expect(celtics?.points).toBe(first.awayBox.points);
     expect(lakers?.points).toBe(first.homeBox.points);
-    // Player rows: 20 distinct, sorted by playerVersionId, ownership derived
-    // from the side box.
+
     expect(players).toHaveLength(20);
     const ids = players.map((player) => player.playerVersionId);
     expect([...ids].sort()).toEqual(ids);
     const lakersPlayer = players.find((player) => player.playerVersionId === 'pv-a1');
     expect(lakersPlayer?.franchiseId).toBe('celtics');
     expect(lakersPlayer?.gamesPlayed).toBe(1);
-    // Forfeit games contribute no player rows.
+
     expect(players.every((player) => player.gamesPlayed === 1)).toBe(true);
 
     const failures = auditSeasonAggregates({
@@ -286,8 +284,6 @@ describe('season aggregate folding (M2.3)', () => {
 
 describe('season leaders (M2.3)', () => {
   it('derives leaders with eligibility, depth, and the frozen tie-break', () => {
-    // Two players on one team: a high-scorer with few games (ineligible for
-    // the 0.7 share) and a lower scorer with enough games (eligible).
     const teams = [
       {
         franchiseId: 'lakers',
@@ -359,17 +355,16 @@ describe('season leaders (M2.3)', () => {
     ];
     const leaders = deriveSeasonLeaders(teams, players);
     expect(seasonLeadersSchema.safeParse(leaders).success).toBe(true);
-    // The star (5 games < 7) is ineligible for rate categories.
+
     expect(leaders.categories.points.map((entry) => entry.playerVersionId)).toEqual([
       'pv-00000000000000000000000000000002',
     ]);
     expect(leaders.categories.points[0]?.perGame).toBe(20);
-    // The star is still eligible for the raw three-point table? No: same
-    // 0.7 share gate applies to every category.
+
     expect(leaders.categories.threePointersMade.map((entry) => entry.playerVersionId)).toEqual([
       'pv-00000000000000000000000000000002',
     ]);
-    // Rebounds combine offensive + defensive.
+
     expect(leaders.categories.rebounds[0]?.value).toBe(40);
   });
 

@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { buildManifest, buildSeasonLeague, buildSeasonRosters } from '@hoop-rush/test-fixtures';
@@ -17,13 +15,6 @@ import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
 mockSvelteKitApp();
-
-/**
- * M2.4 season component tests: the Roster list renders fatigue bands,
- * workload, last-game minutes, and the unit-chemistry panel with the
- * strongest/weakest recorded pairs; the checkpoint recap renders the
- * mechanism-evidence section from retained-detail evidence.
- */
 
 const MANIFEST: HoopRushManifest = buildManifest();
 const ROSTER: SeasonRoster = buildSeasonRosters(
@@ -212,11 +203,10 @@ describe('SeasonRosterList (M2.4)', () => {
       },
     });
     const text = container.textContent;
-    // Tired band at 40% fatigue (4000 bp); the label and percent are
-    // separate text nodes inside the pill span.
+
     expect(text).toContain('Tired');
     expect(text).toContain('40%');
-    // Workload and last-game minutes.
+
     expect(text).toContain('Recent load 30%');
     expect(text).toContain('last game 32 min');
   });

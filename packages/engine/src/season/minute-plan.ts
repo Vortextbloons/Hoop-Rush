@@ -7,40 +7,12 @@ import {
 } from '@hoop-rush/data-contracts';
 import { onCourtFatigueBp, recentLoadAfterGame } from './stamina.ts';
 
-/**
- * Projection milestone minute-policy optimizer (minute-policy-v1,
- * season-rotation-v3). Produces integer per-player regulation target
- * minutes from player projection, stamina, durability, and current fatigue
- * under three strategy envelopes — Starter-Heavy (contract preset `tight`),
- * Balanced, Bench-Heavy — while preserving roster ownership, player
- * uniqueness, legal positions, starters, bench order, the closing five, and
- * the 240-minute total. Plans are selected with a risk-adjusted score
- * weighted toward projected quality, then starter strain, then bench
- * relief; Starter-Heavy is avoided when it projects an unacceptable Heavy
- * fatigue result unless every valid plan does.
- *
- * Fatigue facts use the recorded stamina model (season-stamina-v2):
- * per-game accumulation from on-court minutes through the engine's
- * on-court accumulation formula (consecutive-stint ramp at the full-game
- * stint), the between-game recovery tick, and the recent-load update,
- * starting from the current recorded fatigue. Halftime and trip-level role
- * bonuses are excluded exactly as in the shipped pre-game lock-preview
- * projection: the recorded block-end measurements for a 10-game block land
- * in the 1,500-3,500 basis-point range for heavy-minute starters. The
- * Heavy gate evaluates the within-block peak, because the recovery model
- * drives end-of-block fatigue toward a minutes-insensitive equilibrium.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 export type FatigueBand = 'fresh' | 'ready' | 'tired' | 'heavy';
 
-/** Fatigue band thresholds (basis points), the engine-authoritative bands. */
 export const FATIGUE_BAND_FRESH_MAX = 1500;
 export const FATIGUE_BAND_READY_MAX = 3500;
 export const FATIGUE_BAND_TIRED_MAX = 6000;
 
-/** Fatigue band of a basis-point fatigue value (0..10,000). */
 export function fatigueBandOf(fatigueBasisPoints: number): FatigueBand {
   if (fatigueBasisPoints < FATIGUE_BAND_FRESH_MAX) return 'fresh';
   if (fatigueBasisPoints < FATIGUE_BAND_READY_MAX) return 'ready';
@@ -48,50 +20,40 @@ export function fatigueBandOf(fatigueBasisPoints: number): FatigueBand {
   return 'heavy';
 }
 
-/**
- * The Heavy band's lower bound (basis points): the "unacceptable Heavy
- * fatigue result" the gate protects against.
- */
 export const MINUTE_PLAN_HEAVY_THRESHOLD_BP = FATIGUE_BAND_TIRED_MAX;
 
-/** Per-player load inputs for minute planning. */
 export interface MinutePlanPlayerInput {
   playerVersionId: string;
-  /** Player quality weight in 0..1 (projection- or ratings-derived). */
+
   quality: number;
-  /** 45..95 stamina rating (season-stamina-v1). */
+
   staminaRating: number;
-  /** 45..95 durability rating (durability-v1). */
+
   durability: number;
-  /** 0..10,000 current fatigue basis points. */
+
   fatigueBasisPoints: number;
-  /** 0..10,000 current recent-load basis points. */
+
   recentLoadBasisPoints: number;
 }
 
-/** The rotation structure a plan must preserve exactly. */
 export interface MinutePlanStructure {
-  /** Five starters in slot order (G, G, F, F, C). */
   starters: readonly string[];
-  /** Remaining five in deterministic bench order. */
+
   benchOrder: readonly string[];
-  /** Ordered closing five (independently legal). */
+
   closingFive: readonly string[];
 }
 
-/** Upcoming-block horizon: 10 games, or the remaining games for the final block. */
 export function minutePlanHorizonGames(remainingGamesInSeason: number): number {
   return Math.min(10, Math.max(1, remainingGamesInSeason));
 }
 
-/** Strategy envelopes derived from the frozen preset tables (240-minute totals). */
 const ENVELOPE_STARTER_TOTAL: Record<SeasonMinutePolicyStrategy, number> = {
   'starter-heavy': 5 * SEASON_ROTATION_PRESET_TARGETS.tight.starters,
   balanced: 5 * SEASON_ROTATION_PRESET_TARGETS.balanced.starters,
   'bench-heavy': 5 * SEASON_ROTATION_PRESET_TARGETS['bench-heavy'].starters,
 };
 
-/** The preset value that corresponds to each strategy (`tight` stays the contract value). */
 export const STRATEGY_TO_PRESET: Record<
   SeasonMinutePolicyStrategy,
   keyof typeof SEASON_ROTATION_PRESET_TARGETS
@@ -101,7 +63,6 @@ export const STRATEGY_TO_PRESET: Record<
   'bench-heavy': 'bench-heavy',
 };
 
-/** Minute-policy strategy for a preset command value. */
 export function minuteStrategyOfPreset(
   preset: keyof typeof SEASON_ROTATION_PRESET_TARGETS,
 ): SeasonMinutePolicyStrategy {
@@ -115,18 +76,15 @@ export function minuteStrategyOfPreset(
   }
 }
 
-/** Capacity multipliers: fatigue, stamina, and durability drains on minutes. */
 export const MINUTE_PLAN_FATIGUE_DRAIN = 0.5;
 export const MINUTE_PLAN_STAMINA_DRAIN = 0.4;
 export const MINUTE_PLAN_DURABILITY_DRAIN = 0.2;
 export const MINUTE_PLAN_CAPACITY_FLOOR = 0.55;
 
-/** Risk-adjusted score weights: quality, then strain, then relief. */
 export const MINUTE_PLAN_SCORE_QUALITY_WEIGHT = 0.5;
 export const MINUTE_PLAN_SCORE_STRAIN_WEIGHT = 0.3;
 export const MINUTE_PLAN_SCORE_RELIEF_WEIGHT = 0.2;
 
-/** Capacity multiplier in 0.55..1 from fatigue, stamina, and durability. */
 export function minuteCapacityOf(input: {
   staminaRating: number;
   durability: number;
@@ -143,11 +101,6 @@ export function minuteCapacityOf(input: {
   );
 }
 
-/**
- * Per-game projected fatigue forward over a block (see module doc). Returns
- * the end-of-block fatigue, the within-block peak (the Heavy gate input),
- * and the end band for every player.
- */
 export function projectFatigueAfterBlock(
   players: readonly MinutePlanPlayerInput[],
   minutesByVersion: ReadonlyMap<string, number>,
@@ -208,7 +161,6 @@ export function projectFatigueAfterBlock(
   );
 }
 
-/** Allocates `total` integer minutes across weighted entries, clamped to 48. */
 function allocateGroup(
   entries: readonly { playerVersionId: string; weight: number }[],
   total: number,
@@ -278,7 +230,6 @@ function allocateGroup(
   return result;
 }
 
-/** Quality carried by a plan: Σ minutes × quality / 240. */
 export function planQualityOf(
   targetMinutes: readonly { playerVersionId: string; minutes: number }[],
   qualityByVersion: ReadonlyMap<string, number>,
@@ -292,7 +243,6 @@ export function planQualityOf(
   );
 }
 
-/** Bench relief: share of the plan's quality carried by the bench (0..1). */
 export function benchReliefOf(
   targetMinutes: readonly { playerVersionId: string; minutes: number }[],
   benchOrder: readonly string[],
@@ -313,7 +263,6 @@ export function benchReliefOf(
   return Math.max(0, Math.min(1, total <= 0 ? 0 : carried / total));
 }
 
-/** Risk-adjusted score in 0..1: quality, then strain, then relief. */
 export function riskScoreOf(input: {
   quality: number;
   maxStarterStrainBasisPoints: number;
@@ -326,28 +275,26 @@ export function riskScoreOf(input: {
   );
 }
 
-/** One evaluated minute plan with its compact facts. */
 export interface MinutePlanCandidate {
   strategy: SeasonMinutePolicyStrategy;
-  /** The full legal rotation (structure preserved, minutes + policy applied). */
+
   rotation: SeasonRotation;
-  /** Minute-weighted projected quality (0..1; projection- or ratings-derived). */
+
   quality: number;
-  /** Worst-case starter fatigue after the block (basis points). */
+
   maxStarterStrainBasisPoints: number;
-  /** Band of the worst starter strain. */
+
   strainBand: FatigueBand;
-  /** Bench relief share (0..1). */
+
   relief: number;
-  /** Fatigue band counts over the ten rostered players after the block. */
+
   fatigueBands: Record<FatigueBand, number>;
-  /** Risk-adjusted score (0..1). */
+
   riskScore: number;
-  /** True when any rostered player projects to the Heavy band. */
+
   heavyStrain: boolean;
 }
 
-/** Builds the rotation for a strategy with the allocated minutes. */
 function rotationOf(
   structure: MinutePlanStructure,
   targetMinutes: { playerVersionId: string; minutes: number }[],
@@ -365,7 +312,6 @@ function rotationOf(
   };
 }
 
-/** Builds and evaluates one envelope plan for the structure. */
 function buildPlan(input: {
   structure: MinutePlanStructure;
   players: ReadonlyMap<string, MinutePlanPlayerInput>;
@@ -428,7 +374,6 @@ function buildPlan(input: {
   };
 }
 
-/** The three strategy envelopes in canonical order. */
 export const MINUTE_POLICY_STRATEGIES: readonly SeasonMinutePolicyStrategy[] = [
   'starter-heavy',
   'balanced',
@@ -437,7 +382,7 @@ export const MINUTE_POLICY_STRATEGIES: readonly SeasonMinutePolicyStrategy[] = [
 
 export interface MinutePlanCandidates {
   plans: MinutePlanCandidate[];
-  /** The selected strategy (best risk-adjusted score with the Heavy gate). */
+
   recommended: SeasonMinutePolicyStrategy;
 }
 
@@ -454,7 +399,6 @@ function relativeQuality(plans: MinutePlanCandidate[]): Map<SeasonMinutePolicySt
   );
 }
 
-/** Builds and scores all three envelope plans for one structure. */
 export function buildMinutePlanCandidates(
   input: {
     structure: MinutePlanStructure;
@@ -462,11 +406,6 @@ export function buildMinutePlanCandidates(
     horizon: number;
   },
   options: {
-    /**
-     * Quality override per strategy (e.g. authoritative projected net
-     * ratings). Relative normalization and the risk score use these instead
-     * of the minute-weighted quality when provided.
-     */
     quality?: ReadonlyMap<SeasonMinutePolicyStrategy, number>;
   } = {},
 ): MinutePlanCandidates {

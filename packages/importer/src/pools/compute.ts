@@ -1,19 +1,3 @@
-/**
- * Franchise-era pool computation (spec/02, spec/12) - port of
- * scripts/import-nba/compute_pools.py.
- *
- * Pipeline:
- *   roster.json (strict ratings/tendencies/anchors/provenance) + stints.json
- *   (team-stint accounting) + season-stats.json (league totals) + lineage
- *   + eras -> eligible peak player-seasons per (franchise, era)
- *   -> compact v2 FranchiseEraPool JSON + availability matrix + manifest
- *
- * Ownership rules (spec/12): every source team-season resolves through the
- * authoritative lineage table to exactly one modern slot; the team-stint row
- * (40 games minimum) establishes eligibility; league-total rows inform
- * ratings but never eligibility. Incomplete players fail packaging instead
- * of silently receiving neutral values.
- */
 import { readdirSync, readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { basename, join } from 'node:path';
@@ -56,7 +40,6 @@ import { derivePlayerRecord } from '../ratings/v2.ts';
 import { getEra } from '../ratings/era.ts';
 import { loadRatingsModelArtifact } from '../ratings/artifact.ts';
 
-/** Re-exported so CLI consumers (e.g. bracket generation) share the one normalization. */
 export { POSITION_LABEL_MAP, buildPlayerPositions, normalizePositionLabels } from './positions.ts';
 import {
   LINEAGE_SEGMENTS,
@@ -65,12 +48,6 @@ import {
   resolveHistoricalIdentity,
 } from '../lineage.ts';
 
-/**
- * Python's json.loads accepts the bare NaN token that the fetch layer's
- * json.dumps writes (e.g. "college": NaN); JSON.parse does not. Pools never
- * consume the NaN fields, so the token is read as null - the same value the
- * Python num()/nullable() helpers would produce for it.
- */
 function readJsonLoose(path: string): unknown {
   const text = readFileSync(path, 'utf8');
   try {
@@ -83,7 +60,6 @@ function readJsonLoose(path: string): unknown {
   }
 }
 
-/** Python str(value): string/number/boolean as-is; anything else as ''. */
 function str(value: unknown): string {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
@@ -91,12 +67,10 @@ function str(value: unknown): string {
   return '';
 }
 
-/** Resolved per call so tests can point PUBLIC_DATA at a fixture dir. */
 export function poolDir(): string {
   return join(PUBLIC_DATA, 'pools');
 }
 
-/** Resolved per call so tests can point PUBLIC_DATA at a fixture dir. */
 export function manifestPath(): string {
   return join(PUBLIC_DATA, 'manifest.json');
 }
@@ -104,7 +78,7 @@ export function manifestPath(): string {
 export const SCHEMA_VERSION = POOL_SCHEMA_VERSION;
 export const MIN_TEAM_GAMES = 40;
 export const DATA_VERSION = 'm10-ratings-v3.6';
-/** Confidence policy v1: maximum allowed low-confidence share of required fields. */
+
 export const CONFIDENCE_POLICY_VERSION = 'policy-v1';
 export const MAX_LOW_CONFIDENCE_SHARE = 0.4;
 export {
@@ -113,12 +87,7 @@ export {
   SELECTION_SCORE_VERSION,
 } from '@hoop-rush/data-contracts';
 
-// Career position unions (cached; scans every packaged roster once).
 export function loadCareerPositionLabels(): Map<string, Set<string>> {
-  // The cache is derived from the packaged roster snapshot. Version the
-  // filename so older imports cannot silently erase positions for players
-  // added in a later snapshot. v5 also collects each season's
-  // secondaryPositions entries alongside the primary label.
   const cachePath = join(RAW_CACHE, 'career-position-labels-v5.json');
   if (fileExists(cachePath)) {
     const data = readJsonLoose(cachePath) as Record<string, unknown>;
@@ -193,7 +162,6 @@ export interface SeasonData {
   statsByPlayer: Record<string, Record<string, unknown>>;
 }
 
-/** Memoized per run so availability scans read each season's JSON once. */
 const seasonDataCache = new Map<string, SeasonData>();
 let fallbackRosterCache: Map<string, Record<string, unknown>> | null = null;
 let ratingsModelArtifactCache: ReturnType<typeof loadRatingsModelArtifact> | null = null;
@@ -272,15 +240,6 @@ export function loadSeasonData(season: string): SeasonData {
   return data;
 }
 
-/**
- * Recover historical roster metadata when a source roster snapshot is empty
- * for a team but its player-team stints are present. Some NBA API historical
- * roster endpoints omit the original Charlotte franchise while still
- * returning the game-log stints. Packaged pools already contain validated
- * names, positions, ratings, tendencies, anchors, and provenance for most of
- * those players, so use the best existing record as metadata only and keep
- * the candidate season's stint and stats as the source of truth.
- */
 function loadFallbackRosterPlayers(): Map<string, Record<string, unknown>> {
   if (fallbackRosterCache !== null) return fallbackRosterCache;
 
@@ -345,8 +304,6 @@ function sortedJsonFiles(dir: string): string[] {
 }
 
 export function defaultPoolWorkers(): number {
-  // Unit tests mock config paths; real worker threads would read the real
-  // raw-data dirs, so the parallel default stays off under vitest.
   if (process.env.NODE_ENV === 'test') return 1;
   return Math.min(7, availableParallelism());
 }
@@ -359,17 +316,11 @@ export interface PoolWorkerData {
   targets: Array<[string, string]>;
   manifest: Manifest;
   bbrefIds: Record<string, string>;
-  /** Structured-clone-safe form of Map<string, Set<string>>. */
+
   careerLabels: Array<[string, string[]]> | null;
   withAssets: boolean;
 }
 
-/**
- * Splits targets into at most `workers` chunks so each chunk's season data is
- * disjoint: targets are grouped by era (one era = one season set), and the
- * largest groups are split deterministically in half until the chunk count is
- * reached. Output order is deterministic regardless of worker scheduling.
- */
 export function partitionPoolTargets(
   targets: ReadonlyArray<[string, string]>,
   workers: number,
@@ -448,12 +399,10 @@ function runPoolChunk(
   });
 }
 
-/** Python num(): float(value) with NaN/TypeError/ValueError -> default. */
 function num(row: Record<string, unknown>, key: string, fallback = 0): number {
   return safeFloat(row[key], fallback);
 }
 
-/** Python nullable(): value is None -> None; NaN/bad value -> None. */
 function nullableValue(row: Record<string, unknown>, key: string): number | null {
   const value = row[key];
   if (value === null || value === undefined) {
@@ -499,7 +448,6 @@ export interface PoolStats {
   efgPct: number | null;
 }
 
-/** Null-preserving stats: genuinely absent historical fields stay null. */
 export function buildStats(seasonStats: Record<string, unknown>): PoolStats {
   const truncNullable = (key: string): number | null => {
     const value = nullableValue(seasonStats, key);
@@ -548,7 +496,6 @@ const ANCHOR_UNIT_FIELDS = [
   'freeThrowAttemptRate',
 ] as const;
 
-/** Clamp packaged anchor rates to the 0..1 contract when stint totals are inconsistent. */
 export function sanitizeAnchors(anchors: Record<string, unknown>): Record<string, unknown> {
   const out = { ...anchors };
   for (const field of ANCHOR_UNIT_FIELDS) {
@@ -566,11 +513,6 @@ export interface SummaryRatingsRaw {
   defenseRating?: unknown;
 }
 
-/**
- * Pre-percentile raw overall score for selection scoring: the rating
- * profile's rawOverallScore when present, else the canonical curve overall
- * (should not happen once ratings v3.5+ packaged every candidate).
- */
 export function rawOverallScoreFor(
   player: Record<string, unknown>,
   summary: SummaryRatingsRaw | undefined,
@@ -585,15 +527,10 @@ export function rawOverallScoreFor(
   if (typeof canonical === 'number' && Number.isFinite(canonical)) {
     return canonical;
   }
-  // Fallback: the canonical curve value, never a percentile-shifted overall.
+
   return safeFloat(summary?.overallRating);
 }
 
-/**
- * Versioned selection-score blend plus modest season-availability adjustment.
- * The raw overall is the pre-percentile rawOverallScore from the rating
- * profile so peak selection never depends on cohort-normalized values.
- */
 export function selectionScore(
   rawOverallScore: number,
   offenseRating: number,
@@ -605,10 +542,7 @@ export function selectionScore(
   const usage = Math.min(Math.max(usageRate || 0, 0), 40.0);
   const mpg = Math.min(teamMinutes / Math.max(1, teamGames), 48.0);
   const availability = 0.96 + 0.04 * Math.min(Math.max(teamGames, 0) / 82, 1);
-  // Overall is the production-aware total-contribution estimate. Give it
-  // more weight than either component so pass-first and pre-three-point
-  // creators are not buried, while retaining offense/defense as balance
-  // signals for season selection.
+
   const raw =
     0.6 * rawOverallScore + 0.25 * offenseRating + 0.15 * defenseRating + 0.05 * usage + 0.02 * mpg;
   return Math.round(raw * availability * 1000) / 1000;
@@ -621,7 +555,6 @@ export interface Candidate {
   stats: Record<string, unknown>;
 }
 
-/** Peak tie-break order: selectionScore, team minutes, team games, earlier season. */
 export function candidateKey(candidate: Candidate): readonly number[] {
   const stint = candidate.stint;
   const summary = candidate.player.summaryRatings as SummaryRatingsRaw | undefined;
@@ -643,7 +576,6 @@ export function candidateKey(candidate: Candidate): readonly number[] {
   ];
 }
 
-/** Python max(..., key=): first maximal element wins on ties. */
 function maxBy<T>(items: readonly T[], key: (item: T) => readonly number[]): T {
   const first = items[0];
   if (first === undefined) {
@@ -674,13 +606,6 @@ export function compareSelectionKeys(a: readonly number[], b: readonly number[])
   return 0;
 }
 
-// Global cohort Overall normalization (COHORT_NORMALIZATION_VERSION).
-/**
- * Minimal row shape the cohort pass needs; every PoolPlayer satisfies it.
- * Only overallRating (summary) and the optional ratingProfile percentile
- * fields are written — offense/defense/detailedRatings/tendencies/anchors/
- * provenance never change.
- */
 export interface PoolOverallRow {
   playerId: string;
   franchiseId: string;
@@ -695,28 +620,23 @@ export interface PoolOverallRow {
 }
 
 export interface PoolOverallDiagnostics {
-  /** Total rows ranked and normalized. */
   totalRowCount: number;
-  /** Rows without rawOverallScore; ranked by canonical overall, profile fields untouched. */
+
   rowsWithoutRawOverall: number;
 }
 
-/**
- * Packaged Overall for a cumulative rank fraction p (0 = best, 1 = worst).
- * Band boundaries match the target shares 0.5/4.5/14/61/20 percent.
- */
 export function overallBandForPercentile(p: number): number {
   let value: number;
   if (p < 0.005) {
-    value = 99 - (p / 0.005) * 4; // band 95-99
+    value = 99 - (p / 0.005) * 4;
   } else if (p < 0.05) {
-    value = 94 - ((p - 0.005) / 0.045) * 4; // band 90-94
+    value = 94 - ((p - 0.005) / 0.045) * 4;
   } else if (p < 0.19) {
-    value = 89 - ((p - 0.05) / 0.14) * 4; // band 85-89
+    value = 89 - ((p - 0.05) / 0.14) * 4;
   } else if (p < 0.8) {
-    value = 84 - ((p - 0.19) / 0.61) * 12; // band 72-84
+    value = 84 - ((p - 0.19) / 0.61) * 12;
   } else {
-    value = 71 - ((p - 0.8) / 0.2) * 31; // band 40-71
+    value = 71 - ((p - 0.8) / 0.2) * 31;
   }
   return clamp(Math.round(value), 40, 99);
 }
@@ -726,7 +646,6 @@ function hasRawOverallScore(row: PoolOverallRow): boolean {
   return typeof raw === 'number' && Number.isFinite(raw);
 }
 
-/** Ranking proxy: rawOverallScore, else canonicalOverall, else the summary overall. */
 function rankingProxy(row: PoolOverallRow): number {
   if (hasRawOverallScore(row)) {
     return row.ratingProfile?.rawOverallScore as number;
@@ -738,14 +657,6 @@ function rankingProxy(row: PoolOverallRow): number {
   return row.summaryRatings.overallRating;
 }
 
-/**
- * Post-pass over the complete set of packaged rows: ranks every row globally
- * by raw overall score (descending; ties break ascending by playerId, then
- * seasonKey, then franchiseId), replaces summaryRatings.overallRating with
- * the percentile band value, and stamps the profile percentile fields with
- * COHORT_NORMALIZATION_VERSION. Rows without rawOverallScore are ranked by
- * canonicalOverall and their profile fields are left untouched.
- */
 export function normalizePoolOveralls(rows: PoolOverallRow[]): PoolOverallDiagnostics {
   const totalRowCount = rows.length;
   let rowsWithoutRawOverall = 0;
@@ -774,7 +685,6 @@ export function normalizePoolOveralls(rows: PoolOverallRow[]): PoolOverallDiagno
 }
 
 export function loadBbrefIds(): Record<string, string> {
-  /* External NBA id -> Basketball-Reference id (fetch_bbref_ids.py output). */
   const path = join(RAW_CACHE, 'bbref_ids.json');
   if (!fileExists(path)) {
     console.log('  [WARN] bbref_ids.json missing; run fetch_bbref_ids or run_all (no altIds)');
@@ -783,11 +693,6 @@ export function loadBbrefIds(): Record<string, string> {
   return readJsonLoose(path) as Record<string, string>;
 }
 
-/**
- * Asset altIds from the previously packaged pool (playerExternalId -> altIds).
- * Only the annotate-markers.mjs markers (nbaHeadshotAvailable, photoUrl) are
- * backfilled; a missing or unreadable pool file yields an empty map.
- */
 export function loadExistingAssetAltIds(
   franchiseId: string,
   eraId: string,
@@ -854,7 +759,7 @@ export interface PoolPlayer {
     lineageRuleVersion: string;
   };
   summaryRatings: { overallRating: number; offenseRating: number; defenseRating: number };
-  /** Ratings v3 explanation and calibration profile (raw pre-percentile overall). */
+
   ratingProfile?: RatingProfile;
   detailedRatings: Record<string, number>;
   tendencies: Record<string, number>;
@@ -898,7 +803,6 @@ function failure(
   };
 }
 
-/** Coverage band from the pool's packaged season range (spec/12). */
 export function coverageBandForSeasons(
   seasons: readonly string[],
 ): CoverageSummary['coverageBand'] {
@@ -916,17 +820,10 @@ export function legalLineupCovered(players: readonly PoolPlayer[]): boolean {
   const forwards = players.filter((p) => slotGroupsOf(p).includes('F'));
   const centers = players.filter((p) => slotGroupsOf(p).includes('C'));
   if (guards.length < 2 || forwards.length < 2 || centers.length < 1) return false;
-  // Any guard can take a G slot, any forward an F slot; C must be a center.
+
   return true;
 }
 
-/**
- * Builds the coverage summary: observed/derived/estimated/reconstructed
- * families, missing categories, and the low-confidence share under the
- * versioned policy (spec/12). Reconstructed families (three-point on
- * pre-1979 / missing-record seasons) are accounted separately from derived
- * and estimated values.
- */
 export function buildCoverageSummary(
   players: readonly PoolPlayer[],
   seasons: readonly string[],
@@ -957,7 +854,7 @@ export function buildCoverageSummary(
       missingCategories.add('three-point');
     }
   }
-  // Count confidence on required engine fields only.
+
   for (const field of requiredFields) {
     const provenance = players[0]?.provenance[field];
     if (provenance !== undefined && provenance.confidence === 'low') lowConfidence += 1;
@@ -1053,7 +950,6 @@ export function computePool(
     return failure('identity-failed', `unknown eraId ${eraId}`);
   }
 
-  // No-franchise-history: the slot has no NBA lineage inside the era range.
   const eraHasLineage = LINEAGE_SEGMENTS.some(
     (segment) =>
       segment.modernFranchiseId === franchiseId &&
@@ -1103,9 +999,7 @@ export function computePool(
         continue;
       }
       const pid = str(stint.playerExternalId);
-      // The fallback roster map (all packaged pools, memoized) is only
-      // loaded on a source miss — targets with complete rosters never pay
-      // the ~135 MB pooled scan.
+
       const sourcePlayer = rosterByExtId[pid] ?? loadFallbackRosterPlayers().get(pid);
       if (sourcePlayer === undefined) {
         continue;
@@ -1139,9 +1033,6 @@ export function computePool(
     }
   }
 
-  // The cache exists to memoize season JSON within one pool scan; every
-  // season is reloadable from disk, so drop it before the next target unless
-  // the caller (a worker owning a single era's targets) asks to keep it.
   if (!keepSeasonCache) {
     seasonDataCache.clear();
   }
@@ -1201,7 +1092,7 @@ export function computePool(
         detailedRatings[key] = Math.trunc(value);
       }
     }
-    // Strict engine contracts: incomplete players fail packaging.
+
     const requiredTendencyKeys = [
       'usageRate',
       'passRate',
@@ -1257,10 +1148,7 @@ export function computePool(
     if (Object.hasOwn(bbrefIds, pid)) {
       altIds.bbref = bbrefIds[pid];
     }
-    // Preserve the asset markers scripts/annotate-markers.mjs wrote into the
-    // previous build; regenerating a pool must never wipe
-    // nbaHeadshotAvailable/photoUrl (the UI then regresses to CDN
-    // silhouettes). bbref stays cache-authoritative.
+
     const previous = existingAssetAltIds.get(pid);
     if (previous !== undefined) {
       if (typeof previous.nbaHeadshotAvailable === 'boolean') {
@@ -1366,9 +1254,6 @@ export function computePool(
   }
 
   if (withAssets) {
-    // Headshot/photo annotation is a separate script
-    // (scripts/annotate-markers.mjs); network asset resolution is
-    // intentionally not ported into the pool build.
     console.log(
       '  [WARN] headshot/photo asset annotation stays in scripts/annotate-markers.mjs; skipping',
     );
@@ -1385,7 +1270,6 @@ export function computePool(
   };
 }
 
-/** Log parsePool acceptance; never drop players the schema would reject. */
 export function logPoolValidation(pool: Pool): void {
   try {
     parsePool(pool);
@@ -1400,8 +1284,7 @@ export function logPoolValidation(pool: Pool): void {
 
 export function writePool(pool: Pool): string {
   const path = join(poolDir(), `${pool.franchiseId}-${pool.eraId}.json`);
-  // Synced/filtered filesystems intermittently fail writes; retry with
-  // backoff, then hash the committed bytes.
+
   writeJsonRetry(path, pool);
   let digest = '';
   for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -1432,7 +1315,6 @@ export function parsePoolTargets(raw: readonly string[]): Array<[string, string]
   return targets;
 }
 
-/** The --all logic: modern slots x eras with lineage overlap and packaged seasons. */
 export function allPoolTargets(manifest: Manifest = loadManifest()): Array<[string, string]> {
   const packagedSeasons = new Set(listSeasonKeys());
   const targets: Array<[string, string]> = [];
@@ -1458,13 +1340,11 @@ export function allPoolTargets(manifest: Manifest = loadManifest()): Array<[stri
   return targets;
 }
 
-/** One target's build outcome: the manifest entry when available, plus the coverage row. */
 export interface TargetBuildResult {
   entry: { franchiseId: string; eraId: string; url: string; contentHash: string } | null;
   coverage: CoverageReportEntry;
 }
 
-/** Shared by the sequential path and worker threads; never duplicates rules. */
 export function buildPoolForTarget(
   franchiseId: string,
   eraId: string,
@@ -1518,14 +1398,6 @@ export function buildPoolForTarget(
   };
 }
 
-/**
- * Cohort percentile post-pass (COHORT_NORMALIZATION_VERSION): every packaged
- * franchise-era row is ranked globally by raw overall and its summary
- * overallRating replaced with the percentile band value. Pools are written
- * by workers during the build, so the pass re-reads every pool file and
- * rewrites it before the manifest refresh — content hashes therefore always
- * describe the normalized bytes.
- */
 function applyOverallCohortNormalization(): Array<{
   franchiseId: string;
   eraId: string;
@@ -1587,8 +1459,6 @@ export async function run(
     results = [];
     for (const [franchiseId, eraId] of targets) {
       results.push(
-        // Keep the season JSON cache warm across the whole sequential pass
-        // (each season parses once, not once per target).
         buildPoolForTarget(franchiseId, eraId, manifest, bbrefIds, withAssets, careerLabels, true),
       );
     }
@@ -1616,7 +1486,6 @@ export async function run(
   refreshPlayersIndexInManifest();
 }
 
-/** One persisted coverage-audit row (spec/12 first full audit + CLI data coverage). */
 export interface CoverageReportEntry {
   franchiseId: string;
   eraId: string;
@@ -1632,13 +1501,11 @@ export function coverageReportPath(): string {
   return join(PUBLIC_DATA, 'coverage-report.json');
 }
 
-/** Loads the persisted coverage audit; empty when no build has written one. */
 export function loadCoverageReport(): CoverageReportEntry[] {
   if (!fileExists(coverageReportPath())) return [];
   return readJsonLoose(coverageReportPath()) as CoverageReportEntry[];
 }
 
-/** Writes the coverage audit atomically alongside the manifest (merge, never replace). */
 export function recordCoverageReport(entries: CoverageReportEntry[]): void {
   const existing = new Map(
     loadCoverageReport().map((entry) => [`${entry.franchiseId}/${entry.eraId}`, entry]),
@@ -1655,7 +1522,6 @@ export function recordCoverageReport(entries: CoverageReportEntry[]): void {
   );
 }
 
-/** Cheap truthful classification for combos the last build did not attempt. */
 export function classifyUnattempted(
   franchiseId: string,
   eraId: string,
@@ -1709,9 +1575,6 @@ export function updateManifest(
   );
 }
 
-// Shared helpers.
-
-/** Season dirs with actual packaged data (roster or stints present). */
 function listSeasonKeys(): string[] {
   return readdirSync(NBA_ROOT, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -1724,7 +1587,6 @@ function listSeasonKeys(): string[] {
     .sort();
 }
 
-/** Python list repr for the unknown-label warning (['XYZ', ...]). */
 function formatList(values: readonly string[]): string {
   return `[${values.map((value) => `'${value}'`).join(', ')}]`;
 }

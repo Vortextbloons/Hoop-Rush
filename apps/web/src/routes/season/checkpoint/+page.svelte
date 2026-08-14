@@ -20,30 +20,15 @@
   import { getSeasonBlockRunner, getSeasonRunRepository } from '$lib/season/season-repo';
   import { boxScoreFromSummary, deriveBlockRecap, ordinal } from '$lib/season/season-presentation';
 
-  /**
-   * Season Run checkpoint recap (spec/2.0/02 recap, spec/2.0/11 block recap,
-   * M2.3): record and standings movement, notable performances, streaks,
-   * version-versus-version spotlights, next opponents, and box scores for the
-   * human-team games of the last accepted block. Every claim derives from
-   * saved summaries, standings, rosters, and the committed schedule — the
-   * engine's recap semantics mirrored at the UI boundary. M2.3 does NOT render
-   * injury, trade, Influence, stamina, or chemistry claims; those systems ship
-   * in later milestones.
-   */
-
   let manifest = $state<HoopRushManifest | null>(null);
   let catalog = $state<SeasonDraftCatalog | null>(null);
   let loadError: string | null = $state(null);
   let hub = $state.raw<SeasonHubState | null>(null);
   let blockSummaries = $state<SeasonGameSummary[]>([]);
   let retainedGameIds = $state<string[]>([]);
-  /** Reactive mirror of the hub's plain snapshot field. */
+
   let snapshot = $state<SeasonRunSnapshot | null>(null);
 
-  /**
-   * Box scores render only after their <details> first opens; the BoxScore
-   * chunk itself is lazy-loaded on first open.
-   */
   let openedBoxScores = $state.raw(new Set<string>());
   function onBoxScoreToggle(event: Event, gameId: string) {
     if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
@@ -82,9 +67,7 @@
             snapshot = hub!.snapshot;
           });
           await hub.refresh();
-          // Load the last accepted block's summaries + retained detail ids
-          // directly after the snapshot (single async continuation; the
-          // work is idempotent, so a re-run simply re-assigns).
+
           const s = hub.snapshot;
           const last = s?.acceptedBlocks[s.acceptedBlocks.length - 1];
           if (s && last) {

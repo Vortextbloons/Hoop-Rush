@@ -6,18 +6,6 @@ import { ratingProfileSchema } from './ratings-model.ts';
 import { playerVersionIdSchema } from './season-identity.ts';
 import { THREE_POINT_RECONSTRUCTION_VERSION } from './versions.ts';
 
-/**
- * M2 possession-engine contracts. The engine consumes only these explicit
- * versions of players and teams — never summary Overall ratings and never the
- * open-ended `detailedRatings`/`tendencies` records of the pool artifacts.
- * Player-season records are adapted to `SimulationPlayer` at the application
- * boundary; the engine never reads pool JSON directly.
- *
- * Mirror matchups stay correct because every simulated side is a distinct
- * `SimulationTeam` instance even when the same playerId appears on both teams.
- */
-
-/** Frozen rating keys required on every packaged player (strict engine contract). */
 export const REQUIRED_RATING_KEYS = [
   'insideScoring',
   'closeShot',
@@ -39,7 +27,6 @@ export const REQUIRED_RATING_KEYS = [
   'vertical',
 ] as const;
 
-/** The frozen set of possession-relevant ratings the engine may consume (0-100). */
 export const simulationRatingsSchema = z
   .object({
     insideScoring: z.number().int().min(0).max(100),
@@ -64,7 +51,6 @@ export const simulationRatingsSchema = z
   .strict();
 export type SimulationRatings = z.infer<typeof simulationRatingsSchema>;
 
-/** The frozen set of possession-relevant tendencies the engine may consume. */
 export const simulationTendenciesSchema = z
   .object({
     usageRate: z.number().min(0).max(100),
@@ -94,12 +80,6 @@ export const simulationTendenciesSchema = z
   .strict();
 export type SimulationTendencies = z.infer<typeof simulationTendenciesSchema>;
 
-/**
- * Observed player-season anchors used by the possession engine. These are
- * deliberately separate from ratings: ratings describe transferable ability,
- * while anchors preserve what the player actually did in the selected season.
- * Low-sample values are shrunk during import before they reach this boundary.
- */
 export const simulationAnchorsSchema = z.object({
   gamesPlayed: z.number().int().nonnegative(),
   minutesPerGame: z.number().min(0).max(60),
@@ -114,12 +94,7 @@ export const simulationAnchorsSchema = z.object({
   fieldGoalPct: z.number().min(0).max(1),
   threePointPct: z.number().min(0).max(1).nullable(),
   freeThrowPct: z.number().min(0).max(1),
-  /**
-   * Three-point attempt share of field-goal attempts. `null` means the
-   * record is unavailable (pre-1979 not-applicable or genuinely missing
-   * evidence) and must never be read as an observed zero; numeric `0`
-   * is a validated observed zero-attempt season (spec/12).
-   */
+
   threePointAttemptRate: z.number().min(0).max(1).nullable(),
   freeThrowAttemptRate: z.number().min(0).max(1),
   threePointPctShrunk: z.number().min(0).max(1).nullable().optional(),
@@ -130,39 +105,30 @@ export const simulationAnchorsSchema = z.object({
 });
 export type SimulationAnchors = z.infer<typeof simulationAnchorsSchema>;
 
-/**
- * Conservative reconstructed three-point profile (spec/12). Applied only to
- * pre-1979 not-applicable seasons and genuinely missing three-point records;
- * observed seasons and validated observed zero-attempt seasons never carry
- * one. The engine reproduces the calibrated uncertainty and floors from this
- * profile alone — it never imports model code or the fit artifact.
- */
 export const reconstructedThreePointProfileSchema = z.object({
-  /** The offline model artifact that produced this profile. */
   modelVersion: z.literal(THREE_POINT_RECONSTRUCTION_VERSION),
-  /** Posterior 25th-percentile three-point percentage (conservative accuracy). */
+
   accuracyConservative: z.number().min(0).max(1),
-  /** Posterior mean three-point percentage (informational). */
+
   accuracyMean: z.number().min(0).max(1),
-  /** Laplace posterior std-dev of the accuracy estimate. */
+
   accuracyStdDev: z.number().min(0).max(0.5),
-  /** Posterior 20th-percentile 3PA/FGA (conservative attempt tendency). */
+
   attemptRateConservative: z.number().min(0).max(1),
-  /** Posterior mean 3PA/FGA (informational). */
+
   attemptRateMean: z.number().min(0).max(1),
-  /** Laplace posterior std-dev of the attempt-rate estimate. */
+
   attemptRateStdDev: z.number().min(0).max(0.5),
-  /** Confidence band under the artifact's thresholds. */
+
   confidence: z.literal('high').or(z.literal('medium')).or(z.literal('low')),
-  /** Reconstructed make-probability floor (5th percentile of early-era
-   * conservative estimates; below the established .32/.34 zone floors). */
+
   floor: z.number().min(0).max(1),
-  /** Per-zone make-probability floors for reconstructed three-point shots. */
+
   zoneFloors: z.object({
     cornerThree: z.number().min(0).max(1),
     aboveBreakThree: z.number().min(0).max(1),
   }),
-  /** Evidence behind the prediction (missing features and source fields). */
+
   evidence: z.object({
     missingFeatures: z.number().int().nonnegative(),
     sourceFields: z.array(z.string().min(1).max(64)),
@@ -170,36 +136,27 @@ export const reconstructedThreePointProfileSchema = z.object({
 });
 export type ReconstructedThreePointProfile = z.infer<typeof reconstructedThreePointProfileSchema>;
 
-/** One player exactly as the possession engine sees them. */
 export const simulationPlayerSchema = z.object({
   playerId: playerIdSchema,
-  /**
-   * Season Run identity (spec/2.0/04 M2.2). When present it is the
-   * authoritative key for slot lookups and accounting, so two historical
-   * versions of one person (same playerId) can share a side without
-   * collisions. Absent on Classic/sandbox players, where playerId remains
-   * the key and behavior is byte-identical.
-   */
+
   playerVersionId: playerVersionIdSchema.optional(),
   displayName: z.string().min(1).max(96),
-  /** Career-wide detailed playable union; slot-group legality was validated upstream. */
+
   positions: positionUnionSchema,
   heightInches: z.number().int().min(60).max(96).nullable(),
   weightLbs: z.number().int().min(120).max(400).nullable(),
   ratings: simulationRatingsSchema,
   tendencies: simulationTendenciesSchema,
-  /** Optional for authored opponents and legacy fixtures without source stats. */
+
   anchors: simulationAnchorsSchema.optional(),
-  /** Conservative reconstructed three-point profile (pre-1979/missing records only). */
+
   reconstructedThreePoint: reconstructedThreePointProfileSchema.optional(),
-  /** Canonical OVR is explanatory metadata; possession resolution ignores it. */
+
   overall: z.number().int().min(0).max(100).optional(),
   ratingProfile: ratingProfileSchema.optional(),
 });
 export type SimulationPlayer = z.infer<typeof simulationPlayerSchema>;
 
-/** One fixed five-player side. Team side identity is a runtime boundary: two
- * sides may legally share the same playerId (mirror matchups). */
 export const simulationTeamSchema = z.object({
   teamId: z.string().min(1).max(64),
   displayName: z.string().min(1).max(96),
@@ -207,14 +164,10 @@ export const simulationTeamSchema = z.object({
 });
 export type SimulationTeam = z.infer<typeof simulationTeamSchema>;
 
-/** Everything needed to reproduce one game: seed, game number, versions, era
- * profile, and both fixed lineups. Engine version is injected through
- * EngineContext. The game number is explicit so challenge results are
- * numbered by the shared schedule (spec/01) rather than inferred. */
 export const gameSimulationInputSchema = z.object({
   schemaVersion: z.literal(2),
   seed: seedSchema,
-  /** 1-based game number inside the shared 82-game challenge schedule. */
+
   gameNumber: z.number().int().min(1).max(82),
   dataVersion: z.string().min(1).max(64),
   profile: eraSimulationProfileSchema,

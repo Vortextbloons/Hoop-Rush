@@ -14,8 +14,6 @@
 
   const homeHref = resolve('/');
 
-  // Route IDs (not resolved paths): BottomNav resolves them at render time,
-  // which keeps relative-base static builds correct.
   const navItems: NavItem[] = [
     { id: 'home', label: 'Home', href: '/', icon: Home },
     { id: 'roster', label: 'Roster', href: '/roster', icon: Users },

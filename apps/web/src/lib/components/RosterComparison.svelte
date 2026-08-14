@@ -57,7 +57,6 @@
     return selected.some((entry) => entry.playerId === player.playerId);
   }
 
-  /** Historical label for a row's franchise/era context, modern fallback. */
   function teamLabelFor(player: RosterDetailRow): string {
     const identity = resolveEraTeamIdentity(manifest, player.franchiseId, player.eraId);
     return identity.abbreviationLabel ?? franchiseAbbreviation(player.franchiseId);

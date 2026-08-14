@@ -30,17 +30,9 @@ import type { SeasonBlockRunner, SeasonRunnerEvent } from './season-block-runner
 import { buildSubmitBlockEnvelope } from './season-block-submit';
 import type { SeasonRunShellData } from './season-shell-context';
 
-/**
- * M2.6.5 free-agency hub tests: the three typed commands dispatch through
- * the REAL engine handler (declaration/skip/resolution), the run state chain
- * (revision/digest) gates stale commands after a reload, and the block-submit
- * gate surfaces `free-agency-unresolved` with the free-agency route CTA.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const HUMAN = 'lakers';
 
-/** Playable positions by roster slot: a legal G,G,F,F,C five in slots 0-4. */
 const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -56,7 +48,6 @@ const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
 
 const BAND_CYCLE: SeasonFreeAgencyBand[] = ['featured', 'role', 'role', 'development', 'emergency'];
 
-/** A roster-covering catalog plus 30 unrepresented extra candidates. */
 function fixtureCatalog(run: SeasonRun): SeasonDraftCatalog {
   const candidates: SeasonDraftCandidate[] = [];
   for (const roster of run.rosters) {
@@ -126,8 +117,6 @@ function catalogCandidate(
   };
 }
 
-/** The packaged free-agency index derived from the fixture catalog (mirror
- * of the engine's own fixture index: one entry per catalog candidate). */
 function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
   const candidates = catalog.candidates
     .filter((candidate) => candidate.playerId.startsWith('p-extra-'))
@@ -176,8 +165,6 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
   };
 }
 
-/** The frozen roster-targets policy (minimal fixture mirror of the packaged
- * artifact the web loads for the AI free-agency ceilings). */
 function fixtureTargets(): SeasonRosterTargets {
   return {
     schemaVersion: 2,
@@ -259,7 +246,6 @@ function fixtureTargets(): SeasonRosterTargets {
   };
 }
 
-/** Schema-valid zero effects state (300 loads, 1,350 pairs; schema 2). */
 function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
   return {
     schemaVersion: 2,
@@ -284,7 +270,6 @@ interface HubFixture {
   index: SeasonFreeAgencyIndex;
 }
 
-/** A fixture run with free-agency window 0 open (AI declarations recorded). */
 function hubFixture(): HubFixture {
   const league = buildSeasonLeague({}, { humanFranchiseId: HUMAN });
   const schedule = generateSeasonSchedule({ league, seed: SEED });
@@ -323,7 +308,6 @@ function hubFixture(): HubFixture {
   return { run, effects, catalog, index };
 }
 
-/** In-memory repository fake with the persistence commit guards. */
 function hubRepo(initial: SeasonRunSnapshot | null) {
   let active = initial;
   const initialRun = initial?.run ?? null;
@@ -359,9 +343,6 @@ function hubRepo(initial: SeasonRunSnapshot | null) {
     discardPendingBlock: vi.fn(() => Promise.resolve()),
     applySeasonRunCommand: vi.fn<SeasonRunRepository['applySeasonRunCommand']>(
       (input: SeasonRunCommandApplication) => {
-        // Mirror of the persistence stale guard (SeasonRunCommandStaleStateError):
-        // the stored run is authoritative, and a command asserting pre-guard
-        // facts is rejected without writing anything.
         const stored = active?.run ?? initialRun;
         if (stored === null) {
           return Promise.reject(new Error('no stored run to apply against'));
@@ -470,10 +451,9 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
     const declared = openWindowOf(hub.snapshot?.run ?? fixture.run);
     expect(declared?.declarations[HUMAN]?.targets).toHaveLength(2);
     expect(declared?.declarations[HUMAN]?.targets[0]?.playerVersionId).toBe(first.playerVersionId);
-    // Accepted commands bump the state chain by exactly one.
+
     expect(hub.snapshot?.run.stateRevision).toBe(2);
 
-    // A second declaration is rejected without double-apply.
     await hub.declareFreeAgentInterest({
       windowIndex: 0,
       targets: [
@@ -484,7 +464,6 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
     const applyCalls = repo.applySeasonRunCommand.mock.calls.length;
     expect(hub.snapshot?.run.stateRevision).toBe(2);
 
-    // Resolution dispatches through the engine with the packaged assets.
     await hub.resolveFreeAgentMarket({ windowIndex: 0 });
     expect(hub.commandError).toBeNull();
     const resolved = openWindowOf(hub.snapshot?.run ?? fixture.run);
@@ -544,7 +523,7 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
       acceptedBlocks: [],
       effects: fixture.effects,
     });
-    // Tab A declares against the open window.
+
     const hubA = new SeasonHubState(repo, new FakeRunner());
     hubA.catalog = fixture.catalog;
     hubA.freeAgencyIndex = fixture.index;
@@ -562,7 +541,6 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
     expect(hubA.commandError).toBeNull();
     hubA.destroy();
 
-    // Tab B reloads: the declaration replays from the persisted snapshot.
     const hubB = new SeasonHubState(repo, new FakeRunner());
     hubB.catalog = fixture.catalog;
     hubB.freeAgencyIndex = fixture.index;
@@ -588,7 +566,7 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
     hubA.freeAgencyIndex = fixture.index;
     hubA.freeAgencyTargets = fixtureTargets();
     await hubA.refresh();
-    // Tab B accepts the declaration first (the run moves to revision 2).
+
     const hubB = new SeasonHubState(repo, new FakeRunner());
     hubB.catalog = fixture.catalog;
     hubB.freeAgencyIndex = fixture.index;
@@ -606,10 +584,6 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
     expect(hubB.commandError).toBeNull();
     hubB.destroy();
 
-    // Hub A still holds the pre-declaration snapshot (revision 1). The
-    // engine validates its command against that stale view and accepts, but
-    // the persistence guard (SeasonRunCommandStaleStateError) rejects the
-    // write against the authoritative stored run — nothing double-applies.
     const applyCalls = repo.applySeasonRunCommand.mock.calls.length;
     await hubA.declareFreeAgentInterest({
       windowIndex: 0,
@@ -620,14 +594,12 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
     expect(hubA.commandError).not.toBeNull();
     expect(hubA.commandError?.message).toContain('stale');
     expect(repo.applySeasonRunCommand.mock.calls.length).toBe(applyCalls + 1);
-    // The stored run is still the revision-2 state Tab B committed (the
-    // stale write was rejected before touching the repository).
+
     const applied = repo.applySeasonRunCommand.mock.calls[applyCalls]?.[0] as {
       run: SeasonRun;
     };
     expect(applied.run.stateRevision).toBe(2);
-    // The engine's own gate rejects a stale command with the typed code when
-    // the handler sees the authoritative run.
+
     const { handleSeasonRunCommand } = await import('@hoop-rush/engine');
     const authoritative = applied.run;
     const staleOutput = handleSeasonRunCommand(
@@ -729,7 +701,7 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
       } as never);
       expect(message.length).toBeGreaterThan(10);
     }
-    // The unresolved copy names the open window and the free-agency route.
+
     const unresolved = describeCommandRejection('declare-free-agent-interest', {
       code: 'free-agency-unresolved',
       windowIndex: 0,
@@ -741,7 +713,6 @@ describe('SeasonHubState free-agency commands (M2.6.5)', () => {
 });
 
 describe('block-submit gating (free-agency-unresolved)', () => {
-  /** Block 3 is a window-free block; the gate must fire before any asset load. */
   function gatingRun(fixture: HubFixture): SeasonRun {
     const base = fixture.run;
     return {
@@ -801,7 +772,7 @@ describe('block-submit gating (free-agency-unresolved)', () => {
       expect(result.envelope.command.blockIndex).toBe(3);
       return;
     }
-    // The gate opened; any remaining failure is a later check (assets etc.).
+
     expect(result.error.code).not.toBe('free-agency-unresolved');
   });
 });

@@ -58,13 +58,6 @@ vi.mock('$lib/season/season-assets', async (importOriginal) => {
   };
 });
 
-/**
- * SeasonHubState.quitRun unit tests: quitting stops an in-flight block
- * before the atomic clear, reloads the empty repository state afterwards,
- * and refuses to run when there is nothing to quit. The runner and the
- * repository are fakes; the hub contract itself is under test.
- */
-
 class FakeRunner implements SeasonBlockRunner {
   ackCancel = true;
   terminateCalls = 0;
@@ -98,7 +91,6 @@ class FakeRunner implements SeasonBlockRunner {
     this.terminateCalls += 1;
   }
 
-  /** Performance pass: recorded for assertions; no worker in the fake. */
   prewarmCalls = 0;
   prewarm(): void {
     this.prewarmCalls += 1;
@@ -150,7 +142,7 @@ function repoWith(initial: SeasonRunSnapshot | null) {
     applySeasonRunCommand: vi.fn(() => Promise.resolve()),
     loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),
     upsertSeasonRunPlayerSlice: vi.fn(() => Promise.resolve()),
-    // M2.6 postseason repository surface (unused by the M2.5 quit tests).
+
     commitPostseasonAdvancement: vi.fn(() => Promise.resolve()),
     loadPostseasonSummaries: vi.fn(() => Promise.resolve([])),
     loadPostseasonSummary: vi.fn(() => Promise.resolve(null)),
@@ -276,10 +268,6 @@ describe('SeasonHubState between-block commands', () => {
   });
 
   it('keeps the post-command snapshot in the session cache (stale snapshot cache regression)', async () => {
-    // A real engine-valid run: after the accepted command the hub must
-    // re-read the persisted run instead of serving the session snapshot
-    // cache (keyed by runId + accepted-block count, neither of which
-    // changes for between-block commands).
     const seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
     const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
     const schedule = generateSeasonSchedule({ league, seed });
@@ -302,8 +290,6 @@ describe('SeasonHubState between-block commands', () => {
       effects,
     };
 
-    // The session cache holds the pre-command snapshot, exactly as it does
-    // right after a block commit.
     setCachedSeasonSnapshot(initial);
 
     let active: SeasonRunSnapshot | null = initial;
@@ -338,7 +324,7 @@ describe('SeasonHubState between-block commands', () => {
       }),
       loadSeasonRunPlayerSlice: vi.fn(() => Promise.resolve(null)),
       upsertSeasonRunPlayerSlice: vi.fn(() => Promise.resolve()),
-      // M2.6 postseason repository surface (unused by this test).
+
       commitPostseasonAdvancement: vi.fn(() => Promise.resolve()),
       loadPostseasonSummaries: vi.fn(() => Promise.resolve([])),
       loadPostseasonSummary: vi.fn(() => Promise.resolve(null)),
@@ -367,18 +353,9 @@ describe('SeasonHubState between-block commands', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// M2.6 postseason hub tests: the frozen cross-track command surface against
-// the REAL engine handler (start/submit dispatch through the hub) and the
-// runner-event mirror (advance/spectate/fast-forward orchestration). The
-// repository is an in-memory fake with the persistence commit guards; the
-// postseason runner is an event-emitting fake.
-// ---------------------------------------------------------------------------
-
 const POSTSEASON_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const POSTSEASON_HUMAN = 'lakers';
 
-/** Playable positions by roster slot: a legal G,G,F,F,C five in slots 0-4. */
 const HUB_SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -392,7 +369,6 @@ const HUB_SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['C'],
 ];
 
-/** A roster-covering v3-layout catalog (the submit command needs it). */
 function hubCatalogOf(run: SeasonRun): SeasonDraftCatalog {
   const candidates: SeasonDraftCandidate[] = run.rosters.flatMap((roster) =>
     roster.players.map((player, slot) => {
@@ -443,7 +419,6 @@ function hubCatalogOf(run: SeasonRun): SeasonDraftCatalog {
   };
 }
 
-/** Schema-valid zero effects state (300 loads, 1,350 pairs). */
 function hubZeroEffects(run: SeasonRun): SeasonEffectsState {
   const playerStates = run.rosters.flatMap((roster) =>
     roster.players.map((player) => ({
@@ -475,7 +450,6 @@ function hubZeroEffects(run: SeasonRun): SeasonEffectsState {
   };
 }
 
-/** Distinct east records; a west 7-8 tie between clippers and lakers. */
 function hubStandings(run: SeasonRun): SeasonStandings {
   const teamIds = run.league.teams.map((team) => team.franchiseId);
   const spec: Record<string, { w: number; l: number; h2h?: Record<string, number> }> = {};
@@ -534,7 +508,6 @@ function hubStandings(run: SeasonRun): SeasonStandings {
   };
 }
 
-/** The run at the end of the regular season with the crafted standings. */
 function hubBoundaryRun(): SeasonRun {
   const league = buildSeasonLeague({}, { humanFranchiseId: POSTSEASON_HUMAN });
   const schedule = generateSeasonSchedule({ league, seed: POSTSEASON_SEED });
@@ -572,13 +545,6 @@ function hubBoundaryRun(): SeasonRun {
   return run;
 }
 
-/**
- * Advances the engine one game at a time (through the real controller, no
- * stub resolver; each command targets the current next game) until the run
- * waits at the human's next game, committing every accepted advance through
- * the fake repository. Returns the committed run plus the human game id the
- * next submission must target.
- */
 async function advanceHubRunToHumanGame(
   repo: ReturnType<typeof hubPostseasonRepo>,
   run: SeasonRun,
@@ -641,7 +607,6 @@ async function advanceHubRunToHumanGame(
   }
 }
 
-/** Event-emitting fake postseason runner (hub mirror tests). */
 class FakePostseasonRunner implements SeasonPostseasonRunner {
   advanceCalls: SeasonPostseasonRunInput[] = [];
   spectateCalls: SeasonPostseasonRunInput[] = [];
@@ -706,7 +671,6 @@ class FakePostseasonRunner implements SeasonPostseasonRunner {
   }
 }
 
-/** In-memory postseason-capable repository fake for the hub tests. */
 function hubPostseasonRepo(initial: SeasonRunSnapshot | null) {
   let active = initial;
   const commits: CommitPostseasonAdvancementInput[] = [];
@@ -803,9 +767,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     const hub = new SeasonHubState(repo, new FakeRunner(), new FakePostseasonRunner());
     hub.catalog = hubCatalogOf(run);
     await hub.refresh();
-    // Move the run into the play-in stage through the engine, then advance
-    // until the run waits at the human's next game (submissions must target
-    // the human's current next game).
+
     await hub.startPostseason();
     const started = hub.snapshot?.run;
     if (started === undefined) throw new Error('expected a started run');
@@ -815,8 +777,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       hubZeroEffects(run),
       hubCatalogOf(run),
     );
-    // The helper committed through the repository; re-read so the hub's
-    // dispatch builds the command against the authoritative state.
+
     await hub.refresh();
     const humanNext = atHumanGame.nextGameId;
     const humanRotation = atHumanGame.run.rotations.find(
@@ -864,13 +825,13 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       hubZeroEffects(run),
       hubCatalogOf(run),
     );
-    // Re-read so the hub dispatches against the authoritative state.
+
     await hub.refresh();
     const humanRotation = atHumanGame.run.rotations.find(
       (rotation) => rotation.franchiseId === POSTSEASON_HUMAN,
     );
     if (humanRotation === undefined) throw new Error('expected a human rotation');
-    // An illegal five: the center plays the point-guard slot.
+
     const badPayload: SeasonPostseasonRotationPayload = {
       franchiseId: POSTSEASON_HUMAN,
       rotation: {
@@ -893,7 +854,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     expect(hub.commandError).not.toBeNull();
     expect(hub.commandError?.rejection?.code).toBe('invalid-rotation');
     expect(hub.commandError?.message).toContain('rotation is not legal');
-    // The rejected submit never committed (the earlier start + advances did).
+
     expect(repo.commits).toHaveLength(4);
     hub.destroy();
   });
@@ -919,7 +880,6 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     expect(hub.postseason.phase).toBe('running');
     expect(hub.postseason.error).toBeNull();
 
-    // Mirror a commit event (the runner re-read the authoritative snapshot).
     const snapshot = hub.snapshot;
     if (snapshot === null) throw new Error('expected a snapshot');
     postseasonRunner.emit({
@@ -977,8 +937,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
     await hub.fastForwardPostseason();
 
     expect(postseasonRunner.fastForwardCalls).toHaveLength(1);
-    // The champion was promoted (the runner promotes before the complete
-    // event; the fake repository's promotion clears the active run).
+
     const snapshot = hub.snapshot;
     if (snapshot === null) throw new Error('expected a snapshot');
     await repo.promoteChampionToCompleted();
@@ -1088,7 +1047,7 @@ describe('SeasonHubState postseason commands (M2.6)', () => {
       const message = rejectionOf(code);
       expect(message.length).toBeGreaterThan(10);
     }
-    // The default arm still covers unknown codes.
+
     expect(describeCommandRejection('advance-postseason', { code: 'unknown' } as never)).toContain(
       'rejected',
     );

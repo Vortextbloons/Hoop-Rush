@@ -10,12 +10,6 @@ import {
 } from '@hoop-rush/importer';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 
-/**
- * `hoop-rush import <step>` commands: build-time data derivation. Python
- * remains the fetch layer (`scripts/import-nba/fetch_all.py`); every compute
- * step runs natively here against the raw-data JSON snapshots.
- */
-
 function splitList(value: string | null): string[] | null {
   if (value === null || value === '') return null;
   return value
@@ -39,7 +33,6 @@ export const IMPORT_RATINGS_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-/** Parses --workers; undefined when absent, usage error when malformed. */
 function parseWorkerCount(raw: string | null | undefined): number | undefined {
   if (raw === null || raw === undefined || raw === '') return undefined;
   const n = Number(raw);
@@ -215,10 +208,6 @@ export const IMPORT_RUN_ALL_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-/**
- * Full pipeline: Python fetch layer (rosters, stints, season stats, schedule,
- * bbref ids) then native ratings, pools, and manifest updates.
- */
 export async function importRunAll(args: {
   seasons?: string | null;
   includeSchedule?: boolean;

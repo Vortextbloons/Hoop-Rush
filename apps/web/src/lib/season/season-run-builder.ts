@@ -56,28 +56,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { createInitialSeasonInfluenceState } from '@hoop-rush/engine';
 
-/**
- * Assembles the initial schema-7 Season Run snapshot from a completed draft
- * and its AI league generation (spec/2.0/07 persistence, M2.1 -> M2.5).
- *
- * TEMPORARY UI-BOUNDARY ORCHESTRATION: the authoritative builder belongs in
- * the engine/CLI (the CLI's `gen-season-assets.ts` owns an equivalent v3
- * builder). This adapter reproduces the same recorded facts — corrected league
- * control, rosters, ownership, schedule reference, scheduled games, zero
- * standings, cursor 0, postseason scaffold, draft facts, assignments,
- * private AI pools, rotations, audit, and evaluations — and freezes the M2.4
- * and M2.5 material versions. The result is validated with `seasonRunSchema`
- * before it can be promoted.
- *
- * M2.5 initial facts: an empty health state, the engine's initial Influence
- * state (+2 per franchise with recorded initial-grant ledger entries), the
- * fixed objective catalog with no selections, an empty transaction log, no
- * checkpoint state, and the state chain at revision 0. `stateDigest` defaults
- * to the all-zero placeholder per the frozen fixture guidance; the lead wires
- * the engine's `seasonRunStateDigest` at integration so the first block
- * command asserts the real initial digest.
- */
-
 export async function sha256Hex(material: string): Promise<string | null> {
   return sha256Bytes(new TextEncoder().encode(material));
 }
@@ -94,10 +72,7 @@ export interface BuildSeasonRunInput {
   scheduleContentHash: string;
   draft: SeasonDraftState;
   generation: SeasonLeagueGenerationResult;
-  /**
-   * M2.5 initial state digest (defaults to the all-zero placeholder per the
-   * frozen fixture guidance; the lead wires `seasonRunStateDigest`).
-   */
+
   stateDigest?: string;
 }
 
@@ -263,9 +238,7 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
     },
     evaluations: generation.evaluations,
     trade: null,
-    // M2.6.5: a fresh run carries the empty free-agency state (no windows,
-    // no canonical candidates, every franchise at zero season signings and
-    // zero season spend).
+
     freeAgency: {
       schemaVersion: 1,
       freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,

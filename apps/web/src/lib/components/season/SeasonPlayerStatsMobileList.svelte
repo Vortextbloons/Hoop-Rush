@@ -10,11 +10,6 @@
   import { formatPositions } from '$lib/player-positions';
   import { oneDecimal, percentOneDecimal } from '$lib/format';
 
-  /**
-   * Mobile season stats list: one card per player with a compact stat grid
-   * that fits the viewport without horizontal scrolling.
-   */
-
   let {
     rows,
     measure,

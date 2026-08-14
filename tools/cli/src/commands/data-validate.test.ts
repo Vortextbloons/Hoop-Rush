@@ -25,7 +25,6 @@ async function writeManifest(manifest: unknown): Promise<string> {
   return path;
 }
 
-/** Five fixture players in a legal G,G,F,F,C spread. */
 function legalPool(altIds: PeakPlayerSeason['altIds'] = null): ReturnType<typeof buildPool> {
   const playable: PeakPlayerSeason['positions']['playable'][] = [
     ['PG'],
@@ -194,7 +193,6 @@ describe('dataValidate season free-agency index audit', () => {
   const versionId = `pv-${'a'.repeat(32)}`;
   const playerId = 'p-fixture-1';
 
-  /** A minimal schema-valid free-agency index artifact. */
   function minimalIndex(catalogHash: string): unknown {
     return {
       schemaVersion: 1,

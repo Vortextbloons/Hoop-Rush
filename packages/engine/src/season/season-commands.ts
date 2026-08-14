@@ -133,90 +133,26 @@ import {
 } from './free-agency.ts';
 import { seasonTransactionEntry } from './transactions.ts';
 
-/**
- * M2.5 typed run command handlers (engine side, pure, spec/2.0/07 M2.5 §8).
- * Every handler validates, in fixed order: run identity (run-mismatch),
- * commandId uniqueness against the run's recorded history, the expected
- * state revision/digest (stale-state), and its deterministic preconditions,
- * then returns either the typed rejection or the accepted result plus the
- * mutated run/pending the persistence layer stores atomically.
- *
- * CommandId duplicate scope (documented): a commandId is a duplicate when it
- * appears in the run's recorded history — the accepted checkpoint
- * (`checkpointState.commandId`), any influence ledger entry's commandId, any
- * transaction entry's commandId, or any recorded objective selection's
- * `selectedByCommandId`. The persistence repository additionally guards
- * against races; this check covers every recorded command-scoped fact in the
- * snapshot.
- *
- * Stale-state facts: the handler compares the command's expected
- * revision/digest against the run's stored `stateRevision`/`stateDigest`.
- * The stored digest is verified by the load audit (recomputed via
- * `seasonRunStateDigest` at reload), so a fresh stored chain is equivalent
- * to a recomputed one; every accepted command recomputes the next digest
- * with `seasonRunStateDigest` over the mutated state.
- *
- * Accepted commands bump `stateRevision` by exactly one and recompute
- * `stateDigest`. `resume-season-block` performs no mutation (execution flows
- * through the block runner); rejected commands return the run/pending
- * unchanged.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 export interface SeasonRunCommandContext {
   run: SeasonRun;
-  /** Interrupted-block candidate (resume/forfeit commands only). */
+
   pending: SeasonPendingBlockCandidate | null;
   humanFranchiseId: string | null;
-  /**
-   * Packaged draft catalog (player positions + ratings). Required by the
-   * trade-application and extra-offer paths (a missing catalog throws
-   * `SeasonTradeFactsError` rather than recording an unvalidated trade).
-   */
+
   catalog?: SeasonDraftCatalog;
-  /**
-   * The run's effects state (the persistence record keeps it beside the
-   * snapshot; the state digest covers it and trade application mutates it).
-   * Required for every accepted command.
-   */
+
   effects?: SeasonEffectsState;
-  /**
-   * M2.6: the regular-season rankings seam for `start-postseason` (Track A's
-   * tiebreaker pipeline feeds it at integration). A missing seam on the
-   * start command throws `SeasonPostseasonContextError`.
-   */
+
   rankings?: SeasonPostseasonRankingsFn;
-  /**
-   * M2.6: the era simulation profile for postseason games (the command layer
-   * mirrors the block pipeline's profile carrier). Required by the four
-   * simulating handlers; a missing profile throws `SeasonPostseasonContextError`.
-   */
+
   profile?: EraSimulationProfile;
-  /**
-   * M2.6: the per-game simulation seam (documented test/CLI stub target).
-   * Defaults to the real Season game controller.
-   */
+
   postseasonGameResolver?: SeasonPostseasonGameResolver;
-  /**
-   * M2.6: the recorded regular-season compact summaries (all 82 rounds).
-   * The simulating handlers derive the season awards (awards-v1) from these
-   * facts when the advance reaches the playoffs or completion; a missing
-   * seam leaves `run.awards` null (documented fallback for tests and
-   * partial-facts replay contexts).
-   */
+
   regularSeasonSummaries?: readonly SeasonGameSummary[];
-  /**
-   * M2.6.5: the packaged free-agency index (free-agency-index-v1). Required
-   * by `resolve-free-agent-market`; a missing index throws
-   * `SeasonFreeAgencyFactsError` rather than recording an unvalidated
-   * resolution.
-   */
+
   freeAgencyIndex?: SeasonFreeAgencyIndex;
-  /**
-   * M2.6.5: the frozen roster-targets policy (AI free-agency ceilings).
-   * Optional seam: when absent, the recorded fallback ceilings apply.
-   */
+
   freeAgencyTargets?: SeasonRosterTargets;
 }
 
@@ -240,16 +176,10 @@ export interface SeasonRunCommandOutput {
   result: SeasonRunCommandResult;
   run: SeasonRun;
   pending: SeasonPendingBlockCandidate | null;
-  /**
-   * M2.6: the postseason summaries the command's accepted advance produced
-   * (in play order). The run snapshot does not retain compact postseason
-   * summaries (they persist as separate rows beside the run), so the engine
-   * carries them on the output for the commit side.
-   */
+
   postseasonSummaries?: SeasonPostseasonSummary[];
 }
 
-/** Marker error for unimplemented handlers (kept for compatibility). */
 export class SeasonRunCommandNotImplementedError extends Error {
   readonly command: string;
   constructor(command: string) {
@@ -259,7 +189,6 @@ export class SeasonRunCommandNotImplementedError extends Error {
   }
 }
 
-/** The command kinds this dispatch handles (submit-season-block excluded). */
 type DispatchableCommandKind =
   | 'select-block-objective'
   | 'spend-influence'
@@ -276,19 +205,10 @@ type DispatchableCommandKind =
   | 'skip-free-agent-market'
   | 'resolve-free-agent-market';
 
-/**
- * The engine-facing run view for this dispatch: the command layer supplies
- * the effects state (the persistence record keeps it beside the snapshot)
- * via the context, so accepted commands can recompute the state digest and
- * trade application can mutate chemistry. The mutated run returned to the
- * caller carries the effects state alongside the snapshot (extra property at
- * runtime; the persistence layer reads it with its record shape).
- */
 function economyRunOf(context: SeasonRunCommandContext): SeasonEconomyRun {
   return seasonEconomyRunOf(context.run, context.effects);
 }
 
-/** The run state facts the digest covers (frozen scope, self-excluded). */
 function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonRunStateDigest>[0] {
   return {
     stateRevision: run.stateRevision,
@@ -310,22 +230,11 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
   };
 }
 
-/** The mutated run with stateRevision + 1 and the recomputed stateDigest. */
 function advanceRunState(run: SeasonEconomyRun): SeasonRun {
   const next = { ...run, stateRevision: run.stateRevision + 1, stateDigest: '' };
   return { ...next, stateDigest: seasonRunStateDigest(runStateDigestFactsOf(next)) };
 }
 
-/**
- * M2.6: derives the season awards (awards-v1) from the recorded
- * regular-season summaries the moment the tournament reaches the playoffs
- * (or completes in the same advance). Awards are regular-season facts only
- * and freeze at that point; the derivation runs BEFORE the state digest is
- * recomputed, so the digest and the command-log entry cover the awards. A
- * missing summaries seam (tests, partial-facts replay contexts) leaves
- * `awards` null — the run schema permits it and the load audit digests the
- * stored facts as-is.
- */
 function deriveAwardsIfNeeded(
   run: SeasonEconomyRun,
   context: SeasonRunCommandContext,
@@ -344,18 +253,6 @@ function deriveAwardsIfNeeded(
   };
 }
 
-/**
- * True when the commandId appears anywhere in the run's recorded history:
- * the accepted checkpoint (`checkpointState.commandId`), any influence
- * ledger entry's commandId, any transaction entry's commandId, or any
- * recorded objective selection's `selectedByCommandId`. M2.6 postseason
- * commands record commandIds in the snapshot only through the influence
- * ledger (submit-with-rehab) and transactions; the authoritative accepted-
- * command log lives beside the run (command-log-v1, persistence side), so
- * the persistence repository additionally guards full duplicates. The
- * persistence repository additionally guards against races; this check
- * covers every recorded command-scoped fact in the snapshot.
- */
 function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
   if (run.checkpointState !== null && run.checkpointState.commandId === commandId) return true;
   if (run.influence.ledger.some((entry) => entry.commandId === commandId)) return true;
@@ -366,14 +263,6 @@ function commandAlreadyRecorded(run: SeasonRun, commandId: string): boolean {
   return false;
 }
 
-/**
- * The fixed base validation (run identity, duplicate command, stale state)
- * shared by every handler. Returns the typed rejection output or null. The
- * returned output carries the context pending unchanged (resume/forfeit
- * handlers re-attach it; other handlers pass null). The three base
- * rejections belong to every command's rejection union, so the envelope is
- * narrowed per command by construction (the assertion is a narrowing cast).
- */
 function baseValidation(
   command: SeasonRunCommand,
   run: SeasonRun,
@@ -539,8 +428,6 @@ function handleSpendInfluence(
   if (base !== null) return base;
   const run = economyRunOf(context);
 
-  // The round-60 deadline: after the final window (windowIndex 2) closed,
-  // no Influence may be spent at all.
   const finalWindow = run.trade?.windows.find((window) => window.windowIndex === 2);
   if (finalWindow !== undefined && finalWindow.status === 'closed') {
     const rejection: SeasonNoWindowRejection = {
@@ -765,8 +652,6 @@ function handleAcceptTradeOffer(
     return rejectedAccept(command, rejection, run);
   }
 
-  // Ownership conflict pre-check: every moved version must sit on exactly
-  // the roster the offer states (and nowhere else).
   const conflictIds: string[] = [];
   const rosterById = new Map(
     run.rosters.flatMap((roster) =>
@@ -797,10 +682,6 @@ function handleAcceptTradeOffer(
     return rejectedAccept(command, rejection, run);
   }
 
-  // Roster-illegal pre-check: both resulting rosters must keep the full
-  // ten-player legality contract (catalog positions; absent a catalog, the
-  // offer's generation-time legality proof holds because the run is
-  // unchanged since the window opened — validated by stale-state).
   if (context.catalog !== undefined) {
     const facts = seasonTradeCatalogFactsOf(context.catalog);
     const rosterIdsOf = (franchiseId: string): string[] =>
@@ -979,7 +860,6 @@ function handleResumeSeasonBlock(
     return rejectedResume(command, rejection, run, pending);
   }
 
-  // No run mutation: the resume executes through the block runner.
   return {
     result: {
       command: 'resume-season-block',
@@ -1072,7 +952,6 @@ function handleForfeitInterruptedGame(
   };
 }
 
-/** The stage the postseason command handlers require to run. */
 const REQUIRED_POSTSEASON_STAGE: SeasonRunStage = 'play-in';
 
 function postseasonInvalidStageRejection(run: SeasonRun): SeasonInvalidStageRejection {
@@ -1098,13 +977,6 @@ function rejectedStart(
   };
 }
 
-/**
- * M2.6 `start-postseason` (spec/2.0/02 playoffs): moves a completed regular
- * season into the `play-in` stage by recording the rankings seam output
- * (Track A's tiebreaker pipeline supplies the ordered top ten; the machine
- * records no tiebreak resolutions itself). Requires the `regular-season`
- * stage with all 82 rounds accepted.
- */
 function handleStartPostseason(
   command: SeasonStartPostseasonCommand,
   context: SeasonRunCommandContext,
@@ -1172,15 +1044,6 @@ function rejectedAdvance(
   };
 }
 
-/**
- * M2.6 `advance-postseason`: simulates the next playable game (or the
- * optional target) and continues through AI-only games until a human
- * rotation is required (every human game waits for a fresh submission), the
- * tournament ends with a champion, or the target game is reached. A target
- * that cannot materialize (a game beyond a series' clinch point) runs the
- * advance to its natural end. Accepted results carry the advanced game ids,
- * the next decision, and the summaries for the commit side.
- */
 function handleAdvancePostseason(
   command: SeasonAdvancePostseasonCommand,
   context: SeasonRunCommandContext,
@@ -1241,13 +1104,6 @@ function handleAdvancePostseason(
       humanFranchiseId !== null &&
       seasonPostseasonHumanPlaysGame(current.postseason, gameId, humanFranchiseId)
     ) {
-      // The human rotation decision (documented): the human's saved rotation
-      // carries over between games; the advance stops at a human game only
-      // when the rotation cannot play — no legal five from the available
-      // players, or planned minutes on an unavailable player. The human then
-      // repairs (submit a rotation resting the injured player at zero
-      // minutes), rehabilitates (postseason risky rehab), or — once a
-      // forfeit command exists — forfeits.
       const humanRotation = current.rotations.find(
         (rotation) => rotation.franchiseId === humanFranchiseId,
       );
@@ -1305,9 +1161,7 @@ function handleAdvancePostseason(
     stage === 'completed'
       ? {
           championFranchiseId: current.postseason.championFranchiseId as string,
-          // LEAD DECISION (documented): the promotion replaces the zero
-          // digest when the almanac persists; the run schema only requires
-          // the 32-hex shape here.
+
           almanacDigest: POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER,
           finalizedAtStateRevision: run.stateRevision + 1,
         }
@@ -1355,15 +1209,6 @@ function rejectedSubmit(
   };
 }
 
-/**
- * M2.6 `submit-postseason-rotation`: locks the human rotation for the target
- * game (which must be the run's current next game and involve the human),
- * validates rotation legality, availability, and the optional risky-rehab
- * spend (the only postseason Influence use; the seeded outcome applies
- * `applyRiskyRehabOutcome` semantics and is recorded on the ledger and
- * transaction log). The recorded rotation replaces the human's saved
- * rotation, so it persists between games until the next submission.
- */
 function handleSubmitPostseasonRotation(
   command: SeasonSubmitPostseasonRotationCommand,
   context: SeasonRunCommandContext,
@@ -1454,11 +1299,7 @@ function handleSubmitPostseasonRotation(
       return rejectedSubmit(command, rejection, run);
     }
   }
-  // Availability contract (documented): a rotation may list an injured player
-  // only at zero minutes (rest); a player with planned minutes must be able
-  // to play, and the rotation must be able to field a legal five from the
-  // available players — otherwise the human must repair, rehabilitate, or
-  // (future command) forfeit.
+
   for (const entry of payload.rotation.targetMinutes) {
     if (entry.minutes > 0 && !seasonPlayerAvailable(run.health, entry.playerVersionId)) {
       const rejection: SeasonUnavailablePlayerRejection = {
@@ -1498,9 +1339,7 @@ function handleSubmitPostseasonRotation(
   const rehabInjuryId = payload.riskyRehabInjuryId;
   if (rehabInjuryId !== undefined) {
     const injury = run.health.injuries.find((entry) => entry.injuryId === rehabInjuryId);
-    // Rejection mapping (frozen decision at integration): the M2.6 submit
-    // union has no injury-not-active / already-rehabbed codes, so an invalid
-    // rehab reference rejects with integrity-failure and a precise reason.
+
     const active =
       injury !== undefined &&
       injury.franchiseId === humanFranchiseId &&
@@ -1596,13 +1435,6 @@ function rejectedSpectate(
   };
 }
 
-/**
- * M2.6 `spectate-postseason-game`: simulates exactly the named game with the
- * fixed AI rotations. The target must be the run's current next game and
- * must not involve the human franchise (the human plays their own games
- * through advance + submit); the primary use case is spectating after
- * elimination. Accepted results reuse the advance result shape.
- */
 function handleSpectatePostseasonGame(
   command: SeasonSpectatePostseasonGameCommand,
   context: SeasonRunCommandContext,
@@ -1727,15 +1559,6 @@ function rejectedFastForward(
   };
 }
 
-/**
- * M2.6 `fast-forward-postseason`: simulates every remaining game with the
- * fixed AI rotations through the champion and completes the run. Requires
- * the human franchise to be eliminated (an active human would be skipping
- * lineup decisions; the union has no better code, so the rejection is
- * integrity-failure — frozen decision at integration). The optional target is
- * validated as an upcoming game; the accepted result is always stage
- * `completed` with the champion.
- */
 function handleFastForwardPostseason(
   command: SeasonFastForwardPostseasonCommand,
   context: SeasonRunCommandContext,
@@ -1856,11 +1679,6 @@ function handleFastForwardPostseason(
   };
 }
 
-// ---------------------------------------------------------------------------
-// M2.6.5 free-agency handlers (spec/2.0/15)
-// ---------------------------------------------------------------------------
-
-/** Marker error for missing free-agency facts at the command boundary. */
 export class SeasonFreeAgencyFactsError extends Error {
   constructor(message: string) {
     super(message);
@@ -1868,7 +1686,6 @@ export class SeasonFreeAgencyFactsError extends Error {
   }
 }
 
-/** Converts a rejection wrapper to the typed rejection payload. */
 function freeAgencyRejectionTo(error: FreeAgencyValidationRejection): SeasonRunCommandRejection {
   return error.rejection as SeasonRunCommandRejection;
 }
@@ -2055,12 +1872,6 @@ function handleResolveFreeAgentMarket(
   };
 }
 
-/**
- * The typed run command dispatch (spec/2.0/07 M2.5 §8): validates run
- * identity, commandId uniqueness, and the expected state revision/digest,
- * then dispatches to the per-command handler. Returns the typed result plus
- * the mutated run/pending to persist atomically.
- */
 export function handleSeasonRunCommand(
   command: SeasonRunCommand,
   context: SeasonRunCommandContext,

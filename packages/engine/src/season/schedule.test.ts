@@ -13,12 +13,6 @@ import {
   oppositeConferenceOpponentsOf,
 } from './league.ts';
 
-/**
- * Season Run schedule tests (spec/2.0/02): committed artifact invariants,
- * byte-identical regeneration, frequency formula structure, home/away
- * balance, and auditor corruption detection.
- */
-
 const SEEDS = [SEASON_COMMITTED_SCHEDULE_SEED, seedFromString('schedule-test-1')];
 
 describe('generateSeasonSchedule', () => {

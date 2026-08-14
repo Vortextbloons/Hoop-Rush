@@ -1,16 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-/**
- * M2.5 integration-run calibration tests (spec/2.0 M2.5, contract §17).
- *
- * These tests run the three full calibration commands (season health /
- * trade / influence calibrate) over the committed run fixture. They are
- * skipped unless `HOOP_RUSH_INTEGRATION_RUNS=1`: the commands freeze the
- * packaged targets artifacts (`injury-targets.json`, `trade-targets.json`,
- * `influence-targets.json`) after the first measured run, so the nightly
- * workflow forces them exactly once per day (the same guard the skips were
- * introduced with).
- */
 const INTEGRATION_RUNS = process.env.HOOP_RUSH_INTEGRATION_RUNS === '1';
 
 describe.skipIf(!INTEGRATION_RUNS)('season health calibrate (integration-run)', () => {

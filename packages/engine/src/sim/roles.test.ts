@@ -10,15 +10,6 @@ import { simulateGame } from './game.ts';
 import { createEngineContext } from './context.ts';
 import { classifyArchetype } from '../domain/archetypes.ts';
 
-/**
- * Player-role behavior gates (spec/06). The role-differentiated lineup
- * (creator, spacer, secondary, post, rim runner) must produce a clear usage
- * hierarchy, shot-profile differentiation, creation-driven assists, and
- * position-appropriate rebounding. Absolute values are frozen in the era
- * profile's `playerRoles` targets; relational assertions here cannot drift
- * with engine tuning.
- */
-
 const ctx = createEngineContext();
 const SEEDS = 300;
 
@@ -127,7 +118,7 @@ describe('player-role behavior (roles lineup)', () => {
     expect(usageShare(secondary)).toBeGreaterThan(usageShare(post));
     expect(usageShare(post)).toBeGreaterThan(usageShare(rim));
     expect(usageShare(creator)).toBeGreaterThan(usageShare(spacer));
-    // The star-to-role spread must be a real hierarchy, not a flat split.
+
     expect(usageShare(creator) / Math.max(1e-9, usageShare(rim))).toBeGreaterThan(1.35);
     expect(usageShare(creator)).toBeGreaterThan(0.23);
     expect(usageShare(rim)).toBeLessThan(0.19);

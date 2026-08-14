@@ -23,11 +23,6 @@ import {
   winPct,
 } from './season-presentation';
 
-/**
- * M2.3 presentation helper unit tests: pure formatting and derivation of
- * display facts from the frozen contracts.
- */
-
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 
 function playerLine(

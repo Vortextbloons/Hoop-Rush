@@ -7,15 +7,6 @@
   } from '@hoop-rush/data-contracts';
   import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
 
-  /**
-   * Influence panel (M2.5): the human balance with cap/floor facts, the
-   * recent ledger entries (the authoritative reconciliation source), and the
-   * spend affordances — extra trade offer (once per open window) and risky
-   * rehab (once per active injury). Spends open an explicit confirm dialog;
-   * the seeded outcome is displayed from the recorded state after the
-   * command applies (rehab success/failure, bought extra offer).
-   */
-
   const SOURCE_LABEL: Record<SeasonInfluenceSource, string> = {
     'initial-grant': 'Initial grant',
     'block-grant': 'Block grant',
@@ -45,7 +36,7 @@
     entries: SeasonInfluenceLedgerEntry[];
     affordances: InfluenceSpendAffordance[];
     busy?: boolean;
-    /** Display names for risky-rehab affordances (playerVersionId -> name). */
+
     playerName?: ((playerVersionId: string) => string) | null;
     onSpend: (affordance: InfluenceSpendAffordance) => void;
   } = $props();

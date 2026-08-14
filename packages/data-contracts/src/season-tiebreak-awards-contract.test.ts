@@ -19,18 +19,8 @@ import {
 } from './index.ts';
 import { buildPostseason, buildRun, SEED, fixturePlayerId } from './season-schemas-fixtures.ts';
 
-/**
- * M2.6 postseason-foundations Phase 1 contract validation (spec/2.0/02):
- * representability of the published tiebreak sequence and season awards in
- * the frozen data-contracts. Pure schema round-trips only — no engine, no
- * persistence. Tests named "documents gap G*" pin current (lenient) behavior
- * where the contract header documents an intent the schema does not yet
- * enforce; update them when the coupling lands.
- */
-
 const ALMANAC_DIGEST = 'a'.repeat(32);
 
-/** A minimal valid tie-resolution record (Play-In qualification tie, 7-8-9). */
 export function buildTiebreakResolution(
   overrides: Partial<SeasonTiebreakResolution> = {},
 ): SeasonTiebreakResolution {
@@ -47,11 +37,6 @@ export function buildTiebreakResolution(
   };
 }
 
-/**
- * The four Finals home-court resolutions: every rule in the Finals sequence
- * (overall record, head-to-head, points differential, random draw). The
- * random-draw record carries the saved deterministic draw seed.
- */
 export function buildFinalsHomeCourtResolutions(): SeasonTiebreakResolution[] {
   const drawSeed = buildPostseason(SEED).finalsHomeCourtDrawSeed;
   return [
@@ -95,11 +80,6 @@ export function buildFinalsHomeCourtResolutions(): SeasonTiebreakResolution[] {
   ];
 }
 
-/**
- * A completed bracket: both conferences seeded, all slots unpaired, and a
- * Finals won 4-2 by the champion (same shape as the season-schemas test
- * emptyBracketFixture, with a decided Finals).
- */
 export function buildCompletedBracket(
   champion: string,
 ): NonNullable<SeasonPostseasonState['bracket']> {
@@ -162,11 +142,6 @@ export function buildCompletedBracket(
   };
 }
 
-/**
- * A completed postseason state: resolved Play-In seeds for both conferences,
- * the given tiebreak resolutions in resolution order, a decided bracket, and
- * a champion. Reusable by later phases that need a valid end-of-run state.
- */
 export function buildCompletedPostseason(
   seed: string,
   champion = 'lakers',
@@ -201,11 +176,6 @@ function playerOf(
   return player;
 }
 
-/**
- * Awards whose recipients all come from the fixture run rosters (MVP and
- * Sixth Man on roster 0, DPOY on roster 1, First Team across roster 0), with
- * a self-consistent digest.
- */
 export function buildAwardsForRun(run: SeasonRun): SeasonAwards {
   const recipient = (rosterIndex: number, slot: number) => {
     const roster = rosterOf(run, rosterIndex);
@@ -225,7 +195,6 @@ export function buildAwardsForRun(run: SeasonRun): SeasonAwards {
   return { ...awards, digest: seasonAwardsDigest(awards) };
 }
 
-/** A completed schema-9 run: stage completed, decided postseason, awards, completion. */
 export function buildCompletedRunWithAwards(champion = 'lakers'): SeasonRun {
   const run = buildRun();
   return {
@@ -296,10 +265,6 @@ describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
   });
 
   it('enforces the drawSeed/rule coupling at parse time', () => {
-    // The header documents "Non-null only when the deciding rule is a
-    // deterministic draw"; the resolution schema superRefine enforces it:
-    // a non-null drawSeed under any non-random-draw rule is rejected, and a
-    // random-draw resolution must record its saved draw seed.
     expect(
       seasonTiebreakResolutionSchema.safeParse(
         buildTiebreakResolution({ rule: 'head-to-head', drawSeed: SEED }),
@@ -318,8 +283,6 @@ describe('tiebreak resolution contract (M2.6, tiebreaker-v1)', () => {
   });
 
   it('records the finals-home-court decision at a positive slot (position 1)', () => {
-    // The resolution docstring names the Finals home-court decision as a
-    // decided position; slots are 1-based, so the decision records slot 1.
     const resolution = buildTiebreakResolution({ kind: 'finals-home-court', slots: [1] });
     expect(seasonTiebreakResolutionSchema.safeParse(resolution).success).toBe(true);
     expect(
@@ -348,13 +311,13 @@ describe('finals home court representability (M2.6)', () => {
     expect(first.finalsHomeCourtDrawSeed).toBe(
       seasonNamespaceSeed(tiesSeed, SEASON_SEED_NAMESPACES.postseasonDraws, 'finals-home-court'),
     );
-    // The fixture builder and the direct builder agree (same derivation).
+
     expect(buildPostseason(SEED).finalsHomeCourtDrawSeed).toBe(first.finalsHomeCourtDrawSeed);
-    // A different root seed derives a different saved draw seed.
+
     expect(buildInitialPostseasonState('f'.repeat(32)).finalsHomeCourtDrawSeed).not.toBe(
       first.finalsHomeCourtDrawSeed,
     );
-    // The fresh state pins the frozen tiebreak version.
+
     expect(first.tiebreakVersion).toBe(SEASON_TIEBREAK_VERSION);
   });
 
@@ -488,10 +451,6 @@ describe('run-level stage/completion/awards coupling (M2.6)', () => {
   });
 
   it('enforces the awards/stage coupling at parse time', () => {
-    // The schema comment says awards are "null until postseason
-    // qualification"; the seasonRunSchema superRefine couples awards to the
-    // stage: a regular-season or play-in run carrying awards is rejected,
-    // while a playoffs/completed run may carry them.
     const run = buildRun();
     expect(seasonRunSchema.safeParse({ ...run, awards: buildAwardsForRun(run) }).success).toBe(
       false,

@@ -65,9 +65,7 @@
       (m) => {
         if (!cancelled) manifest = m;
       },
-      () => {
-        // The hero renders without the manifest.
-      },
+      () => {},
     );
     Promise.all([
       challengeRepository.loadActiveRunCheckpoint(),
@@ -80,21 +78,16 @@
         recent = rows.slice(0, 3);
         classicDraft = savedDraft?.draft ?? null;
       },
-      () => {
-        // History and continue are best-effort on the start page.
-      },
+      () => {},
     );
-    // Season Run resume is additive and best-effort; a missing repository
-    // (not yet wired) must never break the rest of the start page.
+
     import('$lib/season/season-repo')
       .then(({ getSeasonRunRepository }) => getSeasonRunRepository())
       .then((repo) => repo.loadActiveRunIndex())
       .then((index) => {
         if (!cancelled) seasonRun = index;
       })
-      .catch(() => {
-        // No active Season Run (or persistence not wired yet).
-      });
+      .catch(() => {});
     warmPlayersIndexDuringIdle();
     return () => {
       cancelled = true;

@@ -24,15 +24,6 @@ import {
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
 
-/**
- * M2.6 postseason-details repository tests (spec/2.0/07 persistence): the
- * optional retained postseason game details commit ATOMICALLY with the
- * advancement (run state, summaries, details, and the command-log row in ONE
- * transaction), round-trip through `loadPostseasonDetails`, surface corrupt
- * rows as typed load errors, and roll back completely when ANY write of the
- * advancement transaction fails.
- */
-
 const DIGEST_32 = '0'.repeat(32);
 
 interface Adapters {
@@ -59,7 +50,6 @@ async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
 }
 
-/** The engine-facing run after one advancement: stage, revision + 1, recomputed digest. */
 function advancedRun(adapters: Adapters, stage: SeasonRun['stage']): SeasonRun {
   const next: SeasonRun = {
     ...adapters.run,
@@ -202,12 +192,6 @@ function basePostseasonSummary(
   };
 }
 
-/**
- * A schema-valid retained postseason game detail for the summary's game. The
- * full simulation result is built through the fixture retained-detail builder
- * (a regular-season game id, which the result itself does not carry), then
- * wrapped with the postseason game identity.
- */
 function postseasonDetailOf(
   adapters: Adapters,
   summary: SeasonPostseasonSummary,
@@ -283,12 +267,11 @@ describe('season postseason details (M2.6)', () => {
     expect(details[0]?.injuryEvents).toEqual([]);
     const result = details[0]?.result;
     if (result?.outcome !== 'completed') throw new Error('expected a completed result');
-    // The full simulation result round-trips with both sides intact.
+
     expect(result.home.franchiseId).not.toBe(result.away.franchiseId);
-    // The detail is byte-identical to the committed payload.
+
     expect(JSON.stringify(result)).toBe(JSON.stringify(detail.result));
 
-    // Summary and command log are committed in the same transaction.
     expect(
       await adapters.repo.loadPostseasonSummary(adapters.run.runId, 'pi-east-seven-eight'),
     ).not.toBeNull();
@@ -296,7 +279,6 @@ describe('season postseason details (M2.6)', () => {
     expect(log?.entries).toHaveLength(1);
     expect(log?.entries[0]?.command.commandId).toBe('cmd-detail-1');
 
-    // The active run reloads with the advanced stage and a passing audit.
     const snapshot = await adapters.repo.loadActiveRun();
     expect(snapshot?.run.stage).toBe('play-in');
     expect(snapshot?.run.stateRevision).toBe(1);
@@ -337,7 +319,7 @@ describe('season postseason details (M2.6)', () => {
       'pi-east-seven-eight',
       'pi-west-nine-ten',
     ]);
-    // A summary-only advance never writes a detail row.
+
     const third = basePostseasonSummary(adapters, {
       gameId: 'pi-east-final',
       round: 'final',
@@ -443,7 +425,7 @@ describe('season postseason details (M2.6)', () => {
       const input = advancementInput(adapters, command, summary, next, [detail]);
       inject(adapters);
       await expect(adapters.repo.commitPostseasonAdvancement(input)).rejects.toThrow(`x-${label}`);
-      // Nothing committed: no run advance, no log, no summaries, no details.
+
       expect(await adapters.repo.loadCommandLog(adapters.run.runId), label).toBeNull();
       expect(await adapters.repo.loadPostseasonSummaries(adapters.run.runId), label).toEqual([]);
       expect(await adapters.repo.loadPostseasonDetails(adapters.run.runId), label).toEqual([]);
@@ -467,7 +449,6 @@ describe('season postseason details (M2.6)', () => {
       advancementInput(adapters, command, summary, next, [postseasonDetailOf(adapters, summary)]),
     );
 
-    // Row keyed by one gameId whose detail facts name a different game.
     const row = await adapters.db.seasonPostseasonDetails.get([
       adapters.run.runId,
       'pi-east-seven-eight',
@@ -481,7 +462,6 @@ describe('season postseason details (M2.6)', () => {
       SeasonRunLoadError,
     );
 
-    // Phase disagreement is corruption too.
     const second = await adapters.db.seasonPostseasonDetails.get([
       adapters.run.runId,
       'pi-east-seven-eight',
@@ -509,7 +489,6 @@ describe('season postseason details (M2.6)', () => {
     );
     adapters.run = next;
 
-    // Fresh repository over the same database: a real reload, not a cache.
     const reloadedRepo = new DexieSeasonRunRepository(adapters.db, {
       schedule: adapters.schedule,
       seam: adapters.seam,
@@ -580,9 +559,6 @@ describe('season postseason details (M2.6)', () => {
     );
     adapters.run = next;
 
-    // Simulate a half-applied store: the ordinal-0 log row is missing while
-    // the ordinal-1 row remains. The next append must be rejected, not
-    // appended over the gap.
     await adapters.db.seasonCommandLog.delete([adapters.run.runId, 0]);
     const third = commandOf(adapters.run, 'advance-postseason', 'cmd-gap-3');
     const after = advancedRun(adapters, 'playoffs');
@@ -591,7 +567,7 @@ describe('season postseason details (M2.6)', () => {
         advancementInput(adapters, third, basePostseasonSummary(adapters), after),
       ),
     ).rejects.toThrow('ordinals are not dense from 0');
-    // Nothing was appended: the log still holds exactly the ordinal-1 row.
+
     expect((await adapters.repo.loadCommandLog(adapters.run.runId))?.entries).toHaveLength(1);
     const snapshot = await adapters.repo.loadActiveRun();
     expect(snapshot?.run.stateRevision).toBe(2);

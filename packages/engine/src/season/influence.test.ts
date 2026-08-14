@@ -13,13 +13,6 @@ import {
 } from './influence.ts';
 import { buildEconomyTestRun, injuryIdOf } from './season-economy-test-support.ts';
 
-/**
- * M2.5 Influence economy tests (season-influence-v1, engine side): initial
- * grants, block grants with cap-apply, objective rewards, floor-rejecting
- * spends, per-purpose tracking (windows/rehabs), ledger reconciliation
- * everywhere, and the absence of Influence-to-possession hooks.
- */
-
 function fixture(): { run: SeasonRun; franchiseIds: string[]; humanFranchiseId: string } {
   const { run } = buildEconomyTestRun();
   return {
@@ -68,7 +61,6 @@ describe('season influence block grants', () => {
       objectiveSuccess: true,
     });
     for (const franchiseId of Object.keys(outcome.influence.balances)) {
-      // +1 block grant for everyone; the human also earns the +1 reward.
       expect(outcome.influence.balances[franchiseId]).toBe(
         franchiseId === humanFranchiseId ? 4 : 3,
       );
@@ -120,7 +112,7 @@ describe('season influence block grants', () => {
   it('cap-applies a grant at +8: appliedDelta 0 with the cap-reached explanation', () => {
     const { run, humanFranchiseId } = fixture();
     let influence = run.influence;
-    // Raise every franchise to the cap through six grant rounds (2 + 6 = 8).
+
     for (let blockIndex = 0; blockIndex < 6; blockIndex += 1) {
       influence = applySeasonBlockInfluenceGrants({
         influence,
@@ -144,7 +136,7 @@ describe('season influence block grants', () => {
     expect(last?.requestedDelta).toBe(1);
     expect(last?.appliedDelta).toBe(0);
     expect(last?.explanation).toContain('cap');
-    // Objective reward at the cap also applies 0.
+
     const rewardAtCap = applySeasonBlockInfluenceGrants({
       influence: atCap.influence,
       blockIndex: 5,
@@ -290,7 +282,7 @@ describe('season influence spends', () => {
         windowIndex: 0,
       }),
     ).toThrow(SeasonInfluenceFloorError);
-    // The rejected spend leaves the state untouched.
+
     expect(influence.balances[humanFranchiseId]).toBe(SEASON_INFLUENCE_FLOOR);
   });
 
@@ -298,7 +290,7 @@ describe('season influence spends', () => {
     const { run, humanFranchiseId } = fixture();
     const balance = run.influence.balances[humanFranchiseId] ?? 0;
     expect(SEASON_INFLUENCE_FLOOR).toBe(-3);
-    // A -6 spend from +2 would land at -4, below the floor: rejected.
+
     expect(balance + -6).toBeLessThan(SEASON_INFLUENCE_FLOOR);
     expect(() =>
       applySeasonInfluenceSpend({
@@ -336,8 +328,7 @@ describe('season influence has no gameplay hooks', () => {
 
   it('the influence module exports only economy functions (no gameplay surface)', async () => {
     const exported = Object.keys(await import('./influence.ts')).sort();
-    // The exports are pure economy builders and constants; any future
-    // gameplay hook would surface here and be caught by this sentinel.
+
     for (const name of exported) {
       expect(name.toLowerCase()).not.toMatch(/possession|simulate|game|shoot|rebound|turnover/);
     }

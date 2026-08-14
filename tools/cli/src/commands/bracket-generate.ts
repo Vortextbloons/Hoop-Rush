@@ -26,14 +26,6 @@ import { UsageError } from './sim.ts';
 import { parseCount } from '../args.ts';
 import { readJson, sha256Hex } from '../io.ts';
 
-/**
- * `bracket generate` (dev tool, spec/01): authors the frozen 30-team bracket
- * through the pure propose-review-freeze workflow. The candidate catalog is
- * built privately from the packaged normalized NBA season data; the browser
- * never loads it and no new player pools are advertised. Regeneration with
- * the same data and committed seed is byte-identical.
- */
-
 export const BRACKET_GENERATE_OPTIONS: Record<string, boolean> = {
   seed: true,
   proposals: true,
@@ -44,7 +36,6 @@ export const BRACKET_GENERATE_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-/** Committed seed of the frozen bracket artifact; regeneration uses it. */
 const COMMITTED_GENERATION_SEED: Seed = '8f2c1d4e6a9b7c3d8f2c1d4e6a9b7c3d';
 const GENERATION_VERSION = 'bracket-m3-v3';
 const MIN_BRACKET_SAMPLES = 32;
@@ -132,14 +123,6 @@ function clampTendency(value: number): number {
   return Math.min(100, Math.max(0, value));
 }
 
-/**
- * Observed player-season anchors for bracket candidates (the possession
- * engine's `SimulationAnchors`). Kept local on purpose: the importer's
- * `opponent.anchorsForPlayer` shares the shrunk-ratio core but differs in
- * two edge cases the frozen bracket was authored with — the no-split
- * offensive-rebound fallback is a flat 0.2 share here (importer: slot-based
- * 0.28/0.22/0.15 rounded), and the attempt rates are clamped to at most 1.
- */
 function anchorsFromStats(
   stats: SeasonStats | undefined,
   positions: PositionUnion,
@@ -177,12 +160,10 @@ function anchorsFromStats(
   };
 }
 
-/** Detailed career-wide playable union for a set of source labels (shared importer normalization). */
 function playablePositions(labels: ReadonlySet<string>): PositionUnion {
   return pools.normalizePositionLabels(labels).detailed as PositionUnion;
 }
 
-/** Builds the private candidate catalog from the packaged NBA season data. */
 export function buildCandidateCatalog(
   manifest: HoopRushManifest,
   verbose: boolean,
@@ -232,7 +213,6 @@ export function buildCandidateCatalog(
   }
   void byTeamExternalId;
 
-  // Career position labels across every season (career-wide union, spec/02).
   const careerLabels = new Map<string, Set<string>>();
   const rosterBySeason = new Map<string, Map<string, RosterPlayer>>();
   const statsBySeason = new Map<string, Map<string, SeasonStats>>();
@@ -275,8 +255,6 @@ export function buildCandidateCatalog(
     }
   }
 
-  // Per franchise: player -> best eligible season by the same selection score
-  // blend the pool importer uses.
   interface PeakCandidate {
     playerId: string;
     displayName: string;
@@ -313,8 +291,7 @@ export function buildCandidateCatalog(
         const key = `p-${stint.playerExternalId}`;
         const stats = statsBySeason.get(season)?.get(stint.playerExternalId);
         const minutes = Math.trunc(stint.minutes);
-        // The importer's authoritative peak-selection key: selection-score
-        // blend, team minutes, team games, earlier season.
+
         const selectionKey = pools.candidateKey({
           season,
           player: player as unknown as Record<string, unknown>,
@@ -374,11 +351,6 @@ export function buildCandidateCatalog(
     }
   }
 
-  // Every player appears in exactly one franchise's catalog: keep the peak
-  // stint with the highest selection score and remove duplicate entries from
-  // the other catalogs. A fixed bracket opponent can only field a player
-  // once, so a player with qualifying stints on two franchises (trades)
-  // represents the franchise where their peak is best.
   {
     const owner = new Map<string, { franchiseId: string; key: readonly number[] }>();
     for (const candidate of candidates) {
@@ -419,7 +391,6 @@ export function buildCandidateCatalog(
   return { candidates, details };
 }
 
-/** Builds the frozen bracket artifact and commits it with the manifest. */
 export function bracketGenerate(args: {
   seed?: string;
   proposals?: string;

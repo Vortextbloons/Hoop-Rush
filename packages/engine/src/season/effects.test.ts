@@ -38,7 +38,6 @@ import {
 
 const ctx = createEngineContext();
 
-/** Same ten-slot position plan as season-game.test.ts (legal everywhere). */
 const POSITION_PLAN: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -71,7 +70,7 @@ function buildStaminaRoster(side: 'home' | 'away', offset = 0): StaminaRoster {
   const staminaInputs: SeasonStaminaInput[] = players.map((player, index) => ({
     schemaVersion: 1,
     playerVersionId: player.playerVersionId,
-    // Starters (0-4) high-stamina, bench (5-9) medium: rating varies.
+
     rating: index < 5 ? 80 : 65,
     historicalMpg: index < 5 ? 28 : 16,
     derivationVersion: SEASON_STAMINA_VERSION,
@@ -138,10 +137,8 @@ function buildGameInput(
   };
 }
 
-/** A ten-player roster with its stamina inputs (return type of buildStaminaRoster). */
 type StaminaRoster = SeasonGameTeamInput & { staminaInputs: SeasonStaminaInput[] };
 
-/** Builds a 300-input league state: rosters 0-1 are home/away, 2-29 filler. */
 function buildLeagueState(
   home: StaminaRoster,
   away: StaminaRoster,
@@ -184,7 +181,6 @@ function buildLeagueState(
   };
 }
 
-/** Counting RNG wrapper: proves effects consume no additional draws. */
 function countingContext(): { engine: EngineContext; draws: () => number } {
   let draws = 0;
   const base = createEngineContext();
@@ -230,14 +226,13 @@ describe('M2.4 effects zero-profile identity', () => {
 
     const effects = countingContext();
     const { result, transition } = simulateSeasonGameWithEffects(input, effects.engine, state);
-    // The effects hook adds no draws to the possession pipeline.
+
     expect(effects.draws()).toBe(neutral.draws());
     expect(result.outcome).toBe('completed');
     expect(transition.pregamePlayerStates).toHaveLength(300);
     expect(transition.postgamePlayerStates).toHaveLength(300);
     expect(transition.pairIncrements.length).toBeGreaterThan(0);
-    // With a zero carried state, every recorded input is at the zero floor
-    // and every delta stays inside its declared cap.
+
     for (const row of transition.evidence) {
       const cap = SEASON_EFFECTS_MECHANISM_CAPS[row.mechanism];
       expect(Math.abs(row.deltaMax)).toBeLessThanOrEqual(cap);
@@ -344,7 +339,6 @@ describe('M2.4 fixed-point fatigue mechanics', () => {
     );
     expect(afterLong).toBeGreaterThanOrEqual(afterShort);
 
-    // Uninterrupted stint accumulates no less than a broken one of equal total.
     const broken = createSeasonEffectsBuffer(state, homeStamina, awayStamina);
     broken.hook.setActiveUnits(
       unit,
@@ -419,7 +413,7 @@ describe('M2.4 between-game recovery tick', () => {
       );
       expect(player.lastCompletedRound).toBe(1);
     }
-    // Positive states strictly decrease with a high enough factor.
+
     const heavy = ticked.playerStates.find((p) => p.fatigueBasisPoints > 0);
     expect(heavy).toBeDefined();
     const twice = applySeasonRecoveryTick(ticked, ratings);
@@ -478,10 +472,10 @@ describe('M2.4 pair chemistry', () => {
     const increments = buffer.finishGame(new Map(), new Map()).pairIncrements;
     const incrementOf = (a: string, b: string): number =>
       increments.find((i) => i.a === a && i.b === b)?.sharedPossessions ?? 0;
-    // Unit A pairs each got exactly one trip.
+
     const [a0, a1] = [unitA[0] ?? '', unitA[1] ?? ''];
     expect(incrementOf(a0, a1)).toBe(1);
-    // Cross-unit pairs never increment.
+
     expect(incrementOf(unitA[0] ?? '', unitB[0] ?? '')).toBe(0);
   });
 });
@@ -522,7 +516,7 @@ describe('M2.4 mechanism evidence', () => {
     );
     expect(shooterRow).toBeDefined();
     expect(shooterRow?.opportunities).toBe(1);
-    // Fatigue 5000/10000 -> input 500,000 millionths; delta -50,000 x 0.5.
+
     expect(shooterRow?.inputTotals.shooter).toBe(500_000);
     expect(shooterRow?.deltaTotals).toBe(-25_000);
     expect(shooterRow?.deltaMin).toBe(-25_000);

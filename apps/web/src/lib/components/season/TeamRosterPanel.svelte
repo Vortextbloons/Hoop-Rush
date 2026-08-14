@@ -10,12 +10,6 @@
   import type { SeasonPlayerStatsView } from '$lib/season/season-player-stats-view';
   import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 
-  /**
-   * Human roster workspace on the Team tab: top-level tabs switch between
-   * the ten-player identity cards (roles, fatigue, last game) and the
-   * folded season-stats table.
-   */
-
   type RosterPanelView = 'roster' | 'stats';
 
   let {
@@ -38,8 +32,6 @@
 
   let view = $state<RosterPanelView>('roster');
 
-  /** M2.6.5: the roster may hold up to fifteen players; ten are active
-   * rotation members and the rest are inactive depth. */
   const inactiveCount = $derived(shell.editor?.inactiveMembers().length ?? 0);
 </script>
 

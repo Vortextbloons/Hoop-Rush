@@ -2,15 +2,6 @@ import { z } from 'zod';
 import { franchiseIdSchema } from './ids.ts';
 import { SEASON_STANDINGS_VERSION, SEASON_TEAM_COUNT } from './season-versions.ts';
 
-/**
- * Standings rows reduced from finalized game facts (spec/2.0/02). Standings
- * are never maintained as a separately mutable table: every value, split,
- * and head-to-head aggregate derives from the completed game records, so a
- * standalone reduction can always be cross-checked. Authoritative ranking
- * (the published NBA tiebreak sequence) is M2.6 work; M2.0 carries the facts
- * that ranking requires.
- */
-
 export const seasonHeadToHeadRecordSchema = z.object({
   franchiseId: franchiseIdSchema,
   wins: z.number().int().nonnegative(),
@@ -33,7 +24,7 @@ export const seasonStandingsRowSchema = z.object({
   divisionLosses: z.number().int().nonnegative(),
   pointsFor: z.number().int().nonnegative(),
   pointsAgainst: z.number().int().nonnegative(),
-  /** Record against every other franchise, present exactly once each. */
+
   headToHead: z.array(seasonHeadToHeadRecordSchema),
 });
 export type SeasonStandingsRow = z.infer<typeof seasonStandingsRowSchema>;

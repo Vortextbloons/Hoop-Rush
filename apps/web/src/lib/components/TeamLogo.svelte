@@ -13,7 +13,7 @@
     manifest: HoopRushManifest;
     franchiseId: string;
     teamExternalId: string;
-    /** Verified historical logo candidates (era-scoped); tried before the modern chain. */
+
     logoCandidates?: string[];
     alt?: string;
     className?: string;
@@ -29,8 +29,6 @@
   });
 </script>
 
-<!-- Always reserve the sized box so missing/loading/failed logos cannot collapse
-     flex/grid neighbors (important during the paced challenge reveal). -->
 <span class="inline-flex shrink-0 items-center justify-center {className || 'h-5 w-5'}">
   {#if fallback.src}
     <img

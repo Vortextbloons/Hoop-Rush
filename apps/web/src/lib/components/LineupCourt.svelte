@@ -32,9 +32,7 @@
 
   const filledCount = $derived(slots.filter((p) => p !== null).length);
   let announcement = $state('');
-  // This is only a comparison snapshot for the current component instance.
-  // Keeping it non-reactive prevents the announcement effect from retriggering
-  // itself after every new array allocation.
+
   let previousSlots: (string | null)[] | null = null;
 
   $effect(() => {

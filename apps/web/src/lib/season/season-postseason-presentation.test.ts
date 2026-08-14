@@ -26,13 +26,6 @@ import {
   tiebreakSlotsLabel,
 } from './season-postseason-presentation';
 
-/**
- * M2.6 postseason presentation helpers: ranking ordering, tiebreak copy,
- * series/bracket view models, Play-In cards, summary rows, awards copy,
- * risky-rehab options, and the typed rejection copy. Pure formatting over
- * engine exports and recorded contracts — no simulation rules here.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 
 function fixtureRun(): SeasonRun {
@@ -86,7 +79,6 @@ function series(
   };
 }
 
-/** A fully decided postseason: play-in rankings + complete bracket. */
 function decidedPostseason(humanFranchiseId: string): SeasonPostseasonState {
   const state = buildInitialPostseasonState(SEED);
   state.playIn.east.ranking = [
@@ -263,11 +255,11 @@ describe('postseasonRankingsOf / rankedEntriesOf', () => {
     expect(rankings.east.playInSeeds).toHaveLength(4);
     const entries = rankedEntriesOf(rankings, run.standings);
     expect(entries).toHaveLength(30);
-    // The first east entry is the ranking's first team.
+
     expect(entries[0]?.row.franchiseId).toBe(rankings.east.ranked[0]);
     expect(entries[0]?.rank).toBe(1);
     expect(entries[0]?.conference).toBe('east');
-    // Ranks ascend within each conference.
+
     const eastRanks = entries
       .filter((entry) => entry.conference === 'east')
       .map((entry) => entry.rank);
@@ -313,7 +305,7 @@ describe('series card view models', () => {
     );
     expect(card.status).toBe('in-progress');
     expect(card.nextGame?.gameNumber).toBe(4);
-    // Game 4 is hosted by the challenger.
+
     expect(card.nextGame?.homeFranchiseId).toBe('b');
     const game5 = seriesCardViewModel(
       series('po-x3', 'first-round', 'east', 1, 8, 'a', 'b', 2, 2, null),
@@ -337,9 +329,9 @@ describe('humanSeriesOf', () => {
   it('finds the human series in a decided bracket', () => {
     const run = fixtureRun();
     run.postseason = decidedPostseason('lakers');
-    // lakers are not in the fixture league's bracket, so no series should match.
+
     expect(humanSeriesOf(run, 'lakers')).toBeNull();
-    // A bracket that includes the human:
+
     run.postseason = decidedPostseason('east1');
     const card = humanSeriesOf(run, 'east1');
     expect(card).not.toBeNull();
@@ -399,7 +391,7 @@ describe('play-in cards', () => {
     expect(column.seeds[0]?.franchiseId).toBe('g');
     const sevenEight = column.games[0];
     expect(sevenEight?.matchupLabel).toBe('7 vs 8');
-    // The scheduled pairing derives from the ranking (seeds 7-10).
+
     expect(sevenEight?.homeSeed).toBe(7);
     expect(sevenEight?.awaySeed).toBe(8);
     expect(sevenEight?.status).toBe('scheduled');
@@ -667,7 +659,7 @@ describe('typed rejection copy', () => {
         reason: 'series wins exceed played games',
       }),
     ).toContain('integrity check');
-    // Base codes still fall through to the shared hub copy.
+
     expect(
       describePostseasonRejection('start-postseason', {
         code: 'stale-state',

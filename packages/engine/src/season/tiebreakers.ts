@@ -10,116 +10,55 @@ import {
 import { createRng } from '../sim/rng.ts';
 import { franchisesInConference } from './league.ts';
 
-/**
- * Authoritative regular-season tiebreak ranking (spec/2.0/02, M2.6,
- * tiebreaker-v1). Ranks all 15 teams of each conference from the saved
- * regular-season facts with the versioned published NBA tiebreak sequence
- * and records every applied criterion as a deterministic
- * `SeasonTiebreakResolution`.
- *
- * ## Ranking algorithm
- *
- * Teams are first ordered by record (win percentage compared exactly by
- * cross-multiplication, never division; equal percentages fall back to wins
- * then losses). Consecutive teams with identical (wins, losses) form a tied
- * group, resolved by the frozen two-team or multi-team criterion list
- * (size 2 uses the two-team list, 3+ the multi-team list; a sub-group that
- * shrinks to two re-evaluates with the two-team list).
- *
- * A criterion is a total preorder over the group. When it separates the
- * group into ordered clusters, the separation is recorded (one resolution
- * per adjacent cluster boundary pair) and each still-tied cluster of two or
- * more teams restarts from the FIRST criterion of the list for its size —
- * the "restart multi-team evaluation when a criterion separates only part
- * of a tied group" rule. When a criterion orders the whole group (or a
- * 2-3 team group is fully decided), resolutions name the decided teams in
- * final order; groups larger than three record adjacent-pair windows.
- *
- * ## Postseason-eligible boundary
- *
- * Criteria 5/6 compare records against the top-ten postseason-eligible
- * teams of the same/opposite conference. The eligible set is derived from
- * the final ranking, so the ranking iterates to a fixpoint: pass 1 ranks
- * without the eligible-set criteria, derives both top tens, re-ranks with
- * the fixed sets, and repeats until the top tens are stable (bounded at
- * four iterations). The final recording pass reruns with the stable sets.
- *
- * ## Resolution records
- *
- * Every resolution names its teams in final decided order (best first) with
- * the positions it decided. Resolutions whose decided positions fall
- * entirely outside the top ten (slots > 10) are not recorded: the frozen
- * contract bounds `slots` to 1-10 (postseason-relevant decisions), while
- * the ranking itself remains fully deterministic for every position.
- * `kind` is 'qualification' when a decided slot overlaps seeds 7-10 and
- * 'seeding' otherwise. A `random-draw` resolution always records its saved
- * draw seed; every other resolution carries a null draw seed.
- *
- * ## Deterministic draw
- *
- * When every criterion is exhausted, the tied teams are ordered by the
- * draw: `seasonNamespaceSeed(seed, 'postseason-ties', 'draw', ...sortedIds)`
- * feeds `createRng`, one draw per team; ties in the draw break by
- * ascending franchise id. Identical inputs produce identical output.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 export type SeasonConferenceId = 'east' | 'west';
 
-/** One conference's authoritative final ranking and its tiebreak trace. */
 export interface SeasonConferenceRanking {
   conference: SeasonConferenceId;
-  /** All 15 franchise ids in final order (best first). */
+
   ranked: string[];
-  /** The postseason-eligible top ten, in ranking order. */
+
   topTen: string[];
-  /** Direct playoff seeds 1-6 (ranking positions 0-5). */
+
   directSeeds: string[];
-  /** Play-In seeds 7-10 (ranking positions 6-9). */
+
   playInSeeds: string[];
-  /** Every applied tiebreak criterion, in resolution order. */
+
   resolutions: SeasonTiebreakResolution[];
 }
 
-/** Both conferences' authoritative rankings (Play-In and seeding inputs). */
 export interface SeasonPostseasonRankings {
   east: SeasonConferenceRanking;
   west: SeasonConferenceRanking;
 }
 
-/** One recorded deciding fact of a resolution. */
 interface CriterionValue {
   label: string;
   value: number | string;
 }
 
-/** One tiebreak criterion: a total preorder over any tied group. */
 interface TiebreakCriterion {
   rule: SeasonTiebreakRule;
-  /** Whether the criterion applies to this group (e.g. shared division). */
+
   applicable(group: readonly string[], ctx: RankContext): boolean;
-  /** Compare two teams: negative when `a` ranks better, 0 undecided. */
+
   compare(a: string, b: string, group: readonly string[], ctx: RankContext): number;
-  /** Recorded deciding facts for teams in final decided order. */
+
   evidenceOf(teams: readonly string[], ctx: RankContext): readonly CriterionValue[];
 }
 
-/** Ranking context: league facts, standings, fixed eligible sets. */
 interface RankContext {
   league: SeasonLeague;
   standings: SeasonStandings;
   rowOf: Map<string, SeasonStandingsRow>;
-  /** Same-conference postseason-eligible set (criterion 5). */
+
   sameEligible: Set<string> | null;
-  /** Opposite-conference postseason-eligible set (criterion 6). */
+
   oppositeEligible: Set<string> | null;
   resolutions: SeasonTiebreakResolution[];
   conference: SeasonConferenceId;
   seed: string;
 }
 
-/** Two-team criterion list (frozen, spec/2.0/02 M2.6). */
 const TWO_TEAM_CRITERIA: readonly TiebreakCriterion[] = [
   headToHeadCriterion(),
   divisionChampionCriterion(),
@@ -130,7 +69,6 @@ const TWO_TEAM_CRITERIA: readonly TiebreakCriterion[] = [
   differentialCriterion(),
 ];
 
-/** Multi-team criterion list (frozen, spec/2.0/02 M2.6). */
 const MULTI_TEAM_CRITERIA: readonly TiebreakCriterion[] = [
   divisionChampionCriterion(),
   recordAmongTiedCriterion(),
@@ -140,7 +78,6 @@ const MULTI_TEAM_CRITERIA: readonly TiebreakCriterion[] = [
   differentialCriterion(),
 ];
 
-/** Exact win-percentage comparison: `a` better when aW*bL > bW*aL. */
 function compareWinPct(aw: number, al: number, bw: number, bl: number): number {
   const aOverB = aw * bl;
   const bOverA = bw * al;
@@ -150,7 +87,6 @@ function compareWinPct(aw: number, al: number, bw: number, bl: number): number {
   return 0;
 }
 
-/** The head-to-head record of `a` against `b`. */
 function headToHeadOf(ctx: RankContext, a: string, b: string): { wins: number; losses: number } {
   const row = ctx.rowOf.get(a);
   const entry = row?.headToHead.find((h2h) => h2h.franchiseId === b);
@@ -160,7 +96,6 @@ function headToHeadOf(ctx: RankContext, a: string, b: string): { wins: number; l
   return entry;
 }
 
-/** Aggregate record of `a` against the other group members. */
 function recordAmongOf(
   ctx: RankContext,
   a: string,
@@ -177,7 +112,6 @@ function recordAmongOf(
   return { wins, losses };
 }
 
-/** Aggregate record of `a` against a fixed eligible set. */
 function recordVsEligibleOf(
   ctx: RankContext,
   a: string,
@@ -195,7 +129,6 @@ function recordVsEligibleOf(
   return { wins, losses };
 }
 
-/** True when the franchise uniquely leads its division by record. */
 function isDivisionChampion(ctx: RankContext, franchiseId: string): boolean {
   const team = ctx.league.teams.find((entry) => entry.franchiseId === franchiseId);
   if (team === undefined) {
@@ -219,7 +152,6 @@ function isDivisionChampion(ctx: RankContext, franchiseId: string): boolean {
   return true;
 }
 
-/** `wins-losses` display string for evidence. */
 function recordLabelOf(wins: number, losses: number): string {
   return `${String(wins)}-${String(losses)}`;
 }
@@ -415,12 +347,10 @@ function differentialCriterion(): TiebreakCriterion {
   };
 }
 
-/** Criterion list for the current sub-group size (frozen two/multi lists). */
 function criteriaOf(group: readonly string[]): readonly TiebreakCriterion[] {
   return group.length === 2 ? TWO_TEAM_CRITERIA : MULTI_TEAM_CRITERIA;
 }
 
-/** Deterministic draw seed for a tied group (pure function of the inputs). */
 function drawSeedOf(ctx: RankContext, group: readonly string[]): string {
   return seasonNamespaceSeed(
     ctx.seed,
@@ -430,7 +360,6 @@ function drawSeedOf(ctx: RankContext, group: readonly string[]): string {
   );
 }
 
-/** Records a resolution for decided teams in final order. */
 function recordResolution(
   ctx: RankContext,
   teams: readonly string[],
@@ -450,7 +379,6 @@ function recordResolution(
   });
 }
 
-/** Applies one criterion to a group: ordered clusters, or null when undecided. */
 function partitionByCriterion(
   ctx: RankContext,
   group: readonly string[],
@@ -497,7 +425,6 @@ function partitionByCriterion(
   return ordered;
 }
 
-/** Records one resolution per adjacent pair for an ordered window of teams. */
 function recordWindows(
   ctx: RankContext,
   ordered: readonly string[],
@@ -520,11 +447,6 @@ function recordWindows(
   }
 }
 
-/**
- * Resolves one tied group into a strict order, recording every applied
- * criterion. Sub-groups left tied restart from the first criterion of the
- * list for their size.
- */
 function resolveTieGroup(ctx: RankContext, group: readonly string[]): string[] {
   const criteria = criteriaOf(group);
   for (const criterion of criteria) {
@@ -583,7 +505,6 @@ function resolveTieGroup(ctx: RankContext, group: readonly string[]): string[] {
   return drawn;
 }
 
-/** Orders the conference teams: record sort then per-group tie resolution. */
 function rankConferenceOnce(ctx: RankContext, conference: SeasonConferenceId): string[] {
   const ids = franchisesInConference(ctx.league, conference);
   ids.sort((a, b) => {
@@ -626,7 +547,6 @@ function rankConferenceOnce(ctx: RankContext, conference: SeasonConferenceId): s
   return ordered;
 }
 
-/** Ranks both conferences under the given fixed eligible sets. */
 function rankBothWith(
   ctx: RankContext,
   eastEligible: Set<string> | null,
@@ -655,7 +575,6 @@ function sameSet(a: Set<string>, b: Set<string>): boolean {
   return true;
 }
 
-/** Fresh ranking context with an empty resolution trace. */
 function freshContext(league: SeasonLeague, standings: SeasonStandings, seed: string): RankContext {
   return {
     league,
@@ -669,13 +588,6 @@ function freshContext(league: SeasonLeague, standings: SeasonStandings, seed: st
   };
 }
 
-/**
- * Ranks all 15 teams of both conferences from the saved regular-season
- * facts. `seed` is the run's postseason seed (see
- * `buildInitialPostseasonState`); it feeds only the deterministic draws.
- * The result is a pure function of the inputs: identical standings and seed
- * produce identical rankings and an identical tiebreak trace.
- */
 export function rankSeasonPostseason(
   league: SeasonLeague,
   standings: SeasonStandings,
@@ -713,7 +625,6 @@ export function rankSeasonPostseason(
   };
 }
 
-/** Finalizes a conference ranking: positions, seeds, and resolution slots. */
 function finishConference(
   league: SeasonLeague,
   standings: SeasonStandings,

@@ -20,18 +20,6 @@ import { resolveReference } from './reference-lineups.ts';
 import { identifyWeaknesses } from './weaknesses.ts';
 import { normalizeValue } from './normalize.ts';
 
-/**
- * Base-five projection (projection milestone): the deterministic,
- * calculation-only evaluation of one legal `G, G, F, F, C` lineup against
- * the versioned neutral reference of its era. The projector validates the
- * exact slot assignment, builds the simulation team with the possession
- * engine's own preparation, computes both directions of the expected
- * ledger, derives the component scores and weaknesses, and produces a
- * canonical audit digest. Seedless: no random draws, byte-identical for
- * identical inputs. Season code composes this same projector and never
- * recreates lineup-performance formulas.
- */
-
 const SLOT_GROUP: Record<ProjectionSlot, 'G' | 'F' | 'C'> = {
   G1: 'G',
   G2: 'G',
@@ -42,11 +30,6 @@ const SLOT_GROUP: Record<ProjectionSlot, 'G' | 'F' | 'C'> = {
 
 const SLOT_ORDER: readonly ProjectionSlot[] = ['G1', 'G2', 'F1', 'F2', 'C'];
 
-/**
- * One stable SimulationTeam per reference lineup (keyed by the model
- * artifact's players array identity) so the reference-side preparation is
- * memoized across projections instead of rebuilt per call.
- */
 const referenceTeamCache = new WeakMap<readonly SimulationPlayer[], SimulationTeam>();
 
 function referenceTeamOf(reference: ProjectionReferenceFive): SimulationTeam {
@@ -62,7 +45,6 @@ function referenceTeamOf(reference: ProjectionReferenceFive): SimulationTeam {
   return team;
 }
 
-/** Default normalization scales (fallbacks; the frozen artifact overrides). */
 const DEFAULT_SCALES: Record<string, { baseline: number; perPoint: number }> = {
   creation: { baseline: 0.5, perPoint: 0.01 },
   spacing: { baseline: 0.5, perPoint: 0.01 },
@@ -100,7 +82,6 @@ function tendencyMean(
   return mean(players.map((player) => player.tendencies[key]));
 }
 
-/** Creation ability from possession inputs (0-1, mirrors the archetype blend). */
 function creationAbility(player: SimulationPlayer): number {
   return (
     (player.ratings.ballHandling * 0.4 +
@@ -110,7 +91,6 @@ function creationAbility(player: SimulationPlayer): number {
   );
 }
 
-/** Defensive coverage of a five-man defense from possession inputs (0-100). */
 function coverageOf(players: readonly SimulationPlayer[], prep: TeamPrep): ProjectionDefense {
   const perimeterCoverage = ratingMean(players, 'perimeterDefense');
   const interiorCoverage = ratingMean(players, 'interiorDefense');
@@ -228,7 +208,6 @@ function validateAndBuildTeam(input: BaseFiveProjectionInput): SimulationTeam {
   };
 }
 
-/** Canonical input digest material for one projection. */
 function inputMaterial(input: BaseFiveProjectionInput, referenceId: string): string {
   const entries = input.lineup
     .map((entry) => ({
@@ -316,10 +295,6 @@ function sideOf(input: {
   };
 }
 
-/**
- * Projects one legal five against the era's neutral reference (or a named
- * reference when `referenceId` is given). Pure, seedless, deterministic.
- */
 export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProjection {
   const team = validateAndBuildTeam(input);
   const reference = resolveReference(input.model, input.eraProfile.eraId, input.referenceId);
@@ -335,8 +310,6 @@ export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProject
     profile: input.eraProfile,
   });
 
-  // The lineup's defensive coverage is the same fact on both sides: what the
-  // reference offense faces. The reference's coverage is only informational.
   const coverage = coverageOf(team.players, prep);
 
   const offense = sideOf({
@@ -421,5 +394,4 @@ export function projectBaseFive(input: BaseFiveProjectionInput): BaseFiveProject
   };
 }
 
-/** Ledger-typed re-export for callers that need the raw facts. */
 export type { LedgerSide, ProjectionLedger };

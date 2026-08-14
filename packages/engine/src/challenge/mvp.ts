@@ -1,13 +1,5 @@
 import type { ChallengeRun, PlayerBoxScore } from '@hoop-rush/data-contracts';
 
-/**
- * League MVP aggregation across a challenge run (spec/01). Every home and
- * away player box score recorded in the run's games is one candidate,
- * keyed by (teamId, playerId), so a mirror matchup (same player on the user
- * side and an opponent side) keeps two separate candidates.
- */
-
-/** Defense-bonus weights applied per appearance (spec/01 League MVP). */
 const DEFENSE_WEIGHTS = {
   steal: 0.6,
   block: 0.6,
@@ -15,37 +7,24 @@ const DEFENSE_WEIGHTS = {
   contestedShot: 0.04,
 } as const;
 
-/** Playmaking-bonus weights applied per appearance (spec/01 League MVP). */
 const PLAYMAKING_WEIGHTS = {
   assist: 0.5,
   assistOpportunity: 0.25,
 } as const;
 
-/** Small team-context bonus for a win; the mirrored penalty for a loss. */
 const TEAM_BONUS = { win: 0.75, loss: -0.75 } as const;
 
-/** Consistency penalty: standard-deviation multiplier on per-game values. */
 const CONSISTENCY_PENALTY = 0.08;
 
-/**
- * True shooting attempts for one appearance: FGA + 0.44×FTA.
- */
 export function shotsUsed(box: PlayerBoxScore): number {
   return box.fieldGoals.attempted + 0.44 * box.freeThrows.attempted;
 }
 
-/**
- * True shooting percentage for one appearance; 0 when the player did not shoot.
- */
 export function trueShooting(box: PlayerBoxScore): number {
   const shots = shotsUsed(box);
   return shots <= 0 ? 0 : box.points / (2 * shots);
 }
 
-/**
- * Game Score (Hollinger-style all-around rating) for one player appearance:
- * PTS + 0.4*FGM - 0.7*FGA - 0.4*(FTA-FTM) + 0.7*ORB + 0.3*DRB + STL + 0.7*AST + 0.7*BLK - 0.4*PF - TOV
- */
 export function gameScore(box: PlayerBoxScore): number {
   return (
     box.points +
@@ -62,13 +41,6 @@ export function gameScore(box: PlayerBoxScore): number {
   );
 }
 
-/**
- * Holistic per-appearance MVP value (spec/01 League MVP): Game Score plus an
- * efficiency bonus (points above or below league-average true shooting on the
- * same shot volume), a defense bonus, a playmaking bonus, and a small
- * team-context bonus for wins. `baselineTs` is the run-wide weighted-average
- * true shooting; `won` is whether the candidate's side won the game.
- */
 export function mvpValue(box: PlayerBoxScore, baselineTs: number, won: boolean): number {
   const diagnostics = box.diagnostics;
   return (
@@ -86,24 +58,24 @@ export function mvpValue(box: PlayerBoxScore, baselineTs: number, won: boolean):
 
 export interface LeagueMvp {
   playerId: string;
-  /** Display name resolved from run snapshots; falls back to playerId. */
+
   playerName: string;
   teamId: string;
-  /** Home: the run's homeDisplayName. Away: the opponent display name from the game result. */
+
   teamName: string;
-  /** True when the candidate is the user's five (teamId === 'user'). */
+
   isUserTeam: boolean;
-  /** Number of appearances (games played by this side/player candidate). */
+
   appearances: number;
-  /** Final composite: average per-game MVP value minus the consistency penalty. */
+
   mvpScore: number;
-  /** Unrounded average Game Score per appearance. */
+
   averageGameScore: number;
-  /** Average true shooting percentage per appearance. */
+
   averageEfficiency: number;
-  /** Standard deviation of per-game MVP values (consistency). */
+
   consistency: number;
-  /** Unrounded per-game points. */
+
   averagePoints: number;
   averageRebounds: number;
   averageAssists: number;
@@ -111,10 +83,6 @@ export interface LeagueMvp {
   averageBlocks: number;
 }
 
-/**
- * Candidate accumulation; per-appearance values are kept so variance
- * (consistency) is computed at ranking time.
- */
 interface Accumulator {
   scoreSum: number;
   pointsSum: number;
@@ -126,17 +94,10 @@ interface Accumulator {
   appearances: Array<{ valueBase: number; shots: number }>;
 }
 
-/** Internal ranking shape: carries the unrounded combined tie-break value. */
 interface RankedMvp extends LeagueMvp {
   averageCombined: number;
 }
 
-/**
- * The League MVP across the whole 82-game run. Every home and away player
- * appearance contributes one candidate keyed by (teamId, playerId), so a
- * mirror matchup (same player on the user side and an opponent) keeps two
- * separate candidates. Returns null for a run with no games.
- */
 export function leagueMvp(run: ChallengeRun): LeagueMvp | null {
   const accumulators = new Map<string, Accumulator>();
   const teamNames = new Map<string, string>();
@@ -173,8 +134,7 @@ export function leagueMvp(run: ChallengeRun): LeagueMvp | null {
         current.blocksSum += box.blocks;
         current.efficiencySum += trueShooting(box);
         current.appearances.push({ valueBase: mvpValue(box, 0, won), shots });
-        // Only appearances that took shots define the league efficiency
-        // baseline; a scoreless-shots line contributes no shot volume.
+
         if (shots > 0) {
           leaguePoints += box.points;
           leagueShots += shots;
@@ -222,7 +182,6 @@ export function leagueMvp(run: ChallengeRun): LeagueMvp | null {
   return ranked[0] ?? null;
 }
 
-/** Population standard deviation of per-game values; 0 for fewer than 2 games. */
 function populationStdDev(values: readonly number[], mean: number): number {
   if (values.length < 2) return 0;
   let sumOfSquares = 0;
@@ -233,10 +192,6 @@ function populationStdDev(values: readonly number[], mean: number): number {
   return Math.sqrt(sumOfSquares / values.length);
 }
 
-/**
- * playerId → displayName for the user five from run snapshots, and per-opponent
- * from the bracket by teamId (cached). Falls back to the playerId itself.
- */
 function buildPlayerNameLookup(run: ChallengeRun): (teamId: string, playerId: string) => string {
   const userNames = new Map(run.players.map((p) => [p.playerId, p.displayName]));
   const opponentsByTeamId = new Map(run.bracket.opponents.map((o) => [o.teamId, o]));
@@ -258,7 +213,6 @@ function buildPlayerNameLookup(run: ChallengeRun): (teamId: string, playerId: st
   };
 }
 
-/** Ranking: MVP score desc, then Game Score, points, combined, then identity. */
 function compareRanked(a: RankedMvp, b: RankedMvp): number {
   if (b.mvpScore !== a.mvpScore) {
     return b.mvpScore - a.mvpScore;

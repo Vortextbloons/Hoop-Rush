@@ -36,23 +36,12 @@ import {
   testDatabaseName,
 } from '../testing/repo-test-support.ts';
 
-/**
- * Season draft repository contract tests (spec/2.0/03, M2.1): the dedicated
- * Season draft boundary lives in its own `seasonDrafts` table, isolated from
- * the Challenge tables and the Classic draft table. Save stores the full
- * revisioned snapshot with the complete command log in one atomic put; load
- * validates every read and resumes at the exact last-saved revision; corrupt
- * rows throw instead of entering app state. Dexie tests run against
- * fake-indexeddb with one fresh database per test.
- */
-
 interface Adapters {
   season: DexieSeasonDraftRepository;
   challenge: DexieChallengeRepository;
   db: TestDatabase;
 }
 
-/** Fresh Dexie-backed repositories with one isolated database per test. */
 function makeAdapter(): Adapters {
   const db = new TestDatabase(testDatabaseName('season-draft'));
   return {
@@ -78,7 +67,6 @@ function classicRecord(draftId = 'classic-draft-a'): StoredClassicDraft {
   };
 }
 
-/** Schema-valid synthetic 30-team generation result for round-trip fixtures. */
 function generationResult(seed: string): SeasonLeagueGenerationResult {
   const league = buildSeasonLeague();
   const rosters = buildSeasonRosters(league, seed);
@@ -122,7 +110,6 @@ function generationResult(seed: string): SeasonLeagueGenerationResult {
   };
 }
 
-/** The saved record without the adapter-stamped timestamp. */
 function withoutTimestamp(loaded: StoredSeasonDraft): StoredSeasonDraft {
   const { updatedAtIso: _updatedAtIso, ...record } = loaded;
   return record;
@@ -187,8 +174,7 @@ describe('season draft repository (dexie)', () => {
     const { season } = makeAdapter();
     const saved = recordFromState(buildSeasonDraftState({ revision: 3 }));
     await season.saveSeasonDraft(saved);
-    // The domain accepted a fourth command, but the process crashed before
-    // the rev-4 snapshot was persisted. Reload must resume at rev 3 exactly.
+
     const loaded = await season.loadSeasonDraft();
     expect(loaded).not.toBeNull();
     expect(loaded?.draft.revision).toBe(3);
@@ -253,7 +239,7 @@ describe('season draft repository (dexie)', () => {
     } as never);
     const loaded = await season.loadSeasonDraft();
     expect(loaded).toBeNull();
-    // The development row is auto-cleared, never read or preserved.
+
     expect(await db.seasonDrafts.count()).toBe(0);
 
     await db.seasonDrafts.put({
@@ -269,7 +255,7 @@ describe('season draft repository (dexie)', () => {
   it('surfaces corrupt v3 rows while auto-clearing malformed save schemas', async () => {
     const { season, db } = makeAdapter();
     await season.saveSeasonDraft(recordFromState(buildSeasonDraftState()));
-    // A v3 row with a corrupt draft snapshot throws (corruption surfaces).
+
     await db.seasonDrafts.put({
       recordId: SEASON_DRAFT_RECORD_ID,
       saveSchemaVersion: 3,
@@ -277,7 +263,7 @@ describe('season draft repository (dexie)', () => {
       generation: null,
     } as never);
     await expect(season.loadSeasonDraft()).rejects.toThrow();
-    // Unknown save-schema families are development rows: auto-cleared.
+
     await db.seasonDrafts.put({
       recordId: SEASON_DRAFT_RECORD_ID,
       saveSchemaVersion: 99,

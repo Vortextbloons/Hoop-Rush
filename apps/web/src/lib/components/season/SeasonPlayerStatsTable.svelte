@@ -10,12 +10,6 @@
   import { formatPositions } from '$lib/player-positions';
   import { oneDecimal, percentOneDecimal } from '$lib/format';
 
-  /**
-   * Full Season Run player stats table: sortable column headers (buttons +
-   * aria-sort) over totals or per-game rates plus shooting percentages.
-   * Rendered on desktop by SeasonPlayerStats; mobile uses the card list instead.
-   */
-
   let {
     rows,
     measure,

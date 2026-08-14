@@ -1,11 +1,5 @@
-/**
- * Strict argument parsing. Commands reject unknown options and invalid
- * combinations; defaults are printed in help output (spec/09).
- */
-
 export class UsageError extends Error {}
 
-/** Parses an optional count option; absent falls back, malformed throws. */
 export function parseCount(value: string | undefined, option: string, fallback: number): number {
   if (value === undefined) return fallback;
   const parsed = Number.parseInt(value, 10);
@@ -15,25 +9,18 @@ export function parseCount(value: string | undefined, option: string, fallback: 
   return parsed;
 }
 
-/** The seed-range/workers options shared by the season calibration commands. */
 export interface SeedRangeOptionBag {
   'seed-from'?: string | null;
   'seed-to'?: string | null;
   workers?: string | null;
 }
 
-/**
- * Parses the inclusive `--seed-from`/`--seed-to` cohort pair. `defaultTo` is
- * the command's frozen cohort upper bound. With `requireOrder`, a `to < from`
- * range throws (the shared fragile guard across the season calibration
- * commands).
- */
 export function parseSeedRange(
   args: SeedRangeOptionBag,
   defaultTo: number,
   options: {
     requireOrder?: boolean;
-    /** Error class for the range guard; defaults to UsageError. */
+
     error?: new (message: string) => Error;
   } = {},
 ): { from: number; to: number } {
@@ -46,10 +33,6 @@ export function parseSeedRange(
   return { from, to };
 }
 
-/**
- * Parses the `--workers` count; `clampToAtLeastOne` mirrors the commands
- * that never run with zero workers.
- */
 export function parseWorkers(
   args: Pick<SeedRangeOptionBag, 'workers'>,
   fallback: number,
@@ -60,16 +43,11 @@ export function parseWorkers(
 }
 
 export interface ParsedArgs {
-  /** Command words, e.g. ["data", "validate"]. */
   command: string[];
   positional: string[];
   options: Map<string, string | boolean>;
 }
 
-/**
- * Parses argv after the executable name. `declared` maps option names (without
- * leading dashes) to whether they take a value. Unknown options throw.
- */
 export function parseArgs(
   argv: readonly string[],
   declared: Readonly<Record<string, boolean>>,

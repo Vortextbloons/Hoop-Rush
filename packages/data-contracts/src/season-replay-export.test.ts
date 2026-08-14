@@ -21,18 +21,9 @@ import {
 } from './season-command-log.ts';
 import { SEASON_COMMAND_LOG_VERSION } from './season-versions.ts';
 
-/**
- * M2.6 full-run replay export tests (replay-export-v1, kind `full-run`):
- * the shared pure builder, byte-stable round-trips (identical inputs ->
- * identical bytes and digest; timestamps are never part of the export), the
- * digest self-exclusion rule, identity-fact reconciliation, and the shared
- * `seasonCommandResultDigest` convention.
- */
-
 const DIGEST_32 = '0'.repeat(32);
 const HASH_64 = '0'.repeat(64);
 
-/** A valid command-log entry; the hash chain is filled by `commandLog()`. */
 function commandLogEntry(ordinal: number): SeasonCommandLogEntry {
   return seasonCommandLogEntrySchema.parse({
     runId: 'fixture-run-1',
@@ -56,7 +47,6 @@ function commandLogEntry(ordinal: number): SeasonCommandLogEntry {
   });
 }
 
-/** A valid command log whose hash chain is self-consistent. */
 function commandLog(): SeasonCommandLog {
   const raw = [commandLogEntry(0), commandLogEntry(1)];
   const chained: SeasonCommandLogEntry[] = [];
@@ -74,7 +64,6 @@ function commandLog(): SeasonCommandLog {
   });
 }
 
-/** A minimal schema-valid postseason summary. */
 function postseasonSummary(): SeasonPostseasonSummary {
   return seasonPostseasonSummarySchema.parse({
     schemaVersion: 1,
@@ -222,8 +211,7 @@ describe('full-run replay export (replay-export-v1)', () => {
     expect(second).toEqual(first);
     expect(second.digest).toBe(first.digest);
     expect(second.digest).toMatch(/^[0-9a-f]{32}$/);
-    // A JSON round-trip preserves the digest exactly (timestamps never
-    // enter the export, so nothing time-varying can leak in).
+
     const parsed = seasonRunReplayExportSchema.parse(
       JSON.parse(JSON.stringify(first)) as SeasonRunReplayExport,
     );
@@ -336,7 +324,7 @@ describe('seasonCommandResultDigest (command-log-v1 shared convention)', () => {
     });
     expect(first).toBe(second);
     expect(first).toMatch(/^[0-9a-f]{32}$/);
-    // A different command or fact changes the digest.
+
     expect(
       seasonCommandResultDigest({
         commandId: 'cmd-adv-2',

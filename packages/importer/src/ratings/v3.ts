@@ -30,7 +30,6 @@ export const RATING_ARCHETYPES: readonly RatingArchetype[] = [
 type SkillKey = keyof SimulationRatings;
 type SkillWeights = Partial<Record<SkillKey, number>>;
 
-/** Archetype weights overlap by design; memberships are not a single label gate. */
 const ARCHETYPE_WEIGHTS: Readonly<Record<RatingArchetype, SkillWeights>> = {
   primaryCreator: {
     ballHandling: 0.28,
@@ -238,10 +237,7 @@ function archetypeScore(
   const entries = Object.entries(ARCHETYPE_WEIGHTS[archetype]) as Array<[SkillKey, number]>;
   const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
   const weighted = entries.reduce((sum, [key, weight]) => sum + skill(ratings, key) * weight, 0);
-  // Memberships already blend the archetype scores. The previous 0.86 floor
-  // applied a second, nearly universal penalty to every player, compressing
-  // high-skill wings and creators before production evidence was considered.
-  // Keep a small contrast adjustment, but preserve the underlying skill scale.
+
   return (weighted / Math.max(1e-9, totalWeight)) * (0.95 + 0.05 * memberships[archetype]);
 }
 
@@ -418,25 +414,14 @@ function deriveMemberships(
 }
 
 function canonicalCurve(raw: number): number {
-  // The upper tail needs to distinguish excellent seasons from the absolute
-  // peaks. The former linear tail pushed nearly fifty player-seasons to 99.
-  // Keep the middle scale generous, then use a concave curve above 70 so 90+
-  // remains attainable while 99 is reserved for the small exceptional set.
   if (raw <= 70) {
     return clampRating(50 + (raw - 50) * 1.635);
   }
   const upper = raw - 70;
-  // Stretch the historic-season tail instead of mapping every raw score near
-  // 83 to 99. Rough anchors: 75 -> 88, 80 -> 93, 85 -> 97, 88+ -> 99.
+
   return Math.min(99, clampRating(82.7 + upper * 1.27 - upper * upper * 0.018));
 }
 
-/**
- * Before steals and blocks were recorded, exceptional center rebounding is
- * the strongest available season-level evidence of defensive possession
- * control. Credit only high-minute centers with missing event stats; modern
- * players and ordinary historical rebounders receive no lift.
- */
 function historicalDefenseEvidenceLift(input: RatingProfileInput): number {
   if (input.stats.steals != null || input.stats.blocks != null) return 0;
   if (input.position !== 'C' && input.position !== 'PF') return 0;
@@ -449,15 +434,6 @@ function historicalDefenseEvidenceLift(input: RatingProfileInput): number {
   return reboundLift + anchorLift;
 }
 
-/**
- * Authoritative Offense/Defense summary computation for ratings v3.
- *
- * Offense blends scoring, creation, and possession-safety skills with a
- * tendency-derived turnover guard. Defense blends perimeter/interior
- * defense, ball disruption, rebounding, and a tendency-derived foul guard.
- * Profile assembly and compatibility summaries must call this function so
- * every surface reports the same Offense/Defense values.
- */
 export function computeOffenseDefense(
   ratings: SimulationRatings,
   tendencies: SimulationTendencies,
@@ -552,8 +528,7 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
     production,
     calibratedImpact,
     canonicalOverall,
-    // Pre-percentile raw overall; pool packaging derives the cohort
-    // percentile and overwrites the packaged summary overall from it.
+
     rawOverallScore: Math.round(raw * 100) / 100,
     offenseRating: summary.offenseRating,
     defenseRating: summary.defenseRating,
@@ -564,7 +539,6 @@ export function deriveRatingProfile(input: RatingProfileInput): DerivedRatingPro
   };
 }
 
-/** Reconstruct tendencies for compatibility callers with stats-only inputs. */
 export function tendenciesForProfile(
   stats: StatsRow,
   ratings: SimulationRatings,

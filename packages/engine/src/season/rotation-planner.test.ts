@@ -12,14 +12,6 @@ import {
   type PlannerUnitRequest,
 } from './rotation-planner.ts';
 
-/**
- * Season Run M2.2 rotation planner tests (rotation-planner-v1): deterministic
- * legal-five enumeration, tipoff selection, projected target-minute
- * deviation scoring with hand-computed fixtures (including a checkpoint-delta
- * flip), the frozen tie-break order, closing-window and overtime preference,
- * no-legal-five nulls, and fast-check property tests over randomized rosters.
- */
-
 const SLOTS = ['G', 'G', 'F', 'F', 'C'] as const;
 
 const STARTER_POS: readonly (readonly Position[])[] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
@@ -93,7 +85,6 @@ function unitKey(unit: readonly string[]): string {
   return [...unit].join('|');
 }
 
-/** Order-independent brute-force legal-five enumeration for set comparison. */
 function bruteForceLegalFives(
   members: readonly PlannerMember[],
   available: ReadonlySet<string>,
@@ -127,13 +118,11 @@ function bruteForceLegalFives(
   return results;
 }
 
-/** The planner's frozen checkpoint delta: seconds to the next whole minute. */
 function checkpointDelta(secondsRemaining: number): number {
   const raw = secondsRemaining % 60 === 0 ? 60 : secondsRemaining % 60;
   return Math.min(raw, secondsRemaining);
 }
 
-/** The planner's frozen deviation score, recomputed independently. */
 function deviationScoreOf(
   unit: readonly string[],
   delta: number,
@@ -273,9 +262,7 @@ describe('planUnit normal scoring (rotation-planner-v1)', () => {
         actualSeconds,
       }),
     });
-    // The current unit (pv-06/pv-02/pv-03/pv-04) minus the fouled-out pv-05:
-    // candidates retaining all four current players add a center; the earlier
-    // bench role (pv-08, index 2) wins over pv-10 (index 4).
+
     expect(result).toEqual(['pv-02', 'pv-06', 'pv-03', 'pv-04', 'pv-08']);
   });
 
@@ -312,8 +299,7 @@ describe('planUnit normal scoring (rotation-planner-v1)', () => {
         actualSeconds,
       }),
     });
-    // pv-01/pv-02/pv-03/pv-08/pv-05 can be arranged two ways; both tie on
-    // score, retention, and hierarchy, so the slot-sequence order decides.
+
     expect(result).toEqual(['pv-01', 'pv-02', 'pv-03', 'pv-08', 'pv-05']);
   });
 

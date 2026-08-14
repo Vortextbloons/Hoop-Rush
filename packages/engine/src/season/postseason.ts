@@ -68,73 +68,12 @@ import { conferenceOf, franchisesInConference } from './league.ts';
 import { simulateSeasonGameWithEffects } from './season-game.ts';
 import { drawHexInt } from './season-seeds.ts';
 
-/**
- * M2.6 Season Run postseason-v2 state machine (spec/2.0/02 postseason-v2,
- * postseason-foundations). Pure functions over the validated v2 contract
- * (`@hoop-rush/data-contracts` season-postseason.ts): Play-In rankings,
- * one-game-at-a-time Play-In resolution, the fixed bracket (no reseeding),
- * best-of-seven series ending immediately at four wins, the 2-2-1-1-1 home
- * pattern, deterministic advancement, the standings-driven Finals home-court
- * decision with its recorded tiebreak resolution, and the champion. The
- * machine never fabricates a winner: an AI team that cannot field a legal
- * five forfeits 2-0 and a game with no legal five on either side is a typed
- * integrity failure with no game simulated.
- *
- * ## Named seed paths (all pure functions of the root seed, never execution
- * order): every Play-In game simulates under
- * `seasonNamespaceSeed(rootSeed, 'postseason-play-in', gameId)`; every
- * playoff game under `seasonNamespaceSeed(rootSeed, 'postseason-playoff-games',
- * gameId)`; postseason injury streams (occurrence, severity, type, clock,
- * same-game-return, return, rehab) under `seasonNamespaceSeed(rootSeed,
- * 'postseason-injuries', ...)`; the Finals home-court fallback draw reads the
- * SAVED `state.finalsHomeCourtDrawSeed` (`seasonNamespaceSeed(tiesSeed,
- * 'postseason-draws', 'finals-home-court')`, derived by the contract's
- * `buildInitialPostseasonState`). AI postseason rotations consume NO RNG:
- * they are the run's saved regular-season rotations, fixed for the whole
- * postseason (the `postseason-ai-rotations` namespace stays reserved for
- * future AI decisions). The postseason round label carried into health
- * transitions is `82 + gameOrdinal`, where the ordinal is the game's fixed
- * position in the canonical full-game enumeration.
- *
- * ## Canonical game order (frozen): phase (play-in then playoffs),
- * conference (east then west), round (first-round -> conference-semifinal ->
- * conference-final -> finals), series slot, game number. A game is only
- * scheduled once its matchup is fully determined; results are recorded one
- * game at a time, so dependent games derive their teams from prior results.
- *
- * ## Command-handler contract (spec/2.0/07 M2.6): `start-postseason` seeds
- * the Play-In rankings through the caller-supplied `SeasonPostseasonRankingsFn`
- * seam (Track A's tiebreaker pipeline feeds it at integration; the machine
- * itself records no tiebreak resolutions). `advance-postseason` simulates
- * one game at a time and continues through AI-only games until a human
- * rotation is required, the tournament ends, or the target game is reached.
- * `submit-postseason-rotation` validates and locks the human rotation (and
- * optionally applies a risky-rehab Influence spend); `spectate-postseason-game`
- * simulates the current game after elimination; `fast-forward-postseason`
- * simulates every remaining game. The Finals home-court decision (overall
- * record by exact cross-multiplication, then head-to-head, then point
- * differential, then the saved draw) is recorded as one
- * `finals-home-court` tiebreak resolution at slot 1 whenever the finals
- * pair; the draw resolution records its saved draw seed.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 export const SEASON_POSTSEASON_RISKY_REHAB_COST = 2;
 
-/**
- * The `completion.almanacDigest` placeholder the engine emits when the
- * champion is decided (LEAD DECISION, documented): the run schema requires a
- * 32-hex digest and the promoted almanac is computed by the persistence
- * promotion (Track C/lead), so the engine writes the frozen zero digest and
- * the promotion replaces it when the almanac persists. The block pipeline
- * uses the same zero-digest placeholder convention for post-block facts.
- */
 export const POSTSEASON_ALMANAC_DIGEST_PLACEHOLDER = '0'.repeat(32);
 
 const CONFERENCES: readonly ConferenceId[] = ['east', 'west'];
 
-/** Fixed first-round seed-index pairs (no reseeding): 1-8, 4-5, 3-6, 2-7. */
 const FIRST_ROUND_PAIRS: ReadonlyArray<readonly [number, number]> = [
   [0, 7],
   [3, 4],
@@ -142,10 +81,8 @@ const FIRST_ROUND_PAIRS: ReadonlyArray<readonly [number, number]> = [
   [1, 6],
 ];
 
-/** Home-court games of the 2-2-1-1-1 pattern (games 1, 2, 5, 7). */
 const HOME_COURT_GAMES: ReadonlySet<number> = new Set([1, 2, 5, 7]);
 
-/** The fixed Play-In game ids in canonical order. */
 const PLAY_IN_GAME_ORDER: readonly string[] = [
   playInGameIdOf('east', 'seven-eight'),
   playInGameIdOf('east', 'nine-ten'),
@@ -155,7 +92,6 @@ const PLAY_IN_GAME_ORDER: readonly string[] = [
   playInGameIdOf('west', 'final'),
 ];
 
-/** The fixed playoff series ids in canonical bracket order. */
 const PLAYOFF_SERIES_IDS: readonly string[] = [
   'east-first-round-1',
   'east-first-round-2',
@@ -174,7 +110,6 @@ const PLAYOFF_SERIES_IDS: readonly string[] = [
   'finals',
 ];
 
-/** Every possible postseason game id in canonical order (ordinals are fixed). */
 const POSTSEASON_GAME_ORDER: readonly string[] = [
   ...PLAY_IN_GAME_ORDER,
   ...PLAYOFF_SERIES_IDS.flatMap((seriesId) =>
@@ -182,7 +117,6 @@ const POSTSEASON_GAME_ORDER: readonly string[] = [
   ),
 ];
 
-/** The frozen injury body-region classification (mirror of injuries.ts). */
 const POSTSEASON_INJURY_TYPES: readonly SeasonInjuryType[] = [
   'lower-body',
   'soft-tissue',
@@ -190,7 +124,6 @@ const POSTSEASON_INJURY_TYPES: readonly SeasonInjuryType[] = [
   'illness',
 ];
 
-/** Typed invariant failure carrying the game/series facts (block-pipeline convention). */
 export class SeasonPostseasonInvariantError extends Error {
   constructor(message: string) {
     super(message);
@@ -198,7 +131,6 @@ export class SeasonPostseasonInvariantError extends Error {
   }
 }
 
-/** Thrown when a required caller-supplied seam (catalog, profile, rankings) is absent. */
 export class SeasonPostseasonContextError extends Error {
   constructor(message: string) {
     super(message);
@@ -206,39 +138,22 @@ export class SeasonPostseasonContextError extends Error {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Rankings seam (Track A's tiebreaker pipeline feeds this at integration).
-// ---------------------------------------------------------------------------
-
-/** The regular-season facts the rankings seam reads. */
 export interface SeasonPostseasonRankingsInput {
   league: SeasonLeague;
   standings: SeasonStandings;
-  /** The run root seed (deterministic tiebreak draws). */
+
   seed: string;
 }
 
-/** The top-ten regular-season ranking per conference, best first. */
 export interface SeasonPostseasonRankings {
   east: readonly string[];
   west: readonly string[];
 }
 
-/**
- * The rankings seam: a caller-supplied pure function of (league, standings,
- * seed) returning the ordered top ten per conference. The engine machine
- * only validates and records the output; Track A's tiebreaker pipeline
- * (concurrent track) implements the actual ranking at integration. Tests
- * supply a deterministic stub.
- */
 export type SeasonPostseasonRankingsFn = (
   input: SeasonPostseasonRankingsInput,
 ) => SeasonPostseasonRankings;
 
-/**
- * Validates and records the Play-In rankings for both conferences. The
- * machine records no tiebreak resolutions itself (Track A records them).
- */
 export function seasonPostseasonSetRankings(
   state: SeasonPostseasonState,
   league: SeasonLeague,
@@ -269,11 +184,6 @@ export function seasonPostseasonSetRankings(
   return { ...state, playIn };
 }
 
-// ---------------------------------------------------------------------------
-// Canonical order and scheduling.
-// ---------------------------------------------------------------------------
-
-/** The fixed ordinal of a postseason game in the canonical enumeration (1-based). */
 export function seasonPostseasonGameOrdinal(gameId: string): number {
   const index = POSTSEASON_GAME_ORDER.indexOf(gameId);
   if (index === -1) {
@@ -282,19 +192,11 @@ export function seasonPostseasonGameOrdinal(gameId: string): number {
   return index + 1;
 }
 
-/** The next decision of the tournament: the next game, completion, or an integrity failure. */
 export type SeasonPostseasonNextGame =
   | { kind: 'game'; gameId: string }
   | { kind: 'complete' }
   | { kind: 'integrity-failure'; reason: string };
 
-/**
- * The one playable game in canonical order (phase, conference, matchup /
- * series slot, game number), or `complete` when the champion is decided, or
- * an integrity failure when the recorded state cannot schedule a game. The
- * first incomplete series is always paired (its feeders complete earlier in
- * canonical order); an unpaired series here is a state inconsistency.
- */
 export function seasonPostseasonNextGame(state: SeasonPostseasonState): SeasonPostseasonNextGame {
   if (state.bracket === null) {
     for (const conference of CONFERENCES) {
@@ -344,14 +246,6 @@ export function seasonPostseasonNextGame(state: SeasonPostseasonState): SeasonPo
   return { kind: 'complete' };
 }
 
-/**
- * The structurally upcoming game ids from the current state, in canonical
- * order: remaining Play-In games (the final only once its qualifiers are
- * done) plus every game of every incomplete playoff series. This is an
- * over-approximation for target validation — a series may end before a
- * late game number materializes; the advance loop then runs to its natural
- * end (human decision or completion).
- */
 export function seasonPostseasonUpcomingGames(state: SeasonPostseasonState): string[] {
   const ids: string[] = [];
   if (state.bracket === null) {
@@ -385,13 +279,6 @@ export function seasonPostseasonUpcomingGames(state: SeasonPostseasonState): str
   return ids;
 }
 
-/**
- * The derived home/away teams of a scheduleable game, or null when the game
- * is not the current playable game (wrong phase, unpaired series, out-of-
- * sequence game number, or an unresolved play-in matchup). Play-In teams
- * derive from the ranking and prior results; playoff teams from the series
- * and the 2-2-1-1-1 pattern.
- */
 export function seasonPostseasonGameTeamsOf(
   state: SeasonPostseasonState,
   gameId: string,
@@ -439,7 +326,6 @@ export function seasonPostseasonGameTeamsOf(
   return { home, away };
 }
 
-/** True when the human franchise is one of the game's two teams. */
 export function seasonPostseasonHumanPlaysGame(
   state: SeasonPostseasonState,
   gameId: string,
@@ -449,14 +335,6 @@ export function seasonPostseasonHumanPlaysGame(
   return teams !== null && (teams.home === humanFranchiseId || teams.away === humanFranchiseId);
 }
 
-/**
- * True when the human franchise has no remaining path in the tournament:
- * a play-in participant who lost the 9/10 game or the final (the 7/8 loser
- * is still alive — they host the final), a playoff participant whose series
- * ended without them, or a franchise outside both top-ten rankings during
- * the play-in stage. Top-six seeds and active play-in participants are never
- * eliminated.
- */
 export function seasonPostseasonHumanEliminated(
   state: SeasonPostseasonState,
   humanFranchiseId: string,
@@ -486,7 +364,7 @@ export function seasonPostseasonHumanEliminated(
           return false;
         }
       }
-      // The 7/8 loser awaits the final while the 9/10 game still runs.
+
       if (
         sevenEight.status !== 'scheduled' &&
         sevenEight.loserFranchiseId === humanFranchiseId &&
@@ -495,9 +373,7 @@ export function seasonPostseasonHumanEliminated(
         return false;
       }
     }
-    // Not ranked anywhere (eliminated at the regular-season ranking), or
-    // ranked but none of the alive conditions matched (lost the 9/10 game or
-    // the final).
+
     return true;
   }
   for (const series of bracketSeriesOrder(state.bracket)) {
@@ -512,30 +388,16 @@ export function seasonPostseasonHumanEliminated(
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Game-result application (state transitions).
-// ---------------------------------------------------------------------------
-
-/** The recorded facts of one completed postseason game. */
 export interface SeasonPostseasonGameFacts {
   gameId: string;
   status: 'final' | 'forfeit';
   winnerFranchiseId: string;
   loserFranchiseId: string;
-  /** Null for forfeits (the game record never carries scores). */
+
   homeScore: number | null;
   awayScore: number | null;
 }
 
-/**
- * Applies one recorded postseason game result: resolves the play-in game and
- * its conference seeds (creating the bracket when both conferences finish),
- * or records the playoff game, advances the winner into its fixed bracket
- * slot, pairs the Finals with the standings-driven home-court decision (and
- * its recorded tiebreak resolution), and sets the champion only when the
- * Finals reach four wins. Every transition is a pure function of the current
- * state and the recorded facts.
- */
 export function seasonPostseasonApplyGameResult(
   state: SeasonPostseasonState,
   facts: SeasonPostseasonGameFacts,
@@ -672,7 +534,6 @@ function resolvePlayInGame(
   };
 }
 
-/** Resolves a conference's playoff seeds once its Play-In completes. */
 function advanceConferencePlayIn(playIn: PlayInState): PlayInState {
   const sevenDone = playIn.games.sevenEight.status !== 'scheduled';
   const nineDone = playIn.games.nineTen.status !== 'scheduled';
@@ -757,7 +618,6 @@ function pendingSeries(
   return seededSeries(seriesId, round, conference, null, null, null, null);
 }
 
-/** Creates the fixed bracket once both conferences resolve their Play-In. */
 function createSeasonPlayoffBracket(state: SeasonPostseasonState): SeasonPostseasonState {
   const eastSeeds = state.playIn.east.playoffSeeds;
   const westSeeds = state.playIn.west.playoffSeeds;
@@ -789,7 +649,6 @@ function createSeasonPlayoffBracket(state: SeasonPostseasonState): SeasonPostsea
   return { ...state, bracket };
 }
 
-/** All series of a bracket in fixed order: east rounds, then west, then Finals. */
 function bracketSeriesOrder(bracket: PlayoffBracket): PlayoffSeries[] {
   return [
     ...bracket.east.firstRound,
@@ -853,7 +712,6 @@ function replaceConferenceSeries(
   throw new SeasonPostseasonInvariantError(`unknown series ${seriesId}`);
 }
 
-/** The seed number of a completed series' winner, or null when unknown. */
 function winnerSeedOf(series: PlayoffSeries): number | null {
   const winner = series.winnerFranchiseId;
   if (winner === null || series.higherSeed === null || series.lowerSeed === null) {
@@ -862,7 +720,6 @@ function winnerSeedOf(series: PlayoffSeries): number | null {
   return winner === series.homeCourtFranchiseId ? series.higherSeed : series.lowerSeed;
 }
 
-/** Pairs a pending slot from its two advancing teams, home court to the higher seed. */
 function pairSeededSeries(
   slot: PlayoffSeries,
   sideA: { team: string; seed: number | null },
@@ -880,7 +737,6 @@ function pairSeededSeries(
   };
 }
 
-/** Advances a completed series' winner into its fixed next-round slot. */
 function advanceSeriesWinner(
   bracket: PlayoffBracket,
   seriesId: string,
@@ -966,24 +822,12 @@ function advanceSeriesWinner(
   }
 
   if (seriesId === `${conference}-conference-final`) {
-    // The Finals slots stay null until BOTH conference champions exist;
-    // applyPlayoffGameResult then pairs them from the standings-driven
-    // home-court decision (pairFinals fills both slots).
     return bracket;
   }
 
   throw new SeasonPostseasonInvariantError(`cannot advance unknown series ${seriesId}`);
 }
 
-/**
- * The Finals home-court decision (frozen hierarchy): overall regular-season
- * record by exact cross-multiplication comparison, then head-to-head
- * regular-season record, then point differential, then the saved
- * deterministic draw (first draw of `drawSeed` picks the east champion).
- * The deciding rule is recorded as one `finals-home-court` tiebreak
- * resolution at slot 1 with bounded evidence; the random-draw resolution
- * records the saved draw seed.
- */
 export function decideSeasonFinalsHomeCourt(input: {
   league: SeasonLeague;
   standings: SeasonStandings;
@@ -1008,7 +852,6 @@ export function decideSeasonFinalsHomeCourt(input: {
   let rule: 'overall-record' | 'head-to-head' | 'points-differential' | 'random-draw';
   let evidence: SeasonTiebreakResolution['evidence'];
 
-  // 1. Overall record (exact cross-multiplication comparison).
   const crossProduct = eastRow.wins * westRow.losses - westRow.wins * eastRow.losses;
   if (crossProduct > 0) {
     homeCourtFranchiseId = east;
@@ -1029,7 +872,6 @@ export function decideSeasonFinalsHomeCourt(input: {
       },
     ];
   } else {
-    // 2. Head-to-head regular-season record.
     const eastH2h = eastRow.headToHead.find((entry) => entry.franchiseId === west);
     const westH2h = westRow.headToHead.find((entry) => entry.franchiseId === east);
     if (eastH2h === undefined || westH2h === undefined) {
@@ -1056,7 +898,6 @@ export function decideSeasonFinalsHomeCourt(input: {
         },
       ];
     } else {
-      // 3. Point differential.
       const eastDifferential = eastRow.pointsFor - eastRow.pointsAgainst;
       const westDifferential = westRow.pointsFor - westRow.pointsAgainst;
       if (eastDifferential > westDifferential) {
@@ -1068,7 +909,6 @@ export function decideSeasonFinalsHomeCourt(input: {
         rule = 'points-differential';
         evidence = [{ label: 'points differential', value: westDifferential }];
       } else {
-        // 4. Saved deterministic draw.
         homeCourtFranchiseId = createRng(input.drawSeed).chance(0.5) ? east : west;
         rule = 'random-draw';
         evidence = [{ label: 'deciding rule', value: 'random-draw' }];
@@ -1092,7 +932,6 @@ export function decideSeasonFinalsHomeCourt(input: {
   return { homeCourtFranchiseId, resolution };
 }
 
-/** Pairs the Finals from the two conference champions and the home-court decision. */
 function pairFinals(
   bracket: PlayoffBracket,
   league: SeasonLeague,
@@ -1223,9 +1062,7 @@ function applyPlayoffGameResult(
     if (series.round === 'conference-final') {
       const eastChamp = updatedBracket.east.conferenceFinal.winnerFranchiseId;
       const westChamp = updatedBracket.west.conferenceFinal.winnerFranchiseId;
-      // The Finals pair once BOTH conference champions exist: the slots stay
-      // null until then, and the standings-driven home-court decision fills
-      // both (recording its tiebreak resolution).
+
       if (
         eastChamp !== null &&
         westChamp !== null &&
@@ -1249,15 +1086,10 @@ function applyPlayoffGameResult(
   };
 }
 
-/** The run stage implied by a postseason state (regular-season is caller-owned). */
 export function seasonPostseasonStageOf(state: SeasonPostseasonState): SeasonRunStage {
   if (state.championFranchiseId !== null) return 'completed';
   return state.bracket === null ? 'play-in' : 'playoffs';
 }
-
-// ---------------------------------------------------------------------------
-// Postseason injury stream (postseason-injuries namespace).
-// ---------------------------------------------------------------------------
 
 function postseasonInjurySeed(rootSeed: string, ...keys: string[]): string {
   return seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.postseasonInjuries, ...keys);
@@ -1275,16 +1107,6 @@ function uniformInt(seed: string, min: number, max: number): number {
   return min + (drawU32(seed) % (max - min + 1));
 }
 
-/**
- * The injuries-model roll over the M2.6 `postseason-injuries` named seed
- * stream: the risk formula, severity split, recovery ranges,
- * same-game-return rate, and clock derivation are exactly the frozen model
- * (`rollSeasonInjuryForPlayer` in injuries.ts), and only the named seed
- * path differs — the M2.6 contract reserves `postseason-injuries` for
- * postseason occurrence/severity/recovery streams. Injury records carry the
- * REAL postseason game id (`pi-...` / `po-...`), which the health contract
- * accepts since M2.6; `seedPath` preserves the full seed stream for replay.
- */
 export function rollPostseasonInjuryForPlayer(
   input: SeasonInjuryRollInput,
 ): SeasonInjuryRollResult {
@@ -1385,8 +1207,7 @@ export function rollPostseasonInjuryForPlayer(
     injuryId: seasonInjuryIdOf(seedPath),
     playerVersionId: input.playerVersionId,
     franchiseId: input.franchiseId,
-    // M2.6: the health contract accepts postseason game ids, so the record
-    // carries the real postseason game id (replayable from the record).
+
     gameId: input.gameId,
     type,
     severity,
@@ -1404,11 +1225,6 @@ export function rollPostseasonInjuryForPlayer(
   return { riskBasisPoints, occurred: true, removalClock, returnClock, injury };
 }
 
-/**
- * Seeded risky-rehab outcome roll (60% success / 40% failure) under the
- * `rehab` event stream of the postseason-injuries namespace keyed by injury
- * id — mirror of `rollSeasonRehabOutcome` (injuries.ts) over the M2.6 stream.
- */
 export function rollPostseasonRehabOutcome(
   rootSeed: string,
   injuryId: string,
@@ -1417,13 +1233,6 @@ export function rollPostseasonRehabOutcome(
   return drawBp(seed, SEASON_INJURY_REHAB_SUCCESS_BP) ? 'success' : 'failure';
 }
 
-/**
- * One game's postseason availability/removal/return seam (mirror of
- * `seasonGameHealthSeam` in health.ts over the postseason-injuries stream):
- * pregame availability for all 20 rostered versions, seeded injury rolls for
- * exposed players (durability, fatigue, recent load, recurrence), and the
- * removal/return clocks. Forfeited games roll nothing (no exposure).
- */
 function postseasonGameHealthSeam(input: {
   run: SeasonRun;
   health: SeasonHealthState;
@@ -1522,26 +1331,12 @@ function postseasonGameHealthSeam(input: {
   return { pregame, removals, returns, newInjuries };
 }
 
-// ---------------------------------------------------------------------------
-// Game simulation (production default = the real Season game controller).
-// ---------------------------------------------------------------------------
-
-/**
- * The per-game simulation seam (documented, test/CLI stub target): resolves
- * the full Season game input plus the pregame effects into the simulation
- * result and its effects transition. The production default runs the real
- * controller (`simulateSeasonGameWithEffects`); tests and CLI fixtures may
- * substitute a deterministic stub that forces winners while the surrounding
- * machine (summaries, health, effects, bracket advancement) stays real.
- */
 export type SeasonPostseasonGameResolver = (input: {
-  /** The stable postseason game id (`pi-...` or `po-...`). */
   gameId: string;
   gameInput: SeasonGameSimulationInput;
   pregameEffects: SeasonEffectsState;
 }) => { result: SeasonGameSimulationResult; transition: SeasonGameEffectsTransition };
 
-/** The production game resolver: the authoritative Season game controller. */
 export function defaultSeasonPostseasonGameResolver(input: {
   gameId: string;
   gameInput: SeasonGameSimulationInput;
@@ -1554,7 +1349,6 @@ export function defaultSeasonPostseasonGameResolver(input: {
   );
 }
 
-/** A zero-delta effects transition (stub-resolver helper): same pre/post states. */
 export function zeroSeasonGameTransition(effects: SeasonEffectsState): SeasonGameEffectsTransition {
   return {
     schemaVersion: 1,
@@ -1565,7 +1359,6 @@ export function zeroSeasonGameTransition(effects: SeasonEffectsState): SeasonGam
   };
 }
 
-/** The outcome of one simulated postseason game. */
 export type SeasonPostseasonGameOutcome =
   | {
       kind: 'simulated';
@@ -1579,7 +1372,7 @@ export type SeasonPostseasonGameOutcome =
 export interface SeasonPostseasonGameSimulationInput {
   run: SeasonRun;
   effects: SeasonEffectsState;
-  /** Expanded roster players keyed by playerVersionId (300 entries). */
+
   expanded: ReadonlyMap<string, SeasonGamePlayerInput>;
   catalog: SeasonDraftCatalog;
   profile: EraSimulationProfile;
@@ -1587,16 +1380,6 @@ export interface SeasonPostseasonGameSimulationInput {
   humanFranchiseId: string | null;
 }
 
-/**
- * Simulates one postseason game through the real Season game controller with
- * the postseason injury seam (a game where a team cannot field a legal five
- * rolls no injuries and forfeits through the controller; a game with no
- * legal five on either side is a typed integrity failure with no game
- * simulated; a human-team game that cannot field five is an invariant error
- * — callers must return the rotation decision instead). Produces the typed
- * game facts, the schema-valid postseason summary (with its result digest),
- * and the next health/effects states.
- */
 export function simulateSeasonPostseasonGame(
   input: SeasonPostseasonGameSimulationInput,
   options: { resolver?: SeasonPostseasonGameResolver } = {},
@@ -1673,10 +1456,7 @@ export function simulateSeasonPostseasonGame(
   }
   const forfeitPending = !homeLegalFacts.legal || !awayLegalFacts.legal;
   const ordinal = seasonPostseasonGameOrdinal(gameId);
-  // The frozen health schema caps the recorded round label at the 82-round
-  // regular season (LEAD DECISION, flagged): postseason health transitions
-  // label returns at the regular-season cap while the recovery cadence
-  // itself stays per-franchise-team-game.
+
   const round = SEASON_ROUND_COUNT;
   const pregame = effects;
   const seam = forfeitPending
@@ -1840,7 +1620,6 @@ function sideOfPlayer(
   );
 }
 
-/** Same-game return resolutions for the game's rolled records. */
 function sameGameReturnResolutionsOf(
   newInjuries: readonly SeasonInjuryRecord[],
   result: SeasonGameSimulationResult,
@@ -1859,7 +1638,6 @@ function sameGameReturnResolutionsOf(
   }));
 }
 
-/** Compact per-game injury events (one per rolled record, applied clocks). */
 function compactPostseasonInjuryEvents(input: {
   homeRoster: SeasonRun['rosters'][number];
   awayRoster: SeasonRun['rosters'][number];
@@ -1905,7 +1683,6 @@ function compactPostseasonInjuryEvents(input: {
   });
 }
 
-/** The postseason identity facts of a game (phase, round, series, number, conference). */
 function roundFactsOf(
   state: SeasonPostseasonState,
   league: SeasonLeague,
@@ -1952,13 +1729,6 @@ function roundFactsOf(
   };
 }
 
-/**
- * Converts one simulated postseason game into its compact summary
- * (postseason-summary-v1): reuses the regular-season compact conversion for
- * boxes and player lines (a forfeit becomes the official 2-0 with zero boxes
- * and empty player arrays), then maps the postseason identity facts and
- * computes the deterministic result digest (self-excluded).
- */
 export function seasonPostseasonSummaryFromGame(input: {
   runId: string;
   gameId: string;

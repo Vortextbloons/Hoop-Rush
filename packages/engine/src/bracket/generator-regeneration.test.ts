@@ -3,14 +3,6 @@ import { seedFromString } from '@hoop-rush/test-fixtures';
 import { generateBracket } from './generator.ts';
 import { fixtureBracket, generationOptions } from './generator-testing.ts';
 
-/**
- * Deterministic regeneration tests (spec/01): the same seed and inputs must
- * reproduce the shared fixture bracket byte-for-byte, and a different seed
- * must diverge. Each test performs a fresh multi-second generation, so they
- * live in their own file and run on a separate worker from the shared-bracket
- * property tests in generator.test.ts.
- */
-
 describe('generateBracket (deterministic regeneration)', () => {
   it('regenerates byte-identically with the same seed and inputs', () => {
     const a = fixtureBracket();

@@ -10,40 +10,18 @@ import { GameRecorder, type SideIndex } from './recorder.ts';
 import { createGameState, createTripContext, resolveTrip } from './possession.ts';
 import { buildFacts } from './facts.ts';
 
-/**
- * Game orchestration (spec/03): four 12-minute regulation periods plus
- * repeating five-minute overtime periods until exactly one winner exists.
- * Each period resets the team-foul count used for the bonus.
- *
- * Classic routes through the neutral fixed-five adapter: the five-player
- * lineups are immutable, foul-out tracking and substitution planning are
- * disabled, and every player receives 48 + 5*OT minutes. The adapter drives
- * the resumable possession pipeline to completion per trip (it never
- * observes the pause boundaries the Season controller uses), so the
- * possession order, RNG call sequence, result schema, and digest are
- * byte-identical to the pre-M2.2 engine.
- */
-
-/**
- * Neutral fixed-five adapter (spec/03): immutable lineups, no foul-outs, no
- * substitution planning, no pause observation. Plays the full period loop
- * against `resolveTrip`, which runs each trip through the same resumable
- * steps the Season controller pauses at, in the exact original RNG order.
- */
 export function playFixedFivePeriods(
   rng: ReturnType<EngineContext['rngFactory']>,
   recorder: GameRecorder,
   state: ReturnType<typeof createGameState>,
   tripContext: ReturnType<typeof createTripContext>,
 ): { overtimePeriods: number; winner: 'home' | 'away' } {
-  // Neutral-site tip: the opening possession is a fair coin.
   let offense: SideIndex = rng.chance(0.5) ? 0 : 1;
   let secondsRemaining = REGULATION_PERIOD_SECONDS;
   state.periodIndex = 0;
 
   for (let period = 0; period < MAX_PERIODS; period += 1) {
     if (period > 0) {
-      // Regulation periods all run; overtime only when the game is tied.
       if (period >= 4) {
         if (recorder.sides[0].points !== recorder.sides[1].points) break;
       }
@@ -60,14 +38,13 @@ export function playFixedFivePeriods(
       secondsRemaining = state.secondsRemaining;
       if (result.ended) offense = (1 - offense) as SideIndex;
       if (!result.ended && result.secondsElapsed === 0 && secondsRemaining > 0) {
-        // Guard against a stalled clock (should not happen with valid inputs).
         break;
       }
     }
   }
 
   const overtimePeriods = Math.max(0, recorder.sides[0].periodPoints.length - 4);
-  // No substitutions (sandbox v1): everyone plays all 48+OT minutes.
+
   recorder.assignMinutes(48 + overtimePeriods * 5);
 
   const homeScore = recorder.sides[0].points;

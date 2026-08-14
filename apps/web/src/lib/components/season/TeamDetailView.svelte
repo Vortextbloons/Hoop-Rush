@@ -12,15 +12,6 @@
     SeasonTeamPlayerStats,
   } from '$lib/season/season-team-detail-view';
 
-  /**
-   * Season Run team detail (M2.5 team drill-down): read-only view of any
-   * franchise's ten player-season versions joined to its locked rotation —
-   * starters, bench order, target minutes, closing five — plus folded
-   * per-player season stats when any block has been accepted. AI rotations
-   * are frozen for the run, so this always reflects the locked rotation; the
-   * human team's pending edits live on the Rotation tab.
-   */
-
   let {
     detail,
     manifest,
@@ -96,8 +87,6 @@
     </div>
   </div>
 
-  <!-- 0-100 team strip: minute-weighted player ratings from the locked
-       rotation (same packaged ratings as the per-player OVR chips). -->
   {#if detail.projection !== null}
     <dl
       class="mt-4 grid grid-cols-3 gap-2"

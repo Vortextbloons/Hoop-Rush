@@ -8,13 +8,6 @@ import { FIELD_AVAILABILITY } from '@hoop-rush/importer';
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
 
-/**
- * `hoop-rush data coverage`: field availability, provenance, confidence,
- * missingness, and playable status by season, era, franchise, and pool
- * (spec/09, spec/12). Reads the packaged manifest and its availability
- * matrix plus the persisted coverage report; never scans raw records.
- */
-
 export const DATA_COVERAGE_OPTIONS: Record<string, boolean> = {
   input: true,
   franchise: true,
@@ -41,7 +34,7 @@ interface CoverageReportPayload {
   unavailable: number;
   byReason: Record<string, number>;
   byBand: Record<string, number>;
-  /** Field families and their first published season (source availability). */
+
   fieldAvailability: Array<{ field: string; firstSeason: string | null }>;
   rows: CoverageRow[];
 }

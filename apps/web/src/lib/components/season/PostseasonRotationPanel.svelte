@@ -11,14 +11,6 @@
   import { INJURY_SEVERITY_LABEL } from '$lib/season/season-health-view';
   import RotationEditor from './RotationEditor.svelte';
 
-  /**
-   * Human postseason lineup decision (M2.6 hub): the shared rotation editor
-   * for the next human game, the optional risky-rehab spend (2 Influence,
-   * once per active injury), typed validation from the editor audit and the
-   * engine's submit rejection, and the lock-and-simulate action. All
-   * legality stays in the engine; this panel only collects the decision.
-   */
-
   let {
     editor,
     disabled,

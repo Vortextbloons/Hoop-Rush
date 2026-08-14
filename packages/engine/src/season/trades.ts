@@ -30,154 +30,20 @@ import { drawHexInt } from './season-seeds.ts';
 import { seasonRunStateDigest } from './state-digest.ts';
 import { seasonTransactionEntry } from './transactions.ts';
 
-/**
- * M2.5 generated trade windows (season-trade-v1, engine side, spec/2.0/07
- * M2.5 §13). Windows open after accepted checkpoints for blocks 2, 4, 5
- * (windowIndex 0, 1, 2): three base human offers plus deterministic AI-to-AI
- * offers/acceptances (8-15 AI trades per season, 3-6 per window) and AI
- * Influence spends, all through the shared legality and transaction
- * functions. Offers survive reload in the run's `trade` state.
- *
- * ## Contextual player value (bounded; NEVER Overall as authority)
- *
- * `seasonTradePlayerValue` combines four recorded inputs only (M2.5 §13:
- * role fit, availability, workload, contribution):
- *
- * - Contribution (0..100): a fixed weighted mean of the catalog's detailed
- *   possession ratings — offense (insideScoring, closeShot, midrange,
- *   threePoint, freeThrow, ballHandling, passing, offensiveIq), defense
- *   (perimeterDefense, interiorDefense, steal, block, defensiveIq,
- *   offensiveRebound, defensiveRebound), physical (speed, strength,
- *   vertical); `0.45 * offense + 0.40 * defense + 0.15 * physical`.
- * - Availability factor: 1.0 when the player has no active injury (the
- *   frozen health derivation, mirroring the health workstream's
- *   `seasonPlayerAvailable`); 0.7 with an active injury (an unavailable
- *   player keeps reduced trade value; recovery is possible).
- * - Workload factor: `1 - 0.15 * recentLoadBasisPoints / 10_000` from the
- *   effects load state (a worn player is worth less today), in [0.85, 1.0].
- * - Role-fit factor: `1 + 0.02 * max(0, 3 - groupDepth)` where groupDepth
- *   is the number of players on the receiving roster (after the swap)
- *   capable of the player's primary coarse group (G/F/C), in [1.00, 1.06].
- *
- * `value = clamp(0, 100, contribution * availability * workload * roleFit)`
- * rounded to two decimals. Every input is a recorded fact; Overall never
- * appears.
- *
- * ## Value bands (M2.5 §13)
- *
- * Ratio in basis points (1000 bp = 100% of the outgoing value):
- * `ratioBasisPoints = round(1000 * incoming / outgoing)`. 1-for-1 trades
- * qualify in [850, 1150] (`85-115` band), 2-for-2 in [800, 1200]
- * (`80-120`). The trade schema bounds the recorded ratio to [800, 1200];
- * the generator therefore only records candidates whose raw ratio is inside
- * [800, 1200] (probe selection below), and `qualified` reflects the frozen
- * band membership. AI-to-AI acceptance requires the ratio to be mutually
- * within band: both directions (ratio and its reciprocal) inside the band —
- * 1-for-1: [870, 1150], 2-for-2: [834, 1200].
- *
- * ## Deterministic generation (no execution-order RNG)
- *
- * All randomness derives from `seasonNamespaceSeed(rootSeed, 'trades', ...)`
- * with named sub-seed keys. Offer seed paths are
- * `['window', <wi>, 'offer', <n>]` for the three base human offers,
- * `['window', <wi>, 'extra-offer']` for the influence-purchased fourth offer,
- * and `['window', <wi>, 'ai', <n>]` for AI-to-AI activity; every offer
- * records its `seedPath` and its `offerId` is `off-` + the derived sub-seed.
- * Player/franchise selection ranks candidates by their own sub-seed and
- * takes the first k (order-independent).
- *
- * Human offers: an AI franchise is picked from the seeded ranking (never the
- * human franchise, and distinct across the three base offers); the swap
- * size (1-for-1 or 2-for-2) is seeded; outgoing human players and incoming
- * AI players are seeded picks. Up to 7 deterministic probes (sub-seed key
- * `probe/<k>`) seek a candidate that (a) keeps both resulting rosters legal
- * (validateSeasonRoster) and (b) has a raw ratio inside [800, 1200],
- * preferring the probe closest to 1000 bp. If no probe lands inside the
- * schema range, the closest legal probe is recorded with its ratio clamped
- * to [800, 1200] (qualified reflects the clamped ratio; virtually
- * unreachable with the packaged pool spread).
- *
- * AI-to-AI trades: per window, a seeded target in [3, 6] with a 40-candidate
- * attempt budget and a season cap of 15 minus the AI trades already recorded
- * in prior windows. Every candidate passes the SAME legality and mutual-band
- * functions as human trades before it is recorded (never forced);
- * AI-accepted offers are recorded with status 'accepted'. AI trades never
- * involve the human roster, and their candidates never move a player
- * referenced by an open human offer of the same window, so open offers
- * always remain actionable.
- *
- * AI Influence spends at window open: for every AI franchise in canonical
- * order, a seeded 25% decision to spend 1 Influence on extra-trade-offer
- * (balance permitting: floor -3), and a seeded 30% decision to spend 2
- * Influence on risky-rehab for one seeded active injury (balance permitting),
- * with the outcome rolled through the health workstream's rehab seams and
- * recorded in the ledger and rehabs tracking. All AI spends use
- * deterministic synthetic commandIds (`ai-window-<wi>-<franchise>-<...>`).
- *
- * ## Rotation repair (deterministic, M2.5 §13)
- *
- * After a trade, the rotation of each affected franchise is rebuilt by
- * `buildMinimalRotation` (deterministic G,G,F,F,C starter matching in
- * canonical order, canonical bench hierarchy, closing five = starters), then
- * the PRE-TRADE minute structure is preserved: every retained player keeps
- * their exact target minutes, and each incoming player inherits the minutes
- * of the outgoing player they replace (1-for-1 direct; 2-for-2 paired by
- * best coarse-group overlap, ties by canonical order). The rebuilt rotation
- * is validated with `validateSeasonRotation` before it is accepted.
- *
- * ## Atomic application (applySeasonTrade)
- *
- * One immutable path: unique ownership transfer (a version never appears on
- * two rosters), both rosters updated (legal ten players), deterministic
- * rotation repair, injury records follow the player (franchiseId updated),
- * player load entries stay keyed to the version (the version set never
- * changes) while the old-roster pair states involving moved players are
- * removed and the two new rosters' canonical pairs are added at zero
- * shared possessions (exactly 1,350 league pairs and 300 loads preserved),
- * and one immutable `trade` transaction entry. `applySeasonTrade` mutates
- * the run except `stateRevision`/`stateDigest`, which the caller advances
- * (every window and every accepted command bumps the revision exactly once).
- *
- * ## Catalog requirement (interpretation decision, reported to the lead)
- *
- * The frozen run snapshot carries no player positions or ratings, but
- * legality checks and rotation repair require positions and the value
- * function requires ratings. The window opener and trade application
- * therefore take the packaged draft catalog (the block runner and the
- * command application layer both hold it); when it is absent,
- * `SeasonTradeFactsError` is thrown instead of recording an unvalidated
- * trade (never force invalid trades).
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
-/**
- * The windowIndex opened by an accepted block index (2, 4, 5). The trade-
- * injury window block→index map: block 2 opens window 0, block 4 opens
- * window 1, block 5 opens window 2.
- */
 export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
   2: 0,
   4: 1,
   5: 2,
 };
 
-/** Frozen 1-for-1 value band (basis points). */
 const BAND_85_115 = { lower: 850, upper: 1150 } as const;
-/** Frozen multi-player / uneven package value band (basis points). */
+
 const BAND_80_120 = { lower: 800, upper: 1200 } as const;
-/** The schema's recordable ratio window (seasonTradeOfferValueBandSchema). */
+
 const RATIO_SCHEMA_BOUNDS = { lower: 800, upper: 1200 } as const;
 
-/**
- * M2.6.5 trade package kinds (spec/2.0/15): 1-for-1, 2-for-2, 1-for-2, and
- * 2-for-1 are legal when both resulting rosters stay within 10-15 and
- * retain a legal ten-player rotation subset. Value bands: 85-115 for
- * 1-for-1, 80-120 for every multi-player or uneven package.
- */
 export type SeasonTradePackageKind = '1-1' | '2-2' | '1-2' | '2-1';
 
-/** The seeded package-kind draw (weights: 1-1 40%, 2-2 30%, 1-2 15%, 2-1 15%). */
 function packageKindOf(seed: string): SeasonTradePackageKind {
   const draw = seedInt(seed, 100);
   if (draw < 40) return '1-1';
@@ -186,7 +52,6 @@ function packageKindOf(seed: string): SeasonTradePackageKind {
   return '2-1';
 }
 
-/** The outgoing/incoming sizes of a package kind. */
 export function packageSizesOf(kind: SeasonTradePackageKind): {
   outgoing: number;
   incoming: number;
@@ -197,7 +62,6 @@ export function packageSizesOf(kind: SeasonTradePackageKind): {
   return { outgoing: 2, incoming: 1 };
 }
 
-/** Value-function weights (documented above). */
 const VALUE_OFFENSE_WEIGHT = 0.45;
 const VALUE_DEFENSE_WEIGHT = 0.4;
 const VALUE_PHYSICAL_WEIGHT = 0.15;
@@ -206,20 +70,17 @@ const VALUE_WORKLOAD_MAX_PENALTY = 0.15;
 const VALUE_ROLE_FIT_BONUS_PER_SHORTAGE = 0.02;
 const VALUE_ROLE_FIT_NEUTRAL_DEPTH = 3;
 
-/** AI willingness constants (documented above). */
 const AI_EXTRA_OFFER_WILLINGNESS_PERCENT = 25;
 const AI_REHAB_WILLINGNESS_PERCENT = 30;
 
-/** Seeded per-window AI trade target: `3 + seedInt % 4` in [3, 6]. */
 const AI_TRADE_TARGET_RANGE = 4;
-/** Candidate attempts per window before recording fewer trades. */
+
 const AI_TRADE_ATTEMPT_BUDGET = 40;
-/** Season-level cap on AI trades (frozen trade-targets gate: 8-15). */
+
 const AI_TRADE_SEASON_CAP = 15;
-/** Deterministic probes per human/extra offer. */
+
 const OFFER_PROBE_BUDGET = 7;
 
-/** Typed error: the catalog player facts (positions/ratings) are missing. */
 export class SeasonTradeFactsError extends Error {
   constructor(message: string) {
     super(`season trades: ${message}`);
@@ -227,7 +88,6 @@ export class SeasonTradeFactsError extends Error {
   }
 }
 
-/** Typed invariant failure: a trade broke a frozen rule. */
 export class SeasonTradeInvariantError extends Error {
   constructor(message: string) {
     super(`season trades invariant: ${message}`);
@@ -235,17 +95,6 @@ export class SeasonTradeInvariantError extends Error {
   }
 }
 
-/**
- * The engine-facing run view used by the economy modules. The persisted
- * Season Run record keeps the M2.4 effects state (300 player loads + 1,350
- * pair chemistries) as a column beside the run snapshot — the engine
- * `SeasonRun` schema does not carry it (M2.5 contract §2: exactly six new
- * run fields, effects excluded). The economy modules mutate effects
- * (chemistry reset on trades, workload reads for value), so they operate on
- * `SeasonRun & { effects }`; callers that keep effects separate (the block
- * runner, the command layer) pass them via the explicit input/options
- * fields documented below.
- */
 export type SeasonEconomyRun = SeasonRun & { effects: SeasonEffectsState };
 
 export interface SeasonWindowOpenResult {
@@ -255,39 +104,23 @@ export interface SeasonWindowOpenResult {
   rosters: SeasonRoster[];
   ownership: SeasonRun['ownership'];
   rotations: SeasonRotation[];
-  /** Post-window effects state (AI trades reset pair chemistry). */
+
   effects: SeasonEffectsState;
-  /**
-   * Post-window health state (AI risky-rehab outcomes mutate injury
-   * records). The frozen M2.5 contract result shape predates this field;
-   * it is an additive extension so the runner can persist the window's
-   * health mutation (the state digest covers health).
-   */
+
   health: SeasonHealthState;
   stateRevision: number;
   stateDigest: string;
 }
 
 export interface SeasonOpenTradeWindowInput {
-  /** The run at its post-block state (health/influence/transactions already updated). */
   run: SeasonRun;
-  /** The accepted block index (2, 4, or 5 opens a window). */
+
   blockIndex: number;
   rootSeed: string;
   humanFranchiseId: string | null;
-  /**
-   * Packaged draft catalog (player positions + detailed ratings + primary
-   * positions). The block runner and command layer hold it; required for
-   * legality validation, rotation repair, and the contextual value function
-   * (a missing catalog throws SeasonTradeFactsError rather than recording an
-   * unvalidated window).
-   */
+
   catalog?: SeasonDraftCatalog;
-  /**
-   * The pre-window effects state (AI trades reset pair chemistry and the
-   * value function reads workloads). Required when `run` does not already
-   * carry an `effects` field (persistence-record shape).
-   */
+
   effects?: SeasonEffectsState;
 }
 
@@ -309,19 +142,11 @@ export function seasonTradeCatalogFactsOf(catalog: SeasonDraftCatalog): SeasonTr
   return { playable, ratings, primary };
 }
 
-/** Derived health facts for one player (frozen availability derivation). */
 export interface SeasonTradePlayerHealthFacts {
   available: boolean;
   activeInjuryIds: string[];
 }
 
-/**
- * Active injury ids and availability from the recorded health state. This
- * mirrors the health workstream's `seasonPlayerAvailable` exactly (a player
- * is unavailable iff they have an injury that is not same-game-returned and
- * has missed games remaining); implemented locally so the trade module stays
- * a pure function of the recorded state.
- */
 export function seasonTradePlayerHealthFacts(
   health: SeasonHealthState,
   playerVersionId: string,
@@ -337,11 +162,6 @@ export function seasonTradePlayerHealthFacts(
   return { available: activeInjuryIds.length === 0, activeInjuryIds };
 }
 
-/**
- * Resolves the engine-facing run view from the frozen input shape: the run
- * itself when it already carries an `effects` field (persistence-record
- * shape), else the explicit effects input. Throws when effects are absent.
- */
 export function seasonEconomyRunOf(run: SeasonRun, effects?: SeasonEffectsState): SeasonEconomyRun {
   if (effects !== undefined) return { ...run, effects };
   if ('effects' in run && run.effects !== undefined) {
@@ -352,22 +172,15 @@ export function seasonEconomyRunOf(run: SeasonRun, effects?: SeasonEffectsState)
   );
 }
 
-/** Contextual player value inputs (documented in the module docstring). */
 export interface SeasonTradeValueContext {
   run: SeasonEconomyRun;
   catalogFacts: SeasonTradeCatalogFacts;
-  /** The roster the player would join (role fit evaluates against it). */
+
   receivingFranchiseId: string;
-  /** The receiving roster AFTER the swap; defaults to the current roster. */
+
   candidateRosterIds?: readonly string[];
 }
 
-/**
- * The bounded contextual player value (0..100, two decimals): weighted
- * contribution from the detailed ratings, scaled by availability, workload
- * (effects recent load), and role fit on the receiving roster. Never reads
- * Overall.
- */
 export function seasonTradePlayerValue(
   playerVersionId: string,
   context: SeasonTradeValueContext,
@@ -438,11 +251,6 @@ function canPlayGroup(playable: readonly Position[], group: SlotGroup): boolean 
   return playable.some((position) => slotGroupOf(position) === group);
 }
 
-/**
- * The value band of a candidate swap (to-side view). 1-for-1 packages use
- * the 85-115 band; every multi-player or uneven package (2-for-2, 1-for-2,
- * 2-for-1) uses the 80-120 band (season-trade-v2, spec/2.0/15).
- */
 export function seasonTradeValueBandFor(input: {
   kind: SeasonTradePackageKind;
   outgoingValues: readonly number[];
@@ -465,14 +273,6 @@ export function seasonTradeValueBandFor(input: {
   };
 }
 
-/**
- * True when the ratio is mutually within the band: both the ratio and its
- * reciprocal (the other side's view) fall inside the frozen band. This is
- * the AI-to-AI acceptance rule (M2.5 §13: bands influence AI willingness;
- * M2.6.5: 85-115 for 1-for-1, 80-120 otherwise). The reciprocal is bounded
- * with a ceiling so the integer boundary matches the documented mutual
- * windows (1-for-1: [870, 1150], 2-for-2: [834, 1200]).
- */
 export function ratioMutuallyWithinBand(
   ratioBasisPoints: number,
   kind: SeasonTradePackageKind,
@@ -496,7 +296,6 @@ function aiFranchiseIdsOf(run: SeasonRun, humanFranchiseId: string): string[] {
     .sort();
 }
 
-/** The named trade-namespace sub-seed for a key path. */
 function tradeSeed(rootSeed: string, ...keys: string[]): string {
   return seasonNamespaceSeed(rootSeed, SEASON_SEED_NAMESPACES.trades, ...keys);
 }
@@ -505,7 +304,6 @@ function seedInt(seed: string, modulus: number): number {
   return drawHexInt(seed) % modulus;
 }
 
-/** Deterministic ranking: by sub-seed, ties broken by the canonical key. */
 function rankedBySeed<T>(
   items: readonly T[],
   seedOf: (item: T) => string,
@@ -521,7 +319,6 @@ function rankedBySeed<T>(
   });
 }
 
-/** Deterministic pick of k distinct items by their own sub-seeds. */
 function pickDistinct<T>(
   items: readonly T[],
   seedOf: (item: T) => string,
@@ -536,7 +333,6 @@ function pickDistinct<T>(
   return rankedBySeed(items, seedOf, keyOf).slice(0, k);
 }
 
-/** The coarse group ('G' | 'F' | 'C') of a player's primary position. */
 function primaryGroupOf(facts: SeasonTradeCatalogFacts, playerVersionId: string): SlotGroup | null {
   const primary = facts.primary.get(playerVersionId);
   return primary === undefined ? null : slotGroupOf(primary);
@@ -558,21 +354,10 @@ function swappedRosterIds(
   return [...rosterIds.filter((id) => !removed.includes(id)), ...added];
 }
 
-/**
- * True when the roster keeps the season-trade-v2 contract: 10-15 distinct
- * versions and a legal ten-player rotation subset (a G,G,F,F,C five that
- * survives any single removal). Same-person versions may coexist.
- */
 function rosterIsLegal(rosterIds: readonly string[], facts: SeasonTradeCatalogFacts): boolean {
   return rosterLegalityReasons(rosterIds, facts).length === 0;
 }
 
-/**
- * Legality failure strings for a candidate roster (accept-command path).
- * M2.6.5 (season-trade-v2): the resulting roster must hold 10-15 distinct
- * versions and at least one legal ten-player rotation subset (the rotation
- * rules the game pipeline enforces). Same-person versions may coexist.
- */
 function rosterLegalityReasons(
   rosterIds: readonly string[],
   facts: SeasonTradeCatalogFacts,
@@ -594,12 +379,6 @@ function rosterLegalityReasons(
   return failures;
 }
 
-/**
- * True when the members admit a legal ten-player rotation subset: ten
- * members with a G,G,F,F,C five that survives removing any single member.
- * Bounded subset enumeration over the 10-15 member rosters (C(15,5) at
- * most); the first valid subset in canonical order decides.
- */
 function rotationSubsetExists(members: readonly SeasonRosterMemberInput[]): boolean {
   if (members.length < 10) return false;
   const extras = members.length - 10;
@@ -633,7 +412,6 @@ function bitCount(value: number): number {
   return count;
 }
 
-/** The v1 rotation legality contract over exactly ten members. */
 function validateTenMemberRotation(members: readonly SeasonRosterMemberInput[]): boolean {
   return validateSeasonRoster(members).length === 0;
 }
@@ -651,7 +429,7 @@ interface OfferCandidate {
   kind: SeasonTradePackageKind;
   outgoing: string[];
   incoming: string[];
-  /** Raw ratio (to-side view) before schema clamping. */
+
   rawRatio: number;
 }
 
@@ -680,9 +458,7 @@ function humanOfferCandidate(
   );
   const humanAfter = swappedRosterIds(humanRosterIds, outgoing, incoming);
   const aiAfter = swappedRosterIds(aiRosterIds, incoming, outgoing);
-  if (
-    !rosterIsLegal(humanAfter, catalogFacts) || !rosterIsLegal(aiAfter, catalogFacts)
-  ) {
+  if (!rosterIsLegal(humanAfter, catalogFacts) || !rosterIsLegal(aiAfter, catalogFacts)) {
     return null;
   }
   const outgoingValues = outgoing.map((id) =>
@@ -721,22 +497,12 @@ function rankedAiFranchises(
   );
 }
 
-/** The package-kind iteration order starting at the drawn kind (cyclic). */
 function kindOrderStartingAt(kind: SeasonTradePackageKind): SeasonTradePackageKind[] {
   const order: SeasonTradePackageKind[] = ['1-1', '2-2', '1-2', '2-1'];
   const start = order.indexOf(kind);
   return [...order.slice(start), ...order.slice(0, start)];
 }
 
-/**
- * Generates one human-facing offer (base or extra): deterministic AI
- * franchise and swap selection with bounded legality/plausibility probes.
- * The drawn package kind is probed first; when the rosters cannot support
- * it (e.g. uneven packages on exactly-ten rosters), the remaining kinds are
- * probed in deterministic order so offers still generate. Returns null only
- * when no legal candidate exists at all (window opens with one fewer offer;
- * virtually unreachable for legal 30-team leagues).
- */
 export function generateHumanTradeOffer(
   context: OfferGenerationContext,
   seedPath: string[],
@@ -771,8 +537,6 @@ export function generateHumanTradeOffer(
     }
   }
 
-  // No franchise yielded a legal candidate (paranoid path): record nothing.
-  // The window still opens; offers are generated facts, never fabricated.
   return null;
 }
 
@@ -876,7 +640,6 @@ function assembleHumanOffer(
   };
 }
 
-/** Post-swap roster depth at the primary groups of the moved-in players. */
 function coverageDepthOf(
   rosterIds: readonly string[],
   movedIn: readonly string[],
@@ -929,13 +692,6 @@ export function generatedExtraOfferForSpend(
   return offer;
 }
 
-/**
- * One AI-to-AI candidate (never the human roster; legality pre-checked).
- * Reads the CURRENT working run (rosters mutate as earlier trades apply),
- * so candidates always reference real rosters. `protectedPlayers` are the
- * players referenced by the window's open human offers — AI trades never
- * move them, so every open offer stays actionable.
- */
 function aiTradeCandidate(
   run: SeasonEconomyRun,
   context: OfferGenerationContext,
@@ -971,8 +727,7 @@ function aiTradeCandidate(
   const kind = packageKindOf(tradeSeed(rootSeed, ...basePath, 'size'));
   const rosterA = rosterPlayerVersionIdsOf(run, a);
   const rosterB = rosterPlayerVersionIdsOf(run, b);
-  // When the rosters cannot support the drawn kind (e.g. uneven packages on
-  // exactly-ten rosters), probe the remaining kinds in deterministic order.
+
   for (const probeKind of kindOrderStartingAt(kind)) {
     const probeSizes = packageSizesOf(probeKind);
     const outgoing = pickDistinct(
@@ -996,13 +751,10 @@ function aiTradeCandidate(
 
     const aAfter = swappedRosterIds(rosterA, outgoing, incoming);
     const bAfter = swappedRosterIds(rosterB, incoming, outgoing);
-    if (
-      !rosterIsLegal(aAfter, catalogFacts) || !rosterIsLegal(bAfter, catalogFacts)
-    ) {
+    if (!rosterIsLegal(aAfter, catalogFacts) || !rosterIsLegal(bAfter, catalogFacts)) {
       continue;
     }
 
-    // To-side view: franchise b receives franchise a's outgoing players.
     const incomingValues = outgoing.map((id) =>
       seasonTradePlayerValue(id, {
         run,
@@ -1041,10 +793,6 @@ function assembleAiOffer(
   },
   attempt: number,
 ): SeasonTradeOffer {
-  // Offer-field convention (shared with human offers): `outgoing` is the
-  // set the TO side gives away and `incoming` is the set the FROM side
-  // sends. For AI-to-AI, b is the to-side: b gives away `incoming` (its own
-  // players picked on rosterB) and receives `outgoing` (a's players).
   const { rootSeed, windowIndex, catalogFacts } = context;
   const seedPath = ['window', String(windowIndex), 'ai', String(attempt)];
   const offerId = `off-${tradeSeed(rootSeed, ...seedPath)}`;
@@ -1120,7 +868,6 @@ function assembleAiOffer(
   };
 }
 
-/** AI trades recorded in prior windows (season cap accounting). */
 function priorAiTradeCount(run: SeasonRun, humanFranchiseId: string): number {
   let count = 0;
   for (const window of run.trade?.windows ?? []) {
@@ -1269,14 +1016,6 @@ function applyAiInfluenceSpends(
   return { health, influence, transactions };
 }
 
-/**
- * Deterministic AI-to-AI trades for one window: seeded target in [3, 6],
- * capped by the season total (15 minus prior windows), with a 40-candidate
- * attempt budget. Every recorded trade passed the same legality and
- * mutual-band functions and is applied through `applySeasonTrade`.
- * `protectedPlayers` are the players referenced by the window's open human
- * offers (generated before the AI activity); AI trades never move them.
- */
 function applyAiTrades(
   run: SeasonEconomyRun,
   rootSeed: string,
@@ -1325,16 +1064,6 @@ function applyAiTrades(
   return { run: working, offers, transactions: working.transactions };
 }
 
-/**
- * Opens a trade window after the accepted checkpoint for blocks 2, 4, 5
- * (windowIndex 0, 1, 2); any other block index returns null, as does a run
- * without a human franchise (offers target the human; the CLI calibration
- * runs use fixtures with one). Returns null when the window already exists
- * (idempotent — the window was persisted with the block commit). Generates
- * three base human offers, AI Influence spends, and AI-to-AI activity, all
- * deterministically, and returns the full post-window state with
- * `stateRevision + 1` and the recomputed `stateDigest`.
- */
 export function openSeasonTradeWindow(
   input: SeasonOpenTradeWindowInput,
 ): SeasonWindowOpenResult | null {
@@ -1363,7 +1092,6 @@ export function openSeasonTradeWindow(
     catalogFacts: seasonTradeCatalogFactsOf(catalog),
   };
 
-  // 1. Three base human offers (distinct AI franchises, seeded order).
   const offers: SeasonTradeOffer[] = [];
   const usedFranchiseIds: string[] = [];
   for (let n = 0; n < 3; n += 1) {
@@ -1375,7 +1103,6 @@ export function openSeasonTradeWindow(
     }
   }
 
-  // 2. AI Influence spends (seeded, balance permitting; ledger + transactions).
   const spends = applyAiInfluenceSpends(
     economyRun,
     rootSeed,
@@ -1389,8 +1116,6 @@ export function openSeasonTradeWindow(
     influence: spends.influence,
   };
 
-  // 3. AI-to-AI trades through the shared applySeasonTrade path. AI trades
-  // never move players referenced by the open human offers above.
   const protectedPlayers = new Set<string>();
   for (const offer of offers) {
     for (const id of [...offer.outgoingPlayerVersionIds, ...offer.incomingPlayerVersionIds]) {
@@ -1459,33 +1184,16 @@ export function openSeasonTradeWindow(
 }
 
 export interface SeasonTradeApplicationOptions {
-  /** The command id recorded on the immutable trade transaction entry. */
   commandId?: string | null;
-  /** The state revision the trade transaction entry records. */
+
   appliedAtStateRevision?: number;
 }
 
 export interface SeasonTradeApplicationResult {
-  /** The mutated run (carries the effects state alongside the snapshot). */
   run: SeasonEconomyRun;
   rosterChanges: SeasonTradeRosterChange[];
 }
 
-/**
- * Applies one trade atomically (M2.5 §13; M2.6.5 season-trade-v2): unique
- * ownership transfer (a version never appears on two rosters), both rosters
- * updated (legal 10-15 distinct versions; same-person versions may coexist)
- * with a legal ten-player rotation subset. Injury records follow the
- * players, and one immutable `trade` transaction entry is recorded. When
- * ONLY inactive players move, rotations and the active effects state are
- * untouched (spec/2.0/15). When rotation players move, rotations are
- * repaired deterministically (retained assignments/minutes preserved where
- * possible) and the active pair state is rebuilt from the repaired
- * rotations, preserving unchanged pairs and creating zero-state pairs for
- * new rotation teammates. Does NOT advance `stateRevision`/`stateDigest` —
- * the caller (command handler or window opener) bumps the revision exactly
- * once and recomputes the digest.
- */
 export function applySeasonTrade(
   run: SeasonEconomyRun,
   offer: SeasonTradeOffer,
@@ -1513,8 +1221,6 @@ export function applySeasonTrade(
     throw new SeasonTradeInvariantError('a trade must move one or two players on each side');
   }
 
-  // Structural pre-checks: every moved version on its stated roster exactly
-  // once, owned by the stated franchise, and never on two rosters.
   const rosterEntriesByFranchise = new Map(
     run.rosters.map((roster) => [roster.franchiseId, roster]),
   );
@@ -1548,7 +1254,6 @@ export function applySeasonTrade(
     }
   }
 
-  // New rosters (ten players each; version identity on each entry is unchanged).
   const toEntries = [
     ...toRoster.players.filter((player) => !outgoing.includes(player.playerVersionId)),
     ...fromRoster.players.filter((player) => incoming.includes(player.playerVersionId)),
@@ -1569,7 +1274,6 @@ export function applySeasonTrade(
     );
   }
 
-  // Ownership transfer (unique: a version never appears on two rosters).
   const ownership = run.ownership.map((row) =>
     moved.includes(row.playerVersionId)
       ? {
@@ -1591,12 +1295,6 @@ export function applySeasonTrade(
     return rotation;
   });
 
-  // Effects (M2.6.5, spec/2.0/15): moving only inactive players leaves the
-  // active rotations and effects unchanged — no reconcile at all. When the
-  // rotation membership changes, the active effects state is reconciled
-  // against the new rosters and repaired rotations (demotion freeze,
-  // promotion restore, zero-state newly active pairs), then the traded
-  // players' archived chemistry is deleted (loads follow the version).
   const rotationMembersBefore = new Set([
     ...(run.rotations.find((rotation) => rotation.franchiseId === toFranchiseId)?.starters ?? []),
     ...(run.rotations.find((rotation) => rotation.franchiseId === toFranchiseId)?.benchOrder ?? []),
@@ -1628,7 +1326,6 @@ export function applySeasonTrade(
     };
   }
 
-  // Health records follow the players (franchiseId updated).
   const health: SeasonHealthState = {
     ...run.health,
     injuries: run.health.injuries.map((injury) =>
@@ -1643,7 +1340,6 @@ export function applySeasonTrade(
     ),
   };
 
-  // One immutable trade transaction entry.
   const windowBlockIndex = windowBlockIndexOf(run, offer.windowIndex);
   const entry = seasonTransactionEntry({
     transactionId: `txn-trade-${offer.offerId}`,
@@ -1663,7 +1359,6 @@ export function applySeasonTrade(
     explanation: `Trade: ${toFranchiseId} receives ${incoming.join(', ')} for ${outgoing.join(', ')}`,
   });
 
-  // Mark the offer accepted when the run's trade state records it.
   let trade = run.trade;
   if (trade !== null) {
     trade = {
@@ -1714,15 +1409,6 @@ function windowBlockIndexOf(run: SeasonRun, windowIndex: number): number | null 
   );
 }
 
-/**
- * Deterministic rotation repair (M2.5 §13): rebuilds a legal rotation for the
- * franchise from its new ten players (matchStartingFive in canonical order,
- * bench hierarchy, closing five = starters), then preserves the pre-trade
- * minute structure — retained players keep their exact target minutes and
- * each incoming player inherits the minutes of the outgoing player they
- * replace (1-for-1 direct; 2-for-2 paired by best coarse-group overlap with
- * canonical tie-breaking). The repaired rotation is validated before return.
- */
 function repairRotationAfterTrade(
   oldRotation: SeasonRotation,
   facts: SeasonTradeCatalogFacts,
@@ -1734,9 +1420,7 @@ function repairRotationAfterTrade(
     playerVersionId,
     playable: facts.playable.get(playerVersionId) ?? [],
   }));
-  // M2.6.5: rosters may hold 10-15 players; the rotation keeps exactly ten.
-  // Retain the old rotation members still on the roster, then fill remaining
-  // slots from the new roster by role fit and canonical id.
+
   const rotationIds = new Set([...oldRotation.starters, ...oldRotation.benchOrder]);
   const retained: SeasonRosterMemberInput[] = members.filter((member) =>
     rotationIds.has(member.playerVersionId),
@@ -1783,8 +1467,7 @@ function repairRotationAfterTrade(
     return { playerVersionId, minutes };
   });
   const rotation: SeasonRotation = { ...base, targetMinutes };
-  // Validate against the ROTATION's ten players only (the catalog facts map
-  // covers every candidate in the packaged catalog, far beyond this roster).
+
   const memberPlayable = new Map<string, readonly Position[]>();
   for (const playerVersionId of rotationMemberIds) {
     const playable = facts.playable.get(playerVersionId);
@@ -1829,13 +1512,6 @@ function pairIncomingToOutgoing(
   return pairs;
 }
 
-/**
- * Closes trade windows whose deadline this block submission triggers
- * (M2.5 §13 LEAD DECISION): window 0 (opened by block 2) closes at block 3
- * submission, window 1 (block 4) at block 5, window 2 (block 5) at block 6.
- * Closing marks the window `closed` and every still-open offer `expired`.
- * Returns null when the run has no trade state.
- */
 export function expireTradeOffersForBlock(
   trade: SeasonTradeState | null,
   blockIndex: number,

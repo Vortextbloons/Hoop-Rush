@@ -1,26 +1,17 @@
-/**
- * League stint aggregates for era simulation profiles (spec/12 provenance).
- *
- * Field families that are absent across an entire era stay `null`
- * (unavailable) instead of being converted to zero. Per-season aggregation
- * keeps family support separate: a family only contributes to era aggregates
- * in seasons where the league published it (spec/12 availability table) and
- * its rows actually carry values.
- */
 import { join } from 'node:path';
 import { NBA_ROOT, fieldAvailableFrom } from '../config.ts';
 import { readJson, safeFloat } from '../json.ts';
 
 export interface LeagueAggregates {
   teamGames: number;
-  /** Possessions estimate; null when rebound splits or turnovers are unavailable. */
+
   possessions: number | null;
   points: number;
   fga: number;
   fgm: number;
-  /** Null when the league did not publish three-point attempts. */
+
   tpa: number | null;
-  /** Null when the league did not publish three-point makes. */
+
   tpm: number | null;
   fta: number;
   ftm: number;
@@ -30,16 +21,11 @@ export interface LeagueAggregates {
   stl: number | null;
   tov: number | null;
   pf: number;
-  /** Rows carrying each family (sample coverage diagnostic). */
+
   coverage: Record<string, number>;
-  /** Total rows scanned. */
+
   rows: number;
-  /**
-   * Common-support pair sums: ratio families derive only over seasons where
-   * BOTH inputs are published and present, so mixed-support eras (e.g. steals
-   * from 1973-74, turnovers from 1977-78) never distort a ratio. Null when no
-   * season has common support.
-   */
+
   pairs: {
     stealShare: { stl: number; tov: number; seasons: number } | null;
     reboundSplit: { oreb: number; dreb: number; seasons: number } | null;
@@ -47,7 +33,6 @@ export interface LeagueAggregates {
   };
 }
 
-/** One stint row; only the fields summed here are read (rest are ignored). */
 export interface StintRow {
   fga?: unknown;
   fgm?: unknown;
@@ -83,7 +68,6 @@ function fin(sum: Sum): number | null {
   return sum.total;
 }
 
-/** Field family -> stint output key used for availability checks. */
 const FAMILY_KEY: Record<string, string> = {
   tpa: 'tpa',
   tpm: 'tpm',
@@ -93,11 +77,6 @@ const FAMILY_KEY: Record<string, string> = {
   tov: 'turnovers',
 };
 
-/**
- * Pure derivation over stint rows for one season. Families the league did
- * not publish in the season (fieldAvailableFrom) or that no row carries stay
- * null.
- */
 export function deriveSeasonAggregatesFromStints(
   season: string,
   stints: readonly StintRow[],
@@ -133,7 +112,7 @@ export function deriveSeasonAggregatesFromStints(
   const teamGames = Math.max(1.0, playerGames / 10.0);
   const fga = sums['fga']?.total ?? 0;
   const fta = sums['fta']?.total ?? 0;
-  // Availability: published by the league AND present in the rows.
+
   const family = (name: string): number | null => {
     if (!fieldAvailableFrom(FAMILY_KEY[name] ?? name, season)) return null;
     return fin(sums[name] ?? { total: 0, rows: 0 });
@@ -171,10 +150,6 @@ export function deriveSeasonAggregatesFromStints(
   };
 }
 
-/**
- * Combined era aggregates: each family sums only over seasons where it is
- * published and present; ratio pairs derive over their common support.
- */
 export function deriveLeagueAggregates(seasons: readonly string[]): LeagueAggregates {
   const combined: LeagueAggregates = {
     teamGames: 0,
@@ -233,7 +208,7 @@ export function deriveLeagueAggregates(seasons: readonly string[]): LeagueAggreg
     for (const [name, count] of Object.entries(a.coverage)) {
       combined.coverage[name] = (combined.coverage[name] ?? 0) + count;
     }
-    // Common-support pairs for ratio families.
+
     if (a.stl !== null && a.tov !== null) {
       pairSeasons.stealShare.stl += a.stl;
       pairSeasons.stealShare.tov += a.tov;
@@ -250,8 +225,7 @@ export function deriveLeagueAggregates(seasons: readonly string[]): LeagueAggreg
       pairSeasons.turnoverPerPossession.count += 1;
     }
   }
-  // Family-level availability across the era: published and present in every
-  // packaged season of the era.
+
   const family = (key: keyof LeagueAggregates): number | null => {
     const value = first === null ? null : (first[key] as number | null);
     if (value === null) return null;
@@ -296,7 +270,6 @@ export function deriveLeagueAggregates(seasons: readonly string[]): LeagueAggreg
   return combined;
 }
 
-/** Backward-compatible pure derivation (no season availability context). */
 export function deriveLeagueAggregatesFromStints(stints: readonly StintRow[]): LeagueAggregates {
   return deriveSeasonAggregatesFromStints('2099-00', stints);
 }

@@ -14,15 +14,6 @@ import type {
 import { generateBracket } from './generator.ts';
 import { createEngineContext } from '../sim/context.ts';
 
-/**
- * Shared fixtures for bracket generation tests (spec/01, spec/06). A small
- * synthetic catalog keeps the suite fast while exercising the full
- * propose-review-freeze workflow. The generation is deterministic, so the
- * bracket is computed once per worker and reused by every test that asserts
- * properties of it; the regeneration tests in generator-regeneration.test.ts
- * still generate independently.
- */
-
 function candidatePlayer(
   franchiseId: string,
   index: number,
@@ -34,10 +25,7 @@ function candidatePlayer(
     displayName: `${franchiseId} ${String(index)}`,
     positions,
   });
-  // Scale the possession ratings with the score so proposals span the
-  // strength spectrum (the score alone only drives proposal sampling).
-  // Tendencies scale too: the m3 engine differentiates on creation, spacing,
-  // and shot volume, so score-flat tendencies would compress win rates.
+
   const delta = score - 65;
   const shifted = Object.fromEntries(
     Object.entries(sim.ratings).map(([key, value]) => [
@@ -99,7 +87,6 @@ const FRANCHISES = [
   'wizards',
 ];
 
-/** One franchise with candidates spread evenly across the strength spectrum. */
 function candidatesFor(franchiseId: string): FranchiseCandidates {
   const players: BracketCandidatePlayer[] = [];
   let index = 0;
@@ -148,14 +135,6 @@ export function generationOptions(
   };
 }
 
-/**
- * The fixture generation is deterministic, and most tests only assert
- * properties of that single artifact. Computing it once keeps the suite fast
- * (each generation measures ~360 proposals against the benchmark matrix);
- * the byte-identity test regenerates independently. The proposal and
- * benchmark counts are the minimum that still spans the strength band:
- * 8 proposals collapse every team to the same percentile.
- */
 let sharedBracket: OpponentBracket | null = null;
 export function fixtureBracket(): OpponentBracket {
   if (sharedBracket === null) {

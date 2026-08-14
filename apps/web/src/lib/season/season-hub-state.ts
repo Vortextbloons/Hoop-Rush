@@ -62,32 +62,6 @@ import {
   type SeasonRunMutation,
 } from './season-cross-tab';
 
-/**
- * Season Run hub state (spec/2.0/07, M2.3, M2.5, M2.6): the single UI-side
- * owner of the accepted snapshot, the live block run, and the postseason
- * orchestration. Reads accepted state from the repository, subscribes to
- * `SeasonBlockRunner` and `SeasonPostseasonRunner` events, and re-reads the
- * snapshot after every accepted commit. Block submission builds the typed
- * `SeasonSubmitBlockCommand` and hands the runner its `SeasonBlockStartInput`;
- * cancellation and retry route through the same request id.
- *
- * M2.5: also issues the typed between-block commands (select-block-objective,
- * spend-influence, accept/decline-trade-offer, forfeit-interrupted-game)
- * through the pure engine handler, persists results through
- * `repo.applySeasonRunCommand`, and mirrors the runner's `interrupted` event
- * for the recovery panel. The runner owns validation, canonical acceptance,
- * and atomic persistence; this module never touches IndexedDB directly.
- *
- * M2.6: the postseason commands (`start-postseason` and
- * `submit-postseason-rotation` dispatch directly through the engine handler
- * and commit through `repo.commitPostseasonAdvancement`; `advance-postseason`,
- * `spectate-postseason-game`, and `fast-forward-postseason` orchestrate
- * through the postseason runner — one game per atomic commit, or ≤ 8-game
- * chunks for the eliminated-run fast-forward — with the `postseason` mirror
- * tracking the session and the runner promoting the champion atomically at
- * completion).
- */
-
 export type BlockPhase = 'idle' | 'running' | 'interrupted' | 'cancelled' | 'failed' | 'complete';
 
 export interface BlockRunState {
@@ -99,7 +73,7 @@ export interface BlockRunState {
   latestGameId: string | null;
   latestResult: SeasonScoreline | null;
   error: { code: string; message: string; seed: string | null; gameId: string | null } | null;
-  /** The submitted command (retry re-issues the same idempotent command). */
+
   command: SeasonSubmitBlockCommand | null;
   startInput: SeasonBlockStartInput | null;
 }
@@ -109,38 +83,28 @@ export interface SubmitBlockEnvelope {
   start: SeasonBlockStartInput;
 }
 
-/** A rejected between-block command, surfaced as a typed alert. */
 export interface SeasonRunCommandError {
   command: SeasonRunCommand['command'];
-  /**
-   * Null when the command never reached the engine handler (for example the
-   * active run was not loaded, or the handler threw before returning a
-   * typed rejection). The engine implements every handler; a non-null
-   * rejection is the typed, mapped outcome.
-   */
+
   rejection: SeasonRunCommandRejection | null;
   message: string;
 }
 
-/** The two M2.5 Influence spend purposes (data-contracts keeps them inline). */
 export type SeasonSpendInfluencePurpose = SeasonSpendInfluenceCommand['purpose'];
 
-/** M2.6 postseason orchestration phase mirror (same spirit as `block`). */
 export type SeasonPostseasonPhase = 'idle' | 'running' | 'cancelled' | 'failed' | 'complete';
 
-/** The frozen hub postseason progress mirror (M2.6 cross-track contract). */
 export interface SeasonPostseasonProgress {
   phase: SeasonPostseasonPhase;
-  /** Games committed in this orchestration session. */
+
   gamesCompleted: number;
-  /** Remaining tournament games (estimate at the last re-read) or 0. */
+
   gamesTotal: number;
   latestGameId: string | null;
   latestResult: SeasonScoreline | null;
   error: { code: string; message: string } | null;
 }
 
-/** The post-command effects state when the engine attached it to the run output. */
 function postCommandEffects(run: SeasonRun, prior: SeasonEffectsState): SeasonEffectsState {
   const withEffects = run as SeasonRun & { effects?: SeasonEffectsState };
   return withEffects.effects ?? prior;
@@ -175,60 +139,42 @@ export class SeasonHubState {
   private readonly runner: SeasonBlockRunner;
   private readonly listeners = new Set<() => void>();
   private unsubscribeRunner: (() => void) | null = null;
-  /** M2.6: the postseason runner (injected in tests; lazy singleton in app). */
+
   private postseasonRunner: SeasonPostseasonRunner | null = null;
   private postseasonRunnerPromise: Promise<SeasonPostseasonRunner> | null = null;
   private unsubscribePostseasonRunner: (() => void) | null = null;
-  /** M2.6: the in-flight postseason session request id (cancel routing). */
+
   private postseasonRequestId: string | null = null;
-  /** M2.6: memoized packaged era simulation profile for engine contexts. */
+
   private profilePromise: Promise<EraSimulationProfile> | null = null;
-  /**
-   * Performance pass: cross-tab mutation channel. Another tab's commit,
-   * clear, or replacement invalidates the local cache, reloads the active
-   * index/snapshot, cancels stale local simulation, and surfaces the
-   * actionable "run changed in another tab" state.
-   */
+
   private readonly channel: SeasonRunChannel;
   private unsubscribeChannel: (() => void) | null = null;
-  /** True while a cross-tab reload is in flight (dedupes concurrent signals). */
+
   private externalReloading = false;
-  /** Cross-tab invalidation reason, surfaced to the UI as an actionable banner. */
+
   externalChange: { kind: SeasonRunMutation['kind']; message: string } | null = null;
 
   snapshot: SeasonRunSnapshot | null = null;
   index: SeasonActiveRunIndex | null = null;
   block: BlockRunState = { ...IDLE_BLOCK };
-  /** M2.6: the postseason orchestration progress mirror (frozen shape). */
+
   postseason: SeasonPostseasonProgress = { ...IDLE_POSTSEASON };
-  /** Load error surfaced to the page. */
+
   error: string | null = null;
-  /**
-   * M2.4: a stored run made under an older schema (schema-v4 runs cannot
-   * continue), preserved until the user explicitly discards it.
-   */
+
   incompatible: SeasonRunIncompatibleInfo | null = null;
-  /**
-   * M2.5: the uncommitted pending block candidate of an interrupted run
-   * (persisted; survives reload). Null when no block is paused.
-   */
+
   pending: SeasonPendingBlockCandidate | null = null;
-  /**
-   * M2.5: the typed invalid-roster interruption (from the runner event; null
-   * after a reload — the pending candidate still proves the pause).
-   */
+
   interruption: SeasonInvalidRosterInterruption | null = null;
-  /** M2.5: the last rejected between-block command, surfaced as a typed alert. */
+
   commandError: SeasonRunCommandError | null = null;
-  /** Packaged draft catalog for trade commands; set after assets load. */
+
   catalog: SeasonDraftCatalog | null = null;
-  /**
-   * M2.6.5: the packaged free-agency eligibility index (free-agency-index-v1)
-   * the resolve command's engine context needs; loaded lazily on the first
-   * market resolution and memoized per manifest.
-   */
+
   freeAgencyIndex: SeasonFreeAgencyIndex | null = null;
-  /** M2.6.5: the frozen roster-targets policy (AI free-agency ceilings). */
+
   freeAgencyTargets: SeasonRosterTargets | null = null;
 
   constructor(
@@ -250,7 +196,6 @@ export class SeasonHubState {
     });
   }
 
-  /** Tears down the runner subscriptions and workers (route change). */
   destroy(): void {
     this.unsubscribeRunner?.();
     this.unsubscribeRunner = null;
@@ -266,13 +211,11 @@ export class SeasonHubState {
     this.listeners.clear();
   }
 
-  /** Performance pass: prewarms the workers' packaged asset caches. */
   prewarm(): void {
     this.runner.prewarm();
     this.postseasonRunner?.prewarm();
   }
 
-  /** M2.6: attaches the postseason runner (lazy app resolution or tests). */
   private attachPostseasonRunner(runner: SeasonPostseasonRunner): void {
     this.postseasonRunner = runner;
     this.unsubscribePostseasonRunner = runner.subscribe((event) => {
@@ -280,7 +223,6 @@ export class SeasonHubState {
     });
   }
 
-  /** M2.6: lazily resolves the app postseason runner through season-repo. */
   private resolvePostseasonRunner(): Promise<SeasonPostseasonRunner> {
     if (this.postseasonRunner !== null) return Promise.resolve(this.postseasonRunner);
     if (this.postseasonRunnerPromise === null) {
@@ -298,7 +240,6 @@ export class SeasonHubState {
     return this.postseasonRunnerPromise;
   }
 
-  /** M2.6: memoized packaged era simulation profile (engine contexts). */
   private loadProfile(): Promise<EraSimulationProfile> {
     if (this.profilePromise === null) {
       this.profilePromise = import('./season-assets').then((module) =>
@@ -311,10 +252,6 @@ export class SeasonHubState {
     return this.profilePromise;
   }
 
-  /**
-   * M2.6.5: memoized packaged free-agency index (resolve commands). Loaded
-   * once per manifest; the ~4.1 MB JSON parse is a one-time main-thread cost.
-   */
   private async ensureFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
     if (this.freeAgencyIndex !== null) return this.freeAgencyIndex;
     const module = await import('./season-assets');
@@ -323,7 +260,6 @@ export class SeasonHubState {
     return index;
   }
 
-  /** M2.6.5: memoized frozen roster-targets policy (AI free-agency ceilings). */
   private async ensureFreeAgencyTargets(): Promise<SeasonRosterTargets> {
     if (this.freeAgencyTargets !== null) return this.freeAgencyTargets;
     const module = await import('./season-assets');
@@ -332,14 +268,14 @@ export class SeasonHubState {
     return targets;
   }
 
-  /**
-   * Cross-tab recovery (performance pass): another tab committed, cleared,
-   * or replaced the run. Invalidate the session cache, cancel local
-   * simulation when it can no longer commit (stale expected facts), reload
-   * the active index/snapshot, and surface an actionable banner. The
-   * repository's revision/digest guards remain authoritative for writes;
-   * this only makes the stale tab recover promptly.
-   */
+  private async ensureCatalog(): Promise<SeasonDraftCatalog> {
+    if (this.catalog !== null) return this.catalog;
+    const module = await import('./season-assets');
+    const catalog = await module.loadSeasonDraftCatalog();
+    this.catalog = catalog;
+    return catalog;
+  }
+
   private async onExternalMutation(mutation: SeasonRunMutation): Promise<void> {
     if (this.externalReloading) return;
     this.externalReloading = true;
@@ -351,15 +287,11 @@ export class SeasonHubState {
         mutation.runId === localRunId &&
         mutation.revision === localRevision
       ) {
-        // Already applied this exact boundary (e.g. a duplicate delivery).
         return;
       }
       if (mutation.kind === 'commit' && localRunId !== null && mutation.runId !== localRunId) {
-        // A different run became active elsewhere; fall through to reload.
       }
-      // Stale local simulation: the run moved underneath it, so its
-      // expectedStateRevision/digest can no longer commit. Cancel cleanly so
-      // the UI never stays "running" against stale state.
+
       if (this.block.phase === 'running' && this.block.requestId !== null) {
         this.cancel();
       }
@@ -374,8 +306,7 @@ export class SeasonHubState {
               : `The season advanced to block ${String(mutation.revision + 1)} in another tab.`,
       };
       await this.refresh();
-      // The banner stays until the user acts on it or the state moves on;
-      // an identical later mutation is still recoverable (cleared below).
+
       if (this.block.phase !== 'running') {
         this.emit();
       }
@@ -384,7 +315,6 @@ export class SeasonHubState {
     }
   }
 
-  /** Clears the cross-tab change banner (user acknowledged it). */
   acknowledgeExternalChange(): void {
     this.externalChange = null;
     this.emit();
@@ -399,8 +329,6 @@ export class SeasonHubState {
     try {
       const index = await this.repo.loadActiveRunIndex();
       if (index !== null && cachedSeasonSnapshotMatches(index.runId, index.revision)) {
-        // This exact accepted state is already loaded; skip the full load +
-        // reconciliation audit.
         this.snapshot = getCachedSeasonSnapshot();
         this.index = index;
         this.error = null;
@@ -408,12 +336,7 @@ export class SeasonHubState {
         this.emit();
         return;
       }
-      // Performance pass: the in-memory snapshot is authoritative when it
-      // already matches the persisted index (accepted block count). The full
-      // validated `loadActiveRun()` (schema parse + reconciliation audit) is
-      // reserved for cold starts, browser reloads, explicit recovery, and
-      // externally changed saves — never for every accepted block or an
-      // ordinary between-block command.
+
       if (
         index !== null &&
         this.snapshot !== null &&
@@ -432,10 +355,6 @@ export class SeasonHubState {
         this.incompatible = null;
       } catch (error) {
         if (isSeasonRunIncompatibleError(error)) {
-          // The run predates the M2.4 schema: it stays stored but cannot
-          // continue; the UI shows the discard-and-restart screen. The guard
-          // narrowed `error` but eslint treats Error members as unsafe, so the
-          // info is re-typed explicitly.
           const info: SeasonRunIncompatibleInfo = error.info;
           this.snapshot = null;
           this.index = index;
@@ -448,8 +367,7 @@ export class SeasonHubState {
       }
       this.snapshot = snapshot;
       this.index = index;
-      // M2.5: a persisted pending candidate survives reload; mirror it so the
-      // interruption recovery panel re-renders after a page reload.
+
       if (snapshot !== null) {
         try {
           this.pending = await this.repo.loadPendingBlock(snapshot.run.runId);
@@ -476,10 +394,6 @@ export class SeasonHubState {
     this.emit();
   }
 
-  /**
-   * M2.4: explicit user discard of an incompatible stored run. The run rows
-   * are deleted only after the user confirms; nothing is migrated.
-   */
   async discardIncompatibleRun(): Promise<void> {
     const incompatible = this.incompatible;
     if (incompatible === null) return;
@@ -492,10 +406,6 @@ export class SeasonHubState {
     await this.refresh();
   }
 
-  /**
-   * Recovery path for corrupt or unrecoverable saves: wipes the active run,
-   * draft, and session cache without validating run identity.
-   */
   async clearSeasonData(): Promise<{ ok: boolean; error: string | null }> {
     try {
       await this.repo.forceClearActiveSeasonRun();
@@ -530,15 +440,12 @@ export class SeasonHubState {
     return this.repo.loadRetainedDetails(runId);
   }
 
-  /** Performance pass: loads the compact per-run player presentation slice. */
   loadPlayerSlice(
     runId: string,
   ): Promise<import('@hoop-rush/persistence').SeasonRunPlayerSliceEntry[] | null> {
     return this.repo.loadSeasonRunPlayerSlice(runId);
   }
 
-  /** Performance pass: merges catalog facts for traded-in roster players into
-   * the stored slice so the rotation editor never loses positions. */
   upsertPlayerSlice(
     runId: string,
     entries: import('@hoop-rush/persistence').SeasonRunPlayerSliceEntry[],
@@ -586,14 +493,6 @@ export class SeasonHubState {
     this.emit();
   }
 
-  /**
-   * M2.5: resumes an interrupted block through the runner's
-   * `SeasonBlockResumeInput` (the interrupted submission's identity facts —
-   * same command id for idempotency, the locked rotations, and the asset
-   * urls). After a reload the locked rotations are rebuilt from the run's
-   * committed set (the runner rejects a digest mismatch with a typed error);
-   * the packaged assets are re-loaded on demand.
-   */
   async resumeBlock(): Promise<void> {
     const pending = this.pending;
     if (pending === null) return;
@@ -659,7 +558,6 @@ export class SeasonHubState {
     this.emit();
   }
 
-  /** M2.5: selects the block's objective (typed command before submission). */
   async selectBlockObjective(input: {
     blockIndex: number;
     objectiveId: SeasonObjectiveId;
@@ -677,7 +575,6 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  /** M2.5: spends Influence on an extra trade offer or a risky rehab. */
   async spendInfluence(input: {
     purpose: SeasonSpendInfluencePurpose;
     windowIndex?: number;
@@ -698,8 +595,20 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  /** M2.5: accepts an open trade offer (atomic roster + ownership transfer). */
   async acceptTradeOffer(input: { windowIndex: number; offerId: string }): Promise<void> {
+    try {
+      await this.ensureCatalog();
+    } catch (error) {
+      this.commandError = {
+        command: 'accept-trade-offer',
+        rejection: null,
+        message: `The draft catalog is unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+      this.emit();
+      return;
+    }
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'accept-trade-offer',
@@ -713,8 +622,20 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  /** M2.5: declines an open trade offer (offer status -> declined). */
   async declineTradeOffer(input: { windowIndex: number; offerId: string }): Promise<void> {
+    try {
+      await this.ensureCatalog();
+    } catch (error) {
+      this.commandError = {
+        command: 'decline-trade-offer',
+        rejection: null,
+        message: `The draft catalog is unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+      this.emit();
+      return;
+    }
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
       command: 'decline-trade-offer',
@@ -728,10 +649,6 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  /**
-   * M2.5: forfeits the interrupted game (official 2-0, no player stats),
-   * advances the pending candidate, and re-checks the next game.
-   */
   async forfeitInterruptedGame(): Promise<void> {
     const pending = this.pending;
     const interruption = this.interruption;
@@ -749,16 +666,6 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  // -------------------------------------------------------------------------
-  // M2.6.5 free-agency commands (frozen cross-track API contract).
-  // -------------------------------------------------------------------------
-
-  /**
-   * M2.6.5: declares the human franchise's interest in one or two ordered
-   * targets of the open market window. Declarations are final once accepted;
-   * the winning commitment is debited at resolution, losing targets cost
-   * zero.
-   */
   async declareFreeAgentInterest(input: {
     windowIndex: number;
     targets: {
@@ -781,7 +688,6 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  /** M2.6.5: skips the open market window (no targets, no cost, no penalty). */
   async skipFreeAgentMarket(input: { windowIndex: number }): Promise<void> {
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
@@ -796,13 +702,6 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
-  /**
-   * M2.6.5: resolves the open market window (first priorities by candidate,
-   * then second priorities; winners leave every remaining target list).
-   * Accepted only after the human franchise declared or skipped. The engine
-   * context carries the packaged free-agency index + roster-targets policy
-   * (the same assets the block commit uses to open windows).
-   */
   async resolveFreeAgentMarket(input: { windowIndex: number }): Promise<void> {
     const snapshot = this.snapshot;
     this.commandError = null;
@@ -856,16 +755,6 @@ export class SeasonHubState {
     this.runner.cancel(requestId);
   }
 
-  // -------------------------------------------------------------------------
-  // M2.6 postseason commands (frozen cross-track API contract).
-  // -------------------------------------------------------------------------
-
-  /**
-   * M2.6: starts the postseason from the final regular-season standings
-   * (typed command through the engine handler; commits through the
-   * repository's postseason advancement path so the accepted command enters
-   * the command log). The engine's default tiebreaker rankings need no seam.
-   */
   async startPostseason(): Promise<void> {
     const command: SeasonRunCommand = {
       schemaVersion: SEASON_RUN_SCHEMA_VERSION,
@@ -878,11 +767,6 @@ export class SeasonHubState {
     await this.dispatchPostseason(command);
   }
 
-  /**
-   * M2.6: advances the postseason one game per atomic commit until a human
-   * rotation is needed, the optional terminal target is committed, or the
-   * tournament completes. Requires the play-in or playoffs stage.
-   */
   async advancePostseason(input?: { targetGameId?: string }): Promise<void> {
     const command: SeasonRunCommand['command'] = 'advance-postseason';
     if (!this.requirePostseasonStage(command)) return;
@@ -895,11 +779,6 @@ export class SeasonHubState {
     });
   }
 
-  /**
-   * M2.6: locks the human postseason rotation for the target game (typed
-   * command; the optional risky-rehab Influence spend is validated and
-   * recorded by the engine).
-   */
   async submitPostseasonRotation(input: {
     targetGameId: string;
     rotation: SeasonPostseasonRotationPayload;
@@ -917,10 +796,6 @@ export class SeasonHubState {
     await this.dispatchPostseason(command);
   }
 
-  /**
-   * M2.6: simulates exactly the named game (spectate after elimination) and
-   * commits it atomically.
-   */
   async spectatePostseasonGame(input: { targetGameId: string }): Promise<void> {
     const command: SeasonRunCommand['command'] = 'spectate-postseason-game';
     if (!this.requirePostseasonStage(command)) return;
@@ -933,12 +808,6 @@ export class SeasonHubState {
     });
   }
 
-  /**
-   * M2.6: chunks the remaining tournament at ≤ 8 games per atomic commit
-   * through the champion and promotes it to completed history. Requires the
-   * play-in or playoffs stage; the runner additionally requires the human
-   * franchise to be eliminated.
-   */
   async fastForwardPostseason(input?: { targetGameId?: string }): Promise<void> {
     const command: SeasonRunCommand['command'] = 'fast-forward-postseason';
     if (!this.requirePostseasonStage(command)) return;
@@ -951,7 +820,6 @@ export class SeasonHubState {
     });
   }
 
-  /** M2.6: cancels the in-flight postseason session (committed chunks stay). */
   cancelPostseason(): void {
     const requestId = this.postseasonRequestId;
     const runner = this.postseasonRunner;
@@ -959,17 +827,14 @@ export class SeasonHubState {
     runner.cancel(requestId);
   }
 
-  /** M2.6: every postseason summary of the run (gameId ascending). */
   loadPostseasonSummaries(runId: string): Promise<SeasonPostseasonSummary[]> {
     return this.repo.loadPostseasonSummaries(runId);
   }
 
-  /** M2.6: one postseason summary by game id; null when absent. */
   loadPostseasonSummary(runId: string, gameId: string): Promise<SeasonPostseasonSummary | null> {
     return this.repo.loadPostseasonSummary(runId, gameId);
   }
 
-  /** The advance/spectate/fast-forward commands require play-in or playoffs. */
   private requirePostseasonStage(command: SeasonRunCommand['command']): boolean {
     const stage = this.snapshot?.run.stage ?? null;
     if (stage === 'play-in' || stage === 'playoffs') return true;
@@ -990,13 +855,6 @@ export class SeasonHubState {
     return false;
   }
 
-  /**
-   * M2.6: dispatches one non-simulating postseason command (start / submit
-   * rotation) through the pure engine handler with the era profile and draft
-   * catalog in the context, commits the accepted advancement atomically
-   * (run state + summaries + command-log row), and refreshes the snapshot.
-   * Rejections surface as the typed `commandError` alert.
-   */
   private async dispatchPostseason(command: SeasonRunCommand): Promise<void> {
     const snapshot = this.snapshot;
     this.commandError = null;
@@ -1047,9 +905,7 @@ export class SeasonHubState {
         runId: snapshot.run.runId,
         run: output.run,
         summaries,
-        // The state digest covers the post-advance effects; store them so
-        // the reload audit's digest reconciliation holds (mirrors the M2.5
-        // applySeasonRunCommand effects seam).
+
         effects: postCommandEffects(output.run, snapshot.effects),
         command,
         preStateRevision: command.expectedStateRevision,
@@ -1060,9 +916,7 @@ export class SeasonHubState {
       };
       await this.repo.commitPostseasonAdvancement(commitInput);
       this.commandError = null;
-      // Apply the engine mutation immediately so the hub reflects the new
-      // stage/rotation before the repository round-trip, and so a stale
-      // session cache cannot flash the pre-command state back into the UI.
+
       if (this.snapshot !== null) {
         const effects = postCommandEffects(output.run, snapshot.effects);
         this.snapshot = { ...this.snapshot, run: output.run, effects };
@@ -1080,7 +934,6 @@ export class SeasonHubState {
     }
   }
 
-  /** M2.6: mirrors the postseason runner events into the progress mirror. */
   private onPostseasonRunnerEvent(event: SeasonPostseasonEvent): void {
     switch (event.type) {
       case 'started':
@@ -1100,8 +953,6 @@ export class SeasonHubState {
         };
         break;
       case 'committed': {
-        // The runner committed atomically and re-read the authoritative
-        // snapshot: mirror it immediately (no full reload + audit).
         this.snapshot = event.snapshot;
         this.index = indexAfterCommit(this.index, event.snapshot);
         setCachedSeasonSnapshot(event.snapshot);
@@ -1110,9 +961,7 @@ export class SeasonHubState {
           phase: 'running',
           gamesCompleted: this.postseason.gamesCompleted + event.gameIds.length,
         };
-        // Cross-tab announce: the run moved without a revision bump, so the
-        // 'commit' dedupe (runId + revision) would swallow it — 'replace'
-        // reloads every other tab from the authoritative state.
+
         this.channel.announce({
           kind: 'replace',
           runId: event.runId,
@@ -1130,7 +979,6 @@ export class SeasonHubState {
           error: null,
         };
         if (promoted) {
-          // The champion was promoted: the active run no longer exists.
           clearCachedSeasonSnapshot();
           this.snapshot = null;
           this.index = null;
@@ -1179,13 +1027,6 @@ export class SeasonHubState {
     this.emit();
   }
 
-  /**
-   * Quits the current run: stops an in-flight block (cancel, then terminate
-   * if the worker does not acknowledge), clears the run atomically, and
-   * reloads so the shell falls back to its empty state. Terminating a stuck
-   * worker also invalidates its pending candidate, so nothing can commit
-   * behind the clear.
-   */
   async quitRun(): Promise<{ ok: boolean; error: string | null }> {
     if (this.snapshot === null) {
       return { ok: false, error: 'no active season run to quit' };
@@ -1223,9 +1064,6 @@ export class SeasonHubState {
     await this.refresh();
     const revision = this.snapshot?.acceptedBlocks.length;
     if (revision === undefined || this.block.command.expectedRevision !== revision) {
-      // The envelope targeted a block that is no longer current (for example
-      // the hub refreshed after a successful commit while retry still held the
-      // old command). Clear the stale failure so the user can submit fresh.
       this.block = { ...IDLE_BLOCK };
       this.emit();
       return;
@@ -1236,11 +1074,6 @@ export class SeasonHubState {
     });
   }
 
-  /**
-   * M2.5: dispatches one between-block command through the pure engine
-   * handler, persists the accepted mutation atomically, and refreshes the
-   * snapshot. Rejections surface as the typed `commandError` alert.
-   */
   private async dispatch(command: SeasonRunCommand): Promise<void> {
     const snapshot = this.snapshot;
     this.commandError = null;
@@ -1260,9 +1093,7 @@ export class SeasonHubState {
         humanFranchiseId: this.humanFranchiseId(),
         effects: snapshot.effects,
         catalog: this.catalog ?? undefined,
-        // M2.6.5: the packaged free-agency index + roster-targets policy
-        // (resolve-free-agent-market requires both; the engine throws
-        // without them, so the hub loads them before dispatching).
+
         freeAgencyIndex: this.freeAgencyIndex ?? undefined,
         freeAgencyTargets: this.freeAgencyTargets ?? undefined,
       } satisfies SeasonRunCommandContext);
@@ -1284,15 +1115,11 @@ export class SeasonHubState {
         pending: output.pending,
       });
       this.commandError = null;
-      // Apply the engine mutation immediately so the hub reflects the
-      // selection before the repository round-trip, and so a stale session
-      // cache cannot flash the pre-command state back into the UI.
+
       if (this.snapshot !== null) {
         const effects = postCommandEffects(output.run, this.snapshot.effects);
         this.snapshot = { ...this.snapshot, run: output.run, effects };
-        // Between-block commands mutate the run without changing the accepted
-        // block count, so refresh() must not resurrect the pre-command state
-        // keyed to the same revision.
+
         setCachedSeasonSnapshot(this.snapshot);
         this.emit();
       }
@@ -1351,12 +1178,7 @@ export class SeasonHubState {
         this.block.latestGameId = null;
         this.block.latestResult = null;
         this.block.error = null;
-        // Performance pass: the runner committed atomically (deleting any
-        // pending row in the same transaction) and carries the authoritative
-        // in-memory snapshot of everything the transaction stored. Apply it
-        // directly — no full `loadActiveRun()` reload + reconciliation audit
-        // after an accepted block. The session cache is updated so later
-        // route mounts reuse this exact state.
+
         this.pending = null;
         this.interruption = null;
         this.snapshot = event.snapshot;
@@ -1407,12 +1229,6 @@ export class SeasonHubState {
   }
 }
 
-/**
- * Performance pass: the active-run index row right after an accepted block,
- * derived from the committed snapshot (the repository updated the persisted
- * row in the same transaction). Kept in the hub so the next `refresh()` can
- * reuse the in-memory snapshot without a repository round trip.
- */
 function indexAfterCommit(
   index: SeasonActiveRunIndex | null,
   snapshot: SeasonRunSnapshot,
@@ -1447,7 +1263,6 @@ function indexAfterCommit(
   };
 }
 
-/** Human-readable explanation of a typed command rejection (UI alert). */
 export function describeCommandRejection(
   command: SeasonRunCommand['command'],
   rejection: SeasonRunCommandRejection,
@@ -1513,7 +1328,7 @@ export function describeCommandRejection(
       return `Series ${rejection.seriesId} cannot advance: ${rejection.reason}.`;
     case 'integrity-failure':
       return `The postseason integrity check failed: ${rejection.reason}.`;
-    // M2.6.5 free-agency rejections (seasonRunCommandRejectionSchema members).
+
     case 'free-agency-unresolved':
       return `The free-agency market window ${String(
         rejection.windowIndex + 1,

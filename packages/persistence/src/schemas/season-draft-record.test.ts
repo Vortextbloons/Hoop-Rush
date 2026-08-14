@@ -28,7 +28,7 @@ describe('storedSeasonDraftSchema', () => {
     expect(storedSeasonDraftSchema.safeParse({ ...record, saveSchemaVersion: 2 }).success).toBe(
       false,
     );
-    // A legacy season-draft-v1 snapshot never parses as the current record.
+
     expect(
       storedSeasonDraftSchema.safeParse({
         recordId: 'season-draft',

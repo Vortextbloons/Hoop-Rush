@@ -25,16 +25,6 @@ import {
 import { packageKindOfOffer, seasonTradeValueBandOf } from './commands/season-trade.ts';
 import { loadSeasonRunFixture } from './commands/season-block.ts';
 
-/**
- * M2.6.5 free-agency CLI tests (spec/2.0/15, free-agency-targets-v1): the
- * recorded-facts audit (window order, candidates, canonical identity
- * persistence, declarations, traces, caps, ledger/transaction/ownership
- * links, effects invariants), the calibrate gate math, the targets/report
- * schema round-trips, and the CLI end-to-end audit path. The full
- * season-driving calibrate cohort is covered by the (skipped) integration
- * suite below.
- */
-
 const RUN_FIXTURE = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 const INTEGRATION_RUNS = process.env.HOOP_RUSH_INTEGRATION_RUNS === '1';
 

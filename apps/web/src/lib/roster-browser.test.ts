@@ -251,7 +251,6 @@ describe('paginateItems', () => {
 });
 
 describe('paginateGroupedRows', () => {
-  // Contiguous by franchise/era, like the packaged players index.
   const rows = [
     row({ playerId: 'a', franchiseId: 'lakers', eraId: '1990s' }),
     row({ playerId: 'b', franchiseId: 'lakers', eraId: '1990s' }),

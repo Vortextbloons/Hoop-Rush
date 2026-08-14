@@ -6,11 +6,6 @@ import { buildManifest } from '@hoop-rush/test-fixtures';
 import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
 import { dataCoverage } from './data-coverage.ts';
 
-/**
- * `data coverage` tests (spec/09): the manifest read/validate boundary and
- * the availability-matrix aggregation over the fixture manifest.
- */
-
 let dir: string;
 
 beforeEach(async () => {
@@ -49,8 +44,7 @@ describe('dataCoverage', () => {
 
   it('aggregates the availability matrix of a valid manifest', async () => {
     const path = join(dir, 'manifest.json');
-    // The fixture manifest's availability matrix: 30 franchises x 7 eras,
-    // every row unavailable (source-incomplete).
+
     await writeFile(path, JSON.stringify(buildManifest()), 'utf8');
     const report = await dataCoverage({ input: path });
     expect(report.ok).toBe(true);

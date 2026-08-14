@@ -76,14 +76,6 @@ import {
   SEED,
 } from './season-schemas-fixtures.ts';
 
-/**
- * Season Run contract tests (M2.0): every runtime schema round-trips valid
- * state and rejects wrong versions, invalid team counts, duplicate
- * ownership, malformed rosters, invalid cursors, and corrupt postseason
- * states. Fixtures come from the shared season-schemas-fixtures module so
- * the contract layer stays dependency-free.
- */
-
 function roundTrip<T>(schema: { parse: (input: unknown) => T }, value: unknown): T {
   return schema.parse(JSON.parse(JSON.stringify(value)));
 }
@@ -225,18 +217,18 @@ describe('season game schema', () => {
     expect(() => seasonGameSchema.parse({ ...base, status: 'overtime' })).toThrow();
     expect(() => seasonGameSchema.parse({ ...base, homeScore: -1 })).toThrow();
     expect(() => seasonGameSchema.parse({ ...base, awayScore: null })).toThrow();
-    // A forfeit without a named loser, or carrying scores, is corrupt.
+
     expect(() => seasonGameSchema.parse({ ...base, status: 'forfeit' })).toThrow();
     const forfeit = { ...base, status: 'forfeit' as const, homeScore: null, awayScore: null };
     expect(() => seasonGameSchema.parse(forfeit)).toThrow();
     expect(() =>
       seasonGameSchema.parse({ ...forfeit, forfeitLoserFranchiseId: 'celtics' }),
     ).not.toThrow();
-    // The forfeit loser must be one of the two teams.
+
     expect(() =>
       seasonGameSchema.parse({ ...forfeit, forfeitLoserFranchiseId: 'bulls' }),
     ).toThrow();
-    // A scheduled game carrying any result is corrupt.
+
     expect(() =>
       seasonGameSchema.parse({ ...base, status: 'scheduled', homeScore: null, awayScore: null }),
     ).not.toThrow();
@@ -264,8 +256,6 @@ describe('season standings schema', () => {
   });
 
   it('carries accounting invariants as domain facts, not schema rules', () => {
-    // The schema validates shape; reconciling wins/losses with game records
-    // is the standings audit's job (engine season/standings tests).
     const run = buildRun();
     const standings = run.standings;
     const rows = standings.rows.map((row, index) =>
@@ -298,7 +288,7 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
     expect(state.playIn.west.ranking).toBeNull();
     expect(state.tiebreakResolutions).toEqual([]);
     expect(state.finalsHomeCourtDrawSeed).toMatch(/^[0-9a-f]{32}$/);
-    // Stable play-in ids are pinned on the scaffold.
+
     expect(state.playIn.east.games.sevenEight.gameId).toBe('pi-east-seven-eight');
     expect(state.playIn.west.games.final.gameId).toBe('pi-west-final');
   });
@@ -316,7 +306,7 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
       },
     };
     expect(() => seasonPostseasonStateSchema.parse(bad)).toThrow();
-    // A play-in game whose id does not match its slot is corrupt.
+
     const wrongGameId = {
       ...state,
       playIn: {
@@ -331,7 +321,7 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
       },
     };
     expect(() => seasonPostseasonStateSchema.parse(wrongGameId)).toThrow();
-    // A final play-in game whose winner is not a participant is corrupt.
+
     const winnerNotInGame = {
       ...state,
       playIn: {
@@ -375,7 +365,7 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
       },
     };
     expect(() => seasonPostseasonStateSchema.parse(winnerNotInGame)).toThrow();
-    // A final play-in game naming only participating teams is valid.
+
     const winnerParticipates = {
       ...winnerNotInGame,
       playIn: {
@@ -427,7 +417,7 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
         },
       }),
     ).toThrow();
-    // A bracket without both conferences' resolved seeds is corrupt.
+
     expect(() =>
       seasonPostseasonStateSchema.parse({
         ...state,
@@ -441,7 +431,7 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
         bracket: { ...emptyBracketFixture() },
       }),
     ).toThrow();
-    // A champion cannot exist without a bracket.
+
     expect(() =>
       seasonPostseasonStateSchema.parse({ ...state, championFranchiseId: 'lakers' }),
     ).toThrow();
@@ -559,7 +549,7 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
       winnerFranchiseId: null,
     };
     const schema = playoffSeriesSchema;
-    // A started series must name both teams.
+
     expect(
       schema.safeParse({
         ...base,
@@ -579,9 +569,9 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
         homeCourtFranchiseId: null,
       }).success,
     ).toBe(false);
-    // A winner requires four wins.
+
     expect(schema.safeParse({ ...base, winnerFranchiseId: 'team-1' }).success).toBe(false);
-    // A seven-game series must name a winner.
+
     expect(
       schema.safeParse({
         ...base,
@@ -599,9 +589,9 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
         challengerWins: 3,
       }).success,
     ).toBe(false);
-    // Wins must equal played games.
+
     expect(schema.safeParse({ ...base, homeCourtWins: 2 }).success).toBe(false);
-    // A game id that does not match the series slot is corrupt.
+
     expect(
       schema.safeParse({
         ...base,
@@ -620,7 +610,7 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
         homeCourtWins: 1,
       }).success,
     ).toBe(false);
-    // Out-of-sequence game numbers are corrupt.
+
     expect(
       schema.safeParse({
         ...base,
@@ -642,7 +632,6 @@ describe('season postseason schema (M2.6 postseason-v2)', () => {
   });
 });
 
-/** A minimal schema-valid empty bracket (all slots unpaired). */
 function emptyBracketFixture() {
   const pending = (seriesId: string, round: string, conference: 'east' | 'west') => ({
     seriesId,
@@ -719,8 +708,7 @@ describe('season run schema', () => {
     const duplicated = [...run.ownership];
     const first = duplicated[0];
     if (!first) throw new Error('no ownership rows');
-    // The schema bounds the row count (300-450); duplicate-ownership
-    // uniqueness is enforced by the engine audit, not the shape.
+
     expect(() =>
       seasonRunSchema.parse({ ...run, ownership: [...duplicated, { ...first }] }),
     ).not.toThrow();
@@ -1142,14 +1130,14 @@ describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
     expect(() =>
       seasonDraftStateSchema.parse({ ...baseState, catalogVersion: 'season-draft-v1' }),
     ).toThrow();
-    // Fewer than eight cards fails the offer contract.
+
     expect(() =>
       seasonDraftStateSchema.parse({
         ...baseState,
         currentOffer: { ...baseState.currentOffer, cards: cards.slice(0, 7) },
       }),
     ).toThrow();
-    // Duplicate cards fail the distinctness refinement.
+
     expect(() =>
       seasonDraftStateSchema.parse({
         ...baseState,
@@ -1159,7 +1147,7 @@ describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
         },
       }),
     ).toThrow();
-    // A selectable card with a coverage reason is corrupt.
+
     expect(() =>
       seasonDraftStateSchema.parse({
         ...baseState,
@@ -1171,7 +1159,7 @@ describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
         },
       }),
     ).toThrow();
-    // A disabled card without a coverage reason is corrupt.
+
     expect(() =>
       seasonDraftStateSchema.parse({
         ...baseState,
@@ -1230,7 +1218,7 @@ describe('season draft state schema (M2.3.5 season-draft-v2)', () => {
       commandLog: [],
     };
     expect(roundTrip(seasonDraftLegacyStateSchema, legacy).draftVersion).toBe('season-draft-v1');
-    // The v2 schema rejects legacy states; the stored union accepts both.
+
     expect(() => seasonDraftStateSchema.parse(legacy)).toThrow();
     expect(roundTrip(storedSeasonDraftStateSchema, legacy).schemaVersion).toBe(1);
     expect(roundTrip(storedSeasonDraftStateSchema, baseState).schemaVersion).toBe(2);
@@ -1310,7 +1298,7 @@ describe('season draft command records (M2.1)', () => {
         },
       }),
     ).not.toThrow();
-    // Legacy v1 command envelopes still parse (stored-record reads).
+
     expect(() =>
       seasonDraftCommandSchema.parse({
         ...command,
@@ -1491,7 +1479,7 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
       repairCount: 1,
     };
     expect(roundTrip(seasonAiPoolSchema, pool).selections).toHaveLength(10);
-    // 19 and 21 member pools are rejected.
+
     expect(() =>
       seasonAiPoolSchema.parse({
         ...pool,
@@ -1506,21 +1494,21 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
         playerVersionIds: [...pool.playerVersionIds, member(20), member(21)],
       }),
     ).toThrow();
-    // Duplicate pool versions are rejected.
+
     expect(() =>
       seasonAiPoolSchema.parse({
         ...pool,
         playerVersionIds: [...pool.playerVersionIds.slice(0, 19), pool.playerVersionIds[0]],
       }),
     ).toThrow();
-    // Selections outside the pool are rejected.
+
     expect(() =>
       seasonAiPoolSchema.parse({
         ...pool,
         selections: [...pool.selections.slice(0, 9), member(20)],
       }),
     ).toThrow();
-    // Invalid anchors are rejected (member outside the pool, wrong tier).
+
     expect(() =>
       seasonAiPoolSchema.parse({
         ...pool,
@@ -1770,17 +1758,17 @@ describe('season AI contracts (M2.1, M2.4 roster-generation-v2)', () => {
         duoBands: { contender: 4, playoff: 8, average: 9, weaker: 7 },
       },
     };
-    // The v1 artifact is rejected outright (never produced or read by v2).
+
     expect(() => seasonRosterTargetsSchema.parse(v1Targets)).toThrow();
     expect(() => seasonRosterTargetsSchema.parse({ ...v1Targets, schemaVersion: 2 })).toThrow();
-    // Wrong target versions are rejected.
+
     expect(() =>
       seasonRosterTargetsSchema.parse({
         schemaVersion: 2,
         targetsVersion: 'roster-targets-v1',
       }),
     ).toThrow();
-    // Null targets are rejected (the artifact is required, never nullable).
+
     expect(() => seasonRosterTargetsSchema.parse(null)).toThrow();
     expect(seasonRosterTargetsSchema.safeParse(undefined).success).toBe(false);
   });
@@ -1982,9 +1970,6 @@ describe('season influence family (M2.5, season-influence-v1)', () => {
   });
 
   it('rejects a ledger entry that would not reconcile its balance', () => {
-    // The schema validates shape; reconciliation is the audit's job, so a
-    // non-reconciling entry still parses but the audit flags it. Balances
-    // must be derivable from the ledger; the engine owns that check.
     const entry = {
       entryId: 'influence-block-0-lakers',
       franchiseId: 'lakers',
@@ -2316,7 +2301,7 @@ describe('season commands (M2.5/M2.6, schema 9)', () => {
       expect(schema.safeParse(command).success).toBe(true);
       expect(seasonRunCommandSchema.safeParse(command).success).toBe(true);
     }
-    // Missing concurrency fields and malformed rotation payloads are rejected.
+
     expect(() =>
       seasonRunCommandSchema.parse({
         command: 'start-postseason',

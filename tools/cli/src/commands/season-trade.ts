@@ -36,23 +36,6 @@ import {
 import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
-/**
- * `season trade calibrate` (spec/2.0 M2.5, contract §17, M2.6.5
- * season-trade-v2): freezes `trade-targets-v2` from seasons that open trade
- * windows at blocks 2/4/5 through the engine economy. The human franchise
- * never acts, so every accepted offer is AI activity; the season gate
- * freezes the mean accepted AI trades per season in [8, 15] (LEAD DECISION,
- * contract §13). Other frozen gates: zero illegal / duplicate-ownership
- * trades, accepted offers inside the frozen value bands (85-115 for 1-for-1,
- * 80-120 for every multi-player or uneven package), deterministic offer
- * generation, the package-kind mix (the engine accepts even packages
- * 1-1/2-2; uneven 1-2/2-1 packages measured but not gated), and chemistry
- * invariants (45 canonical pairs per rotation, 1,350 league-wide, zero-state
- * chemistry on traded pairs). Cohort: 8 calibration + 4 held-out seasons
- * (seasons are the expensive unit); the runner is in-process (a worker
- * variant is deferred).
- */
-
 export const SEASON_TRADE_CALIBRATE_OPTIONS: Record<string, boolean> = {
   input: true,
   'seed-from': true,
@@ -69,22 +52,18 @@ export const DEFAULT_TRADE_TARGETS = resolve(DEFAULT_SEASON_DIR, 'trade-targets.
 export const SEASON_TRADE_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_TRADE_VALIDATION_SEED_COUNT = 4;
 
-/** Frozen season-level AI trade band (LEAD DECISION, contract §13/§17). */
 export const SEASON_TRADE_MIN_AI_TRADES_PER_SEASON = 8;
 export const SEASON_TRADE_MAX_AI_TRADES_PER_SEASON = 15;
 
-/** Frozen value bands: ratio basis points per package kind (v2). */
 export const SEASON_TRADE_VALUE_BANDS = {
   '1-1': { min: 850, max: 1150 },
   multi: { min: 800, max: 1200 },
 } as const;
 
-/** The frozen value band of one package kind (85-115 only for 1-for-1). */
 export function seasonTradeValueBandOf(kind: SeasonTradePackageKind): { min: number; max: number } {
   return kind === '1-1' ? SEASON_TRADE_VALUE_BANDS['1-1'] : SEASON_TRADE_VALUE_BANDS.multi;
 }
 
-/** The package kind of an offer (from its recorded sizes). */
 export function packageKindOfOffer(offer: {
   outgoingPlayerVersionIds: readonly unknown[];
   incomingPlayerVersionIds: readonly unknown[];
@@ -97,14 +76,11 @@ export function packageKindOfOffer(offer: {
   return '2-1';
 }
 
-/** Chemistry invariants (canonical pairs per rotation and league-wide). */
 export const SEASON_TRADE_PAIRS_PER_ROSTER = 45;
 export const SEASON_TRADE_PAIRS_LEAGUE = 1350;
 
-/** Minimum seasons before the mean-across-seeds gates evaluate. */
 export const SEASON_TRADE_MIN_SEASONS = 4;
 
-/** The targets artifact frozen by `season trade calibrate`. */
 export const seasonTradeTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   targetsVersion: z.literal(SEASON_TRADE_TARGETS_VERSION),
@@ -181,13 +157,6 @@ export const seasonTradeTargetsSchema = z.object({
 });
 export type SeasonTradeTargets = z.infer<typeof seasonTradeTargetsSchema>;
 
-/**
- * Accepted AI trades per season: the accepted offers of the window each
- * `SeasonM25WindowOpen` result opened. Each window result's `trade.windows`
- * ACCUMULATES every earlier window (the driver folds the trade state
- * forward), so only the last window of each result is counted — counting
- * all windows would triple-count window 0's offers.
- */
 export function aiTradesOf(season: SeasonM25SeasonFacts): number {
   let accepted = 0;
   for (const window of season.windows) {
@@ -201,13 +170,6 @@ export function aiTradesOf(season: SeasonM25SeasonFacts): number {
   return accepted;
 }
 
-/**
- * Value-band failures among the accepted offers of one season: only the
- * window each result opened is counted (see `aiTradesOf`). The expected
- * band comes from the offer's package kind (85-115 for 1-for-1, 80-120 for
- * every multi-player or uneven package); the ratio must also be mutually
- * within the band (the engine acceptance rule).
- */
 export function valueBandFailuresOf(season: SeasonM25SeasonFacts): number {
   let failures = 0;
   for (const window of season.windows) {
@@ -237,7 +199,6 @@ export function valueBandFailuresOf(season: SeasonM25SeasonFacts): number {
   return failures;
 }
 
-/** Accepted offers by package kind of one season (recorded facts). */
 export function packageMixOf(season: SeasonM25SeasonFacts): Record<SeasonTradePackageKind, number> {
   const mix: Record<SeasonTradePackageKind, number> = { '1-1': 0, '2-2': 0, '1-2': 0, '2-1': 0 };
   for (const window of season.windows) {
@@ -252,15 +213,6 @@ export function packageMixOf(season: SeasonM25SeasonFacts): Record<SeasonTradePa
   return mix;
 }
 
-/**
- * Post-season roster legality and unique-ownership audit (season-roster-v2,
- * M2.6.5): `illegal` counts rosters that fail the 10-15 roster rules
- * (roster legality, distinct versions, unique identities, ownership rows)
- * or whose ten-player rotation subset fails legality (members on the
- * roster, legal five after any removal); `duplicateOwnership` counts a
- * season where the league does not own exactly the roster versions (the
- * expansion throws on duplicates, unknown versions, or a wrong total).
- */
 export function rosterAuditFailuresOf(season: SeasonM25SeasonFacts): {
   illegal: number;
   duplicateOwnership: number;
@@ -333,12 +285,6 @@ function initialRostersOf(run: SeasonRun): string[][] {
   return run.rosters.map((roster) => roster.players.map((player) => player.playerVersionId));
 }
 
-/**
- * Chemistry invariants of one season (season-chemistry-v2, M2.6.5): exactly
- * 45 canonical pairs per final ten-player rotation (1,350 league-wide) and
- * zero-state chemistry on every pair created by a trade (a pair that was
- * not on the same roster at season start).
- */
 export function chemistryFailuresOf(season: SeasonM25SeasonFacts): {
   pairs: number;
   pairFailures: number;
@@ -383,7 +329,6 @@ export interface SeasonTradeArgs {
   format?: string | null;
 }
 
-/** Measured trade cohort facts (mirror the targets artifact `measured`). */
 export interface SeasonTradeCohortFacts {
   aiTradesMean: number;
   aiTradesMin: number;
@@ -432,9 +377,7 @@ export function evaluateTradeGates(args: {
     (sum, entry) => sum + entry.zeroStateNewPairFailures,
     0,
   );
-  // Determinism: the driver re-generated the first window from the exact
-  // pre-window state and threw on divergence; a completed cohort implies
-  // deterministic generation.
+
   const deterministicOffers = c.length > 0;
 
   const sample = c.length;
@@ -518,14 +461,12 @@ export function validateSeasonTradeTargets(args: SeasonTradeArgs, outPath: strin
     schema: seasonTradeTargetsSchema,
     command: 'season trade calibrate --validate',
     extraChecks: () => ({
-      // The schema literal already pins the AI trade band to [8, 15].
       details: [`AI trade band matches the frozen [8, 15]`],
       failures: [],
     }),
   });
 }
 
-/** `season trade calibrate`: runs the gates and freezes trade-targets-v1. */
 export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
   const started = Date.now();
   const { from, to } = parseSeedRange(args, SEASON_TRADE_CALIBRATION_SEED_COUNT - 1);

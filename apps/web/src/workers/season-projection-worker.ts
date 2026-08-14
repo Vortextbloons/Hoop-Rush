@@ -13,19 +13,6 @@ import type {
   ProjectionWorkerResponse,
 } from '../lib/season/season-projection-wire.ts';
 
-/**
- * Season Run projection worker (projection milestone). Runs the bounded
- * human roster autofill search and the minute-plan optimizer off the main
- * thread so the draft/hub stays responsive while complete candidate rosters
- * and rotations project. Envelope types live in
- * `season-projection-wire.ts`, shared with the runner. Assets are fetched
- * and hash-verified inside the worker (mirror of the season block worker's
- * convention).
- */
-
-/** Candidate -> possession player mapping (mirror of the engine's
- * `attachAiProjectionSummaries` mapping; `stamina`/`durability` ride on the
- * load rows, not the simulation player). */
 function candidateToSimulationPlayer(candidate: SeasonDraftCandidate): SimulationPlayer {
   return {
     playerId: candidate.playerId,
@@ -43,11 +30,6 @@ function candidateToSimulationPlayer(candidate: SeasonDraftCandidate): Simulatio
   };
 }
 
-/**
- * Worker-lifetime asset cache (mirror of the season block worker): the
- * hashed URLs are stable for a session, so repeat requests skip the
- * catalog/model/profile fetch, hash verify, and parse entirely.
- */
 let cachedAssets: {
   key: string;
   catalog: Awaited<ReturnType<typeof loadSeasonDraftCatalog>>;

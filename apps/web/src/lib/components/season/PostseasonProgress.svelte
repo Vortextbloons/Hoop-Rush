@@ -1,14 +1,6 @@
 <script lang="ts">
   import type { HubPostseasonProgress } from '$lib/season/season-postseason-presentation';
 
-  /**
-   * Postseason orchestration progress (M2.6, hub): determinate game progress
-   * from the hub's postseason mirror, the latest score, cancel and retry
-   * affordances, and a restrained live region announcing only milestone
-   * changes. The simulation runs on the worker; this panel only renders
-   * hub progress events.
-   */
-
   let {
     progress,
     onCancel,

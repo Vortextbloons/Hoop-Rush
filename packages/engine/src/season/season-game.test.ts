@@ -24,13 +24,6 @@ import { simulateSeasonGame } from './season-game.ts';
 
 const ctx = createEngineContext();
 
-/**
- * Ten-player Season fixture in a legal shape: slots 0-4 are the single
- * position starters (PG, SG, SF, PF, C); slots 5-9 are the bench (combo
- * guard, combo forward, wing, second center, big) so every rotation and
- * contingency stays legal. Both sides are equal by default (mirror of the
- * Classic equal fixture), so planner behavior is exercised symmetrically.
- */
 const POSITION_PLAN: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -72,7 +65,6 @@ function buildSeasonTeam(
   };
 }
 
-/** Authored v2 rotation: balanced preset targets, legal closing five. */
 function buildSeasonRotation(team: SeasonGameTeamInput): SeasonRotation {
   const ids = team.players.map((p) => p.playerVersionId);
   const starters = ids.slice(0, 5);
@@ -89,7 +81,7 @@ function buildSeasonRotation(team: SeasonGameTeamInput): SeasonRotation {
         minutes: targets.bench[index] ?? 0,
       })),
     ],
-    // Legal ordered closing five: SG, combo-G, combo-F, wing, second C.
+
     closingFive: [ids[1], ids[5], ids[6], ids[7], ids[8]].map((id) => {
       if (id === undefined) throw new Error('fixture closing five missing player');
       return id;
@@ -201,7 +193,6 @@ describe('season game controller (M2.2)', () => {
   });
 
   it('plays everyone 48 minutes when targets force it (tight preset has bench at 5 min)', () => {
-    // Tight preset: bench [20,14,9,7,5] — total 240, all positive.
     const { result } = run('tight-1', {
       homeRotation: buildSeasonRotationPreset(buildSeasonTeam('home'), 'tight'),
       awayRotation: buildSeasonRotationPreset(buildSeasonTeam('away'), 'tight'),
@@ -214,8 +205,6 @@ describe('season game controller (M2.2)', () => {
   });
 
   it('foul-out: a fouled-out player sits at the next pause and keeps six fouls', () => {
-    // One away defender with an extreme foul profile absorbs the team's
-    // fouls and fouls out well within the game.
     const magnet = { strength: 95, interiorDefense: 95 };
     const magnetTendencies = { ...buildSimulationPlayer().tendencies, foulRate: 100 };
     const home = buildSeasonTeam('home');
@@ -290,7 +279,7 @@ describe('season game controller (M2.2)', () => {
     expect(event.playerVersionId).toBe(removalTarget.playerVersionId);
     expect(event.period).toBe(2);
     expect(event.secondsRemaining).toBeLessThanOrEqual(360);
-    // The removed player never plays past the removal boundary.
+
     for (const stint of result.unitStints.filter((s) => s.side === 'away')) {
       if (!stint.players.includes(removalTarget.playerVersionId)) continue;
       if (stint.period > 2) throw new Error('removed player played after the removal');
@@ -389,7 +378,7 @@ describe('season game controller (M2.2)', () => {
     expect(deviation).toBeDefined();
     expect(deviation?.reasons).toContain('pregame-unavailable');
     expect(deviation?.actualSeconds).toBe(0);
-    // The contingency replacement carries the contingency-legality cause.
+
     const replacement = firstStint?.players.find(
       (id) => !homeRotationStarters(input, 'home').includes(id),
     );
@@ -418,7 +407,7 @@ describe('season game controller (M2.2)', () => {
     expect(records.length).toBe(2);
     expect(records[0]?.playerVersionId).toBe(twin0.playerVersionId);
     expect(records[1]?.playerVersionId).toBe(twin5.playerVersionId);
-    // Distinct roster records: each version owns its own line.
+
     const seconds = records.map((r) => r.seconds);
     expect(seconds[0]).toBeGreaterThan(0);
     expect(seconds[1]).toBeGreaterThan(0);
@@ -614,10 +603,9 @@ describe('season game returns (M2.5 §11)', () => {
     if (returnEvent === undefined) throw new Error('expected a return event');
     expect(returnEvent.reason).toBe('injury-return');
     expect(returnEvent.period).toBe(2);
-    // The return applies at the next legal boundary at/after its clock.
+
     expect(returnEvent.secondsRemaining).toBeLessThanOrEqual(300);
-    // The returned player re-enters after the return boundary and never
-    // plays between the removal and the return.
+
     const stints = result.unitStints.filter((stint) => stint.side === 'away');
     const playedAfter = stints.some(
       (stint) =>

@@ -30,19 +30,6 @@
   import { seasonRootSeed } from '$lib/season/season-ids';
   import { buildSeasonRunFromGeneration, sha256Hex } from '$lib/season/season-run-builder';
 
-  /**
-   * Season Run setup (spec/2.0/03, spec/2.0/07, M2.3.5, season-draft-v2):
-   * seeded franchise assignment, the ten-round snake draft with one
-   * deterministic global eight-card offer per turn, coverage-safe selections,
-   * draft resume, AI league generation progress, and promotion of the
-   * completed draft to an active run. The board renders engine facts only;
-   * every command flows through `SeasonDraftFlow` -> `applySeasonDraftCommand`.
-   *
-   * Stored records from older save-schema families (development saves) are
-   * cleared automatically by the repository on load; the flow always resumes
-   * from a current record or a fresh setup state.
-   */
-
   let manifest = $state<HoopRushManifest | null>(null);
   let league = $state<SeasonLeague | null>(null);
   let schedule = $state<SeasonSchedule | null>(null);
@@ -87,14 +74,6 @@
     }
   }
 
-  /**
-   * Fresh-visit gating (performance): the ~17 MB draft catalog is only
-   * downloaded, hashed, JSON-parsed, and Zod-validated when it is actually
-   * needed — a saved draft exists (resume) or the user clicks Start draft.
-   * A fresh setup visit loads only the manifest, league, schedule, roster
-   * targets, and the players index, plus a cheap read of the small saved
-   * draft record.
-   */
   $effect(() => {
     if (!browser) return;
     let cancelled = false;
@@ -111,8 +90,7 @@
         league = seasonLeague;
         schedule = seasonSchedule;
         playersIndex = ix;
-        // The saved draft record is small (picks + command log); the catalog
-        // only loads when a draft exists so the board can reconstruct.
+
         const draftRepo = new DexieSeasonDraftRepository();
         const storedDraft = await draftRepo.loadSeasonDraft();
         if (cancelled) return;
@@ -126,7 +104,7 @@
         } else {
           hasDraft = false;
         }
-        // An active run takes precedence over the draft board.
+
         try {
           const repo = await getSeasonRunRepository(seasonSchedule);
           const index = await repo.loadActiveRunIndex();
@@ -148,9 +126,7 @@
               }
             }
           }
-        } catch {
-          // Persistence is best-effort on setup; the board still works.
-        }
+        } catch {}
         loaded = true;
       })
       .catch((error: unknown) => {
@@ -164,11 +140,6 @@
     };
   });
 
-  /**
-   * Loads the draft catalog (memoized) and constructs the flow. The catalog
-   * is required for both the board and every draft command, so it is created
-   * exactly once per visit, when the draft is started or resumed.
-   */
   async function ensureFlow(rosterTargets?: SeasonRosterTargets): Promise<SeasonDraftFlow | null> {
     if (flow !== null) return flow;
     const catalog = await loadSeasonDraftCatalog();
@@ -268,9 +239,6 @@
     }
   }
 
-  /**
-   * Promotes the completed draft to an active run (atomic in the repo).
-   */
   async function promote() {
     if (!flow || !flow.draft || !flow.generation || !schedule) return;
     promoting = true;
@@ -318,13 +286,6 @@
     }
   }
 
-  /**
-   * Performance pass: the compact per-run player presentation slice (one
-   * entry per rostered version: positions, summary ratings, stamina,
-   * durability, identity), persisted atomically with the draft promotion.
-   * The `/season/run` shell renders from this slice so it never needs to
-   * parse the ~17 MB catalog; trades later top it up from the lazy catalog.
-   */
   function buildPlayerSlice(
     run: SeasonRun,
     catalog: SeasonDraftCatalog,

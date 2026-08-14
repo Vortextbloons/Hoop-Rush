@@ -12,27 +12,11 @@ import { makeReport, type CliReport } from '../report.ts';
 import { seasonPostseasonAuditReportSchema } from '../report-schemas.ts';
 import { readJsonFile } from './season-data.ts';
 
-/**
- * M2.6 `season postseason audit` (spec/2.0/02, M2.6): audits the recorded
- * postseason facts of a completed Season Run for the frozen failure classes —
- * duplicate/missing teams, invalid play-in feeders, incorrect home court,
- * games after clinching, inconsistent summaries, and champion/completion
- * mismatches. The audit is a pure function of recorded facts; where the
- * ranking-driven facts (seed order) are not recorded, only the decidable
- * projections are checked (documented per check).
- *
- * Inputs (--input): a full-run replay export (seasonRunReplayExportSchema)
- * or a postseason audit fixture (run snapshot + postseason summaries). The
- * fixture form additionally reconciles the state machine's recorded
- * champion/completion facts against the summaries.
- */
-
 export const SEASON_POSTSEASON_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
 };
 
-/** The fixture form of the audit input (run + recorded postseason facts). */
 export const seasonPostseasonAuditFixtureSchema = z.object({
   schemaVersion: z.literal(1),
   command: z.literal('season postseason audit fixture'),
@@ -41,7 +25,6 @@ export const seasonPostseasonAuditFixtureSchema = z.object({
 });
 export type SeasonPostseasonAuditFixture = z.infer<typeof seasonPostseasonAuditFixtureSchema>;
 
-/** The per-failure-class counts of one audit run. */
 export interface SeasonPostseasonAuditCounts {
   duplicateTeams: number;
   missingTeams: number;
@@ -64,21 +47,12 @@ const ZERO_COUNTS: SeasonPostseasonAuditCounts = {
   digestMismatch: 0,
 };
 
-/** The playoff round a series of `round` is fed by. */
 const PREV_ROUND: Record<string, string> = {
   'conference-semifinal': 'first-round',
   'conference-final': 'conference-semifinal',
   finals: 'conference-final',
 };
 
-/**
- * A round-level game ordinal: play-in games (east 1-3, west 4-6) precede
- * every playoff round, and playoff rounds progress in fixed base order with
- * the game number as the intra-round order. The engine's authoritative
- * ordinal is not exported from the package entry, so the audit derives the
- * ordering it needs (round-level ordering, which is what the prerequisite
- * checks require) locally.
- */
 function gameOrdinalOf(summary: SeasonPostseasonSummary): number {
   if (summary.phase === 'play-in') {
     const conferenceOffset = summary.conference === 'west' ? 3 : 0;
@@ -94,15 +68,10 @@ function gameOrdinalOf(summary: SeasonPostseasonSummary): number {
   return (roundBase[summary.round] ?? 50) + summary.gameNumber;
 }
 
-/** The set of teams of a summary side. */
 function teamsOf(summary: SeasonPostseasonSummary): string[] {
   return [summary.homeFranchiseId, summary.awayFranchiseId];
 }
 
-/**
- * Audits the recorded postseason facts. Returns every failure as a bounded
- * string; `counts` carries the per-class totals.
- */
 export function auditSeasonPostseasonFacts(input: {
   summaries: SeasonPostseasonSummary[];
   championFranchiseId: string | null;
@@ -112,10 +81,6 @@ export function auditSeasonPostseasonFacts(input: {
   const failures: string[] = [];
   const counts = { ...ZERO_COUNTS };
 
-  // ---------------------------------------------------------------------
-  // 1. Inconsistent summaries: schema shape, digest recomputation, and
-  //    duplicate game ids.
-  // ---------------------------------------------------------------------
   const byGameId = new Map<string, SeasonPostseasonSummary>();
   for (const summary of input.summaries) {
     if (byGameId.has(summary.gameId)) {
@@ -138,11 +103,6 @@ export function auditSeasonPostseasonFacts(input: {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // 2. Play-in flows (invalid feeders): the seven-eight winner takes seed 7
-  //    (never re-plays), the nine-ten loser is eliminated, and the final
-  //    pairs exactly {seven-eight loser (host), nine-ten winner}.
-  // ---------------------------------------------------------------------
   const playIn = new Map<string, SeasonPostseasonSummary>();
   for (const summary of input.summaries) {
     if (summary.phase !== 'play-in') continue;
@@ -196,16 +156,9 @@ export function auditSeasonPostseasonFacts(input: {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // 3. Bracket series: duplicate/missing teams, the 2-2-1-1-1 home
-  //    pattern, sequential game numbers, clinch stops, and round
-  //    prerequisites (a series cannot start before its feeders clinched).
-  // ---------------------------------------------------------------------
   const playoffSummaries = input.summaries.filter((summary) => summary.phase === 'playoffs');
   const ordered = [...playoffSummaries].sort((a, b) => gameOrdinalOf(a) - gameOrdinalOf(b));
 
-  // First-round participant sets per conference (a team plays exactly one
-  // first-round series; eight distinct teams per conference).
   const firstRoundTeams = new Map<string, Set<string>>();
   const firstRoundSeriesByTeam = new Map<string, Map<string, string>>();
   for (const summary of ordered) {
@@ -244,7 +197,6 @@ export function auditSeasonPostseasonFacts(input: {
     }
   }
 
-  // Finals teams: the finals must pair exactly two distinct teams.
   const finalsSummaries = playoffSummaries.filter((summary) => summary.seriesId === 'finals');
   const finalsTeamSet = new Set<string>();
   for (const summary of finalsSummaries) {
@@ -255,8 +207,6 @@ export function auditSeasonPostseasonFacts(input: {
     failures.push(`the finals name ${String(finalsTeamSet.size)} distinct teams instead of 2`);
   }
 
-  // Per-series walks (home pattern, sequential numbers, clinch stops) and
-  // the per-round winners that feed the round prerequisites.
   const seriesGames = new Map<string, SeasonPostseasonSummary[]>();
   for (const summary of playoffSummaries) {
     const games = seriesGames.get(summary.seriesId ?? '');
@@ -310,9 +260,6 @@ export function auditSeasonPostseasonFacts(input: {
     }
   }
 
-  // Round prerequisites: a later-round game cannot start before its feeder
-  // series clinched (a game after the feeder clinch is a recorded-facts
-  // violation of the state machine's game order).
   for (const summary of ordered) {
     if (summary.round === 'first-round') continue;
     if (summary.round === 'finals') {
@@ -339,8 +286,6 @@ export function auditSeasonPostseasonFacts(input: {
     }
   }
 
-  // Play-in feeding of the first round: every first-round game of a
-  // conference must come after that conference's play-in games.
   for (const conference of ['east', 'west'] as const) {
     const playInOrdinals = [...playIn.values()]
       .filter((summary) => summary.conference === conference)
@@ -358,10 +303,6 @@ export function auditSeasonPostseasonFacts(input: {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // 4. Home court of the play-in final: the seven-eight loser hosts the
-  //    nine-ten winner.
-  // ---------------------------------------------------------------------
   for (const conference of ['east', 'west'] as const) {
     const sevenEight = playIn.get(`${conference}-seven-eight`);
     const finalGame = playIn.get(`${conference}-final`);
@@ -378,11 +319,6 @@ export function auditSeasonPostseasonFacts(input: {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // 5. Champion/completion mismatches: the recorded champion, the finals
-  //    winner, the almanac champion, and (on the fixture path) the state
-  //    machine and completion champions must all agree.
-  // ---------------------------------------------------------------------
   const finalsSeries = seriesGames.get('finals');
   const finalsWinner =
     finalsSeries?.find((game) => game.status === 'final')?.winnerFranchiseId ?? null;
@@ -427,7 +363,6 @@ export function auditSeasonPostseasonFacts(input: {
   return { failures, counts };
 }
 
-/** The CLI command: audits a full-run replay export or an audit fixture. */
 export function seasonPostseasonAudit(args: { input: string | null }): CliReport {
   const inputPath = args.input;
   if (inputPath === null) {
@@ -481,7 +416,6 @@ export function seasonPostseasonAudit(args: { input: string | null }): CliReport
   );
 }
 
-/** The shared report assembly of the audit command. */
 function auditReport(
   inputPath: string,
   runId: string,

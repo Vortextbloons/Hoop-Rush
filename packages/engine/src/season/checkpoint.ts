@@ -7,26 +7,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { seasonBlockRecapCanonical } from './recap.ts';
 
-/**
- * Season Run game reconstruction and canonical checkpoint digests
- * (spec/2.0/07 persistence, M2.3, season-checkpoint-v2). Completed game
- * facts live in per-block compact summaries, not in the run snapshot's
- * scheduled `games` array; the engine reconstructs finalized game records
- * from the schedule and summaries on demand. The checkpoint digest is a pure
- * function of the candidate's recorded facts — including the M2.4 effects
- * state (300 player loads + 1,350 pair chemistries) — so uninterrupted,
- * cancelled/retried, terminated/reloaded, single-worker, and CLI executions
- * must agree byte-for-byte.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
-/**
- * Reconstructs all 1,230 game records: the scheduled base from the schedule
- * artifact overlaid with final/forfeit state from the completed summaries
- * (forfeit loser and official 2-0 result). Stable order = schedule order.
- * Games with no summary stay `scheduled`.
- */
 export function reconstructSeasonGames(
   schedule: SeasonSchedule,
   summaries: readonly SeasonGameSummary[],
@@ -73,13 +53,6 @@ export function reconstructSeasonGames(
 
 export type SeasonCheckpointFacts = Omit<SeasonCandidateCheckpoint, 'digest'>;
 
-/**
- * Order-independent JSON serialization: object keys are sorted recursively
- * (array order is preserved). Runtime validation (zod) may reorder object
- * keys when parsing a persisted checkpoint, so the canonical serialization
- * must not depend on insertion order — otherwise the digest of a stored
- * checkpoint would differ from the digest of the freshly produced candidate.
- */
 export function canonicalJson(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) {
@@ -107,18 +80,6 @@ function standingsCanonical(candidate: SeasonCheckpointFacts): unknown {
   };
 }
 
-/**
- * Canonical byte-for-byte serialization of a candidate checkpoint: fixed
- * field order, every array sorted canonically, the recap canonicalized, the
- * effects state canonically ordered (player loads by playerVersionId, pairs
- * by the canonical a<b key), the M2.5 health/influence/transactions/
- * objective facts canonically ordered (injuries by injuryId, ledger by
- * entryId, transactions by transactionId), and the digest field itself
- * excluded (a digest is a function of the facts, not of itself). Identical
- * recorded facts always serialize identically, regardless of call order,
- * internal array order, or object key insertion order (keys are sorted
- * recursively; runtime validation may reorder them).
- */
 export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): string {
   return canonicalJson({
     schemaVersion: candidate.schemaVersion,
@@ -140,7 +101,7 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
     gameSummaries: [...candidate.gameSummaries].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
     retainedDetails: [...candidate.retainedDetails].sort((a, b) => (a.gameId < b.gameId ? -1 : 1)),
     recap: seasonBlockRecapCanonical(candidate.recap),
-    // M2.4: the effects state participates in the digest (canonical order).
+
     effects: canonicalJson({
       schemaVersion: candidate.effects.schemaVersion,
       playerStates: [...candidate.effects.playerStates].sort((a, b) =>
@@ -150,8 +111,7 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
         a.a < b.a ? -1 : a.a > b.a ? 1 : a.b < b.b ? -1 : a.b > b.b ? 1 : 0,
       ),
     }),
-    // M2.5: the authoritative post-block health/influence/transactions
-    // facts and the locked objective evaluation participate in the digest.
+
     health: canonicalJson({
       schemaVersion: candidate.health.schemaVersion,
       healthVersion: candidate.health.healthVersion,
@@ -169,9 +129,7 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
       a.transactionId < b.transactionId ? -1 : 1,
     ),
     objective: candidate.objective,
-    // M2.5: the run state chain facts asserted pre-block (the post-block
-    // facts are the commit side's derive output; the assembly placeholder
-    // zeros are part of the assembled candidate, so they serialize here).
+
     expectedStateRevision: candidate.expectedStateRevision,
     expectedStateDigest: candidate.expectedStateDigest,
     stateRevision: candidate.stateRevision,
@@ -179,10 +137,6 @@ export function seasonCheckpointCanonical(candidate: SeasonCheckpointFacts): str
   });
 }
 
-/**
- * Canonical 32-hex checkpoint digest over the canonical serialization of the
- * candidate's recorded facts (the stored `digest` field is excluded).
- */
 export function seasonCheckpointDigest(candidate: SeasonCheckpointFacts): string {
   return seasonDigestHex(seasonCheckpointCanonical(candidate));
 }

@@ -7,17 +7,6 @@
   import { untrack } from 'svelte';
   import TeamLogo from '../TeamLogo.svelte';
 
-  /**
-   * Classic roll presentation: a full-screen slot-machine modal with a
-   * semi-transparent backdrop. A spin opens the overlay, spins the reels for
-   * the requested axis, locks in with a pulse, briefly shows the landed
-   * franchise + era as a result indicator, then closes and fires onSettled.
-   * The domain result is decided before any animation; the component is
-   * purely presentational. Resuming a saved round never opens the modal
-   * (spinKey only changes when the parent issues a fresh roll), and
-   * reduced-motion replaces the spin with a short fade.
-   */
-
   const ROW_HEIGHT_PX = 72;
   const OPTION_REPEATS = 3;
   const SPIN_MS = 900;
@@ -46,10 +35,10 @@
     axis?: 'both' | 'franchise' | 'era';
     spinKey?: number;
     announceText: string;
-    /** e.g. "Round 3 of 5" shown with the settled result indicator. */
+
     roundLabel?: string;
     reducedMotion?: boolean;
-    /** Spin duration for non-reduced spins; defaults to SPIN_MS (900). */
+
     spinDurationMs?: number;
     onSettled: () => void;
   } = $props();
@@ -84,7 +73,6 @@
     return manifest.modernFranchiseSlots.find((slot) => slot.franchiseId === id);
   }
 
-  /** Historical identity for a franchise row against the landed era. */
   function franchiseIdentityFor(id: string) {
     return resolveEraTeamIdentity(manifest, id, eraId);
   }
@@ -183,9 +171,7 @@
     const key = spinKey;
     const isFirst = firstRun;
     firstRun = false;
-    // A resumed draft mounts with spinKey 0 and never replays. A freshly
-    // created draft mounts with spinKey > 0 (the parent increments it for the
-    // very first roll), so the modal spins on mount.
+
     if (!isFirst || key > 0) {
       startSpin(key);
     }

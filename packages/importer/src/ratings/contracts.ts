@@ -1,8 +1,3 @@
-/**
- * Contract derivation (port of compute_ratings.py derive_contract).
- * Roster metadata only; deterministic (rng accepted for signature
- * compatibility and unused).
- */
 import { safeInt } from '../json.ts';
 
 export const SALARY_TIERS: ReadonlyArray<readonly [number, number]> = [
@@ -78,7 +73,6 @@ export function deriveContract(overall: number, age: number, rng?: unknown): Con
     optionYear = null;
   }
 
-  // Guaranteed: all years except last for 4+ year deals
   const guaranteed = years <= 3;
   const guaranteedByYear = new Array<boolean>(years).fill(true);
   if (years > 3) {

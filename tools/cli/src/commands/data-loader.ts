@@ -17,12 +17,6 @@ import {
 import { UsageError } from '../args.ts';
 import { sha256Hex } from '../io.ts';
 
-/**
- * Loads packaged static artifacts from the repo (spec/09: commands read
- * production artifacts but never mutate them). Every artifact is validated
- * and hash-verified against the manifest.
- */
-
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
 export const DEFAULT_MANIFEST = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
 
@@ -53,7 +47,6 @@ function resolveArtifact(manifestDir: string, url: string): string {
   return isAbsolute(url) ? url : resolve(manifestDir, url);
 }
 
-/** Loads the manifest plus its directory for artifact resolution. */
 export function loadPackagedData(manifestPath: string = DEFAULT_MANIFEST): {
   manifest: HoopRushManifest;
   dir: string;
@@ -118,7 +111,6 @@ export class PackagedData {
     return parsed.data;
   }
 
-  /** The compact draft index (every packaged peak row), hash-verified. */
   playersIndex(): PlayersIndex {
     if (this.indexCache) return this.indexCache;
     const entry = this.manifest.playersIndex;
@@ -131,7 +123,6 @@ export class PackagedData {
     return parsed.data;
   }
 
-  /** The single frozen opponent bracket (spec/02), hash-verified. */
   bracket(): OpponentBracket {
     if (this.bracketCache) return this.bracketCache;
     const entry = this.manifest.bracket;
@@ -145,7 +136,6 @@ export class PackagedData {
   }
 }
 
-/** Validates a standalone era-profile file (used by sim/calibrate/challenge). */
 export function loadProfileFile(path: string): EraSimulationProfile {
   const parsed = eraSimulationProfileSchema.safeParse(
     JSON.parse(readFileSync(path, 'utf8')) as unknown,
@@ -158,7 +148,6 @@ export function loadProfileFile(path: string): EraSimulationProfile {
   return parsed.data;
 }
 
-/** Validates a standalone bracket file (used by sim challenge). */
 export function loadBracketFile(path: string): OpponentBracket {
   const parsed = opponentBracketSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')) as unknown);
   if (!parsed.success) {

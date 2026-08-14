@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, within } from '@testing-library/svelte';
 import type { Position, SeasonRotation } from '@hoop-rush/data-contracts';
@@ -14,15 +12,6 @@ import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
 mockSvelteKitApp();
 
-/**
- * M2.6.5 roster-depth tests: the rotation editor distinguishes the ten
- * ACTIVE rotation members from INACTIVE rostered depth (10-15 roster
- * members) and promotes/demotes within the roster while keeping exactly ten
- * active members (engine-audited). The roster list marks active/inactive
- * rows with stable test hooks.
- */
-
-/** A legal G,G,F,F,C five in slots 0-4, then five bench players. */
 const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -41,7 +30,6 @@ interface NamedMember {
   playable: readonly Position[];
 }
 
-/** Ten rotation members + depth, with playables derived from slot patterns. */
 function members(count: number): NamedMember[] {
   const list: NamedMember[] = [];
   for (let i = 0; i < count; i += 1) {
@@ -107,8 +95,7 @@ describe('rotation editor: active/inactive roster (M2.6.5)', () => {
 
   it('promotes an inactive player through the replace picker (engine-audited swap)', async () => {
     const { editor, roster } = editorFor(12);
-    // pv-10 plays PG; the bench-first player (pv-05) also plays PG, so the
-    // swap is legal: pv-10 takes pv-05's bench slot.
+
     const inactive = roster[10];
     const active = roster[5];
     if (inactive === undefined || active === undefined) throw new Error('fixture too small');
@@ -131,14 +118,14 @@ describe('rotation editor: active/inactive roster (M2.6.5)', () => {
     expect(editor.activeMemberIds()).toHaveLength(10);
     expect(editor.inactiveMembers()).toHaveLength(2);
     expect(editor.validate()).toEqual([]);
-    // The promoted player took the replaced player's target minutes.
+
     const minutes = editor.rotation.targetMinutes.find((t) => t.playerVersionId === inactive.id);
     expect(minutes).toBeDefined();
   });
 
   it('demotes an active player through the demote picker', async () => {
     const { editor, roster } = editorFor(12);
-    // pv-10 plays PG, so it can take the demoted pv-00's starter slot 0.
+
     const inactive = roster[10];
     const active = roster[0];
     if (inactive === undefined || active === undefined) throw new Error('fixture too small');
@@ -161,8 +148,7 @@ describe('rotation editor: active/inactive roster (M2.6.5)', () => {
 
   it('rejects an illegal promotion with a visible rejection (no commit)', async () => {
     const { editor, roster } = editorFor(12);
-    // The promoted player only plays guard; the replaced starter is the
-    // center slot (index 4 -> C), so the swap is illegal.
+
     const depth = roster[10];
     const center = editor.rotation.starters[4];
     if (depth === undefined || center === undefined) throw new Error('fixture too small');
@@ -171,7 +157,7 @@ describe('rotation editor: active/inactive roster (M2.6.5)', () => {
     expect(failures.length).toBeGreaterThan(0);
     expect(editor.isActive(inactive.id)).toBe(false);
     expect(editor.isActive(center)).toBe(true);
-    // The component surfaces the rejection copy.
+
     const { container } = render(RotationEditor, {
       props: { editor, disabled: false, onchange: vi.fn() },
     });

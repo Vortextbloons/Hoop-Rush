@@ -16,50 +16,9 @@ import {
   type SeasonRosterMemberInput,
 } from './roster-rules.ts';
 
-/**
- * M2.3.5 global eight-card offer generation (spec/2.0/03, season-draft-v2).
- * One offer per turn is drawn from the complete catalog minus already-owned
- * exact versions:
- *
- * 1. Remaining candidates are canonically sorted by `playerVersionId`.
- * 2. Every candidate is tested against the 4G/4F/3C completion-feasibility
- *    probe (same pattern the pick command uses); safe candidates are marked
- *    selectable.
- * 3. Exactly `SEASON_DRAFT_SAFE_MINIMUM` feasibility-safe candidates are
- *    selected deterministically (seeded, with removal, from the sorted safe
- *    list).
- * 4. Five additional distinct candidates are sampled deterministically from
- *    the remaining (unowned, not among the three) candidates without
- *    feasibility filtering.
- * 5. Sampled cards that would break completion feasibility stay visible with
- *    `selectable: false` and a stable coverage reason.
- *
- * Fewer than `SEASON_DRAFT_SAFE_MINIMUM` safe candidates (or fewer than
- * `SEASON_DRAFT_OFFER_SIZE` unowned candidates) is a typed
- * `NO_FEASIBLE_GLOBAL_OFFER` rejection; rules are never relaxed.
- *
- * Seed sub-key scheme (spec/2.0/07 seed tree; persisted verbatim on each
- * offer's `seedPath`):
- *
- *   ['draft', 'offer', <participantId>, <round>, <pickOrdinal>,
- *    'safe-order', 'sample-order']
- *
- *   offerSeed   = seasonNamespaceSeed(rootSeed, 'draft', 'offer', pid,
- *                 String(round), String(pickOrdinal))
- *   safeSeed    = seasonNamespaceSeed(offerSeed, 'safe-order')
- *   sampleSeed  = seasonNamespaceSeed(offerSeed, 'sample-order')
- *
- * The safe-selected three and the five sampled cards are stable functions of
- * (canonically-sorted remaining candidates, seed), so replaying a persisted
- * seedPath against the same (root seed, state, catalog) reproduces the offer
- * byte-for-byte.
- */
-
-/** Draw seed keys appended to the `draft/offer/<pid>/<round>/<pickOrdinal>` prefix. */
 export const OFFER_SAFE_ORDER_KEY = 'safe-order';
 export const OFFER_SAMPLE_ORDER_KEY = 'sample-order';
 
-/** Stable reason shown beside disabled offer cards (null on selectable cards). */
 export const SEASON_DRAFT_COVERAGE_REASON =
   'Selecting this version would leave the 4G/4F/3C completion targets unreachable with the remaining picks';
 
@@ -109,11 +68,6 @@ function ownedMembers(
   return members;
 }
 
-/**
- * True when selecting this version keeps the participant's 4G/4F/3C
- * completion targets reachable with the remaining picks. The probed
- * candidate itself is no longer available for future picks.
- */
 export function selectionKeepsFeasibility(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -148,12 +102,6 @@ export type SeasonOfferDrawResult =
   | { status: 'too-few-candidates'; remainingCount: number }
   | { status: 'too-few-safe'; safeCount: number };
 
-/**
- * Draws one deterministic eight-card offer for the participant's current
- * turn, or returns the typed infeasibility reason. Pure function of
- * (root seed, state, catalog, participant id); the caller persists the offer
- * and its seed path.
- */
 export function drawGlobalOffer(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -163,12 +111,7 @@ export function drawGlobalOffer(
   if (candidates.length < SEASON_DRAFT_OFFER_SIZE) {
     return { status: 'too-few-candidates', remainingCount: candidates.length };
   }
-  // Feasibility depends only on the candidate's coarse group mask, so the
-  // whole candidate set is probed once per mask (at most seven probes) and
-  // every candidate with a safe mask is marked safe. This is exactly
-  // equivalent to probing every candidate individually, because removing one
-  // candidate from its mask bucket changes that bucket's count identically
-  // for every candidate in the bucket.
+
   const maskOfCandidate = new Map(
     candidates.map((candidate) => [
       candidate.playerVersionId,
@@ -199,7 +142,6 @@ export function drawGlobalOffer(
     String(pickOrdinal),
   );
 
-  // Step 3: exactly three feasibility-safe candidates, deterministically.
   const safePool = [...safeCandidates];
   const safeRng = createRng(seasonNamespaceSeed(offerSeed, OFFER_SAFE_ORDER_KEY));
   const safeSelected: SeasonDraftCandidate[] = [];
@@ -209,7 +151,6 @@ export function drawGlobalOffer(
     safeSelected.push(picked);
   }
 
-  // Step 4: five additional distinct candidates, sampled without filtering.
   const sampledIds = new Set(safeSelected.map((candidate) => candidate.playerVersionId));
   const samplePool = candidates.filter((candidate) => !sampledIds.has(candidate.playerVersionId));
   const sampleRng = createRng(seasonNamespaceSeed(offerSeed, OFFER_SAMPLE_ORDER_KEY));

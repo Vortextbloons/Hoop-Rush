@@ -220,8 +220,6 @@ describe('buildPlayerPositions', () => {
   });
 
   it('throws when the final playable union is empty (schema rejects empty unions)', () => {
-    // The SF fallback normally guarantees a non-empty union; the guard fires
-    // when an override payload carries no valid detailed position at all.
     expect(() =>
       buildPlayerPositions({
         careerLabels: [],

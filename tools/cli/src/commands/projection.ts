@@ -38,17 +38,6 @@ import {
 } from './season-data.ts';
 import type { SeasonProjection, SeasonRotation } from '@hoop-rush/data-contracts';
 
-/**
- * Projection milestone CLI commands (spec/09 + projection milestone):
- * - `projection build`: derives the versioned projection model artifact from
- *   packaged pool aggregates and writes it with explicit `--write`;
- * - `projection base`: projects one legal five against the era reference;
- * - `projection calibrate-base`: paired fixed-five simulation cohorts against
- *   the authoritative `simulateGame` path;
- * - `projection validate`: held-out read-only validation (no `--write`);
- * - `projection benchmark`: base-projection timing gates.
- */
-
 export const PROJECTION_BASE_OPTIONS = {
   fixture: true,
   'seed-from': true,
@@ -119,7 +108,6 @@ function lineupInput(players: readonly SimulationPlayer[]): BaseFiveProjectionIn
   ];
 }
 
-/** Loads the committed projection model artifact (or the manifest entry). */
 function loadModel(
   manifestPath: string | null | undefined,
   modelPath: string | null | undefined,
@@ -155,7 +143,6 @@ interface PoolPlayerView {
   eraId: string;
 }
 
-/** Collects every pool player for an era (deduplicated by playerId). */
 function eraPlayers(data: PackagedData, eraId: string): PoolPlayerView[] {
   const seen = new Set<string>();
   const players: PoolPlayerView[] = [];
@@ -171,7 +158,6 @@ function eraPlayers(data: PackagedData, eraId: string): PoolPlayerView[] {
   return players;
 }
 
-/** Trait membership for one archetype (deterministic population filters). */
 function archetypeFilter(archetype: ProjectionMatchupArchetype): {
   (player: SimulationPlayer): boolean;
   kind: 'neutral' | 'trait';
@@ -204,10 +190,8 @@ function archetypeFilter(archetype: ProjectionMatchupArchetype): {
   }
 }
 
-/** Local alias for the shared arithmetic mean (projection aggregates). */
 const meanOf = mean;
 
-/** Aggregates one slot-group population into a synthetic reference player. */
 function aggregateReferencePlayer(
   candidates: readonly SimulationPlayer[],
   slotIndex: number,
@@ -279,8 +263,6 @@ function aggregateReferencePlayer(
         }
       : undefined;
 
-  // Three-point percentage/rate keep null semantics: averaged over the
-  // non-null observations, null when nothing is observed.
   if (anchors !== undefined) {
     const threePct = anchored
       .map((p) => p.anchors?.threePointPct)
@@ -374,7 +356,6 @@ function aggregateReferencePlayer(
   };
 }
 
-/** Derives one reference five for an era and archetype from pool aggregates. */
 function deriveReferenceFive(
   players: readonly SimulationPlayer[],
   eraId: string,
@@ -407,7 +388,6 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-/** Derives the full model artifact from the packaged pools. */
 export function deriveProjectionModel(data: PackagedData): {
   model: ProjectionModelArtifact;
   populationSizes: Record<string, number>;
@@ -548,7 +528,6 @@ export function deriveProjectionModel(data: PackagedData): {
   return { model, populationSizes };
 }
 
-/** Builds the initial projection-targets artifact (frozen defaults). */
 export function buildProjectionTargets(): ProjectionTargets {
   return {
     schemaVersion: 1,
@@ -606,9 +585,6 @@ export const PROJECTION_AI_SHADOW_OPTIONS = {
   verbose: false,
 };
 
-/** `projection ai-shadow`: generates a league with projection shadow mode and
- * compares the current AI selections against the projection-ranked best
- * candidates of the same pools. Selection is never changed. */
 export function projectionAiShadow(input: {
   manifest: string | null | undefined;
   model: string | null | undefined;
@@ -708,7 +684,6 @@ export function projectionAiShadow(input: {
   );
 }
 
-/** `projection season`: projects one ten-player roster with its rotation. */
 export function projectionSeason(input: {
   fixture: string | null | undefined;
   manifest: string | null | undefined;
@@ -778,7 +753,6 @@ export function projectionSeason(input: {
   return makeReport('projection season', { fixture, era: eraId }, { details, payload: projection });
 }
 
-/** `projection build`: derives and (with --write) commits the model artifact. */
 export function projectionBuild(input: {
   manifest?: string | null;
   out?: string | null;
@@ -1022,9 +996,7 @@ function projectSimulateLineup(input: {
       lineupPoss += result.away.box.possessions;
     }
   }
-  // Paired home/away play: the lineup's rating is its own points per 100
-  // possessions; the defensive rating allowed is the opponent's rate against
-  // it (both sides mirrored, so home-court effects average out).
+
   const simOrtg = (lineupPoints / Math.max(1e-9, lineupPoss)) * 100;
   const simDrtg = (opponentPoints / Math.max(1e-9, opponentPoss)) * 100;
   const simulated = { ortg: simOrtg, drtg: simDrtg, net: simOrtg - simDrtg };
@@ -1038,7 +1010,6 @@ function projectSimulateLineup(input: {
   };
 }
 
-/** Builds a deterministic legal-lineup cohort from an era's pooled players. */
 export function buildLineupCohort(
   data: PackagedData,
   eraId: string,
@@ -1089,7 +1060,6 @@ export function buildLineupCohort(
   return [...legal.values()].slice(0, count);
 }
 
-/** Deterministic seeded visitation order (FNV-1a based, worker-count independent). */
 function seededOrder(length: number, namespace: string): number[] {
   const order = Array.from({ length }, (_, index) => index);
   const offsets = order.map(
@@ -1101,7 +1071,6 @@ function seededOrder(length: number, namespace: string): number[] {
     .map((entry) => entry.value);
 }
 
-/** `projection calibrate-base`: paired simulation cohorts vs the projector. */
 export function projectionCalibrateBase(input: {
   manifest?: string | null;
   model?: string | null;
@@ -1175,8 +1144,6 @@ export function projectionCalibrateBase(input: {
 
   const targets = buildProjectionTargets();
   if (!validate) {
-    // Dev mode (25 games per lineup) is evidence-gathering: gates are only
-    // enforced on release-sized cohorts so quick development runs stay green.
     const enforceGates = gamesPerLineup > 25;
     const failures: string[] = [];
     const gateChecks: Array<[string, boolean]> = [
@@ -1245,7 +1212,6 @@ function summarize(
   };
 }
 
-/** `projection benchmark`: base-projection timing gates. */
 export function projectionBenchmark(input: {
   manifest?: string | null;
   model?: string | null;
@@ -1280,8 +1246,7 @@ export function projectionBenchmark(input: {
       { failures: ['no legal lineups to benchmark'] },
     );
   }
-  // Warm-up: JIT and module initialization settle before measurement (the
-  // engine benchmark command does the same for its sample games).
+
   for (const lineup of lineups) {
     projectBaseFive({ lineup: lineupInput(lineup.players), eraProfile: profile, model });
   }
@@ -1310,16 +1275,7 @@ export function projectionBenchmark(input: {
   if (verbose) {
     details.push(`lineup count: ${String(lineups.length)}`);
   }
-  // Gates are regression guards on shared GitHub runners, not desktop
-  // benchmarks (same philosophy as the engine `benchmark` command): a base
-  // projection measures well under a millisecond on reference desktops, but
-  // shared runners are roughly 30x slower (the engine benchmark command
-  // documents the same gap: a game that measures ~0.3 ms here reads 10-11 ms
-  // on GitHub runners) and p95 spikes further under CPU contention. The
-  // generous bounds catch real slowdowns (a material regression in the
-  // expected ledger multiplies the desktop figure several times over) while
-  // tolerating runner noise; use --samples for tighter, fingerprint-matched
-  // comparisons.
+
   const failures: string[] = [];
   if (median >= 40) {
     failures.push(`base projection median ${median.toFixed(2)} ms exceeds the hard 40 ms gate`);

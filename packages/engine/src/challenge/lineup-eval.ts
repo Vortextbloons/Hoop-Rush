@@ -4,36 +4,20 @@ import { simulateGame } from '../sim/game.ts';
 import { seedFromString } from './seeds.ts';
 import { BENCHMARK_WEIGHTS } from './benchmarks.ts';
 
-/**
- * Lineup evaluation (spec/01 authored opponent requirements, spec/06
- * difficulty calibration). `evaluateLineupBalance` measures the five required
- * dimensions from detailed possession ratings and tendencies; a lineup
- * missing any dimension cannot be authored into the bracket.
- * `evaluateLineupStrength` measures the weighted win rate against the fixed
- * weak/medium/strong benchmark matrix with alternating sides.
- */
-
 export interface LineupBalance {
-  /** Ball creation: passing, handling, IQ, and usage tendencies. */
   creation: number;
-  /** Perimeter shooting: three-point, midrange, and free-throw skill. */
+
   shooting: number;
-  /** Interior presence: inside scoring, finishing, and rim protection. */
+
   interiorPresence: number;
-  /** Rebounding: offensive and defensive glass. */
+
   rebounding: number;
-  /** Defense: perimeter/interior contests, disruption, and IQ. */
+
   defense: number;
-  /** Whether every dimension clears the required balance floor. */
+
   ok: boolean;
 }
 
-/**
- * Minimum lineup-average dimension value for an authored opponent (spec/01 #3).
- * Recalibrated to the m3.5 rating scale (m1.9-era ratings reached 100 on some
- * dimensions; the m3.5 scale compresses rebounding to roughly 40-85), so the
- * proposal sampler can find balanced lineups for every franchise.
- */
 export const BALANCE_FLOOR = 52;
 
 function mean(values: readonly number[]): number {
@@ -91,26 +75,18 @@ export function evaluateLineupBalance(team: SimulationTeam): LineupBalance {
 }
 
 export interface StrengthOptions {
-  /** Seeded games per benchmark team; the lineup alternates sides. */
   samplesPerBenchmark: number;
-  /** Seed prefix so different candidates/measurements never share draws. */
+
   seedBase: string;
 }
 
 export interface StrengthMeasurement {
   winRate: number;
   gamesPlayed: number;
-  /** Win rate per benchmark, keyed by benchmark team id. */
+
   byBenchmark: Record<string, { games: number; wins: number }>;
 }
 
-/**
- * Measures lineup strength as the weighted win rate against the fixed
- * benchmark matrix (spec/01 #4). For every benchmark the candidate plays half
- * its seeded games as the home side and half as the away side; seeds are a
- * pure function of the seed base and index, so measurements are reproducible
- * and independent of scheduling.
- */
 export function evaluateLineupStrength(
   team: SimulationTeam,
   context: EngineContext,
@@ -147,7 +123,6 @@ export function evaluateLineupStrength(
   return { winRate: weightedWins, gamesPlayed: totalGames, byBenchmark };
 }
 
-/** Deterministic seed for one measurement game (worker-count independent). */
 export function strengthSeed(seedBase: string, benchmarkId: string, index: number): string {
   return seedFromString(`${seedBase}|${benchmarkId}|${String(index)}`);
 }

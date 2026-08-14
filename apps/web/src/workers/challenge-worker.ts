@@ -16,17 +16,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { sleep } from '../lib/sleep';
 
-/**
- * Challenge worker entry (spec/04 static deployment and workers). Receives
- * runtime-validated, versioned requests; a `start` request simulates the
- * whole-run best-of-N and reports the chosen attempt seed, and a `simulate`
- * request simulates games from the start game through game 82 through the
- * authoritative challenge command path, posting results in batches of up to
- * BATCH_SIZE games. It never writes IndexedDB and holds no domain state:
- * results are a pure function of the request. The main thread validates every
- * message once at its boundary.
- */
-
 const BATCH_SIZE = 4;
 
 let currentRequestId: string | null = null;
@@ -36,9 +25,6 @@ function post(
   message:
     WorkerResultsMessage | WorkerErrorMessage | WorkerCompleteMessage | WorkerStartResultMessage,
 ): void {
-  // The pinned wire contract is enforced at its only emission point (the
-  // main thread keeps a cheap shape check; acceptGameResult stays the
-  // authoritative per-game validator).
   workerMessageSchema.parse(message);
   self.postMessage(message);
 }
@@ -114,8 +100,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           fromGameNumber: gameNumber,
           results,
         });
-        // Yield once per batch so the main thread stays responsive on slower
-        // devices; pacing of the presentation is the main thread's job.
+
         await sleep(0);
       }
       if (token === requestToken) {

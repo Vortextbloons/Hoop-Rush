@@ -9,13 +9,6 @@ import {
 } from './report-schemas.ts';
 import { jsonPayload, REPO_ROOT, runCli, withTmpDir } from './cli-test-helpers.ts';
 
-/**
- * CLI integration tests for `season schedule generate` and `season schedule
- * audit` (spec/2.0 M2.0): preview/hash reports, explicit writes, packaged
- * artifact audit, regeneration identity, manifest hash cross-checks, invalid
- * inputs, and exit codes.
- */
-
 const PACKAGED_LEAGUE = 'apps/web/static/data/season/league.json';
 const PACKAGED_SCHEDULE = 'apps/web/static/data/season/schedule.json';
 
@@ -64,8 +57,7 @@ describe('cli: season schedule generate', () => {
           '--format',
           'json',
         ]);
-      // Write behavior: the artifact appears only at the explicit --out path
-      // and its bytes hash to the reported sha256.
+
       const { code, stdout } = await run(first);
       expect(code).toBe(0);
       const payload = seasonScheduleGenerateReportSchema.parse(jsonPayload(stdout));
@@ -77,12 +69,10 @@ describe('cli: season schedule generate', () => {
       expect(parsed.games).toHaveLength(1230);
       expect(parsed.rounds).toBe(82);
 
-      // Regeneration identity: a second default-seed run is byte-identical.
       const secondRun = await run(second);
       expect(secondRun.code).toBe(0);
       expect(readFileSync(second, 'utf8')).toBe(written);
 
-      // Seed sensitivity: a different seed produces a different artifact.
       const seededRun = await run(seeded, 'feedfacefeedfacefeedfacefeedface');
       expect(seededRun.code).toBe(0);
       const seededPayload = seasonScheduleGenerateReportSchema.parse(jsonPayload(seededRun.stdout));

@@ -26,25 +26,6 @@ import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact } from '../artifact.ts';
 import { loadPackagedData, PackagedData } from './data-loader.ts';
 
-/**
- * M2.6 `season postseason calibrate` (spec/2.0/02, postseason-targets-v1):
- * freezes the postseason calibration artifact from seasons driven through
- * the engine block pipeline AND the postseason state machine (`start` +
- * `advance` commands through `handleSeasonRunCommand`, the human franchise
- * never acting — the M2.5 calibration convention). Measures series length,
- * upset rate, home advantage, advancement by relative strength, award
- * plausibility, forfeits, and integrity failures; every cohort must produce
- * exactly one champion with zero duplicate/missing bracket teams and zero
- * both-invalid games.
- *
- * Cohort convention (frozen): 8 calibration + 4 held-out seasons (seasons
- * are the expensive unit; the M2.5 calibrate commands use the same split),
- * minimum sample 4 seasons before a gate evaluates. The artifact
- * `apps/web/static/data/season/postseason-targets.json` is written only
- * when every gate passes AND `--write` is given; `--validate` checks an
- * existing artifact.
- */
-
 export const SEASON_POSTSEASON_CALIBRATE_OPTIONS: Record<string, boolean> = {
   input: true,
   'seed-from': true,
@@ -63,20 +44,18 @@ export const SEASON_POSTSEASON_CALIBRATION_SEED_COUNT = 8;
 export const SEASON_POSTSEASON_VALIDATION_SEED_COUNT = 4;
 export const SEASON_POSTSEASON_MIN_SEASONS = 4;
 
-/** Frozen envelope: mean best-of-seven series length (uniform 4-7 -> 5.5). */
 export const SEASON_POSTSEASON_SERIES_LENGTH_RANGE = { min: 4.5, max: 6.5 } as const;
-/** Frozen envelope: share of decided seeded series won by the lower seed. */
+
 export const SEASON_POSTSEASON_UPSET_RATE_MAX = 0.45;
-/** Frozen envelope: postseason home win rate (the tuned home-court profile). */
+
 export const SEASON_POSTSEASON_HOME_ADVANTAGE_RANGE = { min: 0.5, max: 0.7 } as const;
-/** Frozen direction: the higher seed must advance at least half the time. */
+
 export const SEASON_POSTSEASON_STRENGTH_MIN = 0.5;
-/** Frozen envelope: share of award winners who played in the postseason. */
+
 export const SEASON_POSTSEASON_AWARD_PLAUSIBILITY_MIN = 0.8;
-/** Frozen envelope: postseason forfeits per season (mean). */
+
 export const SEASON_POSTSEASON_FORFEITS_PER_SEASON_MAX = 2;
 
-/** The measured-facts shape of one cohort (artifact + report shared). */
 export const seasonPostseasonMeasuredSchema = z.object({
   seasonsSimulated: z.number().int().nonnegative(),
   gamesPlayed: z.number().int().nonnegative(),
@@ -95,7 +74,6 @@ export const seasonPostseasonMeasuredSchema = z.object({
 });
 export type SeasonPostseasonMeasured = z.infer<typeof seasonPostseasonMeasuredSchema>;
 
-/** The targets artifact frozen by `season postseason calibrate`. */
 export const seasonPostseasonTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   targetsVersion: z.literal(SEASON_POSTSEASON_TARGETS_VERSION),
@@ -127,7 +105,6 @@ export const seasonPostseasonTargetsSchema = z.object({
 });
 export type SeasonPostseasonTargets = z.infer<typeof seasonPostseasonTargetsSchema>;
 
-/** The recorded postseason facts of one calibration season. */
 export interface SeasonPostseasonSeasonFacts {
   rootSeed: string;
   championFranchiseId: string | null;
@@ -148,21 +125,18 @@ export interface SeasonPostseasonSeasonFacts {
   seriesCompleted: number;
 }
 
-/** The per-season driver seam (tests inject synthetic facts). */
 export type SeasonPostseasonSeasonRunner = (rootSeed: string) => SeasonPostseasonSeasonFacts;
 
-/** The aggregated facts of one cohort. */
 export interface SeasonPostseasonCohortFacts extends SeasonPostseasonMeasured {
   awardWinners: number;
-  /** Raw upset-series count (the report's `upsetGames`). */
+
   upsetSeries: number;
-  /** Raw postseason home games (the report's `homeGames`). */
+
   homeGames: number;
-  /** Raw decided seeded series (the report's `strengthDecidedSeries`). */
+
   decidedSeededSeries: number;
 }
 
-/** Folds per-season facts into cohort facts (pure; testable without seasons). */
 export function foldSeasonPostseasonCohortFacts(
   facts: readonly SeasonPostseasonSeasonFacts[],
 ): SeasonPostseasonCohortFacts {
@@ -196,7 +170,6 @@ export function foldSeasonPostseasonCohortFacts(
   };
 }
 
-/** The frozen gates of one cohort (skipped below the minimum sample). */
 export function seasonPostseasonGates(cohort: SeasonPostseasonCohortFacts): M25Gate[] {
   const min = SEASON_POSTSEASON_MIN_SEASONS;
   return [
@@ -291,12 +264,6 @@ export function seasonPostseasonGates(cohort: SeasonPostseasonCohortFacts): M25G
   ];
 }
 
-/**
- * The real per-season driver: runs the M2.5 block pipeline (trade windows +
- * objectives), starts the postseason from the recorded standings, and drives
- * every advance command through the champion. The human franchise never
- * acts, so all postseason games simulate with the saved rotations.
- */
 export function simulateSeasonPostseasonFacts(
   rootSeed: string,
   options: {
@@ -382,10 +349,6 @@ export function simulateSeasonPostseasonFacts(
   return seasonPostseasonFactsOf(run, season, postseasonSummaries, integrityFailures);
 }
 
-/**
- * Derives one season's recorded postseason facts from the completed run and
- * the recorded summaries (pure; shared by the driver and the tests).
- */
 export function seasonPostseasonFactsOf(
   run: SeasonRun,
   season: SeasonM25SeasonFacts,
@@ -499,14 +462,12 @@ export function seasonPostseasonFactsOf(
   };
 }
 
-/** Validates an existing targets artifact against the frozen policy. */
 export function validateSeasonPostseasonTargets(path: string): string[] {
   const parsed = seasonPostseasonTargetsSchema.safeParse(readJsonFile(path));
   if (!parsed.success) {
     return [`targets artifact fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`];
   }
-  // The schema pins the frozen `postseason-targets-v1` literal, so a parsed
-  // artifact already carries the frozen version by construction.
+
   return [];
 }
 
@@ -514,7 +475,6 @@ export interface SeasonPostseasonCalibrateDeps {
   runSeason?: SeasonPostseasonSeasonRunner;
 }
 
-/** The CLI command: measures the postseason cohorts and freezes the artifact. */
 export function seasonPostseasonCalibrate(
   args: {
     input?: string | null;
@@ -567,8 +527,7 @@ export function seasonPostseasonCalibrate(
   const validationGates = seasonPostseasonGates(validation);
   const calibrationSummary = gateSummary(calibrationGates);
   const validationSummary = gateSummary(validationGates);
-  // An empty held-out range (the requested seeds stay inside the
-  // calibration cohort) holds out nothing and cannot fail its gates.
+
   const validationPass = validationIndices.length === 0 ? true : validationSummary.pass;
   const pass = calibrationSummary.pass && validationPass;
 
@@ -677,7 +636,6 @@ export function seasonPostseasonCalibrate(
   );
 }
 
-/** The measured-facts object of one cohort (artifact shape). */
 function measuredOf(cohort: SeasonPostseasonCohortFacts): SeasonPostseasonMeasured {
   return {
     seasonsSimulated: cohort.seasonsSimulated,

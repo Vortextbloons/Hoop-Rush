@@ -6,31 +6,11 @@ import type {
 import { weaknessPenalty } from './weaknesses.ts';
 import { normalizeValue } from './normalize.ts';
 
-/**
- * Candidate ranking (projection milestone). Three stages:
- *
- * 1. Hard gates reject candidates that fail roster/rotation legality,
- *    positional coverage, legal starter/closing fives, critical component
- *    floors, critical weakness severities, or the caller's band/anchor/
- *    ownership/role/feasibility rules.
- * 2. Pareto filtering keeps only candidates not dominated across the core
- *    vector (at least as good in every direction, strictly better in one).
- * 3. Composite ranking among survivors:
- *      finalScore = 0.40 x basketballMean + 0.35 x rotationMean
- *                   + 0.25 x robustnessMean - weaknessPenalty
- *                   - redundancyPenalty
- *
- * All normalization baselines, floors, group weights, and penalty
- * coefficients are read from the versioned projection model artifact.
- */
-
-/** Hard-gate flags the caller supplies (band, anchor, ownership, roles,
- * future feasibility are application rules; legality is projection-level). */
 export interface RankingGates {
   legal: boolean;
-  /** Legal starting and closing five both exist. */
+
   legalStartersAndClosers: boolean;
-  /** Positional coverage (4/4/3 completion targets) met. */
+
   coverageOk: boolean;
   bandOk: boolean;
   anchorsOk: boolean;
@@ -88,7 +68,6 @@ export interface RankingResult {
   paretoSurvivors: number;
 }
 
-/** Default normalization scales (fallbacks; the frozen artifact overrides). */
 const DEFAULT_SCALES: Record<string, { baseline: number; perPoint: number }> = {
   offensiveRating: { baseline: 105, perPoint: 1 },
   defensiveRatingAllowed: { baseline: 105, perPoint: 1 },
@@ -112,7 +91,6 @@ function scaleOf(
   return model.scales[key];
 }
 
-/** Normalizes a raw component to 0-100 (higher is better everywhere here). */
 export function normalizeComponent(
   model: ProjectionModelArtifact,
   key: string,
@@ -131,7 +109,6 @@ function mean(values: readonly number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
 }
 
-/** Extracts the 23-component ranking vector from a Season projection. */
 export function rankingVectorOf(
   model: ProjectionModelArtifact,
   projection: SeasonProjection,
@@ -217,14 +194,12 @@ function subMean(vector: RankingVector, keys: readonly (keyof RankingVector)[]):
   return mean(keys.map((key) => vector[key]));
 }
 
-/** Soft redundancy penalty: zero at or above the baseline, linear below. */
 export function redundancyPenaltyValue(vector: RankingVector): number {
   const scale = DEFAULT_SCALES.redundancy ?? { baseline: 60, perPoint: 1 };
   const shortfall = Math.max(0, scale.baseline - vector.redundancy);
   return shortfall / 100;
 }
 
-/** Hard gates: returns the rejection reasons (empty means the candidate passes). */
 export function hardGateReasons(gates: RankingGates, projection: SeasonProjection): string[] {
   const reasons: string[] = [];
   if (!gates.legal) reasons.push('roster is not legal');
@@ -245,7 +220,6 @@ export function hardGateReasons(gates: RankingGates, projection: SeasonProjectio
   return reasons;
 }
 
-/** Pareto filter: drops candidates dominated by another across the vector. */
 export function paretoFilter(candidates: readonly RankedCandidate[]): RankedCandidate[] {
   const keys = [...BASKETBALL_KEYS, ...ROTATION_KEYS, ...ROBUSTNESS_KEYS];
   const survivors: RankedCandidate[] = [];
@@ -274,7 +248,6 @@ export function paretoFilter(candidates: readonly RankedCandidate[]): RankedCand
   return survivors;
 }
 
-/** Ranks candidates through hard gates, Pareto, and the composite score. */
 export function rankCandidates(input: {
   candidates: Array<{ candidateId: string; projection: SeasonProjection; gates: RankingGates }>;
   model: ProjectionModelArtifact;

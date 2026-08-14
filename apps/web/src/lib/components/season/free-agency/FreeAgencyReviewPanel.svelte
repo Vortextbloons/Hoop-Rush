@@ -6,13 +6,6 @@
   import type { SeasonFaceRef } from '$lib/season/season-branding';
   import { ROLE_EXPECTATION_LABEL } from './free-agency-view';
 
-  /**
-   * Review + resolve step (spec/2.0/15): after the human declared or
-   * skipped, the declaration is immutable ("Declaration submitted") and the
-   * market can be explicitly resolved with `resolveFreeAgentMarket`. The
-   * window stays open until resolution; the next block is gated meanwhile.
-   */
-
   let {
     windowIndex,
     declaration,
@@ -25,7 +18,7 @@
     onGoBackToMarket = null,
   }: {
     windowIndex: number;
-    /** The recorded (immutable) declaration; empty targets mean skip. */
+
     declaration: SeasonFreeAgencyDeclaration;
     candidates: readonly SeasonFreeAgencyCandidate[];
     manifest?: HoopRushManifest | null;

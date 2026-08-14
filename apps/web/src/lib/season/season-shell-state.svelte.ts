@@ -1,5 +1,6 @@
 import type {
   HoopRushManifest,
+  PlayersIndexEntry,
   SeasonActiveRunIndex,
   SeasonDraftCatalog,
   SeasonFreeAgencyRoleExpectation,
@@ -30,15 +31,6 @@ import type { SeasonFaceRef } from './season-branding';
 import type { RotationEditor } from './season-rotation-editor';
 import type { SeasonRunShellData } from './season-shell-context';
 
-/**
- * Performance pass: the reactive Season Run shell as a class, so the large
- * immutable payloads (snapshot with the 1,230 reassembled game records, the
- * packaged catalog and schedule, the players-index face map, the per-run
- * player slice) live in `$state.raw` fields: reads are tracked and wholesale
- * reassignment triggers updates, but the values are NEVER deep-proxied into
- * per-property sources. Only the fields that actually change during a session
- * (block state, mirrors, editor, flags) stay deeply reactive.
- */
 export class SeasonRunShell implements SeasonRunShellData {
   ready = $state(false);
   error = $state<string | null>(null);
@@ -62,15 +54,13 @@ export class SeasonRunShell implements SeasonRunShellData {
   league = $state.raw<SeasonLeague | null>(null);
   catalog = $state.raw<SeasonDraftCatalog | null>(null);
   schedule = $state.raw<SeasonSchedule | null>(null);
-  // Raw Maps on purpose: the slice and face index are immutable payloads
-  // replaced wholesale, never proxied into SvelteMap (cheap reads, no
-  // per-entry tracking).
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+
   playerSlice = $state.raw<SeasonRunPlayerSlice>(new Map());
   playerSliceReady = $state(false);
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
+
   facesByVersion = $state.raw<Map<string, SeasonFaceRef>>(new Map());
   facesReady = $state(false);
+  playersIndex = $state.raw<readonly PlayersIndexEntry[] | null>(null);
   run = $state.raw<SeasonRun | null>(null);
   humanFranchiseId = $state<string | null>(null);
   humanTeam = $state.raw<SeasonTeam | null>(null);

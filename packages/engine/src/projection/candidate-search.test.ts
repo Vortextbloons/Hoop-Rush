@@ -90,11 +90,7 @@ function smallModel(): ProjectionModelArtifact {
     weaknesses: [],
     search: {
       seedNamespace: 'season-projection-search',
-      // Trimmed search policy for tests: every assertion type (beam
-      // determinism, feasibility failure, optimizer plans, dynamic minutes)
-      // still exercises the same code paths with far fewer node/projection
-      // evaluations per call. The partial beam stays at the full width: a
-      // narrower beam prunes extendable partials for some locked pairs.
+
       partialBeamsPerLens: 8,
       completeCandidates: 2,
       startingFives: 2,
@@ -241,7 +237,7 @@ describe('rankCandidates', () => {
       ],
       model,
     });
-    // The dominated candidate must not appear among Pareto survivors.
+
     expect(result.ranked.map((candidate) => candidate.candidateId)).not.toContain('dominated');
     expect(result.ranked.map((candidate) => candidate.candidateId)).toContain('dominant');
   });
@@ -332,7 +328,7 @@ describe('searchRosterRotationCandidates', () => {
       expect(validateSeasonRotation(candidate.rotation, memberPlayable)).toEqual([]);
       expect(candidate.projection.metrics.positionalCoverage).toBe(100);
     }
-    // Rotations must be legal against the candidate roster.
+
     const top = first.ranked[0];
     const rosterSet = new Set(top === undefined ? [] : candidateVersionIdsOf(top));
     expect(rosterSet.size).toBe(10);
@@ -342,7 +338,7 @@ describe('searchRosterRotationCandidates', () => {
     const catalog = buildInput().catalog;
     const model = smallModel();
     const versions = catalog.candidates.map((candidate) => candidate.playerVersionId);
-    // Lock nine guards: no legal completion under 4/4/3.
+
     const guards = versions.filter((id) => {
       const member = catalog.candidates.find((candidate) => candidate.playerVersionId === id);
       return member?.positions.playable.includes('PG') || member?.positions.playable.includes('SG');
@@ -367,8 +363,7 @@ describe('searchRosterRotationCandidates', () => {
         candidate.rotation.minutePolicy.strategy,
       );
       expect(candidate.rotation.rotationVersion).toBe('season-rotation-v3');
-      // Candidate projections carry minute-policy plan facts with the same
-      // strategy as the rotation that produced the minutes.
+
       const facts = candidate.projection.planFacts;
       expect(facts).toBeDefined();
       expect(facts?.policyVersion).toBe('minute-policy-v1');
@@ -378,8 +373,6 @@ describe('searchRosterRotationCandidates', () => {
   });
 
   it('produces dynamic (quality/stamina-driven) minute allocations', () => {
-    // A locked pair with opposite capacities: the healthy player must be
-    // asked for more minutes than the fragile one in the ranked rotation.
     const catalog = buildInput().catalog;
     const versions = catalog.candidates.map((candidate) => candidate.playerVersionId);
     const locked = [versions[0] ?? '', versions[3] ?? ''];
@@ -397,7 +390,7 @@ describe('searchRosterRotationCandidates', () => {
     expect(minutesOf.get(locked[0] as string) ?? 0).not.toBe(
       minutesOf.get(locked[1] as string) ?? 0,
     );
-    // The rotation is a plan: integer minutes totaling exactly 240.
+
     expect((rotation?.targetMinutes ?? []).reduce((sum, row) => sum + row.minutes, 0)).toBe(240);
   });
 });
@@ -431,7 +424,7 @@ describe('buildHumanSeasonRoster', () => {
     expect(result.rotation).not.toBeNull();
     expect(result.projection).not.toBeNull();
     expect(result.audit.selectedCandidateId).not.toBeNull();
-    // The ranked-best rotation is an optimizer plan that passes the audit.
+
     const auditRoster = result.roster as string[];
     const memberPlayable = new Map(
       auditRoster.map((id) => {

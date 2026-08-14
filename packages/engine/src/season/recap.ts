@@ -26,67 +26,41 @@ import { blockRoundRange } from '@hoop-rush/data-contracts';
 import { provisionalStandingOrder } from './aggregates.ts';
 import { canonicalJson } from './checkpoint.ts';
 
-/**
- * Block recap construction (spec/2.0/02 recap, spec/2.0/11 block recap,
- * M2.3, season-recap-v1; M2.5 season-recap-v3). Every claim derives from
- * saved league facts: game summaries, standings, aggregates, and the
- * schedule. M2.5 adds the block-level injury evidence (counted from the
- * block's compact injury events and the post-block health state), the
- * evaluated objective evidence, the trade evidence (block-level accepted
- * trades and the human Influence delta), and the human Influence balance.
- *
- * The `summaries` input is the full ordered summary list through
- * completedRounds (block summaries are the last chunk); streaks need prior
- * results, and the digest must not depend on how the runner chunks them.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 export interface SeasonBlockRecapInput {
   runId: string;
-  /** 0-based block index of this recap. */
+
   blockIndex: number;
-  /** Rounds completed when this recap is built. */
+
   completedRounds: number;
-  /** The human franchise (retained details); null in a pure AI/CLI context. */
+
   humanFranchiseId: string | null;
-  /** All summaries through completedRounds, in stable schedule order. */
+
   summaries: readonly SeasonGameSummary[];
   standingsBefore: SeasonStandings;
   standingsAfter: SeasonStandings;
-  /** Player aggregates through completedRounds (block-visible). */
+
   playerAggregates: readonly SeasonPlayerAggregate[];
   schedule: SeasonSchedule;
-  /** playerVersionId -> person playerId (derived from run rosters/catalog). */
+
   rosterPlayerIds: ReadonlyMap<string, string>;
-  /** Reserved for later milestones; M2.3 recaps do not consume rotations. */
+
   rotations?: unknown;
-  /**
-   * M2.5: the post-block health state (injury evidence). Absent in fixture-
-   * driven recaps: the health-derived counts report zero.
-   */
+
   health?: SeasonHealthState;
-  /**
-   * M2.5: the locked objective evaluated at block assembly (null for the
-   * final two-game block and for fixture-driven recaps without an objective).
-   */
+
   objective?: {
     objectiveId: SeasonObjectiveId | null;
     success: boolean | null;
     evaluation: SeasonObjectiveEvaluation;
   } | null;
-  /** M2.5: the post-block transaction entries (trade evidence). */
+
   transactions?: readonly SeasonTransactionEntry[];
-  /** M2.5: the post-block Influence state (delta + human balance). */
+
   influence?: SeasonInfluenceState;
-  /**
-   * M2.6.5: the post-block free-agency state (free-agency evidence). Absent
-   * in fixture-driven recaps: the evidence reports zero signings.
-   */
+
   freeAgency?: SeasonFreeAgencyState;
 }
 
-/** Team games in a block (150 in blocks 0-7, 30 in the final block). */
 export function seasonBlockGameCount(blockIndex: number): number {
   return blockIndex >= 8 ? 30 : 150;
 }
@@ -99,7 +73,6 @@ function blockSummariesOf(
   return summaries.slice(Math.max(0, summaries.length - count), summaries.length);
 }
 
-/** Winner franchise of a summary (scores are never tied on finals). */
 function winnerOf(summary: SeasonGameSummary): string {
   if (summary.status === 'forfeit') {
     const loser = summary.forfeitLoserFranchiseId;
@@ -169,14 +142,12 @@ function notableLines(
   );
 }
 
-/** Canonical chronological order for streak derivation: (round, gameId). */
 function chronologicallyOrdered(summaries: readonly SeasonGameSummary[]): SeasonGameSummary[] {
   return [...summaries].sort(
     (a, b) => a.round - b.round || (a.gameId < b.gameId ? -1 : a.gameId > b.gameId ? 1 : 0),
   );
 }
 
-/** Current win/loss streaks (length >= 2) from ordered game results. */
 function streaksOf(summaries: readonly SeasonGameSummary[]): SeasonStreak[] {
   const results = chronologicallyOrdered(summaries);
   const current = new Map<string, { kind: 'wins' | 'losses'; length: number }>();
@@ -229,11 +200,6 @@ function headToHead(
   return { games, winsA, winsB };
 }
 
-/**
- * Version-versus-version spotlights: pairs of distinct playerVersionIds of
- * the same person, both with >= 1 game in the block, ranked by head-to-head
- * meetings first, then combined points, then canonical version order.
- */
 function versionSpotlightsOf(input: SeasonBlockRecapInput): SeasonVersionSpotlight[] {
   const blockSummaries = blockSummariesOf(input.summaries, input.blockIndex);
   const playedInBlock = new Set<string>();
@@ -302,7 +268,6 @@ function versionSpotlightsOf(input: SeasonBlockRecapInput): SeasonVersionSpotlig
     .slice(0, 5);
 }
 
-/** The human team's games in the next block (empty at season end). */
 function upcomingHumanGamesOf(input: SeasonBlockRecapInput): SeasonUpcomingHumanGame[] {
   if (input.humanFranchiseId === null || input.blockIndex >= 8) return [];
   const { fromRound, toRound } = blockRoundRange(input.blockIndex + 1);
@@ -329,18 +294,6 @@ function upcomingHumanGamesOf(input: SeasonBlockRecapInput): SeasonUpcomingHuman
     .slice(0, 10);
 }
 
-/**
- * M2.5 block-level injury evidence, counted from the block's compact injury
- * events and the post-block health state: `injuries` is the total compact
- * event count of the block's summaries (one event per rolled record),
- * `bySeverity` the severity split, `sameGameReturns` the events whose
- * same-game return actually applied, `seasonEnding` the season-ending
- * events, `returnedThisBlock` the health records whose actual return round
- * falls inside the block, `activeAtBlockEnd` the health records still
- * active at the block end (occurrence at or before the block's last round),
- * and `humanTeamInjuries` the compact events of the human franchise's
- * games (bounded).
- */
 export function blockInjuryEvidenceOf(input: {
   blockSummaries: readonly SeasonGameSummary[];
   health: SeasonHealthState;
@@ -399,13 +352,6 @@ export function blockInjuryEvidenceOf(input: {
   };
 }
 
-/**
- * M2.6.5 block-level free-agency evidence (season-recap-v4): the window
- * resolved this block (if any), its signings, the human franchise's
- * Influence delta from free agency this block, and the human franchise's
- * season signing/spend counts. A block itself signs nothing (windows open
- * after the commit), so fixture-driven blocks report zero.
- */
 export function blockFreeAgencyEvidenceOf(input: {
   blockIndex: number;
   humanFranchiseId: string | null;
@@ -454,12 +400,6 @@ export function blockFreeAgencyEvidenceOf(input: {
   };
 }
 
-/**
- * M2.5 block-level trade evidence: accepted trades with this blockIndex
- * recorded in the post-block transactions, and the human franchise's
- * Influence ledger delta for this block. A block itself accepts no trades
- * (windows open after the commit), so fixture-driven blocks report zero.
- */
 export function blockTradeEvidenceOf(input: {
   blockIndex: number;
   humanFranchiseId: string | null;
@@ -482,12 +422,6 @@ export function blockTradeEvidenceOf(input: {
   return { tradesAccepted, influenceDelta };
 }
 
-/**
- * The human Influence balance at a block's end, reconstructed from the
- * append-only ledger: the current balance minus every later ledger entry
- * (LEAD DECISION: the recap shows the human balance only; the ledger is the
- * authoritative source).
- */
 export function humanInfluenceBalanceAtBlockEnd(
   influence: SeasonInfluenceState,
   humanFranchiseId: string | null,
@@ -506,11 +440,6 @@ export function humanInfluenceBalanceAtBlockEnd(
   return current - laterDelta;
 }
 
-/**
- * Builds the block recap from saved league facts only. Every array is
- * canonically sorted so serialization (and therefore the checkpoint digest)
- * never depends on internal build order.
- */
 export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlockRecap {
   const humanRecord =
     input.humanFranchiseId === null
@@ -584,7 +513,6 @@ export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlock
   };
 }
 
-/** Canonical per-array sort for recap serialization (digest-stable). */
 export function seasonBlockRecapCanonical(recap: SeasonBlockRecap): string {
   return canonicalJson({
     schemaVersion: recap.schemaVersion,
@@ -628,19 +556,10 @@ export function seasonBlockRecapCanonical(recap: SeasonBlockRecap): string {
   });
 }
 
-/** Canonical digest of a recap (used by checkpoint digests and audits). */
 export function seasonBlockRecapDigest(recap: SeasonBlockRecap): string {
   return seasonDigestHex(seasonBlockRecapCanonical(recap));
 }
 
-/**
- * Audits a recap against the saved facts it must derive from: standings
- * movement and provisional positions, notable lines (every performance must
- * exist in a block summary with matching statistics), streaks from ordered
- * results, version spotlights (same person, distinct versions, both played
- * in the block, aggregates and head-to-head facts exact), and upcoming human
- * games from the schedule. Returns failure strings; empty means valid.
- */
 export function auditSeasonBlockRecap(
   recap: SeasonBlockRecap,
   input: SeasonBlockRecapInput,
@@ -662,7 +581,6 @@ export function auditSeasonBlockRecap(
     }
   }
 
-  // Notable performances exist in the block summaries with matching lines.
   const blockSummaries = blockSummariesOf(input.summaries, input.blockIndex);
   const lineByKey = new Map<string, SeasonNotablePerformance>();
   for (const summary of blockSummaries) {
@@ -767,7 +685,6 @@ export function auditSeasonBlockRecap(
     failures.push('recap upcoming human games do not match the schedule');
   }
 
-  // M2.6.5: free-agency evidence must match the recorded post-block state.
   const expectedFreeAgency = blockFreeAgencyEvidenceOf({
     blockIndex: input.blockIndex,
     humanFranchiseId: input.humanFranchiseId,

@@ -4,13 +4,6 @@
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { franchiseIdentityOf } from '$lib/season/season-branding';
 
-  /**
-   * One Play-In game card (M2.6 bracket): seeded matchup, score or
-   * scheduled state, and the win-or-go-home consequence. The winner of the
-   * 7/8 game takes seed 7; the final's winner takes seed 8; the 9/10 loser
-   * is eliminated. Pure display of recorded Play-In facts.
-   */
-
   let {
     card,
     franchiseName,

@@ -2,19 +2,6 @@ import { z } from 'zod';
 import { commandIdSchema } from './ids.ts';
 import { SEASON_OBJECTIVE_VERSION } from './season-versions.ts';
 
-/**
- * M2.5 block objective contracts (spec/2.0 M2.5, season-objective-v1). Six
- * fixed objectives are offered to the HUMAN franchise in deterministic
- * three-choice sets before each full ten-game block (blocks 0-7); the final
- * two-game block (block 8) has no objective. Objectives are human-only: AI
- * franchises earn only block grants. Selection is a typed command locked
- * into the block submission; evaluation happens at block assembly from
- * saved facts only (never invented numbers). Success awards +1 Influence at
- * block commit; failure awards nothing extra and never refunds prior
- * rewards or the base block grant.
- */
-
-/** The six fixed M2.5 block objectives. */
 export const seasonObjectiveIdSchema = z.enum([
   'win-six',
   'defense-108',
@@ -25,7 +12,6 @@ export const seasonObjectiveIdSchema = z.enum([
 ]);
 export type SeasonObjectiveId = z.infer<typeof seasonObjectiveIdSchema>;
 
-/** One catalog entry: identity plus fixed display facts and measure. */
 export const seasonObjectiveDefinitionSchema = z.object({
   objectiveId: seasonObjectiveIdSchema,
   name: z.string().min(1).max(64),
@@ -34,11 +20,6 @@ export const seasonObjectiveDefinitionSchema = z.object({
 });
 export type SeasonObjectiveDefinition = z.infer<typeof seasonObjectiveDefinitionSchema>;
 
-/**
- * Frozen catalog of the six fixed objectives (M2.5 brief measures recorded
- * verbatim). The catalog inside `SeasonObjectiveState` must match this set;
- * the engine evaluates from these measures and nothing else.
- */
 export const SEASON_OBJECTIVE_CATALOG = [
   {
     objectiveId: 'win-six',
@@ -78,11 +59,6 @@ export const SEASON_OBJECTIVE_CATALOG = [
   },
 ] as const satisfies readonly SeasonObjectiveDefinition[];
 
-/**
- * Recorded evaluation facts, measured from saved game summaries and
- * aggregates only. `tipCountedGames` counts the games with an actual tipoff:
- * forfeits have no tipoff and are excluded from availability-eight.
- */
 export const seasonObjectiveEvaluationFactsSchema = z.object({
   games: z.number().int().nonnegative(),
   wins: z.number().int().nonnegative(),
@@ -95,11 +71,6 @@ export const seasonObjectiveEvaluationFactsSchema = z.object({
 });
 export type SeasonObjectiveEvaluationFacts = z.infer<typeof seasonObjectiveEvaluationFactsSchema>;
 
-/**
- * One objective evaluation at block assembly. `success` is derived from the
- * recorded facts through the frozen measure; `tipCountedGames` excludes
- * forfeited games from availability-eight (LEAD DECISION).
- */
 export const seasonObjectiveEvaluationSchema = z.object({
   objectiveId: seasonObjectiveIdSchema,
   blockIndex: z.number().int().min(0).max(8),
@@ -109,11 +80,6 @@ export const seasonObjectiveEvaluationSchema = z.object({
 });
 export type SeasonObjectiveEvaluation = z.infer<typeof seasonObjectiveEvaluationSchema>;
 
-/**
- * One recorded selection for a block (blocks 0-7). `selectedByCommandId`
- * ties the selection to its typed command; `success` is null until the
- * block assembles its evaluation.
- */
 export const seasonObjectiveSelectionSchema = z.object({
   objectiveId: seasonObjectiveIdSchema,
   selectedByCommandId: commandIdSchema,
@@ -121,11 +87,6 @@ export const seasonObjectiveSelectionSchema = z.object({
 });
 export type SeasonObjectiveSelection = z.infer<typeof seasonObjectiveSelectionSchema>;
 
-/**
- * The run-scoped objective state (schema 1, season-objective-v1): the fixed
- * six-entry catalog and the selections record keyed by block index 0-7 (the
- * final two-game block 8 never selects).
- */
 export const seasonObjectiveStateSchema = z
   .object({
     schemaVersion: z.literal(1),

@@ -11,14 +11,6 @@
     ROLE_EXPECTATION_LABEL,
   } from './free-agency-view';
 
-  /**
-   * Recorded results of a resolved window (spec/2.0/15): the winning
-   * signings (headshots, band, role expectation, cost), the human result
-   * (signed or not), and the categorical seven-step trace (criterion +
-   * category + cited facts) in an accessible disclosure. Read-only history:
-   * a resolved window never changes.
-   */
-
   let {
     window,
     humanFranchiseId,
@@ -38,13 +30,12 @@
     faceOf?: ((playerVersionId: string) => SeasonFaceRef | null) | null;
     signingCount: number;
     seasonSpend: number;
-    /** True when the human pressed resolve this session (announce once). */
+
     resolvedInThisSession?: boolean;
   } = $props();
 
   const humanSigning = $derived(humanSigningOf(window, humanFranchiseId ?? null) ?? null);
 
-  /** Trace steps grouped by candidate, preserving comparison order. */
   const traceGroups = $derived.by(() => {
     const groups: Record<string, SeasonFreeAgencyTraceStep[]> = {};
     for (const trace of window.traces) {

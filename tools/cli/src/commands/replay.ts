@@ -11,12 +11,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { replayReportSchema } from '../report-schemas.ts';
 import { UsageError } from './sim.ts';
 
-/**
- * `replay` (spec/09): reproduces a saved game input and compares its result
- * against a stored expected result, reporting the first structured
- * difference when determinism fails.
- */
-
 export const REPLAY_OPTIONS: Record<string, boolean> = {
   input: true,
   expected: true,
@@ -42,7 +36,6 @@ function readInputJson<T>(
   return parsed.data as T;
 }
 
-/** First structured difference between two serializable values, as a path. */
 function firstDifference(expected: unknown, actual: unknown): string | null {
   if (Object.is(expected, actual)) return null;
   if (typeof expected !== typeof actual) return '(type)';

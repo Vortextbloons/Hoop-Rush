@@ -28,14 +28,6 @@ import {
   soloInput,
 } from './ai-test-support.ts';
 
-/**
- * Season Run M2.4 AI generation tests (season-ai-v2, roster-generation-v2):
- * identity and band quotas, anchor guarantees, exclusive 20-member private
- * pools, legal ten-player rosters and rotations, determinism, human-roster
- * preservation, band ordering, scoring identity differentiation (Overall has
- * no effect), calibration runs, and bounded failure with typed diagnostics.
- */
-
 describe('season AI targets validation', () => {
   it('accepts a matching v2 targets artifact', () => {
     expect(() => {
@@ -469,8 +461,6 @@ describe('season AI evaluation', () => {
 
 describe('season AI bounded failure and calibration', () => {
   it('returns GENERATION_EXHAUSTED with diagnostics instead of relaxing rules', () => {
-    // No center-capable candidate anywhere: 30 rosters cannot meet the
-    // completion target; the generator must fail typed with diagnostics.
     const catalog = buildSeasonDraftCatalog({
       franchiseIds: ['lakers', 'celtics', 'bulls', 'warriors', 'heat', 'knicks', 'spurs', 'jazz'],
       eras: ['1980s', '1990s', '2000s', '2010s'],

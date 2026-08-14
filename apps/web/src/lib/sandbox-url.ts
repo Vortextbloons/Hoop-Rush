@@ -9,16 +9,7 @@ import { seedSchema } from '@hoop-rush/data-contracts';
 import { validateLineup } from '@hoop-rush/engine';
 import { randomHex } from '$lib/random-hex';
 
-/**
- * Validated URL state shared by the sandbox draft (spec/08). The draft page
- * carries five player selections (player + franchise/era pool provenance)
- * and an optional seed through the URL so drafts survive refresh without
- * persistence; every value is re-validated against the manifest and the
- * global players index at load time.
- */
-
 export interface SandboxUrlState {
-  /** Five player selections in slot order 0..4. */
   slots: RunPlayerSelection[];
   seed?: Seed;
 }
@@ -26,7 +17,7 @@ export interface SandboxUrlState {
 export interface UrlStateValidation {
   ok: boolean;
   state: SandboxUrlState | null;
-  /** Human-readable reason for an invalid state. */
+
   error: string | null;
 }
 

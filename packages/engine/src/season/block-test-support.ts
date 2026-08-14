@@ -65,24 +65,8 @@ import {
 import { seasonRotationSetDigest } from './rotation.ts';
 import { createInitialSeasonInfluenceState } from './influence.ts';
 
-/**
- * Deterministic full-league test support for the M2.3 block pipeline: a
- * synthetic 30-franchise draft catalog, AI-generated rosters and rotations,
- * the committed-format schedule, and a schema-valid run snapshot. The league
- * build runs AI generation, so the result is cached per test file; run
- * states are cheap clones.
- */
-
 export const TEST_SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 
-/**
- * The 30 franchise ids in the engine fixtures' frozen order (east
- * conference first, then west, each in canonical SEASON_ALIGNMENT order).
- * Derived from the canonical alignment in `@hoop-rush/data-contracts` so
- * the fixture ids cannot drift from the league fact; the explicit
- * east-then-west ordering is frozen because generation outputs (catalog,
- * rosters, schedule) are order-sensitive.
- */
 export const ALL_FRANCHISES: readonly string[] = [
   ...SEASON_ALIGNMENT.filter((entry) => entry.conference === 'east').map(
     (entry) => entry.franchiseId,
@@ -143,7 +127,7 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
     (pool) => pool.franchiseId === humanFranchiseId && pool.eraId === '1990s',
   );
   if (humanPool === undefined) throw new Error('missing human pool');
-  // The full position-archetype cycle (indices 0..9) covers G/F/C variety.
+
   const humanRoster = humanPool.playerVersionIds.slice(0, 10);
   const generation = generateAiLeague({
     seed: TEST_SEED,
@@ -260,7 +244,7 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
     rotations: generation.rotations,
     generationAudit: buildFixtureGenerationAudit(TEST_SEED),
     evaluations: generation.evaluations,
-    // M2.5: run-scoped state chain and economy facts (schema 7).
+
     trade: null,
     freeAgency: {
       schemaVersion: 1,
@@ -290,13 +274,6 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
   return { run, catalog, generation };
 }
 
-/**
- * Synthetic roster-generation-v2 pools for the test run: one 20-player pool
- * per AI franchise (the run's AI assignments exclude the human team), each
- * with ten selections and one allocation seed path per selection. The block
- * pipeline never reads pools (simulation consumes final rosters), so these
- * carry only the recorded facts schema 6 requires.
- */
 function fixtureAiPools(aiAssignments: SeasonRun['aiAssignments']): SeasonRun['aiPools'] {
   return aiAssignments
     .filter((assignment) => assignment.franchiseId !== 'lakers')
@@ -327,7 +304,6 @@ function fixtureAiPools(aiAssignments: SeasonRun['aiAssignments']): SeasonRun['a
     });
 }
 
-/** The league-wide empty health state (M2.5; block 0 / fresh runs). */
 export function emptyHealthState(): SeasonHealthState {
   return {
     schemaVersion: 1,
@@ -340,9 +316,6 @@ function emptyPostseason(rootSeed: string): SeasonRun['postseason'] {
   return buildInitialPostseasonState(rootSeed);
 }
 
-// The generated schedule is a pure function of (league, seed), and every
-// run clone shares the same league object and generation seed, so a
-// per-league cache is exact. Blocks cost ~10s; the schedule is ~250ms.
 const scheduleByLeague = new WeakMap<
   SeasonRun['league'],
   ReturnType<typeof generateSeasonSchedule>
@@ -373,9 +346,7 @@ export function blockCommand(
     expectedRevision,
     blockIndex,
     rotationDigest: seasonRotationSetDigest(run.rotations),
-    // M2.5: fixture-driven commands carry no locked objective and assert the
-    // run's state chain facts (the pipeline's objective seam is absent, so
-    // the invalid-objective validation is skipped for these inputs).
+
     objectiveId: null,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
@@ -400,9 +371,7 @@ export function pipelineInput(
     rosterPlayerIds: rosterPlayerIdsOf(run),
     priorSummaries,
     effects,
-    // M2.5: the pre-block health state and the locked objective (null for
-    // fixture-driven runs); the pre-block influence and transaction log
-    // ride the run.
+
     health: run.health,
     objectiveId: null,
     influence: run.influence,
@@ -410,12 +379,6 @@ export function pipelineInput(
   };
 }
 
-/**
- * The M2.4 zero effects state for a test run: one fresh load state per
- * rostered version (300) and the 45 canonical a<b zero-shared-possession
- * pairs per ten-player roster (1,350). Schema-validated so the candidate
- * checkpoint the pipeline assembles is schema-valid too.
- */
 function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
   const playerStates = run.rosters
     .flatMap((roster) =>
@@ -465,9 +428,7 @@ export function runBlock(
   const checkpoint = simulateSeasonBlock(input);
   state.summaries = [...state.summaries, ...checkpoint.gameSummaries];
   state.effects = checkpoint.effects;
-  // M2.5: fold the candidate facts into the run snapshot exactly like the
-  // CLI's runBlockThroughHandler: health/influence/transactions ride the
-  // checkpoint, and the run state chain derives through the engine seam.
+
   const stateFacts = deriveSeasonPostBlockState({
     run: state.run,
     candidate: checkpoint,

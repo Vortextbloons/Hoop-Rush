@@ -15,30 +15,12 @@ import { makeReport, type CliReport } from '../report.ts';
 import { seasonFreeAgencyAuditReportSchema } from '../report-schemas.ts';
 import { loadSeasonRunFixture } from './season-block.ts';
 
-/**
- * M2.6.5 `season free-agency audit` (spec/2.0/15): audits a persisted run's
- * recorded free-agency facts — window order/block mapping (2/4/6), candidate
- * identity uniqueness (max 12, at most one featured), canonical identity
- * persistence (later windows reuse earlier canonical choices; sibling
- * versions excluded), full declaration coverage on resolved windows,
- * trace/trace-vs-signing consistency, per-franchise band signing caps
- * (1/2/3/3, three per season), season spend (<= 6), ledger/transaction/
- * ownership link reconciliation for every signing, and the 300/1,350
- * effects invariants over the final rosters/rotations.
- *
- * The audit is a pure function of recorded facts (mirror of the persistence
- * reload audit); where the engine canonicalizes the same rule, the CLI calls
- * the engine's own constants (`SEASON_FREE_AGENCY_BAND_SIGNING_CAPS`,
- * `SEASON_FREE_AGENCY_WINDOW_COMPOSITION`) rather than re-declaring them.
- */
-
 export const SEASON_FREE_AGENCY_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
   manifest: true,
   format: true,
 };
 
-/** The per-failure-class counts of one audit run. */
 export interface SeasonFreeAgencyAuditCounts {
   windowOrderFailures: number;
   candidateUniquenessFailures: number;
@@ -91,7 +73,6 @@ const TRACE_CATEGORIES: Record<string, ReadonlySet<string>> = {
   draw: new Set(['won', 'lost']),
 };
 
-/** The declared commitment of one franchise for one window. */
 function declarationTargetOf(
   declarations: Record<string, SeasonFreeAgencyDeclaration>,
   franchiseId: string,
@@ -103,7 +84,6 @@ function declarationTargetOf(
   return target?.influence ?? null;
 }
 
-/** Audits one window's recorded facts; appends failures. */
 function auditWindow(
   window: SeasonFreeAgencyWindowState,
   windowIndex: number,
@@ -146,9 +126,7 @@ function auditWindow(
     playerIds.add(candidate.playerId);
     if (candidate.band === 'featured') featured += 1;
     bandCounts[candidate.band] += 1;
-    // Canonical identity persistence: every candidate carries the run's
-    // canonical version for its identity (first admission persists it; later
-    // windows reuse it and exclude sibling versions).
+
     const canonical = run.freeAgency.canonicalCandidates[candidate.playerId];
     if (canonical === undefined) {
       counts.canonicalFailures += 1;
@@ -168,9 +146,7 @@ function auditWindow(
           `${where} candidate ${candidate.playerVersionId} records band ${candidate.band}, canonical records ${canonical.band}`,
         );
       }
-      // The canonical seed path records the ADMISSION window (later markets
-      // reuse the same choice), so it must match the admission window, not
-      // the current one.
+
       if (
         canonical.seedPath.join('/') !==
         `${String(canonical.admittedWindowIndex)}/canonical/${candidate.playerId}`
@@ -201,8 +177,6 @@ function auditWindow(
     failures.push(`${where} carries ${String(featured)} featured candidates (max 1)`);
   }
 
-  // Sibling-version exclusion across windows: the same identity must never
-  // appear under two versions anywhere in the run.
   for (const earlier of run.freeAgency.windows) {
     if (earlier.windowIndex >= windowIndex) continue;
     for (const candidate of earlier.candidates) {
@@ -309,10 +283,6 @@ function auditWindow(
           failures.push(`${where} trace step ${step.criterion} records category ${step.category}`);
         }
         if (step.criterion === 'influence' && windowIndex === 0) {
-          // The engine records the committed Influence from the FIRST
-          // declaration of the franchise across all windows, so the category
-          // is only cross-checkable on the first market (documented engine
-          // quirk for later windows; reported as an integration risk).
           const committed = declarationTargetOf(
             window.declarations,
             step.franchiseId,
@@ -333,7 +303,6 @@ function auditWindow(
   }
 }
 
-/** Audits one signing's recorded links; appends failures. */
 function auditSigningLinks(
   signing: SeasonFreeAgencySigning,
   run: SeasonRun,
@@ -431,10 +400,6 @@ function auditSigningLinks(
   }
 }
 
-/**
- * Audits the recorded free-agency facts of one run snapshot. Pure function of
- * recorded facts; every failure is bounded and attributed to one class.
- */
 export function auditSeasonFreeAgencyFacts(run: SeasonRun): {
   failures: string[];
   counts: SeasonFreeAgencyAuditCounts;
@@ -443,13 +408,10 @@ export function auditSeasonFreeAgencyFacts(run: SeasonRun): {
   const counts = { ...ZERO_COUNTS };
   const leagueFranchiseIds = new Set(run.league.teams.map((team) => team.franchiseId));
 
-  // Window order: windows appear oldest first with index 0/1/2.
   run.freeAgency.windows.forEach((window, index) => {
     auditWindow(window, index, run, leagueFranchiseIds, failures, counts);
   });
 
-  // Per-franchise season facts: band caps (1/2/3/3), three signings per
-  // season, six Influence per season, all reconciled from the signings.
   const signingsByFranchise = new Map<string, SeasonFreeAgencySigning[]>();
   for (const window of run.freeAgency.windows) {
     for (const signing of window.signings) {
@@ -500,13 +462,6 @@ export function auditSeasonFreeAgencyFacts(run: SeasonRun): {
     }
   }
 
-  // 300/1,350 effects invariants over the final rosters and rotations:
-  // 30 rosters of 10-15, 30 rotations of exactly ten members, 300 distinct
-  // active versions, 1,350 active pairs (45 per rotation), and an ownership
-  // row for every rostered player. Identity uniqueness applies PER ROSTER
-  // (different seasons of the same real player may be owned by different
-  // franchises); the league-wide identity rule is enforced by the market
-  // (signings never introduce an identity already represented anywhere).
   const versionIds = new Set<string>();
   let activeLoads = 0;
   let activePairs = 0;
@@ -552,8 +507,7 @@ export function auditSeasonFreeAgencyFacts(run: SeasonRun): {
     }
     activePairs += 45;
   }
-  // The 300 active loads are the rotation-scoped members (signings sit on
-  // rosters, never in rotations, so they belong to the inactive set).
+
   activeLoads = rotationLoads.size;
   if (activeLoads !== 300 || activePairs !== 1350) {
     counts.effectsFailures += 1;
@@ -569,7 +523,6 @@ export function auditSeasonFreeAgencyFacts(run: SeasonRun): {
   return { failures, counts };
 }
 
-/** The CLI command: audits one persisted run's free-agency facts. */
 export function seasonFreeAgencyAudit(args: {
   input: string | null;
   manifest: string | null;

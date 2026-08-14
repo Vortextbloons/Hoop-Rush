@@ -9,29 +9,11 @@ import {
 } from './report-schemas.ts';
 import { jsonPayload, REPO_ROOT, runCli, TMP } from './cli-test-helpers.ts';
 
-/**
- * CLI integration tests for the M2.3 `season block simulate`, `season block
- * audit`, and `season full simulate` commands (spec/2.0/02, spec/2.0/07).
- * Every test runs the real engine pipeline over the committed v4 run
- * fixture, the packaged catalog and schedule, and the packaged era profile.
- * BLOCK_ZERO_DIGEST is re-pinned whenever a committed schedule or fixture
- * input changes, so it remains an end-to-end reproducibility sentinel.
- */
-
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
-// Re-pinned for the M2.5 schema-7 fixture (injuries, health, and the
-// objective/Influence-carrying checkpoint digest), the projection-milestone
-// v3 fixture (talent-ordered AI rotations change the rotation-set digest),
-// the minute-policy-v1 fixture (optimizer minute plans change the
-// rotation-set digest again), the season-stamina-v2 fatigue rebalance
-// (stronger accumulation and effect caps change game outcomes), the
-// M2.6 postseason-foundations engine changes (compact game-summary and
-// aggregate folding, committed in `m2.6 start`), and the M2.6.5 schema-10
-// fixture regeneration (free-agency state enters the run digest).
+
 const BLOCK_ZERO_DIGEST = '623840d1feffa17d73461c1fc24d2001';
 
 describe('cli: season block simulate', () => {
-  // The default block-0 boot is shared by the simulate and audit tests.
   let blockZero: Awaited<ReturnType<typeof runCli>>;
 
   beforeAll(async () => {
@@ -87,15 +69,11 @@ describe('cli: season block simulate', () => {
   });
 
   it('audits a saved candidate checkpoint with digest verification', async () => {
-    // Produce the checkpoint through the authoritative command path and
-    // persist it to the scratch directory, then audit the file.
     const { code, stdout, stderr } = blockZero;
     expect(code).toBe(0);
     const simulate = seasonBlockSimulateReportSchema.parse(jsonPayload(stdout, stderr));
     expect(simulate.pass).toBe(true);
 
-    // Rebuild the full candidate JSON from a direct engine call so the
-    // audit input is byte-complete.
     const checkpointPath = join(TMP, 'block0-checkpoint.json');
     const candidate = await produceBlockZeroCheckpoint();
     writeFileSync(checkpointPath, `${JSON.stringify(candidate, null, 2)}\n`);
@@ -136,15 +114,12 @@ describe('cli: season full simulate', () => {
     expect(report.pass).toBe(true);
     expect(report.blockDigests).toHaveLength(9);
     expect(report.summaries).toBe(1230);
-    // Block-at-a-time digest equality: the standalone block 0 run above
-    // produced the same digest as the full-season block 0. Repeat-run
-    // digest identity is proven in-process by the engine determinism suite.
+
     expect(report.blockDigests[0]?.digest).toBe(BLOCK_ZERO_DIGEST);
     expect(report.blockDigests[8]?.digest).toBe(report.finalDigest);
   }, 300_000);
 });
 
-/** Produces the block-0 candidate checkpoint through the engine pipeline. */
 async function produceBlockZeroCheckpoint(): Promise<
   ReturnType<typeof seasonCandidateCheckpointSchema.parse>
 > {

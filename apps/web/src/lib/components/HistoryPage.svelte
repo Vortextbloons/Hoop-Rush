@@ -8,19 +8,12 @@
   import AsyncState from './AsyncState.svelte';
   import HistoryList from './HistoryList.svelte';
 
-  /**
-   * Compact completed-run history (spec/08), shared by the Sandbox and
-   * Classic history routes. Rows list lineup, franchise/era, record, outcome,
-   * and completion time; each row reopens the stored summary. The active
-   * challenge, when one exists, is offered for continue.
-   */
-
   let {
     mode,
     eyebrow,
   }: {
     mode: 'sandbox' | 'classic';
-    /** Small uppercase label above the heading, e.g. "Classic · Challenge history". */
+
     eyebrow: string;
   } = $props();
 

@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, waitFor, within } from '@testing-library/svelte';
 import {
@@ -31,21 +29,9 @@ import FreeAgencyRouteWrapper from '../../../test/FreeAgencyRouteWrapper.svelte'
 
 mockSvelteKitApp();
 
-/**
- * M2.6.5 free-agency route tests: the market overview (candidate cards with
- * band labels, facts, best-fit highlights, recorded interest), the
- * declaration step (two ordered targets, Influence bounds, local validation,
- * skip), the review/resolve step, reload recovery (the recorded declaration
- * renders from the snapshot mirror), resolved history (signings + trace
- * disclosure), typed rejection copy, and smaller markets. The open window
- * fixture comes from the REAL engine opener so AI declarations are recorded
- * deterministically.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const HUMAN = 'lakers';
 
-/** Playable positions by roster slot: a legal G,G,F,F,C five in slots 0-4. */
 const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -177,7 +163,6 @@ function fixtureIndex(catalog: SeasonDraftCatalog): SeasonFreeAgencyIndex {
 type SeasonFreeAgencyIndexEntryRoles =
   SeasonFreeAgencyIndex['candidates'][number]['supportedRoles'];
 
-/** Schema-valid zero effects state (300 loads; schema 2). */
 function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
   return {
     schemaVersion: 2,
@@ -257,7 +242,6 @@ function shellFor(run: SeasonRun, overrides: Partial<SeasonRunShellData> = {}): 
   return { ...shell, ...overrides };
 }
 
-/** A run whose open window has a recorded human declaration (or skip). */
 function declaredRun(
   run: SeasonRun,
   targets: {
@@ -282,7 +266,6 @@ function declaredRun(
   return { ...run, freeAgency: { ...run.freeAgency, windows: [declaredWindow] } };
 }
 
-/** A run whose window is resolved with recorded signings + traces. */
 function resolvedRun(run: SeasonRun, humanSigned: boolean): SeasonRun {
   const window = windowOf(run.freeAgency);
   const first = window.candidates[0];
@@ -481,8 +464,6 @@ describe('free-agency declaration step (M2.6.5)', () => {
     expect(targets[1]?.textContent).toContain('Second priority');
     expect(targets[1]?.textContent).toContain(second.displayName);
 
-    // The role expectation defaults to a supported role and the Influence
-    // commitment to the candidate minimum.
     const influences = container.querySelectorAll('[data-fa-influence-input]');
     expect(influences).toHaveLength(2);
     expect((influences[0] as HTMLInputElement).value).toBe(String(first.minimumInfluence));
@@ -526,8 +507,7 @@ describe('free-agency declaration step (M2.6.5)', () => {
     };
     await fireEvent.change(priorityOf(first.playerVersionId), { target: { value: '1' } });
     await fireEvent.change(priorityOf(second.playerVersionId), { target: { value: '2' } });
-    // third takes first priority: the displaced first-priority holder moves
-    // to second, and the displaced second-priority holder drops out.
+
     await fireEvent.change(priorityOf(third.playerVersionId), { target: { value: '1' } });
     const priorities = candidateCards(container).map((card) =>
       Number((card.querySelector('[data-fa-candidate-priority]') as HTMLSelectElement).value),
@@ -551,14 +531,13 @@ describe('free-agency declaration step (M2.6.5)', () => {
     const input = container.querySelector('[data-fa-influence-input]') as HTMLInputElement;
     expect(Number(input.min)).toBe(first.minimumInfluence);
     expect(Number(input.max)).toBe(3);
-    // Typed input commits clamped on change/blur (the raw draft stays while
-    // typing so Svelte keeps the DOM in sync).
+
     await fireEvent.input(input, { target: { value: '0' } });
     await fireEvent.change(input, { target: { value: '0' } });
     await waitFor(() => {
       expect(input.value).toBe(String(first.minimumInfluence));
     });
-    // The raise button is disabled at the maximum.
+
     const up = container.querySelector('[data-fa-influence-up]') as HTMLButtonElement;
     await fireEvent.input(input, { target: { value: '3' } });
     await fireEvent.change(input, { target: { value: '3' } });
@@ -654,10 +633,10 @@ describe('free-agency review + resolve (M2.6.5)', () => {
     expect(review?.textContent).toContain('Declaration submitted');
     expect(review?.textContent).toContain('Immutable');
     expect(review?.textContent).toContain(first.displayName);
-    // The market is read-only now: the priority pickers are disabled.
+
     const select = container.querySelector('[data-fa-candidate-priority]') as HTMLSelectElement;
     expect(select.disabled).toBe(true);
-    // The unresolved gating notice is replaced by the resolve notice.
+
     expect(container.querySelector('[data-fa-unresolved-notice]')).toBeNull();
     expect(container.querySelector('[data-fa-resolve-notice]')).not.toBeNull();
   });
@@ -711,7 +690,7 @@ describe('free-agency review + resolve (M2.6.5)', () => {
     expect(traceText).toContain('High');
     expect(traceText).toContain('rotation lacks a playable C');
     expect(traceText).toContain('Influence');
-    // The human result mentions the season caps.
+
     expect(humanResult?.textContent).toContain('1 season signing');
   });
 
@@ -832,11 +811,10 @@ describe('free-agency window lifecycle across the route (M2.6.5)', () => {
     const window = windowOf(run.freeAgency);
     const first = window.candidates[0];
     if (first === undefined) throw new Error('no candidates');
-    // Step 1: no declaration -> declaration UI.
+
     const initial = renderRoute(run);
     expect(initial.container.querySelector('[data-fa-declaration]')).not.toBeNull();
-    // Step 2: after the shell applies the declaration, the mirror renders
-    // the review panel (reload-recovery path re-renders the same way).
+
     const declared = renderRoute(
       declaredRun(run, [
         { playerVersionId: first.playerVersionId, roleExpectation: 'rotation', influence: 2 },
@@ -844,7 +822,7 @@ describe('free-agency window lifecycle across the route (M2.6.5)', () => {
     );
     expect(declared.container.querySelector('[data-fa-declaration]')).toBeNull();
     expect(declared.container.querySelector('[data-fa-review-panel]')).not.toBeNull();
-    // Step 3: after resolution the window becomes read-only history.
+
     const resolved = renderRoute(resolvedRun(run, true));
     expect(resolved.container.querySelector('[data-fa-review-panel]')).toBeNull();
     expect(resolved.container.querySelector('[data-fa-window-resolved]')).not.toBeNull();
@@ -936,7 +914,7 @@ describe('free-agency hub CTA (M2.6.5)', () => {
     expect(cta?.textContent).toContain('Free Agency Window 1');
     const link = withWindow.container.querySelector('[data-fa-hub-cta-link]');
     expect(link?.getAttribute('href')).toBe('/season/run/free-agency');
-    // No open window -> no CTA.
+
     const league = buildSeasonLeague({}, { humanFranchiseId: HUMAN });
     const schedule = generateSeasonSchedule({ league, seed: SEED });
     const bare = buildSeasonRunFixture({ schedule, league, seed: SEED, humanFranchiseId: HUMAN });

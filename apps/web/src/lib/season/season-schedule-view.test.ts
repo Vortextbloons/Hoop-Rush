@@ -12,13 +12,6 @@ import {
   type ScheduleBlockRow,
 } from './season-schedule-view';
 
-/**
- * Schedule tab view-model tests (M2.3.5): block joins, result state from
- * accepted summaries, and the nine block groupings. The fixture games and
- * summaries are hand-rolled from the frozen contracts; the view model only
- * reads fields the contracts guarantee.
- */
-
 const HUMAN = 'lakers';
 const OPPONENT = 'celtics';
 
@@ -137,7 +130,7 @@ const GAMES: SeasonGame[] = [
   game('s000005', 11, HUMAN, 'warriors', 'final', { home: 120, away: 121 }),
   game('s000006', 81, 'suns', HUMAN),
   game('s000007', 82, HUMAN, 'spurs', 'final', { home: 105, away: 100 }),
-  // Non-human game must never appear in the rows.
+
   game('s000008', 1, 'hawks', 'nets'),
 ];
 

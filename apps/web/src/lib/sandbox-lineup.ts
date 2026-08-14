@@ -1,12 +1,6 @@
 import type { ChallengeRun, HoopRushManifest, PeakPlayerSeason } from '@hoop-rush/data-contracts';
 import { getPool } from '$lib/data';
 
-/**
- * Loads the pools behind a run and maps playerId → peak season. Free-form
- * runs resolve the pools of their selections (unique franchise/era pairs);
- * legacy runs resolve the single franchise/era pool. Missing or failed
- * pools are skipped so callers render from run snapshots regardless.
- */
 export async function loadRunPlayersById(
   currentRun: ChallengeRun,
   manifest: HoopRushManifest,
@@ -23,9 +17,7 @@ export async function loadRunPlayersById(
     pairs.push({ franchiseId: currentRun.franchiseId, eraId: currentRun.eraId });
   }
   const entries: Array<[string, PeakPlayerSeason]> = [];
-  // Load every distinct pool in parallel; a missing entry or a failed load
-  // only skips that pair, never the whole call (callers render from run
-  // snapshots regardless of partial player details).
+
   const loaded = await Promise.all(
     pairs.map(async (pair) => {
       const entry = manifest.pools.find(
@@ -36,7 +28,6 @@ export async function loadRunPlayersById(
         const pool = await getPool(entry);
         return pool.players.filter((player) => currentRun.playerIds.includes(player.playerId));
       } catch {
-        // Player details are optional; callers render from run snapshots regardless.
         return [];
       }
     }),

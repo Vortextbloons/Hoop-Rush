@@ -22,24 +22,8 @@ import { postseasonGameIdSchema } from './season-postseason.ts';
 import { seasonRotationSchema } from './season-rotation.ts';
 import { seasonRunStageSchema } from './season-run.ts';
 
-/**
- * M2.5 typed Season Run commands (spec/2.0 M2.5, schema 7; M2.6.5 schema 10
- * adds the free-agency commands). Every command shares one base shape —
- * schema version, commandId, runId, and the expected run state
- * revision/digest the command asserts — so a handler can validate run
- * identity, state freshness (recomputed by the engine), and commandId
- * uniqueness uniformly before evaluating deterministic preconditions.
- * Handlers are PURE engine functions; this file owns the wire shapes and
- * the typed rejections only.
- */
-
-/** The base envelope every M2.5 run command composes (see season-command-base.ts). */
 export { seasonRunCommandBaseSchema, type SeasonRunCommandBase } from './season-command-base.ts';
 
-/**
- * The command asserted a stale run state: its expected revision/digest do
- * not match the run's current facts (engine recomputes the digest).
- */
 export const seasonStaleStateRejectionSchema = z.object({
   code: z.literal('stale-state'),
   expectedStateRevision: z.number().int().nonnegative(),
@@ -51,9 +35,9 @@ export type SeasonStaleStateRejection = z.infer<typeof seasonStaleStateRejection
 
 export const seasonNotAtBoundaryRejectionSchema = z.object({
   code: z.literal('not-at-boundary'),
-  /** The block the command targeted. */
+
   blockIndex: z.number().int().min(0).max(7),
-  /** The current playable block the run expects (blocks 0-7 only). */
+
   nextUnselectedBlockIndex: z.number().int().min(0).max(7),
 });
 export type SeasonNotAtBoundaryRejection = z.infer<typeof seasonNotAtBoundaryRejectionSchema>;
@@ -62,7 +46,7 @@ export const seasonObjectiveNotOfferedRejectionSchema = z.object({
   code: z.literal('objective-not-offered'),
   blockIndex: z.number().int().min(0).max(7),
   objectiveId: seasonObjectiveIdSchema,
-  /** The block's deterministic three-choice set. */
+
   offeredObjectiveIds: z.array(seasonObjectiveIdSchema).length(3),
 });
 export type SeasonObjectiveNotOfferedRejection = z.infer<
@@ -81,10 +65,10 @@ export type SeasonObjectiveAlreadySelectedRejection = z.infer<
 export const seasonInsufficientBalanceRejectionSchema = z.object({
   code: z.literal('insufficient-balance'),
   franchiseId: franchiseIdSchema,
-  /** The franchise balance before the spend was rejected. */
+
   balance: z.number().int(),
   requestedDelta: z.number().int().negative(),
-  /** The -3 floor that rejected the spend. */
+
   floor: z.number().int(),
 });
 export type SeasonInsufficientBalanceRejection = z.infer<
@@ -93,7 +77,7 @@ export type SeasonInsufficientBalanceRejection = z.infer<
 
 export const seasonWindowNotOpenRejectionSchema = z.object({
   code: z.literal('window-not-open'),
-  /** Null for accept/decline commands that do not name a franchise. */
+
   franchiseId: franchiseIdSchema.nullable(),
   windowIndex: z.number().int().min(0).max(2),
 });
@@ -142,7 +126,7 @@ export const seasonRosterIllegalRejectionSchema = z.object({
   code: z.literal('roster-illegal'),
   windowIndex: z.number().int().min(0).max(2),
   offerId: seasonTradeOfferIdSchema,
-  /** Legality reasons for the resulting rosters. */
+
   reasons: z.array(z.string().min(1).max(256)).min(1),
 });
 export type SeasonRosterIllegalRejection = z.infer<typeof seasonRosterIllegalRejectionSchema>;
@@ -151,7 +135,7 @@ export const seasonOwnershipConflictRejectionSchema = z.object({
   code: z.literal('ownership-conflict'),
   windowIndex: z.number().int().min(0).max(2),
   offerId: seasonTradeOfferIdSchema,
-  /** Versions that would appear on two rosters after the trade. */
+
   playerVersionIds: z.array(playerVersionIdSchema).min(1),
 });
 export type SeasonOwnershipConflictRejection = z.infer<
@@ -187,19 +171,11 @@ export const seasonGameMismatchRejectionSchema = z.object({
 });
 export type SeasonGameMismatchRejection = z.infer<typeof seasonGameMismatchRejectionSchema>;
 
-// M2.6.5 free-agency commands and typed rejections (spec/2.0/15).
-
-/**
- * Re-exported from season-block.ts (the submit-block rejection union owns
- * it; both surfaces share the literal): a block submission was attempted
- * while a free-agency market window is still open.
- */
 export {
   seasonFreeAgencyUnresolvedRejectionSchema,
   type SeasonFreeAgencyUnresolvedRejection,
 } from './season-block.ts';
 
-/** The named market window is not open (closed, resolved, or not yet opened). */
 export const seasonFreeAgencyWindowNotOpenRejectionSchema = z.object({
   code: z.literal('free-agency-window-not-open'),
   franchiseId: franchiseIdSchema.nullable(),
@@ -209,7 +185,6 @@ export type SeasonFreeAgencyWindowNotOpenRejection = z.infer<
   typeof seasonFreeAgencyWindowNotOpenRejectionSchema
 >;
 
-/** The named market window is already resolved; no further commands apply. */
 export const seasonFreeAgencyAlreadyResolvedRejectionSchema = z.object({
   code: z.literal('free-agency-already-resolved'),
   windowIndex: z.number().int().min(0).max(2),
@@ -218,7 +193,6 @@ export type SeasonFreeAgencyAlreadyResolvedRejection = z.infer<
   typeof seasonFreeAgencyAlreadyResolvedRejectionSchema
 >;
 
-/** The franchise already declared or skipped this window (final once accepted). */
 export const seasonFreeAgencyAlreadyDeclaredRejectionSchema = z.object({
   code: z.literal('free-agency-already-declared'),
   franchiseId: franchiseIdSchema,
@@ -228,7 +202,6 @@ export type SeasonFreeAgencyAlreadyDeclaredRejection = z.infer<
   typeof seasonFreeAgencyAlreadyDeclaredRejectionSchema
 >;
 
-/** The named target is not a candidate of this window. */
 export const seasonFreeAgencyTargetIneligibleRejectionSchema = z.object({
   code: z.literal('free-agency-target-ineligible'),
   windowIndex: z.number().int().min(0).max(2),
@@ -238,7 +211,6 @@ export type SeasonFreeAgencyTargetIneligibleRejection = z.infer<
   typeof seasonFreeAgencyTargetIneligibleRejectionSchema
 >;
 
-/** The declared identity is already represented on a roster in the league. */
 export const seasonFreeAgencyDuplicateIdentityRejectionSchema = z.object({
   code: z.literal('free-agency-duplicate-identity'),
   playerId: z.string().min(1).max(64),
@@ -248,7 +220,6 @@ export type SeasonFreeAgencyDuplicateIdentityRejection = z.infer<
   typeof seasonFreeAgencyDuplicateIdentityRejectionSchema
 >;
 
-/** The two targets are the same version (a priority must order distinct targets). */
 export const seasonFreeAgencyInvalidPriorityRejectionSchema = z.object({
   code: z.literal('free-agency-invalid-priority'),
   playerVersionId: playerVersionIdSchema,
@@ -257,7 +228,6 @@ export type SeasonFreeAgencyInvalidPriorityRejection = z.infer<
   typeof seasonFreeAgencyInvalidPriorityRejectionSchema
 >;
 
-/** The role expectation is not supported by the candidate. */
 export const seasonFreeAgencyUnsupportedRoleRejectionSchema = z.object({
   code: z.literal('free-agency-unsupported-role'),
   playerVersionId: playerVersionIdSchema,
@@ -268,7 +238,6 @@ export type SeasonFreeAgencyUnsupportedRoleRejection = z.infer<
   typeof seasonFreeAgencyUnsupportedRoleRejectionSchema
 >;
 
-/** The committed Influence is below the candidate minimum or above 3. */
 export const seasonFreeAgencyInvalidInfluenceRejectionSchema = z.object({
   code: z.literal('free-agency-invalid-influence'),
   playerVersionId: playerVersionIdSchema,
@@ -279,7 +248,6 @@ export type SeasonFreeAgencyInvalidInfluenceRejection = z.infer<
   typeof seasonFreeAgencyInvalidInfluenceRejectionSchema
 >;
 
-/** The franchise is already at the 15-player roster cap. */
 export const seasonFreeAgencyRosterCapRejectionSchema = z.object({
   code: z.literal('free-agency-roster-cap'),
   franchiseId: franchiseIdSchema,
@@ -289,7 +257,6 @@ export type SeasonFreeAgencyRosterCapRejection = z.infer<
   typeof seasonFreeAgencyRosterCapRejectionSchema
 >;
 
-/** The franchise already signed three free agents this season. */
 export const seasonFreeAgencySeasonSigningCapRejectionSchema = z.object({
   code: z.literal('free-agency-season-signing-cap'),
   franchiseId: franchiseIdSchema,
@@ -299,7 +266,6 @@ export type SeasonFreeAgencySeasonSigningCapRejection = z.infer<
   typeof seasonFreeAgencySeasonSigningCapRejectionSchema
 >;
 
-/** The franchise already spent its 6-Influence free-agency season budget. */
 export const seasonFreeAgencySeasonInfluenceCapRejectionSchema = z.object({
   code: z.literal('free-agency-season-influence-cap'),
   franchiseId: franchiseIdSchema,
@@ -309,7 +275,6 @@ export type SeasonFreeAgencySeasonInfluenceCapRejection = z.infer<
   typeof seasonFreeAgencySeasonInfluenceCapRejectionSchema
 >;
 
-/** The franchise's available non-debt balance cannot cover the commitment. */
 export const seasonFreeAgencyInsufficientBalanceRejectionSchema = z.object({
   code: z.literal('free-agency-insufficient-balance'),
   franchiseId: franchiseIdSchema,
@@ -320,7 +285,6 @@ export type SeasonFreeAgencyInsufficientBalanceRejection = z.infer<
   typeof seasonFreeAgencyInsufficientBalanceRejectionSchema
 >;
 
-/** The franchise has not yet declared or skipped; resolution cannot run. */
 export const seasonFreeAgencyPendingDeclarationRejectionSchema = z.object({
   code: z.literal('free-agency-pending-declaration'),
   franchiseId: franchiseIdSchema,
@@ -330,7 +294,6 @@ export type SeasonFreeAgencyPendingDeclarationRejection = z.infer<
   typeof seasonFreeAgencyPendingDeclarationRejectionSchema
 >;
 
-/** An ownership or roster conflict would make the signing illegal. */
 export const seasonFreeAgencyOwnershipConflictRejectionSchema = z.object({
   code: z.literal('free-agency-ownership-conflict'),
   franchiseId: franchiseIdSchema,
@@ -341,26 +304,17 @@ export type SeasonFreeAgencyOwnershipConflictRejection = z.infer<
   typeof seasonFreeAgencyOwnershipConflictRejectionSchema
 >;
 
-/**
- * Declare interest in one or two ordered targets of an open market window.
- * Declarations are final once accepted; UI edits remain local until
- * submission. Losing, cancelled, skipped, stale, or rejected targets cost
- * zero; the winning commitment is debited at resolution.
- */
 export const seasonDeclareFreeAgentInterestCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('declare-free-agent-interest'),
   franchiseId: franchiseIdSchema,
   windowIndex: z.number().int().min(0).max(2),
-  /** One or two ordered targets (first priority, then second). */
+
   targets: z.array(seasonFreeAgencyTargetSchema).min(1).max(2),
 });
 export type SeasonDeclareFreeAgentInterestCommand = z.infer<
   typeof seasonDeclareFreeAgentInterestCommandSchema
 >;
 
-/**
- * Skip the open market window with no targets, no cost, and no penalty.
- */
 export const seasonSkipFreeAgentMarketCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('skip-free-agent-market'),
   franchiseId: franchiseIdSchema,
@@ -370,14 +324,6 @@ export type SeasonSkipFreeAgentMarketCommand = z.infer<
   typeof seasonSkipFreeAgentMarketCommandSchema
 >;
 
-/**
- * Resolve the open market window. Accepted only after every human-controlled
- * franchise declared or skipped; AI declarations were recorded
- * deterministically when the window opened. Resolves first priorities
- * simultaneously by candidate, then second priorities for franchises that
- * did not sign; winners leave every remaining target list and at most one
- * player signs per franchise.
- */
 export const seasonResolveFreeAgentMarketCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('resolve-free-agent-market'),
   windowIndex: z.number().int().min(0).max(2),
@@ -443,7 +389,7 @@ export const seasonDeclareFreeAgentInterestResultSchema = z.discriminatedUnion('
     commandId: commandIdSchema,
     franchiseId: franchiseIdSchema,
     windowIndex: z.number().int().min(0).max(2),
-    /** The recorded declaration (targets in priority order). */
+
     declaration: seasonFreeAgencyTargetSchema.array(),
   }),
 ]);
@@ -476,7 +422,7 @@ export const seasonResolveFreeAgentMarketResultSchema = z.discriminatedUnion('st
     status: z.literal('accepted'),
     commandId: commandIdSchema,
     windowIndex: z.number().int().min(0).max(2),
-    /** The recorded resolution trace(s) for the window. */
+
     traces: z.array(
       z.object({
         seedPath: z.array(z.string()).min(1),
@@ -485,9 +431,9 @@ export const seasonResolveFreeAgentMarketResultSchema = z.discriminatedUnion('st
         signedPlayerVersionId: playerVersionIdSchema.nullable(),
       }),
     ),
-    /** The immutable signings applied by this resolution. */
+
     signings: z.array(seasonFreeAgencySigningSchema),
-    /** Whether the human franchise signed in this window. */
+
     humanSigned: z.boolean(),
   }),
 ]);
@@ -495,44 +441,31 @@ export type SeasonResolveFreeAgentMarketResult = z.infer<
   typeof seasonResolveFreeAgentMarketResultSchema
 >;
 
-// M2.6 postseason commands and typed rejections (spec/2.0/02 Playoffs).
-
-/**
- * The command requires a run stage the run is not in (e.g. starting the
- * postseason before the regular season completes, or advancing the
- * postseason after completion).
- */
 export const seasonInvalidStageRejectionSchema = z.object({
   code: z.literal('invalid-stage'),
-  /** The stage the command requires. */
+
   requiredStage: seasonRunStageSchema,
-  /** The run's current stage. */
+
   currentStage: seasonRunStageSchema,
 });
 export type SeasonInvalidStageRejection = z.infer<typeof seasonInvalidStageRejectionSchema>;
 
-/**
- * The command named a postseason game that is not the run's current expected
- * game (wrong phase, wrong series, or wrong game number).
- */
 export const seasonWrongGameRejectionSchema = z.object({
   code: z.literal('wrong-game'),
   targetGameId: postseasonGameIdSchema,
-  /** The postseason game the run expects next. */
+
   nextGameId: postseasonGameIdSchema,
 });
 export type SeasonWrongGameRejection = z.infer<typeof seasonWrongGameRejectionSchema>;
 
-/** The submitted postseason rotation is not legal against the roster. */
 export const seasonInvalidRotationRejectionSchema = z.object({
   code: z.literal('invalid-rotation'),
   franchiseId: franchiseIdSchema,
-  /** Legality reasons for the submitted rotation. */
+
   reasons: z.array(z.string().min(1).max(256)).min(1),
 });
 export type SeasonInvalidRotationRejection = z.infer<typeof seasonInvalidRotationRejectionSchema>;
 
-/** The rotation (or a risky-rehab request) names a player who cannot play. */
 export const seasonUnavailablePlayerRejectionSchema = z.object({
   code: z.literal('unavailable-player'),
   playerVersionId: playerVersionIdSchema,
@@ -542,24 +475,18 @@ export type SeasonUnavailablePlayerRejection = z.infer<
   typeof seasonUnavailablePlayerRejectionSchema
 >;
 
-/**
- * A risky-rehab spend was requested but the franchise lacks the required
- * Influence balance (postseason Influence spending supports risky rehab
- * only).
- */
 export const seasonInsufficientRehabResourcesRejectionSchema = z.object({
   code: z.literal('insufficient-rehab-resources'),
   franchiseId: franchiseIdSchema,
-  /** The franchise balance before the rejected spend. */
+
   balance: z.number().int(),
-  /** Influence required for the requested rehab. */
+
   required: z.number().int(),
 });
 export type SeasonInsufficientRehabResourcesRejection = z.infer<
   typeof seasonInsufficientRehabResourcesRejectionSchema
 >;
 
-/** The named series cannot receive the requested advance (unpaired/complete/not current). */
 export const seasonInvalidSeriesStateRejectionSchema = z.object({
   code: z.literal('invalid-series-state'),
   seriesId: z.string().min(1).max(64),
@@ -569,23 +496,12 @@ export type SeasonInvalidSeriesStateRejection = z.infer<
   typeof seasonInvalidSeriesStateRejectionSchema
 >;
 
-/**
- * The postseason state failed an integrity check (accounting or structural
- * inconsistency); the command is rejected without mutating the run.
- */
 export const seasonIntegrityFailureRejectionSchema = z.object({
   code: z.literal('integrity-failure'),
   reason: z.string().min(1).max(256),
 });
 export type SeasonIntegrityFailureRejection = z.infer<typeof seasonIntegrityFailureRejectionSchema>;
 
-/**
- * Start the postseason from the final regular-season standings (M2.6):
- * resolves qualification and seeding ties through the versioned tiebreak
- * sequence, records the deterministic resolutions, sets the Play-In
- * rankings, and moves the run to the `play-in` stage. Requires the
- * `regular-season` stage with all 82 rounds complete.
- */
 export const seasonStartPostseasonCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('start-postseason'),
 });
@@ -600,14 +516,9 @@ export const seasonStartPostseasonRejectionSchema = z.discriminatedUnion('code',
 ]);
 export type SeasonStartPostseasonRejection = z.infer<typeof seasonStartPostseasonRejectionSchema>;
 
-/**
- * Advance the postseason until the next human lineup decision (M2.6). The
- * engine simulates the target game (or the next playable game when omitted)
- * and continues until a human rotation is required or the postseason ends.
- */
 export const seasonAdvancePostseasonCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('advance-postseason'),
-  /** The next postseason game to simulate; omitted advances the next playable game. */
+
   targetGameId: postseasonGameIdSchema.optional(),
 });
 export type SeasonAdvancePostseasonCommand = z.infer<typeof seasonAdvancePostseasonCommandSchema>;
@@ -625,23 +536,15 @@ export type SeasonAdvancePostseasonRejection = z.infer<
   typeof seasonAdvancePostseasonRejectionSchema
 >;
 
-/** The human postseason rotation payload (rotation + optional risky rehab). */
 export const seasonPostseasonRotationPayloadSchema = z.object({
   franchiseId: franchiseIdSchema,
-  /** The legal ten-player rotation (starters, closing five, target minutes). */
+
   rotation: seasonRotationSchema,
-  /**
-   * Optional risky-rehab spend for an injured player before the target game
-   * (postseason Influence spending supports risky rehab only).
-   */
+
   riskyRehabInjuryId: injuryIdSchema.optional(),
 });
 export type SeasonPostseasonRotationPayload = z.infer<typeof seasonPostseasonRotationPayloadSchema>;
 
-/**
- * Submit the human postseason rotation for the target game (M2.6). Human
- * rotations may change between games; AI rotations are fixed.
- */
 export const seasonSubmitPostseasonRotationCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('submit-postseason-rotation'),
   targetGameId: postseasonGameIdSchema,
@@ -666,10 +569,6 @@ export type SeasonSubmitPostseasonRotationRejection = z.infer<
   typeof seasonSubmitPostseasonRotationRejectionSchema
 >;
 
-/**
- * Spectate the next postseason game after elimination (M2.6): simulates the
- * named game with no human decision required.
- */
 export const seasonSpectatePostseasonGameCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('spectate-postseason-game'),
   targetGameId: postseasonGameIdSchema,
@@ -691,13 +590,9 @@ export type SeasonSpectatePostseasonGameRejection = z.infer<
   typeof seasonSpectatePostseasonGameRejectionSchema
 >;
 
-/**
- * Fast-forward an eliminated run to its champion (M2.6): simulates every
- * remaining postseason game with fixed AI rotations and completes the run.
- */
 export const seasonFastForwardPostseasonCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('fast-forward-postseason'),
-  /** Optional terminal target; defaults to the champion-deciding game. */
+
   targetGameId: postseasonGameIdSchema.optional(),
 });
 export type SeasonFastForwardPostseasonCommand = z.infer<
@@ -715,12 +610,6 @@ export type SeasonFastForwardPostseasonRejection = z.infer<
   typeof seasonFastForwardPostseasonRejectionSchema
 >;
 
-/**
- * Select the block's objective BEFORE block submission. The objective is
- * locked into the block command and evaluated at assembly from saved facts
- * only. Must target the next unselected block and an id inside the block's
- * deterministic three-choice set.
- */
 export const seasonSelectBlockObjectiveCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('select-block-objective'),
   blockIndex: z.number().int().min(0).max(7),
@@ -742,12 +631,6 @@ export type SeasonSelectBlockObjectiveRejection = z.infer<
   typeof seasonSelectBlockObjectiveRejectionSchema
 >;
 
-/**
- * Spend 1 Influence on `extra-trade-offer` (at most once per franchise per
- * open window) or 2 Influence on `risky-rehab` (at most once per active
- * injury). The floor -3 is enforced by validation, never by silent clamp;
- * the extra offer generated by the spend travels in the accepted result.
- */
 export const seasonSpendInfluenceCommandSchema = seasonRunCommandBaseSchema
   .extend({
     command: z.literal('spend-influence'),
@@ -785,12 +668,6 @@ export const seasonSpendInfluenceRejectionSchema = z.discriminatedUnion('code', 
 ]);
 export type SeasonSpendInfluenceRejection = z.infer<typeof seasonSpendInfluenceRejectionSchema>;
 
-/**
- * Accept an open trade offer. Application is atomic: unique ownership
- * transfer, legal ten-player rosters, deterministic rotation repair,
- * preserved health/load facts, zero-state chemistry for new pairs, and an
- * immutable `trade` transaction entry.
- */
 export const seasonAcceptTradeOfferCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('accept-trade-offer'),
   windowIndex: z.number().int().min(0).max(2),
@@ -810,7 +687,6 @@ export const seasonAcceptTradeOfferRejectionSchema = z.discriminatedUnion('code'
 ]);
 export type SeasonAcceptTradeOfferRejection = z.infer<typeof seasonAcceptTradeOfferRejectionSchema>;
 
-/** Decline an open trade offer (no roster change, offer status -> declined). */
 export const seasonDeclineTradeOfferCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('decline-trade-offer'),
   windowIndex: z.number().int().min(0).max(2),
@@ -830,11 +706,6 @@ export type SeasonDeclineTradeOfferRejection = z.infer<
   typeof seasonDeclineTradeOfferRejectionSchema
 >;
 
-/**
- * Resume an interrupted block from its pending candidate. The rotation
- * digest must match the one locked at submission (the rotations never
- * change mid-block).
- */
 export const seasonResumeSeasonBlockCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('resume-season-block'),
   blockIndex: z.number().int().min(0).max(8),
@@ -854,12 +725,6 @@ export type SeasonResumeSeasonBlockRejection = z.infer<
   typeof seasonResumeSeasonBlockRejectionSchema
 >;
 
-/**
- * Forfeit the interrupted game (`nextGameId`) with an official 2-0 result
- * and no player statistics (`human-interruption-forfeit`), append the
- * forfeit summary to the pending candidate, and advance to the next game in
- * block order. Repeats while the human still lacks a legal five.
- */
 export const seasonForfeitInterruptedGameCommandSchema = seasonRunCommandBaseSchema.extend({
   command: z.literal('forfeit-interrupted-game'),
   blockIndex: z.number().int().min(0).max(8),
@@ -916,9 +781,9 @@ export const seasonSpendInfluenceResultSchema = z.discriminatedUnion('status', [
     commandId: commandIdSchema,
     franchiseId: franchiseIdSchema,
     purpose: z.enum(['extra-trade-offer', 'risky-rehab']),
-    /** The recorded ledger entry (balanceAfter reconciles). */
+
     ledgerEntry: seasonInfluenceLedgerEntrySchema,
-    /** Offer #4 for extra-trade-offer spends; null otherwise. */
+
     generatedOffer: seasonTradeOfferSchema.nullable(),
   }),
 ]);
@@ -979,9 +844,9 @@ export const seasonForfeitInterruptedGameResultSchema = z.discriminatedUnion('st
     status: z.literal('accepted'),
     commandId: commandIdSchema,
     blockIndex: z.number().int().min(0).max(8),
-    /** The game that was forfeited 2-0. */
+
     forfeitedGameId: seasonGameIdSchema,
-    /** The next game in block order after the forfeit. */
+
     nextGameId: seasonGameIdSchema,
   }),
 ]);
@@ -989,19 +854,18 @@ export type SeasonForfeitInterruptedGameResult = z.infer<
   typeof seasonForfeitInterruptedGameResultSchema
 >;
 
-/** Shared accepted shape of postseason advancement results. */
 export const seasonPostseasonAdvanceResultSchema = z.object({
   status: z.literal('accepted'),
   commandId: commandIdSchema,
-  /** The run stage after the advance. */
+
   stage: seasonRunStageSchema,
-  /** Games simulated by this advance, in play order. */
+
   advancedGameIds: z.array(postseasonGameIdSchema),
-  /** Whether the run now needs a human rotation ('rotation') or not ('none'). */
+
   nextDecision: z.enum(['rotation', 'none']),
-  /** The next game awaiting a human rotation, when one is needed. */
+
   nextGameId: postseasonGameIdSchema.nullable(),
-  /** The next game to simulate with AI rotations, when the run continues. */
+
   aiNextGameId: postseasonGameIdSchema.nullable(),
 });
 
@@ -1014,11 +878,11 @@ export const seasonStartPostseasonResultSchema = z.discriminatedUnion('status', 
   z.object({
     status: z.literal('accepted'),
     commandId: commandIdSchema,
-    /** The run stage after the start (always `play-in`). */
+
     stage: z.literal('play-in'),
-    /** The derived postseason namespace seed. */
+
     postseasonSeed: z.string().regex(/^[0-9a-f]{16,64}$/),
-    /** The first game awaiting resolution (a Play-In game). */
+
     nextGameId: z.string().regex(/^pi-(east|west)-(seven-eight|nine-ten|final)$/),
   }),
 ]);
@@ -1045,7 +909,7 @@ export const seasonSubmitPostseasonRotationResultSchema = z.discriminatedUnion('
     commandId: commandIdSchema,
     targetGameId: postseasonGameIdSchema,
     franchiseId: franchiseIdSchema,
-    /** Canonical digest of the locked rotation (engine season/rotation). */
+
     rotationDigest: seasonRotationSetDigestSchema,
   }),
 ]);
@@ -1074,7 +938,7 @@ export const seasonFastForwardPostseasonResultSchema = z.discriminatedUnion('sta
   z.object({
     status: z.literal('accepted'),
     commandId: commandIdSchema,
-    /** The run stage after the fast-forward (always `completed`). */
+
     stage: z.literal('completed'),
     championFranchiseId: franchiseIdSchema,
   }),
@@ -1083,7 +947,6 @@ export type SeasonFastForwardPostseasonResult = z.infer<
   typeof seasonFastForwardPostseasonResultSchema
 >;
 
-/** Every M2.5/M2.6/M2.6.5 typed run command (submit-season-block lives in season-block.ts). */
 export const seasonRunCommandSchema = z.discriminatedUnion('command', [
   seasonSelectBlockObjectiveCommandSchema,
   seasonSpendInfluenceCommandSchema,

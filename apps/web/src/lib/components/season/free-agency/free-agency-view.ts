@@ -9,14 +9,6 @@ import type {
   SeasonFreeAgencyWindowState,
 } from '@hoop-rush/data-contracts';
 
-/**
- * M2.6.5 free-agency presentation facts (spec/2.0/15). Pure view model:
- * every fact shown on the market derives from recorded state (candidate
- * cards, all-30 declarations, signings, traces) or recorded roster facts
- * (position need). Best-fit ordering is presentation order only — it never
- * reserves, commits, or simulates anything.
- */
-
 export const FREE_AGENCY_BAND_LABEL: Record<SeasonFreeAgencyBand, string> = {
   featured: 'Featured',
   role: 'Role',
@@ -55,11 +47,10 @@ export type NeedTier = 'High' | 'Medium' | 'Low';
 export type Opportunity = 'Immediate' | 'Competitive' | 'Crowded';
 
 export interface CandidateFitFacts {
-  /** How many active rotation players cover the candidate's primary position. */
   needTier: NeedTier;
-  /** How many other franchises recorded interest in this candidate. */
+
   opportunity: Opportunity;
-  /** Other (non-human) franchises with recorded interest. */
+
   interestedCount: number;
 }
 
@@ -78,7 +69,6 @@ export function humanDeclarationOf(
   return window.declarations[franchiseId] ?? null;
 }
 
-/** True when the human franchise recorded an explicit skip for the window. */
 export function humanSkipped(
   window: SeasonFreeAgencyWindowState,
   franchiseId: string | null,
@@ -93,7 +83,6 @@ export interface InterestedTeam {
   human: boolean;
 }
 
-/** Franchises with recorded interest in a candidate, human first. */
 export function interestedTeamsOf(
   window: SeasonFreeAgencyWindowState,
   candidatePlayerVersionId: string,
@@ -125,11 +114,6 @@ export function humanSigningOf(
   return window.signings.find((signing) => signing.franchiseId === franchiseId) ?? null;
 }
 
-/**
- * Fit facts for one candidate from recorded roster facts (how many active
- * rotation members cover the primary position) and the recorded declaration
- * set (how many other franchises bid). Never a simulation: presentation only.
- */
 export function candidateFitFacts(
   candidate: SeasonFreeAgencyCandidate,
   activeRotationIds: readonly string[],
@@ -160,12 +144,6 @@ const BAND_RANK: Record<SeasonFreeAgencyBand, number> = {
 
 const NEED_RANK: Record<NeedTier, number> = { High: 0, Medium: 1, Low: 2 };
 
-/**
- * Presentation order for the market: need tier first, then market band,
- * then fewer competing teams, then identity. The top `limit` are the
- * highlighted "best fits for your rotation". Presentation only — nothing is
- * reserved, committed, or simulated.
- */
 export function bestFitOrder(
   candidates: readonly SeasonFreeAgencyCandidate[],
   fitOf: (candidate: SeasonFreeAgencyCandidate) => CandidateFitFacts,
@@ -185,7 +163,6 @@ export function bestFitOrder(
   return ordered.slice(0, limit).map((candidate) => candidate.playerVersionId);
 }
 
-/** Selectable Influence commitments for a candidate (minimum through 3). */
 export function influenceOptionsOf(candidate: SeasonFreeAgencyCandidate): number[] {
   const options: number[] = [];
   for (let value = candidate.minimumInfluence; value <= FREE_AGENCY_MAX_COMMITMENT; value += 1) {
@@ -207,7 +184,6 @@ export interface DeclarationValidationInput {
   seasonSpend: number;
 }
 
-/** Next free declaration slot (first, then second). Null when both are taken. */
 export function nextFreePriority(entries: Iterable<{ priority: 1 | 2 }>): 1 | 2 | null {
   const used = new Set<1 | 2>();
   for (const entry of entries) used.add(entry.priority);
@@ -216,7 +192,6 @@ export function nextFreePriority(entries: Iterable<{ priority: 1 | 2 }>): 1 | 2 
   return null;
 }
 
-/** Local declaration validation (advisory; the engine remains authoritative). */
 export function validateDeclaration(input: DeclarationValidationInput): string[] {
   const failures: string[] = [];
   if (input.targets.length === 0) {

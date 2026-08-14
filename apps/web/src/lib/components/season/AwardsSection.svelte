@@ -4,13 +4,6 @@
   import type { SeasonFaceRef } from '$lib/season/season-branding';
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
 
-  /**
-   * Season awards (M2.6 Leaders tab + history): the recorded MVP, Defensive
-   * Player of the Year, Sixth Man of the Year, and the positionless
-   * All-League First Team, each with its recorded recipient and the
-   * derivation-rule explanation. Pure display of `run.awards`.
-   */
-
   let {
     awards,
     playerName,

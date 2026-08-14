@@ -23,20 +23,6 @@ import {
 } from '@hoop-rush/engine';
 import type { SeasonRunEngineSeam } from './engine-seam-types.ts';
 
-/**
- * Production binding of the `SeasonRunEngineSeam` to the pure engine helpers
- * (spec/2.0/07 persistence, M2.3, M2.4, M2.5). This file is the single place
- * that imports `@hoop-rush/engine`; the repository, the audit, and the test
- * fixtures depend only on the interface in `engine-seam-types.ts`, so a
- * signature drift in the engine implementation is fixed here and nowhere
- * else. The M2.4 effects helpers are pure TypeScript with no engine dependency.
- *
- * The engine folds return one row per franchise/version appearing in the
- * summaries; the stored checkpoint requires the full 30-row team and 300-row
- * player tables (zero rows for anything unplayed), so the seam pads the engine
- * output with the canonical data-contracts zero-row builders. All helpers are
- * pure TypeScript; the seam imports no Svelte, Dexie, browser, or network code.
- */
 export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   reconstructSeasonGames,
   foldSeasonTeamAggregates: paddedTeamAggregates,
@@ -53,7 +39,6 @@ export const seasonRunEngineSeam: SeasonRunEngineSeam = {
   windowBlockIndexToIndex: WINDOW_BLOCK_INDEX_TO_INDEX,
 };
 
-/** Engine team fold padded to the full 30-row table (zero rows unplayed). */
 function paddedTeamAggregates(
   league: SeasonLeague,
   summaries: readonly SeasonGameSummary[],
@@ -65,7 +50,6 @@ function paddedTeamAggregates(
     .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
 }
 
-/** Engine player fold padded to the full 300-row table (zero rows unplayed). */
 function paddedPlayerAggregates(
   rosters: readonly SeasonRoster[],
   summaries: readonly SeasonGameSummary[],
@@ -89,21 +73,12 @@ function seasonRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[
   ].sort();
 }
 
-/**
- * M2.6.5 rotation-member union: the 300 ACTIVE players (ten per locked
- * rotation). The v2 effects state's active load records and active pairs
- * are exactly the rotation members, so the audit reconciles against this
- * projection of the frozen rotation shape. Pure TypeScript on the
- * data-contracts rotation contract (no engine import needed); the fixture
- * stub mirrors it.
- */
 function seasonRotationPlayerVersionIds(rotations: readonly SeasonRotation[]): string[] {
   return [
     ...new Set(rotations.flatMap((rotation) => [...rotation.starters, ...rotation.benchOrder])),
   ].sort();
 }
 
-/** Canonical pair key: 'a\u0000b' with a < b (duplicate-detection convention). */
 function seasonPairKey(a: string, b: string): string {
   return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
 }
@@ -112,14 +87,6 @@ function seasonPairIsCanonical(a: string, b: string): boolean {
   return a < b;
 }
 
-/**
- * Zero effects state for a league: one fresh ACTIVE load state per locked
- * rotation member (zero fatigue, zero recent load, no completed round), no
- * inactive depth, and the canonical 1,350 zero-shared-possession pairs (45
- * per ten-player rotation). Validated through the stored-effects schema
- * before it can be persisted. Draft promotion rosters are exactly ten
- * players, so the roster union equals the rotation union at this boundary.
- */
 function zeroSeasonEffectsState(rosters: readonly SeasonRoster[]): SeasonEffectsState {
   const playerStates = seasonRosterPlayerVersionIds(rosters).map((playerVersionId) => ({
     playerVersionId,

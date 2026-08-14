@@ -62,23 +62,7 @@ import {
   type RoleThresholds,
   type SeasonScoreMember,
 } from './ai-scoring.ts';
-/**
- * Deterministic AI league generation (spec/2.0/03, season-ai-v2,
- * roster-generation-v2, M2.4). A league-wide private-pool allocator replaces
- * the v1 team-at-a-time greedy: role percentiles over the canonical non-human
- * population drive anchors and tier mixtures; anchors are matched together
- * under exact-version exclusivity; the 20-member private pools are filled in
- * league-wide seeded rounds under tier ranges, band score caps, global
- * scarcity, and ten-player legality feasibility; and each roster is selected
- * from its own finalized pool. Generation never duplicates a version, never
- * duplicates a real-player identity (`playerId`) on an AI roster or across
- * remaining identities, never reads packaged Overall, and never relaxes a
- * rule: failures repair deterministically and then throw
- * `SeasonAiGenerationError` with the failing phase and the last canonical
- * allocation state. Human rosters may hold multiple versions of one person.
- */
 
-/** Solo-human band quotas (kept as the v1 export; targets.policy is authoritative). */
 export const SOLO_BAND_QUOTAS = {
   contender: 4,
   playoff: 8,
@@ -86,7 +70,6 @@ export const SOLO_BAND_QUOTAS = {
   weaker: 7,
 } as const;
 
-/** Two-human generation removes one team from the largest quota (average). */
 export const DUO_BAND_QUOTAS = {
   contender: 4,
   playoff: 8,
@@ -94,7 +77,6 @@ export const DUO_BAND_QUOTAS = {
   weaker: 7,
 } as const;
 
-/** Legacy total node budget; v2 uses targets.policy.nodeBudgets. */
 export const AI_GENERATION_NODE_BUDGET = 100_000;
 
 export const BAND_ORDER: readonly SeasonStrengthBand[] = [
@@ -113,10 +95,6 @@ export const IDENTITIES: readonly SeasonAiIdentity[] = [
   'active-trader',
 ];
 
-/**
- * Fallback identity priority roles (roster-targets-v2 policy is
- * authoritative; the table only covers a stale targets artifact).
- */
 export const DEFAULT_IDENTITY_PRIORITY_ROLES: Record<
   SeasonAiIdentity,
   readonly SeasonRosterRole[]
@@ -129,7 +107,6 @@ export const DEFAULT_IDENTITY_PRIORITY_ROLES: Record<
   'active-trader': ROSTER_ROLES,
 };
 
-/** Priority roles of one identity from the targets policy (fallback table). */
 export function identityPriorityRolesOf(
   targets: SeasonRosterTargets,
   identity: SeasonAiIdentity,
@@ -143,7 +120,6 @@ export function identityPriorityRolesOf(
 
 export type SeasonAiGenerationPhase = 'anchors' | 'pool-fill' | 'selection';
 
-/** Typed rejection for a null or mismatched roster-targets artifact. */
 export class SeasonAiTargetsError extends Error {
   readonly code = 'TARGETS_MISMATCH' as const;
 
@@ -154,8 +130,6 @@ export class SeasonAiTargetsError extends Error {
 }
 
 export function validateSeasonRosterTargets(targets: SeasonRosterTargets): void {
-  // The version literals are enforced at the boundary: read them through an
-  // untyped view so a null or mismatched artifact is rejected at runtime.
   const raw = targets as unknown as Record<string, unknown> | null;
   if (raw === null || typeof raw !== 'object') {
     throw new SeasonAiTargetsError('roster targets are required for roster-generation-v2');
@@ -212,7 +186,6 @@ function quotaTotal(
   );
 }
 
-/** Per-roster strength evaluation from possession inputs (unchanged seam). */
 export function evaluateSeasonRoster(input: {
   franchiseId: string;
   band: SeasonAiAssignment['band'];
@@ -270,12 +243,6 @@ export class SeasonAiGenerationError extends Error {
   }
 }
 
-/**
- * Projection milestone shadow mode: runs the bounded projection search over
- * every AI pool and records compact summaries on the evaluations. Selection
- * is never changed; the summary records how the current selection compares
- * to the projection-ranked best candidate of the same pool.
- */
 export function attachAiProjectionSummaries(input: {
   generation: SeasonLeagueGenerationResult;
   catalog: SeasonDraftCatalog;
@@ -324,9 +291,7 @@ export function attachAiProjectionSummaries(input: {
       seed: seasonDigestHex(`${seed}\u0000ai-projection\u0000${evaluation.franchiseId}`),
       eraProfile,
       model,
-      // Shadow evaluation is evidence, not exhaustive search: tight per-call
-      // caps keep 29 pools tractable (the artifact policy is multi-minute per
-      // pool at the base projection's current cost).
+
       caps: { completeCandidates: 8, rotationsPerRoster: 8 },
     });
     const selected = byId.get(evaluation.franchiseId) ?? [];
@@ -386,28 +351,19 @@ export function attachAiProjectionSummaries(input: {
   return { ...generation, evaluations };
 }
 
-/** Shared cache across AI shadow searches (bounded, per-call). */
 const searchCache = new ProjectionCache();
 
 export interface SeasonAiGenerationInput {
   seed: Seed;
   catalog: SeasonDraftCatalog;
   league: SeasonLeague;
-  /** Human franchises are excluded from AI generation. */
+
   humanFranchiseIds: readonly string[];
-  /** Finalized human ownership (version ids per human franchise). */
+
   humanRosters: ReadonlyArray<{ franchiseId: string; playerVersionIds: string[] }>;
-  /** Required v2 roster targets; validated before any allocation. */
+
   targets: SeasonRosterTargets;
-  /**
-   * Projection milestone (optional shadow mode): when present, generation
-   * runs the projection search over every AI pool AFTER the current
-   * selection phases and records compact projection summaries on the
-   * evaluations. Shadow mode never changes selection: band quotas, anchor
-   * guarantees, ownership, pool membership, legality, role coverage, outlier
-   * caps, node budgets, and repair/backtracking rules are untouched. Absent
-   * means byte-identical output to projection-free generation.
-   */
+
   projection?: {
     eraProfile: EraSimulationProfile;
     model: ProjectionModelArtifact;
@@ -427,8 +383,7 @@ export function assignAiBandsAndIdentities(input: {
     input.humanFranchiseIds.length === 2
       ? input.targets.policy.bandQuotas.duo
       : input.targets.policy.bandQuotas.solo;
-  // Canonical base order so the seeded shuffle never depends on the input
-  // league's array order.
+
   const shuffled = shuffle(
     aiTeams.map((team) => team.franchiseId).sort(),
     createRng(seasonNamespaceSeed(input.seed, 'ai-rosters', 'band-order')),
@@ -456,8 +411,7 @@ export function assignAiBandsAndIdentities(input: {
       teamIndex += 1;
     }
   }
-  // Human franchises are informational placeholders; they never consume AI
-  // quota slots or identity counts.
+
   const humanRows: SeasonAiAssignment[] = input.league.teams
     .filter((team) => input.humanFranchiseIds.includes(team.franchiseId))
     .map((team) => ({
@@ -487,25 +441,24 @@ function identityCounts(n: number, offset: number): Record<SeasonAiIdentity, num
   return counts;
 }
 
-/** One AI team's private pool state (anchors live inside the pool). */
 interface PoolTeam {
   franchiseId: string;
   band: SeasonStrengthBand;
   identity: SeasonAiIdentity;
-  /** Insertion order; anchors first, then round picks and repairs. */
+
   pool: string[];
-  /** Position group counts of the pool, maintained incrementally. */
+
   groupCounts: { guards: number; forwards: number; centers: number };
-  /** Union of role-coverage masks across the pool, maintained incrementally. */
+
   coverageMask: number;
-  /** Pool tier mixture, maintained incrementally (highest tier per member). */
+
   tierCounts: Record<PercentileTier, number>;
-  /** Pool members whose identity score exceeds the band pool score cap. */
+
   outliers: number;
   anchors: SeasonAiAnchor[];
-  /** Deduplicated seed paths that determined this pool. */
+
   seedPaths: string[];
-  /** The seed path that brought each pool member into the pool. */
+
   memberPaths: Map<string, string[]>;
   repairCount: number;
   selections: string[] | null;
@@ -517,42 +470,42 @@ interface GenerationState {
   byId: Map<string, SeasonDraftCatalog['candidates'][number]>;
   maskByVersion: Map<string, number>;
   roleScores: Map<string, Record<SeasonRosterRole, number>>;
-  /** Bitmask of the roles a candidate covers (score >= coverage threshold). */
+
   coverageMaskByVersion: Map<string, number>;
   roleTiers: Map<string, Record<SeasonRosterRole, PercentileTier>>;
-  /** Highest tier across roles per candidate (its pool tier). */
+
   poolTiers: Map<string, PercentileTier>;
   identityScores: Map<string, Record<SeasonAiIdentity, number>>;
-  /** Per-candidate sums of identity priority role scores (precomputed once). */
+
   identityPriorityTotals: Map<string, Record<SeasonAiIdentity, number>>;
   thresholds: Record<SeasonRosterRole, RoleThresholds>;
   humanOwned: Set<string>;
-  /** Real-player identities claimed by humans or any pool member. */
+
   claimedIdentities: Set<string>;
-  /** Every catalog version of each real-player identity. */
+
   versionsByIdentity: Map<string, readonly string[]>;
-  /** Candidates not human-owned, not identity-claimed, and not inside any pool. */
+
   unassigned: Set<string>;
-  /** Incremental per-mask counts of `unassigned` (kept in sync). */
+
   unassignedMaskCountsArr: number[];
-  /** Per-role counts of unassigned candidates covering that role (kept in sync). */
+
   unassignedRoleCoverCounts: number[];
-  /** Incremental total of remaining pool slots across every team. */
+
   remainingSlots: number;
   teams: Map<string, PoolTeam>;
-  /** AI franchise ids sorted canonically (order-invariant iteration). */
+
   teamOrder: string[];
   targets: SeasonRosterTargets;
-  /** Candidates sorted by playerVersionId ascending (canonical iteration). */
+
   canonicalCandidates: readonly SeasonDraftCatalog['candidates'][number][];
   assignments: Map<string, SeasonAiAssignment>;
   nodes: number;
   nodesByPhase: Record<SeasonAiGenerationPhase, number>;
   phase: SeasonAiGenerationPhase;
-  /** Per-team selection node floor (fair share of the rosterSelection budget). */
+
   selectionFloor: number;
   backtracks: number;
-  /** Backtracking bans keyed `${teamId}:${versionId}`. */
+
   bans: Set<string>;
 }
 
@@ -690,12 +643,6 @@ function maskCountsOf(
   return counts;
 }
 
-/**
- * Exact reachability of a legal G,G,F,F,C five from counts: the capped DP
- * over (guards <= 2, forwards <= 2, centers <= 1) proves a legal slot
- * assignment exists among owned members plus up to `remainingPicks` picks
- * from the available per-mask counts.
- */
 export function fiveReachableFromCounts(
   ownedCounts: { guards: number; forwards: number; centers: number },
   availableMaskCounts: readonly number[],
@@ -742,14 +689,6 @@ export function fiveReachableFromCounts(
   return reachable[remainingPicks * usedBase + targetG * 6 + targetF * 2 + targetC] === 1;
 }
 
-/**
- * Fill-gate reachability: the fixed pool members (each counted once) are
- * combined with up to `slotsToFill` picks from the unassigned per-mask
- * counts. The fixed stage is uncapped by design — it only proves the pool
- * can still reach the completion targets with the remaining supply; the
- * exact ten-slot accounting happens at the final validation and repair
- * boundaries via the used-capped per-member DP.
- */
 function reachableAfterFixedAndFills(
   targets: { guards: number; forwards: number; centers: number },
   startCounts: { guards: number; forwards: number; centers: number },
@@ -796,8 +735,7 @@ function reachableAfterFixedAndFills(
   if (maxPicks <= 0) {
     return reachable[stateIndex(targetG, targetF, targetC)] === 1;
   }
-  // Unassigned picks: the per-mask pass is order-sensitive, so the mask
-  // passes are repeated to a fixpoint (bounded by the pick budget).
+
   const withPicks = new Uint8Array(usedBase * (maxPicks + 1));
   for (let g = targetG; g >= 0; g -= 1) {
     for (let f = targetF; f >= 0; f -= 1) {
@@ -850,12 +788,6 @@ function reachableAfterFixedAndFills(
   return false;
 }
 
-/**
- * Exact ten admission of a pool: the ten (anchors plus up to `10 - anchors`
- * other members) must reach the completion targets and field a legal five.
- * Used at the final pool validation and the repair boundaries, where the
- * ten-slot accounting must be exact.
- */
 function poolAdmitsTenExact(state: GenerationState, team: PoolTeam): boolean {
   const anchorIds = team.anchors.map((anchor) => anchor.playerVersionId);
   const anchorCounts = rosterGroupCounts(membersOf(state, anchorIds));
@@ -881,14 +813,6 @@ function poolAdmitsTenExact(state: GenerationState, team: PoolTeam): boolean {
   return true;
 }
 
-/**
- * Exact ten-feasibility of a team's pool after adding `versionId` (or of the
- * pool as it stands when `versionId` is null): the ten contains the anchors,
- * so the completion 4/4/3 must be reachable from the anchors plus the pool's
- * fixed members plus at most the team's remaining pool slots of unassigned
- * picks; a legal five must be reachable among any five of the ten under the
- * same fill budget.
- */
 function poolTenFeasibleAfterAdd(
   state: GenerationState,
   team: PoolTeam,
@@ -907,7 +831,7 @@ function poolTenFeasibleAfterAdd(
   if (versionId !== null) {
     const addMask = state.maskByVersion.get(versionId) ?? 0;
     if (addMask !== 0) fixedMasks.push(addMask);
-    // The probe is still inside the unassigned counts; remove it once.
+
     if (addMask !== 0) {
       unassignedMasks[addMask] = Math.max(0, (unassignedMasks[addMask] ?? 0) - 1);
     }
@@ -942,15 +866,6 @@ function poolTenFeasibleAfterAdd(
   return true;
 }
 
-/**
- * Role-coverage feasibility of a team's pool: the union of the roles the
- * pool members (plus the probe) cover must cover all eight roles. While the
- * pool is still filling, remaining unassigned candidates may still complete
- * the coverage; once the pool is full the union must stand alone. The
- * unassigned side is the precomputed per-role cover counts, which are
- * exactly the union of the unassigned coverage masks (a role is covered by
- * the supply iff at least one unassigned candidate covers it).
- */
 function poolCoverageFeasible(
   state: GenerationState,
   team: PoolTeam,
@@ -971,13 +886,6 @@ function poolCoverageFeasible(
   return (poolMask | unassignedMask) === 0xff;
 }
 
-/**
- * Role-coverage scarcity across the league: after the pick, the remaining
- * unassigned candidates must still cover every role that at least one pool
- * lacks (the probe covers the picking team's own gap). This stops pools from
- * deferring their role coverage until the supply runs out. The unassigned
- * union comes from the precomputed per-role cover counts.
- */
 function coverageScarcityAfter(state: GenerationState, team: PoolTeam, versionId: string): boolean {
   let lacking = 0xff;
   for (const teamId of state.teamOrder) {
@@ -996,13 +904,6 @@ function coverageScarcityAfter(state: GenerationState, team: PoolTeam, versionId
   return true;
 }
 
-/**
- * Exact ten-feasibility of a team's pool after adding `versionId` (or of the
- * pool as it stands when `versionId` is null): the ten contains the anchors,
- * so the completion 4/4/3 must be reachable from the anchors plus the pool's
- * fixed members (used-capped per-member DP, order-independent), and a legal
- * five must be reachable among any five of the pool's members.
- */
 function poolTenFeasibleAfterAddExact(
   state: GenerationState,
   team: PoolTeam,
@@ -1034,9 +935,7 @@ function poolTenFeasibleAfterAddExact(
   ) {
     return false;
   }
-  // The selection phase enforces maxRosterStrengthOutliers as a hard gate, so
-  // the pool must admit a legal ten inside the band's strength outlier
-  // budget. Anchors are fixed members and count toward the budget.
+
   const capValue = state.targets.policy.bandPoolScoreCaps[team.band];
   let anchorOutliers = 0;
   for (const anchorId of anchorIds) {
@@ -1061,22 +960,20 @@ function poolTenFeasibleAfterAddExact(
 
 function gatesForAdd(state: GenerationState, team: PoolTeam, versionId: string): string[] {
   const failures: string[] = [];
-  // Global scarcity: one candidate must remain for every remaining pool slot
-  // across the league after this pick.
+
   if (state.unassigned.size < state.remainingSlots) {
     failures.push('global scarcity');
   }
-  // Position-level scarcity: the pick must not starve any team's completion.
+
   const addMask = state.maskByVersion.get(versionId) ?? 0;
   if (addMask !== 0 && !positionScarcityAfter(state, team, addMask)) {
     failures.push('position scarcity');
   }
-  // Role coverage: the pool must stay able to cover all eight roles.
+
   if (!poolCoverageFeasible(state, team, versionId, true)) {
     failures.push('role coverage infeasible');
   }
-  // League-wide coverage scarcity: the pick must not starve the remaining
-  // pools of a role nobody covers yet.
+
   if (!coverageScarcityAfter(state, team, versionId)) {
     failures.push('coverage scarcity');
   }
@@ -1084,10 +981,7 @@ function gatesForAdd(state: GenerationState, team: PoolTeam, versionId: string):
   if (playerId !== undefined && state.claimedIdentities.has(playerId)) {
     failures.push('identity already claimed');
   }
-  // Exact ten feasibility: the pool (anchors + fixed members) must admit a
-  // legal ten with the remaining fill budget. With at most two slots left
-  // the check is exact (used-capped per-member DP); earlier the uncapped
-  // gate proves reachability with the remaining supply.
+
   const slotsLeft = state.targets.policy.poolSize - team.pool.length - 1;
   if (slotsLeft <= 0) {
     if (!poolTenFeasibleAfterAddExact(state, team, versionId)) {
@@ -1138,8 +1032,7 @@ function removePoolMember(state: GenerationState, team: PoolTeam, versionId: str
     team.groupCounts.forwards = Math.max(0, team.groupCounts.forwards - 1);
   if (mask !== undefined && (mask & 4) !== 0)
     team.groupCounts.centers = Math.max(0, team.groupCounts.centers - 1);
-  // A removed member's coverage cannot be subtracted from a union, so the
-  // pool coverage mask is recomputed from the remaining pool.
+
   team.coverageMask = 0;
   for (const memberId of team.pool) {
     team.coverageMask |= state.coverageMaskByVersion.get(memberId) ?? 0;
@@ -1160,7 +1053,6 @@ function checkBudget(state: GenerationState): void {
   }
 }
 
-/** The node budget of one phase (targets keys map onto phases). */
 function budgetForPhase(state: GenerationState, phase: SeasonAiGenerationPhase): number {
   const budgets = state.targets.policy.nodeBudgets;
   switch (phase) {
@@ -1177,7 +1069,6 @@ function selectionBudgetExceeded(state: GenerationState): boolean {
   return state.nodesByPhase.selection > state.selectionFloor;
 }
 
-/** Canonical snapshot of the last allocation state for error reporting. */
 function canonicalAllocationState(state: GenerationState): string {
   const pools = state.teamOrder.map((teamId) => {
     const team = state.teams.get(teamId);
@@ -1257,10 +1148,6 @@ class PoolFillDeadlock extends Error {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Phase 1: anchors
-// ---------------------------------------------------------------------------
-
 interface AnchorOption {
   versionId: string;
   qualifyingRole: SeasonRosterRole;
@@ -1293,18 +1180,10 @@ function anchorOptionsFor(state: GenerationState, team: PoolTeam): AnchorOption[
   return options;
 }
 
-/** Exact-version exclusivity: the candidate is not inside any pool yet. */
 function inAnyPool(state: GenerationState, versionId: string): boolean {
   return !state.unassigned.has(versionId) && !state.humanOwned.has(versionId);
 }
 
-/**
- * Prune after (or before) a reservation: every team must still be able to
- * reach its guarantee, no band's elite range may be exceeded, the global
- * scarcity bound must hold, and every team's future pool must stay
- * ten-feasible. Returns the violation strings; empty means the branch can
- * still be completed.
- */
 function anchorBranchViolations(
   state: GenerationState,
   order: readonly PoolTeam[],
@@ -1325,8 +1204,7 @@ function anchorBranchViolations(
     if (team.tierCounts.elite > eliteMaxByBand[team.band]) {
       violations.push(`${team.franchiseId} elite range exceeded`);
     }
-    // Every team's future pool must stay ten-feasible: later reservations
-    // shrink the availability of earlier teams too.
+
     if (!poolTenFeasibleAfterAdd(state, team, null)) {
       violations.push(`${team.franchiseId} future pool cannot admit a legal ten`);
     }
@@ -1353,12 +1231,6 @@ function anchorBranchViolations(
   return violations;
 }
 
-/**
- * Deterministic bounded matching of the guaranteed anchors across every team.
- * Teams are processed by fewest eligible options, then seeded team rank, then
- * franchiseId. Each branch reserves one candidate; branches that prevent
- * another guarantee or make any team's future pool infeasible are pruned.
- */
 function matchGuaranteedAnchors(state: GenerationState): void {
   const teams = state.teamOrder
     .map((teamId) => state.teams.get(teamId))
@@ -1405,10 +1277,7 @@ function matchGuaranteedAnchors(state: GenerationState): void {
       ranked.map((entry) => entry.option.versionId),
     );
   }
-  // Options are per team: the same candidate can be an anchor option for
-  // several teams, each with a different qualifying priority role. A global
-  // version->option map would let the last team's option overwrite the
-  // recorded qualifying role for earlier teams.
+
   const optionById = new Map<string, Map<string, AnchorOption>>();
   for (const team of teams) {
     const perTeam = new Map<string, AnchorOption>();
@@ -1438,9 +1307,7 @@ function matchGuaranteedAnchors(state: GenerationState): void {
       if (option === undefined) continue;
       addAnchor(state, team, option, ['ai-rosters', 'anchors', team.franchiseId, 'guaranteed']);
       const after = anchorBranchViolations(state, order, optionsByTeam, index);
-      // Stay on this team until its whole guarantee is placed: recursing on
-      // the same index fills the second contender anchor, the single playoff
-      // anchor, and so on before the next team is processed.
+
       if (after.length === 0 && solve(index)) return true;
       removeAnchor(state, team, versionId);
     }
@@ -1530,10 +1397,6 @@ function rollExtraEliteAnchors(state: GenerationState): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Phase 2: league-wide private-pool filling
-// ---------------------------------------------------------------------------
-
 const TIER_DEFICIT_FACTOR: Record<PercentileTier, number> = {
   elite: 3,
   strong: 2,
@@ -1548,14 +1411,6 @@ function weakestRoles(
   return [...ROSTER_ROLES].sort((a, b) => poolRoleScores[a] - poolRoleScores[b]).slice(0, count);
 }
 
-/**
- * Weighted seeded ranking of a pool candidate (hard gates already passed).
- * The band tier ranges guide the pool mixture softly: deficits toward the
- * tier minimums add weight, and picking beyond a tier maximum is penalized
- * (never rejected) so pools keep a spread of tiers. `priorityRoles`,
- * `weakest`, and `poolCounts` are per-pick invariants computed once by the
- * caller; the identity priority total is precomputed per candidate.
- */
 function poolPickScore(
   state: GenerationState,
   team: PoolTeam,
@@ -1570,7 +1425,7 @@ function poolPickScore(
   const cap = state.targets.policy.bandPoolScoreCaps[team.band];
   if (identity > cap) {
     score -= (identity - cap) * BAND_CEILING_PENALTY;
-    // Soft over-budget penalty when the pool would exceed its outlier budget.
+
     if (team.outliers + 1 > state.targets.policy.maxPoolStrengthOutliers) {
       score -= (team.outliers + 1 - state.targets.policy.maxPoolStrengthOutliers) * 6;
     }
@@ -1587,7 +1442,7 @@ function poolPickScore(
     const tierRange = ranges[tier];
     const tierDeficit = Math.max(0, tierRange[0] - team.tierCounts[tier]);
     score += tierDeficit * TIER_DEFICIT_FACTOR[tier];
-    // Cumulative-or-better overage penalty (soft).
+
     const cumulative = tierOverage(state, team, tier, 1);
     if (cumulative > tierRange[1]) score -= (cumulative - tierRange[1]) * TIER_DEFICIT_FACTOR[tier];
   }
@@ -1600,13 +1455,11 @@ function poolPickScore(
   if (Math.max(0, completion.centers - poolCounts.centers) > 0 && (mask & 4) !== 0)
     positionHelp += 1;
   score += positionHelp * 0.4;
-  // Seeded ranking: the per-round candidate rank meaningfully orders
-  // near-equal candidates so different seeds produce different pools.
+
   score += (rngRanks.get(versionId) ?? 0) * 2.5;
   return score;
 }
 
-/** Cumulative-or-better tier count of a team's pool after `extra` members. */
 function tierOverage(
   state: GenerationState,
   team: PoolTeam,
@@ -1628,12 +1481,6 @@ function tierOverage(
   }
 }
 
-/**
- * Best gated candidate for one team at one round, or null on deadlock. The
- * scarcity gate is candidate-invariant; the exact ten-feasibility gate only
- * depends on the candidate's group mask, so it is probed once per mask and
- * the remaining per-candidate gates are constant-time.
- */
 function pickForPool(state: GenerationState, team: PoolTeam, round: number): string | null {
   if (team.pool.length >= state.targets.policy.poolSize) return null;
   if (state.unassigned.size < state.remainingSlots) return null;
@@ -1666,7 +1513,7 @@ function pickForPool(state: GenerationState, team: PoolTeam, round: number): str
     rngRanks.set(candidate.playerVersionId, rng.next());
   }
   const poolRoleScores = roleScoresOfIds(state, team.pool);
-  // Per-pick invariants computed once instead of once per candidate.
+
   const priorityRoles = identityPriorityRolesOf(state.targets, team.identity);
   const weakest = weakestRoles(poolRoleScores, 2);
   const poolCounts = team.groupCounts;
@@ -1692,7 +1539,6 @@ function pickForPool(state: GenerationState, team: PoolTeam, round: number): str
   return best.id;
 }
 
-/** First canonical unassigned candidate of a group mask (for DP probes). */
 function probeForMask(state: GenerationState, team: PoolTeam, mask: number): string | undefined {
   for (const candidate of state.canonicalCandidates) {
     const id = candidate.playerVersionId;
@@ -1703,13 +1549,6 @@ function probeForMask(state: GenerationState, team: PoolTeam, mask: number): str
   return undefined;
 }
 
-/**
- * Position-level global scarcity: after adding a member of `mask` to `team`,
- * the unassigned supply of each position group must still cover every team's
- * remaining completion need (4 guard-, 4 forward-, 3 center-capable pool
- * members). This stops pools from hoarding scarce positions while other
- * pools still need them.
- */
 function positionScarcityAfter(state: GenerationState, team: PoolTeam, mask: number): boolean {
   const completion = state.targets.policy.completionTargets;
   const need = { guards: 0, forwards: 0, centers: 0 };
@@ -1748,7 +1587,6 @@ function positionScarcityAfter(state: GenerationState, team: PoolTeam, mask: num
   );
 }
 
-/** Twenty league-wide rounds; each round uses a seeded canonical team order. */
 function fillPools(state: GenerationState): void {
   const poolSize = state.targets.policy.poolSize;
   for (let round = 0; round < poolSize; round += 1) {
@@ -1838,8 +1676,7 @@ function restorePools(state: GenerationState, snapshot: PoolSnapshot): void {
     team.memberPaths = new Map(entry.memberPaths);
     team.repairCount = entry.repairCount;
   }
-  // The incremental memberships were rebuilt above; recompute the derived
-  // role-cover counts and per-team position/coverage state from them.
+
   state.unassignedRoleCoverCounts = roleCoverCountsOf(
     state.unassigned,
     state.coverageMaskByVersion,
@@ -1859,18 +1696,12 @@ function restorePools(state: GenerationState, snapshot: PoolSnapshot): void {
   }
 }
 
-/**
- * Deterministic local replacement: swap a pool member for an unassigned
- * candidate so every pool gate holds. Pool order first, then canonical
- * candidate order; the first legal swap is accepted.
- */
 function localPoolRepair(state: GenerationState, teamId: string): boolean {
   const team = state.teams.get(teamId);
   if (team === undefined) return false;
   const anchorSet = new Set(team.anchors.map((anchor) => anchor.playerVersionId));
   const original = [...team.pool];
   for (const memberId of original) {
-    // Guaranteed anchors never leave the pool.
     if (anchorSet.has(memberId)) continue;
     removePoolMember(state, team, memberId);
     for (const candidate of state.canonicalCandidates) {
@@ -1880,8 +1711,6 @@ function localPoolRepair(state: GenerationState, teamId: string): boolean {
       state.nodesByPhase['pool-fill'] += 1;
       checkBudget(state);
       if (gatesForAdd(state, team, id).length === 0) {
-        // The repaired pool must admit a legal ten exactly (used-capped
-        // per-member DP), otherwise the repair would leave a dead end.
         addPoolMember(state, team, id, ['ai-rosters', 'pool-repair', teamId, memberId]);
         const exactOk = poolAdmitsTenExact(state, team);
         if (exactOk) {
@@ -1896,11 +1725,6 @@ function localPoolRepair(state: GenerationState, teamId: string): boolean {
   return false;
 }
 
-/**
- * Deterministic cross-pool swap: a donor pool that can spare a member passes
- * it to the failing team; when the failing team is full, its weakest member
- * returns to the unassigned pool first.
- */
 function crossPoolRepair(state: GenerationState, teamId: string): boolean {
   const team = state.teams.get(teamId);
   if (team === undefined) return false;
@@ -1911,21 +1735,16 @@ function crossPoolRepair(state: GenerationState, teamId: string): boolean {
     const donorAnchorSet = new Set(donor.anchors.map((anchor) => anchor.playerVersionId));
     for (const memberId of [...donor.pool]) {
       if (state.bans.has(`${teamId}:${memberId}`)) continue;
-      // The donor's guaranteed anchors never leave its pool.
+
       if (donorAnchorSet.has(memberId)) continue;
       state.nodes += 1;
       state.nodesByPhase['pool-fill'] += 1;
       checkBudget(state);
       removePoolMember(state, donor, memberId);
-      // The donor must still be able to complete its own pool: its pool
-      // (after the removal) has to admit a legal ten with the slots that
-      // remain. Without this gate the repair would ping-pong the hole
-      // between the failing team and a donor that cannot recover.
+
       const donorOk = poolAdmitsTenExact(state, donor);
       const addFailures = gatesForAdd(state, team, memberId);
       if (donorOk && !inAnyPool(state, memberId) && addFailures.length === 0) {
-        // When the failing team is full, its weakest pool member returns to
-        // the unassigned pool first (deterministic pool order).
         let swapOut: string | null = null;
         if (team.pool.length >= state.targets.policy.poolSize) {
           for (const candidateOut of [...team.pool]) {
@@ -1954,7 +1773,7 @@ function crossPoolRepair(state: GenerationState, teamId: string): boolean {
           }
         } else {
           addPoolMember(state, team, memberId, ['ai-rosters', 'pool-repair', teamId, memberId]);
-          // The repaired pool must admit a legal ten exactly.
+
           if (!poolAdmitsTenExact(state, team)) {
             removePoolMember(state, team, memberId);
             addPoolMember(state, donor, memberId, [
@@ -1975,7 +1794,6 @@ function crossPoolRepair(state: GenerationState, teamId: string): boolean {
   return false;
 }
 
-/** Pool-level violations; the exact ten admission is verified separately. */
 function poolViolations(state: GenerationState, teamId: string): string[] {
   const team = state.teams.get(teamId);
   if (team === undefined) return ['missing team'];
@@ -1986,9 +1804,7 @@ function poolViolations(state: GenerationState, teamId: string): string[] {
   }
   if (new Set(team.pool).size !== team.pool.length) violations.push('pool contains duplicates');
   if (!uniqueIdentities(state, team.pool)) violations.push('pool contains duplicate identities');
-  // The exact ten admission uses the order-independent used-capped per-member
-  // DP (the shared per-mask DP in roster-rules is order-sensitive for
-  // multi-position masks and is not used for pool validation here).
+
   if (!poolAdmitsTenExact(state, team)) {
     violations.push('pool admits no 4/4/3 ten');
   }
@@ -1998,15 +1814,6 @@ function poolViolations(state: GenerationState, teamId: string): string[] {
   return violations;
 }
 
-/**
- * Order-independent reachability of the target group counts from a fixed
- * member list with at most `maxPicks` picks: each member is applied at most
- * once (its mask contributes to its groups), the counts are capped at the
- * targets, and the used dimension bounds the total picks. Unlike the shared
- * per-mask-count DP, this cannot miss combinations where a multi-position
- * member must be consumed before a single-position one, and unlike an
- * uncapped member DP it cannot over-approximate the pick budget.
- */
 function memberReachCapped(
   state: GenerationState,
   targets: { guards: number; forwards: number; centers: number },
@@ -2059,13 +1866,6 @@ function memberReachCapped(
   return false;
 }
 
-/**
- * Outlier-budget-aware completion reachability: the 4/4/3 target must be
- * reachable while keeping the number of members whose identity score exceeds
- * the band pool score cap at or below `maxOutliers` (the selection phase's
- * hard `maxRosterStrengthOutliers` gate). State adds the outlier dimension;
- * member outlier flags come from the per-candidate identity score.
- */
 function memberReachCappedWithOutlierBudget(
   state: GenerationState,
   team: PoolTeam,
@@ -2133,12 +1933,6 @@ function memberReachCappedWithOutlierBudget(
   return false;
 }
 
-/**
- * Bounded deterministic DFS for a legal ten (validateSeasonRoster plus the
- * 4/4/3 completion target and all-eight-roles coverage) inside a member
- * list. Canonical order, early exit, completion/coverage pruning; counts
- * against the active phase budget.
- */
 function legalTenExists(state: GenerationState, members: readonly string[]): boolean {
   const ordered = [...members].sort();
   const picked: string[] = [];
@@ -2191,7 +1985,6 @@ function legalTenExists(state: GenerationState, members: readonly string[]): boo
   return rec(0);
 }
 
-/** Fills all pools; on deadlock repairs locally, then across pools, then backtracks. */
 function fillPoolsWithRepair(state: GenerationState): void {
   const maxAttempts = 10;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -2242,11 +2035,6 @@ function fillPoolsWithRepair(state: GenerationState): void {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Phase 3: final roster selection from each finalized private pool
-// ---------------------------------------------------------------------------
-
-/** Exact coverage DP over a member list: can `slots` picks cover all roles? */
 function coverageFeasibleFromPool(
   state: GenerationState,
   uncovered: readonly SeasonRosterRole[],
@@ -2274,9 +2062,7 @@ function coverageFeasibleFromPool(
   const full = (1 << uncovered.length) - 1;
   const reachable = new Uint8Array((slots + 1) * (full + 1));
   reachable[0] = 1;
-  // The per-mask pass is order-sensitive (a multi-role member processed late
-  // cannot add its roles once the pick budget is spent), so the passes are
-  // repeated to a fixpoint, bounded by the pick budget.
+
   for (let pass = 0; pass <= slots; pass += 1) {
     const before = new Uint8Array(reachable);
     for (let mask = 1; mask <= full; mask += 1) {
@@ -2306,16 +2092,6 @@ function coverageFeasibleFromPool(
   return reachable[slots * (full + 1) + full] === 1;
 }
 
-/**
- * A ten must be legal, complete, cover all eight roles, and rotate 240 min.
- * The band tier ranges are soft targets (scoring deficits/penalties), never
- * hard gates: with the pool tier being the highest tier across all eight
- * roles and identity scores dominating the pool fill, hard tier caps would
- * make generation infeasible for the population. The selected-roster
- * strength outlier budget IS a hard gate (targets.policy.maxRoster
- * StrengthOutliers): it is what separates the strength bands in measured
- * roster quality and is enforced by every selection path.
- */
 function rosterLegal(state: GenerationState, team: PoolTeam, ids: readonly string[]): boolean {
   if (ids.length !== 10) return false;
   if (!uniqueIdentities(state, ids)) return false;
@@ -2348,7 +2124,6 @@ function rosterOutlierCount(
   return outliers;
 }
 
-/** Hard gate: the ten may exceed the band cap only a bounded number of times. */
 function rosterOutlierBudgetOk(
   state: GenerationState,
   team: PoolTeam,
@@ -2391,11 +2166,10 @@ function selectionPickScore(
   return score;
 }
 
-/** Greedy ten from the pool: anchors first, then gated picks, then score. */
 function greedySelection(state: GenerationState, team: PoolTeam): string[] | null {
   const picked = [...team.anchors.map((anchor) => anchor.playerVersionId)];
   const rngRanks = selectionRanks(state, team);
-  // The pool is finalized before selection; sort once and reuse each round.
+
   const sortedPool = [...team.pool].sort();
   while (picked.length < 10) {
     const slotsLeft = 10 - picked.length - 1;
@@ -2444,10 +2218,7 @@ function greedySelection(state: GenerationState, team: PoolTeam): string[] | nul
         continue;
       }
       const memberScores = state.roleScores.get(id);
-      // The candidate's own coverage closes some uncovered roles; the
-      // remaining slots only need to cover what it leaves open. Testing the
-      // full `uncovered` set against the pool minus the candidate rejects
-      // picks that are the last member covering a role (a false negative).
+
       const uncoveredAfter =
         memberScores === undefined
           ? uncovered
@@ -2478,8 +2249,7 @@ function rosterSelectionScore(
   const uncovered = uncoveredRoles(roleScores);
   score -= uncovered.length * 2;
   score -= rosterOutlierCount(state, team, ten) * BAND_CEILING_PENALTY;
-  // Tier ranges guide the mixture softly: deficits toward the minimums add
-  // weight and cumulative-or-better overage beyond the maximums is penalized.
+
   const ranges = state.targets.policy.tierRanges[team.band];
   let elite = 0;
   let strong = 0;
@@ -2503,7 +2273,6 @@ function rosterSelectionScore(
   return score;
 }
 
-/** Bounded deterministic improvement: first legal swap that raises the score. */
 function improveSelection(
   state: GenerationState,
   team: PoolTeam,
@@ -2538,17 +2307,12 @@ function improveSelection(
   }
 }
 
-/** Bounded best-ten DFS fallback when the greedy path cannot complete. */
 function bestTenDfs(
   state: GenerationState,
   team: PoolTeam,
   members: readonly string[],
   incumbent: string[] | null,
 ): string[] | null {
-  // Member order: role-coverage contribution first (members covering more
-  // of the eight roles lead the search so coverage-complete tens are found
-  // early), then completion group (center-capable first), then canonical,
-  // so legal tens are found within the budget.
   const ordered = [...members].sort((a, b) => {
     const covA = state.coverageMaskByVersion.get(a) ?? 0;
     const covB = state.coverageMaskByVersion.get(b) ?? 0;
@@ -2568,9 +2332,7 @@ function bestTenDfs(
   });
   let best = incumbent;
   const picked: string[] = [];
-  // The DFS rescues greedy dead-ends: it stops at the first legal ten it
-  // finds (improveSelection polishes afterwards), so the search cost stays
-  // bounded by the first found solution instead of the full solution space.
+
   let found = false;
   const rec = (index: number): void => {
     if (found) return;
@@ -2640,7 +2402,6 @@ function bestTenDfs(
   return best;
 }
 
-/** Best legal ten from a finalized pool (greedy, improvement, bounded DFS). */
 function bestRosterFromPool(state: GenerationState, team: PoolTeam): string[] | null {
   const greedy = greedySelection(state, team);
   if (
@@ -2685,10 +2446,6 @@ function selectRosters(state: GenerationState): void {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Result assembly and calibration
-// ---------------------------------------------------------------------------
-
 function toSeasonAiPool(state: GenerationState, team: PoolTeam): SeasonAiPool {
   const selections = [...(team.selections ?? [])].sort();
   return {
@@ -2698,8 +2455,7 @@ function toSeasonAiPool(state: GenerationState, team: PoolTeam): SeasonAiPool {
     playerVersionIds: [...team.pool].sort(),
     anchors: [...team.anchors].sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1)),
     selections,
-    // One seed path per selection, in selection order (the path that brought
-    // each selected member into the pool).
+
     allocationSeedPaths: selections.map(
       (versionId) => team.memberPaths.get(versionId) ?? ['ai-rosters', team.franchiseId],
     ),
@@ -2707,13 +2463,6 @@ function toSeasonAiPool(state: GenerationState, team: PoolTeam): SeasonAiPool {
   };
 }
 
-/**
- * Roster-relative quality weights (0..1) for the minute-policy optimizer.
- * Uses exactly the talent authority of the rotation `order` comparator:
- * mean of the candidate's detailed ratings, normalized within the roster
- * (`q = mean / maxMeanAcrossRoster`; 0.5 when the roster has no ratings).
- * Ratings-derived only — generation has no era profile or projection model.
- */
 function qualityWeightsFromRatings(
   members: readonly { playerVersionId: string; detailedRatings: Record<string, number> }[],
 ): ReadonlyMap<string, number> {
@@ -2774,9 +2523,7 @@ function finalizeResult(
       if (!candidate) throw new Error(`missing candidate ${player.playerVersionId}`);
       return { playerVersionId: player.playerVersionId, playable: candidate.positions.playable };
     });
-    // Projection milestone: AI rotations are talent-ordered (mean detailed
-    // ratings; Overall is never a pick or rotation authority) so the
-    // strongest legal five starts and the bench hierarchy is talent-ranked.
+
     return buildMinimalRotation({
       franchiseId: roster.franchiseId,
       members,
@@ -2791,13 +2538,7 @@ function finalizeResult(
       },
     });
   });
-  // Projection milestone (minute-policy-v1): every rotation's target minutes
-  // come from the risk-adjusted minute-plan optimizer — quality weights from
-  // roster-relative mean detailed ratings, stamina/durability from the
-  // candidate profiles, zero current fatigue at initial generation, and the
-  // 10-game block horizon. Starters, bench order, and closing five stay
-  // byte-identical to the talent-ordered base; a malformed roster falls back
-  // to its base rotation without a minute-plan summary.
+
   const rotationByFranchise = new Map(
     rotations.map((rotation) => [rotation.franchiseId, rotation]),
   );
@@ -2933,13 +2674,6 @@ function finalizeResult(
   return seasonLeagueGenerationResultSchema.parse(result);
 }
 
-/**
- * Generates the remaining AI league atomically (roster-generation-v2).
- * Throws `SeasonAiTargetsError` on invalid targets before any allocation and
- * `SeasonAiGenerationError` on budget exhaustion with the failing phase,
- * failed teams, unmet constraints, repairs, nodes, and the last canonical
- * allocation state. Rules are never relaxed.
- */
 export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGenerationResult {
   validateSeasonRosterTargets(input.targets);
   const catalog = validateDraftCatalog(input.catalog);
@@ -2983,7 +2717,7 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     }
   }
   const humanOwned = new Set(input.humanRosters.flatMap((roster) => roster.playerVersionIds));
-  // Canonical non-human candidate population (playerVersionId ascending).
+
   const canonicalCandidates = [...catalog.candidates].sort((a, b) =>
     a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0,
   );
@@ -3126,17 +2860,9 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
   return generation;
 }
 
-/**
- * Engine-side extended calibration run (M2.4 pool-level facts). The base
- * fields and the `pools` array (the full `SeasonAiPool[]` of every league)
- * match the frozen `SeasonRosterCalibrationRun` contract; `superTeamIncidence`
- * and `poolFacts` are the per-run facts the calibration gates audit. The CLI
- * workstream reconciles this shape with the data-contracts schema.
- */
 export interface SeasonRosterCalibrationRunV2 extends SeasonRosterCalibrationRun {
-  /** Average/weaker franchises whose roster strength exceeds the contender median. */
   superTeamIncidence: string[];
-  /** Per-pool facts: anchor counts, extra-elite flags, and failure lists. */
+
   poolFacts: Array<{
     franchiseId: string;
     band: SeasonStrengthBand;
@@ -3148,10 +2874,6 @@ export interface SeasonRosterCalibrationRunV2 extends SeasonRosterCalibrationRun
   }>;
 }
 
-/**
- * Generates and evaluates a calibration cohort of complete leagues. Each
- * run is independent: no shared RNG stream, no order dependence.
- */
 export function runSeasonRosterCalibrationSeeds(input: {
   seeds: readonly Seed[];
   catalog: SeasonDraftCatalog;

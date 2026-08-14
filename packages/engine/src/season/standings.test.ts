@@ -8,12 +8,6 @@ import { buildSeasonLeague } from '@hoop-rush/test-fixtures';
 import { createRng } from '../sim/rng.ts';
 import { auditSeasonStandings, reduceSeasonStandings } from './standings.ts';
 
-/**
- * Season Run standings tests (spec/2.0/02): pure reduction from finalized
- * game facts, 2-0 forfeit handling, split and head-to-head reconciliation,
- * and auditor corruption detection.
- */
-
 const league = buildSeasonLeague();
 const teams = league.teams.map((team) => team.franchiseId);
 

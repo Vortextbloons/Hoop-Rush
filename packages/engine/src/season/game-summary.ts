@@ -12,22 +12,6 @@ import {
   type SeasonTeamBox,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Compact summary conversion (spec/2.0/02 retention policy, M2.3,
- * season-game-summary-v1). Every league game reduces to one compact summary
- * carrying the identity, result state, complete team boxes, and 20 compact
- * player lines; richer facts are retained only for human-team games through
- * `seasonRetainedDetailFromResult`. Player lines are canonically sorted by
- * playerVersionId so serialization is stable for digests.
- *
- * A forfeited game's official result is 2-0 with zero boxes and empty player
- * arrays; the forfeit loser is named. The `no-legal-five-both` outcome is a
- * typed invariant failure with no legal summary representation; the block
- * pipeline throws instead of fabricating a winner.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 function compactLineOf(
   player: {
     playerVersionId: string;
@@ -109,7 +93,6 @@ function sortedLines(lines: readonly SeasonCompactPlayerLine[]): SeasonCompactPl
   );
 }
 
-/** Zero team box used on forfeits (official 2-0 result, no statistics). */
 function zeroTeamBox(franchiseId: string): SeasonTeamBox {
   return {
     franchiseId,
@@ -131,13 +114,6 @@ function zeroTeamBox(franchiseId: string): SeasonTeamBox {
   };
 }
 
-/**
- * The actual opening lineup of one side: the five players on the court at
- * the first tipoff. The opening stint is the recorded period-1 stint with
- * the latest start clock (largest `startSecondsRemaining`); when the
- * simulation records no stints (defensive fallback), no player is a
- * starter. M2.6 awards facts.
- */
 function openingStartersOf(result: SeasonGameSimulationResult, side: 'home' | 'away'): Set<string> {
   if (result.outcome !== 'completed') return new Set();
   let opening: { startSecondsRemaining: number; players: readonly string[] } | null = null;
@@ -151,16 +127,6 @@ function openingStartersOf(result: SeasonGameSimulationResult, side: 'home' | 'a
   return new Set(opening.players);
 }
 
-/**
- * Converts one simulation result plus its schedule game into a compact
- * summary. The schedule game is the source of identity (gameId, round,
- * home/away franchise); the result's side boxes carry the franchise ids and
- * statistics. A forfeit becomes the official 2-0 with zero boxes and empty
- * player arrays. `no-legal-five-both` throws: it has no legal summary
- * representation and must never be fabricated into a winner. M2.5: the
- * optional `injuryEvents` (compact per-game injury facts) ride the summary;
- * a zero-injury game carries an empty array.
- */
 export function seasonGameSummaryFromResult(
   result: SeasonGameSimulationResult,
   game: SeasonScheduleGame,
@@ -190,10 +156,7 @@ export function seasonGameSummaryFromResult(
       awayBox: zeroTeamBox(game.awayFranchiseId),
       homePlayers: [],
       awayPlayers: [],
-      // M2.5: a forfeit-after-removal game's injury rolls are real facts
-      // (the removals happened mid-game before the forfeit); the compact
-      // events ride the summary so records and events stay 1:1. Tipoff
-      // forfeits roll nothing (no exposure), so they carry no events.
+
       injuryEvents: [...injuryEvents],
     };
   }
@@ -228,13 +191,6 @@ export function seasonGameSummaryFromResult(
   };
 }
 
-/**
- * Wraps the full simulation result as a retained detail row (human-team
- * games only). Reuses the complete M2.2 result contract, so substitutions,
- * unit stints, deviations, foul-outs, removals, shot-zone facts, and
- * diagnostics are preserved exactly where the product explains them. M2.5:
- * the compact injury-event rollup rides the detail for display.
- */
 export function seasonRetainedDetailFromResult(
   result: SeasonGameSimulationResult,
   game: SeasonScheduleGame,
@@ -257,11 +213,6 @@ export function seasonRetainedDetailFromResult(
   };
 }
 
-/**
- * Compact per-game effects rollup for game summaries: mechanism, side,
- * opportunity count, and the accumulated probability delta in integer
- * millionths (season-game-summary-v2 retention policy).
- */
 export function seasonEffectsRollupFromEvidence(
   evidence: readonly SeasonMechanismEvidence[],
 ): SeasonEffectsRollup[] {
@@ -279,15 +230,6 @@ export function seasonEffectsEvidenceOf(
   return transition.evidence;
 }
 
-/**
- * Audits one compact summary: for final games the team boxes equal the sum
- * of the player lines and the scores are consistent with the boxes; for
- * forfeits every non-zero field is flagged. M2.5: the compact injury events
- * are validated structurally — forfeits carry none; every event references a
- * rostered version of its side; one event per player per game; a returned
- * event always carries its return clock and a non-returned event never does.
- * Returns failure strings; empty means valid.
- */
 export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
   const failures: string[] = [];
   const sides = ['home', 'away'] as const;
@@ -365,7 +307,7 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
         );
       }
     }
-    // Box-level identities: makes never exceed attempts; points reconcile.
+
     const fgm = box.fieldGoalsMade;
     const fga = box.fieldGoalsAttempted;
     const tpm = box.threePointersMade;
@@ -396,10 +338,7 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
     if (summary.overtimePeriods !== 0) {
       failures.push('forfeit carries no overtime');
     }
-    // M2.5: a forfeit-after-removal game's compact injury events are real
-    // facts (uniqueness + return-clock consistency; side/membership checks
-    // need rosters the summary audit cannot see — the block audit covers
-    // them against the expanded set).
+
     const seenForfeit = new Set<string>();
     for (const event of summary.injuryEvents) {
       if (seenForfeit.has(event.playerVersionId)) {
@@ -424,7 +363,6 @@ export function auditSeasonGameSummary(summary: SeasonGameSummary): string[] {
     failures.push('final game cannot be tied');
   }
 
-  // M2.5 compact injury-event audit (final games only; forfeits carry none).
   {
     const rosteredOf = new Map<string, string>();
     for (const side of sides) {

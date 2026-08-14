@@ -30,20 +30,6 @@ import {
   seasonRotationSetDigestFixture,
 } from '../testing/season-run-fixture.ts';
 
-/**
- * M2.6 postseason-foundations repository contract extension tests
- * (spec/2.0/07 persistence): the append-only command log's dense-ordinal
- * chain and corruption surfacing, postseason summary corruption surfacing
- * and run-identity guards, the completed-season view assembly and deletion,
- * promotion integrity rejections and log-finalization behavior, replay
- * export determinism, and rollback on an injected failure at a DIFFERENT
- * write than the existing suite (the almanac write).
- *
- * Helpers mirror `season-postseason.test.ts` exactly; the extension suite
- * adds the adversarial and lifecycle requirements the core suite does not
- * cover.
- */
-
 const DIGEST_32 = '0'.repeat(32);
 
 interface Adapters {
@@ -67,7 +53,6 @@ async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
 }
 
-/** The engine-facing run after one advancement: stage play-in, revision + 1, recomputed digest. */
 function advancedRun(adapters: Adapters, stage: SeasonRun['stage']): SeasonRun {
   const next: SeasonRun = {
     ...adapters.run,
@@ -115,7 +100,6 @@ function stateDigestOf(adapters: Adapters, run: SeasonRun): string {
   });
 }
 
-/** A completed postseason state over the fixture league (validated shape). */
 function completedPostseasonOf(adapters: Adapters, champion: string) {
   const east = adapters.run.league.teams
     .filter((team) => team.conference === 'east')
@@ -203,7 +187,6 @@ function completedPostseasonOf(adapters: Adapters, champion: string) {
   };
 }
 
-/** The final engine-facing completed run over the fixture league. */
 function completedRunOf(adapters: Adapters, stateRevision: number): SeasonRun {
   const champion = adapters.run.rosters[0]?.franchiseId ?? 'lakers';
   const base: SeasonRun = {
@@ -221,7 +204,6 @@ function completedRunOf(adapters: Adapters, stateRevision: number): SeasonRun {
   return { ...base, stateDigest: stateDigestOf(adapters, base) };
 }
 
-/** A digest-reconciling almanac for the fixture run. */
 function buildAlmanac(
   run: SeasonRun,
   champion: string,
@@ -326,7 +308,6 @@ function basePostseasonSummary(adapters: Adapters): SeasonPostseasonSummary {
   };
 }
 
-/** The completion state of a final run (must be set). */
 function completionOf(finalRun: SeasonRun): NonNullable<SeasonRun['completion']> {
   const completion = finalRun.completion;
   if (completion === null) {
@@ -335,7 +316,6 @@ function completionOf(finalRun: SeasonRun): NonNullable<SeasonRun['completion']>
   return completion;
 }
 
-/** The final run with its completion almanac digest pointed at the promoted almanac. */
 function finalRunWithAlmanac(finalRun: SeasonRun, almanacDigest: string): SeasonRun {
   return { ...finalRun, completion: { ...completionOf(finalRun), almanacDigest } };
 }
@@ -359,7 +339,6 @@ function advancementInput(
   };
 }
 
-/** Advances the run N times with distinct commands, keeping `adapters.run` current. */
 async function advanceN(
   adapters: Adapters,
   count: number,
@@ -381,7 +360,6 @@ async function advanceN(
   }
 }
 
-/** Stores a few regular-season rows (summaries, one retained detail, one block) for the run. */
 async function storeRegularSeasonRows(adapters: Adapters): Promise<number> {
   const regularSummaries = buildFixtureSummaries({
     runId: adapters.run.runId,
@@ -447,14 +425,14 @@ describe('season postseason repository contract extension (M2.6)', () => {
     const entries = log?.entries ?? [];
     expect(entries).toHaveLength(3);
     expect(entries.map((entry) => entry.ordinal)).toEqual([0, 1, 2]);
-    // Each entry's previousLogDigest is the digest of exactly the prior entries.
+
     expect(entries[0]?.previousLogDigest).toBe(SEASON_EMPTY_COMMAND_LOG_DIGEST);
     for (let ordinal = 1; ordinal < entries.length; ordinal += 1) {
       expect(entries[ordinal]?.previousLogDigest).toBe(
         seasonCommandLogDigest(entries.slice(0, ordinal)),
       );
     }
-    // The full-log digest is a stable function of the entries across reloads.
+
     expect(seasonCommandLogDigest(entries)).toBe(
       seasonCommandLogDigest(
         (await adapters.repo.loadCommandLog(adapters.run.runId))?.entries ?? [],
@@ -468,8 +446,7 @@ describe('season postseason repository contract extension (M2.6)', () => {
     await advanceN(adapters, 3);
 
     const before = await adapters.repo.loadCommandLog(adapters.run.runId);
-    // Replay the first command id against the CURRENT run state: the stale-state
-    // guard passes, so the duplicate guard must reject without writing anything.
+
     const replay = commandOf(adapters.run, 'start-postseason', 'cmd-1');
     await expect(
       adapters.repo.commitPostseasonAdvancement(
@@ -494,8 +471,7 @@ describe('season postseason repository contract extension (M2.6)', () => {
 
     const row = await adapters.db.seasonCommandLog.get([adapters.run.runId, 0]);
     if (row === undefined) throw new Error('expected a command log row');
-    // Schema-valid row whose row-level ordinal no longer agrees with its entry
-    // facts (a row written directly, bypassing the interface).
+
     await adapters.db.seasonCommandLog.put({ ...row, ordinal: 5 });
 
     await expect(adapters.repo.loadCommandLog(adapters.run.runId)).rejects.toBeInstanceOf(
@@ -508,7 +484,6 @@ describe('season postseason repository contract extension (M2.6)', () => {
     await promote(adapters);
     await advanceN(adapters, 1);
 
-    // Row keyed by one gameId whose summary facts name a different game.
     const corrupted = { ...basePostseasonSummary(adapters), gameId: 'pi-east-nine-ten' };
     await adapters.db.seasonPostseasonSummaries.put({
       runId: adapters.run.runId,
@@ -563,8 +538,7 @@ describe('season postseason repository contract extension (M2.6)', () => {
 
     const completedSeason = await adapters.repo.loadCompletedSeason(adapters.run.runId);
     expect(completedSeason).not.toBeNull();
-    // The run view reassembles all 1,230 scheduled games from the schedule plus
-    // the stored regular-season summaries.
+
     expect(completedSeason?.run.games).toHaveLength(SEASON_GAME_COUNT);
     expect(completedSeason?.run.games.filter((game) => game.status === 'final')).toHaveLength(
       regularSummaryCount,
@@ -583,7 +557,7 @@ describe('season postseason repository contract extension (M2.6)', () => {
 
     await adapters.repo.deleteCompletedSeason(adapters.run.runId);
     expect(await adapters.repo.loadCompletedSeason(adapters.run.runId)).toBeNull();
-    // Every postseason row AND every regular-season row of the run is gone.
+
     expect(
       await adapters.db.seasonPostseasonSummaries.where('runId').equals(adapters.run.runId).count(),
     ).toBe(0);
@@ -613,7 +587,7 @@ describe('season postseason repository contract extension (M2.6)', () => {
     const log = await adapters.repo.loadCommandLog(adapters.run.runId);
     if (log === null) throw new Error('expected a command log');
     const almanac = buildAlmanac(adapters.run, champion, seasonCommandLogDigest(log.entries));
-    // The run's completion names a DIFFERENT almanac digest than the almanac.
+
     const foreignCompletion = {
       ...completionOf(finalRun),
       almanacDigest: 'f'.repeat(32),
@@ -643,8 +617,7 @@ describe('season postseason repository contract extension (M2.6)', () => {
     if (storedLog === null) throw new Error('expected a command log');
     const storedEntry = storedLog.entries[0];
     if (storedEntry === undefined) throw new Error('expected a log entry');
-    // A provided entry that collides with the stored ordinal-0 row but differs:
-    // the promotion bulkPuts the provided log, so the provided entry wins.
+
     const rewritten = {
       ...storedEntry,
       command: { ...storedEntry.command, commandId: 'cmd-rewritten-0' },
@@ -668,8 +641,6 @@ describe('season postseason repository contract extension (M2.6)', () => {
       postseasonSummaries: await adapters.repo.loadPostseasonSummaries(adapters.run.runId),
     });
 
-    // The stored rows were overwritten: the log now reads back as the provided
-    // entries, and the completed view reconciles against them.
     expect((await adapters.repo.loadCommandLog(adapters.run.runId))?.entries).toEqual([rewritten]);
     const completedSeason = await adapters.repo.loadCompletedSeason(adapters.run.runId);
     expect(completedSeason?.commandLog.entries).toEqual([rewritten]);
@@ -688,7 +659,7 @@ describe('season postseason repository contract extension (M2.6)', () => {
     expect(second).not.toBeNull();
     expect(JSON.stringify(first)).toBe(JSON.stringify(second));
     expect(first?.digest).toBe(second?.digest);
-    // The digest is a deterministic function of the export facts (self-excluded).
+
     expect(first?.digest).toBe(seasonReplayExportDigest(first as NonNullable<typeof first>));
     expect(first?.gameId).toBe('pi-east-seven-eight');
   });
@@ -700,8 +671,6 @@ describe('season postseason repository contract extension (M2.6)', () => {
     const before = await adapters.repo.buildReplayExport(adapters.run.runId, 'pi-east-seven-eight');
     expect(before).not.toBeNull();
 
-    // A second advancement overwrites the summary row for the same game with
-    // different facts; the export digest must change.
     const changed = { ...basePostseasonSummary(adapters), homeScore: 121, awayScore: 88 };
     await advanceN(adapters, 1, changed, 1);
     const after = await adapters.repo.buildReplayExport(adapters.run.runId, 'pi-east-seven-eight');
@@ -709,7 +678,7 @@ describe('season postseason repository contract extension (M2.6)', () => {
     expect(after?.summary.homeScore).toBe(121);
     expect(after?.digest).not.toBe(before?.digest);
     expect(after?.digest).toBe(seasonReplayExportDigest(after as NonNullable<typeof after>));
-    // A game of a different run does not exist in this run's store.
+
     expect(await adapters.repo.buildReplayExport('other-run', 'pi-east-seven-eight')).toBeNull();
   });
 });

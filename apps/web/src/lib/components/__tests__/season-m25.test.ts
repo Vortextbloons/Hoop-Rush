@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import type {
@@ -26,8 +24,7 @@ import { buildManifest } from '@hoop-rush/test-fixtures';
 
 vi.mock('@hoop-rush/engine', () => ({
   seasonObjectiveChoicesForBlock: () => ['win-six', 'defense-108', 'turnover-130'] as const,
-  // Mirrors the engine's fatigueBandOf (1500/3500/6000 thresholds); the
-  // season-effects-view re-exports it under `fatigueBand`.
+
   fatigueBandOf: (fatigueBasisPoints: number) => {
     if (fatigueBasisPoints < 1500) return 'fresh';
     if (fatigueBasisPoints < 3500) return 'ready';
@@ -37,14 +34,6 @@ vi.mock('@hoop-rush/engine', () => ({
 }));
 
 mockSvelteKitApp();
-
-/**
- * M2.5 season component tests: the checkpoint health strip, the roster
- * injury timeline, the objective picker, the trade-offers panel (accept /
- * decline with confirm dialogs), the Influence panel (spend confirm dialogs
- * + recorded outcomes), the interruption recovery panel (three paths +
- * resume), and the recap's health/evidence sections.
- */
 
 const PLAYER_A = 'pv-00000000000000000000000000000000';
 const PLAYER_B = 'pv-11111111111111111111111111111111';
@@ -237,7 +226,7 @@ describe('HealthStrip', () => {
     expect(text).toContain('back around R12');
     expect(text).toContain('Recurrence risk');
     expect(text).toContain('Available');
-    // Live-region summary announces the counts.
+
     expect(container.querySelector('[role="status"]')?.textContent).toContain(
       '1 player out, 1 returning from injury',
     );
@@ -441,7 +430,6 @@ describe('InterruptionPanel', () => {
     expect(text).toContain('3 · Forfeit the next game');
     expect(screen.getByRole('link', { name: /Open Rotation/ })).toBeTruthy();
 
-    // The forfeit path needs an explicit confirm dialog.
     await fireEvent.click(screen.getByRole('button', { name: /Forfeit game s000105/ }));
     expect(screen.getByRole('heading', { name: /Forfeit game s000105\?/ })).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Forfeit the game' }));

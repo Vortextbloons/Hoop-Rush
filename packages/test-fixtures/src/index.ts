@@ -25,12 +25,6 @@ import type {
   SummaryRatings,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Deterministic fixture builders. Every builder returns schema-valid records
- * so tests and CLI fixtures can rely on the contracts. Overrides are shallow
- * at each level; nested sections use named arguments.
- */
-
 export { seedFromString };
 
 const DEFAULT_SUMMARY_RATINGS: SummaryRatings = {
@@ -130,7 +124,7 @@ export function buildPlayerSeason(overrides: Partial<PeakPlayerSeason> = {}): Pe
       teamGames: 78,
       teamMinutes: 2700,
     },
-    // Reproducible from the packaged summary/usage/minutes: 91.517.
+
     selectionScore: 91.517,
     selectionScoreVersion: 'score-v1',
     stats: DEFAULT_PLAYER_STATS,
@@ -244,7 +238,6 @@ function buildModernFranchiseSlots(): ModernFranchiseSlot[] {
   return ALL_FRANCHISE_SLOTS.map((slot) => ({ ...slot }));
 }
 
-/** Default availability matrix: every slot x era unavailable (source-incomplete). */
 function unavailableMatrix(): HoopRushManifest['availability'] {
   const rows: HoopRushManifest['availability'] = [];
   for (const slot of ALL_FRANCHISE_SLOTS) {
@@ -515,11 +508,6 @@ function buildBracketOpponent(
   };
 }
 
-/**
- * A fixed no-repeat 82-game schedule for the 30 fixture opponents: the first
- * opponent (the opening opponent) plays game one, the first eight appear
- * twice, the remaining 22 three times.
- */
 function buildFixtureSchedule(opponentIds: readonly string[]): BracketScheduleEntry[] {
   if (opponentIds.length !== 30) {
     throw new Error(`fixture schedule needs 30 opponents (got ${String(opponentIds.length)})`);
@@ -567,14 +555,6 @@ export function buildFixtureBracket(overrides: Partial<OpponentBracket> = {}): O
   return bracket;
 }
 
-/**
- * M2 simulation fixtures. Defaults model a solid 1990s rotation player so
- * fixture lineups vary only along the dimensions tests care about. The
- * canonical rating/tendency literals live in `@hoop-rush/data-contracts`
- * (`SIMULATION_RATINGS` / `SIMULATION_TENDENCIES`); these derive from them
- * so the season-game fixtures and the sim fixtures cannot drift apart.
- */
-
 const DEFAULT_SIM_RATINGS: SimulationRatings = { ...SIMULATION_RATINGS };
 
 const DEFAULT_SIM_TENDENCIES = { ...SIMULATION_TENDENCIES };
@@ -620,13 +600,6 @@ export function buildLegalSimulationTeam(overrides: Partial<SimulationTeam> = {}
   };
 }
 
-/**
- * Role-differentiated lineup for player-role calibration (spec/06): one
- * primary creator, one floor spacer, one secondary creator, one post
- * presence, and one rim runner in legal G,G,F,F,C slot order. The engine
- * must measurably differentiate these roles (usage hierarchy, shot mix,
- * assist conversion, rebounding share).
- */
 export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): SimulationTeam {
   const players: SimulationPlayer[] = [
     buildSimulationPlayer({
@@ -737,14 +710,6 @@ export function buildRolesTeam(overrides: Partial<SimulationTeam> = {}): Simulat
   };
 }
 
-/**
- * Multi-position slot-permutation fixture (spec/06): the same five players
- * with overlapping position unions so several legal G,G,F,F,C orderings
- * exist. The engine's assigned-slot responsibility modifiers must shift
- * responsibility by player ID across permutations while leaving team-level
- * outcomes inside a small band. Unions are sorted/deduplicated per the
- * position-union contract.
- */
 export function buildSlotPermutationPlayers(): SimulationPlayer[] {
   return [
     buildSimulationPlayer({
@@ -846,12 +811,6 @@ export function buildSlotPermutationPlayers(): SimulationPlayer[] {
   ];
 }
 
-/**
- * Legal slot orderings of the five slot-permutation players. Every ordering
- * satisfies the G,G,F,F,C structure (each player's union covers their slot
- * group): creator can play any slot, shooter any guard/forward slot, wing any
- * guard/forward slot, and the two bigs either forward or center.
- */
 export function buildSlotPermutationTeams(): SimulationTeam[] {
   const players = buildSlotPermutationPlayers();
   const orders: number[][] = [
@@ -875,7 +834,6 @@ export function buildSlotPermutationTeams(): SimulationTeam[] {
   }));
 }
 
-/** Strength bands: strong ~85 across the board, medium ~65, weak ~48. */
 function fixtureScale(targetCenter: number) {
   return (_element: unknown, index: number): SimulationPlayer => {
     const base = buildSimulationPlayer({
@@ -897,7 +855,6 @@ function fixtureScale(targetCenter: number) {
   };
 }
 
-/** Equal-lineup fixture: both sides identical (determinism, mirror, and close-game tests). */
 export function buildEqualFixture(): { home: SimulationTeam; away: SimulationTeam } {
   return {
     home: buildLegalSimulationTeam({ teamId: 'fixture-a', displayName: 'Fixture A' }),
@@ -976,9 +933,7 @@ function fixtureTargets(): EraSimulationProfile['targets'] {
     overtimeRate: t(0.06, 0.02, 1000),
     strongVsWeakWinRate: t(0.85, 0.08, 1000),
     equalLineupHomeWinRate: t(0.5, 0.05, 1000),
-    // Player-role gates on the `roles` fixture (measured with the m3
-    // engine at build time; regenerated through `calibrate run`). Keys use
-    // slot indices: 0 creator, 1 spacer, 2 secondary, 3 post, 4 rim.
+
     playerRoles: [
       { key: 'usageShare.0', target: t(0.27, 0.035, 200) },
       { key: 'usageShare.1', target: t(0.173, 0.035, 200) },
@@ -1063,7 +1018,6 @@ export function buildGameSimulationInput(
   };
 }
 
-/** The authored M2 opening opponent: 1990s Lakers at medium strength. */
 export function buildOpeningOpponent(overrides: Partial<OpponentTeam> = {}): OpponentTeam {
   return {
     schemaVersion: 2,

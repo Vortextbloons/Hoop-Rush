@@ -14,49 +14,32 @@ import type {
   ProjectionWorkerResponse,
 } from './season-projection-wire';
 
-/**
- * Season Run projection runner (projection milestone): the main-thread
- * client for the projection worker. Long roster autofill searches and the
- * minute-plan optimizer run off-thread; the runner resolves the hashed
- * asset references, keeps one worker per runner for the session (asset
- * fetches and parses are cached inside the worker), and resolves the
- * authoritative engine result by requestId. The `workerUrl` override is the
- * test seam (mirror of the season block runner).
- */
-
 export interface ProjectionRunnerDeps {
   workerUrl?: string;
 }
 
 export interface ProjectionRosterBuildInput {
-  /** Already-selected playerVersionIds (preserved verbatim). */
   locked: readonly string[];
-  /** Selectable playerVersionIds (owned versions, excluding locked). */
+
   available: readonly string[];
   seed: string;
   lens?: SearchLens;
 }
 
 export interface ProjectionRotationOptimizeInput {
-  /** Exactly the ten rostered playerVersionIds (the current ten). */
   roster: readonly string[];
-  /** The current editor rotation (franchiseId/starters/benchOrder/closingFive). */
+
   structure: SeasonRotation;
-  /** Ten load rows, one per rostered playerVersionId. */
+
   load: readonly ProjectionRotationLoadRow[];
-  /** Upcoming-block horizon in team games (engine-clamped). */
+
   horizon: number;
   seed: string;
 }
 
 export interface ProjectionRunner {
-  /** Builds (or completes) a ten-player roster through the projection
-   * ranking policy. Rejects with a typed error when the projection model
-   * artifact is unavailable or the worker fails. */
   buildRoster(input: ProjectionRosterBuildInput): Promise<HumanRosterBuildResult>;
-  /** Optimizes the current rotation's target minutes under the three minute
-   * policies. Rejects with a typed error when the projection model artifact
-   * is unavailable or the worker fails. */
+
   optimizeRotation(input: ProjectionRotationOptimizeInput): Promise<MinutePlanOptimizationResult>;
 }
 
@@ -92,9 +75,7 @@ export function createProjectionRunner(deps: ProjectionRunnerDeps = {}): Project
       if (urls.modelUrl === undefined || urls.modelHash === undefined) {
         throw missingModelError();
       }
-      // The wire is type-only; the structure arrives from the shell's `$state`
-      // rotation editor — a Svelte 5 reactive proxy `postMessage` cannot clone.
-      // Rebuild from validated plain objects so the worker never sees a proxy.
+
       const request: ProjectionRotationOptimizeRequest = {
         type: 'optimize-rotation',
         requestId: newSeasonId('proj'),
@@ -127,13 +108,6 @@ function missingModelError(): Error {
   );
 }
 
-/**
- * One long-lived worker per runner: assets are fetched and hash-verified
- * once inside the worker, so repeated strategy clicks and autofill runs
- * skip the multi-megabyte catalog download/parse. Requests resolve by
- * requestId; a worker error rejects every in-flight request and resets the
- * worker so the next request starts fresh.
- */
 class ProjectionWorkerClient {
   private worker: Worker | null = null;
   private pending = new Map<
@@ -156,9 +130,7 @@ class ProjectionWorkerClient {
 
   private ensureWorker(): Worker {
     if (this.worker !== null) return this.worker;
-    // Vite bundles a worker only when `new URL(..., import.meta.url)` appears
-    // literally in `new Worker`; an indirection copies the .ts as a public
-    // asset that GitHub Pages serves as video/mp2t, which browsers reject.
+
     const worker =
       this.deps.workerUrl !== undefined
         ? new Worker(this.deps.workerUrl, { type: 'module' })

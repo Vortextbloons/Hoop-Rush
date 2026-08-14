@@ -1,13 +1,6 @@
 import type { ExplanationFact, GameResult, TeamResult } from '@hoop-rush/data-contracts';
 import { usageOf } from './recorder.ts';
 
-/**
- * Structured evidence for decisive margins (spec/01 feedback, spec/03 outputs).
- * Every fact is derived from the recorded box-score stream with a documented
- * threshold; the UI owns human-readable wording. Facts describe the winning
- * side unless a kind is intrinsically about the game (overtime).
- */
-
 export const FACT_THRESHOLDS = {
   turnoverMargin: 2,
   shotEfficiencyEfgDiff: 0.02,
@@ -99,9 +92,6 @@ export function buildFacts(result: GameResult): ExplanationFact[] {
     });
   }
 
-  // Usage: the winner's most-usage player. Usage is the recorded diagnostic
-  // FGA + 0.44*FTA + TOV (invariant-checked in invariants.ts), never scoring
-  // share; the fallback re-derives it for legacy records without diagnostics.
   function playerUsage(player: TeamResult['players'][number]): number {
     if (player.diagnostics) return player.diagnostics.usage;
     return usageOf(player.fieldGoals.attempted, player.freeThrows.attempted, player.turnovers);

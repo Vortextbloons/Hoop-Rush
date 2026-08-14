@@ -11,22 +11,6 @@ import {
   type SeasonTeamAggregate,
 } from '@hoop-rush/data-contracts';
 
-/**
- * League aggregates, leaders, and provisional ordering (spec/2.0/02, M2.3,
- * season-aggregates-v1). Every aggregate value is a pure fold over compact
- * completed-game summaries, so a fresh fold always agrees with the stored
- * checkpoint and an audit can reconcile exactly. Standings wins/losses/points
- * come from the official game records (a forfeit counts 2-0); box-derived
- * aggregate fields sum the player stat lines, which are zero for forfeits.
- *
- * `provisionalStandingOrder` is explicitly NOT the M2.6 postseason tiebreak:
- * it orders by wins, then point differential, then franchise id so recaps and
- * movement tables have a stable display position before the authoritative NBA
- * tiebreak sequence ships.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 const ZERO_TEAM: Omit<SeasonTeamAggregate, 'franchiseId' | 'gamesPlayed' | 'wins' | 'losses'> = {
   points: 0,
   fieldGoalsMade: 0,
@@ -66,7 +50,6 @@ const ZERO_PLAYER: Omit<SeasonPlayerAggregate, 'playerVersionId' | 'franchiseId'
   fouls: 0,
 };
 
-/** Winner franchise of a completed summary (scores are never tied). */
 function winnerOf(summary: SeasonGameSummary): string {
   if (summary.status === 'forfeit') {
     const loser = summary.forfeitLoserFranchiseId;
@@ -78,12 +61,6 @@ function winnerOf(summary: SeasonGameSummary): string {
   return summary.homeScore > summary.awayScore ? summary.homeFranchiseId : summary.awayFranchiseId;
 }
 
-/**
- * Folds one franchise's team aggregate over completed summaries: wins and
- * losses from the official result (a forfeit winner is the non-loser), and
- * every box field summed. Returns one row per franchise sorted by
- * franchiseId ascending.
- */
 export function foldSeasonTeamAggregates(
   summaries: readonly SeasonGameSummary[],
 ): SeasonTeamAggregate[] {
@@ -120,18 +97,6 @@ export function foldSeasonTeamAggregates(
   return [...rows.values()].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
 }
 
-/**
- * Folds one player aggregate per drafted player-version over completed
- * summaries. The owning franchise is the franchise of the player's FIRST
- * completed game in the summaries (M2.5: a traded player legitimately plays
- * for two franchises across the season; the season aggregate row stays
- * keyed by playerVersionId and keeps the first franchise it recorded —
- * deterministic and stable across block folds, since summaries always
- * arrive in stable game order). Per-game exclusivity still holds
- * (`checkSeasonGameResult` never sees a version on both sides of one game).
- * Returns rows sorted by playerVersionId ascending; forfeits contribute
- * nothing.
- */
 export function foldSeasonPlayerAggregates(
   summaries: readonly SeasonGameSummary[],
 ): SeasonPlayerAggregate[] {
@@ -177,14 +142,6 @@ export function foldSeasonPlayerAggregates(
   );
 }
 
-/**
- * Reconciles stored aggregate tables and standings against the completed
- * summaries: every aggregate field must equal a fresh fold, standings
- * wins/losses/gamesPlayed must match the summary-derived records, and
- * pointsFor/pointsAgainst must match box points on every non-forfeit game
- * (forfeits count the official 2-0). Returns failure strings; empty means
- * valid.
- */
 export function auditSeasonAggregates(input: {
   teams: readonly SeasonTeamAggregate[];
   players: readonly SeasonPlayerAggregate[];
@@ -381,12 +338,6 @@ function categoryValue(player: SeasonPlayerAggregate, category: SeasonLeaderCate
   }
 }
 
-/**
- * Derives the per-category leader tables. A player-version qualifies with at
- * least 0.7 * the owning team's games played; tables are depth 5 with the
- * frozen tie-break: higher per-game rate, then higher total, then
- * playerVersionId ascending.
- */
 export function deriveSeasonLeaders(
   teams: readonly SeasonTeamAggregate[],
   players: readonly SeasonPlayerAggregate[],
@@ -433,13 +384,6 @@ export function deriveSeasonLeaders(
   };
 }
 
-/**
- * Provisional display ordering (recaps and movement tables only): wins
- * descending, then point differential descending, then franchise id
- * ascending. This is NOT the M2.6 authoritative postseason tiebreak; it is a
- * stable, explainable position for provisional presentation until the
- * published NBA tiebreak sequence ships.
- */
 export function provisionalStandingOrder(standings: SeasonStandings): string[] {
   return [...standings.rows]
     .sort(

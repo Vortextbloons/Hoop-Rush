@@ -6,13 +6,6 @@
     strongestAndWeakestPairs,
   } from '$lib/season/season-effects-view';
 
-  /**
-   * Season Run unit-chemistry panel (M2.4): the active-lineup chemistry
-   * derived from the recorded pair states, plus the strongest and weakest
-   * shared-play pairs of the ten-player roster. Shared possessions are
-   * recorded evidence from completed trips, never a prediction.
-   */
-
   let {
     roster,
     effects,

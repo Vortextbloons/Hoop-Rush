@@ -29,15 +29,6 @@
   import StandingsTable from '$lib/components/season/StandingsTable.svelte';
   import TiebreakExplanations from '$lib/components/season/TiebreakExplanations.svelte';
 
-  /**
-   * Completed-season result (M2.6, /season/run/history?runId=...): the
-   * champion, final bracket, final standings with tiebreak explanations,
-   * postseason results, awards, block recaps, injuries, transactions, the
-   * per-game replay export affordance, and explicit deletion. Every fact
-   * comes from the validated completed-season view; nothing is re-derived
-   * outside the engine's ranking/awards helpers.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   let {
@@ -97,7 +88,6 @@
   );
 
   const rosterByVersion = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, { displayName: string; franchiseId: string }>();
     for (const roster of run?.rosters ?? []) {
       for (const entry of roster.players) {
@@ -164,10 +154,6 @@
     ),
   );
 
-  // -------------------------------------------------------------------------
-  // Export affordance: one self-contained replay export per postseason game.
-  // -------------------------------------------------------------------------
-
   let exportingGameId = $state<string | null>(null);
   let exportError = $state<string | null>(null);
 
@@ -197,10 +183,6 @@
       exportingGameId = null;
     }
   }
-
-  // -------------------------------------------------------------------------
-  // Deletion: explicit confirm, then back to the history list.
-  // -------------------------------------------------------------------------
 
   let deleteOpen = $state(false);
   let deleting = $state(false);

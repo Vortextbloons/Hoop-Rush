@@ -3,12 +3,6 @@
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import SeasonTeamLogo from '$lib/components/season/SeasonTeamLogo.svelte';
 
-  /**
-   * Season Run masthead (M2.3.5): the human franchise's modern identity,
-   * record, and provisional conference position. Rendered by the run shell
-   * layout above the tab rail; pages must not re-render it.
-   */
-
   let {
     manifest,
     franchiseId,

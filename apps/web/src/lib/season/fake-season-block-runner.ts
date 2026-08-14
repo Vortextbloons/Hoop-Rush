@@ -62,29 +62,6 @@ import type {
 import { getSeasonRunRepository } from '$lib/season/season-repo';
 import { gamesToLockForBlock } from '$lib/season/season-lock-preview';
 
-/**
- * TEST-ONLY deterministic fake `SeasonBlockRunner` (e2e seam). The lead's
- * real runner is not required for e2e journeys: this fake simulates a block
- * through the frozen runner interface, streams progress events, and commits
- * the accepted checkpoint through the repository using the AUTHORITATIVE
- * engine seam folds (`seasonRunEngineSeam`), so reload validation and the
- * reconciliation audit pass exactly like a real checkpoint.
- *
- * Activation: the e2e spec sets `window.__HOOP_RUSH_E2E_FAKE_RUNNER__` before
- * navigation; `getSeasonBlockRunner()` then returns this fake. The fake is
- * never used in production.
- *
- * M2.5: the fake writes deterministic health (one active injury + one
- * returned injury with an open recurrence window for the human team),
- * Influence (initial +2 grant and +1 per accepted block for all 30
- * franchises), and grant transactions into every committed checkpoint, so
- * the health strip and the Influence panel render recorded facts. A window
- * flag (`__HOOP_RUSH_E2E_INTERRUPT_ONCE__`) makes the next `startBlock` emit
- * one typed `invalid-roster` interruption with a persisted pending
- * candidate; `resumeBlock` loads the pending candidate, simulates the
- * remaining games, and commits the full block atomically.
- */
-
 const PROGRESS_STEP_MS = 40;
 const GAMES_PER_STEP = 15;
 
@@ -96,7 +73,6 @@ function deterministicPoints(gameId: string, base: number): number {
   return base + (hash % 41);
 }
 
-/** Deterministic non-tied scores (the engine rejects tied finals). */
 function deterministicScores(gameId: string): { homeScore: number; awayScore: number } {
   const homeScore = deterministicPoints(gameId, 100);
   const awayScore = deterministicPoints(`${gameId}x`, 95);
@@ -126,7 +102,6 @@ function emptyLine(playerVersionId: string): SeasonCompactPlayerLine {
   };
 }
 
-/** M2.6.5: the schema-2 zero effects state (no inactive depth, no archives). */
 function emptyEffectsState(): SeasonEffectsState {
   return {
     schemaVersion: 2,
@@ -137,11 +112,6 @@ function emptyEffectsState(): SeasonEffectsState {
   };
 }
 
-/**
- * M2.6.5: the block recap's free-agency evidence (mirror of the engine's
- * `blockFreeAgencyEvidenceOf`): the window resolved by this block, its
- * signings, and the human franchise's season signing/spend counts.
- */
 function freeAgencyEvidenceOf(input: {
   blockIndex: number;
   humanFranchiseId: string | null;
@@ -170,15 +140,12 @@ function freeAgencyEvidenceOf(input: {
 
 declare global {
   interface Window {
-    /** e2e: when true, the fake stalls the first startBlock until cancelled. */
     __HOOP_RUSH_E2E_STALL_ONCE__?: boolean;
-    /** e2e: when true, the next startBlock emits one typed interruption. */
+
     __HOOP_RUSH_E2E_INTERRUPT_ONCE__?: boolean;
   }
 }
 
-/** M2.5 commit extras for the fake (the full commit input is typed against
- * the landed `CommitSeasonBlockInput`; these are the engine-derived facts). */
 interface FakeM25CommitInput {
   health: SeasonHealthState;
   transactions: SeasonTransactionEntry[];
@@ -196,7 +163,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   private cancelled = false;
   private currentBlockIndex: number | null = null;
   private stallingRequestId: string | null = null;
-  /** The last submitted start input (resume re-uses its identity facts). */
+
   private lastStartInput: SeasonBlockStartInput | null = null;
 
   startBlock(input: SeasonBlockStartInput): string {
@@ -206,8 +173,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     this.lastStartInput = input;
     this.emit({ type: 'started', requestId, blockIndex: input.blockIndex });
 
-    // e2e cancel/retry seam: the first startBlock stalls between games until
-    // cancelled; the retry then runs to completion.
     if (typeof window !== 'undefined' && window.__HOOP_RUSH_E2E_STALL_ONCE__) {
       window.__HOOP_RUSH_E2E_STALL_ONCE__ = false;
       this.stallingRequestId = requestId;
@@ -223,8 +188,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       return requestId;
     }
 
-    // e2e interruption seam: the next startBlock stops before any game with
-    // one typed invalid-roster interruption (persisted pending candidate).
     if (typeof window !== 'undefined' && window.__HOOP_RUSH_E2E_INTERRUPT_ONCE__) {
       window.__HOOP_RUSH_E2E_INTERRUPT_ONCE__ = false;
       void this.interrupt(requestId, input);
@@ -277,12 +240,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     return requestId;
   }
 
-  /**
-   * M2.5 frozen runner extension: resumes an interrupted block from its
-   * persisted pending candidate, simulates the remaining games, and commits
-   * the full block atomically (the commit deletes the pending row).
-   * Returns the request id for cancel/terminate routing.
-   */
   resumeBlock(input: SeasonBlockResumeInput): string {
     const requestId = `fake-resume-${input.commandId}`;
     if (this.cancelled) return requestId;
@@ -416,7 +373,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     return this.cancelled;
   }
 
-  /** M2.5: emits one typed interruption and persists the pending candidate. */
   private async interrupt(requestId: string, input: SeasonBlockStartInput): Promise<void> {
     const pending = await this.buildPending(input);
     const repo = await getSeasonRunRepository();
@@ -591,10 +547,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       window: SeasonWindowOpenResult | null;
       freeAgency: SeasonFreeAgencyState;
     } | null = null;
-    // The prior accepted state is read BEFORE the commit: the committed
-    // snapshot must fold the pre-commit facts, or the just-committed block
-    // would be counted twice (duplicate accepted-block rows and doubled
-    // summaries in the emitted snapshot).
+
     const prior = await loadCurrentSnapshot(this.scheduleOf(input)).catch(() => null);
     try {
       const freeAgencyAssets = await this.freeAgencyAssetsOf(input);
@@ -622,20 +575,11 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       });
       return;
     }
-    // `committed` is non-null here: the try above either assigned it or
-    // returned on error/cancel. The type-level narrowing is lost across the
-    // catch, so the null guard stays.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (this.isCancelled() || committed === null) return;
+    if (this.isCancelled()) return;
     const snapshot = this.committedSnapshot(input, checkpoint, input.commandId, committed, prior);
     this.emit({ type: 'complete', requestId, checkpoint, snapshot });
   }
 
-  /**
-   * Performance pass: the authoritative post-commit snapshot the real runner
-   * also emits (mirror of `assembleCommittedSnapshot` over the fake's own
-   * committed facts), so the hub renders immediately after the commit.
-   */
   private committedSnapshot(
     input: SeasonBlockStartInput,
     checkpoint: SeasonCandidateCheckpoint,
@@ -669,10 +613,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     });
   }
 
-  /**
-   * M2.6.5: the packaged free-agency index + roster-targets policy for
-   * window blocks (2/4/6); other blocks never need the ~4 MB asset.
-   */
   private async freeAgencyAssetsOf(
     input: SeasonBlockStartInput,
   ): Promise<
@@ -792,9 +732,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       effects,
       health,
       influence: this.fakeInfluenceFor(input, input.blockIndex),
-      // M2.6.5: the carried pre-block free-agency state (the commit side
-      // opens market windows on top of it; the fake mirrors the real
-      // runner's authoritative carrier).
+
       freeAgency: input.run.freeAgency,
       transactions: this.fakeTransactionsFor(input.blockIndex),
       objective: {
@@ -825,7 +763,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     };
   }
 
-  /** Commits the checkpoint with the M2.5 run-state facts (one transaction). */
   private async commitCheckpoint(
     input: SeasonBlockStartInput,
     commandId: string,
@@ -863,14 +800,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     });
   }
 
-  /**
-   * M2.5: the engine derives the post-block run state chain from the
-   * candidate and the LOCKED rotation set (mirror of the real runner, which
-   * commits the locked rotations — the human team's pending edit included —
-   * so the state digest must cover exactly that set or the reload audit
-   * reports a divergence). M2.6.5: the packaged free-agency index + targets
-   * travel only for window blocks (2/4/6).
-   */
   private committedFacts(
     input: SeasonBlockStartInput,
     checkpoint: SeasonCandidateCheckpoint,
@@ -898,8 +827,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     });
   }
 
-  /** Deterministic M2.5 health: one active injury + one returned injury for
-   * the human team (the health strip renders both states). */
   private fakeHealthFor(input: SeasonBlockStartInput): SeasonHealthState {
     const humanRoster =
       input.run.rosters.find((roster) => roster.franchiseId === input.humanFranchiseId)?.players ??
@@ -951,7 +878,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     };
   }
 
-  /** M2.5 interruption health: all five rotation starters unavailable. */
   private interruptionHealthFor(input: SeasonBlockStartInput): SeasonHealthState {
     const humanRoster =
       input.run.rosters.find((roster) => roster.franchiseId === input.humanFranchiseId)?.players ??
@@ -985,7 +911,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     };
   }
 
-  /** Deterministic M2.5 Influence: +2 initial and +1 per accepted block. */
   private fakeInfluenceFor(input: SeasonBlockStartInput, blockIndex: number): SeasonInfluenceState {
     const franchiseIds = input.run.league.teams.map((team) => team.franchiseId);
     const balance = 2 + blockIndex + 1;
@@ -1026,7 +951,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     };
   }
 
-  /** Deterministic grant transactions for the accepted blocks 0..blockIndex. */
   private fakeTransactionsFor(blockIndex: number): SeasonTransactionEntry[] {
     const transactions: SeasonTransactionEntry[] = [];
     for (let block = 0; block <= blockIndex; block += 1) {
@@ -1069,7 +993,6 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
   }
 }
 
-/** The validated snapshot of the accepted state (schedule-aware loader). */
 async function loadCurrentSnapshot(schedule: unknown): Promise<SeasonRunSnapshot | null> {
   const { loadActiveRunWithSchedule } = (await import('@hoop-rush/persistence')) as unknown as {
     loadActiveRunWithSchedule?: (schedule: unknown) => Promise<SeasonRunSnapshot | null>;

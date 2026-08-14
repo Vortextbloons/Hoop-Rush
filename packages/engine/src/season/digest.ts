@@ -8,15 +8,6 @@ import {
   type SeasonRotation,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Canonical Season Run generation digests (spec/2.0/07, M2.1, M2.4). The
- * digest is a pure function of the result's recorded facts: rosters,
- * ownership rows, rotations, AI assignments, the private pools, the targets
- * artifact version, and the generation diagnostics. Every serialization step
- * sorts canonically so call order, worker counts, and unrelated draws can
- * never change the digest.
- */
-
 export interface SeasonGenerationDigestInput {
   seed: string;
   aiVersion: string;
@@ -95,7 +86,6 @@ function aiPoolsCanonical(pools: readonly SeasonAiPool[]): unknown[] {
     }));
 }
 
-/** Canonical digest of a league generation result. */
 export function seasonGenerationDigest(input: SeasonGenerationDigestInput): string {
   const canonical = JSON.stringify({
     seed: input.seed,

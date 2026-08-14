@@ -16,7 +16,6 @@ afterAll(() => {
   for (const root of tempRoots) rmSync(root, { recursive: true, force: true });
 });
 
-/** A synthetic `calibrate run --format json` report payload embedded in log text. */
 function buildReport(overrides: Record<string, unknown> = {}): string {
   const payload = {
     command: 'calibrate run',
@@ -115,11 +114,11 @@ describe('freezeTargets', () => {
       tolerance: 5,
       minimumSample: 200,
     });
-    // Nested dot-path target (zoneMix.rim).
+
     expect(profile.targets['zoneMix']).toEqual({
       rim: { value: 0.4625, tolerance: 0.02, minimumSample: 200 },
     });
-    // Distribution gates keep their larger documented minimum sample.
+
     expect(profile.targets['closeGameRate']).toEqual({
       value: 0.2847,
       tolerance: 0.04,

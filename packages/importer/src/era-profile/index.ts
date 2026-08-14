@@ -1,9 +1,3 @@
-/**
- * Build-time derivation of era simulation profiles (port of the
- * `main`/`--era` flow from scripts/import-nba/compute_era_sim_profile.py).
- *
- * Output: `apps/web/static/data/era-sim/<era>.json` (EraSimulationProfile).
- */
 import { parseEraSimulationProfile } from '@hoop-rush/data-contracts';
 import { join } from 'node:path';
 import { ensureDir, writeJsonRetry } from '../json.ts';
@@ -36,9 +30,7 @@ export function run(eras?: readonly string[]): void {
   ensureDir(ERA_SIM_DIR);
   for (const era of selected) {
     const profile = computeEraProfile(era);
-    // Validate the finished profile against the packaged schema before
-    // writing; a schema failure aborts the build instead of shipping a
-    // corrupt artifact.
+
     parseEraSimulationProfile(profile);
     const out = join(ERA_SIM_DIR, `${era.eraId}.json`);
     writeJsonRetry(out, profile, true);

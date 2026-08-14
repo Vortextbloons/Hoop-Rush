@@ -93,9 +93,7 @@ describe('M2.4 season effects view', () => {
     const heavy = projectedFatigueBand(0, 48, 80, 10);
     const bands = ['fresh', 'ready', 'tired', 'heavy'] as const;
     expect(bands.indexOf(heavy)).toBeGreaterThanOrEqual(bands.indexOf(light));
-    // A heavy-current-load player stays elevated after one game and declines
-    // toward the workload plateau over a long horizon (the projection's
-    // minutes-only accumulation is conservative vs recorded role bonuses).
+
     expect(bands.indexOf(projectedFatigueBand(10_000, 48, 45, 1))).toBeGreaterThanOrEqual(
       bands.indexOf('tired'),
     );

@@ -9,19 +9,6 @@ import {
   type SeasonRoster,
 } from '@hoop-rush/data-contracts';
 
-/**
- * M2.5 health presentation (season-health-v1). Pure derivations of display
- * facts from the recorded health state and game summaries: availability
- * status per player, recovery estimates from the remaining-games countdown
- * and the committed schedule, recurrence windows, the compact checkpoint
- * health strip rows, and the per-player injury timeline for the roster tab.
- *
- * Availability mirrors the frozen engine derivation ("unavailable at a
- * game's tipoff iff they have an active injury that is not same-game-returned
- * and has missed games remaining"); the engine stays the authority, this
- * module only renders recorded facts.
- */
-
 export type InjuryStatus = 'active' | 'returned' | 'none';
 
 export function activeInjuriesOf(
@@ -44,22 +31,14 @@ export function injuryStatusOf(health: SeasonHealthState, playerVersionId: strin
 }
 
 export interface RecoveryEstimate {
-  /** Team games still missed at the last recorded boundary. */
   remainingGames: number;
-  /** Earliest round the player can be back (round of the remaining-th future team game). */
+
   returnRoundMin: number | null;
-  /** Latest round the player can be back (same cadence: per team game). */
+
   returnRoundMax: number | null;
   seasonEnding: boolean;
 }
 
-/**
- * Recovery estimate for one injury record. `futureTeamGames` is the player's
- * franchise games strictly after the occurrence game, round-ascending; the
- * recovery cadence is one countdown per team game, so the return round is the
- * round of the `remainingGames`-th future team game (exact when the schedule
- * is known; min == max).
- */
 export function recoveryEstimate(
   record: SeasonInjuryRecord,
   futureTeamGames: readonly { gameId: string; round: number }[],
@@ -80,7 +59,6 @@ export function recoveryEstimate(
   };
 }
 
-/** Recurrence flag: the +40 bp recurrence window is open after an actual return. */
 export function recurrenceOf(record: SeasonInjuryRecord): boolean {
   return record.recurrenceWindowRoundsRemaining > 0;
 }
@@ -89,18 +67,13 @@ export interface AvailabilityStripRow {
   playerVersionId: string;
   displayName: string;
   status: InjuryStatus;
-  /** Return round range of the active injury (null when unknown or none). */
+
   returnRange: { min: number | null; max: number | null } | null;
   recurrence: boolean;
-  /** The next human game where the player is out, when the player is out. */
+
   nextGameConsequence: string | null;
 }
 
-/**
- * Compact per-player availability rows for the checkpoint health strip.
- * `franchiseGames` (the player's franchise games, any order) enables the
- * return-round estimate; `names` overrides roster display names.
- */
 export function availabilityStripRows(
   health: SeasonHealthState,
   roster: SeasonRoster,
@@ -179,7 +152,7 @@ export interface InjuryTimelineEntry {
   gameId: string;
   type: SeasonInjuryType;
   severity: SeasonInjurySeverity;
-  /** Natural occurrence or a failed risky rehab (+1 rehabModifier). */
+
   source: 'natural' | 'risky-rehab-failure';
   seasonEnding: boolean;
   sameGameReturn: boolean;
@@ -198,11 +171,6 @@ export interface InjuryTimelinePlayer {
   entries: InjuryTimelineEntry[];
 }
 
-/**
- * Per-player injury history for the roster tab: the run-scoped health
- * records of the franchise's players, enriched with the compact in-game
- * facts (removal/return clocks) from the accepted game summaries.
- */
 export function humanInjuryTimeline(
   health: SeasonHealthState,
   roster: SeasonRoster,
@@ -264,7 +232,6 @@ export const INJURY_TYPE_LABEL: Record<SeasonInjuryType, string> = {
   illness: 'Illness',
 };
 
-/** Severity band labels + badge classes (mirror of FATIGUE_BAND_LABEL/BADGE). */
 export const INJURY_SEVERITY_LABEL: Record<SeasonInjurySeverity, string> = {
   minor: 'Minor',
   moderate: 'Moderate',

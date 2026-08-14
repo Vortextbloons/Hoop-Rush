@@ -17,14 +17,6 @@ import {
   SEASON_INJURY_RISK_MIN_BP,
 } from './injuries.ts';
 
-/**
- * M2.5 injury model tests (frozen contract §5): the risk formula and
- * clamps, severity/recovery sanity, named-seed reproducibility, the
- * same-game-return gate, the season-ending sentinel, risky-rehab rolls and
- * application, and the recurrence-window arithmetic. All rolls are
- * deterministic, so the statistical gates never flake.
- */
-
 function healthWith(injuries: SeasonInjuryRecord[]): SeasonHealthState {
   return {
     schemaVersion: 1,
@@ -33,7 +25,6 @@ function healthWith(injuries: SeasonInjuryRecord[]): SeasonHealthState {
   };
 }
 
-/** A fully rolled record from a deterministic player-game exposure. */
 function rollAt(
   rootSeed: string,
   gameId: string,
@@ -54,7 +45,6 @@ function rollAt(
   });
 }
 
-/** A forced-occurrence input: every risk term at its maximum (194 bp). */
 function forcedRoll(rootSeed: string, gameId: string, playerVersionId: string) {
   return rollAt(rootSeed, gameId, playerVersionId, {
     durabilityRating: 45,
@@ -73,7 +63,6 @@ describe('season injury clocks', () => {
 
 describe('season injury risk formula (M2.5 §5)', () => {
   it('computes the frozen coefficients exactly', () => {
-    // Base 80 at the reference durability, zero inputs, 20 minutes, no window.
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 70,
@@ -83,7 +72,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 0,
       }),
     ).toBe(80);
-    // Durability penalty: (70 - 45) * 0.5 = +12.5 -> 92.5 rounds half up to 93.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 45,
@@ -93,7 +82,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 0,
       }),
     ).toBe(93);
-    // Durability bonus: (70 - 95) * 0.5 = -12.5 -> 67.5 rounds half up to 68.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 95,
@@ -103,7 +92,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 0,
       }),
     ).toBe(68);
-    // Fatigue share: 200 / 400 = 0.5 -> 80.5 rounds half up to 81.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 70,
@@ -113,7 +102,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 0,
       }),
     ).toBe(81);
-    // Recent-load share: 250 / 500 = 0.5.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 70,
@@ -123,7 +112,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 0,
       }),
     ).toBe(81);
-    // Minutes exposure: (40 - 20) * 0.6 = 12.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 70,
@@ -133,7 +122,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 0,
       }),
     ).toBe(92);
-    // Below the 20-minute base: no exposure term.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 70,
@@ -143,7 +132,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 0,
       }),
     ).toBe(80);
-    // Recurrence bonus: +40.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 70,
@@ -156,7 +145,6 @@ describe('season injury risk formula (M2.5 §5)', () => {
   });
 
   it('clamps every input combination into 20..220', () => {
-    // The extreme input stack stays inside the frozen bounds.
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 45,
@@ -175,7 +163,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 10,
       }),
     ).toBeLessThanOrEqual(SEASON_INJURY_RISK_MAX_BP);
-    // Degenerate inputs (durability far above the ceiling) still floor at 20.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: 200,
@@ -185,8 +173,7 @@ describe('season injury risk formula (M2.5 §5)', () => {
         recurrenceWindowRoundsRemaining: 0,
       }),
     ).toBe(SEASON_INJURY_RISK_MIN_BP);
-    // And the upper clamp binds when a call passes a far-too-high durability
-    // penalty stack directly.
+
     expect(
       seasonInjuryRiskBasisPoints({
         durabilityRating: -1000,
@@ -199,15 +186,11 @@ describe('season injury risk formula (M2.5 §5)', () => {
   });
 
   it('depends only on minutes/fatigue/load/durability/prior injury', () => {
-    // The same risk inputs produce the same risk regardless of opponent,
-    // standings, or any other context: the roll's occurrence seed is a pure
-    // function of (rootSeed, gameId, playerVersionId, occurrence).
     const a = rollAt('seed-a', 's000001', 'pv-1', { targetMinutes: 30 });
     const b = rollAt('seed-a', 's000001', 'pv-1', { targetMinutes: 30 });
     expect(a.riskBasisPoints).toBe(b.riskBasisPoints);
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-    // Fatigue and minutes are the ONLY sensitivity: changing them changes
-    // the risk, changing nothing else cannot.
+
     const highMinutes = rollAt('seed-a', 's000001', 'pv-1', { targetMinutes: 48 });
     expect(highMinutes.riskBasisPoints).not.toBe(a.riskBasisPoints);
   });
@@ -223,7 +206,7 @@ describe('season injury occurrence lifecycle (M2.5 §5)', () => {
     const otherGame = forcedRoll('root-1', 's000002', 'pv-1');
     const otherSeed = forcedRoll('root-2', 's000001', 'pv-1');
     const distinct = [otherPlayer, otherGame, otherSeed].filter((roll) => roll.occurred);
-    // Each distinct input stream must roll its own independent record.
+
     const ids = distinct
       .map((roll) => roll.injury?.injuryId)
       .filter((id): id is string => id !== undefined);
@@ -248,8 +231,7 @@ describe('season injury occurrence lifecycle (M2.5 §5)', () => {
       const roll = forcedRoll('severity-cohort', 's000001', `pv-sev-${String(i)}`);
       if (roll.occurred && roll.injury !== null) records.push(roll.injury);
     }
-    // ~2% occurrence over 12,000 exposed player-games: several hundred
-    // records guarantee a healthy sample of every severity band.
+
     expect(records.length).toBeGreaterThan(100);
     for (const record of records) {
       if (record.severity === 'season-ending') {
@@ -257,8 +239,6 @@ describe('season injury occurrence lifecycle (M2.5 §5)', () => {
         expect(record.missedGamesTotal).toBe(SEASON_ENDING_MISSED_GAMES_SENTINEL);
         expect(record.seasonEnding).toBe(true);
       } else if (record.sameGameReturn) {
-        // A same-game return resolves within the occurrence game: the
-        // record carries zero missed games by design.
         expect(record.missedGamesTotal).toBe(0);
         expect(record.missedGamesRemaining).toBe(0);
         expect(record.seasonEnding).toBe(false);
@@ -282,7 +262,7 @@ describe('season injury occurrence lifecycle (M2.5 §5)', () => {
       expect(record.recurrenceWindowRoundsRemaining).toBe(0);
       expect(record.sameGameReturned).toBeNull();
     }
-    // Severity distribution sanity: 60/28/10/2 with wide deterministic bounds.
+
     const minor = records.filter((record) => record.severity === 'minor').length;
     const moderate = records.filter((record) => record.severity === 'moderate').length;
     const major = records.filter((record) => record.severity === 'major').length;
@@ -318,8 +298,7 @@ describe('season injury occurrence lifecycle (M2.5 §5)', () => {
     for (const record of withReturn) {
       expect(record.missedGamesTotal).toBe(0);
     }
-    // A non-eligible injury (moderate, or after halftime) never gets the
-    // same-game-return flag.
+
     for (let i = 0; i < 6000; i += 1) {
       const roll = forcedRoll('return-cohort-2', 's000001', `pv-ret2-${String(i)}`);
       if (roll.occurred && roll.injury !== null) {
@@ -370,10 +349,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
       seedPath: ['injuries', 's000001', 'pv-1', 'occurrence'],
     };
     let health = healthWith([record]);
-    // A pre-existing active injury decrements per completed team game of the
-    // franchise (the occurrence game counts for records already in the state;
-    // a NEW record's occurrence game never counts because it is appended
-    // after the recovery pass).
+
     health = applySeasonGameHealthTransition(health, {
       gameId: 's000002',
       round: 2,
@@ -392,7 +368,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     });
     expect(health.injuries[0]?.missedGamesRemaining).toBe(1);
     expect(health.injuries[0]?.actualReturnRound).toBeNull();
-    // The third team game returns the player and opens the 10-game window.
+
     health = applySeasonGameHealthTransition(health, {
       gameId: 's000004',
       round: 4,
@@ -405,7 +381,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     expect(returned?.actualReturnRound).toBe(4);
     expect(returned?.recurrenceWindowRoundsRemaining).toBe(10);
     expect(seasonPlayerAvailable(health, 'pv-1')).toBe(true);
-    // The window decrements per team game after the return.
+
     health = applySeasonGameHealthTransition(health, {
       gameId: 's000005',
       round: 5,
@@ -506,8 +482,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     expect(resolved?.actualReturnRound).toBe(3);
     expect(resolved?.recurrenceWindowRoundsRemaining).toBe(10);
     expect(seasonPlayerAvailable(health, 'pv-3')).toBe(true);
-    // A failed same-game return stays resolved-false and the record is not
-    // active (missedGamesTotal 0).
+
     const missed = applySeasonGameHealthTransition(healthWith([]), {
       gameId: 's000003',
       round: 3,
@@ -529,7 +504,7 @@ describe('season injury recovery and recurrence (M2.5 §5)', () => {
     const successShare = successes / outcomes.length;
     expect(successShare).toBeGreaterThan(0.5);
     expect(successShare).toBeLessThan(0.7);
-    // Deterministic per (rootSeed, injuryId).
+
     expect(rollSeasonRehabOutcome('rehab-root', 'inj-1'.padEnd(34, '0'))).toBe(
       rollSeasonRehabOutcome('rehab-root', 'inj-1'.padEnd(34, '0')),
     );

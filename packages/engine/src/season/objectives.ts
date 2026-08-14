@@ -9,36 +9,10 @@ import {
   type SeasonRotation,
 } from '@hoop-rush/data-contracts';
 
-/**
- * M2.5 block objectives (season-objective-v1, engine side). The six fixed
- * objectives, the deterministic three-choice offer per block, and the
- * frozen-measure evaluation from saved facts. Selection and evaluation flow
- * through the typed command and block pipelines; this module owns the
- * catalog-derived pure functions only.
- *
- * Evaluation measures the HUMAN franchise's block from the recorded compact
- * summaries only (never invented numbers): the human team's games, official
- * wins (forfeits count 2-0, loser named on the summary), the opponent team
- * boxes (points allowed, rebound margin, turnovers use the human team box
- * and the opponent team box; forfeit boxes are zeros), the per-tipoff
- * available-player counts collected by the block pipeline (forfeits have no
- * tipoff and are excluded via tipCountedGames), and the human rotation
- * (starters = the rotation's starter list with target minutes > 0; every
- * other human player's on-court seconds count toward bench minutes, summed
- * and floored to whole minutes).
- */
-
-/** The fixed six-entry objective catalog (contract shape). */
 export function seasonObjectiveCatalog(): readonly SeasonObjectiveDefinition[] {
   return SEASON_OBJECTIVE_CATALOG;
 }
 
-/**
- * The deterministic three-choice offer for a block (blocks 0-7): the six
- * catalog ids ranked by their named subseeds under the objective namespace,
- * taking the first three. Pure function of (root seed, block index); the
- * human picks one of the three before block submission.
- */
 export function seasonObjectiveChoicesForBlock(
   rootSeed: string,
   blockIndex: number,
@@ -59,12 +33,6 @@ export function seasonObjectiveChoicesForBlock(
   return ranked.slice(0, 3).map(({ entry }) => entry.objectiveId);
 }
 
-/**
- * Input facts the evaluator measures: the block's completed summaries, the
- * human rotation (starter minutes identify starters for bench-320), and the
- * per-game available-player count at each human tipoff (collected by the
- * block pipeline from the health-derived availability map).
- */
 export interface SeasonObjectiveEvaluationInput {
   objectiveId: SeasonObjectiveId | null;
   blockIndex: number;
@@ -74,33 +42,12 @@ export interface SeasonObjectiveEvaluationInput {
   tipAvailability: readonly { gameId: string; availableCount: number }[];
 }
 
-/** Frozen-measure objective evaluation result (null when no objective). */
 export interface SeasonObjectiveEvaluationResult {
   objectiveId: SeasonObjectiveId | null;
   success: boolean | null;
   evaluation: SeasonObjectiveEvaluation;
 }
 
-/**
- * Frozen-measure objective evaluation (M2.5 brief). All facts are measured
- * from the input summaries, the human rotation, and the per-tipoff
- * availability records; the six measures are:
- *
- * - `win-six`: wins >= 6 of the block's human team games
- * - `defense-108`: pointsAllowed <= 1080 (opponent team box points)
- * - `rebound-plus-20`: reboundMargin >= 20 (human box rebounds - opponent)
- * - `availability-eight`: every counted tip had >= 8 available players
- *   (tipsWithAtLeastEightAvailable === tipsTotal; forfeits have no tipoff
- *   and are excluded by the pipeline from `tipAvailability`)
- * - `bench-320`: benchMinutes >= 320 (non-starter on-court seconds / 60,
- *   floored; starters = rotation starters with target minutes > 0)
- * - `turnover-130`: turnovers <= 130 (human team box turnovers)
- *
- * A null objectiveId (the final two-game block, or a pipeline call before
- * any selection) returns the unevaluated shape with zeroed facts; a null
- * humanFranchiseId (pure AI context) returns the same unevaluated shape
- * because the human block facts cannot be identified.
- */
 export function evaluateSeasonBlockObjective(
   input: SeasonObjectiveEvaluationInput,
 ): SeasonObjectiveEvaluationResult {

@@ -42,59 +42,16 @@ import {
 } from '@hoop-rush/engine';
 import { sleep } from '../lib/sleep';
 
-/**
- * Season Run block worker entry (spec/2.0/07, M2.3, M2.5). Runs the
- * authoritative block pipeline game by game through the engine's exported
- * pieces — the same code the CLI runs through `simulateSeasonBlock`. Never
- * touches IndexedDB or the save database; it fetches and hash-verifies the
- * content-addressed draft catalog and era profile itself. Yields to the event
- * loop between games so cancellation is observed and progress streams
- * (throttled to at most four per second). The complete message carries either
- * one bounded candidate checkpoint (≤ 2 MB) for the main thread to accept, or
- * an uncommitted pending candidate on an 'invalid-roster' interruption.
- *
- * ## M2.5 state threading
- *
- * Health crosses the wire exactly like effects: `priorHealth` resets the
- * accumulator, null keeps it. `startGameId` resumes mid-block; the block-scoped
- * summaries the accumulator already holds seed the candidate so it covers the
- * FULL block without duplicates.
- *
- * ## M2.5 SEAMS awaiting the health workstream
- *
- * - `simulateSeasonBlockGame` threads health and returns the game facts or a
- *   typed `invalid-roster` interruption marker.
- * - `assembleSeasonBlockCandidate` / `assembleSeasonPendingBlock` build the
- *   committed candidate / uncommitted pending candidate.
- * - The candidate's `expectedStateRevision`/`expectedStateDigest` are not on
- *   the frozen wire; the worker reads them from the run context, falling back
- *   to zero facts. The RUNNER validates them against the authoritative run and
- *   rejects mismatches, so a wrong seam value is never committed.
- */
-
 const PROGRESS_MIN_INTERVAL_MS = 250;
 
 let currentRequestId: string | null = null;
 let cancelled = false;
 
-/**
- * Persistent worker accumulates compact summaries across blocks so the main
- * thread only ships one block's worth of deltas. `priorSummaries` resets the
- * accumulator (fresh worker or resumed after a route change), `newSummaries`
- * appends. A stale accumulator would fail the checkpoint audit on the main
- * thread.
- */
 let accumulatedRunId: string | null = null;
 let accumulatedSummaries: SeasonGameSummary[] = [];
 let accumulatedEffects: SeasonEffectsState | null = null;
 let accumulatedHealth: SeasonHealthState | null = null;
 
-/**
- * Wire v5 continuation context: run-static inputs (schedule, league, rosters,
- * home-court) are cached per runId so continuation blocks travel as deltas.
- * A terminated worker loses the cache and the runner falls back to a full
- * start request.
- */
 interface WorkerRunContext {
   run: SeasonBlockRunContext;
   schedule: SeasonSchedule;
@@ -110,10 +67,7 @@ function synthesizeStart(request: SeasonWorkerContinueRequest): SeasonWorkerStar
   return {
     ...request,
     type: 'season-block-start',
-    // Cursor and rotations are block-boundary state, not run-static state:
-    // reconstruct them from the continuation or the engine rejects later
-    // blocks as a stale cursor (and would simulate an old rotation even when
-    // the user edited it between blocks).
+
     run: {
       ...context.run,
       rotations: request.rotations,
@@ -135,8 +89,6 @@ function post(
     | SeasonWorkerErrorMessage
     | SeasonWorkerWarmAckMessage,
 ): void {
-  // The main thread parses every message at its boundary, so the worker does
-  // not re-parse the ≤ 2 MB complete message it just assembled.
   self.postMessage(message);
 }
 
@@ -178,7 +130,6 @@ async function loadProfileCached(url: string, contentHash: string): Promise<EraS
   return profile;
 }
 
-/** Trade-window rosters change mid-run, so the expansion cache keys on content. */
 function rosterFingerprint(run: SeasonBlockRunContext): string {
   return run.rosters
     .map(
@@ -188,7 +139,6 @@ function rosterFingerprint(run: SeasonBlockRunContext): string {
     .join('|');
 }
 
-/** Rosters are static between trade windows; reuse the expanded map across blocks. */
 const expandedCache = new Map<string, Map<string, SeasonGamePlayerInput>>();
 function expandRostersCached(
   run: SeasonBlockRunContext,
@@ -202,19 +152,16 @@ function expandRostersCached(
   return expanded;
 }
 
-/** Yields to the event loop so cancel messages and progress posts interleave. */
 async function yieldToEventLoop(): Promise<void> {
   await sleep(0);
 }
 
-/** Observes a cancel request at a game boundary (helper keeps CFG honest). */
 function throwIfCancelled(): void {
   if (cancelled) {
     throw new SeasonWorkerCancelled();
   }
 }
 
-/** League-wide empty health state (block 0 / fresh worker). */
 function initialHealth(): SeasonHealthState {
   return {
     schemaVersion: 1,
@@ -223,17 +170,10 @@ function initialHealth(): SeasonHealthState {
   };
 }
 
-/** League-wide initial Influence state (defensive fallback). */
 function initialInfluence(run: SeasonBlockRunContext): SeasonInfluenceState {
   return createInitialSeasonInfluenceState(run.league.teams.map((team) => team.franchiseId));
 }
 
-/**
- * The per-game simulation outcome is either the game facts (summary,
- * retained detail, next effects, next health) or a typed `invalid-roster`
- * interruption marker. Detection is defensive so the pre-interruption
- * outcome shape (no interruption field) also parses.
- */
 function isInterruption(
   outcome: unknown,
 ): outcome is { interruption: SeasonInvalidRosterInterruption } {
@@ -267,9 +207,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
     accumulatedSummaries = [...accumulatedSummaries, ...request.newSummaries];
   }
-  // Effects follows the same reset/delta convention — a full reset carries
-  // the authoritative pre-block state, the delta path keeps the worker's
-  // accumulated state.
+
   if (request.priorEffects !== undefined && request.priorEffects !== null) {
     accumulatedEffects = request.priorEffects;
   } else if (accumulatedRunId === null) {
@@ -280,8 +218,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     );
     return;
   }
-  // Health follows the same convention; a fresh worker with no priorHealth
-  // (block 0) falls back to the empty state.
+
   if (request.priorHealth !== undefined && request.priorHealth !== null) {
     accumulatedHealth = request.priorHealth;
   } else if (accumulatedHealth === null) {
@@ -300,10 +237,6 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     return;
   }
 
-  // The candidate's expected pre-block run state facts ride the wire
-  // (required fields); the runner validates the assembled candidate against
-  // the authoritative submitted run at acceptance, so a wrong seam value can
-  // never be committed.
   const expectedStateRevision = request.expectedStateRevision;
   const expectedStateDigest = request.expectedStateDigest;
 
@@ -348,11 +281,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   }
 
   const games = seasonBlockGamesOf(request.schedule, request.blockIndex);
-  // Resume mid-block from an interrupted pending candidate — simulate
-  // from `startGameId` forward (null = block start). The block-scoped
-  // summaries already accumulated (the pending's partial summaries, shipped
-  // as the reset/delta) seed the candidate so the assembled block covers
-  // the FULL block without duplicates.
+
   let summaries: SeasonGameSummary[];
   let retainedDetails: SeasonRetainedGameDetail[];
   if (request.startGameId !== null) {
@@ -377,12 +306,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     return;
   }
   const remainingGames = games.slice(startIndex);
-  // Recovery cadence mirrors the CLI pipeline: one between-round tick per
-  // player, never before the first game. On resume the tick fires only when
-  // the first resumed game crosses a round boundary (the pending's partial
-  // summaries already carried their ticks), so the cadence matches the
-  // uninterrupted path. The engine skips the tick when `skipRecoveryTick` is
-  // true (no round advance).
+
   const { fromRound } = blockRoundRange(request.blockIndex);
   const precedingRound =
     startIndex > 0 ? (games[startIndex - 1]?.round ?? fromRound) : fromRound - 1;
@@ -393,9 +317,6 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   let latestSummary: SeasonGameSummary | null = null;
   let interruption: SeasonInvalidRosterInterruption | null = null;
 
-  // Run-constant lookup maps: pure functions of the block input, built once
-  // here and threaded through every game instead of being rebuilt per game
-  // by the engine's per-game fallback (mirror of the whole-block CLI path).
   const gameNumberById = new Map(
     input.schedule.games.map((game, index) => [game.gameId, index + 1]),
   );
@@ -412,8 +333,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
     await yieldToEventLoop();
     throwIfCancelled();
-    // SEAM (health workstream): the simulation threads the health
-    // state and returns either the game facts or the typed interruption.
+
     const outcome = simulateSeasonBlockGame(input, game, effects, health, {
       skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
       gameNumberById,
@@ -443,8 +363,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
         gamesCompleted: summaries.length,
         gamesTotal: games.length,
         latestGameId: latestSummary.gameId,
-        // Wire version 5: progress carries only the rendered scoreline; the
-        // full compact summary ships inside the complete message.
+
         latestResult: {
           gameId: latestSummary.gameId,
           homeFranchiseId: latestSummary.homeFranchiseId,
@@ -456,9 +375,6 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
   }
 
-  // The interruption stops the block BEFORE the candidate assembles:
-  // the engine builds the uncommitted pending candidate (the accepted run
-  // cursor never advances; the runner persists it and resumes later).
   if (interruption !== null) {
     const pending = assembleSeasonPendingBlock({
       run,
@@ -497,11 +413,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   if (auditFailures.length > 0) {
     throw new EngineInvariantFailure(auditFailures.join('; '));
   }
-  // Keep the persistent worker's summary accumulator aligned with the
-  // finalized checkpoint. `summaries` is block-scoped; the accumulator holds
-  // prior accepted blocks (and may already hold partial games from an
-  // interrupted attempt). Replace this block's slice so the next continuation
-  // folds standings and aggregates from every accepted game exactly once.
+
   accumulatedSummaries = [
     ...accumulatedSummaries.filter(
       (summary) => blockIndexForRound(summary.round) !== request.blockIndex,
@@ -528,7 +440,6 @@ function initialEffects(
   return createSeasonEffectsState(staminaInputs);
 }
 
-/** Worker-local cancellation signal; thrown at game boundaries. */
 class SeasonWorkerCancelled extends Error {
   constructor() {
     super('season block cancelled');
@@ -550,11 +461,6 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
   }
   const request = parsed.data;
   if (request.type === 'season-block-warm') {
-    // Performance pass: preload and cache the packaged catalog and era
-    // profile so the first block start pays no download/parse time. No
-    // simulation state is touched; the ack lets the runner know the worker
-    // is ready without racing a concurrent block start (onmessage is
-    // sequential, and the cached assets make a concurrent start instant).
     void (async () => {
       try {
         await Promise.all([
@@ -578,12 +484,10 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     }
     return;
   }
-  // A new start supersedes any stale work (the main thread never starts two).
+
   currentRequestId = request.requestId;
   cancelled = false;
-  // Wire v5 continuation: rebuild the full start request from the cached run
-  // context; a worker without context rejects it and the runner re-sends the
-  // full start.
+
   const startRequest =
     request.type === 'season-block-continue' ? synthesizeStart(request) : request;
   if (startRequest === null) {

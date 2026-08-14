@@ -44,16 +44,6 @@ import {
 import type { RosterCalibrationWorkerRun } from './rosters-calibration-worker.ts';
 import { commitTargetsArtifact, runWorkerChunk, runWorkerChunks } from '../artifact.ts';
 
-/**
- * `season rosters` (spec/2.0 M2.1, M2.4 roster-generation-v2): deterministic
- * AI league generation through verified `roster-targets-v2`, an independent
- * league audit (versions, quotas, tier thresholds, pools, anchors,
- * exclusivity, legality, digest), and the calibration cohort that rewrites
- * the targets artifact's `measured` facts. The verified targets artifact is
- * REQUIRED everywhere: a missing or hash-mismatched artifact is a typed
- * failure, never a silent null.
- */
-
 export const SEASON_ROSTERS_GENERATE_OPTIONS: Record<string, boolean> = {
   seed: true,
   draft: true,
@@ -80,11 +70,8 @@ export const SEASON_ROSTERS_CALIBRATE_OPTIONS: Record<string, boolean> = {
   format: true,
 };
 
-/** Calibration seed i: the fixed 32-hex-digit sequential cohort (M2.1).
- * Canonical implementation in `season-calibration.ts`. */
 export const rosterCalibrationSeed = seasonCalibrationSeed;
 
-/** Order-invariance probe seeds: a small reversed/shuffled-input cohort. */
 export const ORDER_INVARIANCE_SEED_COUNT = 2;
 
 function humanRostersOf(state: SeasonDraftState): Array<{
@@ -295,8 +282,6 @@ function auditedLeagueOf(input: unknown, inputPath: string): AuditedLeague {
   }
   const resultParse = seasonLeagueGenerationResultSchema.safeParse(input);
   if (resultParse.success) {
-    // Bare results do not record which franchise was human; the audit's
-    // quota/identity gates require the --human-franchises option.
     return {
       rosters: resultParse.data.rosters,
       ownership: resultParse.data.ownership,
@@ -351,8 +336,7 @@ export function seasonRostersAudit(args: {
       { failures: [(error as Error).message], exitCode: 2 },
     );
   }
-  // Bare generation results do not record which franchise was human; pass
-  // --human-franchises to enable the quota/identity gates on those inputs.
+
   const explicitHumans =
     args['human-franchises'] === undefined || args['human-franchises'] === null
       ? null
@@ -368,9 +352,7 @@ export function seasonRostersAudit(args: {
       'quota/identity gates skipped: no human franchise known (pass --human-franchises)',
     );
   }
-  // Tier thresholds and anchor checks are exact only when the non-human
-  // population is known; without recorded or explicit human franchises the
-  // population includes the human roster.
+
   if (humanFranchiseIds.length === 0) {
     details.push(
       'tier thresholds computed over the full catalog: no human franchise known (pass --human-franchises)',
@@ -395,7 +377,6 @@ export function seasonRostersAudit(args: {
   const roleCoverageFailures: string[] = [];
   const versionFailures: string[] = [];
 
-  // Ownership: 300 rows, unique, consistent with rosters.
   if (league.ownership.length !== 300) {
     selectionFailures.push(`ownership must have 300 rows (got ${String(league.ownership.length)})`);
   }
@@ -421,7 +402,6 @@ export function seasonRostersAudit(args: {
     if (!rosterOwned.has(id)) selectionFailures.push(`ownership row ${id} is missing from rosters`);
   }
 
-  // Roster legality and completion targets.
   for (const roster of league.rosters) {
     const members = roster.players.map((player) => {
       const candidate = catalog.candidates.find(
@@ -441,8 +421,6 @@ export function seasonRostersAudit(args: {
     }
   }
 
-  // Rotations: v2 validation (partition, 240 minutes, independent legal
-  // starter and closing fives) against the catalog's position data.
   for (const rotation of league.rotations) {
     const memberPlayable = new Map(
       league.rosters
@@ -463,8 +441,6 @@ export function seasonRostersAudit(args: {
     }
   }
 
-  // Band quotas and identity counts over AI rows only, against the verified
-  // targets policy (solo 29 / duo 28 by human count).
   const aiRows = league.aiAssignments.filter((a) => !humanSet.has(a.franchiseId));
   if (quotaGatesEnabled) {
     if (aiRows.length !== 29 && aiRows.length !== 28) {
@@ -500,7 +476,6 @@ export function seasonRostersAudit(args: {
     }
   }
 
-  // Role coverage and versions.
   for (const evaluation of league.evaluations) {
     if (evaluation.rolesCovered.length !== 8) {
       roleCoverageFailures.push(
@@ -526,9 +501,6 @@ export function seasonRostersAudit(args: {
     );
   }
 
-  // M2.4 pool gates: recomputed tier thresholds over the canonical non-human
-  // population, per-pool legality, anchors, and cross-pool/cross-roster
-  // exclusivity.
   const thresholds = roleTierThresholdsOf(catalog, humanVersionIds);
   const aiPools = league.aiPools;
   if (aiPools.length === 0) {
@@ -572,8 +544,6 @@ export function seasonRostersAudit(args: {
     }
   }
 
-  // Canonical digest recomputation (roster-generation-v2: targets version,
-  // pools, and diagnostics participate in the digest).
   let digestVerified = false;
   try {
     const recomputed = seasonGenerationDigest({
@@ -599,8 +569,6 @@ export function seasonRostersAudit(args: {
     failures.push(`digest recomputation failed: ${(error as Error).message}`);
   }
 
-  // Tier failures are already carried by the anchor failure messages; only
-  // the anchor array is composed into `failures` so nothing double-counts.
   failures.push(...poolFailures, ...anchorFailures, ...exclusivityFailures);
   failures.push(...selectionFailures, ...quotaFailures, ...identityFailures, ...rotationFailures);
   failures.push(...roleCoverageFailures, ...versionFailures);
@@ -642,8 +610,6 @@ export function seasonRostersAudit(args: {
   );
 }
 
-/** Index-based lower median: keeps regeneration byte-identical with the
- * frozen `roster-targets-v2` measured medians (see `stats.ts` for canonical). */
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -659,12 +625,7 @@ function distribution(values: readonly number[]): {
   const sorted = [...values].sort((a, b) => a - b);
   return {
     median: median(sorted),
-    // min..max: the frozen band envelope. The roster strengthScore
-    // distribution is compressed in roster-generation-v2 (complete rosters
-    // converge on the max-per-role metric), so a p1-p99 envelope excludes
-    // more than 5% of held-out scores; the min..max envelope is the honest
-    // calibration range and the held-out gate (>= heldOutPassShare within
-    // range) doubles as a drift gate against the calibration extremes.
+
     range: [sorted[0] ?? 0, sorted[sorted.length - 1] ?? 0],
     min: sorted[0] ?? 0,
     max: sorted[sorted.length - 1] ?? 0,
@@ -704,7 +665,6 @@ async function runOrderInvarianceChunk(args: {
 }
 
 export interface SeasonRostersCalibrateDeps {
-  /** Injectable cohort runner (tests substitute deterministic doubles). */
   runCohort?: (args: {
     seeds: string[];
     catalogPath: string;
@@ -713,7 +673,7 @@ export interface SeasonRostersCalibrateDeps {
     workers: number;
     targets: SeasonRosterTargets;
   }) => Promise<RosterCalibrationWorkerRun[]>;
-  /** Injectable order-invariance probe (same rationale as runCohort). */
+
   runOrderInvariance?: (args: {
     seeds: string[];
     catalogPath: string;
@@ -794,7 +754,6 @@ export async function seasonRostersCalibrate(
   });
   const durationMs = Date.now() - start;
 
-  // Score distributions by band and identity over the calibration cohort.
   const byBand: Record<string, number[]> = {
     contender: [],
     playoff: [],
@@ -817,7 +776,6 @@ export async function seasonRostersCalibrate(
     backtracks += run.backtracks;
     const identities = new Set<string>();
     for (const team of run.teams) {
-      // Human franchise rows are placeholders; distributions describe AI rows.
       if (humanFranchiseIds.includes(team.franchiseId)) continue;
       byBand[team.band]?.push(team.strengthScore);
       byIdentity.set(team.identity, [...(byIdentity.get(team.identity) ?? []), team.strengthScore]);
@@ -846,7 +804,6 @@ export async function seasonRostersCalibrate(
     identities[identity] = distribution(byIdentity.get(identity) ?? []);
   }
 
-  // M2.4 measured facts over the calibration cohort.
   const tierTotals: Record<
     SeasonStrengthBand,
     { elite: number; strong: number; useful: number; total: number }
@@ -929,13 +886,6 @@ export async function seasonRostersCalibrate(
     };
   }
 
-  // Gates. Band separation is anchor-driven in the v2 design: contenders
-  // carry two guaranteed elite anchors, playoffs one, and average/weaker
-  // none, so the measurable separation is between the contender band and the
-  // rest. The lower three bands cluster within the catalog's wide mid-pack
-  // (max-per-role roster identity compresses their medians), so the ordering
-  // gate requires the contender median to lead every other band, and the
-  // separation gate measures the contender-to-weaker gap only.
   const orderedBandMedians =
     bands.contender.median > bands.playoff.median &&
     bands.contender.median > bands.average.median &&
@@ -958,8 +908,6 @@ export async function seasonRostersCalibrate(
   const roleCoverage = roleGaps === 0;
   const identitiesGate = identityGapLeagues === 0;
 
-  // Held-out pass share: validation scores within the frozen calibration
-  // ranges (p1..p99 per band).
   let heldOutWithin = 0;
   let heldOutTotal = 0;
   for (const run of validationRuns) {
@@ -972,7 +920,6 @@ export async function seasonRostersCalibrate(
   }
   const heldOutPassShare = heldOutTotal === 0 ? 0 : heldOutWithin / heldOutTotal;
 
-  // Order invariance: reversed/shuffled inputs produce identical digests.
   const orderInvarianceFailures = orderInvariance.filter(
     (probe) => new Set(probe.digests).size !== 1,
   ).length;
@@ -1010,8 +957,6 @@ export async function seasonRostersCalibrate(
     roleCoverage &&
     identitiesGate;
 
-  // Rewrite `measured` (policy and calibration gates preserved verbatim);
-  // --validate never writes the artifact or touches the manifest.
   let targetsWritten = false;
   let targetsPath: string | null = null;
   const gateFailures: string[] = [];

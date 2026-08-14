@@ -12,15 +12,6 @@ import {
   type SeasonHomeCourtGameFacts,
 } from './season-home-court.ts';
 
-/**
- * Season home-court calibration worker (M2.3). Each worker loads the fixture
- * file itself and runs a seed-index chunk through the authoritative engine
- * calibration path (every game twice: neutral adapter and the tuned home
- * profile); per-game facts are posted back as plain data. Worker counts and
- * chunk ordering never change the facts, and the main thread aggregates
- * order-insensitively.
- */
-
 interface SeasonHomeCourtWorkerInput {
   fixtureId: string;
   fixturePath: string;

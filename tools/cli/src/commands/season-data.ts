@@ -33,11 +33,6 @@ import { readJson as readJsonFile, sha256Hex } from '../io.ts';
 export { sha256Hex };
 export { readJsonFile };
 
-/**
- * Season Run M2.1 CLI data loading. Every artifact is schema-checked at the
- * boundary; catalog/league hashes are verified against the manifest.
- */
-
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../');
 export const DEFAULT_MANIFEST = resolve(REPO_ROOT, 'apps/web/static/data/manifest.json');
 export const DEFAULT_SEASON_DIR = resolve(REPO_ROOT, 'apps/web/static/data/season');
@@ -46,7 +41,6 @@ export const DEFAULT_LEAGUE = resolve(DEFAULT_SEASON_DIR, 'league.json');
 export const DEFAULT_ROSTER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'roster-targets.json');
 export const DEFAULT_FREE_AGENCY_INDEX = resolve(DEFAULT_SEASON_DIR, 'free-agency-index.json');
 
-/** Loads the packaged draft catalog, hash-verified against the manifest. */
 export function loadSeasonDraftCatalog(
   manifestPath: string = DEFAULT_MANIFEST,
   catalogPath: string = DEFAULT_DRAFT_CATALOG,
@@ -82,15 +76,6 @@ export function loadSeasonLeague(leaguePath: string = DEFAULT_LEAGUE): SeasonLea
   return parsed.data;
 }
 
-/**
- * Loads the frozen `roster-targets-v2` artifact, hash-verified against the
- * manifest's `season.rosterTargets` entry. The manifest entry is REQUIRED:
- * roster-generation-v2 always generates against a verified targets artifact,
- * so a missing entry or content-hash mismatch is a typed failure, never a
- * silent null. The targets path defaults to the manifest's recorded url
- * (resolved against the manifest directory) so scratch manifests can point
- * the loader at arbitrary artifact bytes.
- */
 export function loadSeasonRosterTargets(
   manifestPath: string = DEFAULT_MANIFEST,
   targetsPath?: string,
@@ -127,14 +112,6 @@ export function loadSeasonRosterTargets(
   return parsed.data;
 }
 
-/**
- * Loads the packaged `free-agency-index-v1` eligibility index, hash-verified
- * against the manifest's `season.freeAgencyIndex` entry (required, like the
- * roster targets: free-agency market generation always reads a verified
- * index). The index's own `catalogRef.contentHash` must also match the
- * manifest's `season.draftCatalog` hash so a stale index is a typed
- * failure, never silently consumed.
- */
 export function loadSeasonFreeAgencyIndex(
   manifestPath: string = DEFAULT_MANIFEST,
   indexPath?: string,
@@ -197,12 +174,6 @@ export function resolveArtifact(manifestDir: string, url: string): string {
   return isAbsolute(url) ? url : resolve(manifestDir, url);
 }
 
-/**
- * Fixed deterministic human roster for calibration cohorts and fixture
- * generation: candidates in `overallRating` order, keeping every pick that
- * preserves completion feasibility, until ten legal players are assembled.
- * Independent of any seed.
- */
 export function fixtureHumanRoster(catalog: SeasonDraftCatalog): string[] {
   const sorted = [...catalog.candidates].sort(
     (a, b) =>
@@ -240,12 +211,6 @@ export function fixtureHumanRoster(catalog: SeasonDraftCatalog): string[] {
   return roster.map((member) => member.playerVersionId);
 }
 
-/**
- * Deterministic season-draft-v2 pick policy for fixture generation and
- * calibration cohorts: the selectable card of the current offer with the
- * highest summary overall rating, ties broken canonically by
- * playerVersionId. Throws when no offer is drawn or no card is selectable.
- */
 export function pickBestSelectable(
   state: SeasonDraftState,
   catalog: SeasonDraftCatalog,
@@ -268,19 +233,8 @@ export function pickBestSelectable(
   return candidates[0] as SeasonDraftCandidate;
 }
 
-/**
- * M2.4 roster-generation-v2 audit facts (spec/2.0/03): the canonical
- * non-human candidate population, per-role nearest-rank tier thresholds,
- * pool tier classification, and the pool/anchor legality checks the audit
- * and the calibration cohort recompute independently of any recorded facts.
- * Thresholds come from the authoritative engine tier helpers; this module
- * only assembles the canonical population and reduces pool facts against it.
- */
-
-/** The eight basketball roles in canonical (schema) order. */
 export const ROSTER_ROLES: readonly SeasonRosterRole[] = seasonRosterRoleSchema.options;
 
-/** Canonically sorted non-human candidates (the tier-threshold population). */
 export function canonicalNonHumanCandidates(
   catalog: SeasonDraftCatalog,
   humanVersionIds: ReadonlySet<string>,
@@ -290,11 +244,6 @@ export function canonicalNonHumanCandidates(
     .sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
 }
 
-/**
- * Per-role role scores for one candidate through the authoritative
- * evaluation seam (a single-member roster evaluation returns that member's
- * role scores).
- */
 function candidateRoleScores(candidate: SeasonDraftCandidate): Record<SeasonRosterRole, number> {
   return evaluateSeasonRoster({
     franchiseId: candidate.playerVersionId,
@@ -309,10 +258,6 @@ function candidateRoleScores(candidate: SeasonDraftCandidate): Record<SeasonRost
   }).roleScores;
 }
 
-/**
- * Per-role nearest-rank p90/p75/p50 thresholds over the canonically sorted
- * non-human candidates. Ties at a threshold belong to that tier.
- */
 export function roleTierThresholdsOf(
   catalog: SeasonDraftCatalog,
   humanVersionIds: ReadonlySet<string>,
@@ -321,7 +266,6 @@ export function roleTierThresholdsOf(
   return rolePercentileThresholds(population.map((candidate) => candidateRoleScores(candidate)));
 }
 
-/** A pool's tier: its highest tier across all eight roles. */
 export function tierOfPool(
   pool: SeasonAiPool,
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
@@ -344,12 +288,6 @@ export function tierOfPool(
   return playerPercentileTier(percentileTierOf(evaluation.roleScores, thresholds));
 }
 
-/**
- * Anchor-record checks: the anchor must be a pool member, elite in one of
- * the identity's priority roles, and its recorded roleScore and
- * percentileThreshold must equal the recomputed candidate role score and
- * the role's nearest-rank p90 threshold.
- */
 export function poolAnchorFailuresOf(
   pool: SeasonAiPool,
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
@@ -394,12 +332,6 @@ export function poolAnchorFailuresOf(
   return failures;
 }
 
-/**
- * Pool-legality checks: exactly 20 distinct versions, selections inside the
- * pool, anchor records legal, and the anchor count within
- * [guaranteedAnchors, guaranteedAnchors + 1] (the band guarantee plus at
- * most one extra elite from the seeded extra-elite roll).
- */
 export function poolLegalFailuresOf(
   pool: SeasonAiPool,
   thresholds: Record<SeasonRosterRole, RoleThresholds>,

@@ -15,12 +15,6 @@
   import { percentOneDecimal } from '$lib/format';
   import PlayerFace from './PlayerFace.svelte';
 
-  /**
-   * Player detail dialog for the Roster browser: identity, ratings, per-game
-   * and shooting lines, advanced numbers, and physical context for one
-   * roster row. The page owns which row is open and closes through `onClose`.
-   */
-
   let {
     player,
     manifest,
@@ -35,7 +29,6 @@
     onClose: () => void;
   } = $props();
 
-  /** Historical display name for the row's franchise/era context. */
   function teamNameFor(row: RosterDetailRow): string {
     const identity = resolveEraTeamIdentity(manifest, row.franchiseId, row.eraId);
     return identity.displayLabel ?? franchiseName.get(row.franchiseId) ?? row.franchiseId;

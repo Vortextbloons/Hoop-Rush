@@ -15,15 +15,6 @@ import {
   type SeasonEffectsGameFacts,
 } from './season-effects.ts';
 
-/**
- * Season effects calibration worker (M2.4). Each worker loads the fixture
- * file itself and runs a seed-index chunk through the authoritative engine
- * calibration path (every game once neutral and once with the representative
- * effects state, double-run for determinism evidence); per-game facts are
- * posted back as plain data. Worker counts and chunk ordering never change
- * the facts.
- */
-
 interface SeasonEffectsWorkerInput {
   fixtureId: string;
   fixturePath: string;

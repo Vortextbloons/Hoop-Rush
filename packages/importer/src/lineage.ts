@@ -1,36 +1,18 @@
-/**
- * Authoritative modern franchise slots and historical NBA lineage (spec/12).
- *
- * Every NBA team-season resolves to exactly one modern franchise slot and one
- * historical identity. The lineage table, never a name or abbreviation,
- * determines ownership. Segments are NBA-valid only: ABA and other
- * predecessor-league rows are excluded (Nets/Pacers/Nuggets/Spurs begin at
- * the 1976-77 merger; Hornets at 1988-89; Pelicans at 2002-03).
- *
- * Source identity note: NBA.com statistics endpoints publish historical
- * seasons under the modern franchise team ID (Seattle SuperSonics games are
- * returned under 1610612760, original Charlotte Hornets games under
- * 1610612766), and the source's own continuity matches the NBA's reassigned
- * Charlotte/New Orleans history. Source IDs are retained as metadata; the
- * game's lineage table still resolves ownership explicitly.
- */
-
 export interface LineageSegment {
-  /** Modern franchise slot that owns this segment. */
   modernFranchiseId: string;
-  /** Source team identity for the segment (NBA team ID). */
+
   historicalTeamId: string;
-  /** First NBA season of this identity, inclusive. */
+
   validFromSeasonKey: string;
-  /** Last NBA season of this identity, inclusive; absent when current. */
+
   validThroughSeasonKey?: string;
-  /** Historical display name. */
+
   displayName: string;
-  /** Historical city. */
+
   city: string;
-  /** Historical source abbreviation. */
+
   abbreviation?: string;
-  /** Verified historical logo candidates, best first. */
+
   logoCandidates?: Array<{
     url: string;
     source: string;
@@ -44,7 +26,6 @@ export interface ModernSlot {
   teamExternalId: string;
 }
 
-/** Exactly 30 modern franchise slots, ordered by NBA team ID. */
 export const MODERN_SLOTS: readonly ModernSlot[] = [
   { franchiseId: 'hawks', displayName: 'Atlanta Hawks', teamExternalId: '1610612737' },
   { franchiseId: 'celtics', displayName: 'Boston Celtics', teamExternalId: '1610612738' },
@@ -82,13 +63,7 @@ export const MODERN_SLOTS: readonly ModernSlot[] = [
   { franchiseId: 'wizards', displayName: 'Washington Wizards', teamExternalId: '1610612764' },
 ];
 
-/**
- * Complete NBA-valid lineage segments, oldest first. Non-NBA play (ABA,
- * NBL, BAA predecessor history that never joined the NBA) is excluded; the
- * NBA-valid start is the BAA/NBA membership season.
- */
 export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
-  // Hawks: Buffalo Bisons/Tri-Cities (1946-47), Tri-Cities, Milwaukee, St. Louis, Atlanta
   {
     modernFranchiseId: 'hawks',
     historicalTeamId: '1610612737',
@@ -167,7 +142,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Celtics
+
   {
     modernFranchiseId: 'celtics',
     historicalTeamId: '1610612738',
@@ -183,7 +158,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Nets: NBA from the 1976-77 merger
+
   {
     modernFranchiseId: 'nets',
     historicalTeamId: '1610612751',
@@ -241,7 +216,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Hornets: original Charlotte Hornets + Bobcats/Hornets; 2002-03/2003-04 gap
+
   {
     modernFranchiseId: 'hornets',
     historicalTeamId: '1610612766',
@@ -299,7 +274,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Bulls
+
   {
     modernFranchiseId: 'bulls',
     historicalTeamId: '1610612741',
@@ -315,7 +290,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Cavaliers
+
   {
     modernFranchiseId: 'cavaliers',
     historicalTeamId: '1610612739',
@@ -331,7 +306,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Mavericks
+
   {
     modernFranchiseId: 'mavericks',
     historicalTeamId: '1610612742',
@@ -347,7 +322,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Nuggets: NBA from the 1976-77 merger
+
   {
     modernFranchiseId: 'nuggets',
     historicalTeamId: '1610612743',
@@ -363,7 +338,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Pistons: Fort Wayne Zollner Pistons joined the BAA for 1948-49
+
   {
     modernFranchiseId: 'pistons',
     historicalTeamId: '1610612765',
@@ -400,7 +375,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Warriors
+
   {
     modernFranchiseId: 'warriors',
     historicalTeamId: '1610612744',
@@ -458,7 +433,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Rockets
+
   {
     modernFranchiseId: 'rockets',
     historicalTeamId: '1610612745',
@@ -495,7 +470,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Pacers: NBA from the 1976-77 merger
+
   {
     modernFranchiseId: 'pacers',
     historicalTeamId: '1610612754',
@@ -511,7 +486,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Clippers
+
   {
     modernFranchiseId: 'clippers',
     historicalTeamId: '1610612746',
@@ -569,7 +544,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Lakers: Minneapolis Lakers joined the BAA for 1948-49
+
   {
     modernFranchiseId: 'lakers',
     historicalTeamId: '1610612747',
@@ -606,7 +581,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Grizzlies: Vancouver expansion 1995-96
+
   {
     modernFranchiseId: 'grizzlies',
     historicalTeamId: '1610612763',
@@ -643,7 +618,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Heat
+
   {
     modernFranchiseId: 'heat',
     historicalTeamId: '1610612748',
@@ -659,7 +634,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Bucks
+
   {
     modernFranchiseId: 'bucks',
     historicalTeamId: '1610612749',
@@ -675,7 +650,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Timberwolves
+
   {
     modernFranchiseId: 'timberwolves',
     historicalTeamId: '1610612750',
@@ -691,7 +666,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Pelicans: New Orleans franchise began 2002-03 (Hornets name; OKC relocation 2005-07)
+
   {
     modernFranchiseId: 'pelicans',
     historicalTeamId: '1610612740',
@@ -728,7 +703,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Knicks
+
   {
     modernFranchiseId: 'knicks',
     historicalTeamId: '1610612752',
@@ -744,7 +719,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Thunder: Seattle SuperSonics 1967-68 through 2007-08
+
   {
     modernFranchiseId: 'thunder',
     historicalTeamId: '1610612760',
@@ -781,7 +756,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Magic
+
   {
     modernFranchiseId: 'magic',
     historicalTeamId: '1610612753',
@@ -797,7 +772,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // 76ers: Syracuse Nationals joined the NBA for 1949-50
+
   {
     modernFranchiseId: 'sixers',
     historicalTeamId: '1610612755',
@@ -834,7 +809,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Suns
+
   {
     modernFranchiseId: 'suns',
     historicalTeamId: '1610612756',
@@ -850,7 +825,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Trail Blazers
+
   {
     modernFranchiseId: 'blazers',
     historicalTeamId: '1610612757',
@@ -866,7 +841,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Kings: Rochester Royals joined the NBA for 1948-49
+
   {
     modernFranchiseId: 'kings',
     historicalTeamId: '1610612758',
@@ -966,7 +941,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Spurs: NBA from the 1976-77 merger
+
   {
     modernFranchiseId: 'spurs',
     historicalTeamId: '1610612759',
@@ -982,7 +957,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Raptors
+
   {
     modernFranchiseId: 'raptors',
     historicalTeamId: '1610612761',
@@ -998,7 +973,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Jazz: New Orleans Jazz expansion 1974-75
+
   {
     modernFranchiseId: 'jazz',
     historicalTeamId: '1610612762',
@@ -1035,7 +1010,7 @@ export const LINEAGE_SEGMENTS: readonly LineageSegment[] = [
       },
     ],
   },
-  // Wizards: Chicago Packers expansion 1961-62
+
   {
     modernFranchiseId: 'wizards',
     historicalTeamId: '1610612764',
@@ -1164,7 +1139,6 @@ export function resolveHistoricalIdentity(
   return null;
 }
 
-/** Map of teamExternalId -> first NBA season (fetch-layer planning). */
 export function foundingSeasonByTeamExternalId(): Record<string, string> {
   const map: Record<string, string> = {};
   for (const segment of LINEAGE_SEGMENTS) {

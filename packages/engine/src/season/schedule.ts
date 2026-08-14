@@ -19,56 +19,29 @@ import {
   oppositeConferenceOpponentsOf,
 } from './league.ts';
 
-/**
- * Deterministic Season Run schedule generator (spec/2.0/02,
- * schedule-formula-v1). Produces the frozen league schedule: 82 abstract
- * rounds of 15 games, 41 home and 41 away per team, four games against
- * every division opponent, four games against six and three games against
- * four of the other same-conference opponents, and two games against every
- * opposite-conference opponent.
- *
- * Construction: the frozen frequency formula becomes an 82-regular
- * undirected multigraph. A deterministic blossom-based factorization produces
- * 82 perfect matchings, and pair-specific orientation produces the required
- * home/away counts. Pure TypeScript: no Svelte, persistence, worker, or
- * network code.
- */
-
 export const SEASON_SCHEDULE_GENERATION_VERSION = 'schedule-gen-v3';
 
-/**
- * A repeat matchup needs this many intervening rounds. This keeps the
- * synchronized 82-round abstraction from presenting a player with a string
- * of the same opponent (the factorization itself only controls totals).
- */
 const MINIMUM_OPPONENT_REPEAT_GAP = 1;
 
 export interface GenerateSeasonScheduleInput {
   league: SeasonLeague;
   seed: Seed;
-  /** Defaults to SEASON_SCHEDULE_GENERATION_VERSION. */
+
   generationVersion?: string;
 }
 
-/** An undirected edge that can appear in one or more extra rounds. */
 interface ExtraEdge {
   id: number;
   a: number;
   b: number;
   remaining: number;
   total: number;
-  /** Number of copies hosted by endpoint `a`; the rest are hosted by `b`. */
+
   homeCopies: number;
 }
 
 type Factor = Array<{ edgeId: number; a: number; b: number }>;
 
-/**
- * Returns one maximum matching using Edmonds' blossom algorithm. The graph is
- * tiny (30 teams), so rebuilding its adjacency list for each factor keeps the
- * implementation simple and still gives a hard, sub-millisecond-sized bound
- * compared with the old local-search repair.
- */
 function maximumMatching(adjacency: readonly number[][]): number[] {
   const n = adjacency.length;
   const match = new Array<number>(n).fill(-1);
@@ -173,11 +146,6 @@ function maximumMatching(adjacency: readonly number[][]): number[] {
   return match;
 }
 
-/**
- * Edge-colors the complete 82-regular schedule multigraph into 82 perfect
- * matchings. Each matching consumes one copy of every selected edge, so the
- * resulting rounds preserve the exact pair counts by construction.
- */
 function factorizeScheduleGraph(
   teamCount: number,
   edges: ExtraEdge[],
@@ -226,14 +194,6 @@ function pairKey(a: string, b: string): string {
   return [a, b].sort().join('\u0000');
 }
 
-/**
- * Which six of the ten same-conference non-division opponents get four
- * games: a seeded three-regular bipartite graph between each pair of
- * divisions (each team connects to three teams of each other division), so
- * the choice is symmetric by construction and part of the frozen formula
- * (schedule-formula-v1). Every other non-division opponent receives three
- * games.
- */
 function fourGameOpponents(league: SeasonLeague, seed: Seed): Map<string, Set<string>> {
   const result = new Map<string, Set<string>>();
   for (const team of league.teams) {
@@ -276,13 +236,6 @@ function fourGameOpponents(league: SeasonLeague, seed: Seed): Map<string, Set<st
   return result;
 }
 
-/**
- * Orients the three-game pairs so every team hosts twice in exactly two of
- * its four three-game pairings (forced by the 41-home total). Deterministic
- * backtracking over pair directions with a remaining-possibility bound; a
- * balanced orientation of a 4-regular graph always exists. Returns a map
- * team -> opponents against whom the team hosts twice.
- */
 function orientThreeGamePairs(
   pairs: ReadonlyArray<readonly [string, string]>,
 ): Map<string, Set<string>> {
@@ -342,7 +295,6 @@ function orientThreeGamePairs(
   return result;
 }
 
-/** Builds the complete undirected schedule multigraph with exact pair counts. */
 function buildScheduleEdges(
   league: SeasonLeague,
   teamOrder: readonly string[],
@@ -395,7 +347,6 @@ function buildScheduleEdges(
   return edges;
 }
 
-/** Orients each pair's factor occurrences to its exact home/away split. */
 function orientScheduleFactors(
   factors: readonly Factor[],
   edges: readonly ExtraEdge[],
@@ -438,13 +389,6 @@ function factorEdgeIds(factor: Factor): Set<number> {
   return new Set(factor.map((edge) => edge.edgeId));
 }
 
-/**
- * The graph factorizer intentionally optimizes feasibility, not chronology;
- * consequently its raw output can put all copies of one matchup in adjacent
- * rounds. Reorder the already-valid perfect matchings with a deterministic
- * greedy pass so no team faces the same opponent in back-to-back rounds.
- * Reordering cannot alter pair counts or home/away totals.
- */
 function spaceFactorRematches(
   factors: readonly Factor[],
   seed: Seed,
@@ -496,7 +440,6 @@ function spaceFactorRematches(
   return ordered;
 }
 
-/** Deterministic schedule construction for one retry attempt. */
 function buildScheduleAttempt(
   league: SeasonLeague,
   seed: Seed,
@@ -591,7 +534,6 @@ function buildScheduleAttempt(
   return schedule;
 }
 
-/** Generates the deterministic league schedule for the authoring seed. */
 export function generateSeasonSchedule(input: GenerateSeasonScheduleInput): SeasonSchedule {
   const generationVersion = input.generationVersion ?? SEASON_SCHEDULE_GENERATION_VERSION;
   if (input.league.teams.length !== SEASON_TEAM_COUNT) {
@@ -611,7 +553,6 @@ export function generateSeasonSchedule(input: GenerateSeasonScheduleInput): Seas
   );
 }
 
-/** Whether a generated schedule satisfies every frozen schedule invariant. */
 export function auditSeasonSchedule(schedule: SeasonSchedule, league: SeasonLeague): string[] {
   const failures: string[] = [];
 

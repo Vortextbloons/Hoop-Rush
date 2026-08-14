@@ -1,12 +1,6 @@
 @import 'tailwindcss';
 
-/* ----------------------------------------------------------------------------
-   Hoop Rush — Theme tokens
-   Dark arena floor with scoreboard orange and championship gold accents.
---------------------------------------------------------------------------- */
-
 @theme {
-  /* Brand */
   --color-background: hsl(222 22% 6%);
   --color-foreground: hsl(40 20% 94%);
 
@@ -16,18 +10,15 @@
   --color-popover: hsl(222 22% 7%);
   --color-popover-foreground: hsl(40 20% 94%);
 
-  /* Primary = scoreboard orange */
   --color-primary: hsl(13 100% 62%);
   --color-primary-foreground: hsl(222 30% 6%);
 
-  /* Secondary = cool slate panel */
   --color-secondary: hsl(222 16% 14%);
   --color-secondary-foreground: hsl(40 20% 94%);
 
   --color-muted: hsl(222 16% 14%);
   --color-muted-foreground: hsl(222 10% 68%);
 
-  /* Accent = championship gold */
   --color-accent: hsl(42 91% 61%);
   --color-accent-foreground: hsl(222 30% 6%);
 
@@ -40,26 +31,23 @@
 
   --radius: 0.625rem;
 
-  /* Custom surface tokens */
   --color-surface-1: hsl(222 20% 9%);
   --color-surface-2: hsl(222 18% 12%);
   --color-surface-3: hsl(222 16% 16%);
 
   --color-line-soft: hsl(222 14% 18%);
   --color-line-strong: hsl(222 14% 26%);
-  /* Strong-border alias (same value as line-strong) for component styles. */
+
   --color-border-strong: hsl(222 14% 26%);
 
   --color-positive: hsl(150 60% 48%);
   --color-negative: hsl(0 72% 58%);
-  /* Bare-var alias for component styles that predate the color prefix. */
+
   --destructive: hsl(0 72% 58%);
 
-  /* Court graphic (theme-independent arena floor colors) */
   --color-court-wood: #c98c45;
   --color-court-rim: #f04d22;
 
-  /* Fonts (loaded via app.html <link>) */
   --font-display: 'Barlow Condensed', system-ui, sans-serif;
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -126,7 +114,6 @@
   }
 }
 
-/* Typography utilities */
 .font-display {
   font-family: var(--font-display);
   letter-spacing: -0.01em;
@@ -136,14 +123,12 @@
   font-family: var(--font-mono);
 }
 
-/* Condensed display for titles, records, and important numbers */
 .text-stat {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
-/* Mono uppercase for eyebrows, labels, and metadata */
 .text-label {
   font-family: var(--font-mono);
   font-size: 0.6875rem;
@@ -152,7 +137,6 @@
   text-transform: uppercase;
 }
 
-/* Scoreboard panel — subtle court-line geometry */
 .scoreboard-panel {
   position: relative;
   overflow: hidden;
@@ -183,7 +167,6 @@
   opacity: 0.35;
 }
 
-/* 82-game road strip with court-line accent */
 .road-strip {
   position: relative;
   padding: 0.75rem 1rem;
@@ -207,7 +190,6 @@
   );
 }
 
-/* Scrollbar polish */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -223,7 +205,6 @@
   background: var(--color-line-strong);
 }
 
-/* Screen reader only utility */
 .sr-only {
   position: absolute;
   width: 1px;

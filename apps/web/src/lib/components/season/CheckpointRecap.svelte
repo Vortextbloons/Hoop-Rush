@@ -21,19 +21,6 @@
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
 
-  /**
-   * Factual block recap (spec/2.0/02 recap, spec/2.0/11 block recap, M2.3,
-   * M2.3.5, M2.4, M2.5). Leads with record and standings movement, then
-   * notable performances, streaks, version-versus-version spotlights, the
-   * next human games, and — since M2.4 — a stamina/chemistry section built
-   * from the recorded mechanism evidence of the block's human games:
-   * opportunity counts, the average recorded state band, and the bounded
-   * aggregate probability movement. M2.5 adds the per-player health strip
-   * (availability + recovery estimates), the block injury evidence, and the
-   * recorded objective/trade/Influence facts. Every claim derives from
-   * accepted saved facts; nothing is invented.
-   */
-
   let {
     recap,
     humanRecord,
@@ -49,13 +36,13 @@
     humanRecord: SeasonRecordMovement | null;
     franchiseName: (franchiseId: string) => string;
     playerName: (playerVersionId: string) => string;
-    /** Packaged manifest; when present recaps render logos and headshots. */
+
     manifest?: HoopRushManifest | null;
     faces?: ReadonlyMap<string, SeasonFaceRef>;
     rosterByVersion?: ReadonlyMap<string, SeasonRosterEntry>;
-    /** M2.4: aggregated mechanism evidence of the block's human games. */
+
     effectsEvidence?: BlockMechanismEvidenceRow[];
-    /** M2.5: per-player availability rows for the health strip. */
+
     healthRows?: AvailabilityStripRow[];
   } = $props();
 

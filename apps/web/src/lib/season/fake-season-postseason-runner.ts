@@ -17,31 +17,13 @@ import {
   type SeasonPostseasonSimulatorFn,
 } from '$lib/season/season-postseason-runner';
 
-/**
- * TEST-ONLY deterministic direct engine simulator (e2e seam + unit tests).
- * Runs the EXACT shared engine-advance core the real worker runs — no
- * Worker, no IndexedDB — and returns the same complete/error wire outcomes
- * the worker would post. The e2e spec sets
- * `window.__HOOP_RUSH_E2E_FAKE_POSTSEASON_RUNNER__` before navigation;
- * `getSeasonPostseasonRunner()` then returns a real `SeasonPostseasonRunner`
- * bound to this simulator, so every runner behavior (per-game commits,
- * chunking, re-reads, promotion, cancellation) is exercised without a
- * worker. Never used in production.
- *
- * The simulator consumes NO RNG of its own: the engine's seeded command
- * handler produces the identical output the real worker would produce for
- * the same request.
- */
-
 const catalogCache = new Map<string, SeasonDraftCatalog>();
 const profileCache = new Map<string, EraSimulationProfile>();
 
 export interface SeasonPostseasonEngineSimulatorOptions {
-  /** Injected packaged assets (unit tests); the e2e seam loads from URLs. */
   catalog?: SeasonDraftCatalog;
   profile?: EraSimulationProfile;
-  /** Injected per-game resolver (deterministic fixtures); the engine's
-   * real controller is the default. */
+
   resolver?: SeasonPostseasonGameResolver;
 }
 
@@ -131,7 +113,6 @@ async function loadProfileCached(url: string, contentHash: string): Promise<EraS
   return profile;
 }
 
-/** e2e seam: a full runner bound to the direct engine simulator. */
 export function createFakeSeasonPostseasonRunner(): ReturnType<
   typeof createSeasonPostseasonRunner
 > {

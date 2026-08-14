@@ -5,19 +5,10 @@ import type {
   SimulationTendencies,
 } from '@hoop-rush/data-contracts';
 
-/**
- * The fixed benchmark matrix used to measure opponent strength (spec/01:
- * "Is calibrated against benchmark lineups before the bracket is published").
- * Weak, medium, and strong legal G,G,F,F,C teams with league-average
- * tendencies. The matrix is frozen content: any change to these lineups is a
- * versioned benchmark change that invalidates recorded strength evidence.
- */
-
 export const BENCHMARK_VERSION = 'benchmark-v1';
 
 const SLOT_POSITIONS: SimulationPlayer['positions'][] = [['PG'], ['SG'], ['SF'], ['PF'], ['C']];
 
-/** League-average possession-relevant tendencies shared by every benchmark player. */
 const BENCHMARK_TENDENCIES: SimulationTendencies = {
   usageRate: 20,
   passRate: 30,
@@ -44,7 +35,6 @@ const BENCHMARK_TENDENCIES: SimulationTendencies = {
   crashOffensiveGlassRate: 12,
 };
 
-/** Neutral detailed ratings profile; scaled uniformly around the target center. */
 function scaleRatings(targetCenter: number): SimulationRatings {
   const base: SimulationRatings = {
     insideScoring: 78,
@@ -96,7 +86,6 @@ export const WEAK_BENCHMARK = benchmarkTeam('benchmark-weak', 'Benchmark Weak', 
 export const MEDIUM_BENCHMARK = benchmarkTeam('benchmark-medium', 'Benchmark Medium', 65);
 export const STRONG_BENCHMARK = benchmarkTeam('benchmark-strong', 'Benchmark Strong', 85);
 
-/** Measurement weights per benchmark; the composite strength is this weighted win rate. */
 export const BENCHMARK_WEIGHTS: ReadonlyArray<{ team: SimulationTeam; weight: number }> = [
   { team: STRONG_BENCHMARK, weight: 0.25 },
   { team: MEDIUM_BENCHMARK, weight: 0.5 },

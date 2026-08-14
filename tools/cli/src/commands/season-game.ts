@@ -32,14 +32,6 @@ import { seasonCalibrationSeed, seedIndexRange } from './season-calibration.ts';
 import { percentile } from '../stats.ts';
 import { commitTargetsArtifact, runWorkerChunks } from '../artifact.ts';
 
-/**
- * M2.2 `season game` commands (spec/2.0/04): single-game simulation with
- * exact-seconds facts and the frozen 0-1023/1024-1279 calibration cohort that
- * freezes `season-game-targets-v1`. Both commands call the authoritative
- * engine surface; the injectable `deps` seam lets tests substitute doubles
- * without touching the real engine wiring.
- */
-
 export const SEASON_GAME_SIMULATE_OPTIONS: Record<string, boolean> = {
   input: true,
   seed: true,
@@ -56,16 +48,13 @@ export const SEASON_GAME_CALIBRATE_OPTIONS: Record<string, boolean> = {
   format: true,
 };
 
-/** Frozen calibration cohort: seeds 0-1023 calibration, 1024-1279 held out. */
 export const SEASON_GAME_CALIBRATION_SEED_COUNT = 1024;
 export const SEASON_GAME_VALIDATION_SEED_COUNT = 256;
 export const SEASON_GAME_CALIBRATION_SEED_TOTAL =
   SEASON_GAME_CALIBRATION_SEED_COUNT + SEASON_GAME_VALIDATION_SEED_COUNT;
 
-/** Chunking-independence probe size (subset re-run with a single chunk). */
 export const SEASON_GAME_CHUNKING_PROBE_COUNT = 32;
 
-/** The three rotation-preset fixtures; the default calibrate cohort. */
 export const SEASON_GAME_PRESET_FIXTURES = [
   'season-game-balanced',
   'season-game-tight',
@@ -78,12 +67,8 @@ const FIXTURES_DIR = new URL('../fixtures/', import.meta.url).pathname
   .replace(/^\/([A-Za-z]:)/, '$1')
   .replace(/%20/g, ' ');
 
-/** Calibration seed i: the fixed 32-hex-digit sequential cohort (M2.2).
- * Canonical implementation in `season-calibration.ts`. */
 export const seasonGameCalibrationSeed = seasonCalibrationSeed;
 
-/** Resolves a fixture reference: a path (or `*.json`) is read as-is, an id
- * resolves against the committed fixtures directory. */
 export function resolveSeasonGameFixturePath(ref: string): string {
   const looksLikePath = ref.includes('/') || ref.includes('\\') || ref.endsWith('.json');
   return looksLikePath ? resolve(ref) : `${FIXTURES_DIR}${ref}.json`;
@@ -106,42 +91,33 @@ export function loadSeasonGameFixture(ref: string): SeasonGameFixture {
   return parsed.data;
 }
 
-/** Engine surface injected by tests; defaults to the real engine. */
 export interface SeasonGameEngineDeps {
   simulateSeasonGame: typeof simulateSeasonGame;
   checkSeasonGameResult: typeof checkSeasonGameResult;
-  /** M2.4 effects-mode calibration (season-game-targets-v3). */
+
   simulateSeasonGameWithEffects?: typeof simulateSeasonGameWithEffects;
 }
 
-/** Per-game facts posted by the calibration worker; aggregation is
- * order-insensitive so worker counts and chunk order never change results. */
 export interface SeasonGameGameFacts {
   fixtureId: string;
   seedIndex: number;
   seed: string;
   outcome: 'completed' | 'forfeit' | 'no-legal-five-both';
   deterministic: boolean;
-  /** checkSeasonGameResult failure strings for the game. */
+
   checks: string[];
-  /** Starter actual seconds, five per side, in slot order (completed only). */
+
   starterSeconds: number[];
-  /** Bench actual seconds, five per side, in benchOrder (completed only). */
+
   benchSeconds: number[];
-  /** Per bench role (sixth..tenth), actual seconds across both sides. */
+
   benchRoleSeconds: number[][];
-  /** Team points, [home, away] (completed only). */
+
   points: number[];
-  /** Team possessions, [home, away] (completed only). */
+
   possessions: number[];
 }
 
-/**
- * Simulates one calibration game twice (determinism evidence) and derives the
- * per-game facts. Shared by the worker (real engine) and the in-process test
- * runner (injected doubles). With `effects` set, the M2.4 stamina/chemistry
- * seam is applied on top of the fixture input (season-game-targets-v3).
- */
 export async function simulateSeasonGameFacts(
   fixtureId: string,
   seedIndex: number,
@@ -165,9 +141,7 @@ export async function simulateSeasonGameFacts(
     first = firstOutcome.result;
     second = secondOutcome.result;
     checks = first.outcome === 'completed' ? deps.checkSeasonGameResult(first, effectsInput) : [];
-    // The neutral-replay determinism check inside checkSeasonGameResult is
-    // expected to differ under effects; determinism is verified by the
-    // double-run below.
+
     checks = checks.filter((failure) => !failure.startsWith('determinism:'));
   } else {
     first = deps.simulateSeasonGame(input, context);
@@ -212,7 +186,7 @@ export interface SeasonGameCohortRequest {
   fixtures: Array<{ fixtureId: string; path: string }>;
   seedIndices: number[];
   workers: number;
-  /** M2.4: run the cohort through the stamina/chemistry seam. */
+
   effects?: boolean;
 }
 
@@ -220,11 +194,6 @@ export type SeasonGameCohortRunner = (
   request: SeasonGameCohortRequest,
 ) => Promise<SeasonGameGameFacts[]>;
 
-/**
- * Worker-based cohort runner: each (fixture, seed-range chunk) is simulated
- * in a worker thread; the main thread only concatenates per-game facts, so
- * every aggregate is a pure fold over (fixture, seed).
- */
 export async function runSeasonGameCohort(
   request: SeasonGameCohortRequest,
 ): Promise<SeasonGameGameFacts[]> {
@@ -249,8 +218,6 @@ export async function runSeasonGameCohort(
   return chunks.flat();
 }
 
-/** In-process cohort runner for tests: identical chunking to the worker path
- * but calls the injected engine doubles. */
 export async function runSeasonGameCohortInProcess(
   request: SeasonGameCohortRequest,
   deps: SeasonGameEngineDeps,
@@ -358,7 +325,6 @@ function buildSimulatePayload(
   };
 }
 
-/** Actual-vs-target rows for all twenty rostered players. */
 function playerMinutesOf(
   input: SeasonGameSimulationInput,
   result: SeasonGameSimulationResult,
@@ -471,17 +437,11 @@ function renderSimulateDetails(
   return details;
 }
 
-/**
- * Index-based lower median; kept local because the frozen
- * `game-targets-v1` medians were authored with it (regeneration must stay
- * byte-identical; see `stats.ts` for the canonical median).
- */
 function median(values: readonly number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }
 
-/** p1-p99 envelope over one aggregate metric (the frozen calibration band). */
 function envelope(values: readonly number[]): [number, number] {
   const sorted = [...values].sort((a, b) => a - b);
   return [percentile(sorted, 0.01), percentile(sorted, 0.99)];
@@ -498,7 +458,6 @@ export interface SeasonGameFixtureStats {
   failures: { games: number; checks: number; determinism: number };
 }
 
-/** Order-insensitive fold over per-game facts for one fixture. */
 function aggregateFixture(
   fixtureId: string,
   facts: readonly SeasonGameGameFacts[],
@@ -548,8 +507,6 @@ function aggregateFixture(
 }
 
 export interface SeasonGameCalibrateDeps extends Partial<SeasonGameEngineDeps> {
-  /** Cohort runner; defaults to worker threads (real engine) or, when engine
-   * doubles are injected, the in-process runner. */
   runCohort?: SeasonGameCohortRunner;
 }
 
@@ -561,7 +518,7 @@ export async function seasonGameCalibrate(
     workers?: string | null;
     out?: string | null;
     manifest?: string | null;
-    /** M2.4: run the cohort through the stamina/chemistry effects seam. */
+
     effects?: string | null;
   },
   deps: SeasonGameCalibrateDeps = {},
@@ -602,7 +559,6 @@ export async function seasonGameCalibrate(
   ).size;
   const hasAllPresetFixtures = presetCount === 3;
 
-  // Frozen split: indices below 1024 are calibration, 1024+ are held out.
   const calibrationIndices = seedIndexRange(
     seedFrom,
     Math.min(seedTo, SEASON_GAME_CALIBRATION_SEED_COUNT - 1),
@@ -639,7 +595,6 @@ export async function seasonGameCalibrate(
   });
   const durationMs = Date.now() - start;
 
-  // Gate 6: re-run a fixed subset with a single chunk and compare facts.
   const probeIndices = calibrationIndices.slice(0, SEASON_GAME_CHUNKING_PROBE_COUNT);
   const probeFacts = await runCohort({
     fixtures,
@@ -670,11 +625,9 @@ export async function seasonGameCalibrate(
   const balanced = statsByFixture.get('season-game-balanced');
   const benchHeavy = statsByFixture.get('season-game-bench-heavy');
 
-  // Gate 1: zero accounting/legality/ownership/determinism failures.
   const allFacts = [...calibrationFacts, ...validationFacts];
   const zeroFailures = allFacts.every((fact) => fact.checks.length === 0 && fact.deterministic);
 
-  // Gates 2-3: median starter/bench second ordering across the presets.
   const starterOrdering =
     hasAllPresetFixtures &&
     tight !== undefined &&
@@ -690,14 +643,12 @@ export async function seasonGameCalibrate(
     benchHeavy.benchSecondsMedian > balanced.benchSecondsMedian &&
     balanced.benchSecondsMedian > tight.benchSecondsMedian;
 
-  // Gate 4: bench-role medians non-increasing from sixth through tenth.
   const benchRoleNonIncreasing =
     tight !== undefined &&
     balanced !== undefined &&
     benchHeavy !== undefined &&
     [tight, balanced, benchHeavy].every((stat) => nonIncreasing(stat.benchRoleMedianSeconds));
 
-  // Gate 5: held-out aggregate metrics inside the frozen calibration envelopes.
   let heldOutWithin = 0;
   let heldOutTotal = 0;
   for (const fact of validationFacts) {

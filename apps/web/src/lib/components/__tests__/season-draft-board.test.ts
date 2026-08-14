@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import {
@@ -18,13 +16,6 @@ import { SOLO_PARTICIPANT_ID, type SeasonDraftFlowState } from '$lib/season/seas
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
 mockSvelteKitApp();
-
-/**
- * SeasonDraftBoard component tests (M2.3.5): the live ten-round board renders
- * engine facts — round, the current turn's global eight-card offer with
- * selectable/disabled states and coverage reasons, coverage needs, and the
- * selected ten — and routes interactions through the page callbacks.
- */
 
 const LEAGUE = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
 const CATALOG = buildSeasonDraftCatalog();
@@ -51,7 +42,6 @@ function run(
   ).state;
 }
 
-/** Drives engine commands to a draft state with the given step count. */
 function draftState(steps: { drawn?: boolean; picked?: boolean } = {}): SeasonDraftState {
   let state = run(null, {
     kind: 'create-season-draft',
@@ -124,7 +114,7 @@ describe('SeasonDraftBoard component', () => {
     expect(getByText('Round 1 of 10')).not.toBeNull();
     expect(getByText(/your franchise/)).not.toBeNull();
     expect(getByText('Coverage needs')).not.toBeNull();
-    // dd text is split across text + span nodes; read the definition list.
+
     const dl = container.querySelector('dl');
     expect(dl?.textContent).toContain('0/4');
     expect(dl?.textContent).toContain('0/3');
@@ -148,16 +138,16 @@ describe('SeasonDraftBoard component', () => {
     const selectable = offer.cards.filter((card) => card.selectable);
     const disabled = offer.cards.filter((card) => !card.selectable);
     const { getAllByRole, getAllByText, onPick: wired } = renderBoard(state, { pick: onPick });
-    // Every selectable card renders a Pick button.
+
     const pickButtons = getAllByRole('button', { name: 'Pick' });
     expect(pickButtons.length).toBe(selectable.length);
-    // Disabled cards render their coverage reason text.
+
     for (const card of disabled) {
       expect(getAllByText(new RegExp(`Disabled · ${card.coverageReason ?? ''}`)).length).toBe(
         selectable.length === 0 ? 1 : 1,
       );
     }
-    // A selectable card click routes to onPick with the version id.
+
     const firstSelectable = selectable[0];
     if (firstSelectable !== undefined && pickButtons[0] !== undefined) {
       await fireEvent.click(pickButtons[0]);

@@ -50,14 +50,6 @@ import {
   soloInput,
 } from './ai-test-support.ts';
 
-/**
- * Season Run M2.4 roster-generation-v2 tests: percentile tiering (never
- * Overall), league-wide private pools (exclusivity, anchors, tier mixtures),
- * canonical order invariance, rerun equality, seeded variation, statistical
- * extra-elite frequency, and typed failure under scarcity with phase and
- * allocation-state diagnostics. Rules are never relaxed.
- */
-
 function canonicalFacts(result: SeasonLeagueGenerationResult): string {
   const rosters = [...result.rosters]
     .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))
@@ -88,7 +80,7 @@ function canonicalFacts(result: SeasonLeagueGenerationResult): string {
 describe('v2 percentile tiering', () => {
   it('computes nearest-rank thresholds with ties inside the tier', () => {
     const sorted = [1, 2, 2, 2, 10];
-    // p = 0.8, n = 5: Math.ceil(4) - 1 = 3 -> sorted[3] = 2.
+
     expect(nearestRankThreshold(sorted, 0.8)).toBe(2);
     expect(nearestRankThreshold(sorted, 0.2)).toBe(1);
     expect(nearestRankThreshold(sorted, 1)).toBe(10);
@@ -102,7 +94,7 @@ describe('v2 percentile tiering', () => {
       { ...zeroScores(), 'primary-creation': 70 },
       { ...zeroScores(), 'primary-creation': 90 },
     ]);
-    // n = 4: elite = sorted[3] = 90, strong = sorted[2] = 70, useful = sorted[1] = 40.
+
     expect(thresholds['primary-creation']).toEqual({ elite: 90, strong: 70, useful: 40 });
     const elite = percentileTierOf({ ...zeroScores(), 'primary-creation': 90 }, thresholds);
     expect(elite['primary-creation']).toBe('elite');
@@ -161,7 +153,7 @@ describe('v2 league-wide private pools', () => {
       }
     }
     expect(allPoolIds.size).toBe(29 * 20);
-    // No exact version in two rosters either.
+
     const rosterIds = result.ownership.map((o) => o.playerVersionId);
     expect(new Set(rosterIds).size).toBe(300);
     expect(result.aiPools.length).toBe(29);
@@ -198,7 +190,7 @@ describe('v2 league-wide private pools', () => {
       }
     }
     const expectedTotal = expectedPerLeague * seeds;
-    // Generous bounds: between 40% and 160% of the expected count.
+
     expect(extraCount).toBeGreaterThan(expectedTotal * 0.4);
     expect(extraCount).toBeLessThan(expectedTotal * 1.6);
   });
@@ -285,8 +277,7 @@ describe('v2 determinism', () => {
       ...LEAGUE,
       teams: [...LEAGUE.teams].reverse(),
     };
-    // The human roster is fixed across both inputs: it is derived from the
-    // original catalog so the two generations only differ in array order.
+
     const human = humanRoster(CATALOG, 'lakers', '1990s');
     const a = generateAiLeague(soloInput(seedFromString('order-invariance')));
     const b = generateAiLeague({
@@ -312,15 +303,13 @@ describe('v2 determinism', () => {
       for (const id of setA) if (setB.has(id)) shared += 1;
       if (shared < 20) differs += 1;
     }
-    // Meaningful variation: most teams receive different pool assignments.
+
     expect(differs).toBeGreaterThan(20);
   });
 });
 
 describe('v2 scarcity and failure', () => {
   it('fails typed with phase and allocation state when anchors are scarce', () => {
-    // Only eight candidates are elite in any role; 16 guaranteed anchors
-    // cannot be satisfied, so the anchor matching must fail without relaxing.
     const catalog = buildSeasonDraftCatalog({
       franchiseIds: ['lakers', 'celtics', 'bulls', 'warriors', 'heat', 'knicks', 'spurs', 'jazz'],
       eras: ['1980s', '1990s', '2000s', '2010s'],
@@ -371,10 +360,7 @@ describe('v2 scarcity and failure', () => {
       eras: ['1980s', '1990s', '2000s', '2010s'],
       playersPerPool: 20,
     });
-    // Only two center-capable candidates per pool: anchors can still match
-    // (the ten-feasibility gate is satisfied team by team), but the
-    // position-scarcity gate can never be satisfied league-wide, so the pool
-    // filling must exhaust after the repair ladder.
+
     const keepC = new Set<string>();
     catalog.pools.forEach((pool) => {
       pool.playerVersionIds.forEach((versionId, i) => {
@@ -455,7 +441,6 @@ describe('v2 scarcity and failure', () => {
   });
 });
 
-/** All-zero role scores helper. */
 function zeroScores(): Record<(typeof ROSTER_ROLES)[number], number> {
   const scores = {} as Record<(typeof ROSTER_ROLES)[number], number>;
   for (const role of ROSTER_ROLES) scores[role] = 0;
@@ -468,19 +453,13 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
     const strategies = result.evaluations.map(
       (evaluation) => evaluation.minutePlanSummary?.strategy,
     );
-    // Every team records a summary with a strategy from the policy enum.
+
     for (const strategy of strategies) {
       expect(MINUTE_POLICY_STRATEGIES).toContain(strategy);
     }
-    // Observed fixture reality: every team's optimizer run recommends
-    // Starter-Heavy (roster-relative quality weights and zero initial
-    // fatigue make the starter envelope's minute-weighted quality
-    // dominant). Assert the observed distribution so a future calibration
-    // change that diversifies strategies updates this test.
+
     expect(new Set(strategies)).toEqual(new Set(['starter-heavy']));
-    // Structural determinism: the recorded strategy is the same strategy a
-    // fresh optimizer run over the same roster recommends, and its minutes
-    // equal the recorded rotation's minutes.
+
     for (const evaluation of result.evaluations) {
       const rotation = result.rotations.find(
         (candidate) => candidate.franchiseId === evaluation.franchiseId,
@@ -554,9 +533,7 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
     for (const rotation of result.rotations) {
       expect(rotation.targetMinutes).toHaveLength(10);
       expect(rotationTargetMinutes(rotation)).toBe(240);
-      // The optimizer allocates minutes from quality, stamina, and
-      // durability capacities; a roster never comes out as the legacy flat
-      // five-at-32 / five-at-16 template.
+
       expect(rotation.targetMinutes.every((row) => row.minutes === 32 || row.minutes === 16)).toBe(
         false,
       );
@@ -565,10 +542,6 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
   });
 
   it('honors per-roster stamina and durability differences through the AI path', () => {
-    // Same fixture catalog with stamina/durability skewed per candidate
-    // (ratings untouched, so pools, rosters, and selections are unchanged).
-    // The AI path must feed each roster's capacities into the optimizer and
-    // record exactly what a fresh optimizer run over the same roster picks.
     const skewed = buildSeasonDraftCatalog({
       franchiseIds: ['lakers', 'celtics', 'bulls', 'warriors', 'heat', 'knicks', 'spurs', 'jazz'],
       eras: ['1980s', '1990s', '2000s', '2010s'],
@@ -611,12 +584,6 @@ describe('v2 minute-policy rotations (projection milestone)', () => {
   });
 });
 
-/**
- * Recomputes the minute-plan optimizer's recommended rotation for one
- * generated roster, mirroring the generation seam: quality weights from
- * roster-relative mean detailed ratings, stamina/durability from the
- * candidate profiles, zero initial fatigue, and the 10-game horizon.
- */
 function recommendMinutes(
   result: SeasonLeagueGenerationResult,
   franchiseId: string,
@@ -669,7 +636,6 @@ function recommendMinutes(
   return { strategy: recommended, rotation: plan.rotation };
 }
 
-/** Roster-relative quality weights (mirrors the generation seam). */
 function qualityWeightsOf(
   members: readonly {
     playerVersionId: string;

@@ -9,18 +9,6 @@ import {
   SEASON_TEAM_COUNT,
 } from './season-versions.ts';
 
-/**
- * League aggregates and leaders (spec/2.0/02, M2.3, season-aggregates-v1).
- * Every aggregate value is a pure fold over compact completed-game summaries,
- * so a fresh fold always agrees with the stored checkpoint and an audit can
- * reconcile exactly. Standings wins/losses/points come from the official
- * game records (a forfeit counts 2-0); box-derived aggregate fields sum the
- * player stat lines, which are zero for forfeits. The two sources are
- * reconciled by the engine audit: standings and box points agree on every
- * non-forfeit game.
- */
-
-/** Folding totals for one franchise over its played games. */
 export const seasonTeamAggregateSchema = z.object({
   franchiseId: franchiseIdSchema,
   gamesPlayed: z.number().int().nonnegative(),
@@ -44,10 +32,6 @@ export const seasonTeamAggregateSchema = z.object({
 });
 export type SeasonTeamAggregate = z.infer<typeof seasonTeamAggregateSchema>;
 
-/**
- * One zeroed team aggregate row for a franchise with no played games yet
- * (every numeric fold field starts at 0). Passes `seasonTeamAggregateSchema`.
- */
 export function emptySeasonTeamAggregate(franchiseId: string): SeasonTeamAggregate {
   return {
     franchiseId,
@@ -72,18 +56,14 @@ export function emptySeasonTeamAggregate(franchiseId: string): SeasonTeamAggrega
   };
 }
 
-/** Folding totals for one drafted player-version over its played games. */
 export const seasonPlayerAggregateSchema = z.object({
   playerVersionId: playerVersionIdSchema,
-  /** Owning franchise of this version (ownership is exclusive). */
+
   franchiseId: franchiseIdSchema,
   gamesPlayed: z.number().int().nonnegative(),
-  /**
-   * M2.6 awards facts: games with recorded on-court seconds greater than
-   * zero (a zero-second line is not an appearance).
-   */
+
   appearances: z.number().int().nonnegative(),
-  /** Games the player was in the actual opening lineup (from the first period-1 stint). */
+
   started: z.number().int().nonnegative(),
   seconds: z.number().int().nonnegative(),
   points: z.number().int().nonnegative(),
@@ -103,10 +83,6 @@ export const seasonPlayerAggregateSchema = z.object({
 });
 export type SeasonPlayerAggregate = z.infer<typeof seasonPlayerAggregateSchema>;
 
-/**
- * One zeroed player aggregate row for a version with no played games yet
- * (every numeric fold field starts at 0). Passes `seasonPlayerAggregateSchema`.
- */
 export function emptySeasonPlayerAggregate(
   playerVersionId: string,
   franchiseId: string,
@@ -135,7 +111,6 @@ export function emptySeasonPlayerAggregate(
   };
 }
 
-/** Per-category leader tables (identity = playerVersionId). */
 export const seasonLeaderCategorySchema = z.enum([
   'points',
   'rebounds',
@@ -150,9 +125,9 @@ export const seasonLeaderEntrySchema = z.object({
   playerVersionId: playerVersionIdSchema,
   franchiseId: franchiseIdSchema,
   gamesPlayed: z.number().int().nonnegative(),
-  /** Category total over eligible games. */
+
   value: z.number().nonnegative(),
-  /** value / gamesPlayed (rate categories only; still provided). */
+
   perGame: z.number().nonnegative(),
 });
 export type SeasonLeaderEntry = z.infer<typeof seasonLeaderEntrySchema>;
@@ -160,7 +135,7 @@ export type SeasonLeaderEntry = z.infer<typeof seasonLeaderEntrySchema>;
 export const seasonLeadersSchema = z.object({
   schemaVersion: z.literal(1),
   leadersVersion: z.literal(SEASON_LEADERS_VERSION),
-  /** Eligibility and tie-break facts are frozen (see module docstring). */
+
   minimumGameShare: z.literal(SEASON_LEADER_MIN_GAME_SHARE),
   depth: z.literal(SEASON_LEADER_DEPTH),
   categories: z.object({
@@ -174,19 +149,12 @@ export const seasonLeadersSchema = z.object({
 });
 export type SeasonLeaders = z.infer<typeof seasonLeadersSchema>;
 
-/**
- * Both aggregate tables, canonically sorted, ready for storage and digests.
- * M2.6.5 (season-aggregates-v2): `players` accepts 300-450 rows as acquired
- * players begin appearing (rows are created at signing application, so a
- * fresh run starts at 300 and grows); presentation merges absent rows as
- * factual zero-game/zero-minute records rather than inventing them.
- */
 export const seasonAggregatesSchema = z.object({
   schemaVersion: z.literal(1),
   aggregatesVersion: z.literal(SEASON_AGGREGATES_VERSION),
-  /** Sorted by franchiseId ascending. */
+
   teams: z.array(seasonTeamAggregateSchema).length(SEASON_TEAM_COUNT),
-  /** Sorted by playerVersionId ascending (300-450 rows). */
+
   players: z
     .array(seasonPlayerAggregateSchema)
     .min(300)

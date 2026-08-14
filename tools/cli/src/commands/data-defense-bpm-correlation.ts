@@ -8,23 +8,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { defenseBpmCorrelationReportSchema } from '../report-schemas.ts';
 import { tryReadJson } from '../io.ts';
 
-/**
- * `data defense-bpm-correlation`: Pearson correlation between packaged
- * pool defenseRating and the raw source season box plus/minus
- * (raw-data/nba/<season>/season-stats.json, matched by playerExternalId and
- * season). Gates: sample >= 1000 and r <= 0.92.
- *
- * The gate is a regression check, not a zero-dependency claim: BPM is itself
- * a box-stat-derived aggregate, so an evidence-driven defense rating built
- * from steals/blocks/rebounds (ratings-v3.6, no BPM in any defensive
- * formula) measured r = 0.8916 vs 0.9439 before the BPM removal. Reaching
- * the previous 0.75 target is structurally impossible without gutting the
- * box-stat evidence: steals alone correlate 0.75 with BPM, blocks 0.78, and
- * the guard/center style split (perimeterDefense vs interiorDefense,
- * r = -0.55) amplifies any blend. The 0.92 gate therefore documents the
- * expected ceiling of an honest defensive summary.
- */
-
 export const DATA_DEFENSE_BPM_CORRELATION_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
@@ -34,10 +17,6 @@ interface DefenseBpmCorrelationOptions {
   input: string;
 }
 
-/**
- * Pearson product-moment correlation coefficient; null when the inputs have
- * fewer than two pairs or either side has zero variance.
- */
 export function pearsonCorrelation(xs: readonly number[], ys: readonly number[]): number | null {
   const n = xs.length;
   if (n !== ys.length || n < 2) return null;
@@ -63,7 +42,6 @@ function round4(value: number): number {
   return Math.round(value * 10000) / 10000;
 }
 
-/** Correlates packaged defenseRating with the raw source box plus/minus. */
 export function defenseBpmCorrelation(options: DefenseBpmCorrelationOptions): CliReport {
   const rawManifest = tryReadJson(options.input);
   const parsedManifest = hoopRushManifestSchema.safeParse(rawManifest);

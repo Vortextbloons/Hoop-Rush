@@ -27,18 +27,6 @@ import {
 } from './gen-season-free-agency-index.ts';
 import { sha256Hex } from './io.ts';
 
-/**
- * M2.6.5 free-agent eligibility index tests (spec/2.0/15): committed-artifact
- * golden acceptance (regeneration must reproduce the committed artifact
- * byte-for-byte), determinism, band sanity (no elite admission, at most one
- * featured per identity, exclusion evidence for excluded siblings),
- * card-fact bounds, catalogRef resolution, and the compactness gate.
- * The derivation runs the real packaged catalog (~7,900 candidates) through
- * the authoritative engine scoring seam, so this suite is the slow one for
- * the CLI package; the derivation runs once for the whole file.
- */
-
-/** Role scores of one candidate through the authoritative engine seam. */
 function roleScoresOf(
   candidate: SeasonDraftCatalog['candidates'][number],
 ): Record<SeasonRosterRole, number> {
@@ -171,8 +159,6 @@ describe('free-agency index band sanity', () => {
       evidenceByIdentity.set(entry.playerId, `${joined} ${entry.exclusionEvidence}`);
     }
     for (const [playerId, excluded] of excludedByIdentity) {
-      // Identities with no surviving eligible version cannot carry evidence;
-      // every identity that DOES survive must cite all its excluded siblings.
       if ((indexedByIdentity.get(playerId) ?? 0) === 0) continue;
       const evidence = evidenceByIdentity.get(playerId) ?? '';
       expect(evidence, `identity ${playerId}`).not.toBe('');

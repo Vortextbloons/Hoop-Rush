@@ -24,59 +24,39 @@ import {
   type PositionResponsibilityModifiers,
 } from './position-responsibilities.ts';
 
-/**
- * Authoritative identity key for possession lookups and accounting
- * (spec/2.0/04 M2.2): `playerVersionId` when present, otherwise `playerId`.
- * Season Run players carry a playerVersionId so two historical versions of
- * one person (same playerId) never collide in a shared side; Classic/sandbox
- * players have no playerVersionId and key by playerId, keeping the Classic
- * path byte-identical. Lookups consume no RNG, so the key change never
- * alters a draw sequence.
- */
 export function enginePlayerKey(player: SimulationPlayer): string {
   return player.playerVersionId ?? player.playerId;
 }
 
-/**
- * One-time per-game weight and lookup tables for one team. Every value is a
- * pure function of the immutable player snapshots and the era profile, so
- * precomputing once per game leaves the RNG draw sequence untouched (all
- * `weightedPick` calls consume the same weight values in the same order).
- */
 export interface TeamPrep {
-  /** Slot lookup keyed by enginePlayerKey (playerVersionId ?? playerId). */
   slotByPlayerId: Map<string, number>;
   initiatorWeights: number[];
-  /** Per-initiator action weight tables, keyed by playerId. */
+
   actionWeights: Map<string, number[]>;
-  /** Per-initiator teammate shot weights (roll and pass variants), keyed by playerId. */
+
   teammateShots: Map<string, TeammateShots>;
-  /** Rebound attribution weights: [offensive, defensive], in team index order. */
+
   rebounderWeights: [number[], number[]];
   foulerWeights: number[];
   freeThrowShooterWeights: number[];
   stealerWeights: number[];
-  /** Team-mean offensive rebound rating. */
+
   offensiveReboundMean: number;
-  /** Team-mean defensive rebound rating. */
+
   defensiveReboundMean: number;
   pressure: number;
   stealAbility: number;
-  /** Lineup spacing (0..1), used by the two-point efficiency anchor. */
+
   spacing: number;
-  /** Per-player pristine zone blends and three-point targets, keyed by playerId. */
+
   zonePrep: Map<string, ZonePrep>;
-  /** Per-player two-point anchor factors, keyed by playerId. */
+
   twoPointAnchor: Map<string, number | null>;
-  /**
-   * Assigned-position responsibility modifiers, keyed by playerId (pure
-   * functions of the slot index and versioned constants; consumed by the
-   * initiator, action, roll-man, defender, and rebounder weights).
-   */
+
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>;
   defenderBase: DefenderBase;
   freeThrowP: number[];
-  /** Per-initiator pass probabilities (parallel to ACTION_TYPES), keyed by playerId. */
+
   passP: Map<string, number[]>;
 }
 
@@ -96,12 +76,7 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
     const key = enginePlayerKey(player);
     slotByPlayerId.set(key, slot);
     const positionModifiers = responsibilityModifiersForSlot(slot);
-    // Keyed by engine identity for possession lookups. The playerId alias
-    // keeps the weight functions that look up by playerId (teamInitiatorWeights,
-    // teammateShotWeights, pickDefender, rebounderWeights) working for Season
-    // players; for Classic players both keys coincide. Two versions of one
-    // person sharing the same active five would alias to the last version's
-    // modifiers via the playerId key only.
+
     positionModifiersByPlayer.set(key, positionModifiers);
     positionModifiersByPlayer.set(player.playerId, positionModifiers);
     actionWeightsByPlayer.set(key, actionWeights(player, positionModifiers));
@@ -147,14 +122,6 @@ export function prepareTeam(team: SimulationTeam, profile: EraSimulationProfile)
   };
 }
 
-/**
- * Memoized preparation for identical (team, profile) pairs. prepareTeam is
- * pure and every prep value is consumed read-only (weightedPick never
- * mutates weights; pickZone copies before mutating), so repeated benchmark,
- * calibration, and bracket sample games against the same team objects reuse
- * the per-game tables instead of rebuilding them. Entries die with their
- * team objects (WeakMap), so a long Season Run cannot grow unbounded.
- */
 const prepCache = new WeakMap<SimulationTeam, { profile: EraSimulationProfile; prep: TeamPrep }>();
 
 export function prepareTeamCached(team: SimulationTeam, profile: EraSimulationProfile): TeamPrep {

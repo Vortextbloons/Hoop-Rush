@@ -7,16 +7,6 @@
   import SeriesCard from './SeriesCard.svelte';
   import PlayInCard from './PlayInCard.svelte';
 
-  /**
-   * Postseason bracket (M2.6, /season/run/postseason): desktop renders the
-   * tournament as round columns — Play-In, First Round, Conference Semis,
-   * Conference Finals, Finals — with the east matchups first and the west
-   * below; mobile renders the same series as ordered cards under round
-   * headings. Play-In games render in a visually distinct dashed-card
-   * format (different phase, different format). Pure display of the
-   * recorded postseason state; the human team is highlighted.
-   */
-
   let {
     postseason,
     franchiseName,
@@ -36,7 +26,6 @@
 </script>
 
 <div class="min-w-0">
-  <!-- Desktop: round columns -->
   <div class="hidden gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-5">
     {#each columns as column (column.key)}
       <section aria-labelledby={`bracket-column-${column.key}`} class="min-w-0">
@@ -81,7 +70,6 @@
     {/each}
   </div>
 
-  <!-- Mobile: ordered series cards -->
   <ol class="flex flex-col gap-5 md:hidden">
     {#each mobileCards as entry (entry.kind === 'play-in' ? entry.column.conference : entry.card.seriesId)}
       {#if entry.kind === 'play-in'}

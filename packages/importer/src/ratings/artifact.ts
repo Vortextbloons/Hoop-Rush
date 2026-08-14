@@ -8,7 +8,6 @@ import {
 import { fileExists, readJson } from '../json.ts';
 import { PUBLIC_DATA } from '../config.ts';
 
-/** The checked-in fallback is itself a frozen artifact, never an implicit sim. */
 export const DEFAULT_RATINGS_MODEL_ARTIFACT: RatingsModelArtifact = {
   schemaVersion: 2,
   modelVersion: RATING_MODEL_VERSION,
@@ -43,7 +42,6 @@ export function loadRatingsModelArtifact(
   return artifact;
 }
 
-/** The artifact is immutable per build; repeat loads (per season) reuse it. */
 const ratingsModelArtifactByPath = new Map<string, RatingsModelArtifact>();
 
 function loadRatingsModelArtifactUncached(path: string): RatingsModelArtifact {

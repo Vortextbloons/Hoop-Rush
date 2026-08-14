@@ -42,22 +42,6 @@ import {
   type CommitSeasonBlockInput,
 } from './season-run.ts';
 
-/**
- * Season Run repository contract tests (spec/2.0/07 persistence, spec/2.0/10
- * M2.3, M2.4). The dedicated v6 tables isolate the active run from the
- * Challenge and Classic stores. `commitSeasonBlock` is one atomic
- * transaction: a failure before or inside the transaction writes nothing and
- * the accepted checkpoint never advances; a failed promotion leaves the
- * draft intact. Every load validates stored rows and audits aggregate and
- * M2.4 effects-state reconciliation, so corrupt rows throw a typed
- * `SeasonRunLoadError` instead of entering app state. Stored development
- * rows (save-schema v1/v2, schema-4 and schema-5 runs) are auto-cleared at
- * load and reported as null: they are never read, migrated, or preserved.
- * The engine math comes through the stub seam (documented pure semantics),
- * keeping these tests independent of the engine agent's parallel
- * block-pipeline work.
- */
-
 interface Adapters {
   db: TestDatabase;
   repo: DexieSeasonRunRepository;
@@ -69,16 +53,11 @@ interface Adapters {
   seam: ReturnType<typeof buildStubSeasonEngineSeam>;
 }
 
-// Read-only full-season fixture data shared by every test in this file.
-// Each test only clones or spreads `run`/`blocks`/`schedule`, so one
-// module-level build (schema parse of the 1,230-game snapshot) replaces a
-// per-test rebuild of the full dataset.
 const sharedDataset = buildFullSeasonDataset({
   seam: buildStubSeasonEngineSeam(),
   runId: 'season-run-contract-test',
 });
 
-/** Fresh repositories with one isolated database and the stub engine seam. */
 function makeAdapters(): Adapters {
   const db = new TestDatabase(testDatabaseName('season-run'));
   const seam = buildStubSeasonEngineSeam();
@@ -134,7 +113,6 @@ function commitInputFor(
   };
 }
 
-/** A locked rotation set: the run's rotations with the human team edited. */
 function lockedRotationSet(dataset: Pick<Adapters, 'run'>): SeasonRun['rotations'] {
   return dataset.run.rotations.map((rotation) =>
     rotation.franchiseId === 'lakers'
@@ -529,7 +507,6 @@ describe('season run repository (dexie)', () => {
 });
 
 describe('season run development-row auto-clear (M2.4)', () => {
-  /** Minimal-but-faithful stored save-schema-v1 row (schema-4 run). */
   function developmentV1Row(runId: string): Record<string, unknown> {
     return {
       recordId: SEASON_RUN_RECORD_ID,
@@ -542,7 +519,6 @@ describe('season run development-row auto-clear (M2.4)', () => {
     };
   }
 
-  /** Development v2 row (schema-5 run, pre-v3 wrapper with effects). */
   function developmentV2Row(adapters: Adapters): Record<string, unknown> {
     const { run } = adapters;
     const { games: _games, ...runWithoutGames } = run;
@@ -576,7 +552,6 @@ describe('season run development-row auto-clear (M2.4)', () => {
     return row;
   }
 
-  /** Rewrites the stored row with a mutated effects state (schema-valid writes only). */
   async function corruptStoredEffects(
     adapters: Adapters,
     mutate: (effects: SeasonEffectsState) => SeasonEffectsState,
@@ -1015,7 +990,7 @@ describe('season run M2.5 pending blocks (v5)', () => {
     await promote(adapters);
     const block = blocks[0];
     if (block === undefined) throw new Error('expected fixture block 0');
-    // Interruption after 60 of the block's 150 games.
+
     const partial = block.summaries.slice(0, 60);
     const pending = buildFixturePendingBlock({
       run,
@@ -1037,8 +1012,7 @@ describe('season run M2.5 pending blocks (v5)', () => {
       }),
     );
     expect(await db.seasonPendingBlocks.count()).toBe(1);
-    // Resume completes the block: the pending's partial summaries plus the
-    // remaining games form the full block (the union, no duplicates).
+
     await repo.commitSeasonBlock(commitInputFor(adapters, 0));
     expect(await db.seasonPendingBlocks.count()).toBe(0);
     expect(await repo.loadPendingBlock(run.runId)).toBeNull();
@@ -1131,7 +1105,6 @@ describe('season run M2.5 command application (v5)', () => {
     } as SeasonRunCommand;
   }
 
-  /** The engine-produced post-command run (objective selected, revision +1). */
   function postCommandRun(adapters: Adapters): SeasonRun {
     const { run } = adapters;
     const objectives = {
@@ -1205,8 +1178,7 @@ describe('season run M2.5 command application (v5)', () => {
       run: postCommandRun(adapters),
       pending: null,
     });
-    // The same command id again (with the now-current state facts): the id
-    // is already recorded via the objective selection.
+
     await expect(
       repo.applySeasonRunCommand({
         runId: run.runId,
@@ -1266,7 +1238,7 @@ describe('season run M2.5 command application (v5)', () => {
         unavailablePlayerVersionIds: ['pv-' + '1'.repeat(32)],
       }),
     );
-    // A forfeit command advances the pending to the next game.
+
     const advanced = { ...pending, nextGameId: 's000017' };
     await repo.applySeasonRunCommand({
       runId: run.runId,
@@ -1361,26 +1333,13 @@ describe('season run M2.5 reload audit (v5)', () => {
     expect(snapshot?.run.stateDigest).toBe(postCommitDigest);
   });
 
-  /**
-   * Regression (rotation-edit divergence): the block runner commits the
-   * LOCKED rotation set (the human team's pending edit included) as the
-   * stored rotations, so the post-block state digest must cover that same
-   * set. Committing edited rotations whose digest was computed over the
-   * pre-submission set is exactly the corruption that surfaced as
-   * "run.effects diverged from the last checkpoint effects without a trade
-   * window (last block stateDigest does not recompute over the stored
-   * facts); stored stateDigest does not recompute over the stored mutable
-   * state" after a reload.
-   */
   it('repairs a committed digest that covered the pre-lock rotation set', async () => {
     const adapters = makeAdapters();
     const { repo, run } = adapters;
     await promote(adapters);
     const base = commitInputFor(adapters, 0);
     const locked = lockedRotationSet(adapters);
-    // The commit rebuilds checkpointState with the locked-set rotation digest
-    // (engine `deriveSeasonPostBlockState`); the divergence is the DIGEST
-    // covering the pre-submission rotations while the commit stores locked.
+
     const checkpointState = {
       ...base.checkpointState,
       rotationDigest: adapters.seam.seasonRotationSetDigest(locked),
@@ -1442,9 +1401,6 @@ describe('season run M2.5 reload audit (v5)', () => {
     const lockedDigest = adapters.seam.seasonRotationSetDigest(locked);
     expect(lockedDigest).not.toBe(base.rotationDigest);
 
-    // Legacy failure signature: the edited rotations were stored, while
-    // the accepted block, checkpoint identity, and state digest retained
-    // the pre-edit lock.
     await repo.commitSeasonBlock({
       ...base,
       rotations: locked,
@@ -1688,8 +1644,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       expectedStateDigest: run.stateDigest,
       nextGameId: 's000016',
     });
-    // The repo guard rejects this via savePendingBlock; a row written
-    // directly (corruption) is caught by the reload audit.
+
     await db.seasonPendingBlocks.put({
       runId: run.runId,
       block: pending,
@@ -1731,8 +1686,7 @@ describe('season run M2.5 reload audit (v5)', () => {
     const { db, repo, run } = adapters;
     const fixture = buildFixtureRun({ runId: run.runId });
     const { games: _games, ...runWithoutGames } = fixture;
-    // The fixture run now carries the schema-8 minute-policy shape; a
-    // genuine M2.4-era row stores a schema-7 run under save schema 3.
+
     const legacyRun = {
       ...runWithoutGames,
       schemaVersion: 7,

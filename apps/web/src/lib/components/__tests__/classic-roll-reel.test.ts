@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/svelte';
 import { tick } from 'svelte';
@@ -80,8 +78,6 @@ describe('ClassicRollReel', () => {
     expect(eraStrip?.classList.contains('reel-spinning')).toBe(true);
     expect(container.querySelector(LIVE_REGION)?.textContent).toBe('');
 
-    // The spin settles: the reels unmount into the result indicator and the
-    // modal stays open with the final pair announced.
     await vi.advanceTimersByTimeAsync(950);
     expect(container.querySelector(FRANCHISE_STRIP)).toBeNull();
     expect(container.querySelector(RESULT)).not.toBeNull();
@@ -91,7 +87,6 @@ describe('ClassicRollReel', () => {
     expect(container.querySelector(LIVE_REGION)?.textContent).toBe(ANNOUNCE_TEXT);
     expect(onSettled).not.toHaveBeenCalled();
 
-    // The result beat ends and the modal closes with onSettled.
     await vi.advanceTimersByTimeAsync(850);
     expect(container.querySelector(OVERLAY)).toBeNull();
     expect(onSettled).toHaveBeenCalledTimes(1);
@@ -187,7 +182,6 @@ describe('ClassicRollReel', () => {
   it('settles early when spinDurationMs shortens the spin', async () => {
     const { container, onSettled } = renderReel({ spinKey: 1, spinDurationMs: 100 });
 
-    // With a 100 ms spin the reels settle well before the default 900 ms.
     await vi.advanceTimersByTimeAsync(300);
     expect(container.querySelector(RESULT)).not.toBeNull();
     expect(onSettled).not.toHaveBeenCalled();
@@ -214,7 +208,6 @@ describe('ClassicRollReel', () => {
     await tick();
     expect(container.querySelector(OVERLAY)).toBeNull();
 
-    // The pending result timer must not double-fire onSettled.
     await vi.advanceTimersByTimeAsync(5000);
     expect(onSettled).toHaveBeenCalledTimes(1);
   });

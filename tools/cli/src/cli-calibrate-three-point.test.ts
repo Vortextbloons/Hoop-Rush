@@ -5,13 +5,6 @@ import { threePointReconstructionArtifactSchema } from '@hoop-rush/data-contract
 import { threePointCalibrateReportSchema } from './report-schemas.ts';
 import { jsonPayload, runCli, withTmpDir } from './cli-test-helpers.ts';
 
-/**
- * `calibrate three-point` (spec/12): fits the conservative reconstruction
- * over the 1979-80..1983-84 cohort. The deterministic fit takes ~15-20s per
- * invocation, so the suite is limited to two invocations: one fit-only run
- * (JSON payload assertions) and one write run (default text output, which
- * also covers the text-format contract).
- */
 const CALIBRATE_TIMEOUT = 120_000;
 
 describe('cli: calibrate three-point', () => {

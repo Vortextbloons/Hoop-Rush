@@ -1,9 +1,3 @@
-/**
- * Artifact assembly, validation, and loading for the conservative
- * three-point reconstruction (spec/12). The checked-in artifact and the
- * `calibrate three-point` report are the audit/reproducibility boundary;
- * derivation consumes only the per-player profiles predicted from it.
- */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -36,15 +30,10 @@ import {
   type ReconstructionRow,
 } from './rows.ts';
 
-/** Default checked-in artifact path (apps/web/static/data). */
 export function reconstructionArtifactPath(): string {
   return join(PUBLIC_DATA, 'three-point-reconstruction-v1.json');
 }
 
-/**
- * Attempt-weighted fifth percentile (conservative floor source). Percentile
- * is computed over the sorted distribution with linear interpolation.
- */
 export function weightedPercentile(
   values: readonly { value: number; weight: number }[],
   percentile: number,
@@ -84,7 +73,7 @@ export function buildRatingMapping(
 
 export interface FitResult {
   artifact: ThreePointReconstructionArtifact;
-  /** Per-model holdout metrics (also embedded in the artifact). */
+
   holdout: {
     accuracy: ReconstructionMetrics;
     attemptRate: ReconstructionMetrics;
@@ -96,16 +85,10 @@ export interface FitResult {
     meanBiasNonPositiveTranslatedAttemptRate: boolean;
     floorBelowEstablished: boolean;
   };
-  /** Per-model conservative estimates over the fit cohort (for reports). */
+
   cohortEstimates: { accuracy: number[]; attemptRate: number[] };
 }
 
-/**
- * Fits both models over the early three-point cohort and assembles the
- * complete artifact. Deterministic: same cohort rows -> same artifact.
- * The conservative modern translation is validated against the modern
- * cohort (2014-15..2023-24); its non-positive bias is the attempt gate.
- */
 export const ATTEMPT_TRANSLATION = {
   factor: 2.5,
   caps: { G: 0.15, F: 0.08, C: 0.02 },
@@ -263,7 +246,6 @@ export function fitThreePointReconstruction(
   };
 }
 
-/** Loads the checked-in artifact, failing loudly when it is absent or invalid. */
 export function loadThreePointReconstructionArtifact(
   path: string = reconstructionArtifactPath(),
 ): ThreePointReconstructionArtifact {
@@ -274,7 +256,6 @@ export function loadThreePointReconstructionArtifact(
   return artifact;
 }
 
-/** The artifact is immutable per build; repeat loads (per season) reuse it. */
 const threePointArtifactByPath = new Map<string, ThreePointReconstructionArtifact>();
 
 function loadThreePointReconstructionArtifactUncached(
@@ -296,7 +277,6 @@ function loadThreePointReconstructionArtifactUncached(
   return parsed.data;
 }
 
-/** Writes the artifact to its checked-in path (after gate validation). */
 export function writeThreePointReconstructionArtifact(
   artifact: ThreePointReconstructionArtifact,
   path: string = reconstructionArtifactPath(),
@@ -312,7 +292,7 @@ export function writeThreePointReconstructionArtifact(
     throw new Error('refusing to write artifact: reconstructed floor not below the .32/.34 floors');
   }
   writeFileSync(path, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
-  // A fresh write supersedes any memoized load for the same path.
+
   threePointArtifactByPath.delete(path);
 }
 

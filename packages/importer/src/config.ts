@@ -1,11 +1,7 @@
-/**
- * Configuration for the import pipeline (port of scripts/import-nba/config.py).
- */
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
-// …/packages/importer/src/ -> repo root is three levels up.
 const SRC_DIR = dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = resolve(SRC_DIR, '..');
 export const REPO_ROOT = resolve(PACKAGE_ROOT, '..', '..');
@@ -16,10 +12,6 @@ export const NBA_ROOT = process.env.HOOP_RUSH_NBA_ROOT ?? join(REPO_ROOT, 'raw-d
 export const RAW_CACHE = join(REPO_ROOT, '.raw_nba_cache');
 mkdirSync(RAW_CACHE, { recursive: true });
 
-/**
- * Versioned supported-season configuration (spec/12): the 1960-61 through
- * 1989-90 historical band plus the existing 1990s-2020s coverage.
- */
 export const DEFAULT_SEASONS = [
   '2025-26',
   '2024-25',
@@ -89,11 +81,6 @@ export const DEFAULT_SEASONS = [
   '1960-61',
 ];
 
-/**
- * Source availability boundaries (spec/12): the first NBA season in which a
- * field family is a validated observation. Earlier values are `null` with
- * `not-applicable` or `unavailable` source status — never converted zeros.
- */
 export const FIELD_AVAILABILITY: Record<string, string> = {
   steals: '1973-74',
   blocks: '1973-74',

@@ -6,16 +6,6 @@ import {
   type SeasonStandingsRow,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Pure standings reduction from finalized game facts (spec/2.0/02). The
- * standings table is never maintained as a separately mutable source: every
- * row, split, and head-to-head aggregate derives from the completed game
- * records, so `reduceSeasonStandings` always agrees with the games and
- * `auditSeasonStandings` cross-checks a stored table against a fresh
- * reduction. Forfeited games count as the official 2-0 result.
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
 interface PlayedGame {
   game: SeasonGame;
   winner: string;
@@ -28,7 +18,6 @@ function isForfeit(game: SeasonGame): boolean {
   return game.status === 'forfeit';
 }
 
-/** The winner, loser, and points contribution of one played game. */
 function playedGameOf(game: SeasonGame): PlayedGame {
   if (isForfeit(game)) {
     const loser = game.forfeitLoserFranchiseId;
@@ -74,10 +63,6 @@ function playedGameOf(game: SeasonGame): PlayedGame {
   };
 }
 
-/**
- * Reduces finalized game records into standings rows. `scheduled` games are
- * ignored; every referenced franchise must belong to the league.
- */
 export function reduceSeasonStandings(
   league: SeasonLeague,
   games: readonly SeasonGame[],
@@ -182,12 +167,6 @@ export function reduceSeasonStandings(
   };
 }
 
-/**
- * Audits a stored standings table against the finalized game records. Returns
- * a failure list; an empty list means every row, split, score, and
- * head-to-head aggregate reconciles exactly with the games (including 2-0
- * forfeits).
- */
 export function auditSeasonStandings(
   league: SeasonLeague,
   games: readonly SeasonGame[],

@@ -8,15 +8,6 @@ import type {
 import { formatPositions } from '$lib/player-positions';
 import { candidateOf } from '$lib/season/season-catalog-index';
 
-/**
- * M2.5 trade presentation (season-trade-v1). Pure derivation of display
- * facts for generated trade offers: player names from the run rosters,
- * value-band labels, role-fit and roster-need notes from the recorded
- * facts, the projected rotation change, and the chemistry disruption
- * counts. The open-window derivation and offer resolution labels render
- * recorded status facts only; the engine owns offer generation.
- */
-
 export interface TradePlayerViewModel {
   playerVersionId: string;
   displayName: string;
@@ -29,9 +20,9 @@ export interface TradePlayerViewModel {
   overallRating: number | null;
   offenseRating: number | null;
   defenseRating: number | null;
-  /** Current rotation minutes per game (outgoing players only). */
+
   rotationMinutes: number | null;
-  /** Projected minutes after the trade (incoming players only). */
+
   projectedMinutes: number | null;
 }
 
@@ -59,7 +50,6 @@ export interface TradeOfferViewModel {
   statusLabel: string;
 }
 
-/** Windows open after accepted checkpoints for blocks 2, 4, 5. */
 export const TRADE_WINDOW_BLOCK_INDEX: readonly number[] = [2, 4, 5];
 
 export function windowBlockIndexOf(windowIndex: number): number | null {
@@ -242,10 +232,9 @@ export function tradeOfferViewModel(
       []
     );
   };
-  // The view-model accepts partial run shapes (test fixtures and legacy
-  // rows can omit rotations); the frozen SeasonRun type says non-optional.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  const rotation = run.rotations?.find((entry) => entry.franchiseId === offer.toFranchiseId);
+  const rotation = (run.rotations as SeasonRun['rotations'] | undefined)?.find(
+    (entry) => entry.franchiseId === offer.toFranchiseId,
+  );
   const minutesById = new Map(
     (rotation?.targetMinutes ?? []).map((entry) => [entry.playerVersionId, entry.minutes]),
   );
@@ -322,7 +311,6 @@ export function tradeOfferViewModel(
   };
 }
 
-/** The first open trade window (the one the human can act on), or null. */
 export function openWindowOf(trade: SeasonTradeState | null): SeasonTradeWindowState | null {
   return trade?.windows.find((window) => window.status === 'open') ?? null;
 }
@@ -339,7 +327,7 @@ export function humanTradeOffersOf(
 export interface TradeResolution {
   status: SeasonTradeOffer['status'];
   label: string;
-  /** The block whose submission closed an expired offer (null otherwise). */
+
   resolvedByBlockIndex: number | null;
 }
 

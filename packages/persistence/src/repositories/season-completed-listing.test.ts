@@ -30,17 +30,6 @@ import {
   seasonRotationSetDigestFixture,
 } from '../testing/season-run-fixture.ts';
 
-/**
- * M2.6 completed-season listing and completion-transaction tests
- * (spec/2.0/07 persistence): no completed-history entry exists before a
- * champion promotion succeeds; `listCompletedSeasonRuns` returns the
- * validated metadata rows newest-first; `loadCompletedSeason` round-trips the
- * final run (including engine awards), the almanac, and the command log;
- * regular-season records survive completion; deletion is scoped to one run;
- * and EVERY write of the promotion transaction rolls back completely when it
- * fails.
- */
-
 const DIGEST_32 = '0'.repeat(32);
 
 interface Adapters {
@@ -67,7 +56,6 @@ async function promote(adapters: Adapters): Promise<void> {
   await adapters.repo.promoteSeasonDraftToRun(buildFixtureStoredDraft(adapters.run), adapters.run);
 }
 
-/** The engine-facing run after one advancement: stage, revision + 1, recomputed digest. */
 function advancedRun(adapters: Adapters, stage: SeasonRun['stage']): SeasonRun {
   const next: SeasonRun = {
     ...adapters.run,
@@ -218,7 +206,6 @@ function advancementInput(
   };
 }
 
-/** Advances the run once (play-in stage), keeping `adapters.run` current. */
 async function advanceOnce(adapters: Adapters, commandId = 'cmd-adv-1'): Promise<void> {
   const command = commandOf(adapters.run, 'start-postseason', commandId);
   const next = advancedRun(adapters, 'play-in');
@@ -228,7 +215,6 @@ async function advanceOnce(adapters: Adapters, commandId = 'cmd-adv-1'): Promise
   adapters.run = next;
 }
 
-/** A completed postseason state over the fixture league (validated shape). */
 function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun['postseason'] {
   const east = adapters.run.league.teams
     .filter((team) => team.conference === 'east')
@@ -316,7 +302,6 @@ function completedPostseasonOf(adapters: Adapters, champion: string): SeasonRun[
   };
 }
 
-/** The final engine-facing completed run over the fixture league. */
 function completedRunOf(
   adapters: Adapters,
   stateRevision: number,
@@ -339,7 +324,6 @@ function completedRunOf(
   return { ...base, stateDigest: stateDigestOf(adapters, base) };
 }
 
-/** A digest-reconciling almanac for the fixture run. */
 function buildAlmanac(
   run: SeasonRun,
   champion: string,
@@ -361,14 +345,12 @@ function buildAlmanac(
   return { ...base, digest: seasonAlmanacDigest(base) };
 }
 
-/** The run with the almanac digest patched into its completion state. */
 function finalRunWithAlmanac(run: SeasonRun, almanacDigest: string): SeasonRun {
   const completion = run.completion;
   if (completion === null) throw new Error('expected completion state');
   return { ...run, completion: { ...completion, almanacDigest } };
 }
 
-/** Schema-valid awards over the fixture rosters (engine-supplied at completion). */
 function buildAwards(run: SeasonRun): SeasonAwards {
   const all = run.rosters.flatMap((roster) => roster.players);
   const recipient = (index: number) => ({
@@ -388,7 +370,6 @@ function buildAwards(run: SeasonRun): SeasonAwards {
   return { ...base, digest: seasonAwardsDigest(base) };
 }
 
-/** Promotes the champion of the current `adapters.run` into completed history. */
 async function completeChampion(
   adapters: Adapters,
   awards: SeasonAwards | null = null,
@@ -417,7 +398,6 @@ async function completeChampion(
   return { almanac, commandLog: log, finalRun };
 }
 
-/** Stores a few regular-season rows (summaries, one retained detail, one block) for the run. */
 async function storeRegularSeasonRows(adapters: Adapters): Promise<number> {
   const regularSummaries = buildFixtureSummaries({
     runId: adapters.run.runId,
@@ -478,7 +458,7 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     await promote(adapters);
     expect(await adapters.repo.listCompletedSeasonRuns()).toEqual([]);
     await advanceOnce(adapters);
-    // Postseason advances alone never register completed history.
+
     expect(await adapters.repo.listCompletedSeasonRuns()).toEqual([]);
     expect(await adapters.repo.loadCompletedSeason(adapters.run.runId)).toBeNull();
   });
@@ -489,7 +469,6 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     await advanceOnce(adapters, 'cmd-a-1');
     const firstCompletion = await completeChampion(adapters);
 
-    // A second run completes in the SAME database after the first is archived.
     const runB = makeAdapters({
       db: adapters.db,
       seed: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
@@ -506,10 +485,10 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     const entryB = byRunId.get('cl-run-b');
     expect(entryA).toBeDefined();
     expect(entryB).toBeDefined();
-    // Newest first.
+
     const timestamps = listing.map((entry) => entry.completedAtIso);
     expect((timestamps[0] ?? '') >= (timestamps[1] ?? '')).toBe(true);
-    // Metadata facts are recorded and stable.
+
     for (const [entry, completion] of [
       [entryA, firstCompletion],
       [entryB, secondCompletion],
@@ -555,7 +534,6 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     await advanceOnce(adapters, 'cmd-survive-1');
     await completeChampion(adapters);
 
-    // Regular-season summary rows still load through the block views.
     const blockSummaries = await adapters.repo.loadBlockSummaries(adapters.run.runId, 0);
     expect(blockSummaries).toHaveLength(regularCount);
     const blockHistory = await adapters.repo.loadBlockHistory(adapters.run.runId);
@@ -563,7 +541,6 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     expect(blockHistory[0]?.commandId).toBe('block-cmd-0');
     expect(await adapters.repo.loadRetainedDetails(adapters.run.runId)).toHaveLength(1);
 
-    // The completed view assembles the same regular-season facts.
     const completedSeason = await adapters.repo.loadCompletedSeason(adapters.run.runId);
     expect(completedSeason).not.toBeNull();
     expect(completedSeason?.run.games).toHaveLength(SEASON_GAME_COUNT);
@@ -596,7 +573,7 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     expect(await adapters.db.seasonAlmanacs.get('cl-run-del-a')).toBeUndefined();
     expect(await adapters.db.seasonCompletedIndex.get('cl-run-del-a')).toBeUndefined();
     expect(await adapters.db.seasonAlmanacs.get('cl-run-del-b')).toBeDefined();
-    // Run B still loads completely.
+
     const surviving = await adapters.repo.loadCompletedSeason('cl-run-del-b');
     expect(surviving?.almanac.runId).toBe('cl-run-del-b');
     expect(surviving?.commandLog.entries).toHaveLength(1);
@@ -654,8 +631,7 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
       };
       inject(adapters);
       await expect(adapters.repo.promoteChampionToCompleted(input)).rejects.toThrow(errorMessage);
-      // NOTHING committed: no completed rows, no almanac, no history index,
-      // no partial command log, and the active run is intact.
+
       expect(await adapters.db.seasonCompletedRuns.count(), label).toBe(0);
       expect(await adapters.db.seasonAlmanacs.count(), label).toBe(0);
       expect(await adapters.db.seasonCompletedIndex.count(), label).toBe(0);
@@ -676,7 +652,6 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     const adapters = makeAdapters({ runId: 'cl-run-stages' });
     await promote(adapters);
 
-    // Stage 1: play-in, reload through a fresh repository instance.
     await advanceOnce(adapters, 'cmd-stage-1');
     const repo1 = new DexieSeasonRunRepository(adapters.db, {
       schedule: adapters.schedule,
@@ -687,7 +662,6 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     expect(reload1?.run.stateRevision).toBe(1);
     expect(reload1?.run.stateDigest).toBe(adapters.run.stateDigest);
 
-    // Stage 2: playoffs, reload again.
     const command2 = commandOf(adapters.run, 'advance-postseason', 'cmd-stage-2');
     const next2 = advancedRun(adapters, 'playoffs');
     await repo1.commitPostseasonAdvancement(
@@ -708,7 +682,6 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
       seasonCommandLogDigest(log2?.entries.slice(0, 1) ?? []),
     );
 
-    // Stage 3: completed, through a third repository instance.
     await completeChampion(adapters);
     const repo3 = new DexieSeasonRunRepository(adapters.db, {
       schedule: adapters.schedule,
@@ -767,7 +740,6 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
     );
     expect(logA?.entries[0]?.previousLogDigest).toBe(SEASON_EMPTY_COMMAND_LOG_DIGEST);
 
-    // Replay exports are byte-identical within and across runs.
     const exportA1 = await runA.repo.buildReplayExport(runA.run.runId, 'pi-east-seven-eight');
     const exportA2 = await runA.repo.buildReplayExport(runA.run.runId, 'pi-east-seven-eight');
     const exportB1 = await runB.repo.buildReplayExport(runB.run.runId, 'pi-east-seven-eight');

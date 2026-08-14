@@ -3,13 +3,6 @@ import { buildMinimalRotation } from '@hoop-rush/engine';
 import { buildSeasonDraftCatalog } from '@hoop-rush/test-fixtures';
 import type { RotationMember } from './season-rotation-editor';
 
-/**
- * Shared RotationEditor fixtures (season-rotation-editor.test.ts + the
- * RotationEditor component test): the fixture catalog, its ten candidates,
- * the member rows, and an engine-built legal rotation. One copy avoids
- * drift between the pure editor suite and the component wiring suite.
- */
-
 const CATALOG = buildSeasonDraftCatalog({
   franchiseIds: ['lakers'],
   eras: ['1990s'],
@@ -44,7 +37,6 @@ export function rotationPlayableOf(playerVersionId: string): readonly Position[]
   return candidate.positions.playable;
 }
 
-/** Legal rotation over the ten fixture candidates (engine-built). */
 export function legalRotation(): SeasonRotation {
   return buildMinimalRotation({
     franchiseId: 'lakers',

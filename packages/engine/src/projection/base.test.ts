@@ -495,7 +495,7 @@ describe('projectExpectedLedger', () => {
       opponentPrep: referencePrep,
       profile: DEFAULT_ERA_SIM_PROFILE,
     });
-    // Steal cross terms: each side's steals come from the other's turnovers.
+
     expect(result.offense.ledger.steals).toBeCloseTo(
       result.defense.ledger.turnovers *
         Math.min(0.9, Math.max(0.3, DEFAULT_ERA_SIM_PROFILE.parameters.stealShareOfTurnovers)),

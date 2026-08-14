@@ -123,16 +123,16 @@ describe('season game summaries (M2.3)', () => {
     expect(summary.overtimePeriods).toBe(result.overtimePeriods);
     expect(summary.homePlayers).toHaveLength(10);
     expect(summary.awayPlayers).toHaveLength(10);
-    // Canonical order: playerVersionId ascending.
+
     const homeIds = summary.homePlayers.map((line) => line.playerVersionId);
     expect([...homeIds].sort()).toEqual(homeIds);
-    // Box identity: points reconcile with the player lines.
+
     const homePoints = summary.homePlayers.reduce((sum, line) => sum + line.points, 0);
     expect(homePoints).toBe(summary.homeBox.points);
     expect(auditSeasonGameSummary(summary)).toEqual([]);
-    // Contract round trip.
+
     expect(seasonGameSummarySchema.safeParse(summary).success).toBe(true);
-    // Box franchise ids match the game identity.
+
     expect(summary.homeBox.franchiseId).toBe(game.homeFranchiseId);
     expect(summary.awayBox.franchiseId).toBe(game.awayFranchiseId);
   });
@@ -150,7 +150,7 @@ describe('season game summaries (M2.3)', () => {
 
   it('converts a forfeit into the official 2-0 summary with zero boxes', () => {
     const input = buildInput('summary-3');
-    // Force a tipoff forfeit: the away team is entirely unavailable.
+
     const awayIds = input.away.players.map((p) => p.playerVersionId);
     const unavailable = input.availability.map((entry) => ({
       ...entry,

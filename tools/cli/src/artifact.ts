@@ -1,15 +1,3 @@
-/**
- * Shared artifact-commit, artifact-validate, and worker-chunk plumbing
- * (deduplicated from the season-* calibrate commands).
- *
- * `commitTargetsArtifact` writes a targets JSON artifact and updates the
- * manifest's `season.<key>` content hash exactly when the output path is the
- * command's committed default target; scratch `--out` paths never touch the
- * manifest. `validateTargetsArtifact` runs the `--validate` scaffold shared
- * by the M2.4/M2.5 targets commands. `runWorkerChunk(s)` is the worker-thread
- * chunk runner (chunking, message/error/exit handling, flattening) used by
- * the season calibration cohorts.
- */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
@@ -17,7 +5,6 @@ import { z } from 'zod';
 import { sha256Hex, readJson } from './io.ts';
 import { makeReport, type CliReport } from './report.ts';
 
-/** Writes a targets artifact and commits its hash into the manifest. */
 export function commitTargetsArtifact(args: {
   outPath: string;
   defaultTargetsPath: string;
@@ -53,7 +40,6 @@ export function commitTargetsArtifact(args: {
   }
 }
 
-/** The `--validate` report scaffold shared by the targets commands. */
 export function validateTargetsArtifact<T>(args: {
   outPath: string;
   schema: z.ZodType<T>;
@@ -83,7 +69,6 @@ export function validateTargetsArtifact<T>(args: {
   return makeReport(args.command, {}, { details, failures: failuresList });
 }
 
-/** Runs one worker chunk and resolves with its payload. */
 export function runWorkerChunk<TResult>(args: {
   workerUrl: URL;
   workerData: unknown;
@@ -102,7 +87,6 @@ export function runWorkerChunk<TResult>(args: {
   });
 }
 
-/** Chunks `items` into at most `workers` slices and runs one worker each. */
 export function runWorkerChunks<TItem, TResult>(args: {
   workerUrl: URL;
   workerData: (chunk: TItem[]) => unknown;

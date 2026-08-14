@@ -9,12 +9,6 @@ import {
 } from './season-lock-preview';
 import { humanUpcomingGamesFromGames } from './season-presentation';
 
-/**
- * M2.3 "What changed?" lock preview unit tests (spec/2.0/11 block lock
- * preview): games that will lock, upcoming human games, the set-digest
- * comparison, and the granular per-player diff.
- */
-
 const CATALOG = buildSeasonDraftCatalog({
   franchiseIds: ['lakers'],
   eras: ['1990s'],

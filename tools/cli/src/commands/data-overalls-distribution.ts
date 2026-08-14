@@ -9,15 +9,6 @@ import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.
 import { overallsDistributionReportSchema } from '../report-schemas.ts';
 import { tryReadJson } from '../io.ts';
 
-/**
- * `data overalls-distribution`: reports the cohort percentile Overall
- * distribution over every packaged franchise-era row (the post-pass written
- * under COHORT_NORMALIZATION_VERSION): per-band counts/percentages, medians,
- * min/max, and per-era breakdowns. Bands are identified by the value ranges
- * the cohort pass assigns (95-99, 90-94, 85-89, 72-84, 40-71) and each band
- * carries its target share so the observed shape is checkable.
- */
-
 export const DATA_OVERALLS_DISTRIBUTION_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
@@ -35,10 +26,6 @@ const BANDS: ReadonlyArray<{ label: string; min: number; max: number; targetPerc
   { label: '40-71', min: 40, max: 71, targetPercent: 20 },
 ];
 
-/**
- * Index-based lower median (the report convention) with a null empty case;
- * kept local because the report's medians were authored with it.
- */
 function median(values: readonly number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);

@@ -1,13 +1,6 @@
 import type { GameResult, PlayerBoxScore, TeamBoxScore } from '@hoop-rush/data-contracts';
 import { auditSideAccounting } from './accounting-core.ts';
 
-/**
- * Pure invariant checker (spec/06 exact invariants). Used by tests, the CLI,
- * and replay to validate scoring identities, player/team reconciliation,
- * possessions, rebounds, minutes, five-player uniqueness, determinism, and a
- * single winner. Returns a list of violated invariants; empty means valid.
- */
-
 export function checkGameResult(result: GameResult): string[] {
   const failures: string[] = [];
 
@@ -31,7 +24,6 @@ export function checkGameResult(result: GameResult): string[] {
       );
     }
 
-    // Points identity and player/team accounting (shared scoring core).
     const accounting = auditSideAccounting(players, box, team.shotZones, (p) => p.playerId);
     if (accounting.playerPointsTotal !== box.points) {
       failures.push(
@@ -64,8 +56,6 @@ export function checkGameResult(result: GameResult): string[] {
       }
     }
 
-    // Opportunity-level diagnostics (present on m3 engine results): usage
-    // identity, zone reconciliation, rebound chances, and assist accounting.
     if (box.diagnostics) {
       const d = box.diagnostics;
       const misses =
@@ -86,7 +76,7 @@ export function checkGameResult(result: GameResult): string[] {
       if (!accounting.contestedShotsOk) {
         failures.push(`${side}: player contested shots != team contested shots`);
       }
-      // Every miss gives all five players on the floor a rebound chance.
+
       if (!accounting.offensiveReboundChancesOk) {
         failures.push(
           `${side}: player offensive-rebound chances != 5 * team rebound opportunities`,
@@ -106,7 +96,7 @@ export function checkGameResult(result: GameResult): string[] {
         );
       }
     }
-    // Per-player zone splits reconcile with the team zone summary.
+
     for (const zone of accounting.zoneSplits) {
       if (zone.playerAttempts !== zone.teamAttempts) {
         failures.push(
@@ -138,8 +128,6 @@ export function checkGameResult(result: GameResult): string[] {
       }
     }
 
-    // Every miss resolves to exactly one rebound bucket on the two sides:
-    // the shooter's offensive rebounds plus the defense's player/team rebounds.
     const otherBox = result[other].box;
     const rebounds = box.rebounds;
     const misses =
@@ -153,7 +141,6 @@ export function checkGameResult(result: GameResult): string[] {
       );
     }
 
-    // Possession reconciliation: every ended trip counted once.
     const opponentMisses =
       otherBox.fieldGoals.attempted -
       otherBox.fieldGoals.made +
@@ -172,7 +159,6 @@ export function checkGameResult(result: GameResult): string[] {
   checkSide('home');
   checkSide('away');
 
-  // Period scores reconcile with totals and winner.
   const homeTotal = result.periodScores.home.reduce((a, b) => a + b, 0);
   const awayTotal = result.periodScores.away.reduce((a, b) => a + b, 0);
   if (homeTotal !== result.home.box.points) {
@@ -205,7 +191,6 @@ export function checkGameResult(result: GameResult): string[] {
   return failures;
 }
 
-/** Compact box-score digest for replay comparison and golden fixtures. */
 export function gameResultDigest(result: GameResult): string {
   const { home, away, periodScores, winner, overtimePeriods, seed } = result;
   const digest = {

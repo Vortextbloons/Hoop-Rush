@@ -1,7 +1,6 @@
 import { opponentBracketSchema } from '../bracket.ts';
 import { loadJsonAsset } from './load-json.ts';
 
-/** Fetches and hash-verifies the OpponentBracket artifact. */
 export function loadOpponentBracket(
   url: string,
   expectedHash?: string,

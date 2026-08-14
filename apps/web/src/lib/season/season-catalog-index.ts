@@ -1,11 +1,5 @@
 import type { SeasonDraftCatalog, SeasonDraftCandidate } from '@hoop-rush/data-contracts';
 
-/**
- * One Map<playerVersionId, candidate> per catalog object. The packaged
- * draft catalog is a build-time artifact that is stable for the session,
- * and pages look up candidates by version id many times per render; the
- * WeakMap keeps the index alive exactly as long as the catalog.
- */
 const catalogByVersion = new WeakMap<SeasonDraftCatalog, Map<string, SeasonDraftCandidate>>();
 
 export function catalogCandidateMap(

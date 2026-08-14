@@ -32,18 +32,6 @@ import {
 } from './commands/season-data.ts';
 import { loadPackagedData, PackagedData } from './commands/data-loader.ts';
 
-/**
- * Shared reproduce-test support (M2.6, replay-export-v1): builds a REAL
- * full-run replay export over the committed fixture — a trade window opens
- * (block 2), the first open offer is accepted, a block-0 objective is
- * selected, and a second offer is declined — with every command driven
- * through the authoritative engine dispatch and recorded as command-log
- * entries. The export carries the post-window run and effects as its
- * initial state, mirroring the persistence flow (the window folds into the
- * block-2 checkpoint commit; the first logged command's pre-state sits
- * after it).
- */
-
 const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 const MANIFEST = join(REPO_ROOT, 'apps/web/static/data/manifest.json');
 const DIGEST_32 = '0'.repeat(32);
@@ -66,8 +54,7 @@ export function loadManifestHashes(): SeasonRunReplayExportInput['assetHashes'] 
     schedule: manifest.season?.schedule?.contentHash ?? '',
     draftCatalog: manifest.season?.draftCatalog?.contentHash ?? '',
     eraProfile,
-    // M2.6.5: the free-agency assets ride the export only when the manifest
-    // carries them (the committed manifest pins both since M2.6.5).
+
     ...(manifest.season?.freeAgencyIndex?.contentHash === undefined
       ? {}
       : { freeAgencyIndex: manifest.season.freeAgencyIndex.contentHash }),
@@ -77,7 +64,6 @@ export function loadManifestHashes(): SeasonRunReplayExportInput['assetHashes'] 
   };
 }
 
-/** The packaged replay deps (catalog + era profile) of the direct calls. */
 export function replayDeps(): {
   catalog: ReturnType<typeof loadSeasonDraftCatalog>;
   profile: ReturnType<PackagedData['eraProfile']>;
@@ -89,7 +75,6 @@ export function replayDeps(): {
   return { catalog, profile, verifyAssetHashes: () => [] };
 }
 
-/** The M2.6.5 free-agency replay deps (index + targets seams included). */
 export function freeAgencyReplayDeps(): ReturnType<typeof replayDeps> & {
   freeAgencyIndex: ReturnType<typeof loadSeasonFreeAgencyIndex>;
   freeAgencyTargets: ReturnType<typeof loadSeasonRosterTargets>;
@@ -101,7 +86,6 @@ export function freeAgencyReplayDeps(): ReturnType<typeof replayDeps> & {
   };
 }
 
-/** Re-chains a command log with the frozen hash-chain rule. */
 export function chainLog(entries: readonly SeasonCommandLogEntry[]): SeasonCommandLog {
   const chained: SeasonCommandLogEntry[] = [];
   for (const entry of entries) {
@@ -123,11 +107,6 @@ export interface ReplayedRun {
   exportArtifact: SeasonRunReplayExport;
 }
 
-/**
- * Builds a real three-command replay export (see the module docstring).
- * The same builder backs the direct replay tests and the CLI end-to-end
- * tests, so both exercise identical recorded facts.
- */
 export function buildReplayedRun(): ReplayedRun {
   const run = loadSeasonRunFixture(SEASON_RUN);
   const catalog = loadSeasonDraftCatalog(MANIFEST);
@@ -298,16 +277,6 @@ export function buildReplayedRun(): ReplayedRun {
   return { exportInput, exportArtifact: buildSeasonRunReplayExport(exportInput) };
 }
 
-/**
- * M2.6.5 free-agency replay export: the committed fixture run with the
- * block-2 free-agency market OPEN (the post-commit snapshot the production
- * flow would record), and a two-command log — the human skip and the window
- * resolution — driven through the authoritative command layer. The export's
- * initial run carries the opened window (AI declarations recorded at open);
- * the replay resolves it and must reproduce the recorded final state
- * byte-for-byte. `mutateInitialFreeAgency` lets tests corrupt a recorded
- * free-agency fact of the export (canonical candidates, signing counts).
- */
 export function buildFreeAgencyReplayedRun(
   mutateInitialFreeAgency?: (freeAgency: SeasonFreeAgencyState) => void,
 ): ReplayedRun {
@@ -331,12 +300,7 @@ export function buildFreeAgencyReplayedRun(
     0,
     2,
   );
-  // The AI declarations at window open commit against the run's recorded
-  // Influence balances (up to 3 per target). The fresh fixture run holds the
-  // initial +2 grant, which some declarations exceed; top every balance up
-  // so the recorded window resolves (the calibration driver accumulates
-  // block grants before its windows open; this fixture snapshots the window
-  // on the fresh run for a fast replay export).
+
   const balances = Object.fromEntries(run.league.teams.map((team) => [team.franchiseId, 6]));
   const initialRun = {
     ...run,

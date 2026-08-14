@@ -11,13 +11,6 @@ import {
   withTmpDir,
 } from './cli-test-helpers.ts';
 
-/**
- * CLI integration tests for `data defense-bpm-correlation` (spec: defensive
- * BPM audit): Pearson r between packaged defenseRating and raw source box
- * plus/minus, the 1000-row and 0.92 gates, and clean exit-2 reports on
- * invalid manifests. Unit tests for pearsonCorrelation live alongside.
- */
-
 const SEASON_KEY = '1996-97';
 
 interface FixtureRow {
@@ -26,16 +19,6 @@ interface FixtureRow {
   bpm: number;
 }
 
-/**
- * Writes a manifest + pool under the apps/web/static/data layout and the
- * raw source season-stats at <tmp>/raw-data/nba/<seasonKey>/, which is where
- * the command resolves raw data from the manifest directory.
- *
- * Defense values cycle 40-90; BPM follows the same monotone order with
- * deterministic pseudo-noise (measured r ~0.64, comfortably under the gate).
- * Provenance maps are stripped so the 1000+ row fixture stays small; the
- * schema accepts empty maps.
- */
 function writeDefenseFixture(dataRoot: string, count: number): string {
   const rows: FixtureRow[] = Array.from({ length: count }, (_, i) => {
     const defense = 40 + (i % 51);

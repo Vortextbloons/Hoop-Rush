@@ -58,7 +58,6 @@ function fixtureCreation(overrides: Partial<ChallengeCreationBase> = {}): Challe
   };
 }
 
-/** Minimal run shape exercising exactly the fields scoreRun reads. */
 function fakeRun(wins: number, differential: number): ChallengeRun {
   return {
     aggregates: {

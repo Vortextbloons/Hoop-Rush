@@ -40,20 +40,6 @@ import {
   fixtureSeedFromString,
 } from '../testing/season-run-fixture.ts';
 
-/**
- * Storage and timing benchmark for the Season Run persistence layer
- * (spec/2.0/10 M2.3, spec/2.0/12 performance framework, M2.4). Builds a
- * synthetic full-season dataset, commits it through `commitSeasonBlock` (one
- * transaction per block), reloads the validated snapshot, and reports p95
- * commit/reload times plus the serialized byte size of every stored row. The
- * engine math runs through the `SeasonRunEngineSeam`, so the harness measures
- * repository mechanics with the pure helpers behind it.
- *
- * Frozen budgets (asserted in the cheap test suite):
- * - commit p95 <= 300 ms per block transaction
- * - reload p95 <= 1,000 ms per full validated load
- * - active-run storage <= 25 MB (serialized rows, effects included)
- */
 export const SEASON_RUN_BUDGET_COMMIT_P95_MS = 300;
 export const SEASON_RUN_BUDGET_RELOAD_P95_MS = 1000;
 export const SEASON_RUN_BUDGET_STORAGE_BYTES = 25 * 1024 * 1024;
@@ -87,17 +73,11 @@ export interface SeasonRunPersistenceBenchmarkReport {
 }
 
 export interface SeasonRunPersistenceBenchmarkOptions {
-  /** Full-season commit+reload samples; each commits all nine blocks. */
   samples?: number;
-  /** Engine seam; defaults to the production binding. */
+
   seam?: SeasonRunEngineSeam;
   seed?: string;
-  /**
-   * Builds the database for one sample. The default creates a fresh
-   * `HoopRushDatabase`; fake-indexeddb-based tests pass a wrapper that
-   * installs a fresh `IDBFactory` per sample (a shared factory degrades
-   * transactions after the first).
-   */
+
   createDatabase?: () => HoopRushDatabase;
 }
 
@@ -110,21 +90,21 @@ interface BlockDataset {
   teamAggregates: SeasonTeamAggregate[];
   playerAggregates: SeasonPlayerAggregate[];
   recap: SeasonBlockRecap;
-  /** M2.4 authoritative effects state at this boundary. */
+
   effects: SeasonEffectsState;
   rotationDigest: string;
   checkpointDigest: string;
-  /** The 30 rotations locked by this block commit. */
+
   rotations: SeasonRotation[];
-  /** M2.5 accepted-checkpoint facts folded into the run at this commit. */
+
   checkpointState: SeasonCheckpointState;
-  /** M2.5 run state chain position after this commit. */
+
   stateRevision: number;
-  /** M2.5 canonical digest of the mutable run state after this commit. */
+
   stateDigest: string;
-  /** M2.5 canonical digest of the pre-block mutable run state. */
+
   expectedStateDigest: string;
-  /** M2.5 mutable-state facts at this boundary (row-level commit values). */
+
   health: SeasonHealthState;
   transactions: SeasonTransactionEntry[];
   influence: SeasonInfluenceState;
@@ -148,7 +128,6 @@ function digestOf(seed: string, blockIndex: number): string {
   return fixtureSeedFromString(`${seed}:digest:${String(blockIndex)}`);
 }
 
-/** Builds the synthetic full-season dataset and its nine block commits. */
 export function buildFullSeasonDataset(input: {
   seed?: string;
   runId?: string;
@@ -213,10 +192,7 @@ export function buildFullSeasonDataset(input: {
   let teamAggregates: SeasonTeamAggregate[] = [];
   let playerAggregates: SeasonPlayerAggregate[] = [];
   let cumulativeCount = 0;
-  // M2.5 mutable state stays constant across fixture blocks (no injuries,
-  // no spends, no trades, no commands): only the state chain advances. The
-  // expected pre-block facts are the previous boundary's mutable state
-  // (null checkpoint and zero effects before the first block).
+
   const health = buildFixtureHealthState();
   const influence = buildFixtureInfluenceState(run.league);
   const objectives = buildFixtureObjectiveState();
@@ -226,9 +202,7 @@ export function buildFullSeasonDataset(input: {
     const { summaries } = byBlock(blockIndex);
     cumulativeCount += summaries.length;
     const completedRounds = blockIndex === 8 ? 82 : (blockIndex + 1) * 10;
-    // Standings and aggregates at this boundary are CUMULATIVE over every
-    // game played so far, so the reload audit (which folds the complete
-    // stored summary set) reconciles exactly.
+
     const cumulativeSummaries = allSummaries.slice(0, cumulativeCount);
     const playedGames = seam
       .reconstructSeasonGames(schedule, cumulativeSummaries)
@@ -236,9 +210,7 @@ export function buildFullSeasonDataset(input: {
     standings = seam.reduceSeasonStandings(league, playedGames);
     teamAggregates = seam.foldSeasonTeamAggregates(league, cumulativeSummaries);
     playerAggregates = seam.foldSeasonPlayerAggregates(rosters, cumulativeSummaries);
-    // M2.4 effects state: monotonically increasing fatigue and shared
-    // possessions per block (bounded well inside the schema ranges) so the
-    // storage measurement reflects the full effects payload.
+
     const effects = buildFixtureEffectsState(rosters, {
       fatigueBasisPoints: 500 + blockIndex * 1000,
       recentLoadBasisPoints: 400 + blockIndex * 900,
@@ -342,12 +314,6 @@ async function storedBytes(
   return { total, perTable };
 }
 
-/**
- * Runs the full-season persistence benchmark. Each sample creates one fresh
- * database, promotes a synthetic draft, commits all nine blocks (timing each
- * transaction), reloads the validated snapshot (timed), then the final
- * sample's stored rows are measured in bytes.
- */
 export async function benchmarkSeasonRunPersistence(
   options: SeasonRunPersistenceBenchmarkOptions = {},
 ): Promise<SeasonRunPersistenceBenchmarkReport> {
@@ -363,8 +329,6 @@ export async function benchmarkSeasonRunPersistence(
   let storage: { total: number; perTable: Record<string, number> } = { total: 0, perTable: {} };
 
   for (let sample = 0; sample < samples; sample += 1) {
-    // Samples are isolated by the database factory (tests install a fresh
-    // fake-indexeddb factory per sample; the CLI runs one per process).
     const db = (options.createDatabase ?? (() => new HoopRushDatabase()))();
     const repository = new DexieSeasonRunRepository(db, { schedule, seam });
     await repository.promoteSeasonDraftToRun(buildFixtureStoredDraft(run), run);
@@ -444,11 +408,9 @@ export async function benchmarkSeasonRunPersistence(
   };
 }
 
-/** Builds the benchmark dataset using the stub seam (test/CI use). */
 export function buildStubSeamBenchmarkDataset(): ReturnType<typeof buildFullSeasonDataset> {
   return buildFullSeasonDataset({ seam: buildStubSeasonEngineSeam() });
 }
 
-/** Number of summaries in one regular block (150) and the final block (30). */
 export const SEASON_SUMMARIES_PER_BLOCK = 150;
 export const SEASON_SUMMARIES_FINAL_BLOCK = 30;

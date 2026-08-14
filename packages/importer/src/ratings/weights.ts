@@ -1,7 +1,3 @@
-/**
- * Overall weights (port of compute_ratings.py OVERALL_WEIGHTS /
- * src/game/ratings/overallWeights.ts) and the skill overall computation.
- */
 export const OVERALL_WEIGHTS: Record<string, Record<string, number>> = {
   PG: {
     ballHandling: 0.13,
@@ -80,13 +76,6 @@ export const OVERALL_WEIGHTS: Record<string, Record<string, number>> = {
   },
 };
 
-/**
- * Detect big-man profile. Cs and PFs are always bigs.
- * SFs qualify only with genuine frontcourt height (6'10"+). Raw NBA roster
- * labels are unreliable for eras past (Duncan is listed as an SF), but
- * defensive-attribute thresholds alone misclassify athletic wings — LeBron,
- * Kawhi, Pippen, and Marion all clear them and were capped as centers.
- */
 export function isBigProfile(position: string, heightInches?: number | null): boolean {
   if (position === 'C' || position === 'PF') return true;
   if (position === 'SF') {
@@ -110,11 +99,7 @@ export function computeOverall(
   }
   const deviation = total - 50;
   const isBig = isBigProfile(position, heightInches);
-  // Keep the curve mildly positive without turning a good weighted profile
-  // into an automatic 97-99. The previous divisors (120/85) made a center
-  // with a weighted skill of roughly 84 look like a 97 before production was
-  // considered; that is how ordinary All-NBA seasons such as Towns' 2016-17
-  // season reached the same band as all-time peaks.
+
   const divisor = isBig ? 240 : 170;
   return Math.min(99, Math.round(50 + deviation * (1 + deviation / divisor)));
 }

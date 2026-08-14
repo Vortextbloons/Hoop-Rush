@@ -93,8 +93,7 @@
           ariaLabel: `Place ${subject.displayName} at ${slotName}, moving ${incumbent.displayName} to ${SLOT_NAMES[target]} slot ${target + 1}`,
         };
       }
-      // Classic drafts never displace: an occupied slot is only reachable as
-      // a swap when the incumbent can take the subject's current slot.
+
       if (!allowDisplacement && subjectSlot !== -1 && canFillSlot(incumbent, subjectSlot)) {
         return {
           index: i,
@@ -114,11 +113,6 @@
     });
   });
 
-  /**
-   * Handles a slot choice. The option list already resolved whether the slot
-   * is open, occupied, or displaceable; the parent owns the lineup state and
-   * applies the placement via onplace.
-   */
   function placePlayer(subject: IndexRow, slotIndex: number) {
     onplace(subject, slotIndex);
   }

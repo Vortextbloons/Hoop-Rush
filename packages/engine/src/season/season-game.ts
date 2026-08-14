@@ -47,84 +47,16 @@ import {
 import { seasonHomeCourtMechanisms } from './home-court.ts';
 import { createSeasonEffectsBuffer, type SeasonEffectsBuffer } from './effects.ts';
 
-/**
- * M2.2 Season Run game controller (spec/2.0/04, season-game-v1). Orchestrates
- * a single game around the authoritative possession pipeline with ten-player
- * rotations, substitution planning, foul-outs, exact seconds, unit stints,
- * rotation deviations, and typed forfeits. Classic games route through the
- * fixed-five adapter in sim/game.ts and must stay byte-identical to today.
- *
- * ## Frozen controller rules (spec/2.0/04 M2.2)
- *
- * - Identity: `playerVersionId` is the authoritative simulation and recorder
- *   identity; `playerId` is person-level metadata. The recorder translates
- *   the active five slots into ten-roster records keyed by roster index (in
- *   input order), so two historical versions of one person on one roster
- *   never merge.
- * - Possession execution is resumable: the controller pauses only after
- *   made baskets, completed foul/free-throw sequences, inbound-producing
- *   fouls, dead-ball team rebounds, and period endings. Live turnovers, live
- *   rebounds, and unresolved shot/free-throw sequences never trigger
- *   substitutions. An and-one made basket is followed immediately by its
- *   free throw; no pause splits the sequence.
- * - Reconsider the lineup at period boundaries, at the first eligible dead
- *   ball after each whole-minute checkpoint (whole-minute marks 660..60 of
- *   regulation periods), and immediately after the legal boundary following
- *   a foul-out, injected removal, or other availability change. The planner
- *   produces the next unit; a substitution is recorded only when the unit
- *   changes. Overtime never chases rotation targets: every OT period starts
- *   with the legal preferred closing unit and only foul-outs/removals force
- *   later OT substitutions.
- * - Six personal fouls remove the player at the next legal pause (no rating
- *   penalty beforehand). Injected removals from the availability seam apply
- *   at the next legal boundary at or after their recorded clock.
- * - If one team cannot field a legal five at tipoff or after a removal, the
- *   controller returns the typed 2-0 forfeit with the losing franchise and
- *   trigger fact and no player statistics. If both teams are invalid before
- *   tipoff, return the `no-legal-five-both` variant instead of choosing a
- *   loser.
- * - Exact playing time is integer seconds. Regulation reconciles each side
- *   to 14,400 player-seconds (five on-court players x 2,880 seconds) plus
- *   1,500 per overtime period. Display minutes are seconds / 60. Stint
- *   boundaries are recorded at the floor of the floating clock at each
- *   pause, and a sealed period end closes at zero, so consecutive stints are
- *   exactly contiguous and the totals reconcile exactly.
- * - Per-player regulation deviations are emitted only when actual seconds
- *   differ from target seconds (target minutes x 60). Reasons are the union
- *   of causes that affected the player: dead-ball timing, closing
- *   preference, foul-out, pregame unavailability, injected injury removal,
- *   and contingency legality.
- * - Possession preparation tables are rebuilt only after a substitution;
- *   rebuilding consumes no RNG (prepareTeam is pure).
- * - The controller consumes RNG only through the possession pipeline and the
- *   fixed-five tie-break draw (a pathological guard after the 12-period cap,
- *   identical to Classic). The planner and the availability seam never draw
- *   RNG, and no presentation randomness exists in M2.2.
- */
-
 const CHECKPOINT_MARKS: readonly number[] = [660, 600, 540, 480, 420, 360, 300, 240, 180, 120, 60];
 
-/**
- * Deterministic availability/removal/return seam (M2.2 uses pregame
- * availability only; tests and CLI fixtures inject same-game removals; M2.5
- * supplies the seeded injury model through this seam). The default seam
- * derives from the input's `availability`, `removals`, and `returns`; tests
- * may substitute their own.
- */
 export interface SeasonGameAvailabilitySeam {
-  /** Pregame availability per playerVersionId (both sides). */
   pregame: ReadonlyMap<string, boolean>;
-  /** Same-game removals, applied at the next legal boundary at/after their clock. */
+
   removals: readonly SeasonRemoval[];
-  /**
-   * M2.5: same-game returns (seeded injury returns, reason `injury-return`),
-   * applied at the next legal boundary at/after their clock (mirror of
-   * removals); a returned player re-enters only at legal boundaries.
-   */
+
   returns: readonly SeasonReturn[];
 }
 
-/** Default seam: input availability entries, removals, and returns. */
 export function defaultSeasonGameSeam(
   input: SeasonGameSimulationInput,
 ): SeasonGameAvailabilitySeam {
@@ -135,11 +67,6 @@ export function defaultSeasonGameSeam(
   };
 }
 
-/**
- * Simulates one Season game (season-game-v1). Deterministic: identical input
- * and seed produce a byte-identical result including substitutions, unit
- * stints, deviations, foul-outs, and removals.
- */
 export function simulateSeasonGame(
   input: SeasonGameSimulationInput,
   context: EngineContext,
@@ -150,17 +77,6 @@ export function simulateSeasonGame(
   return controller.run();
 }
 
-/**
- * Simulates one Season game with the M2.4 stamina/chemistry effects
- * (season-stamina-v1 + season-chemistry-v1). Identical flow to
- * `simulateSeasonGame` plus the per-game effects accumulation; returns the
- * result and the explicit effects transition (pregame/postgame load states,
- * pair increments, and mechanism evidence). `state` is the carried league
- * effects state; every rostered player of both sides must carry a stamina
- * profile (absence is a typed error). The neutral zero profile never reaches
- * this entry point: Classic and neutral Season games route through
- * `simulateSeasonGame` and stay byte-identical to M2.3.
- */
 export function simulateSeasonGameWithEffects(
   input: SeasonGameSimulationInput,
   context: EngineContext,
@@ -199,7 +115,6 @@ export function simulateSeasonGameWithEffects(
   return { result, transition };
 }
 
-/** Effects mode bundle for the game controller (M2.4). */
 export interface SeasonGameEffectsMode {
   buffer: SeasonEffectsBuffer;
   pregamePlayerStates: readonly SeasonPlayerLoadState[];
@@ -211,7 +126,7 @@ function compareQueueEntries(
 ): number {
   const byPeriod = a.period - b.period;
   if (byPeriod !== 0) return byPeriod;
-  // Game clocks count down, so 600 is earlier than 100 within a period.
+
   const byClock = b.secondsRemaining - a.secondsRemaining;
   if (byClock !== 0) return byClock;
   return a.side === b.side ? 0 : a.side === 'home' ? -1 : 1;
@@ -226,23 +141,23 @@ class SideState {
   readonly roster: readonly SeasonGamePlayerInput[];
   readonly simPlayers: SimulationPlayer[];
   readonly rosterIndexByVersion: ReadonlyMap<string, number>;
-  /** Current ordered unit (G, G, F, F, C). */
+
   unit: string[] = [];
-  /** Players unavailable right now (pregame, fouled out, removed). */
+
   readonly unavailable = new Set<string>();
   readonly fouledOut = new Set<string>();
   readonly removed = new Set<string>();
-  /** Union of deviation causes per rostered playerVersionId. */
+
   readonly causes = new Map<string, Set<SeasonRotationDeviationReason>>();
-  /** Regulation seconds played per rostered playerVersionId (exact integers). */
+
   readonly regulationSeconds = new Map<string, number>();
   readonly substitutions: SeasonSubstitution[] = [];
   readonly stints: SeasonUnitStint[] = [];
   readonly foulOutEvents: SeasonFoulOut[] = [];
   readonly removalEvents: SeasonRemovalEvent[] = [];
-  /** M2.5: applied same-game return events (reason `injury-return`). */
+
   readonly returnEvents: SeasonReturnEvent[] = [];
-  /** Open stint: period, immutable open clock, cursor, unit; null between periods. */
+
   stint: { period: number; openClock: number; cursor: number; unit: string[] } | null = null;
   boundaryEvents: { foulOuts: number; removals: number; returns: number } = {
     foulOuts: 0,
@@ -251,7 +166,7 @@ class SideState {
   };
   changedThisBoundary = false;
   private checkpointIndex = 0;
-  /** Cached legal-five enumeration, keyed by the availability signature. */
+
   candidateCache: { signature: string; list: readonly (readonly string[])[] } | null = null;
 
   constructor(
@@ -325,9 +240,9 @@ class SeasonGameController {
   private offense: SideIndex = 0;
   private secondsRemaining = REGULATION_PERIOD_SECONDS;
   private period = 1;
-  /** Display clock of the current boundary (integer; 0 at period ends). */
+
   private boundaryClock = 0;
-  /** Produced once per game by the effects-mode exit path. */
+
   effectsTransition: SeasonGameEffectsTransition | null = null;
 
   constructor(
@@ -376,7 +291,6 @@ class SeasonGameController {
 
     for (this.period = 1; this.period <= MAX_PERIODS; this.period += 1) {
       if (this.period > 1) {
-        // Regulation periods all run; overtime only when the game is tied.
         if (this.period >= 5) {
           if (this.recorder.sides[0].points !== this.recorder.sides[1].points) break;
         }
@@ -386,7 +300,7 @@ class SeasonGameController {
         this.state.periodIndex = this.period - 1;
         this.state.periodFouls = [0, 0];
         this.tripContext.possessionStart = 'neutral';
-        // M2.4: halftime recovery fires exactly once between periods 2 and 3.
+
         if (this.period === 3) this.effectsMode?.buffer.hook.halftime();
       }
       this.home.resetCheckpoints();
@@ -405,7 +319,6 @@ class SeasonGameController {
     return this.exitWithEffects(this.buildResult());
   }
 
-  /** Finishes the effects buffer exactly once and attaches the transition. */
   private exitWithEffects(result: SeasonGameSimulationResult): SeasonGameSimulationResult {
     const effects = this.effectsMode;
     if (effects !== null && this.effectsTransition === null) {
@@ -470,15 +383,12 @@ class SeasonGameController {
     return null;
   }
 
-  /** One trip through the resumable pipeline, pausing at legal boundaries. */
   private driveOneTrip(): { step: PossessionStep; forfeit: SeasonGameSimulationResult | null } {
     const machine = new PossessionStepper(this.tripContext, this.offense);
     let step: PossessionStep = { ended: false, pause: false, periodEnded: false, finished: false };
     do {
       step = machine.step();
-      // A pause is a legal dead-ball boundary; a period-ending step is also
-      // a boundary even when the last trip ended live (e.g. a turnover at
-      // clock zero), so the stints always close exactly at period ends.
+
       if (step.pause || step.periodEnded) {
         const forfeit = this.processBoundary(step.periodEnded);
         if (forfeit !== null) return { step, forfeit };
@@ -487,10 +397,6 @@ class SeasonGameController {
     return { step, forfeit: null };
   }
 
-  /**
-   * One legal dead-ball or period-ending boundary: events, seconds
-   * accumulation, planning, substitution, and stint bookkeeping.
-   */
   private processBoundary(periodEnded: boolean): SeasonGameSimulationResult | null {
     const period = this.period;
     const floatClock = this.state.secondsRemaining;
@@ -501,34 +407,26 @@ class SeasonGameController {
       side.changedThisBoundary = false;
     }
 
-    // 1. Events: removals due at/after the boundary clock, then returns
-    //    (a return at the same boundary re-enables the player for planning),
-    //    then foul-outs.
     this.applyDueRemovals(period, floatClock, clock, periodEnded);
     this.applyDueReturns(period, floatClock, clock, periodEnded);
     this.applyFoulOuts(this.home, period, clock);
     this.applyFoulOuts(this.away, period, clock);
 
-    // 2. Accumulate the just-played interval into seconds (before planning,
-    //    so the planner sees the current actual seconds).
     for (const side of [this.home, this.away]) {
       this.accumulateStintInterval(side, period, clock);
     }
 
-    // 3. Planning and substitution (only when the game continues).
     const gameContinues = this.gameContinuesAfter(period, periodEnded);
     for (const side of [this.home, this.away]) {
       if (!gameContinues) continue;
       const plan = this.planFor(side, period, periodEnded, clock);
       if (plan === null) continue;
       if (plan.unit === null) {
-        // No legal five can be formed: typed forfeit (no player statistics).
         return this.forfeitResult(side, 'no-legal-five-after-removal');
       }
       this.applySubstitutionIfChanged(side, plan.unit, period, clock, plan.reason);
     }
 
-    // 4. Stint records: emit when the unit changed or the period ended.
     for (const side of [this.home, this.away]) {
       this.finalizeStint(side, period, clock, periodEnded);
     }
@@ -552,9 +450,7 @@ class SeasonGameController {
         continue;
       }
       const side = removal.side === 'home' ? this.home : this.away;
-      // An in-game injury can only occur during actual court exposure. If
-      // the seeded wall-clock point lands while the player is on the bench,
-      // defer it to the first legal boundary after they next take the floor.
+
       if (!side.unit.includes(removal.playerVersionId)) {
         index += 1;
         continue;
@@ -574,12 +470,6 @@ class SeasonGameController {
     }
   }
 
-  /**
-   * Applies every same-game return due at or before the (period,
-   * boundaryClock) boundary (mirror of removals). A returned player
-   * re-enters availability: the planner may bring them back at this
-   * boundary or a later one, always through a legal substitution.
-   */
   private applyDueReturns(
     period: number,
     floatClock: number,
@@ -593,9 +483,6 @@ class SeasonGameController {
       boundaryClock,
       periodEnded,
       (ret, side) => {
-        // A return never re-enables a fouled-out player (the seeded seam
-        // only returns injury-removed players; the guard keeps the
-        // invariant).
         if (side.fouledOut.has(ret.playerVersionId)) return;
         side.removed.delete(ret.playerVersionId);
         side.unavailable.delete(ret.playerVersionId);
@@ -612,11 +499,6 @@ class SeasonGameController {
     );
   }
 
-  /**
-   * Drains every queue entry due at or before the boundary, applying the
-   * per-entry mutation in stable sorted order. Shared by removals and
-   * returns so the due-at-or-before clock/period guard lives in one place.
-   */
   private drainQueue<T extends { period: number; secondsRemaining: number; side: 'home' | 'away' }>(
     queue: T[],
     period: number,
@@ -670,12 +552,6 @@ class SeasonGameController {
     }
   }
 
-  /**
-   * The side's legal-five enumeration, cached until availability changes.
-   * Foul-outs and removals are the only availability mutations, so the
-   * enumeration is typically built once per game instead of at every
-   * whole-minute checkpoint.
-   */
   private cachedCandidates(side: SideState): readonly (readonly string[])[] {
     const signature = [...side.unavailable].sort().join('\u0000');
     if (side.candidateCache !== null && side.candidateCache.signature === signature) {
@@ -695,9 +571,7 @@ class SeasonGameController {
     const hasFoulOut = side.boundaryEvents.foulOuts > 0;
     const hasRemoval = side.boundaryEvents.removals > 0;
     const hasReturn = side.boundaryEvents.returns > 0;
-    // The substitution reason enum has no return literal; a return-driven
-    // re-plan records as a rotation-plan substitution (the deviation cause
-    // `injury-return` carries the return fact on the player's deviation).
+
     const eventReason: SeasonSubstitutionReason | null = hasFoulOut
       ? 'foul-out'
       : hasRemoval
@@ -750,13 +624,6 @@ class SeasonGameController {
     return { reason, unit };
   }
 
-  /**
-   * Records one substitution per truly-removed/truly-added player when the
-   * unit changes. The player sets differ, so the removed set is the old unit
-   * minus the new and the added set the reverse; slot shuffles never record
-   * a player as entering and leaving at once. Pairs are matched in old-unit
-   * and new-unit order respectively (deterministic).
-   */
   private applySubstitutionIfChanged(
     side: SideState,
     planned: readonly string[],
@@ -808,8 +675,7 @@ class SeasonGameController {
     this.tripContext.teamUnits[side.sideIndex] = [...side.unit];
     this.tripContext.preps[side.sideIndex] = prepareTeam(team, this.profile);
     this.recorder.setActiveFive(side.sideIndex, rosterIndices);
-    // M2.4: the effects hook needs the active units for unit chemistry and
-    // defensive-unit fatigue (consumes no RNG; no-op when absent).
+
     this.effectsMode?.buffer.hook.setActiveUnits(this.home.unit, this.away.unit);
   }
 
@@ -857,8 +723,7 @@ class SeasonGameController {
       if (rosterIndex === undefined) {
         throw new Error(`season: no roster index for version ${playerVersionId}`);
       }
-      // Regulation-only accumulation drives planner targets and deviations;
-      // the recorder accumulates the full-game seconds.
+
       if (period <= 4) {
         side.regulationSeconds.set(
           playerVersionId,
@@ -867,8 +732,7 @@ class SeasonGameController {
       }
       this.recorder.playSeconds(side.sideIndex, rosterIndex, duration);
     }
-    // M2.4: on-court accumulation and off-court recovery for the interval
-    // (consumes no RNG; no-op when the hook is absent).
+
     this.effectsMode?.buffer.hook.recordStintSeconds(side.sideIndex, duration, stint.unit);
     stint.cursor = clock;
   }
@@ -943,12 +807,7 @@ class SeasonGameController {
     trigger: 'no-legal-five-tipoff' | 'no-legal-five-after-removal',
   ): SeasonGameSimulationResult {
     const homeWins = loser === this.away;
-    // NOTE (contract problem for the lead): the current season-game-simulation
-    // contract types homeScore as literal 2 and awayScore as literal 0, which
-    // cannot express an away forfeit win. The semantically correct official
-    // result is winner 2, loser 0, so the home-win and away-win scores are
-    // cast here and the data-contracts literal must be fixed to
-    // z.literal(0|2) with exactly one 2 (or a 2-0 tuple).
+
     return {
       schemaVersion: 1,
       outcome: 'forfeit',
@@ -1051,21 +910,13 @@ function toSimulationPlayer(player: SeasonGamePlayerInput): SimulationPlayer {
   };
 }
 
-/** Regulation target seconds for a rostered version (target minutes x 60). */
 function targetSecondsFor(rotation: SeasonRotation, playerVersionId: string): number {
   const entry = rotation.targetMinutes.find((t) => t.playerVersionId === playerVersionId);
   return (entry?.minutes ?? 0) * 60;
 }
 
-/** Set equality for ordered units (slot reordering is not a substitution). */
 export function sameUnit(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) return false;
   const set = new Set(a);
   return b.every((id) => set.has(id));
 }
-
-/**
- * `checkSeasonGameResult` and its stint/substitution/deviation audits moved to
- * `season-game-audit.ts` (they re-simulate the game for determinism evidence
- * and import `simulateSeasonGame` from here).
- */

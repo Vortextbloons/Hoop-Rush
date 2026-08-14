@@ -99,8 +99,7 @@ describe('season effects CLI commands', () => {
     );
     const payload = seasonEffectsCalibrateReportSchema.parse(report.payload);
     expect(payload.calibrationGames).toBeGreaterThan(0);
-    // Small cohorts cannot pass the statistical gates; the payload must
-    // still be well-formed and the caps must match the engine.
+
     expect(payload.targetsVersion).toBe(SEASON_EFFECT_TARGETS_VERSION);
     void SEASON_EFFECTS_SHOOTER_FATIGUE_MAX_PP;
     void SEASON_EFFECTS_HANDLER_FATIGUE_MAX_PP;

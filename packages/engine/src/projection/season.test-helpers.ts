@@ -7,11 +7,6 @@ import {
   type SimulationPlayer,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Shared projection test fixtures: a slot-legal ten-player roster and
- * rotation built from the deterministic season draft catalog.
- */
-
 export function candidateToPlayer(candidate: SeasonDraftCandidate): SimulationPlayer {
   return {
     playerId: candidate.playerId,
@@ -34,7 +29,7 @@ export function buildInput() {
     playersPerPool: 20,
   });
   const pool = catalog.candidates.slice(0, 20).map((candidate) => candidateToPlayer(candidate));
-  // Build a slot-legal ten: 2 G, 2 F, 1 C starters and the same for the bench.
+
   const canPlay = (player: SimulationPlayer, group: 'G' | 'F' | 'C') =>
     group === 'G'
       ? player.positions.includes('PG') || player.positions.includes('SG')

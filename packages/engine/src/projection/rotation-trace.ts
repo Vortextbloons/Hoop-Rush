@@ -7,22 +7,10 @@ import {
 } from '../season/rotation-planner.ts';
 import { OVERTIME_PERIOD_SECONDS, REGULATION_PERIOD_SECONDS } from '../sim/periods.ts';
 
-/**
- * Read-only rotation trace (projection milestone). The trace calls the
- * existing planner rules without simulating a game: it starts with
- * `chooseInitialUnit`, advances in deterministic one-minute planning ticks,
- * maintains abstract actual-minute totals, calls `planUnit` with the same
- * target-minute context the game controller uses, and applies the closing
- * preference during the final five minutes of regulation in a close-game
- * trace. It never uses score, fouls, injuries, fatigue, possessions, or RNG.
- * Treat traces as pregame target-minute projections; contingencies are
- * evaluated separately.
- */
-
 const REGULATION_TICKS = 48;
 const TICK_SECONDS = 60;
 const CLOSING_WINDOW_SECONDS = OVERTIME_PERIOD_SECONDS;
-/** Non-close traces use a margin that never triggers the closing window. */
+
 const NON_CLOSE_MARGIN = 20;
 
 export interface RotationTraceUnit {
@@ -32,9 +20,9 @@ export interface RotationTraceUnit {
 
 export interface RotationTraceResult {
   units: RotationTraceUnit[];
-  /** Regulation actual seconds per rostered player. */
+
   actualSeconds: ReadonlyMap<string, number>;
-  /** Regulation minutes per rostered player. */
+
   actualMinutes: ReadonlyMap<string, number>;
   totalMinutes: number;
 }
@@ -48,8 +36,6 @@ function trace(context: PlannerRotationContext, closeGame: boolean): RotationTra
 
   let currentUnit = chooseInitialUnit(context, unavailable);
   if (currentUnit === null) {
-    // No legal five at the tipoff: the trace is empty (the controller turns
-    // this into a typed forfeit; projection records the failure).
     return {
       units: [],
       actualSeconds,
@@ -71,9 +57,6 @@ function trace(context: PlannerRotationContext, closeGame: boolean): RotationTra
     unitMinutes.set(key, (unitMinutes.get(key) ?? 0) + 1);
     unitPlayers.set(key, currentUnit);
 
-    // Plan the next segment at the same checkpoints the game controller uses
-    // (whole-minute boundaries), with the closing preference active only in
-    // the close-game trace's final five minutes of regulation.
     const closingWindow = closeGame && period === 4 && secondsRemaining <= CLOSING_WINDOW_SECONDS;
     const request: PlannerUnitRequest = {
       side: 'home',
@@ -109,7 +92,6 @@ function minutesOf(actualSeconds: ReadonlyMap<string, number>): ReadonlyMap<stri
   return new Map([...actualSeconds.entries()].map(([id, seconds]) => [id, seconds / TICK_SECONDS]));
 }
 
-/** Canonical unit key: the five version ids in deterministic order. */
 function unitKey(unit: readonly string[]): string {
   return [...unit].sort().join(',');
 }

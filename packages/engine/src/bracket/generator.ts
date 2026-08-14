@@ -21,19 +21,7 @@ import { BENCHMARK_VERSION } from '../challenge/benchmarks.ts';
 import { playableSlotGroups } from '../domain/positions.ts';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 
-/** Frozen schedule version label shared by the artifact and audits. */
 export const SCHEDULE_VERSION_LABEL = `schedule-${SCHEDULE_GENERATION_VERSION.replace('schedule-', '')}`;
-
-/**
- * Bracket generation (spec/01 fixed opponent bracket). A deterministic
- * propose-review-freeze workflow: proposals are sampled per franchise from
- * the private candidate catalog, rejected when they miss a required balance
- * dimension or a legal G,G,F,F,C assignment, measured by seeded games against
- * the fixed benchmark matrix, then selected to span the configured strength
- * bands with the league median inside its band. The committed generation
- * seed, target bands, reviewed selections, and resulting artifact make
- * regeneration byte-identical.
- */
 
 export interface BracketCandidatePlayer {
   playerId: string;
@@ -45,7 +33,7 @@ export interface BracketCandidatePlayer {
   tendencies: SimulationTendencies;
   anchors?: SimulationAnchors;
   seasonKey: string;
-  /** Quality score used for weighted proposal sampling. */
+
   score: number;
 }
 
@@ -63,18 +51,17 @@ export interface BracketGenerationOptions {
   openingOpponent: OpponentTeam;
   difficulty: DifficultyProfile;
   candidates: FranchiseCandidates[];
-  /** Proposals sampled per franchise; more proposals widen the selection. */
+
   proposalsPerFranchise?: number;
-  /** Seeded games per benchmark during measurement (alternating sides). */
+
   samplesPerBenchmark?: number;
-  /** Minimum player quality score for a proposal to be considered. */
+
   minPlayerScore?: number;
   engineContext: EngineContext;
 }
 
 const DEFAULT_PROPOSALS = 32;
-// Six games is too coarse for percentile ranking: many proposals share the
-// same win rate and the bracket cannot satisfy its strength-band constraints.
+
 const DEFAULT_SAMPLES = 32;
 const DEFAULT_MIN_PLAYER_SCORE = 45;
 
@@ -106,19 +93,10 @@ function percentileOf(value: number, population: readonly number[]): number {
     if (v < value) below += 1;
     else if (v === value) equal += 1;
   }
-  // Strength measurements are intentionally discrete at small sample counts.
-  // Use the tie group's midpoint rank rather than assigning every tied value
-  // to its lower edge; lower-edge ranks created artificial holes in the
-  // selectable percentile band for otherwise valid alternate seeds.
+
   return (below + equal / 2) / population.length;
 }
 
-/**
- * Generates the complete frozen bracket: 30 measured opponents (the opening
- * opponent unchanged plus 29 selected proposals) and the fixed 82-game
- * schedule. Throws with diagnostics when the candidate data cannot satisfy
- * the requested bands.
- */
 export function generateBracket(options: BracketGenerationOptions): OpponentBracket {
   const proposalsPerFranchise = options.proposalsPerFranchise ?? DEFAULT_PROPOSALS;
   const samplesPerBenchmark = options.samplesPerBenchmark ?? DEFAULT_SAMPLES;
@@ -136,7 +114,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     );
   }
 
-  // ---- Propose: deterministic seeded sampling with balance rejection. ----
   const proposalsByFranchise = new Map<string, Proposal[]>();
   for (const candidates of options.candidates) {
     const eligible = candidates.players.filter((p) => p.score >= minPlayerScore);
@@ -151,13 +128,10 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     const rng = createRng(`${seed}:propose:${candidates.franchiseId}`);
     const proposals: Proposal[] = [];
     const seen = new Set<string>();
-    // Cap how often one player may appear across a franchise's proposals so
-    // the selection step always has conflict-free alternatives (dedup).
+
     const participation = new Map<string, number>();
     const maxParticipation = Math.max(6, Math.ceil(proposalsPerFranchise * 0.45));
-    // Stratified sampling keeps the candidate population wide across the
-    // skill spectrum, so percentile bands are meaningful (spec/01 bands).
-    // Strong strata appear twice so the population's top end is populated.
+
     const BIASES: ReadonlyArray<'strong' | 'mid' | 'uniform'> = [
       'strong',
       'strong',
@@ -207,7 +181,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     proposalsByFranchise.set(candidates.franchiseId, proposals);
   }
 
-  // ---- Measure the fixed opening opponent identically. ----
   const openingTeam: SimulationTeam = {
     teamId: options.openingOpponent.teamId,
     displayName: options.openingOpponent.displayName,
@@ -218,14 +191,12 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     seedBase: `${seed}:strength:opening`,
   });
 
-  // ---- Candidate population for percentile ranks. ----
   const population: number[] = [openingMeasurement.winRate];
   for (const proposals of proposalsByFranchise.values()) {
     for (const p of proposals) population.push(p.strength);
   }
   population.sort((a, b) => a - b);
 
-  // ---- Select one proposal per franchise toward evenly spaced targets. ----
   const band = options.difficulty.teamPercentileBand;
   const selectableFranchises = franchiseIds.filter((id) => id !== options.openingOpponent.teamId);
   if (selectableFranchises.length !== 29) {
@@ -235,11 +206,9 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   }
   const selected = new Map<string, { proposal: Proposal; target: number }>();
 
-  // ---- Constraint repair: player dedup, band range, and league median. ----
   const medianBand = options.difficulty.leagueMedianPercentileBand;
   const openingPercentileOfPopulation = percentileOf(openingMeasurement.winRate, population);
 
-  /** Players used by every selection plus the opening opponent (excluding one franchise). */
   function usedPlayerIds(excludingFranchise: string | null): Set<string> {
     const used = new Set<string>();
     for (const player of options.openingOpponent.players) used.add(player.playerId);
@@ -250,12 +219,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     return used;
   }
 
-  /**
-   * Band violations dominate target distance; player duplication dominates
-   * both. Duplication is a hard validity constraint (a player can appear in
-   * exactly one opponent), so its penalty must exceed any in-band distance
-   * cost, otherwise a conflict-free proposal is never swapped in.
-   */
   function proposalScore(
     proposal: Proposal,
     target: number,
@@ -272,7 +235,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
   }
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    // Initial selection: in-band first, then target distance.
     const shuffled = shuffle(
       selectableFranchises,
       createRng(`${seed}:select:order:${String(attempt)}`),
@@ -304,7 +266,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     for (let round = 0; round < 100; round += 1) {
       let changed = false;
 
-      // Best-improvement repair: minimize (band penalty, conflicts, distance).
       for (const franchiseId of shuffled) {
         const current = selected.get(franchiseId);
         if (!current) continue;
@@ -322,9 +283,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
         }
       }
 
-      // League-median adjustment: try every candidate move and apply the one
-      // that brings the bracket median closest to the median band (strictly
-      // closer). Target distance stays soft: the median is a hard constraint.
       const bracketMedian = (): number =>
         medianOf(bracketPercentileList(selected, openingPercentileOfPopulation, population));
       const currentMedian = bracketMedian();
@@ -384,7 +342,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
       if (!changed) break;
     }
 
-    // Check the attempt: every selection in band with zero conflicts.
     let clean = true;
     for (const [franchiseId, current] of selected) {
       const pct = percentileOf(current.proposal.strength, population);
@@ -401,7 +358,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     if (clean) break;
   }
 
-  // Confirm the committed selection is clean.
   {
     const conflictDetails: string[] = [];
     for (const [franchiseId, current] of selected) {
@@ -419,7 +375,6 @@ export function generateBracket(options: BracketGenerationOptions): OpponentBrac
     }
   }
 
-  // ---- Build the frozen artifact. ----
   const opponents: BracketOpponent[] = [];
   const usedInBracket = new Set(options.openingOpponent.players.map((p) => p.playerId));
   const opponentsByFranchise = new Map<string, BracketOpponent>();
@@ -604,7 +559,6 @@ function inBand(strength: number, population: readonly number[], band: [number, 
   return p >= band[0] && p <= band[1];
 }
 
-/** How far a median sits outside its band (0 when inside). */
 function bestDirectionGap(median: number, band: [number, number]): number {
   if (median < band[0]) return band[0] - median;
   if (median > band[1]) return median - band[1];

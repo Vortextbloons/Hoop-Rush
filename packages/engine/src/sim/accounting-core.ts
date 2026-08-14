@@ -1,23 +1,5 @@
 import { usageOf } from './recorder.ts';
 
-/**
- * Shared scoring/accounting audit core for game results. Classic
- * (`sim/invariants.ts checkGameResult`) and Season Run
- * (`season/season-game-audit.ts checkSeasonGameResult`) audit the same
- * identities against structurally identical box-score records, so the
- * arithmetic lives here once: points identity, makes/attempts bounds,
- * rebound buckets, player/team reconciliation, opportunity diagnostics
- * (rebound chances, contested shots, usage identity, assist opportunities),
- * and per-zone splits.
- *
- * The core returns violation FACTS; each auditor formats its own failure
- * messages (the two audits' message wording differs and is preserved
- * verbatim at each site). Divergent checks stay at the sites: the classic
- * audit's defensive-rebound-chances check reads the opponent's recorded
- * rebound opportunities while the Season audit recomputes opponent misses,
- * so that check is NOT shared.
- */
-
 export interface AccountingShotZones {
   zone: string;
   attempts: number;
@@ -39,7 +21,6 @@ export interface AccountingTeamDiagnostics {
   contestedShots: number;
 }
 
-/** Structural player box-score subset shared by PlayerBoxScore and SeasonGamePlayerResult. */
 export interface AccountingPlayerInput {
   points: number;
   fieldGoals: { made: number; attempted: number };
@@ -54,7 +35,6 @@ export interface AccountingPlayerInput {
   diagnostics?: AccountingPlayerDiagnostics | null;
 }
 
-/** Structural team box-score subset shared by TeamBoxScore and the Season side box. */
 export interface AccountingBoxInput {
   points: number;
   fieldGoals: { made: number; attempted: number };
@@ -71,7 +51,7 @@ export interface AccountingBoxInput {
 
 export interface SideAccountingViolations {
   playerPointsTotal: number;
-  /** (fgm - tpm) * 2 + tpm * 3 + ftm for the box. */
+
   pointsIdentity: number;
   pointsIdentityOk: boolean;
   makesExceed: Array<'fieldGoal' | 'three' | 'freeThrow'>;
@@ -97,12 +77,6 @@ export interface SideAccountingViolations {
   }>;
 }
 
-/**
- * Audits one side's scoring/accounting identities against the box and team
- * zone summary. Players without diagnostics contribute nothing to the
- * per-player diagnostics checks, and a box without team diagnostics skips
- * the team-level diagnostic checks, matching both callers' guards.
- */
 export function auditSideAccounting<P extends AccountingPlayerInput>(
   players: readonly P[],
   box: AccountingBoxInput,
@@ -161,8 +135,6 @@ export function auditSideAccounting<P extends AccountingPlayerInput>(
       playerDiag((p) => p.offensiveReboundChances) === d.reboundOpportunities * 5;
   }
 
-  // Opportunity-level checks run only when at least one diagnostic exists
-  // (the classic audit's guard; Season results always carry diagnostics).
   const hasAnyDiagnostics = Boolean(d) || players.some((p) => p.diagnostics);
   const zoneSplits: SideAccountingViolations['zoneSplits'] = [];
   const usageViolations: SideAccountingViolations['usageViolations'] = [];

@@ -6,16 +6,6 @@ import { buildInput, fixtureSeed, loadFixture, runSingleGame, UsageError } from 
 import { loadPackagedData, PackagedData } from './data-loader.ts';
 import { parseCount } from '../args.ts';
 
-/**
- * `sim diagnose` and `sim season` (spec/09). Opportunity-level diagnostics for
- * player-role behavior: `sim diagnose` aggregates per-player usage, shot-mix,
- * assist, rebound, and contest data across a seeded batch; `sim season`
- * simulates 82-game seasons and checks that per-game shooting variance is
- * consistent with independent per-shot binomial draws (a regression toward
- * player skill instead of excessive per-game randomness). Both commands call
- * the authoritative engine; neither re-implements basketball rules.
- */
-
 export const DIAGNOSE_OPTIONS: Record<string, boolean> = {
   fixture: true,
   samples: true,
@@ -61,9 +51,9 @@ interface PlayerAccumulator {
   offensiveReboundChances: number;
   defensiveReboundChances: number;
   contestedShots: number;
-  /** Misses by this player's team while they played (OReb denominator). */
+
   teamMisses: number;
-  /** Misses by the opponent while this player played (DREb denominator). */
+
   opponentMisses: number;
   zoneAttempts: Record<string, number>;
   zoneMakes: Record<string, number>;
@@ -381,8 +371,6 @@ export function simSeason(args: {
       .sort((a, b) => b.usagePerGame - a.usagePerGame),
   }));
 
-  // Variance-consistency gate: per-game shooting variance should match
-  // independent per-shot draws within a plausible band (1.0 = exact match).
   const RATIO_BAND: [number, number] = [0.5, 2.0];
   for (const { season, players } of allSeasons) {
     for (const p of players) {
@@ -443,11 +431,6 @@ export function simSeason(args: {
   );
 }
 
-/**
- * Observed per-game rate variance divided by the binomial variance implied
- * by the player's season rate and per-game attempt count (1.0 = per-game
- * shooting behaves like independent per-shot draws).
- */
 function varianceRatio(
   perGameRates: readonly number[],
   perGameAttempts: readonly number[],

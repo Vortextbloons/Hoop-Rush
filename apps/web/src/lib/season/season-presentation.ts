@@ -25,16 +25,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { humanUpcomingGames } from './season-lock-preview';
 
-/**
- * Season Run presentation helpers (M2.3 hub/checkpoint): pure formatting and
- * derivation of display facts from recorded data. Every value comes from the
- * frozen contracts — standings rows, aggregate folds, game summaries — so the
- * UI never invents a fact. Business rules (ranking, eligibility, tie-breaks)
- * stay in the engine; this module only renders them.
- */
-
-/** Provisional conference ordering (frozen for M2.3): wins desc, point
- * differential desc, franchiseId asc. NOT the M2.6 postseason tiebreak. */
 export function provisionalRanking(
   standings: SeasonStandings,
   league: SeasonLeague,
@@ -136,12 +126,6 @@ export function franchiseStreak(
   return streakOfGames(games, franchiseId);
 }
 
-/**
- * One-pass streak computation for many franchises: groups every summary by
- * participating franchise and sorts each list once, instead of filtering and
- * sorting the full summary set once per team. Returns null entries for
- * franchises with no games, exactly like `franchiseStreak`.
- */
 export function franchiseStreaks(
   summaries: readonly SeasonGameSummary[],
   franchiseIds: readonly string[],
@@ -179,9 +163,6 @@ export function didWin(summary: SeasonGameSummary, franchiseId: string): boolean
   return isHome ? summary.homeScore > summary.awayScore : summary.awayScore > summary.homeScore;
 }
 
-/** Reconstructs finalized game records by merging summary results into the
- * run's scheduled games (the engine rebuilds these on demand; this mirror
- * serves the schedule/results presentation). */
 export function finalizeGameRecords(
   games: readonly SeasonGame[],
   summaries: readonly SeasonGameSummary[],
@@ -244,9 +225,6 @@ export interface BoxScore {
   won: boolean;
 }
 
-/** Derives the box score for one side of a completed game from the compact
- * summary, joined with roster names and position data. Returns null when the
- * franchise did not play in the game. */
 export function boxScoreFromSummary(
   summary: SeasonGameSummary,
   franchiseId: string,
@@ -329,14 +307,6 @@ export function progressLabel(completedRounds: number): string {
   return `Rounds 1–${String(completedRounds)} complete`;
 }
 
-/**
- * Pure fold of compact summaries into the aggregate shapes the checkpoint
- * commits (the frozen `season-aggregates-v1` fold). The snapshot exposes only
- * summaries, so the hub folds on demand; a fold over the same facts always
- * agrees with the stored checkpoint. The fold is memoized per summaries
- * array identity — snapshots are immutable per commit — so several tabs
- * folding the same snapshot share one result.
- */
 const aggregateFoldCache = new WeakMap<
   readonly SeasonGameSummary[],
   { teams: SeasonTeamAggregate[]; players: SeasonPlayerAggregate[] }
@@ -481,14 +451,6 @@ export function foldSeasonAggregates(summaries: readonly SeasonGameSummary[]): {
   return result;
 }
 
-/**
- * Reconstructs the standings immediately before a block by subtracting the
- * block's recorded games from the current standings fold (pure reverse fold
- * over recorded facts; the engine's checkpoint keeps only the post-block
- * fold). Forfeits subtract their official 2-0 records without points. The
- * input standings are never mutated: rows and head-to-head records are
- * cloned before adjustment.
- */
 export function rebaseStandingsBefore(
   standings: SeasonStandings,
   league: SeasonLeague,
@@ -588,7 +550,6 @@ export function rebaseStandingsBefore(
   };
 }
 
-/** Notable block lines: human-team first, then league-wide (top 5 each). */
 export function deriveNotablePerformances(
   blockSummaries: readonly SeasonGameSummary[],
   humanFranchiseId: string,
@@ -727,27 +688,6 @@ export function deriveVersionSpotlights(
   return spotlights.slice(0, 5);
 }
 
-/**
- * Derives a recap-shaped presentation from recorded facts when the
- * repository exposes no recap accessor (the frozen checkpoint contract keeps
- * recaps inside `CommitSeasonBlockInput` only). Every claim — record and
- * standings movement, notable performances, streaks, version spotlights, and
- * upcoming human games — derives from saved summaries, standings, rosters,
- * and the committed schedule. M2.5 adds the block-level injury, objective,
- * trade, and Influence evidence derived from the summaries' compact injury
- * events, the run health/transactions/ledger, and the schedule.
- *
- * Derivation notes (documented approximations where the UI mirror cannot
- * reproduce an engine-exact fact):
- * - `activeAtBlockEnd` counts records still active in the CURRENT health
- *   state whose occurrence game round is at or before the block's last
- *   round (exact for the last accepted block; may undercount for older
- *   blocks whose injuries recovered afterwards).
- * - `objectiveEvidence` stays null: the availability evaluation facts are
- *   not reconstructible from summaries/health after the fact; the engine
- *   recap carries the recorded evaluation. The recorded selection outcome
- *   (objectiveId + success) is readable from the run's objective state.
- */
 export function deriveBlockRecap(input: {
   runId: string;
   blockIndex: number;
@@ -855,13 +795,6 @@ export function deriveBlockRecap(input: {
   };
 }
 
-/**
- * M2.6.5: block-level free-agency evidence (season-recap-v4; mirror of the
- * engine's `blockFreeAgencyEvidenceOf`): the window resolved by this block,
- * its signings, and the human franchise's season signing/spend counts. A
- * block itself signs nothing (windows resolve between blocks), so ordinary
- * blocks report zero.
- */
 export function blockFreeAgencyEvidenceOf(input: {
   blockIndex: number;
   humanFranchiseId: string | null;
@@ -897,10 +830,6 @@ export function blockFreeAgencyEvidenceOf(input: {
   };
 }
 
-/**
- * The human Influence balance at a block's end, reconstructed from the
- * append-only ledger: the current balance minus every later ledger entry.
- */
 export function humanBalanceAtBlockEnd(
   run: SeasonRun,
   humanFranchiseId: string,
@@ -918,11 +847,6 @@ export function humanBalanceAtBlockEnd(
   return current - laterDelta;
 }
 
-/**
- * Block-level injury evidence counted from the block's compact injury
- * events and the run health (see `deriveBlockRecap` notes for the
- * approximations).
- */
 export function deriveBlockInjuryEvidence(input: {
   blockSummaries: readonly SeasonGameSummary[];
   health: SeasonRun['health'];
@@ -984,8 +908,6 @@ function conferenceOfLeague(league: SeasonLeague, franchiseId: string): string {
   return league.teams.find((team) => team.franchiseId === franchiseId)?.conference ?? 'east';
 }
 
-/** Human games in a block's round range (schedule-derived; the shared
- * implementation lives in season-lock-preview). */
 export function humanUpcomingGamesFromGames(
   games: readonly SeasonGame[],
   humanFranchiseId: string,

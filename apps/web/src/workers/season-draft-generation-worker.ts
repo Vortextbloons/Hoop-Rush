@@ -4,16 +4,7 @@ import type {
   GenerationWorkerResponse,
 } from '../lib/season/season-generation-wire.ts';
 
-/**
- * Season Run AI league generation worker (M2.3.5). Runs the bounded
- * `generateAiLeague` seam off the main thread so the draft board stays
- * responsive while up to ~660k roster-selection nodes execute. Envelope
- * types live in `season-generation-wire.ts`, shared with the draft flow.
- */
-
 self.addEventListener('message', (event: MessageEvent<GenerationWorkerRequest>) => {
-  // The declared envelope type narrows the union; at runtime the port may
-  // carry anything, so treat the payload as nullable before guarding.
   const request = event.data as GenerationWorkerRequest | null;
   if (request?.type !== 'generate') return;
 

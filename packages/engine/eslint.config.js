@@ -3,9 +3,7 @@ import { sharedEslintBase } from '../../eslint.base.config.js';
 
 export default tseslint.config(
   ...sharedEslintBase(import.meta.dirname),
-  // Determinism is a hard contract: simulation state must never come from
-  // platform randomness or wall clocks. Web UI ids may use them; the engine
-  // may not (see AGENTS.md, "Design determinism intentionally").
+
   {
     files: ['src/**'],
     rules: {
@@ -20,8 +18,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Tests may time their own runs (e.g. the perf contract in sim/game.test.ts)
-  // but must still never draw unseeded randomness or wall-clock seeds.
+
   {
     files: ['src/**/*.test.ts'],
     rules: {
@@ -32,8 +29,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Season Run domain modules stay pure TypeScript (spec/2.0/07): no UI,
-  // persistence, worker, browser, or network imports.
+
   {
     files: ['src/season/**'],
     rules: {

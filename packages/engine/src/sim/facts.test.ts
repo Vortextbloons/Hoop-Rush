@@ -95,8 +95,6 @@ function usageDiag(usage: number): PlayerBoxScore['diagnostics'] {
 
 describe('buildFacts usage fact', () => {
   it('picks the highest-usage player, not the top scorer', () => {
-    // A scores 30 but uses little; B scores 8 while using most of the
-    // possessions. Usage (FGA + 0.44*FTA + TOV) must drive the fact.
     const scorer = player({
       playerId: 'p-scorer',
       points: 30,
@@ -171,7 +169,7 @@ describe('buildFacts usage fact', () => {
     );
     const result = buildFacts(game(home, away, 'home'));
     const usageFact = result.find((fact) => fact.kind === 'usage');
-    // Legacy formula usage = 16 + 0.44*5 + 4 = 22.2 of 22.2 team usage.
+
     expect(usageFact?.playerIds).toEqual(['p-legacy']);
     expect(usageFact?.evidence.usageShare).toBeCloseTo(1, 6);
   });

@@ -36,42 +36,19 @@ import { creationScore } from '../domain/archetypes.ts';
 import type { SeasonHomeCourtMechanisms } from '../season/home-court.ts';
 import type { SeasonEffectsHook } from '../season/effects.ts';
 
-/**
- * One offensive trip (spec/03 pipeline stages 1-9), executed as resumable
- * steps so a controller can pause at legal dead-ball boundaries (spec/2.0/04
- * M2.2): made baskets, completed foul/free-throw sequences, inbound-producing
- * fouls, dead-ball team rebounds, and period endings. Live turnovers, live
- * rebounds, and unresolved shot/free-throw sequences never pause. An and-one
- * made basket is followed immediately by its free throw; no step splits that
- * sequence. All clock consumption flows through `state.secondsRemaining`,
- * which the caller owns and seals per period.
- *
- * The step decomposition preserves the monolithic trip's RNG call order
- * exactly: each step performs one atomic unit of work in the original
- * sequence, so `resolveTrip` (the run-to-completion driver) is behavior- and
- * digest-identical to the pre-M2.2 engine, and the Season controller that
- * pauses between steps consumes RNG only through this same pipeline.
- */
-
 export interface TripResolution {
-  /** Seconds of game clock consumed (base trip + fouls + free throws + continuations). */
   secondsElapsed: number;
-  /** Whether the trip ended (change of possession) or continues as the same trip. */
+
   ended: boolean;
 }
 
 export interface GameState {
-  /** Team fouls committed by each side in the current period. */
   periodFouls: [number, number];
   periodIndex: number;
-  /** Seconds remaining in the current period; trips consume from it. */
+
   secondsRemaining: number;
 }
 
-/**
- * Fresh game state. The clock is initialized by the game loop immediately
- * after creation (game.ts), so this factory takes no inputs.
- */
 export function createGameState(): GameState {
   return {
     periodFouls: [0, 0],
@@ -80,48 +57,25 @@ export function createGameState(): GameState {
   };
 }
 
-/**
- * Shared per-game trip context. Constructed once per game and passed by
- * reference: the RNG, recorder, state, teams, and all per-team preparation
- * tables are game-stable, so no trip rebuilds them. Season Run substitutes by
- * replacing `teams[side]` and `preps[side]` at a legal boundary; rebuilding
- * consumes no RNG (prepareTeam is pure).
- */
 export interface TripContext {
   rng: Rng;
   recorder: GameRecorder;
   state: GameState;
   profile: EraSimulationProfile;
   teams: [SimulationTeam, SimulationTeam];
-  /**
-   * Per-side playerVersionId arrays mirroring `teams` (the current on-court
-   * five for Season Run, the full roster for Classic). Hoisted so the
-   * effects hook never rebuilds them per trip; the Season controller keeps
-   * them in sync when a substitution replaces `teams[side]`.
-   */
+
   teamUnits: [readonly string[], readonly string[]];
-  /** Per-team per-game weight and lookup tables, in side order. */
+
   preps: [TeamPrep, TeamPrep];
-  /** Hoisted game scalars (pure functions of the profile). */
+
   meanTripSeconds: number;
   eraPossEstimatePerTrip: number;
   passingAnchorFactor: number;
-  /** How the current offense obtained the ball; updated at every trip end. */
+
   possessionStart: PossessionStartType;
-  /**
-   * M2.3 home-court mechanisms (season-home-court-v1). Absent for Classic
-   * and neutral Season games: both adjustments are zero and every draw and
-   * probability is byte-identical to the M2.2 engine. The season controller
-   * computes the signed, bounded adjustments from the versioned profile.
-   */
+
   homeCourt?: SeasonHomeCourtMechanisms;
-  /**
-   * M2.4 stamina/chemistry effects hook (season-stamina-v1 +
-   * season-chemistry-v1). Absent for Classic and neutral Season games: every
-   * adjustment is exactly +0, no extra RNG draw exists, and all probabilities
-   * stay byte-identical to the M2.3 engine. The season controller builds the
-   * hook from the versioned effects state via `createSeasonEffectsBuffer`.
-   */
+
   effects?: SeasonEffectsHook;
 }
 
@@ -151,19 +105,6 @@ export function createTripContext(
   };
 }
 
-/**
- * Outcome of one atomic step of the trip machine.
- *
- * - `ended`: the trip is over and possession changed.
- * - `pause`: a legal dead-ball substitution boundary was reached. True for
- *   made baskets, completed foul/free-throw sequences, inbound-producing
- *   fouls (trip continues), dead-ball team rebounds, and period endings;
- *   false for live turnovers, live rebounds, and unresolved sequences.
- * - `periodEnded`: the game clock is exhausted or the trip was sealed with an
- *   offensive rebound below the minimum start time; the caller must end the
- *   period.
- * - `finished`: no further steps exist for this trip.
- */
 export interface PossessionStep {
   ended: boolean;
   pause: boolean;
@@ -171,13 +112,6 @@ export interface PossessionStep {
   finished: boolean;
 }
 
-/**
- * Resumable trip executor. Construct once per trip, call `step()` until a
- * finished or periodEnded step; a pause step returns control to the caller
- * (the Season controller may substitute), and the next `step()` resumes the
- * same trip. The RNG draw sequence matches the pre-M2.2 monolithic trip
- * exactly, regardless of how many steps the caller lets run.
- */
 export class PossessionStepper {
   private phase: 'sample' | 'security' | 'foul' | 'inbound' | 'shot' | 'continuation' | 'done' =
     'sample';
@@ -188,7 +122,7 @@ export class PossessionStepper {
   private readonly offenseSide: SideIndex;
   private readonly startedRemaining: number;
   private finalStep: PossessionStep | null = null;
-  /** M2.4 trip facts for the effects hook (stashed by the pipeline steps). */
+
   private handlerVersion: string | undefined;
   private shooterVersion: string | undefined;
   private defenderVersion: string | undefined;
@@ -236,7 +170,6 @@ export class PossessionStepper {
       this.ctx.meanTripSeconds,
     );
     if (sampled === null) {
-      // Period has less than the minimum start time left: it ends without a trip.
       return this.finish({ ended: false, pause: true, periodEnded: true });
     }
     const consumedBase = consumeTime(state, sampled);
@@ -256,12 +189,10 @@ export class PossessionStepper {
     const handler = pickInitiator(team, teamPrep.initiatorWeights, rng);
     const handlerSlot = teamPrep.slotByPlayerId.get(enginePlayerKey(handler)) ?? -1;
     this.handlerVersion = handler.playerVersionId;
-    // M2.3 away-turnover-pressure mechanism: the away offense faces a small
-    // bounded turnover-probability increase (zero under the neutral profile).
+
     const awayTurnoverPressure =
       this.offenseSide === 1 ? (this.ctx.homeCourt?.awayTurnoverPressureAdjustment ?? 0) : 0;
-    // M2.4 effects: handler fatigue and unit chemistry adjust the turnover
-    // probability in bounded steps (zero when the hook is absent).
+
     const effectsAdjustment =
       this.ctx.effects?.turnoverAdjustment({
         handlerVersion: simulationPlayerVersion(handler),
@@ -287,7 +218,7 @@ export class PossessionStepper {
       }
       this.ctx.possessionStart = 'liveTurnover';
       recorder.possession(offense);
-      // A live turnover changes possession without a stoppage: no pause.
+
       return this.endedStep(false);
     }
     this.phase = 'foul';
@@ -341,10 +272,10 @@ export class PossessionStepper {
       );
       this.ctx.possessionStart = 'deadBall';
       recorder.possession(offense);
-      // Completed free-throw sequence: legal dead-ball pause.
+
       return this.endedStep(true);
     }
-    // Inbound-producing non-bonus foul: legal pause; the trip continues.
+
     this.phase = 'inbound';
     return { ended: false, pause: true, periodEnded: false, finished: false };
   }
@@ -358,12 +289,10 @@ export class PossessionStepper {
     this.defenderVersion = outcome.defenderVersion;
     if (!outcome.continues) {
       recorder.possession(offense);
-      // Made baskets, completed shooting-foul free throws, and dead-ball
-      // team rebounds pause; a live defensive rebound does not.
+
       return this.endedStep(!outcome.liveReboundEnd);
     }
     if (this.continuations >= 4) {
-      // Continuation guard reached: seal the trip to avoid unbounded loops.
       recorder.possession(offense);
       return this.endedStep(false);
     }
@@ -377,7 +306,6 @@ export class PossessionStepper {
     this.continuations += 1;
     consumeTime(state, 3);
     if (state.secondsRemaining < ENGINE_CONSTANTS.minimumStartSeconds) {
-      // The period ends with the offensive rebound: the trip is sealed.
       recorder.possession(offense);
       this.recordTrip();
       return this.finish({ ended: true, pause: true, periodEnded: true });
@@ -395,10 +323,6 @@ export class PossessionStepper {
     });
   }
 
-  /**
-   * M2.4: reports the completed trip's facts to the effects hook exactly
-   * once per trip (no-op when the hook is absent). Consumes no RNG.
-   */
   private recordTrip(): void {
     const effects = this.ctx.effects;
     if (effects === undefined) return;
@@ -423,12 +347,6 @@ export class PossessionStepper {
   }
 }
 
-/**
- * Runs one offensive trip to completion (the Classic fixed-five driver).
- * Pauses are legal boundaries, but this driver never observes them: lineups
- * are immutable in Classic, so the trip always finishes in the same RNG
- * sequence as the pre-M2.2 monolithic resolver.
- */
 export function resolveTrip(ctx: TripContext, offenseSide: SideIndex): TripResolution {
   const startedRemaining = ctx.state.secondsRemaining;
   const stepper = new PossessionStepper(ctx, offenseSide);
@@ -448,11 +366,6 @@ function consumeTime(state: GameState, seconds: number): number {
   return consumed;
 }
 
-/**
- * The simulation player's authoritative version id. The effects hook only
- * exists in Season Run context, where every player carries a playerVersionId;
- * a missing id in an effects query is an invariant failure.
- */
 function simulationPlayerVersion(player: SimulationPlayer): string {
   const version = player.playerVersionId;
   if (version === undefined) {
@@ -461,25 +374,10 @@ function simulationPlayerVersion(player: SimulationPlayer): string {
   return version;
 }
 
-/**
- * playerVersionId array of a side's players (hoisted per game/unit). The
- * arrays are consumed only by the effects hook (Season Run, where every
- * player carries a version id); Classic players without an id map to the
- * empty string and are never read.
- */
 function unitVersionIdsOf(team: SimulationTeam): readonly string[] {
   return team.players.map((player) => player.playerVersionId ?? '');
 }
 
-/**
- * Assist probability for a made field goal on a passed possession (pure;
- * shared by the sampled pipeline and the projection layer). Anchored so a
- * passer at the population anchor rating converts at the era assist rate,
- * then modulated by creation ability, the play type (rolls, cuts, and
- * transition finishes are real passes; post-ups and isolations rarely earn
- * an assist), the shot zone (rim finishes off passes convert as assists),
- * and the shooter's finishing at the zone.
- */
 export function assistProbabilityPure(
   profile: EraSimulationProfile,
   passingAnchorFactor: number,
@@ -493,8 +391,7 @@ export function assistProbabilityPure(
   const roleFactor = passer.anchors
     ? 0.75 + Math.min(1, passer.anchors.assistsPerGame / 8) * 0.25
     : 1;
-  // Creation spreads the conversion: real playmakers turn more of their
-  // passes into assists than role players do.
+
   const creation = 0.6 + 0.7 * creationScore(passer);
   const actionFactor =
     action === 'transition'
@@ -557,9 +454,6 @@ function assistProbability(
   );
 }
 
-/** Records one assist for an actual passer after a made basket. The pass
- * opportunity belongs to the credited passer, so every assist is backed by
- * an opportunity for the same player. */
 function creditAssist(
   ctx: TripContext,
   offenseSide: SideIndex,
@@ -576,8 +470,7 @@ function creditAssist(
   const slot = ctx.preps[offenseSide].slotByPlayerId.get(enginePlayerKey(passer)) ?? -1;
   if (slot < 0) return;
   ctx.recorder.assistOpportunity(offenseSide, slot);
-  // M2.4 assist-conversion mechanism: unit chemistry raises the conversion
-  // in a bounded step (zero when the hook is absent).
+
   const effectsAdjustment = ctx.effects?.assistAdjustment({ offenseSide }) ?? 0;
   if (
     !ctx.rng.chance(
@@ -634,10 +527,6 @@ function reboundFromMissedFreeThrow(
   }
 }
 
-/**
- * Resolves free throws after a foul. The trip always ends after free throws;
- * attempts are dead-ball events and therefore consume no game-clock time.
- */
 function resolveFreeThrows(
   ctx: TripContext,
   offenseSide: SideIndex,
@@ -661,8 +550,6 @@ function resolveFreeThrows(
     if (last && !made) {
       reboundFromMissedFreeThrow(ctx, offenseSide, defenseSide, deadBall, reboundCounter);
     } else if (!made) {
-      // A missed non-final free throw is a declared dead-ball miss: the
-      // defensive team takes the rebound before the next attempt.
       reboundChances(ctx, offenseSide, defenseSide, reboundCounter);
       recorder.teamRebound(defenseSide);
     }
@@ -671,21 +558,14 @@ function resolveFreeThrows(
 }
 
 interface ShotOutcome {
-  /** True when an offensive rebound keeps the trip alive. */
   continues: boolean;
-  /** True when the trip ended on a live defensive player rebound (no pause). */
+
   liveReboundEnd: boolean;
-  /** M2.4 trip facts: the shot taker and primary defender of this shot. */
+
   shooterVersion?: string;
   defenderVersion?: string;
 }
 
-/**
- * Resolves one shot attempt as one atomic step. Returns the continuation and
- * boundary facts; every shot outcome consumes the relevant clock. An and-one
- * made basket is followed immediately by its free throw inside this step —
- * no pause splits the sequence.
- */
 function resolveShot(
   ctx: TripContext,
   offenseSide: SideIndex,
@@ -733,9 +613,7 @@ function resolveShot(
     spacing: teamPrep.spacing,
     twoPointAnchor: teamPrep.twoPointAnchor.get(enginePlayerKey(shooter)) ?? null,
   };
-  // M2.4 effects: shooter fatigue, defensive-unit fatigue, and help-defense
-  // chemistry adjust the make probability in bounded steps (zero when the
-  // hook is absent). Computed once per shot so evidence counts each shot once.
+
   const effectsAdjustment =
     ctx.effects?.makeAdjustment({
       shooterVersion: simulationPlayerVersion(shooter),
@@ -747,12 +625,9 @@ function resolveShot(
   const foulP = shootingFoulProbability(shooter, defender, zone, profile);
   if (rng.chance(foulP)) {
     recorder.foul(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
-    // Every defensive foul counts toward the period team-foul limit. The
-    // former path counted only non-shooting fouls, delaying the bonus.
+
     state.periodFouls[defenseSide] += 1;
-    // M2.3 home defensive-communication mechanism: away shots against the
-    // home defense convert at a small bounded lower rate (zero under the
-    // neutral profile).
+
     const homeDefenseAdjustment =
       defenseSide === 0 ? (ctx.homeCourt?.homeDefenseShotAdjustment ?? 0) : 0;
     const shotP =
@@ -771,11 +646,9 @@ function resolveShot(
     recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
     if (made) {
       creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
-      // And-one free throw, resolved immediately (no pause between basket and FT).
+
       resolveFreeThrows(ctx, offenseSide, defenseSide, shooterSlot, 1, false, reboundCounter);
     } else {
-      // The missed shot on a shooting foul is a declared dead-ball miss:
-      // the defensive team takes the rebound, then free throws resolve.
       reboundChances(ctx, offenseSide, defenseSide, reboundCounter);
       recorder.teamRebound(defenseSide);
       resolveFreeThrows(
@@ -788,7 +661,7 @@ function resolveShot(
         reboundCounter,
       );
     }
-    // Free-throw trips always change possession at a dead-ball pause.
+
     ctx.possessionStart = 'deadBall';
     return {
       continues: false,
@@ -798,7 +671,6 @@ function resolveShot(
     };
   }
 
-  // A block forces a miss, then a normal rebound.
   const blockP = blockProbability(defender, zone, action);
   if (rng.chance(blockP)) {
     recorder.block(defenseSide, defenderSlot >= 0 ? defenderSlot : 0);
@@ -832,7 +704,7 @@ function resolveShot(
   recorder.fieldGoalAttempt(offenseSide, shooterSlot, zone, made, three, shot.passed);
   if (made) {
     creditAssist(ctx, offenseSide, team, shooter, initiator, action, zone, shot.passed);
-    // A made basket is a dead-ball pause.
+
     ctx.possessionStart = 'madeBasket';
     return {
       continues: false,
@@ -874,7 +746,6 @@ function reboundAfterMiss(
     deadBall,
   );
   if (result.team) {
-    // Dead-ball team rebound: legal pause, possession changes.
     recorder.teamRebound(defenseSide);
     ctx.possessionStart = 'deadBall';
     return {
@@ -902,7 +773,7 @@ function reboundAfterMiss(
   const slot = prep.slotByPlayerId.get(enginePlayerKey(rebounder)) ?? -1;
   recorder.defensiveRebound(defenseSide, slot >= 0 ? slot : 0);
   ctx.possessionStart = 'defensiveRebound';
-  // A live defensive player rebound changes possession without a stoppage.
+
   return {
     continues: false,
     liveReboundEnd: true,

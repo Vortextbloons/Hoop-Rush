@@ -16,9 +16,7 @@ describe('calibrationConfidence', () => {
 describe('buildRatingsModelArtifact', () => {
   const loaded = {
     ...DEFAULT_RATINGS_MODEL_ARTIFACT,
-    // The previous run's actual sample count is 512; the declared
-    // confidence target is 256. Confidence must track the target, not the
-    // previous artifact's sample count.
+
     sampleCountPerContext: 512,
   };
   const samples = 128;
@@ -47,8 +45,7 @@ describe('buildRatingsModelArtifact', () => {
           output.confidenceTargetSamplesPerContext,
         ),
       );
-      // Regression guard for the old bug shape: the previous artifact's
-      // sample count (512) must not shrink confidence to 128/512 = 0.25.
+
       expect(entry.confidence).toBe(0.5);
     }
     expect(output.schemaVersion).toBe(2);

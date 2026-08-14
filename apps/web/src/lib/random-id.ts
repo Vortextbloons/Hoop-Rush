@@ -1,9 +1,3 @@
-/**
- * Platform UUID generation for client-side run and draft identity.
- * `crypto.randomUUID` is secure-context only; fall back to v4 bytes from
- * `getRandomValues`, which remains available on plain HTTP.
- */
-
 import { bytesToHex, randomBytes } from './random-hex';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -26,7 +20,6 @@ function randomUUIDFromBytes(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** Last-resort identity when no CSPRNG is exposed (e.g. SSR). */
 function fallbackUUID(): string {
   const time = Date.now().toString(16).padStart(12, '0');
   const rand = Math.floor(Math.random() * 0xffff_ffff)

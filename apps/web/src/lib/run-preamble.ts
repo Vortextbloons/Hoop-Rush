@@ -5,12 +5,6 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { getBracket, getEraSimulationProfile, getManifest } from '$lib/data';
 
-/**
- * Run-creation preamble shared by the sandbox and classic run creators
- * (spec/01): the manifest, the frozen '2010s' era profile, and the fixed
- * opponent bracket. Every run simulates in the same environment era.
- */
-
 export const FIXED_SANDBOX_ERA = '2010s';
 
 export async function loadRunPreamble(): Promise<{

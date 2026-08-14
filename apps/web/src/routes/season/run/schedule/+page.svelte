@@ -20,18 +20,6 @@
     type ScheduleBlockRow,
   } from '$lib/season/season-schedule-view';
 
-  /**
-   * Schedule tab (spec/2.0/11, M2.3.5, M2.6): the human team's 82 games
-   * grouped into the nine blocks, with All/Played/Upcoming filters, plus —
-   * once the postseason starts — the Play-In and playoff games loaded from
-   * the saved postseason summaries. Mobile renders opponent cards (logo,
-   * round, home/away, score, W/L state) and completed games expand into
-   * branded compact box scores; desktop renders a denser table in a scroll
-   * wrapper. Each completed block heading links to its checkpoint recap.
-   * Every fact derives from the run's schedule, the accepted summaries,
-   * and the recorded postseason summaries.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   type ScheduleFilter = 'all' | 'played' | 'upcoming';
@@ -42,12 +30,6 @@
   ];
   let filter = $state<ScheduleFilter>('all');
 
-  /**
-   * Box scores mount only when their <details> opens (progressive
-   * disclosure): each row's three table variants stay out of the DOM until
-   * first expanded, then remain mounted so closing/reopening is instant.
-   * The BoxScore chunk itself is lazy-loaded on first open.
-   */
   let openedBoxScores = $state.raw(new Set<string>());
   function onBoxScoreToggle(event: Event, gameId: string) {
     if (!(event.currentTarget instanceof HTMLDetailsElement)) return;
@@ -62,11 +44,6 @@
     return boxScoreModule;
   }
 
-  /**
-   * Responsive split: once the viewport is known, only the active variant of
-   * the schedule mounts. Null = unknown (SSR, jsdom, no matchMedia): both
-   * variants render, exactly like the historical markup.
-   */
   let desktopViewport = $state<boolean | null>(null);
   $effect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
@@ -101,7 +78,6 @@
   );
 
   const playerNames = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, string>();
     for (const roster of shell.run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry.displayName);
@@ -109,7 +85,6 @@
     return map;
   });
   const playable = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, readonly string[]>();
     for (const roster of shell.run?.rosters ?? []) {
       for (const entry of roster.players) {

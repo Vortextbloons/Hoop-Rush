@@ -8,14 +8,6 @@ import {
   windowBlockIndexOf,
 } from './season-trade-view';
 
-/**
- * M2.5 trade view-model tests (season-trade-v1): the open-window
- * derivation, offer presentation (names, value band, role fit, roster need,
- * rotation projection, chemistry disruption), and resolution labels. Runs
- * are minimal roster-bearing shapes; the view model only reads player
- * display names.
- */
-
 const OFFER_ID = 'off-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 function offer(overrides: Partial<SeasonTradeOffer> = {}): SeasonTradeOffer {

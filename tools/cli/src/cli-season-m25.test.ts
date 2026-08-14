@@ -20,14 +20,6 @@ import {
   seasonBlockSimulateReportSchema,
 } from './report-schemas.ts';
 
-/**
- * M2.5 CLI unit tests for the pure calibration parts that are testable
- * before the engine seams land: gate math, the durability derivation, the
- * fixed cohort seed derivation, and the report/targets schema round-trips.
- * The season-cohort drivers and the three calibrate commands are covered by
- * the (skipped) integration suite in cli-season-m25-calibrate.test.ts.
- */
-
 describe('season m25 gate helpers', () => {
   it('tolerance gates pass inside the envelope and skip below the sample floor', () => {
     expect(m25ToleranceGate('incidence', 85, 80, 15, 100_000, 50_000).status).toBe('pass');
@@ -94,8 +86,6 @@ describe('season m25 durability derivation (durability-v1)', () => {
   });
 
   it('floors at 45 when stats or eligibility are missing', () => {
-    // One representative per missing-input shape: games missing, team games
-    // missing, and a zero eligibility edge (division-by-zero guard).
     expect(durabilityRatingFrom(null, 82)).toBe(45);
     expect(durabilityRatingFrom(65, null)).toBe(45);
     expect(durabilityRatingFrom(65, 0)).toBe(45);

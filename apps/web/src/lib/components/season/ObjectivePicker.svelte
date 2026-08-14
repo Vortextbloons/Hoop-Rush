@@ -2,15 +2,6 @@
   import type { SeasonObjectiveId } from '@hoop-rush/data-contracts';
   import type { ObjectiveChoiceViewModel } from '$lib/season/season-influence-view';
 
-  /**
-   * Objective picker (M2.5): before each full ten-game block (blocks 0-7)
-   * the hub offers the block's deterministic three-choice set; selection is
-   * a typed command that locks the objective into the block submission.
-   * Block 8 (the final two-game block) never selects. The selected choice is
-   * marked with aria-pressed; the panel announces the selection via a
-   * polite live region.
-   */
-
   let {
     blockIndex,
     choices,
@@ -18,7 +9,6 @@
     busy = false,
     onSelect,
   }: {
-    /** The block the choices are offered for (null when none remains). */
     blockIndex: number | null;
     choices: ObjectiveChoiceViewModel[];
     selectedObjectiveId: SeasonObjectiveId | null;

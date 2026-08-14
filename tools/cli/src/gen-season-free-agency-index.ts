@@ -1,68 +1,3 @@
-/**
- * Derives the packaged Season Run free-agent eligibility index
- * (spec/2.0 M2.6.5, free-agency-index-v1) from the validated draft catalog
- * and updates the manifest hashes. Run with
- * `pnpm --filter @hoop-rush/cli gen-season-free-agency-index` AFTER the
- * draft catalog exists; `pnpm --filter @hoop-rush/cli gen-season-assets`
- * regenerates it as part of the full season asset pass.
- *
- * The index is the build-time free-agent universe: every eligible packaged
- * player-season version with its market band, card facts, and derivation
- * evidence. It is grouped by real playerId so the runtime selects at most
- * one canonical version per identity through the named seed tree. The
- * browser never scans historical data to discover candidates.
- *
- * Scoring authority: the engine. Role scores come from
- * `evaluateSeasonRoster` (a single-member roster evaluation returns that
- * member's role scores, the same seam `season-data.ts` uses for roster
- * generation), and tier thresholds come from `rolePercentileThresholds`
- * (nearest-rank p90/p75/p50 over the canonically sorted candidate
- * population). The roster-targets-v3 artifact freezes the percentile tiers
- * (elite p90 / strong p75 / useful p50) this derivation reuses; bands are
- * never assigned from Overall.
- *
- * Eligibility and bands (frozen by this generator; the artifact records the
- * input content hash so any drift is detectable):
- *
- * - EXCLUDE elite-tier versions (>= the role p90 threshold in at least one
- *   role) and any version missing a recorded rating, position, stamina,
- *   durability, identity, or presentation fact (schema-required catalog
- *   fields; v4 candidates additionally require the validated `anchors`).
- *   The optional `reconstructedThreePoint` profile is NOT an eligibility
- *   fact: it is a projection-only input absent for most pre-1985 seasons,
- *   and the Season game adapter does not consume it.
- * - `featured`: player tier `strong` (>= p75 in at least one role) — a
- *   credible rotation contributor at or below drafted-starter quality. At
- *   most one version per identity carries `featured`: the identity's best
- *   strong-tier version (most roles at p75+, then highest role-score sum,
- *   then lowest playerVersionId); sibling strong-tier versions are demoted
- *   to `role` so every identity appears in the market under one band.
- * - `role`: player tier `useful` (>= p50 in at least one role) — a
- *   specialist or useful reserve, plus the demoted strong-tier siblings
- *   above.
- * - `development`: player tier `depth` (below p50 in every role) with a
- *   recorded minutes trait — `stamina.rating >= 58` (stamina-v2,
- *   `round(45 + 1.25 * historicalMpg)`, i.e. a recorded ~10.4+ mpg), so the
- *   version demonstrably absorbed minutes and has a plausible future role
- *   inside the run.
- * - `emergency`: player tier `depth` below that trait — healthy
- *   position-coverage / injury-replacement floor candidates (the recorded
- *   depth tier is uniformly durable, so the recorded minutes history is the
- *   differentiator).
- *
- * Card facts are deterministic functions of recorded data: minimumInfluence
- * (emergency 1; development 1; role 2 when two+ roles at p50+, else 1;
- * featured 3 when two+ roles at p75+, else 2), supportedRoles (rotation for
- * featured/role bands, depth and emergency for every healthy indexed
- * version), factual strengths (roles at p75+; stamina >= 70) and
- * limitations (roles below 45; stamina < 50), the recorded durability
- * rating, the historical mpg rounded to one decimal, and healthy
- * availability. `derivationEvidence` cites the recorded facts that produced
- * the band (and the identity featured cap when a strong-tier sibling was
- * demoted to `role`); `exclusionEvidence` cites every excluded sibling of
- * the same identity (elite tier or missing facts, by version id).
- */
-
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -92,50 +27,27 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../');
 const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const SEASON_DIR = resolve(STATIC_DATA, 'season');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
-/** Entry-point guard: `main` runs only when invoked as the CLI script. */
+
 const IS_ENTRY =
   process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
-/** The eight basketball roles in canonical (schema) order. */
 export const ROSTER_ROLES: readonly SeasonRosterRole[] = seasonRosterRoleSchema.options;
 
-/**
- * Development/emergency split within the depth tier: a recorded minutes
- * trait of stamina >= 58 (stamina-v2 `round(45 + 1.25 * mpg)`, ~10.4+ mpg)
- * marks a depth-tier version as `development`; below that the healthy
- * floor is `emergency`. Chosen because the packaged depth tier is otherwise
- * homogeneous (uniformly high durability, no multi-position versions).
- */
 export const DEVELOPMENT_MIN_STAMINA = 58;
 
-/** Limitation floor for a role score (below this the role is cited). */
 export const LIMITATION_MAX_ROLE_SCORE = 45;
 
-/** Availability stamina facts cited as strengths/limitations. */
 export const STRENGTH_MIN_STAMINA = 70;
 export const LIMITATION_MAX_STAMINA = 50;
 
-/** Maximum role facts cited per card (strengths and limitations). */
 export const ROLE_FACT_CAP = 3;
 
-/** Maximum role facts cited as limitations (kept tighter than strengths). */
 export const LIMITATION_ROLE_FACT_CAP = 2;
 
-/** Maximum excluded siblings cited in one exclusionEvidence string. */
 export const EXCLUDED_SIBLING_CITE_CAP = 2;
 
-/**
- * Compactness gate (bytes of the serialized artifact). The frozen index
- * schema carries a fixed per-version key/field overhead of roughly 700
- * bytes per entry (identity, positions, catalogRef, evidence), so the
- * full-universe index of ~4,900 eligible versions cannot reach a few
- * hundred KB: the measured committed artifact is ~4.1 MB (24% of the
- * 17 MB draft catalog). This gate pins the bound with ~9% headroom so
- * future derivation changes cannot silently bloat the artifact.
- */
 export const FREE_AGENCY_INDEX_MAX_BYTES = 4_500_000;
 
-/** Records the exclusion reason of one catalog version (elite or missing facts). */
 export interface ExclusionRecord {
   playerVersionId: string;
   reason: string;
@@ -153,7 +65,6 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
 
-/** Role scores of one candidate through the authoritative engine seam. */
 function roleScoresOf(candidate: SeasonDraftCandidate): Record<SeasonRosterRole, number> {
   return evaluateSeasonRoster({
     franchiseId: candidate.playerVersionId,
@@ -188,7 +99,6 @@ function rounded(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-/** The highest-scoring role of a candidate (canonical tie-break). */
 function bestRoleOf(scored: ScoredCandidate): SeasonRosterRole {
   let best: SeasonRosterRole = ROSTER_ROLES[0] as SeasonRosterRole;
   for (const role of ROSTER_ROLES) {
@@ -197,7 +107,6 @@ function bestRoleOf(scored: ScoredCandidate): SeasonRosterRole {
   return best;
 }
 
-/** Roles at or above a percentile threshold, in canonical order. */
 function rolesAtOrAbove(
   scored: ScoredCandidate,
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
@@ -206,10 +115,6 @@ function rolesAtOrAbove(
   return ROSTER_ROLES.filter((role) => scored.roleScores[role] >= thresholds[role][threshold]);
 }
 
-/**
- * Band of one eligible version. Demotion for the identity featured cap is
- * applied separately (see `featuredVersionIdOf`).
- */
 function bandOf(
   scored: ScoredCandidate,
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
@@ -223,12 +128,6 @@ function bandOf(
   return 'emergency';
 }
 
-/**
- * The identity's featured version: the eligible strong-tier sibling with
- * the most roles at p75+, then the highest role-score sum, then the lowest
- * playerVersionId. All other strong-tier siblings are demoted to `role` so
- * at most one featured version exists per identity group.
- */
 function featuredVersionIdOf(
   scoredGroup: ScoredCandidate[],
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
@@ -255,7 +154,6 @@ function featuredVersionIdOf(
   return best?.candidate.playerVersionId ?? null;
 }
 
-/** Missing-fact exclusions (defensive; the catalog schema already enforces most). */
 function missingFactReason(candidate: SeasonDraftCandidate, catalogVersion: string): string | null {
   if (candidate.positions.playable.length === 0) return 'missing playable positions';
   if (catalogVersion === 'season-draft-catalog-v4' && candidate.anchors === undefined) {
@@ -340,13 +238,6 @@ function derivationEvidenceOf(
   )}); dur ${String(candidate.durability.rating)}${capNote}`;
 }
 
-/**
- * One cited exclusion reason per excluded sibling (best elite role only).
- * Compact deterministically under the schema's 256-char cap: first drop the
- * threshold parentheticals, then cite only the first sibling, so the
- * remaining-count marker always survives and the evidence never truncates
- * silently.
- */
 function exclusionEvidenceOf(
   excludedSiblings: ReadonlyArray<{ version: SeasonDraftCandidate; reason: string }>,
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
@@ -382,12 +273,6 @@ function exclusionEvidenceOf(
   return joined;
 }
 
-/**
- * Derives the validated free-agency index from a parsed catalog. Pure and
- * deterministic: the same catalog bytes always produce the same index.
- * `catalogContentHash` is the SHA-256 of the committed catalog artifact
- * bytes (the same hash the manifest pins under `season.draftCatalog`).
- */
 export function deriveFreeAgencyIndex(
   catalog: SeasonDraftCatalog,
   catalogContentHash: string,
@@ -403,8 +288,6 @@ export function deriveFreeAgencyIndex(
     scored.set(candidate.playerVersionId, scoreCandidate(candidate, thresholds));
   }
 
-  // Exclusions: elite tier and missing recorded facts. Per identity, every
-  // non-indexed version records its reason for the survivors' evidence.
   const excluded = new Map<string, { version: SeasonDraftCandidate; reason: string }>();
   for (const candidate of canonical) {
     const scoredCandidate = scored.get(candidate.playerVersionId);
@@ -424,7 +307,6 @@ export function deriveFreeAgencyIndex(
     }
   }
 
-  // Group eligible versions by identity (canonical version order).
   const eligibleByIdentity = new Map<string, ScoredCandidate[]>();
   for (const candidate of canonical) {
     if (excluded.has(candidate.playerVersionId)) continue;
@@ -434,7 +316,6 @@ export function deriveFreeAgencyIndex(
     eligibleByIdentity.set(candidate.playerId, group);
   }
 
-  // Band assignment with the identity featured cap.
   const excludedIds = new Set(excluded.keys());
   const featuredIds = new Set<string>();
   for (const [playerId, group] of eligibleByIdentity) {
@@ -452,7 +333,6 @@ export function deriveFreeAgencyIndex(
     }
   }
 
-  // Build entries in canonical (playerVersionId ascending) order.
   const indexById = new Map<string, number>();
   catalog.candidates.forEach((candidate, index) => {
     indexById.set(candidate.playerVersionId, index);
@@ -529,7 +409,6 @@ export function deriveFreeAgencyIndex(
   return parsed.data;
 }
 
-/** Serializes a derived index to the compact committed artifact bytes. */
 export function freeAgencyIndexContent(index: SeasonFreeAgencyIndex): string {
   const content = `${JSON.stringify(index)}\n`;
   if (content.length > FREE_AGENCY_INDEX_MAX_BYTES) {
@@ -540,7 +419,6 @@ export function freeAgencyIndexContent(index: SeasonFreeAgencyIndex): string {
   return content;
 }
 
-/** Counts facts of a derived index (band distribution, sizes). */
 export function freeAgencyIndexStats(
   index: SeasonFreeAgencyIndex,
   bytes: number,

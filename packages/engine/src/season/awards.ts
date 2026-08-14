@@ -5,110 +5,27 @@ import {
   type SeasonRoster,
 } from '@hoop-rush/data-contracts';
 
-/**
- * Season awards derivation (spec/2.0/02, M2.6, awards-v1). MVP, Defensive
- * Player of the Year, Sixth Man of the Year, and All-League First Team are
- * pure functions of the recorded REGULAR-SEASON facts: the compact game
- * summaries (which are frozen from postseason qualification onward) and the
- * rosters. The caller passes the regular-season summary set; postseason
- * summaries never enter this module.
- *
- * ## Appearance and start facts
- *
- * A player APPEARS in a game only when their recorded on-court seconds are
- * greater than zero (a zero-second line is not an appearance). A START is
- * recorded only when the compact line's `started` flag is true (the actual
- * opening period-1 unit). Traded players aggregate by `playerVersionId`
- * across franchises; the primary franchise is the one with the most
- * appearances (tie: more starts, then franchiseId ascending), and awards
- * report that franchise.
- *
- * ## Eligibility
- *
- * A player is eligible when `appearances >= ceil(0.7 * teamGames)` where
- * teamGames is the primary franchise's regular-season games played (82 in a
- * complete season, so normally 58). This mirrors the leader table's
- * `SEASON_LEADER_MIN_GAME_SHARE` convention. Zero-appearance players are
- * never recipients. When no player meets the gate for an award, the gate is
- * dropped for that award only (zero-appearance exclusion still applies) so
- * the derivation always returns a valid, deterministic record.
- *
- * ## Availability factor
- *
- * Every composite multiplies by `0.75 + 0.25 * appearances / 82`, so a
- * full-availability season contributes the full composite and a part-time
- * season is discounted proportionally.
- *
- * ## MVP composite (transparent, follows the challenge/mvp.ts precedent)
- *
- * Per appearance: Game Score (PTS + 0.4*FGM - 0.7*FGA - 0.4*(FTA-FTM) +
- * 0.7*ORB + 0.3*DRB + STL + 0.7*AST + 0.7*BLK - 0.4*PF - TOV) plus an
- * efficiency bonus (player true-shooting percentage minus the league average
- * on the same shot volume: (ts - leagueAvgTs) * shotsUsed), a defense bonus
- * (0.6*STL + 0.6*BLK + 0.15*DRB), a playmaking bonus (0.5*AST), and a
- * game-result bonus (+0.75 for a win, -0.75 for a loss). The league-average
- * true shooting is points/(2*shotsUsed) over every line with shots used.
- * The composite is the mean per-appearance value minus a consistency penalty
- * (0.08 * population standard deviation), times the availability factor.
- *
- * ## DPOY composite
- *
- * Per-game defensive production (2.0*STL + 2.0*BLK + 0.5*DRB, divided by
- * appearances) plus a team defensive-rating advantage: (leagueAvgDefRtg -
- * teamDefRtg) / 100 where teamDefRtg = opponent points per 100 possessions
- * from the recorded boxes, weighted by the player's share of the team's
- * total on-court seconds, times 3.0; the sum times the availability factor.
- * Monotonic in steals, blocks, defensive rebounds, defensive advantage, and
- * minutes.
- *
- * ## Sixth Man
- *
- * The MVP composite, eligible only when bench appearances exceed starts
- * (`appearances - started > started`).
- *
- * ## All-League First Team
- *
- * The five highest eligible players by the MVP composite, positionless.
- *
- * ## Tie-breaks (every award)
- *
- * Unrounded composite score, then the primary component (MVP / Sixth Man /
- * First Team: mean per-appearance Game Score; DPOY: per-game defensive
- * production), then total seconds, then playerVersionId ascending.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
-/** Input facts of the awards derivation (regular-season facts only). */
 export interface SeasonAwardsInput {
   runId: string;
   rosters: SeasonRoster[];
-  /** Regular-season compact summaries (frozen at postseason qualification). */
+
   summaries: SeasonGameSummary[];
 }
 
-/** Season-long eligibility share of a franchise's games (leader convention). */
 export const SEASON_AWARD_MIN_GAME_SHARE = 0.7;
 
-/** Full-season games denominator of the availability factor. */
 export const SEASON_AWARD_FULL_SEASON_GAMES = 82;
 
-/** Consistency penalty multiplier on the per-appearance standard deviation. */
 const CONSISTENCY_PENALTY = 0.08;
 
-/** Defense-bonus weights (challenge/mvp.ts precedent). */
 const DEFENSE_WEIGHTS = { steal: 0.6, block: 0.6, defensiveRebound: 0.15 } as const;
 
-/** Playmaking-bonus weight (challenge/mvp.ts precedent). */
 const PLAYMAKING_ASSIST_WEIGHT = 0.5;
 
-/** Game-result bonus per appearance (challenge/mvp.ts precedent). */
 const TEAM_BONUS = { win: 0.75, loss: -0.75 } as const;
 
-/** DPOY composite coefficients. */
 const DPOY = { steal: 2.0, block: 2.0, defensiveRebound: 0.5, advantage: 3.0 } as const;
 
-/** Per-player folding totals over the regular-season summaries. */
 interface PlayerTotals {
   playerVersionId: string;
   appearances: number;
@@ -126,19 +43,18 @@ interface PlayerTotals {
   blocks: number;
   turnovers: number;
   fouls: number;
-  /** Per-appearance MVP value bases (defense/playmaking included). */
+
   valueBases: number[];
-  /** Per-appearance inputs (one entry per appearance). */
+
   gameScores: number[];
   efficiencyValues: number[];
   shotsList: number[];
   wins: boolean[];
-  /** Appearances per franchise (primary-franchise resolution). */
+
   franchiseAppearances: Map<string, number>;
   franchiseStarts: Map<string, number>;
 }
 
-/** Team-level facts derived from the summaries. */
 interface TeamFacts {
   gamesPlayed: number;
   pointsAgainst: number;
@@ -188,7 +104,6 @@ function gameScoreOf(line: {
   );
 }
 
-/** Population standard deviation; 0 for fewer than 2 values. */
 function populationStdDev(values: readonly number[], mean: number): number {
   if (values.length < 2) return 0;
   let sumOfSquares = 0;
@@ -199,7 +114,6 @@ function populationStdDev(values: readonly number[], mean: number): number {
   return Math.sqrt(sumOfSquares / values.length);
 }
 
-/** Per-appearance MVP value without the baseline efficiency bonus. */
 function mvpValueBase(line: {
   points: number;
   fieldGoalsMade: number;
@@ -223,7 +137,6 @@ function mvpValueBase(line: {
   );
 }
 
-/** Per-appearance MVP values for the consistency computation. */
 function mvpValuesOf(facts: AwardsFacts, row: PlayerTotals): number[] {
   const baseline = facts.leagueAverageTs;
   const values: number[] = [];
@@ -239,7 +152,6 @@ function mvpValuesOf(facts: AwardsFacts, row: PlayerTotals): number[] {
   return values;
 }
 
-/** Folded per-player totals plus the league baseline facts. */
 interface AwardsFacts {
   totals: Map<string, PlayerTotals>;
   leagueAverageTs: number;
@@ -247,7 +159,6 @@ interface AwardsFacts {
   leagueAverageDefRtg: number;
 }
 
-/** Folds the regular-season summaries into per-player totals and baselines. */
 function foldAwardsFacts(input: SeasonAwardsInput): AwardsFacts {
   const totals = new Map<string, PlayerTotals>();
   const teamFacts = new Map<string, TeamFacts>();
@@ -367,7 +278,6 @@ function foldAwardsFacts(input: SeasonAwardsInput): AwardsFacts {
   return { totals, leagueAverageTs, teamFacts, leagueAverageDefRtg };
 }
 
-/** Primary franchise: most appearances, then more starts, then id ascending. */
 function primaryFranchiseOf(row: PlayerTotals): string {
   let best = '';
   let bestAppearances = -1;
@@ -389,12 +299,10 @@ function primaryFranchiseOf(row: PlayerTotals): string {
   return best;
 }
 
-/** Availability factor: 0.75 + 0.25 * appearances / 82. */
 function availabilityFactorOf(row: PlayerTotals): number {
   return 0.75 + 0.25 * (row.appearances / SEASON_AWARD_FULL_SEASON_GAMES);
 }
 
-/** The MVP composite (mean per-appearance value minus consistency penalty). */
 function mvpCompositeOf(facts: AwardsFacts, row: PlayerTotals): number {
   const values = mvpValuesOf(facts, row);
   const mean =
@@ -403,13 +311,11 @@ function mvpCompositeOf(facts: AwardsFacts, row: PlayerTotals): number {
   return (mean - CONSISTENCY_PENALTY * stdDev) * availabilityFactorOf(row);
 }
 
-/** Mean per-appearance Game Score (MVP primary tie-break component). */
 function averageGameScoreOf(row: PlayerTotals): number {
   if (row.gameScores.length === 0) return 0;
   return row.gameScores.reduce((sum, value) => sum + value, 0) / row.gameScores.length;
 }
 
-/** The DPOY composite (per-game production + defensive-rating advantage). */
 function dpoyCompositeOf(facts: AwardsFacts, row: PlayerTotals, franchiseId: string): number {
   const production = defensiveProductionOf(row);
   const team = facts.teamFacts.get(franchiseId);
@@ -423,7 +329,6 @@ function dpoyCompositeOf(facts: AwardsFacts, row: PlayerTotals, franchiseId: str
   return (production + DPOY.advantage * advantage * minutesShare) * availabilityFactorOf(row);
 }
 
-/** DPOY primary tie-break component: per-game defensive production. */
 function defensiveProductionOf(row: PlayerTotals): number {
   return (
     (DPOY.steal * row.steals +
@@ -433,7 +338,6 @@ function defensiveProductionOf(row: PlayerTotals): number {
   );
 }
 
-/** Eligibility gate: at least ceil(0.7 * teamGames) appearances. */
 function eligibleFor(facts: AwardsFacts, row: PlayerTotals, franchiseId: string): boolean {
   const team = facts.teamFacts.get(franchiseId);
   const games = team === undefined ? 0 : team.gamesPlayed;
@@ -441,7 +345,6 @@ function eligibleFor(facts: AwardsFacts, row: PlayerTotals, franchiseId: string)
   return row.appearances >= minimum;
 }
 
-/** Ranked candidate of one award. */
 interface AwardCandidate {
   row: PlayerTotals;
   franchiseId: string;
@@ -449,7 +352,6 @@ interface AwardCandidate {
   primary: number;
 }
 
-/** Comparators: score desc, primary desc, seconds desc, playerVersionId asc. */
 function compareCandidates(a: AwardCandidate, b: AwardCandidate): number {
   if (b.score !== a.score) return b.score - a.score;
   if (b.primary !== a.primary) return b.primary - a.primary;
@@ -461,11 +363,6 @@ function compareCandidates(a: AwardCandidate, b: AwardCandidate): number {
       : 0;
 }
 
-/**
- * Derives the season awards from recorded regular-season facts. The result
- * is a pure function of the inputs and carries a self-consistent canonical
- * digest (`seasonAwardsDigest`).
- */
 export function deriveSeasonAwards(input: SeasonAwardsInput): SeasonAwards {
   const facts = foldAwardsFacts(input);
 
@@ -527,7 +424,6 @@ export function deriveSeasonAwards(input: SeasonAwardsInput): SeasonAwards {
   return { ...awards, digest: seasonAwardsDigest(awards) };
 }
 
-/** Winner of a candidate pool under the documented tie-break chain. */
 function winnerOf(candidates: readonly AwardCandidate[]): AwardCandidate {
   const ordered = [...candidates].sort(compareCandidates);
   const winner = ordered[0];

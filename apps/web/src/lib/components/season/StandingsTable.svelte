@@ -14,19 +14,6 @@
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
 
-  /**
-   * Season Run standings (spec/2.0/02 standings, M2.3.5 League tab). Shows
-   * the provisional conference ordering — wins desc, point differential desc,
-   * franchiseId asc — which is explicitly NOT the M2.6 postseason tiebreak.
-   * Streaks come from ordered game summaries, not from the standings fold.
-   *
-   * Responsive: below `md` each team is a ranked card with its logo, record,
-   * point differential, and an expandable splits panel (home/away,
-   * conference, division, streak); at `md+` the same facts render as a
-   * complete semantic table. The human franchise is highlighted without
-   * implying the ordering is authoritative.
-   */
-
   let {
     standings,
     league,
@@ -42,16 +29,11 @@
     humanFranchiseId: string | null;
     franchiseName: (franchiseId: string) => string;
     streakOf: (franchiseId: string) => { kind: 'wins' | 'losses'; length: number } | null;
-    /** When set, only one conference is rendered (League tab switch). */
+
     conference?: 'east' | 'west' | null;
-    /** Packaged manifest; when present rows render franchise logos. */
+
     manifest?: HoopRushManifest | null;
-    /**
-     * M2.6 authoritative ordering: pre-ranked `{row, rank, conference}`
-     * entries (e.g. `rankSeasonPostseason` output). When set, the table
-     * renders exactly this order and labels it official instead of
-     * provisional.
-     */
+
     rankedOrder?: Array<{
       row: SeasonStandingsRow;
       rank: number;
@@ -85,11 +67,6 @@
   const identityOf = (franchiseId: string) =>
     manifest ? franchiseIdentityOf(manifest, franchiseId) : null;
 
-  /**
-   * Responsive split: once the viewport is known, only the active variant
-   * mounts (md breakpoint). Null = unknown (SSR, jsdom, no matchMedia): both
-   * variants render, exactly like the historical markup.
-   */
   let desktopViewport = $state<boolean | null>(null);
   $effect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;

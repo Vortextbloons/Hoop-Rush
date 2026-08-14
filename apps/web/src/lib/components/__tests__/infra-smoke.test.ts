@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { buildManifest, buildPlayerSeason } from '@hoop-rush/test-fixtures';

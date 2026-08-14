@@ -8,15 +8,6 @@
   } from '@hoop-rush/data-contracts';
   import { didWin, recordLabel } from '$lib/season/season-presentation';
 
-  /**
-   * Season tape (M2.3.5 hub): nine segments for checkpoints 1-9. Completed
-   * segments are links to their checkpoint detail (`/season/run/checkpoint?
-   * block=N`) and show the human team's W-L across that block's round range;
-   * the current segment marks the next decision; the rest are muted. Every
-   * segment exposes `data-season-tape-segment` for e2e and a descriptive
-   * aria-label; the current segment carries `aria-current="step"`.
-   */
-
   let {
     acceptedBlocks,
     nextBlockIndex,
@@ -25,7 +16,7 @@
     totalBlocks = 9,
   }: {
     acceptedBlocks: readonly SeasonAcceptedBlock[];
-    /** 0-based accepted-block count (0..8); 9 when the season is complete. */
+
     nextBlockIndex: number | null;
     summaries: readonly SeasonGameSummary[];
     humanFranchiseId: string | null;
@@ -91,15 +82,8 @@
     return `${range} upcoming`;
   }
 
-  /** The horizontally scrollable tape track (client only). */
   let track: HTMLElement | null = $state(null);
 
-  /**
-   * Keeps the decision segment in view on mobile: centers the current
-   * checkpoint when the tape mounts and whenever the accepted-block count
-   * advances, so the player never has to guess where the strip ended up.
-   * Manual scrolling is left alone; only block transitions re-align.
-   */
   let lastCenteredIndex: number | null = null;
   $effect(() => {
     if (import.meta.env.SSR) return;

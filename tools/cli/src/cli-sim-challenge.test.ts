@@ -28,7 +28,6 @@ function indexData(): { data: PackagedData; entries: PlayersIndexEntry[] } {
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
-/** Picks five distinct, uniquely-indexed entries that fit G,G,F,F,C. */
 let memoizedLegalLineup: PlayersIndexEntry[] | null = null;
 function legalUniqueLineup(): PlayersIndexEntry[] {
   if (memoizedLegalLineup !== null) return memoizedLegalLineup;
@@ -58,7 +57,6 @@ function legalUniqueLineup(): PlayersIndexEntry[] {
   return lineup;
 }
 
-/** Legal entries whose display name is unique in the whole index and CLI-safe. */
 let memoizedLegalNames: PlayersIndexEntry[] | null = null;
 function legalUniqueNames(): PlayersIndexEntry[] {
   if (memoizedLegalNames !== null) return memoizedLegalNames;
@@ -85,7 +83,6 @@ function franchiseDisplayName(data: PackagedData, franchiseId: string): string {
   return slot.displayName;
 }
 
-/** The most common display name in the index (guaranteed ambiguous bare). */
 let memoizedAmbiguousName: string | null = null;
 function commonAmbiguousName(): string {
   if (memoizedAmbiguousName !== null) return memoizedAmbiguousName;

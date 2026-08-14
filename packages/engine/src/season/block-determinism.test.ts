@@ -23,10 +23,6 @@ describe('season block determinism and accounting (M2.3)', () => {
     };
     const first = runThroughBlock3();
 
-    // Interrupted run: cancel after half the games of block 3, discard the
-    // partial result, and re-run the whole block from the cursor. The
-    // cancelled path re-derives the full 0..3 chain, so its equality with
-    // `first` doubles as the repeated-run determinism proof.
     const cancelled = (() => {
       const state = freshState();
       for (let i = 0; i < 3; i += 1) runBlock(state, i);
@@ -72,8 +68,7 @@ describe('season block determinism and accounting (M2.3)', () => {
         reconstructSeasonGames(scheduleOf(run), state.summaries),
       );
       expect(JSON.stringify(standings)).toBe(JSON.stringify(checkpoint.standings));
-      // The audit runs against the pre-commit run (cursor still at the
-      // block start), exactly like the persistence acceptance path.
+
       const audit = auditSeasonBlock(checkpoint, {
         ...pipelineInput(
           preBlockRun,
@@ -84,7 +79,7 @@ describe('season block determinism and accounting (M2.3)', () => {
         command: blockCommand(preBlockRun, blockIndex, blockIndex),
       });
       expect(audit).toEqual([]);
-      // The candidate digest always matches a fresh recomputation.
+
       expect(seasonCheckpointDigest(checkpoint)).toBe(checkpoint.digest);
     }
     expect(state.summaries).toHaveLength(1230);

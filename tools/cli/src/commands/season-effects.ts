@@ -48,21 +48,6 @@ import { seedIndexRange } from './season-calibration.ts';
 import { median } from '../stats.ts';
 import { commitTargetsArtifact, runWorkerChunks, validateTargetsArtifact } from '../artifact.ts';
 
-/**
- * M2.4 `season effects` commands (spec/2.0/05, season-effect-targets-v1).
- * Measures the stamina/chemistry effects seam through the authoritative
- * engine: sensitivity (mechanism response to fatigue/chemistry inputs),
- * distribution (production deltas vs the neutral cohort), roles (rotation
- * workload ordering), and calibrate (the frozen effect-targets artifact and
- * its gates). Every cohort uses worker threads; worker counts and chunk
- * order never change the facts.
- *
- * The calibration fixture convention: fixture players carry deterministic
- * stamina (starters 80, bench 65), and the representative production state
- * carries ~600bp starter / 200bp bench fatigue with ~1,000 shared possessions
- * per same-roster pair (about ten games of shared play).
- */
-
 export const SEASON_EFFECTS_OPTIONS: Record<string, boolean> = {
   fixture: true,
   'seed-from': true,
@@ -82,28 +67,22 @@ export const SEASON_EFFECTS_PRESET_FIXTURES = [
   'season-game-bench-heavy',
 ] as const;
 
-/** Command args as received by the registered entry points. */
 export type SeasonEffectsArgs = Record<string, string | null>;
 
-/** Option reader: value or fallback (options registered but absent are null). */
 function opt(args: SeasonEffectsArgs, key: string, fallback: string): string {
   return args[key] ?? fallback;
 }
 
 export const DEFAULT_EFFECT_TARGETS = resolve(DEFAULT_SEASON_DIR, 'effect-targets.json');
 
-/** Production envelope gates (fractions of the neutral cohort). */
 export const SEASON_EFFECTS_SCORING_ENVELOPE = 0.05;
 export const SEASON_EFFECTS_TURNOVER_ENVELOPE = 0.1;
 export const SEASON_EFFECTS_ASSIST_ENVELOPE = 0.1;
 
-/** Held-out pass-share gate for the production envelopes. */
 export const SEASON_EFFECTS_HELD_OUT_PASS_SHARE = 0.95;
 
-/** Chemistry separation gate (basis points after ten games). */
 export const SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP = 1000;
 
-/** The artifact written by `season effects calibrate`. */
 export const seasonEffectTargetsSchema = z.object({
   schemaVersion: z.literal(1),
   targetsVersion: z.union([
@@ -178,12 +157,10 @@ export const seasonEffectTargetsSchema = z.object({
 });
 export type SeasonEffectTargets = z.infer<typeof seasonEffectTargetsSchema>;
 
-/** Fixture stamina convention: starters 80, bench 65 (calibration). */
 export function fixtureStaminaFor(rosterIndex: number): number {
   return rosterIndex < 5 ? 80 : 65;
 }
 
-/** Attaches the deterministic fixture stamina convention to a game input. */
 export function withFixtureStamina(input: SeasonGameSimulationInput): SeasonGameSimulationInput {
   const attach = (
     players: SeasonGameSimulationInput['home']['players'],
@@ -233,11 +210,6 @@ function staminaInputOf(
   };
 }
 
-/**
- * The representative production state for calibration games: 300 players
- * (fixture home + away rosters first), carry-in fatigue for the fixture's
- * twenty players, and ~1,000 shared possessions per same-roster pair.
- */
 export function representativeEffectsState(input: SeasonGameSimulationInput): {
   state: SeasonEffectsState;
   homeStamina: Map<string, SeasonStaminaInput>;
@@ -298,7 +270,6 @@ export const defaultEffectsEngineDeps: SeasonEffectsEngineDeps = {
   createSeasonEffectsState,
 };
 
-/** Per-game facts for the distribution cohort. */
 export interface SeasonEffectsGameFacts {
   fixtureId: string;
   seedIndex: number;
@@ -349,10 +320,6 @@ export function simulateSeasonEffectsGameFacts(
   const checks = neutral.outcome === 'completed' ? deps.checkSeasonGameResult(neutral, input) : [];
   const completed = first.result.outcome === 'completed';
   if (completed) {
-    // The effects result must pass every structural accounting check; the
-    // neutral-replay determinism check inside checkSeasonGameResult is
-    // expected to differ (effects change the game), so determinism is
-    // verified separately by the double-run below.
     checks.push(
       ...deps
         .checkSeasonGameResult(first.result, input)
@@ -388,7 +355,6 @@ export type SeasonEffectsCohortRunner = (
   request: SeasonEffectsCohortRequest,
 ) => Promise<SeasonEffectsGameFacts[]>;
 
-/** Worker-based cohort runner: one worker per (fixture, seed-range chunk). */
 export async function runSeasonEffectsCohort(
   request: SeasonEffectsCohortRequest,
 ): Promise<SeasonEffectsGameFacts[]> {
@@ -438,12 +404,6 @@ function pct(delta: number, base: number): number {
   return base === 0 ? 0 : (delta / base) * 100;
 }
 
-/**
- * Percentile with p as a percentage (1..99) and nearest-rank rounding; kept
- * local because the frozen `effect-targets-v1` coverage envelopes were
- * authored with it (the canonical `stats.percentile` takes a fraction and
- * floors the index).
- */
 function percentile(values: number[], p: number): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -459,7 +419,6 @@ function coverageWithin(deltas: number[], low: number, high: number): number {
   return deltas.filter((delta) => delta >= low && delta <= high).length / deltas.length;
 }
 
-/** Mini-season: ten consecutive games with between-game recovery ticks. */
 export function runMiniSeason(
   input: SeasonGameSimulationInput,
   deps: SeasonEffectsEngineDeps,
@@ -537,7 +496,6 @@ function medianFatigueOf(state: SeasonEffectsState, versions: readonly string[])
   return median(values);
 }
 
-/** Sensitivity: per-mechanism delta response across fatigue levels. */
 export function seasonEffectsSensitivity(
   args: SeasonEffectsArgs,
   deps: SeasonEffectsEngineDeps = defaultEffectsEngineDeps,
@@ -618,7 +576,6 @@ export function seasonEffectsSensitivity(
   return makeReport('season effects sensitivity', { fixture: fixtureId }, { details, payload });
 }
 
-/** Distribution: production deltas vs the neutral cohort across seeds. */
 export async function seasonEffectsDistribution(
   args: SeasonEffectsArgs,
   runner: SeasonEffectsCohortRunner = runSeasonEffectsCohort,
@@ -688,7 +645,6 @@ export async function seasonEffectsDistribution(
   );
 }
 
-/** Roles: ten-game mini seasons per rotation preset; workload ordering. */
 export function seasonEffectsRoles(
   args: SeasonEffectsArgs,
   deps: SeasonEffectsEngineDeps = defaultEffectsEngineDeps,
@@ -755,7 +711,6 @@ export function seasonEffectsRoles(
   );
 }
 
-/** Chemistry separation: stable vs deliberately shuffled rotation after ten games. */
 export function seasonEffectsChemistrySeparation(deps: SeasonEffectsEngineDeps): {
   stableMedianBp: number;
   shuffledMedianBp: number;
@@ -766,8 +721,7 @@ export function seasonEffectsChemistrySeparation(deps: SeasonEffectsEngineDeps):
   const homeVersions = input.home.players.map((player) => player.playerVersionId);
   const starters = [...input.homeRotation.starters];
   const stableState = runMiniSeason(input, deps);
-  // The shuffled arm fields a different five every game (deterministic
-  // rolling window), so no pair accumulates meaningful shared play.
+
   const shuffledState = runMiniSeason(input, deps, {
     homeUnit: homeVersions.slice(0, 5),
     awayUnit: homeVersions.slice(5),
@@ -857,10 +811,6 @@ export async function seasonEffectsCalibrate(
   const calibration = fold(calibrationFacts);
   const heldOut = fold(validationFacts);
 
-  // Held-out coverage: per-game deltas of the held-out cohort inside the
-  // calibration cohort's p1..p99 envelope per metric (binomial game noise is
-  // far wider than the cohort-level envelope, so coverage is measured
-  // against the calibration-derived distribution, not a fixed percentage).
   const heldOutCoverage = (deltas: number[], envelope: number[]): number =>
     coverageWithin(deltas, percentile(envelope, 1), percentile(envelope, 99));
   const heldOutWithinEnvelopeShare = Math.min(
@@ -878,9 +828,6 @@ export async function seasonEffectsCalibrate(
 
   const chemistry = seasonEffectsChemistrySeparation(deps);
 
-  // Sensitivity monotonicity probe: the fatigue-driven mechanism deltas grow
-  // with the fatigue input (the chemistry-driven ones are constant by design
-  // and vary only with opportunity counts).
   const sensitivityReport = seasonEffectsSensitivity({ fixture: 'season-game-balanced' }, deps);
   const sensitivityPayload = seasonEffectsSensitivityReportSchema.parse(sensitivityReport.payload);
   const rows = sensitivityPayload.rows;
@@ -1042,7 +989,6 @@ export async function seasonEffectsCalibrate(
   );
 }
 
-/** Validates a committed effect-targets artifact against the engine. */
 export function validateSeasonEffectTargets(args: SeasonEffectsArgs, outPath: string): CliReport {
   void args;
   return validateTargetsArtifact({

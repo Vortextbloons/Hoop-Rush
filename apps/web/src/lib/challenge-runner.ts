@@ -15,50 +15,23 @@ import {
 import { randomUUID } from '$lib/random-id';
 import { sleep } from '$lib/sleep';
 
-/**
- * Main-thread challenge orchestration (spec/04 state ownership). The worker
- * computes ahead and posts results in batches; this runner owns the accepted
- * run, queues results for the paced presentation, validates every result
- * through the challenge command, appends each accepted game to the active run
- * (one game row plus the updated checkpoint) before exposing it as accepted
- * UI state, and discards buffered results after cancellation. A worker crash,
- * invalid result, or persistence failure stops presentation without advancing
- * beyond the last successfully saved game.
- *
- * Fresh runs start with a `start` request: the worker simulates the whole-run
- * best-of and reports the chosen attempt seed, which is persisted (a full
- * saveActiveRun) before the first game is ever revealed.
- */
-
 export const REVEAL_INTERVAL_MS = 36;
 
 export type RunnerPhase = 'idle' | 'starting' | 'running' | 'paused' | 'finished' | 'error';
 
 export interface RunnerCallbacks {
-  /** A game was accepted, persisted, and is now revealed as UI state. */
   onReveal(result: GameResult, run: ChallengeRun): void;
-  /** The full run finished and was promoted to completed history. */
+
   onFinished(run: ChallengeRun): void;
-  /** Cancellation stopped presentation at the last persisted prefix. */
+
   onPaused(): void;
-  /** A worker, validation, or persistence failure stopped the run. */
+
   onError(message: string): void;
 }
 
 export interface RunnerOptions {
-  /** Under reduced motion, remove artificial pacing (spec/08). */
   reducedMotion: boolean;
 }
-
-/**
- * Cheap boundary shape check for worker messages. The engine's
- * acceptGameResult is the authoritative validator: it re-verifies the game
- * number, derived seed, frozen versions, scheduled opponent, and exact
- * accounting invariants per game before anything is persisted. This guard
- * only keeps well-formed envelopes from reaching the queue (schema version,
- * request id, and a literal type), so a bad batch can never crash the pump or
- * skip the engine's checks.
- */
 
 export class ChallengeRunner {
   private worker: Worker | null = null;
@@ -67,7 +40,7 @@ export class ChallengeRunner {
   private run: ChallengeRun | null = null;
   private profile: EraSimulationProfile | null = null;
   private queue: Array<{ gameNumber: number; result: GameResult }> = [];
-  /** Index of the next unconsumed queue entry; compaction avoids shift(). */
+
   private queueHead = 0;
   private expectedNext = 1;
   private nextRevealAt = 0;
@@ -93,12 +66,6 @@ export class ChallengeRunner {
     return this.lastError;
   }
 
-  /**
-   * Starts (or resumes) a run from its next unplayed game. A fresh run enters
-   * 'starting' first: the worker simulates the whole-run best-of and reports
-   * the chosen attempt seed, which is re-saved as the run seed before the
-   * reveal begins. A run with accepted games skips straight to the reveal.
-   */
   start(run: ChallengeRun, profile: EraSimulationProfile, options: RunnerOptions): void {
     if (this.phase === 'running' || this.phase === 'starting') return;
     if (run.status !== 'active') {
@@ -160,7 +127,6 @@ export class ChallengeRunner {
     this.callbacks.onPaused();
   }
 
-  /** Releases the worker; navigation leaves the last persisted prefix active. */
   dispose(): void {
     this.disposed = true;
     this.pumpToken += 1;
@@ -202,19 +168,13 @@ export class ChallengeRunner {
     }
   }
 
-  /**
-   * Persists the chosen attempt seed (spec/01: no game may be revealed before
-   * the chosen seed is saved), then starts the paced reveal with that seed.
-   */
   private async handleStartResult(
     envelope: Extract<WorkerMessage, { type: 'start-result' }>,
   ): Promise<void> {
     if (this.disposed || this.phase !== 'starting') return;
     const run = this.run;
     if (!run) return;
-    // cancel()/dispose()/fail() bump the pump token; the token snapshot makes
-    // the post-await revalidation explicit (TS keeps the early-return
-    // narrowing across the await, but the worker may have been torn down).
+
     const token = this.pumpToken;
     const updatedRun =
       envelope.chosenRunSeed === run.runSeed ? run : { ...run, runSeed: envelope.chosenRunSeed };
@@ -250,8 +210,7 @@ export class ChallengeRunner {
         schemaVersion: 1,
         type: 'simulate',
         requestId: this.requestId,
-        // Games are stripped from the worker copy: inputs derive from the
-        // schedule, seed, and versions, never from recorded results.
+
         run: { ...run, games: [] },
         startGameNumber: this.expectedNext,
         profile,
@@ -267,8 +226,7 @@ export class ChallengeRunner {
 
   private async pump(): Promise<void> {
     const token = ++this.pumpToken;
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    while (true) {
+    for (;;) {
       if (this.isStale(token)) return;
       const phaseNow = this.phase;
       if (phaseNow !== 'running') {

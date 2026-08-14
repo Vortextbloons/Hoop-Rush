@@ -3,7 +3,6 @@ import { SEASON_ALIGNMENT } from '@hoop-rush/data-contracts';
 import { buildFixtureBracket, seedFromString } from '@hoop-rush/test-fixtures';
 import { generateSchedule, scheduleInvariants, SCHEDULE_GENERATION_VERSION } from './schedule.ts';
 
-/** Canonical 30-franchise id order (single source: SEASON_ALIGNMENT). */
 const ALL_FRANCHISES = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
 
 function opponentIds(prefix = 'bracket-'): string[] {

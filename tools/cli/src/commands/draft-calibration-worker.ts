@@ -7,18 +7,11 @@ import {
 import { readFileSync } from 'node:fs';
 import { runSeasonDraftCalibrationSeeds } from './season-draft-calibrate.ts';
 
-/**
- * Draft-calibration worker (M2.3.5). Each worker loads the packaged catalog
- * and league itself and runs a seed chunk through the authoritative engine
- * draft path; results are posted back as plain data. Worker counts never
- * change seed assignment or results.
- */
-
 interface WorkerInput {
   catalogPath: string;
   leaguePath: string;
   seeds: string[];
-  /** Serialized `roster-targets-v2` artifact (JSON string or plain object). */
+
   targets: string | Record<string, unknown>;
 }
 

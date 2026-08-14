@@ -57,14 +57,6 @@ import {
   SEASON_TRADE_VERSION,
 } from '@hoop-rush/data-contracts';
 
-/**
- * M2.4 block-level effects and determinism. The shared block test support
- * builds its league through AI generation; this suite synthesizes a legal
- * 30-franchise run directly from the fixture catalog so the effects seam can
- * be verified independently of any AI-generation changes.
- */
-
-/** Synthesizes one legal ten from a franchise pool: 4 G, 4 F, 3 C greedy. */
 function synthesizeRoster(
   catalog: SeasonDraftCatalog,
   franchiseId: string,
@@ -127,7 +119,6 @@ function synthesizeRoster(
   return picks;
 }
 
-/** A schema-valid schema-6 run with synthesized rosters and rotations. */
 function buildSynthesizedRun(): { run: SeasonRun; catalog: SeasonDraftCatalog } {
   const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
   const catalog = buildSeasonDraftCatalog({
@@ -337,7 +328,7 @@ function buildSynthesizedRun(): { run: SeasonRun; catalog: SeasonDraftCatalog } 
     rotations,
     generationAudit: buildFixtureGenerationAudit(TEST_SEED),
     evaluations,
-    // M2.5: run-scoped state chain and economy facts (schema 7).
+
     trade: null,
     freeAgency: {
       schemaVersion: 1,
@@ -403,15 +394,13 @@ describe('M2.4 block-level effects', () => {
       digests.push(checkpoint.digest);
     }
     expect(digests).toHaveLength(9);
-    // Every block produces its own digest (cross-block determinism and
-    // interruption/rerun identity are covered by block-determinism.test.ts).
+
     expect(new Set(digests).size).toBe(9);
 
     const first = checkpoints[0];
     const last = checkpoints[8];
     if (first === undefined || last === undefined) throw new Error('checkpoints');
-    // Fatigue accumulated by block 0 and sustains a positive steady state
-    // through the season (recovery never collapses it to zero).
+
     const maxFatigueFirst = first.effects.playerStates.reduce(
       (max, player) => Math.max(max, player.fatigueBasisPoints),
       0,
@@ -428,12 +417,10 @@ describe('M2.4 block-level effects', () => {
       (max, player) => Math.max(max, player.fatigueBasisPoints),
       0,
     );
-    // The plateau stays within the same order of magnitude (no runaway or
-    // collapse): late-season max fatigue is at least half the block-0 max.
+
     expect(maxFatigueLast).toBeGreaterThanOrEqual(Math.round(maxFatigueFirst / 2));
     expect(maxFatigueMid).toBeGreaterThanOrEqual(Math.round(maxFatigueFirst / 2));
 
-    // Chemistry grew only through recorded shared play.
     const sharedFirst = first.effects.pairStates.reduce(
       (sum, pair) => sum + pair.sharedPossessions,
       0,
@@ -444,7 +431,7 @@ describe('M2.4 block-level effects', () => {
     );
     expect(sharedFirst).toBeGreaterThan(0);
     expect(sharedLast).toBeGreaterThan(sharedFirst);
-    // A stable unit's pair chemistry exceeds a shuffled unit's at season end.
+
     const humanRoster = state.run.rosters.find((roster) => roster.franchiseId === 'lakers');
     if (humanRoster === undefined) throw new Error('lakers');
     const humanIds = humanRoster.players.map((player) => player.playerVersionId);
@@ -471,8 +458,6 @@ describe('M2.4 block-level effects', () => {
     };
     expect(unitChem(stableUnit)).toBeGreaterThan(unitChem(shuffled));
 
-    // Human-game retained details carry mechanism evidence; summaries carry
-    // the compact rollup.
     let detailWithEvidence = 0;
     for (const checkpoint of checkpoints) {
       for (const detail of checkpoint.retainedDetails) {
@@ -496,7 +481,7 @@ describe('M2.4 block-level effects', () => {
       (max, player) => Math.max(max, player.lastCompletedRound),
       0,
     );
-    // One tick per round boundary: rounds 2..10 = 9 ticks in block 0.
+
     expect(maxRound).toBe(9);
     for (const player of checkpoint0.effects.playerStates) {
       expect(player.fatigueBasisPoints).toBeGreaterThanOrEqual(0);

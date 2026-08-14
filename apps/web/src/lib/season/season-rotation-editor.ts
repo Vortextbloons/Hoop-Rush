@@ -11,20 +11,11 @@ import {
 } from '@hoop-rush/data-contracts';
 import { applySeasonRotationPreset, auditSeasonRotation } from '@hoop-rush/engine';
 
-/**
- * Season Run rotation editor (spec/2.0/04, M2.2 contract, M2.3 hub).
- * All legality stays in the engine: every mutation builds a candidate
- * rotation, runs `auditSeasonRotation`, and commits only when the audit is
- * clean. The editor is a thin stateful wrapper over the frozen rotation
- * contract, so the pending rotation can never drift into a submission the
- * engine would reject.
- */
-
 export interface RotationMember {
   playerVersionId: string;
   displayName: string;
   playable: readonly Position[];
-  /** Historical source identity (presentation only; null in fixtures). */
+
   franchiseId?: string;
   eraId?: string;
   seasonKey?: string;
@@ -32,10 +23,6 @@ export interface RotationMember {
 
 export const SLOT_GROUPS: readonly SlotGroup[] = ['G', 'G', 'F', 'F', 'C'];
 
-/**
- * One player's minutes change from a rebalance; `delta` is signed so the UI
- * can announce who gained and who lost.
- */
 export interface MinuteAdjustment {
   playerVersionId: string;
   minutes: number;
@@ -66,7 +53,6 @@ export function presetLabel(preset: SeasonRotationPreset): string {
   }
 }
 
-/** Minute-policy strategy label for the optimize-with-projection plan cards. */
 export function strategyLabel(strategy: SeasonMinutePolicyStrategy): string {
   switch (strategy) {
     case 'starter-heavy':
@@ -96,8 +82,7 @@ export function rotationRoleOf(rotation: SeasonRotation, playerVersionId: string
 export class RotationEditor {
   rotation: SeasonRotation;
   private readonly members: RotationMember[];
-  /** Playables for the ten ACTIVE rotation members only, so the engine audit
-   * (which requires an exact partition correspondence) stays clean. */
+
   memberPlayable: ReadonlyMap<string, readonly Position[]>;
   readonly names: ReadonlyMap<string, string>;
   private readonly rosterIds: string[];
@@ -129,30 +114,18 @@ export class RotationEditor {
     this.rosterIds = members.map((m) => m.playerVersionId);
   }
 
-  /** The ten players currently in the rotation (starters + bench order). */
   activeMemberIds(): string[] {
     return [...this.rotation.starters, ...this.rotation.benchOrder];
   }
 
-  /** True when the roster player is one of the ten active rotation members. */
   isActive(playerVersionId: string): boolean {
     return this.activeIds.has(playerVersionId);
   }
 
-  /** Rostered players outside the rotation (inactive depth). */
   inactiveMembers(): RotationMember[] {
     return this.members.filter((member) => !this.activeIds.has(member.playerVersionId));
   }
 
-  /**
-   * M2.6.5: promotes an inactive roster player into the rotation in place of
-   * an active player, keeping exactly ten active members. The promoted player
-   * takes the demoted player's rotation position (starter slot, bench slot,
-   * target minutes, and closing-five slot when present). The candidate is
-   * engine-audited against the ten active members; reverts with failures
-   * when the result is illegal (e.g. the promoted player cannot play the
-   * vacated starter slot, or the closing five becomes illegal).
-   */
   promoteToRotation(inactivePlayerVersionId: string, replacedPlayerVersionId: string): string[] {
     if (inactivePlayerVersionId === replacedPlayerVersionId) return [];
     if (!this.rosterIds.includes(inactivePlayerVersionId)) {
@@ -224,10 +197,6 @@ export class RotationEditor {
     });
   }
 
-  /** Members that can legally fill one starter slot, mirroring the engine
-   * audit's eligibility so the pickers never offer an illegal swap. Inactive
-   * depth is not offered here (promote it through the inactive roster
-   * section first). */
   eligibleForSlot(slotIndex: number): RotationMember[] {
     const group = SLOT_GROUPS[slotIndex];
     if (group === undefined) return [];
@@ -246,8 +215,6 @@ export class RotationEditor {
     return auditSeasonRotation(this.rotation, this.memberPlayable);
   }
 
-  /** Sets one player's target minutes (integer 0-48). Invalid edits are kept
-   * visible so the hub can surface them; submission is blocked by validation. */
   setMinutes(playerVersionId: string, minutes: number): string[] {
     const clamped = Math.max(0, Math.min(48, Math.round(minutes)));
     this.rotation = {
@@ -259,24 +226,11 @@ export class RotationEditor {
     return this.validate();
   }
 
-  /**
-   * Stepper adjustment that keeps the 240 total intact: +1 takes a minute from
-   * the highest-minute other player, -1 gives one to the lowest-minute other
-   * player (bench order breaks ties). Returns the audit failures.
-   */
   adjustMinutes(playerVersionId: string, delta: number): string[] {
     return this.rebalanceMinutes(playerVersionId, this.minutesFor(playerVersionId) + delta)
       .failures;
   }
 
-  /**
-   * Sets one player's target minutes (clamped 0-48, integer) and rebalances
-   * the rest deterministically so the total stays exactly 240: typing higher
-   * takes from the highest-minute teammates, lower gives to the lowest-minute
-   * (bench order breaks ties). Commits only on a clean audit; otherwise the
-   * rotation is unchanged. `adjustments` lists every changed player with
-   * signed deltas for the UI to highlight and announce.
-   */
   rebalanceMinutes(playerVersionId: string, minutes: number): RebalanceResult {
     if (!this.activeIds.has(playerVersionId)) {
       return {
@@ -340,12 +294,6 @@ export class RotationEditor {
     return { failures: [], adjustments };
   }
 
-  /**
-   * Closing-five toggle: a player already closing is replaced by the best
-   * eligible non-closing player for their vacated slot; otherwise they take
-   * the first closing slot their positions permit, displacing the incumbent.
-   * Keeps exactly five; reverts (with failures) when no legal result exists.
-   */
   toggleClosing(playerVersionId: string): string[] {
     if (!this.activeIds.has(playerVersionId)) {
       return [`${playerVersionId} is not an active rotation member`];
@@ -388,8 +336,6 @@ export class RotationEditor {
     return this.commit({ ...this.rotation, closingFive });
   }
 
-  /** Moves a bench player one step up or down the substitution hierarchy.
-   * No-op at the edges; reverts on audit failure. */
   moveBench(benchIndex: number, delta: -1 | 1): string[] {
     const target = benchIndex + delta;
     const benchOrder = [...this.rotation.benchOrder];
@@ -418,12 +364,6 @@ export class RotationEditor {
     return this.validate();
   }
 
-  /**
-   * Commits an externally produced candidate rotation (e.g. an applied minute
-   * plan) through the same engine audit as every other mutation; throws when
-   * the audit rejects it. The editor never adopts a rotation the engine would
-   * reject.
-   */
   applyRotation(candidate: SeasonRotation): SeasonRotation {
     const failures = auditSeasonRotation(candidate, this.memberPlayable);
     if (failures.length > 0) {
@@ -433,11 +373,6 @@ export class RotationEditor {
     return this.rotation;
   }
 
-  /**
-   * Assigns a roster player to a starter slot: a bench player is promoted and
-   * the displaced starter takes their bench index; swapping two starters
-   * swaps them. Reverts (with failures) when the result is illegal.
-   */
   assignStarter(slotIndex: number, playerVersionId: string): string[] {
     const current = this.rotation.starters[slotIndex];
     if (current === playerVersionId) return [];
@@ -459,11 +394,6 @@ export class RotationEditor {
     return this.commit({ ...this.rotation, starters, benchOrder });
   }
 
-  /**
-   * Assigns a roster player to a closing-five slot: a player already closing
-   * elsewhere swaps with the incumbent; otherwise the incumbent leaves the
-   * closing five. Reverts when the result is illegal.
-   */
   assignClosing(slotIndex: number, playerVersionId: string): string[] {
     const current = this.rotation.closingFive[slotIndex];
     if (current === playerVersionId) return [];
@@ -496,12 +426,6 @@ export function createRotationEditor(
   return new RotationEditor(rotation, roster);
 }
 
-/**
- * True when the cached editor was built before playable positions were
- * available but the slice (or catalog top-up) now has them. The shell keeps
- * pending rotation edits across tab switches; this is the narrow escape hatch
- * that still rebuilds member playables once async slice data arrives.
- */
 export function rotationEditorNeedsPositionRefresh(
   editor: RotationEditor,
   rosterPlayerVersionIds: readonly string[],
@@ -516,12 +440,6 @@ export function rotationEditorNeedsPositionRefresh(
   return false;
 }
 
-/**
- * Splits audit failure strings into per-player failures (messages that name
- * a playerVersionId) and global failures (totals, duplicates, structure).
- * The engine's failure strings embed ids positionally; parse them
- * defensively so the UI can attach each failure to the affected control.
- */
 export interface RotationFailureIndex {
   byPlayer: ReadonlyMap<string, readonly string[]>;
   global: readonly string[];

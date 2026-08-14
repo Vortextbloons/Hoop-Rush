@@ -1,9 +1,3 @@
-/**
- * Era configs (port of compute_ratings.py ERA_CONFIGS / src/game/models/eraConfig.ts).
- *
- * The 1960-61 through 1989-90 rows are documented league averages used as a
- * deterministic fallback before the era-profile derivation packages stints.
- */
 export interface EraConfig {
   leaguePpg: number;
   league3PARate: number;

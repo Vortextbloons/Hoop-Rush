@@ -42,9 +42,6 @@ function emptyStandings(franchiseIds: string[]): SeasonStandings {
 }
 
 describe('season block recap (M2.3)', () => {
-  // Block 0 costs seconds to simulate; the first two tests consume the same
-  // simulated checkpoint and its derived recap scaffolding (identical input,
-  // so the recap is built and audited once).
   let run: SeasonRun;
   let checkpoint: ReturnType<typeof simulateSeasonBlock>;
   let zero: SeasonStandings;
@@ -157,8 +154,6 @@ describe('season block recap (M2.3)', () => {
   });
 
   it('keeps streak facts consistent with the ordered game results', () => {
-    // Hand-built three-game set: lakers win, win, lose -> current streak is
-    // a 1-game losing streak (not reported); celtics lose, lose, win -> 1.
     const win = (gameId: string): SeasonGameSummary => ({
       schemaVersion: 1,
       summaryVersion: 'season-game-summary-v3',
@@ -253,7 +248,7 @@ describe('season block recap (M2.3)', () => {
       schedule: scheduleOf(buildTestRun().run),
       rosterPlayerIds: new Map(),
     });
-    // Current streaks are all length 1: nothing is reported.
+
     expect(recap.streaks).toEqual([]);
   });
 });

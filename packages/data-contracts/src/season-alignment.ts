@@ -1,25 +1,11 @@
 import type { ConferenceId, DivisionId, SeasonControl } from './season-league.ts';
 
-/**
- * Canonical Season Run league alignment (league-v1): the accepted 30-franchise
- * conference/division mapping and the frozen league team order. This module
- * is the single source of the league fact; the data-contracts fixture league,
- * the test-fixture alignment, and the persistence fixture alignment all
- * derive from `SEASON_ALIGNMENT`, so the versioned league fact cannot drift
- * between packages.
- *
- * The array order is the frozen league-v1 team order (conference-major):
- * deriving `CONFERENCE_TEAMS` by filtering preserves the exact historical
- * team order every golden fixture depends on.
- */
-
 export interface SeasonAlignmentEntry {
   franchiseId: string;
   conference: ConferenceId;
   division: DivisionId;
 }
 
-/** Accepted 30-franchise alignment; conference/division follow league-v1. */
 export const SEASON_ALIGNMENT: readonly SeasonAlignmentEntry[] = [
   { franchiseId: 'hawks', conference: 'east', division: 'southeast' },
   { franchiseId: 'celtics', conference: 'east', division: 'atlantic' },
@@ -53,16 +39,12 @@ export const SEASON_ALIGNMENT: readonly SeasonAlignmentEntry[] = [
   { franchiseId: 'wizards', conference: 'east', division: 'southeast' },
 ];
 
-/** The league's human-controlled team, or null when none exists. Accepts any
- * league-shaped team list (the full `SeasonLeague` or the narrow cursor
- * league of the persistence commit path). */
 export function humanTeamOf<T extends { franchiseId: string; control: SeasonControl }>(league: {
   teams: readonly T[];
 }): T | null {
   return league.teams.find((team) => team.control === 'human') ?? null;
 }
 
-/** The league's human franchise id, or null when none exists. */
 export function humanFranchiseIdOf(league: {
   teams: readonly { franchiseId: string; control: SeasonControl }[];
 }): string | null {

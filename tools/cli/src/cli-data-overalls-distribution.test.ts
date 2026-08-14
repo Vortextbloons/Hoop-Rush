@@ -10,12 +10,6 @@ import {
   withTmpDir,
 } from './cli-test-helpers.ts';
 
-/**
- * CLI integration tests for `data overalls-distribution` (spec: cohort
- * percentile check): band counts/percentages/medians over every packaged
- * row, per-era breakdowns, and a clean exit-2 report on an invalid manifest.
- */
-
 interface FixturePlayer {
   overall: number;
   externalId: string;
@@ -28,7 +22,6 @@ interface FixturePool {
   players: FixturePlayer[];
 }
 
-/** Writes a manifest + pool files under the apps/web/static/data layout. */
 function writeOverallsFixture(dataRoot: string, pools: FixturePool[]): string {
   const dataDir = join(dataRoot, 'apps/web/static/data');
   const poolsDir = join(dataDir, 'pools');

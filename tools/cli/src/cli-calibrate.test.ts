@@ -28,8 +28,7 @@ describe('cli: calibrate commands', () => {
     expect(payload.bracketMedianObservedWinRate).not.toBeNull();
     expect(payload.perfectRunRate).not.toBeNull();
     expect(payload.challengeRuns).toBe(1);
-    // Gates below their minimum sample report as skipped, never as a
-    // vacuous pass; --allow-skipped keeps this quick run from failing.
+
     const lowSampleMetrics = new Set([
       'closeGameRate',
       'blowoutRate',
@@ -73,7 +72,6 @@ describe('cli: calibrate commands', () => {
   }, 60_000);
 
   it('calibrate run exits 1 when a gate fails', async () => {
-    // A tolerance of zero on one metric cannot be satisfied by a seeded batch.
     await withTmpDir(async (tmp) => {
       const badProfile = JSON.parse(
         readFileSync(join(REPO_ROOT, 'apps/web/static/data/era-sim/1990s.json'), 'utf8'),

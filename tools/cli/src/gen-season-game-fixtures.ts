@@ -19,34 +19,13 @@ import {
 import { buildEraSimulationProfile, buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import { minuteStrategyOfPreset } from '@hoop-rush/engine';
 
-/**
- * M2.2 season-game scenario fixture generator (spec/2.0/04). Regenerates the
- * committed `src/fixtures/season-game-*.json` scenarios. Run with:
- *   pnpm exec tsx src/gen-season-game-fixtures.ts
- *
- * The embedded `input.seed` is a placeholder except for
- * `season-game-overtime` (authored OT seed) and `season-game-foul-pressure`
- * (verified foul-out seed).
- */
-
 const OUT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const PLACEHOLDER_SEED = '0'.repeat(32);
-/** Verified against the runtime engine: produces overtime (seed index 63). */
+
 const OVERTIME_SEED = '0000000000000000000000000000003f';
-/** Verified against the runtime engine: produces four foul-outs. */
+
 const FOUL_PRESSURE_SEED = '00000000000000000000000000000001';
 
-/**
- * Roster shapes mirror the engine's own fixture builders (proven legal):
- * starters are single-position PG/SG/SF/PF/C, and bench coverage follows
- * bench-order sequence: 6 = both guard slots (PG/SG), 7 = small forward
- * (SF), 8 = center (PF/C), with 9 and 10 as center and guard depth. Every
- * class keeps at least three members so foul-outs cannot deplete a slot
- * class into a forfeit. The deviation-scoring planner hands extended
- * minutes to the hierarchy leader of the class that lost a starter, so
- * bench-role actual medians stay non-increasing from sixth through tenth
- * (the frozen season-game-targets-v1 calibration gate).
- */
 const POSITION_PLAN: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -81,11 +60,6 @@ function buildTeam(
     if (options.foulProne) {
       tendencies.foulRate = 45;
     } else if (index < 2) {
-      // The guard starters are rested more often than the forwards (the 6th
-      // man covers both guard slots), so they accrue fewer foul-outs. A
-      // slightly higher guard foul rate equalizes guard-vs-forward foul-out
-      // frequencies and keeps the bench-role median ordering stable (the
-      // frozen season-game-targets-v1 calibration gate).
       tendencies.foulRate = 3;
     }
     return {
@@ -161,8 +135,7 @@ function buildInput(options: {
     awayRotation: buildRotation(options.away, options.preset),
     availability,
     removals: options.removals ?? [],
-    // M2.5 (season-game-v4): the same-game-return seam; zero-injury fixtures
-    // carry an empty list so they reproduce the v3 result byte-for-byte.
+
     returns: [],
     homeCourt: {
       schemaVersion: 1,

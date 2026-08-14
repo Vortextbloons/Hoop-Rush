@@ -1,23 +1,3 @@
-/**
- * Versioned field-method registry and deterministic ratings/tendencies/
- * anchors derivation (spec/11, spec/12).
- *
- * Derivation ladder per required field (first valid method wins):
- *   1. observed      - validated source observation
- *   2. derived       - exact deterministic formula from observed inputs
- *   3. reconstructed - sample-size-adjusted reconstruction from the same
- *                      player-season context
- *   4. interpolated  - adjacent-season interpolation (career context)
- *   5. shrunk        - shrinkage toward a position-era-role prior
- *
- * Rules:
- *   - No random jitter: every value is a pure function of versioned inputs.
- *   - Missing inputs never become zero unless zero is a real rule or
- *     observation (pre-1979 three-point play is not-applicable, not zero).
- *   - Unclamped diagnostic values are retained alongside final values.
- *   - Ability (ratings), evidenced behavior (tendencies), and season
- *     production (anchors) stay distinct.
- */
 import {
   DERIVATION_METHOD_VERSION,
   SOURCE_VERSION,
@@ -42,7 +22,6 @@ import { predictReconstructedProfile, ratingFromAccuracy } from '../reconstructi
 import { seasonIndexFor, type ReconstructionRow } from '../reconstruction/rows.ts';
 import type { StatsRow } from './stats.ts';
 
-/** League context used for era-relative translation (spec/12 environment). */
 export interface SeasonContext {
   leaguePpg: number;
   league3PARate: number;
@@ -51,25 +30,20 @@ export interface SeasonContext {
 
 export interface DerivationInput {
   season: string;
-  /** Stable packaged player identifier used for calibrated adjustments. */
+
   playerId?: string;
-  /** Mapped detailed position (PG/SG/SF/PF/C). */
+
   position: string;
   heightInches: number | null;
-  /** Physicals used by the three-point reconstruction predictors. */
+
   weightLbs?: number | null;
   age?: number | null;
   stats: StatsRow;
   era: SeasonContext;
   artifact?: RatingsModelArtifact;
-  /** Pooled season×position-group shooting priors (made/attempted ratios). */
+
   ratePriors?: { threePointPctPrior?: number; freeThrowPctPrior?: number };
-  /**
-   * Checked-in three-point reconstruction artifact (spec/12). When present,
-   * pre-1979 not-applicable seasons and genuinely missing three-point
-   * records receive conservative reconstructed profiles; observed seasons
-   * and validated observed zero-attempt seasons are never touched.
-   */
+
   threePointReconstruction?: ThreePointReconstructionArtifact;
 }
 
@@ -79,17 +53,16 @@ export interface DerivedRecord {
   anchors: SimulationAnchors;
   summaryRatings: SummaryRatings;
   ratingProfile: RatingProfile;
-  /** Field-level provenance keyed by packaged field name. */
+
   provenance: ProvenanceMap;
-  /** Unclamped diagnostic values per final field (spec/12 clamp rule). */
+
   unclamped: Record<string, number>;
-  /** Methods chosen per final field. */
+
   methods: Record<string, ProvenanceKind>;
-  /** Conservative reconstructed three-point profile (pre-1979/missing only). */
+
   reconstructedThreePoint?: ReconstructedThreePointProfile;
 }
 
-/** Versioned position-era-role priors (shrinkage targets; never tuned per player). */
 export interface PriorTable {
   stealsPer36: number;
   blocksPer36: number;
@@ -126,11 +99,6 @@ const POSITION_PRIORS: Readonly<Record<string, Readonly<PriorTable>>> = {
   },
 };
 
-/**
- * League-default shooting priors per position group, used only when a season
- * cohort has no valid pooled made/attempted observations. 3P: guards shoot
- * most efficiently and bigs least. FT: guards convert most, bigs least.
- */
 const LEAGUE_RATE_DEFAULTS: Readonly<
   Record<'G' | 'F' | 'C', Readonly<{ threePointPctPrior: number; freeThrowPctPrior: number }>>
 > = {
@@ -139,7 +107,6 @@ const LEAGUE_RATE_DEFAULTS: Readonly<
   C: { threePointPctPrior: 0.31, freeThrowPctPrior: 0.71 },
 };
 
-/** Collapses a detailed position into the prior position group (PG/SG -> G, PF/SF -> F). */
 export function positionGroup(detailPos: string): 'G' | 'F' | 'C' {
   return detailPos === 'PG' || detailPos === 'SG'
     ? 'G'
@@ -148,7 +115,6 @@ export function positionGroup(detailPos: string): 'G' | 'F' | 'C' {
       : 'C';
 }
 
-/** Whether the source publishes the field for this season (spec/12 table). */
 export function fieldPublished(field: string, season: string): boolean {
   const boundary = FIELD_AVAILABILITY[field];
   if (boundary === undefined) return true;
@@ -162,15 +128,12 @@ function confidenceFor(kind: ProvenanceKind): Confidence {
     case 'derived':
       return 'medium';
     case 'reconstructed':
-      // Reconstructed confidence is stamped from the model's posterior
-      // std-dev after the record; this default keeps the type total.
       return 'low';
     default:
       return 'low';
   }
 }
 
-/** Null-preserving season totals. */
 interface SeasonTotals {
   gamesPlayed: number;
   minutes: number;
@@ -236,11 +199,6 @@ interface Resolved {
   fields: string[];
 }
 
-/**
- * Resolves one counting stat with the ladder: observed when the source
- * publishes the field and the row carries a value; else an estimated per-game
- * value from a per-36 blend of player evidence and the position-era-role prior.
- */
 function resolveCounting(
   observed: number | null,
   published: boolean,
@@ -255,10 +213,7 @@ function resolveCounting(
   if (published && observed !== null && games > 0) {
     return { value: observed / games, kind: 'observed', fields };
   }
-  // Related player evidence (e.g. total rebounds when the split is missing)
-  // scales by the prior share; without it the prior is used directly and no
-  // evidence is fabricated. Both sides of the blend stay in per-36 units,
-  // then the blended per-36 value is converted to the caller's per-game unit.
+
   const usedRelated = relatedPer36 !== null && relatedPer36 !== undefined && share !== undefined;
   const estimatePer36 = usedRelated ? relatedPer36 * share : priorPer36;
   const evidenceWeight = minutes / Math.max(1, minutes + 1500);
@@ -276,10 +231,6 @@ function perGame(total: number | null, games: number): number | null {
   return total / games;
 }
 
-/**
- * Derives the complete strict record for one player-season. Every packaged
- * field gets a deterministic method, provenance, and unclamped diagnostic.
- */
 export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const totals = seasonTotals(input.stats);
   const { gamesPlayed: gp, minutes } = totals;
@@ -299,7 +250,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const methods: Record<string, ProvenanceKind> = {};
   const provenance: ProvenanceMap = {};
 
-  /** Rating key -> source field family used for availability (spec/12). */
   const RATING_SOURCE_FIELD: Readonly<Record<string, string>> = {
     steal: 'steals',
     block: 'blocks',
@@ -343,8 +293,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     gp,
     ['blocks'],
   );
-  // When the rebound split is missing, total rebounds are still evidence:
-  // the split is estimated by sharing total rebounds with the prior shares.
+
   const reboundShare =
     priors.offensiveReboundsPer36 / (priors.offensiveReboundsPer36 + priors.defensiveReboundsPer36);
   const rebsPer36 = rpg !== null && mpg > 0 ? (rpg * 36) / mpg : null;
@@ -383,12 +332,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const threePct =
     tpm !== null && tpa !== null && tpa > 0 ? clampUnitInterval(Math.min(tpm, tpa) / tpa) : null;
 
-  // Conservative three-point reconstruction (spec/12): applied only to
-  // pre-1979 not-applicable seasons and genuinely missing three-point
-  // records (tpa null post-1979). A validated observed zero-attempt season
-  // (tpa === 0) is never reconstructed, and observed seasons never are.
-  // Without the checked-in artifact the legacy estimated fallbacks apply
-  // (the unavailable anchor contract still holds: null, never zero).
   const reconstructionArtifact = input.threePointReconstruction;
   const reconstructionEligible = !fieldPublished('threesAttempted', input.season) || tpa === null;
   let reconstructedThreePoint: ReconstructedThreePointProfile | undefined;
@@ -424,10 +367,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
 
   const ppgNorm = ppg !== null ? ppg * (114.7 / Math.max(1, input.era.leaguePpg)) : null;
 
-  // Shooting rates shrink toward the pooled season×position-group prior with
-  // 80 equivalent prior attempts (Bayesian attempt-weighted average); the raw
-  // rates remain for anchors as historical facts. Per-field fallbacks use the
-  // documented league defaults when a cohort has no pooled observations.
   const ratePriors = {
     threePointPctPrior:
       input.ratePriors?.threePointPctPrior ?? LEAGUE_RATE_DEFAULTS[position].threePointPctPrior,
@@ -452,10 +391,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const tsComponent = tsPct !== null ? (tsPct - 0.5) * 60 : 0;
   const ftComponent = ftPctShrunk !== null ? (ftPctShrunk - 0.7) * 15 : 0;
 
-  // Three-point skill: observed three-point shooting when available; else a
-  // conservative reconstructed accuracy from the versioned model artifact
-  // (pre-1979 / genuinely missing records); else a conservative spacing
-  // estimate from free-throw evidence (estimated).
   let threeRaw: number;
   let threeKind: ProvenanceKind;
   let threeFields: string[];
@@ -481,7 +416,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   }
   record('threePoint', blend(threeRaw, 54), threeKind, threeFields);
   if (threeKind === 'reconstructed' && reconstructedThreePoint !== undefined) {
-    // Reconstructed values carry the model version and confidence.
     const entry = provenance['threePoint'];
     if (entry !== undefined) {
       entry.confidence = reconstructedThreePoint.confidence;
@@ -497,11 +431,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     ftPctShrunk !== null ? ['ftm', 'fta', 'prior', 'shrink-80-attempts'] : ['prior'],
   );
 
-  // Scoring production is evidence of interior offense, but it is not the
-  // same thing as a 100-rated rim finisher. The former coefficients pushed
-  // nearly every efficient 20+ PPG big to the clamp, then the possession
-  // engine used that same clamp for rim skill. Keep elite finishers high while
-  // leaving room for matchup, spacing, and observed two-point efficiency.
   const insideRaw =
     58 +
     ((ppgNorm ?? 10) - 14) * 1.5 +
@@ -528,9 +457,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
 
   const passRaw = 60 + ((apg ?? 3) - 3) * 5 + (per ?? 12) * 0.6;
   record('passing', blend(passRaw, 54), apg !== null ? 'derived' : 'estimated', ['assists', 'per']);
-  // Usage alone systematically underrates pass-first creators. Assist volume
-  // is a direct creation/handle signal, especially for historical guards whose
-  // usage models are reconstructed less reliably than their box score.
+
   const creationRaw = 60 + ((usage ?? 16) - 16) * 0.6 + ((apg ?? 3) - 3) * 3.0 + (per ?? 12) * 0.15;
   record(
     'ballHandling',
@@ -539,9 +466,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     ['assists', 'usageRate', 'per'],
   );
 
-  // Before rebound splits were published, total rebounds are still strong
-  // evidence. The old path discarded them and shrank elite rebounders toward
-  // a generic prior, badly understating Russell-era centers.
   const reboundEvidence = rpg !== null && (oreb.kind !== 'observed' || dreb.kind !== 'observed');
   const offensiveReboundRaw = 50 + (oreb.value - 1.5) * 8 + Math.max(0, (rpg ?? 4) - 4) * 0.8;
   const defensiveReboundRaw = 55 + (dreb.value - 4) * 5 + Math.max(0, (rpg ?? 4) - 4) * 0.4;
@@ -566,16 +490,14 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
   const blockSignal = bpg.value * 10;
   const defensiveKind: ProvenanceKind =
     spg.kind === 'observed' && bpg.kind === 'observed' ? 'derived' : 'estimated';
-  // Perimeter defense is steal- and position-driven; the steals prior anchors
-  // the signal so the same steal rate means more for a guard than a big.
+
   const perimeterRaw =
     55 +
     stealSignal +
     (priors.stealsPer36 - 1.2) * 6 +
     (position === 'G' ? 3 : position === 'C' ? -7 : 0);
   record('perimeterDefense', blend(perimeterRaw, 54), defensiveKind, ['steals', 'position']);
-  // Interior defense is block-, rebound-, and size-driven; the blocks prior
-  // supplies the size baseline (bigs are expected to contest shots).
+
   const interior =
     54 +
     blockSignal +
@@ -614,10 +536,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     stockObserved ? ['steals', 'blocks', 'rebounds', 'fouls'] : ['rebounds', 'prior'],
   );
 
-  // PER, usage, and minutes describe opportunity and production, not running
-  // speed. Use a conservative activity signal for speed and reserve size and
-  // height for strength so high-production centers do not become 100-rated
-  // athletes by construction.
   const positionSpeedPrior = position === 'G' ? 75 : position === 'F' ? 67 : 59;
   const heightSpeedPenalty =
     input.heightInches === null ? 0 : Math.max(0, input.heightInches - 78) * 0.7;
@@ -668,7 +586,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     if (raw !== undefined) ratings[key as keyof SimulationRatings] = clampRating(raw);
   }
 
-  // --- Tendencies (evidenced behavior) -----------------------------------
   const tendencies = {} as SimulationTendencies;
   const t = (key: string, raw: number, kind: ProvenanceKind, fields: string[]): void => {
     const value = clamp(raw, 0, 100);
@@ -697,10 +614,7 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     fgaPerGame !== null ? 'derived' : 'estimated',
     ['fga'],
   );
-  // Three-point volume used by the shot-mix tendencies. Reconstructed
-  // players (pre-1979 / missing records) use the conservative attempt rate
-  // instead of the raw position prior, so related three-point tendencies
-  // are recalculated without introducing a modern-volume assumption.
+
   const threeRate =
     reconstructedThreePoint !== undefined
       ? reconstructedThreePoint.attemptRateConservative
@@ -773,10 +687,6 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     'assists',
   ]);
 
-  // Three-point volume tendency: pre-1979 the shot did not exist (league
-  // rule, not-applicable), so the conservative reconstructed attempt rate
-  // carries the volume. From 1979-80 the rate is observed; absent evidence
-  // shrinks toward the position-era prior scaled by league rate.
   if (reconstructedThreePoint !== undefined) {
     t('threePointRate', reconstructedThreePoint.attemptRateConservative * 100, 'reconstructed', [
       ...reconstructedThreePoint.evidence.sourceFields,
@@ -870,16 +780,11 @@ export function derivePlayerRecord(input: DerivationInput): DerivedRecord {
     'offensiveRebound',
   ]);
 
-  // --- Anchors (season production) ----------------------------------------
   const games = Math.max(1, gp);
-  // Unavailable three-point records (pre-1979 not-applicable, genuinely
-  // missing fields) anchor as null — never a converted zero. Numeric 0 is
-  // reserved for validated observed zero-attempt seasons (spec/12).
+
   const threePointAttemptRate = tpa !== null && fga !== null && fga > 0 ? tpa / fga : null;
   const freeThrowAttemptRate = fta !== null && fga !== null && fga > 0 ? fta / fga : 0;
-  // Anchor shares are consumed as 0..1 probabilities; a player with more
-  // free throws than field-goal attempts saturates at 1.0 (unclamped value
-  // retained in diagnostics).
+
   unclamped['anchor:freeThrowAttemptRate'] = freeThrowAttemptRate;
   const anchors: SimulationAnchors = {
     gamesPlayed: gp,

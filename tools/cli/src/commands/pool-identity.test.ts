@@ -6,10 +6,6 @@ import { franchiseEraPoolSchema, type FranchiseEraPool } from '@hoop-rush/data-c
 import { dataValidate, DEFAULT_MANIFEST } from './data-validate.ts';
 import { EXIT_OK } from '../report.ts';
 
-/**
- * Curated identity fixtures (spec/02): known Lakers 1990s stars and role
- * players must appear with their expected representative peak seasons.
- */
 const EXPECTED_PEAKS: Record<string, string> = {
   'Magic Johnson': '1990-91',
   "Shaquille O'Neal": '1999-00',
@@ -19,8 +15,7 @@ const EXPECTED_PEAKS: Record<string, string> = {
   'James Worthy': '1990-91',
   'Nick Van Exel': '1994-95',
   'A.C. Green': '1992-93',
-  // ratings-v3.6 raw-score selection favors Fisher's 82-game 1997-98 season
-  // (more minutes + availability) over the lockout-shortened 1998-99.
+
   'Derek Fisher': '1997-98',
   'Robert Horry': '1997-98',
   'Elden Campbell': '1995-96',

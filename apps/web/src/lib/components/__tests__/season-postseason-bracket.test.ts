@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { buildManifest } from '@hoop-rush/test-fixtures';
@@ -10,14 +8,6 @@ import PlayInCard from '$lib/components/season/PlayInCard.svelte';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
 mockSvelteKitApp();
-
-/**
- * M2.6 bracket rendering: desktop round columns and mobile ordered series
- * cards both derive from the same recorded postseason state — series score,
- * home-court team, next scheduled game, completed results, and Play-In
- * cards with seeds. Assertions cover rendered markup, accessible labels,
- * and the human-team highlight.
- */
 
 const MANIFEST = buildManifest();
 
@@ -257,8 +247,7 @@ describe('PostseasonBracket', () => {
         'Finals',
       ]),
     );
-    // Both desktop columns and mobile cards mount in jsdom (viewport unknown),
-    // so every card renders twice.
+
     expect(container.querySelectorAll('[data-season-playin-card]')).toHaveLength(12);
     expect(container.querySelectorAll('[data-season-series-card]')).toHaveLength(30);
   });
@@ -288,7 +277,7 @@ describe('PostseasonBracket', () => {
 
   it('highlights the human franchise series', () => {
     const postseason = fixturePostseason();
-    // Move the human into the in-progress west 4/5 series.
+
     const westSeries = postseason.bracket?.west.firstRound[1];
     if (westSeries === undefined) throw new Error('missing west series');
     westSeries.homeCourtFranchiseId = 'lakers';
@@ -338,8 +327,7 @@ describe('PostseasonBracket', () => {
         humanFranchiseId: null,
       },
     });
-    // Both variants render in jsdom (viewport unknown); the mobile <ol> is
-    // the first ordered list, headed by the Play-In sections.
+
     const mobileLists = container.querySelectorAll('ol');
     const mobile = mobileLists[0];
     expect(mobile).not.toBeNull();

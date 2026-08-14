@@ -14,33 +14,12 @@ import { legalFiveExists, type SeasonRosterMemberInput } from './roster-rules.ts
 import { canPlay } from '../domain/positions.ts';
 import { minuteStrategyOfPreset } from './minute-plan.ts';
 
-/**
- * Minimal M2.1 rotation builder (spec/2.0/04, season-rotation-v1). Five
- * slot-assigned starters (G, G, F, F, C) play 32 minutes each and the five
- * bench players play 16 each, totals equal exactly 240, and the closing five
- * initially equals the starters. The legal-five matching is deterministic:
- * members are canonically sorted by playerVersionId and the first legal
- * slot assignment is found by backtracking in slot order. An optional
- * `order` comparator (projection milestone) makes the matching and the bench
- * hierarchy talent-ordered for callers that can score members (AI
- * generation); the default stays byte-identical. M2.2 adds presets,
- * editing, substitution execution, and contingency behavior without replacing
- * this persisted rotation contract.
- */
-
 const STARTING_SLOTS: Array<'G' | 'F' | 'C'> = ['G', 'G', 'F', 'F', 'C'];
 
 function canonicalOrder(a: SeasonRosterMemberInput, b: SeasonRosterMemberInput): number {
   return a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0;
 }
 
-/**
- * Deterministic legal-five matching. With no `order`, members are canonically
- * sorted and the first legal slot assignment is found by backtracking in slot
- * order; with `order`, the same search runs over the ordered list, so the
- * first legal five is the strongest under the caller's comparator. Returns
- * the five starters in slot order 0..4, or null when no legal five exists.
- */
 export function matchStartingFive(
   members: readonly SeasonRosterMemberInput[],
   order?: (a: SeasonRosterMemberInput, b: SeasonRosterMemberInput) => number,
@@ -70,13 +49,6 @@ export function matchStartingFive(
   return result;
 }
 
-/**
- * Builds the minimal M2.1 rotation for a ten-player roster. Throws when the
- * roster cannot field a legal starting five. With an `order` comparator the
- * starters are the strongest legal five under it and the bench hierarchy
- * follows the same order (best remaining player first); the default is
- * byte-identical canonical behavior.
- */
 export function buildMinimalRotation(input: {
   franchiseId: string;
   members: SeasonRosterMemberInput[];
@@ -113,19 +85,10 @@ export function buildMinimalRotation(input: {
   };
 }
 
-/** Total of the rotation's target minutes (must equal 240). */
 export function rotationTargetMinutes(rotation: SeasonRotation): number {
   return rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0);
 }
 
-/**
- * Canonical digest of the locked 30-rotation set (spec/2.0/07 M2.3). Sort by
- * franchiseId; include starters, bench order, target minutes sorted by
- * playerVersionId, the closing five, the minute policy, and the rotation
- * version; hash with `seasonDigestHex`. Identical sets hash identically
- * regardless of input order, so a stale or tampered block lock is rejected
- * before any simulation runs.
- */
 export function seasonRotationSetDigest(rotations: readonly SeasonRotation[]): string {
   const canonical = [...rotations]
     .sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1))
@@ -143,13 +106,6 @@ export function seasonRotationSetDigest(rotations: readonly SeasonRotation[]): s
   return seasonDigestHex(JSON.stringify(canonical));
 }
 
-/**
- * Audits a rotation against the M2.2 contract (season-rotation-v2): starter
- * and closing fives are independently legal ordered fives, the partition
- * covers the roster exactly with no duplicates, and target minutes are
- * integers 0-48 totaling exactly 240. Equivalent to validateSeasonRotation;
- * kept as the authoritative audit export.
- */
 export function auditSeasonRotation(
   rotation: SeasonRotation,
   memberPlayable: ReadonlyMap<string, readonly Position[]>,
@@ -157,15 +113,6 @@ export function auditSeasonRotation(
   return validateSeasonRotation(rotation, memberPlayable);
 }
 
-/**
- * M2.2 v2 rotation validation (season-rotation-v2, spec/2.0/04): the
- * starter/bench partition references exactly the ten rostered versions with
- * no duplicates, target minutes are integers from 0-48 totaling exactly 240
- * and covering exactly the roster, the starters form a legal ordered
- * G, G, F, F, C five in their configured slot order, and the closing five
- * is an independent ordered legal five (which may differ from the starters
- * and include bench players). Returns failure strings; empty means valid.
- */
 export function validateSeasonRotation(
   rotation: SeasonRotation,
   memberPlayable: ReadonlyMap<string, readonly Position[]>,
@@ -263,15 +210,6 @@ export function validateSeasonRotation(
   return failures;
 }
 
-/**
- * M2.2 preset application: rewrites ONLY the target minutes using the frozen
- * preset tables (SEASON_ROTATION_PRESET_TARGETS: Balanced 33 each starter /
- * bench 21,18,15,12,9; Tight 37 / 20,14,9,7,5; Bench-Heavy 29 /
- * 23,21,19,17,15). The current starter order, bench hierarchy, and closing
- * five are preserved exactly. The rotation's minute policy is rewritten to
- * the strategy that matches the applied preset (`tight` maps to
- * Starter-Heavy). Returns a new rotation; the input is untouched.
- */
 export function applySeasonRotationPreset(
   rotation: SeasonRotation,
   preset: SeasonRotationPreset,
@@ -299,13 +237,6 @@ export function applySeasonRotationPreset(
   };
 }
 
-/**
- * First M2.2 rejection for an explicit-rotation command, in fixed priority
- * order: duplicates, roster/partition correspondence, target values, starter
- * slot legality, then closing-five slot legality. Returns null when the
- * rotation is valid. The category mapping is the authoritative translation
- * of the audit failures into the fixed rejection codes.
- */
 function firstRotationRejection(
   rotation: SeasonRotation,
   memberPlayable: ReadonlyMap<string, readonly Position[]>,
@@ -426,22 +357,6 @@ function firstRotationRejection(
   return null;
 }
 
-/**
- * M2.2 typed rotation-editing command handler. Preset commands rewrite target
- * minutes and preserve the current starter order, bench hierarchy, and
- * closing five; explicit-rotation commands replace the rotation wholesale.
- * Rejection codes are fixed as ROSTER_MISMATCH, DUPLICATE_PLAYER_VERSION,
- * INVALID_TARGETS, ILLEGAL_STARTERS, and ILLEGAL_CLOSING_FIVE.
- *
- * Command shapes that carry neither a preset nor a rotation (or both) are
- * rejected before handling with INVALID_TARGETS and the schema's own stable
- * messages. A preset command preserves `currentRotation` when the caller
- * supplies it (the persisted rotation); otherwise the base rotation is
- * derived deterministically from the roster (matchStartingFive, canonical
- * bench), so the preset rewrites only the target minutes exactly like
- * applySeasonRotationPreset. An explicit-rotation command is validated with
- * the fixed-code mapping above and returned wholesale when accepted.
- */
 export function handleSetSeasonRotationCommand(
   command: SetSeasonRotationCommand,
   memberPlayable: ReadonlyMap<string, readonly Position[]>,

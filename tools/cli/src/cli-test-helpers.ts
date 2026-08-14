@@ -7,17 +7,6 @@ import { promisify } from 'node:util';
 import { expect } from 'vitest';
 import { sha256Hex } from './io.ts';
 
-/**
- * Shared harness for CLI integration tests (spec/09, spec/06): the real
- * command surface invoked through Node's native type stripping, verifying
- * argument handling, exit codes, payload schemas, worker-count independence,
- * and replay determinism.
- *
- * Each test file imports this helper, so every file gets its own scratch
- * directory; vitest runs files in parallel, which is what keeps the
- * subprocess-per-test suite fast.
- */
-
 const execFileAsync = promisify(execFile);
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const CLI_ENTRY = join(REPO_ROOT, 'tools/cli/src/index.ts');
@@ -45,11 +34,6 @@ export function jsonPayload(stdout: string, stderr = ''): unknown {
   return parsed.payload;
 }
 
-/**
- * Creates a scratch dir, runs fn, and removes the dir in a finally block.
- * The fn result is awaited before cleanup so the dir outlives any async
- * work (subprocess boots) the callback starts.
- */
 export async function withTmpDir<T>(fn: (dir: string) => T | Promise<T>): Promise<T> {
   const dir = mkdtempSync(join(tmpdir(), 'hoop-rush-cli-test-'));
   try {
@@ -59,11 +43,6 @@ export async function withTmpDir<T>(fn: (dir: string) => T | Promise<T>): Promis
   }
 }
 
-/**
- * Runs a `data` command against a bogus manifest and asserts the shared
- * exit-2 clean-report contract (spec/09): exit 2, no stack trace, a report
- * with exitCode 2 whose first failure mentions the manifest.
- */
 export async function expectExit2CleanManifestReport(
   commandArgs: string[],
   dataDir: string,
@@ -88,7 +67,6 @@ export async function expectExit2CleanManifestReport(
   expect(report.failures[0]).toContain('manifest');
 }
 
-/** Writes the 9-field bracket manifest for `bracket audit` fixtures. */
 export function writeManifestWithBracket(
   dir: string,
   bracketPath: string,

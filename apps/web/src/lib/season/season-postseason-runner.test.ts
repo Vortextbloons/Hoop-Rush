@@ -66,22 +66,6 @@ import {
 } from './season-postseason-runner';
 import { createSeasonPostseasonEngineSimulator } from './fake-season-postseason-runner';
 
-/**
- * Season postseason runner unit tests (M2.6): the orchestration loop against
- * the REAL engine command handler through the direct simulator seam — one
- * game per atomic commit for advance sessions, ≤ 8-game chunks for the
- * eliminated-run fast-forward, authoritative re-reads after every commit,
- * cancellation at every boundary (committed chunks retained, the uncommitted
- * chunk discarded), idempotent duplicate-command retry, stale-state /
- * run-mismatch recovery, cross-tab invalidation, reload continuation, and
- * the atomic champion promotion (almanac digests reconcile, active-run
- * pointers removed, completed history registered). The repository is an
- * in-memory fake that mirrors the persistence contract's guards (stale
- * state, duplicate command ids, exact +1 revision advance, promotion
- * integrity); the engine is REAL, with a forced-result resolver so the
- * tournament flow is deterministic.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const HUMAN = 'lakers';
 
@@ -91,7 +75,6 @@ interface TeamSpec {
   h2h?: Record<string, number>;
 }
 
-/** Distinct east records; a west 7-8 tie between clippers and lakers. */
 function standingsSpec(): Record<string, TeamSpec> {
   const league = buildSeasonLeague({}, { humanFranchiseId: HUMAN });
   const spec: Record<string, TeamSpec> = {};
@@ -156,7 +139,6 @@ function standingsOf(spec: Record<string, TeamSpec>): SeasonStandings {
   };
 }
 
-/** Playable positions by roster slot: a legal G,G,F,F,C five in slots 0-4. */
 const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['PG'],
   ['SG'],
@@ -170,7 +152,6 @@ const SLOT_POSITIONS: ReadonlyArray<readonly Position[]> = [
   ['C'],
 ];
 
-/** A roster-covering v3-layout catalog (mirror of the cross-track fixture). */
 function catalogOf(run: SeasonRun): SeasonDraftCatalog {
   const candidates: SeasonDraftCandidate[] = run.rosters.flatMap((roster) =>
     roster.players.map((player, slot) => {
@@ -221,7 +202,6 @@ function catalogOf(run: SeasonRun): SeasonDraftCatalog {
   };
 }
 
-/** Schema-valid zero effects state (300 loads, 1,350 pairs). */
 function zeroEffects(run: SeasonRun): SeasonEffectsState {
   const playerStates = run.rosters.flatMap((roster) =>
     roster.players.map((player) => ({
@@ -253,7 +233,6 @@ function zeroEffects(run: SeasonRun): SeasonEffectsState {
   };
 }
 
-/** The run at the end of the regular season with the crafted standings. */
 function runAtPostseasonBoundary(): SeasonRun {
   const league = buildSeasonLeague({}, { humanFranchiseId: HUMAN });
   const schedule = generateSeasonSchedule({ league, seed: SEED });
@@ -286,7 +265,6 @@ function runAtPostseasonBoundary(): SeasonRun {
   return run;
 }
 
-/** An active injury on the human rotation's first starter (rotation wait). */
 function withHumanStarterInjury(run: SeasonRun): SeasonRun {
   const humanRotation = run.rotations.find((rotation) => rotation.franchiseId === HUMAN);
   const starter = humanRotation?.starters[0];
@@ -312,7 +290,6 @@ function withHumanStarterInjury(run: SeasonRun): SeasonRun {
   return { ...run, health: { ...run.health, injuries: [...run.health.injuries, injury] } };
 }
 
-/** A forced completed game result over the game input (no RNG consumed). */
 function forcedCompletedResult(
   gameInput: SeasonGameSimulationInput,
   homeScore: number,
@@ -398,7 +375,6 @@ function forcedCompletedResult(
   };
 }
 
-/** Home team wins; the human loses every game it participates in. */
 function humanLosesResolver(): SeasonPostseasonGameResolver {
   return ({ gameInput, pregameEffects }) => {
     const home = gameInput.home.franchiseId;
@@ -417,7 +393,6 @@ function humanLosesResolver(): SeasonPostseasonGameResolver {
   };
 }
 
-/** The engine context the manual setup loops use (mirror of the runner's). */
 function contextOf(
   run: SeasonRun,
   effects: SeasonEffectsState,
@@ -453,13 +428,6 @@ function commandOf(
   };
 }
 
-/**
- * In-memory Season Run + postseason repository fake. Mirrors the persistence * contract's commit guards: run identity, stale expected state facts,
- * duplicate command ids, the exact +1 state revision advance, and the
- * promotion integrity gates (stage, champion agreement, log density, almanac
- * digest reconciliation). No reload audit — the runner tests target
- * orchestration, not record validation.
- */
 class FakePostseasonRepository implements SeasonRunRepository {
   active: SeasonRunSnapshot | null = null;
   commandIds = new Set<string>();
@@ -467,7 +435,7 @@ class FakePostseasonRepository implements SeasonRunRepository {
   summaries: SeasonPostseasonSummary[] = [];
   completed: SeasonCompletedSeason | null = null;
   completedIndex: SeasonCompletedRunIndexEntry[] = [];
-  /** Injects a commit failure (stale-state / run-mismatch race simulation). */
+
   failNextCommitWith: Error | null = null;
 
   commitPostseasonAdvancement(input: CommitPostseasonAdvancementInput): Promise<void> {
@@ -708,7 +676,6 @@ function makeRunner(
   });
 }
 
-/** Starts the postseason with the engine's default tiebreaker rankings. */
 async function startPostseason(
   repo: FakePostseasonRepository,
   run: SeasonRun,
@@ -723,8 +690,7 @@ async function startPostseason(
   if (envelope.command !== 'start-postseason' || envelope.result.status !== 'accepted') {
     throw new Error(`start rejected: ${JSON.stringify(envelope)}`);
   }
-  // The repository fake holds the pre-command run (set by the fixture); the
-  // commit validates the expected facts, then stores the engine output.
+
   await repo.commitPostseasonAdvancement({
     runId: output.run.runId,
     run: output.run,
@@ -741,7 +707,6 @@ async function startPostseason(
   return output.run;
 }
 
-/** Advances the engine one game at a time until the human is eliminated. */
 async function advanceUntilEliminated(
   repo: FakePostseasonRepository,
   run: SeasonRun,
@@ -790,7 +755,6 @@ async function advanceUntilEliminated(
   return current;
 }
 
-/** Collects events until the terminal event type arrives. */
 function collectUntil(
   runner: SeasonPostseasonRunner,
   terminal: SeasonPostseasonEvent['type'],
@@ -818,7 +782,6 @@ function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** Replaces the fake repository's active run (narrowed spread helper). */
 function setActiveRun(repo: FakePostseasonRepository, run: SeasonRun): void {
   const current = repo.active;
   if (current === null) throw new Error('no active snapshot to replace');
@@ -863,10 +826,6 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     });
     const terminal = await done;
 
-    // Every commit is exactly one game; the session stops before the first
-    // human-involved game (the engine always yields the rotation decision
-    // for the human's next game). The three east play-in games commit, then
-    // the run waits at the human's west 7/8 game.
     const committed = terminal.filter((event) => event.type === 'committed');
     expect(committed.length).toBe(3);
     for (const event of committed) {
@@ -881,9 +840,9 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     expect(complete.nextGameId).toBe('pi-west-seven-eight');
     expect(complete.promoted).toBe(false);
     expect(complete.snapshot?.run.postseason.playIn.west.ranking).not.toBeNull();
-    // Re-read after every commit: the fake's active run is the committed one.
+
     expect(repo.active?.run.stateRevision).toBe(complete.snapshot?.run.stateRevision);
-    // Every committed summary round-trips the frozen schema.
+
     for (const summary of repo.summaries) {
       expect(() => seasonPostseasonSummarySchema.parse(summary)).not.toThrow();
     }
@@ -906,7 +865,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const types = events.map((event) => event.type);
     expect(types[0]).toBe('started');
     expect(types[types.length - 1]).toBe('complete');
-    // Progress and committed alternate per game; no committed after complete.
+
     const firstCommitted = types.indexOf('committed');
     const lastCommitted = types.lastIndexOf('committed');
     expect(firstCommitted).toBeGreaterThanOrEqual(1);
@@ -927,7 +886,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
       commandId: 'adv-session-cancel',
       humanFranchiseId: HUMAN,
     });
-    // Wait for the first commit, then cancel between games.
+
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         unsubscribe();
@@ -950,8 +909,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     unsub();
 
     expect(events.some((event) => event.type === 'cancelled')).toBe(true);
-    // The committed games are retained; no further commits landed. The start
-    // command recorded one id; the session committed exactly one game.
+
     expect(repo.commandIds.size).toBe(committedBefore);
     expect(repo.summaries.length).toBe(1);
     expect(events.filter((event) => event.type === 'complete')).toHaveLength(0);
@@ -971,7 +929,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
       commandId: 'ff-cancel-chunk',
       humanFranchiseId: HUMAN,
     });
-    // Cancel as soon as the session starts: the first chunk is in flight.
+
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         unsubscribe();
@@ -993,7 +951,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     unsub();
 
     expect(events.some((event) => event.type === 'cancelled')).toBe(true);
-    // The in-flight chunk never committed; retained commits are untouched.
+
     expect(repo.commandIds.size).toBe(committedBefore);
     expect(events.some((event) => event.type === 'complete')).toBe(false);
     expect(events.some((event) => event.type === 'error')).toBe(false);
@@ -1002,8 +960,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
   it('retries idempotently when the first command id was already committed', async () => {
     const { repo, runner } = fixture;
     const started = await startPostseason(repo, runAtPostseasonBoundary(), fixture);
-    // Simulate a previous session that committed the first game then crashed
-    // before acknowledging: same commandId, run already advanced one game.
+
     const firstGame = seasonPostseasonNextGame(started.postseason);
     if (firstGame.kind !== 'game') throw new Error('expected a first game');
     const first = commandOf(started, 'advance-postseason', 'adv-session-retry', {
@@ -1045,9 +1002,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const terminal = await done;
 
     expect(terminal.some((event) => event.type === 'error')).toBe(false);
-    // The duplicate first command was absorbed; the session continued from
-    // the authoritative re-read (the east 9/10 game was re-attempted and
-    // absorbed, the east final committed) through the wait.
+
     const committed = terminal.filter((event) => event.type === 'committed');
     expect(committed.length).toBeGreaterThanOrEqual(2);
     const complete = terminal[terminal.length - 1];
@@ -1068,8 +1023,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
       commandId: 'adv-session-stale',
       humanFranchiseId: HUMAN,
     });
-    // Wait for the first commit, then inject a stale-state commit failure
-    // (another tab advanced the run between re-read and commit).
+
     await new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
         unsubscribe();
@@ -1092,7 +1046,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     if (error?.type !== 'error') return;
     expect(error.code).toBe('internal');
     expect(error.message).toContain('run moved');
-    // The start command plus one committed game; nothing else commits.
+
     expect(repo.commandIds.size).toBe(2);
     expect(repo.summaries.length).toBe(1);
   });
@@ -1121,7 +1075,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
         }
       });
     });
-    // Another tab replaced the active run mid-session.
+
     repo.failNextCommitWith = new SeasonRunCommandRunMismatchError('other-run');
     await done;
     unsub();
@@ -1145,8 +1099,6 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     await done1;
     first.terminate();
 
-    // A fresh runner (as after a page reload) re-reads the authoritative
-    // state and continues without replaying the committed game.
     const second = makeRunner(repo, fixture.catalog, fixture.profile, fixture.resolver);
     const done2 = collectUntil(second, 'complete');
     second.advancePostseason({
@@ -1163,7 +1115,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     expect(complete?.type).toBe('complete');
     if (complete?.type !== 'complete') return;
     expect(complete.nextDecision).toBe('rotation');
-    // The first game (committed before the reload) was not replayed.
+
     expect(repo.summaries[0]?.gameId).toBe('pi-east-seven-eight');
     expect(
       repo.summaries.filter((summary) => summary.gameId === 'pi-east-seven-eight'),
@@ -1219,7 +1171,6 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     if (complete?.type !== 'complete') return;
     expect(complete.promoted).toBe(true);
 
-    // Active-run pointers removed; completed history registered.
     expect(repo.active).toBeNull();
     expect(await repo.loadActiveRunIndex()).toBeNull();
     const completed = await repo.loadCompletedSeason(eliminated.runId);
@@ -1232,7 +1183,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     expect(completed.run.completion?.championFranchiseId).toBe(
       completed.run.postseason.championFranchiseId,
     );
-    // Almanac digests reconcile exactly like the cross-track reference.
+
     const facts = {
       schemaVersion: 1 as const,
       almanacVersion: 'almanac-v1' as const,
@@ -1255,7 +1206,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     expect(completed.almanac.awardsDigest).toBe(
       seasonDigestHex(canonicalJson(completed.run.awards)),
     );
-    // The command log is dense from ordinal 0 and non-empty.
+
     expect(completed.commandLog.entries.length).toBeGreaterThan(1);
     for (let index = 0; index < completed.commandLog.entries.length; index += 1) {
       expect(completed.commandLog.entries[index]?.ordinal).toBe(index);
@@ -1263,7 +1214,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     expect(
       (await repo.listCompletedSeasonRuns()).some((entry) => entry.runId === eliminated.runId),
     ).toBe(true);
-    // Every committed postseason summary round-trips the frozen schema.
+
     for (const summary of repo.summaries) {
       expect(() => seasonPostseasonSummarySchema.parse(summary)).not.toThrow();
     }
@@ -1273,8 +1224,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     const { repo } = fixture;
     const started = await startPostseason(repo, runAtPostseasonBoundary(), fixture);
     const eliminated = await advanceUntilEliminated(repo, started, fixture);
-    // Drive the engine to completion manually (one game at a time). The
-    // whole tournament after the human's elimination can exceed 100 games.
+
     let current = eliminated;
     let guard = 0;
     while (current.stage !== 'completed' && guard < 200) {
@@ -1322,8 +1272,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     expect(almanac.championFranchiseId).toBe(current.postseason.championFranchiseId);
     expect(almanac.postseasonDigest).toBe(seasonDigestHex(canonicalJson(current.postseason)));
     expect(almanac.commandLogDigest).toBe(seasonCommandLogDigest(repo.logEntries));
-    // The run's completion almanacDigest was replaced by the real digest
-    // while the state digest was NOT recomputed (frozen reference flow).
+
     expect(repo.completed?.run.completion?.almanacDigest).toBe(almanac.digest);
     expect(repo.completed?.run.stateDigest).toBe(current.stateDigest);
     expect(await repo.loadActiveRun()).toBeNull();
@@ -1343,7 +1292,7 @@ describe('season postseason runner (M2.6 orchestration)', () => {
     expect(error?.type).toBe('error');
     if (error?.type !== 'error') return;
     expect(error.message).toContain('still has postseason decisions');
-    // Only the start command recorded; the fast-forward never committed.
+
     expect(repo.commandIds.size).toBe(1);
   });
 
@@ -1374,7 +1323,6 @@ describe('season postseason runner (M2.6 orchestration)', () => {
       await flush();
       for (let i = 0; i < 10; i += 1) await flush();
 
-      // The start request parses at the frozen wire schema.
       const worker = FakeWorker.instances[0];
       expect(worker).toBeDefined();
       const raw = worker?.posted[0];
@@ -1385,13 +1333,11 @@ describe('season postseason runner (M2.6 orchestration)', () => {
       expect(request.runId).toBe(started.runId);
       expect(request.commandId).toBe('adv-wire-1');
 
-      // Invalid / stale-family envelopes are dropped at the boundary.
       worker?.emit({ schemaVersion: 1, type: 'season-block-progress' });
       worker?.emit({ schemaVersion: 5, type: 'season-postseason-complete', requestId });
       await flush();
       expect(events.some((event) => event.type === 'progress')).toBe(false);
 
-      // A valid cancel request parses at the frozen wire schema.
       runner.cancel(requestId);
       await flush();
       const cancelRaw = worker?.posted[1];
@@ -1408,7 +1354,6 @@ describe('season postseason runner (M2.6 orchestration)', () => {
   });
 });
 
-/** Minimal worker stub (mirror of the block runner test's FakeWorker). */
 class FakeWorker {
   static instances: FakeWorker[] = [];
   posted: unknown[] = [];

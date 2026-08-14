@@ -21,13 +21,6 @@ export const CALIBRATE_THREE_POINT_OPTIONS: Record<string, boolean> = {
   output: true,
 };
 
-/**
- * `calibrate three-point` (spec/12): fits the conservative three-point
- * reconstruction artifact over the 1979-80..1983-84 cohort, checks the
- * acceptance gates, and optionally writes the versioned artifact. The
- * report payload is the summary; the artifact itself is the
- * reproducibility boundary.
- */
 export function calibrateThreePoint(args: {
   write?: boolean;
   format?: string;

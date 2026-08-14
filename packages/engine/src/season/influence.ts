@@ -7,32 +7,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { seasonTransactionEntry } from './transactions.ts';
 
-/**
- * M2.5 Influence economy (season-influence-v1, engine side). Pure functions
- * over the run-scoped Influence state: creation, block grants, objective
- * rewards, and spending. Balances always reconcile from the append-only
- * ledger; the +8 cap applies 0 with a recorded entry, the -3 floor rejects
- * spends by typed validation. Balance and debt NEVER modify gameplay.
- *
- * Ledger/transaction facts (M2.5 contract §6-§7):
- * - every grant/reward/spend appends ONE ledger entry recording
- *   requestedDelta, appliedDelta, balanceAfter, source, blockIndex,
- *   commandId, and explanation; `balanceAfter === balanceBefore +
- *   appliedDelta` always holds.
- * - block-grant ledger entries carry commandId null (no producing command);
- *   the league-wide `block-grant` transaction entry and the `objective-
- *   reward` transaction entry use deterministic synthetic commandIds
- *   (contract §6: system-generated entries use a deterministic synthetic
- *   command id; the ledger entry is the null-command record).
- * - `appliedAtStateRevision` on transaction entries defaults to
- *   `blockIndex + 1` (the revision the block commit produces in the
- *   standard pipeline); callers that know the real revision pass it.
- */
-
-/**
- * Initial run-creation state: every franchise at +2 with its recorded
- * initial-grant ledger entry (blockIndex/commandId null).
- */
 export function createInitialSeasonInfluenceState(
   franchiseIds: readonly string[],
 ): SeasonInfluenceState {
@@ -68,14 +42,9 @@ export interface SeasonBlockInfluenceGrantInput {
   influence: SeasonInfluenceState;
   blockIndex: number;
   humanFranchiseId: string | null;
-  /** Objective success (null when no objective was locked). */
+
   objectiveSuccess: boolean | null;
-  /**
-   * The run stateRevision these entries apply at. Optional: defaults to the
-   * blockIndex-derived value `blockIndex + 1` (the revision the standard
-   * block pipeline produces for block `blockIndex`); the block pipeline
-   * passes the real post-block revision when it knows it.
-   */
+
   appliedAtStateRevision?: number;
 }
 
@@ -84,15 +53,6 @@ export interface SeasonBlockInfluenceGrantOutput {
   entries: SeasonTransactionEntry[];
 }
 
-/**
- * Applies the accepted-block economy (M2.5 contract §7): +1 block grant for
- * ALL 30 franchises with cap-apply (a grant at the +8 cap applies 0 and
- * records `appliedDelta: 0` with the `cap-reached` explanation), and +1
- * objective reward for the human franchise when the locked objective
- * succeeded (also cap-applied). Every grant appends one ledger entry; the
- * function returns the new influence state plus the transaction entries
- * (one league-wide `block-grant`, plus one `objective-reward` on success).
- */
 export function applySeasonBlockInfluenceGrants(
   input: SeasonBlockInfluenceGrantInput,
 ): SeasonBlockInfluenceGrantOutput {
@@ -181,25 +141,23 @@ export function applySeasonBlockInfluenceGrants(
   };
 }
 
-/** Spend input shared by the typed command handler and the AI window logic. */
 export interface SeasonInfluenceSpendInput {
   influence: SeasonInfluenceState;
   franchiseId: string;
   source: 'extra-trade-offer' | 'risky-rehab';
-  /** Negative (the cost the purpose charges). */
+
   requestedDelta: number;
   blockIndex: number | null;
   commandId: string | null;
   explanation: string;
-  /** Track the extra-trade-offer window spend (purpose extra-trade-offer). */
+
   windowIndex?: number;
-  /** Track the risky-rehab spend per injury (purpose risky-rehab). */
+
   injuryId?: string;
-  /** The seeded rehab outcome to record on the rehabs entry. */
+
   rehabOutcome?: 'success' | 'failure' | 'pending';
 }
 
-/** Typed floor rejection for a spend that would cross the -3 floor. */
 export class SeasonInfluenceFloorError extends Error {
   readonly code = 'insufficient-balance' as const;
   readonly franchiseId: string;
@@ -219,16 +177,6 @@ export class SeasonInfluenceFloorError extends Error {
   }
 }
 
-/**
- * Applies one Influence spend with the -3 floor enforced by validation
- * (LEAD DECISION: never a silent clamp). Rejects by throwing
- * `SeasonInfluenceFloorError` when `balance + requestedDelta < -3`; the
- * typed command handler pre-validates and returns the `insufficient-balance`
- * rejection, and callers must treat the throw as an invariant. Appends one
- * ledger entry recording requested/applied delta and the balance after, and
- * tracks the spend on the influence state (`windows` for extra-trade-offer,
- * `rehabs` for risky-rehab).
- */
 export function applySeasonInfluenceSpend(input: SeasonInfluenceSpendInput): {
   influence: SeasonInfluenceState;
   entry: SeasonInfluenceLedgerEntry;
@@ -278,5 +226,4 @@ export function applySeasonInfluenceSpend(input: SeasonInfluenceSpendInput): {
   return { influence: { ...influence, balances, ledger, windows, rehabs }, entry };
 }
 
-/** Cap + floor freeze (schema constants, re-exported for the CLI gates). */
 export { SEASON_INFLUENCE_CAP, SEASON_INFLUENCE_FLOOR };

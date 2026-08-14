@@ -21,27 +21,13 @@
     openFreeAgencyWindowOf,
     validateDeclaration,
   } from '$lib/components/season/free-agency/free-agency-view';
-  import { initialsOf, type SeasonFaceRef } from '$lib/season/season-branding';
-  import { candidateOf, overallRatingOf } from '$lib/season/season-catalog-index';
+  import { overallRatingOf } from '$lib/season/season-catalog-index';
+  import { mergeFreeAgencyFaces } from '$lib/season/season-branding';
   import { describeCommandRejection } from '$lib/season/season-hub-state';
   import {
     SEASON_RUN_SHELL_CONTEXT,
     type SeasonRunShellData,
   } from '$lib/season/season-shell-context';
-
-  /**
-   * Season Run Free Agency tab (M2.6.5, spec/2.0/15): the open market's
-   * up-to-12 candidate cards, the declaration step (up to two ordered
-   * targets with role expectation + Influence commitment, or a skip), the
-   * review + resolve step, and the read-only resolved history (signings and
-   * categorical traces). Every decision is a typed command through the
-   * shell; the persisted snapshot is the single source of truth, so a
-   * reload between declaration and resolution restores the recorded
-   * declaration from the shell mirror.
-   *
-   * State machine per window: open + no declaration -> declare/skip;
-   * open + declaration -> review + resolve; resolved -> read-only.
-   */
 
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
@@ -66,15 +52,12 @@
       : (freeAgency.signingCounts[humanFranchiseId] ?? 0),
   );
 
-  /** Local, unsubmitted declaration edits. Cleared on reload; the persisted
-   * declaration (window.declarations) is the authoritative record. */
   let draft = $state<
     Record<string, { priority: 1 | 2; role: SeasonFreeAgencyRoleExpectation; influence: number }>
   >({});
 
   let submitting = $state(false);
 
-  /** The window the human resolved this session (once-per-render announce). */
   let resolvedThisSession = $state<number | null>(null);
 
   const candidateById = $derived(
@@ -123,7 +106,6 @@
     draft = assignPriority(playerVersionId, priority);
   }
 
-  /** Click-to-target: first pick is first priority, second pick is second. */
   function toggleTarget(playerVersionId: string) {
     if (submitting) return;
     if (draft[playerVersionId] !== undefined) {
@@ -178,34 +160,11 @@
 
   const activeRotationIds = $derived(shell.editor?.activeMemberIds() ?? []);
 
-  /**
-   * Headshot ref for a market candidate, resolved from the packaged catalog
-   * (the candidate card's `catalogRef` points at it). Best-effort: cards
-   * render initials without a doomed network request when the catalog is
-   * missing or the join fails.
-   */
-  function freeAgencyFaceOf(candidate: SeasonFreeAgencyCandidate): SeasonFaceRef | null {
-    const catalogCandidate = candidateOf(shell.catalog, candidate.playerVersionId);
-    if (catalogCandidate === null) return null;
-    return {
-      playerId: catalogCandidate.playerId,
-      playerExternalId: catalogCandidate.playerExternalId,
-      altIds: null,
-      initials: initialsOf(catalogCandidate.displayName),
-    };
-  }
-
   const manifest = $derived(shell.manifest);
-
-  /** Headshot refs for the open window's candidates (version-id keyed). */
-  const candidateFaceByVersion = $derived(
-    new Map<string, SeasonFaceRef>(
-      (openWindow?.candidates ?? []).flatMap((candidate) => {
-        const face = freeAgencyFaceOf(candidate);
-        return face === null ? [] : [[candidate.playerVersionId, face] as const];
-      }),
-    ),
+  const marketFaces = $derived.by(() =>
+    mergeFreeAgencyFaces(shell.playersIndex, shell.catalog, shell.freeAgency, shell.facesByVersion),
   );
+  const faceOf = (playerVersionId: string) => marketFaces.get(playerVersionId) ?? null;
 
   const cards: FreeAgencyCardView[] = $derived.by(() => {
     const window = openWindow;
@@ -232,7 +191,7 @@
         priority: (entry?.priority ?? 0) as 0 | 1 | 2,
         role: entry?.role ?? null,
         influence: entry?.influence ?? null,
-        face: candidateFaceByVersion.get(candidate.playerVersionId) ?? null,
+        face: faceOf(candidate.playerVersionId),
         overallRating: overallRatingOf(shell.catalog, candidate.playerVersionId),
       };
     });
@@ -246,7 +205,6 @@
     openWindow !== null && declaration === null && humanFranchiseId !== null,
   );
 
-  /** The last rejected free-agency command, with the authoritative copy. */
   const freeAgencyCommandError = $derived.by(() => {
     const error = shell.commandError;
     if (error === null) return null;
@@ -433,7 +391,7 @@
               {declaration}
               candidates={openWindow.candidates}
               {manifest}
-              faceOf={(playerVersionId) => candidateFaceByVersion.get(playerVersionId) ?? null}
+              {faceOf}
               overallOf={(playerVersionId) => overallRatingOf(shell.catalog, playerVersionId)}
               busy={submitting}
               onSubmit={() => void resolveMarket()}
@@ -461,7 +419,7 @@
             {manifest}
             franchiseName={shell.franchiseName}
             playerName={shell.playerName}
-            faceOf={(playerVersionId) => shell.facesByVersion.get(playerVersionId) ?? null}
+            {faceOf}
             {signingCount}
             {seasonSpend}
             resolvedInThisSession={resolvedThisSession === window.windowIndex}

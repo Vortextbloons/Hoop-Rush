@@ -109,10 +109,10 @@ describe('anchorsForPlayer', () => {
     expect(anchors.minutesPerGame).toBe(37.5);
     expect(anchors.pointsPerGame).toBe(15);
     expect(anchors.reboundsPerGame).toBe(6.25);
-    // Split known: offensiveRebounds 100 / 80 games.
+
     expect(anchors.offensiveReboundsPerGame).toBe(1.25);
     expect(anchors.defensiveReboundsPerGame).toBe(5);
-    // shrunk_ratio(450, 950, 0.45, 80) = (450 + 36) / (950 + 80).
+
     expect(anchors.fieldGoalPct).toBeCloseTo(486 / 1030, 10);
     expect(anchors.threePointPct).toBeCloseTo((60 + 0.34 * 80) / (180 + 80), 10);
     expect(anchors.freeThrowPct).toBeCloseTo((240 + 0.75 * 80) / (320 + 80), 10);
@@ -126,7 +126,7 @@ describe('anchorsForPlayer', () => {
       stats: { ...poolPlayer({}).stats, offensiveRebounds: 0, defensiveRebounds: null },
     });
     const anchors = anchorsForPlayer(p);
-    // C fallback share is 0.28; 500 * 0.28 = 140 (Math.round of 140.0).
+
     expect(anchors.offensiveReboundsPerGame).toBe(140 / 80);
     expect(anchors.defensiveReboundsPerGame).toBe((500 - 140) / 80);
   });
@@ -142,7 +142,7 @@ describe('anchorsForPlayer', () => {
       },
     });
     const anchors = anchorsForPlayer(p);
-    // F fallback share is 0.22; 400 * 0.22 = 88.
+
     expect(anchors.offensiveReboundsPerGame).toBe(88 / 80);
     expect(anchors.defensiveReboundsPerGame).toBe((400 - 88) / 80);
   });
@@ -199,7 +199,6 @@ describe('buildOpponentArtifact', () => {
       expect(artifact.players[i]?.positions).toEqual(artifact.lineup.assignments[i]?.positions);
     }
 
-    // The whole artifact is covered by the packaged OpponentTeam schema.
     expect(() => parseOpponentTeam(artifact)).not.toThrow();
   });
 

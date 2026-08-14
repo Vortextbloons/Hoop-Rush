@@ -30,15 +30,6 @@ import { lineupForTeam } from './challenge.ts';
 import { loadPackagedData, PackagedData, loadProfileFile } from './data-loader.ts';
 import { parseCount } from '../args.ts';
 
-/**
- * `calibrate run` and `calibrate sensitivity` (spec/09, spec/06). Calibration
- * uses the authoritative engine and the packaged data; the era profile holds
- * the frozen targets and tolerances that these commands enforce. `calibrate
- * run` additionally remeasures every bracket opponent against the fixed
- * benchmark matrix and reports the observed bracket distribution plus the
- * informational 82-0 completion rate.
- */
-
 export const CALIBRATE_OPTIONS: Record<string, boolean> = {
   samples: true,
   'seed-from': true,
@@ -48,15 +39,12 @@ export const CALIBRATE_OPTIONS: Record<string, boolean> = {
   era: true,
   'challenge-samples': true,
   'opponent-games': true,
-  // Dev convenience: report undersampled gates as skipped without failing.
-  // Release calibration (the default, without this flag) fails on any
-  // skipped required gate.
+
   'allow-skipped': false,
   format: true,
   verbose: false,
 };
 
-/** Builds a league-average team from the packaged pool (usage-weighted means). */
 export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
   const usage = pool.players.map((p) => Math.max(0.01, p.tendencies.usageRate));
   const totalUsage = usage.reduce((a, b) => a + b, 0);
@@ -92,12 +80,6 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
     tendencies[key] = meanTendencies[key] ?? tendencies[key];
   }
 
-  // Pre-1979 pools are entirely reconstructed: the synthetic average player
-  // carries the usage-weighted conservative profile and the null
-  // three-point anchors, so era calibration measures the translated volume
-  // instead of the anchor-less tendency fallback. Mixed and observed-era
-  // pools keep the legacy synthetic form (no anchors) so frozen targets
-  // remain meaningful.
   const reconstructedPlayers = pool.players.filter((p) => p.reconstructedThreePoint !== undefined);
   const allReconstructed = reconstructedPlayers.length === pool.players.length;
   let averageProfile: SimulationPlayer['reconstructedThreePoint'] | undefined;
@@ -169,15 +151,6 @@ export function leagueAverageTeam(pool: FranchiseEraPool): SimulationTeam {
   };
 }
 
-/** Strong and weaker legal lineups from the pool by selection score.
- * Selection is slot-greedy: for each PG/SG/SF/PF/C requirement, take the best
- * remaining eligible player in the candidate band, so the result is always legal.
- *
- * Bands are upper-quintile vs mid-pack rather than absolute best-vs-worst.
- * Ratings-v3.1 widens the pool ceiling/floor enough that absolute extremes
- * win ~99% of games and fail the frozen strongVsWeakWinRate target
- * (0.88 ± 0.07). Elite-vs-mid still shows clear talent separation inside that gate.
- */
 export function poolStrengthLineups(pool: FranchiseEraPool): {
   strong: SimulationTeam;
   weak: SimulationTeam;
@@ -222,7 +195,7 @@ export function poolStrengthLineups(pool: FranchiseEraPool): {
     return { strong: pick(strongBand), weak: pick(weakBand) };
   } catch (error) {
     if (!(error instanceof UsageError)) throw error;
-    // Sparse position coverage in a band: fall back to full-pool extremes.
+
     return { strong: pick(byScoreDesc), weak: pick([...byScoreDesc].reverse()) };
   }
 }
@@ -271,7 +244,6 @@ function newAccumulator(): MetricAccumulator {
   };
 }
 
-/** Runs one game and folds its home side into the accumulator. */
 function accumulate(
   acc: MetricAccumulator,
   input: GameSimulationInput,
@@ -325,10 +297,6 @@ export function calibrateRun(args: {
     ? loadProfileFile(args.profile)
     : data.eraProfile(args.era ?? DEFAULT_ERA_ID);
 
-  // The calibration fixtures must match the era under test: the harness
-  // builds its league-average and strong/weak lineups from the packaged
-  // pool for the profile's own era, so era comparisons measure the era, not
-  // a hardcoded 1990s pool.
   const pool = data.pool('lakers', profile.eraId);
   const average = leagueAverageTeam(pool);
   const { strong, weak } = poolStrengthLineups(pool);
@@ -360,12 +328,10 @@ export function calibrateRun(args: {
       away: weak,
     };
     invariantFailures += accumulate(equalAcc, equalInput, true);
-    // equalInput and swInput share the seed; accumulate already simulates
-    // swInput and tracks the strong-side home win, so it is not run again.
+
     invariantFailures += accumulate(strongWeakAcc, swInput, true);
   }
 
-  // Opening opponent vs a strong user lineup (informational difficulty probe).
   const openingOpponent = bracket.opponents.find(
     (o) => o.opponentId === `lakers-${profile.eraId}-opening`,
   );
@@ -393,7 +359,6 @@ export function calibrateRun(args: {
     openingWinRateVsStrongUser = games === 0 ? null : 1 - wins / games;
   }
 
-  // Remeasure every bracket opponent against the fixed benchmark matrix.
   const bracketDistribution: Array<{
     opponentId: string;
     recordedWinRate: number;
@@ -420,7 +385,6 @@ export function calibrateRun(args: {
   const observedRates = bracketDistribution.map((d) => d.observedWinRate).sort((a, b) => a - b);
   const medianObserved = observedRates[Math.floor(observedRates.length / 2)] ?? null;
 
-  // Informational 82-0 completion probe: complete 82-game runs vs the bracket.
   const userLineup = lineupForTeam(strong);
   const samplePlayer = pool.players[0];
   let perfectRuns = 0;
@@ -515,10 +479,7 @@ function buildMetrics(
   profile: EraSimulationProfile,
 ): Array<z.infer<typeof calibrationMetricSchema>> {
   const t = profile.targets;
-  // The accumulator folds the home side of every equal-fixture game once,
-  // so per-game metrics divide by n (one team line per game). Possession
-  // denominators use the standard league estimate FGA + 0.44*FTA - OReb + TOV
-  // so efficiency gates compare with the stint-derived targets directly.
+
   const perGame = (value: number) => value / n;
   const fga = Math.max(1, equal.fga);
   const possEst = Math.max(1, equal.fga + 0.44 * equal.fta - equal.oreb + equal.tov);
@@ -570,9 +531,6 @@ function metric(
   target: { value: number; tolerance: number; minimumSample: number },
   sample: number,
 ): z.infer<typeof calibrationMetricSchema> {
-  // Gates below their minimum sample are not evaluated and are reported as
-  // skipped, never as a vacuous pass. `calibrate run` fails unless every
-  // required gate was sampled (or --allow-skipped is given).
   if (sample < target.minimumSample) {
     return {
       key,
@@ -613,13 +571,6 @@ interface RoleAccumulator {
   opponentMisses: number;
 }
 
-/**
- * Player-role gates (spec/06): measures the `roles` fixture (creator,
- * spacer, secondary, post, rim runner) and compares per-slot usage,
- * three-point rate, free-throw rate, assist conversion, and rebound
- * percentages against the frozen era targets. Vacuous (no metrics) when the
- * profile has not frozen role targets yet.
- */
 function buildRoleMetrics(
   samples: number,
   profile: EraSimulationProfile,
@@ -695,10 +646,7 @@ const SENSITIVITY_FAMILIES: Array<{
   { id: 'sens-creation', direction: 'initiator usage share up', pass: (b, c) => c > b * 1.05 },
   { id: 'sens-passing', direction: 'assists up', pass: (b, c) => c > b * 1.02 },
   { id: 'sens-turnovers', direction: 'turnovers down', pass: (b, c) => c < b * 0.97 },
-  // m3-engine-v5 zero-centered the contest: an average defender no longer
-  // carries an implicit penalty, so a +15 two-rating bump reduces opponent
-  // points by ~2.5-3.5% instead of stacking on the old baseline penalty
-  // (~4.5-5%). The gate keeps defense measurably meaningful.
+
   { id: 'sens-defense', direction: 'opponent points down', pass: (b, c) => c < b * 0.975 },
   { id: 'sens-rebounding', direction: 'offensive rebounds up', pass: (b, c) => c > b * 1.03 },
   { id: 'sens-fouls', direction: 'free throws attempted up', pass: (b, c) => c > b * 1.02 },

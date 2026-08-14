@@ -1,14 +1,3 @@
-/**
- * Authors the first permanent bracket entry: the medium-strength 1990s Lakers
- * opening opponent (Van Exel, Threatt, A.C. Green, Horry, Divac in legal
- * G,G,F,F,C assignments). Port of scripts/import-nba/author_opening_opponent.py.
- *
- * M3 includes this artifact unchanged in the full bracket. Player records are
- * converted to the explicit SimulationPlayer contract; summary Overall ratings
- * never enter the engine.
- *
- * Output: `apps/web/static/data/opponents/lakers-1990s-opening.json`
- */
 import { parseOpponentTeam, REQUIRED_RATING_KEYS } from '@hoop-rush/data-contracts';
 import { playableSlotGroups, type Position } from '@hoop-rush/data-contracts';
 import { join } from 'node:path';
@@ -64,7 +53,7 @@ export interface PoolPlayer {
   positions: { playable: string[] };
   detailedRatings: Record<string, number>;
   tendencies: Record<string, number>;
-  /** Stint-derived stat totals; the anchor derivation treats null like Python's None. */
+
   stats: Record<string, number | null>;
 }
 
@@ -163,7 +152,6 @@ export function ratio(numerator: number, denominator: number, fallback: number):
   return denominator > 0 ? numerator / denominator : fallback;
 }
 
-/** Ratio shrunk toward a prior for low sample sizes (Python's shrunk anchors). */
 export function shrunkRatio(
   numerator: number,
   denominator: number,
@@ -175,14 +163,12 @@ export function shrunkRatio(
     : prior;
 }
 
-/** Observed player-season anchors used by the possession engine, shrunk for
- * low sample sizes (mirrors the Python `anchors_for_player`). */
 export function anchorsForPlayer(player: PoolPlayer): PlayerAnchors {
   const stats = player.stats;
   const games = Math.max(1, stats['gamesPlayed'] ?? 0);
   const slotGroups = playableSlotGroups(player.positions.playable as Position[]);
   const fallbackShare = slotGroups.includes('C') ? 0.28 : slotGroups.includes('F') ? 0.22 : 0.15;
-  // Mirror `x is not None`: JSON null and missing keys both disable the split.
+
   const offensiveKnown =
     stats['offensiveRebounds'] !== null && stats['offensiveRebounds'] !== undefined;
   const defensiveKnown =
@@ -238,7 +224,6 @@ export function anchorsForPlayer(player: PoolPlayer): PlayerAnchors {
   };
 }
 
-/** Build the full opponent artifact from a packaged pool (pure; exposed for tests). */
 export function buildOpponentArtifact(pool: { players: PoolPlayer[] }): OpponentArtifact {
   const byId = new Map(pool.players.map((p) => [p.playerId, p]));
   const missing = LINEUP.map((entry) => entry.playerId).filter((id) => !byId.has(id));
@@ -257,8 +242,6 @@ export function buildOpponentArtifact(pool: { players: PoolPlayer[] }): Opponent
       positions: playable,
     });
 
-    // Python: ratings clamp(round(v), 0, 100); tendencies clamp(v, 0, 100)
-    // (pool tendencies are already rounded to two decimals at pool build time).
     const ratings = {} as SimPlayerRatings;
     for (const key of RATING_KEYS) {
       ratings[key] = clamp(Math.round(p.detailedRatings[key] ?? 50), 0, 100);
@@ -297,14 +280,10 @@ export function run(options?: { poolPath?: string; outPath?: string }): void {
   const poolPath = options?.poolPath ?? POOL_PATH;
   const pool = readJson(poolPath) as { players: PoolPlayer[] };
   const artifact = buildOpponentArtifact(pool);
-  // The artifact is a whole OpponentTeam file: the packaged schema covers it
-  // (lineup legality, strict ratings/tendencies key sets, five players), so
-  // validate before writing.
+
   parseOpponentTeam(artifact);
   const out = options?.outPath ?? join(OPPONENTS_DIR, `${OPPONENT_ID}.json`);
-  // Dev servers, sync clients, and antivirus scanners can briefly hold this
-  // packaged artifact open on Windows. Use the import pipeline's bounded
-  // retry writer instead of failing the entire rebuild on a transient lock.
+
   writeJsonRetry(out, artifact, true);
   for (const player of artifact.players) {
     console.log(

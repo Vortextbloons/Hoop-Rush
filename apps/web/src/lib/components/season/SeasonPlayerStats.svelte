@@ -9,12 +9,6 @@
   } from '$lib/season/season-player-stats-view';
   import type { SeasonRunShellData } from '$lib/season/season-shell-context';
 
-  /**
-   * Season Run player stats section (Team tab): the human team's ten players
-   * with totals or per-game rates plus shooting percentages, folded from
-   * accepted game summaries. Sort state lives here (default PPG desc).
-   */
-
   let {
     view,
     manifest,
@@ -24,7 +18,7 @@
     view: SeasonPlayerStatsView;
     manifest: HoopRushManifest;
     shell: SeasonRunShellData;
-    /** When true, the parent panel owns the section heading. */
+
     embedded?: boolean;
   } = $props();
 

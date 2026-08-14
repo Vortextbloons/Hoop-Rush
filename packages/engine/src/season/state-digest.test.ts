@@ -2,13 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { seasonRunStateDigest, type SeasonRunStateDigestFacts } from './state-digest.ts';
 import { buildTestRun, pipelineInput } from './block-test-support.ts';
 
-/**
- * M2.5 run-state digest properties (spec/2.0/07, state-digest contract):
- * the canonical digest is a pure function of the recorded facts — array
- * order never matters, every single fact change changes the digest, and the
- * stored `stateDigest` field is excluded from its own computation.
- */
-
 function baseFacts(): SeasonRunStateDigestFacts {
   const { run, catalog } = buildTestRun();
   const input = pipelineInput(run, catalog, 0);
@@ -303,9 +296,7 @@ describe('seasonRunStateDigest', () => {
       rotations: snapshot.rotations,
       effects: baseFacts().effects,
     });
-    // Two snapshots identical except for the stored stateDigest (e.g. a
-    // stale or tampered chain field) recompute to the same digest, because
-    // the digest is a function of the recorded facts, not of itself.
+
     const tampered = { ...run, stateDigest: 'f'.repeat(32) };
     expect(seasonRunStateDigest(factsOfRun(run))).toBe(seasonRunStateDigest(factsOfRun(tampered)));
   });

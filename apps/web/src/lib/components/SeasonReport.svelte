@@ -21,14 +21,6 @@
   import { oneDecimal, percentOneDecimal } from '$lib/format';
   import { SLOT_LABELS } from '$lib/player-positions';
 
-  /**
-   * Challenge result (spec/08): final record and 82-0 outcome with a League
-   * MVP spotlight, the full game strip, aggregate shooting, turnover,
-   * rebound, free-throw, and possession facts, and the user's five-player
-   * season table. Shared by Sandbox and Classic; the owning route keeps the
-   * page header, data loading, and the mode-specific Run again navigation.
-   */
-
   type PeakPlayer = PeakPlayerSeason;
 
   let {
@@ -45,14 +37,14 @@
     manifest: HoopRushManifest | null;
     run: ChallengeRun;
     byId: Map<string, PeakPlayerSeason> | null;
-    /** Global players-index entries by playerId, used for MVP headshots. */
+
     indexById: Map<string, PlayersIndexEntry> | null;
     modeLabel: string;
     running: boolean;
     onRunAgain: () => void;
-    /** Sandbox only: simulate the same lineup again with a fresh seed. */
+
     onRetrySameTeam?: (() => void) | null;
-    /** Sandbox only: return to the draft with this lineup pre-filled. */
+
     editTeamHref?: SandboxHref | null;
   } = $props();
 
@@ -67,10 +59,8 @@
   const aggregates = $derived(run.aggregates ?? null);
   const record = $derived(aggregates?.team ?? null);
 
-  /** League MVP across every home and away appearance of the run's games. */
   const mvp = $derived(run.games.length > 0 ? leagueMvp(run) : null);
 
-  /** Headshot record for the MVP: pool record, then global index, then initials. */
   const mvpFace = $derived.by(() => {
     const current = mvp;
     if (!current) return null;
@@ -83,7 +73,6 @@
     } satisfies Pick<PeakPlayerSeason, 'playerId' | 'playerExternalId' | 'altIds'>;
   });
 
-  /** The user's five in slot order with their packaged names. */
   const seasonTable = $derived.by(() => {
     if (!byId) {
       return [] as Array<{ player: PeakPlayer; aggregate: PlayerSeasonAggregate }>;
@@ -150,7 +139,7 @@
         );
         const playerName = seasonTable.find((row) => row.aggregate.playerId === player?.playerId)
           ?.player.displayName;
-        // Usage is the recorded diagnostic FGA + 0.44*FTA + TOV, not points.
+
         return player
           ? `${playerName ?? player.playerId} consumed ${Math.round(Number(evidence.usageShare) * 100)}% of ${team}'s estimated usage (${String(evidence.playerUsage)} of ${String(evidence.teamUsage)}).`
           : `${team} concentrated ${Math.round(Number(evidence.usageShare) * 100)}% of estimated usage in one player.`;
@@ -197,13 +186,11 @@
     return percentOneDecimal(rate);
   }
 
-  /** True shooting percentage from exact season totals: PTS / (2*(FGA + 0.44*FTA)). */
   function trueShootingPct(points: number, fga: number, fta: number): string {
     const denominator = 2 * (fga + 0.44 * fta);
     return denominator <= 0 ? '—' : percentOneDecimal(points / denominator);
   }
 
-  /** Usage percentage: the player's possession estimate share of the team's. */
   function usagePct(raw: PlayerSeasonAggregate, team: RunAggregates['team']): string {
     const possessionEstimate = (p: {
       fieldGoals: MadeAttempted;

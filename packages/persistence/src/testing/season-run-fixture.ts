@@ -99,34 +99,14 @@ import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { SEASON_RUN_RECORD_ID, type StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/season-draft-record.ts';
 
-/**
- * Synthetic-but-schema-valid Season Run fixtures for the persistence tests
- * and the `benchmarkSeasonRunPersistence` harness (spec/2.0/10 M2.3, M2.4,
- * M2.5, M2.6.5). The builders stay in the persistence package because the
- * benchmark harness is production code and `@hoop-rush/test-fixtures` is a
- * devDependency; the leaf shapes bind the canonical data-contracts builders
- * where outputs are identical, and everything else derives deterministically
- * from integer arithmetic — no Math.random, no clocks — with fold helpers
- * mirroring the documented engine semantics, so the reload reconciliation
- * audit passes with either the production engine seam or the stub seam.
- * Fixture runs are schema-10 (M2.6.5) with the M2.5 mutable run state, the
- * v2 rotation-scoped effects state, the empty free-agency state, and the
- * REAL state digest computed through the engine's canonical
- * `seasonRunStateDigest`.
- */
-
-/** Accepted 30-franchise alignment; conference/division follow league-v1
- * (canonical constant in `@hoop-rush/data-contracts`). */
 const ALIGNMENT = SEASON_ALIGNMENT;
 
 const FRANCHISE_ORDER = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);
 
-/** Deterministic 32-hex seed from any string (canonical data-contracts primitive). */
 export function fixtureSeedFromString(value: string): string {
   return seedFromString(value);
 }
 
-/** The frozen league manifest: 30 teams, one human franchise (default lakers). */
 export function buildFixtureLeague(humanFranchiseId = 'lakers'): SeasonLeague {
   return {
     schemaVersion: 1,
@@ -140,17 +120,10 @@ export function buildFixtureLeague(humanFranchiseId = 'lakers'): SeasonLeague {
   };
 }
 
-/** M2.5 empty health state: no injury records yet (canonical binding). */
 export function buildFixtureHealthState(): SeasonHealthState {
   return seasonHealthStateSchema.parse(buildEmptyHealth());
 }
 
-/**
- * M2.6.5 initial free-agency state for the fixture league: no windows, no
- * canonical candidates, every franchise at zero season signings and zero
- * season spend. Built locally (data-contracts does not export its fixture
- * `buildEmptyFreeAgency` through the package entry; the shape is frozen).
- */
 export function buildFixtureFreeAgencyState(): SeasonRun['freeAgency'] {
   return seasonFreeAgencyStateSchema.parse({
     schemaVersion: 1,
@@ -162,10 +135,6 @@ export function buildFixtureFreeAgencyState(): SeasonRun['freeAgency'] {
   });
 }
 
-/**
- * M2.5 initial Influence state for the fixture league: every franchise at +2
- * with its recorded `initial-grant` ledger entry, no windows, no rehabs.
- */
 export function buildFixtureInfluenceState(league: SeasonLeague): SeasonInfluenceState {
   const balances: Record<string, number> = {};
   const ledger: SeasonInfluenceState['ledger'] = [];
@@ -195,7 +164,6 @@ export function buildFixtureInfluenceState(league: SeasonLeague): SeasonInfluenc
   };
 }
 
-/** M2.5 initial objective state: the fixed six-entry catalog, no selections. */
 export function buildFixtureObjectiveState(): SeasonObjectiveState {
   return seasonObjectiveStateSchema.parse({
     schemaVersion: 1,
@@ -205,11 +173,6 @@ export function buildFixtureObjectiveState(): SeasonObjectiveState {
   });
 }
 
-/**
- * Deterministic schema-valid 1,230-game schedule: each round pairs consecutive
- * franchise pairs, home/away flips every round, every team plays exactly once
- * per round. Identity and round coverage are what the contract cares about.
- */
 export function buildFixtureSchedule(seed: string): SeasonSchedule {
   const offset = fnv1a32(`schedule-${seed}`) % 30;
   const games = [];
@@ -247,7 +210,6 @@ export function buildFixtureSchedule(seed: string): SeasonSchedule {
   };
 }
 
-/** Deterministic ten-player rosters with unique derived player-version ids. */
 export function buildFixtureRosters(league: SeasonLeague): SeasonRoster[] {
   return league.teams.map((team) => ({
     franchiseId: team.franchiseId,
@@ -265,13 +227,6 @@ export function buildFixtureRosters(league: SeasonLeague): SeasonRoster[] {
   }));
 }
 
-/**
- * Deterministic M2.4 effects state for an arbitrary roster set: one load
- * state per rostered version and the canonical a<b pairs per roster, all
- * zero by default. Pass `options` to raise values uniformly (the benchmark
- * folds monotonically increasing values across blocks). Exported for other
- * lanes' tests.
- */
 export function buildFixtureEffectsState(
   rosters: readonly SeasonRoster[],
   options: {
@@ -317,24 +272,18 @@ export function buildFixtureEffectsState(
   });
 }
 
-/** Sorted unique player-version ids across every roster (stub seam helper). */
 export function fixtureRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[] {
   return [
     ...new Set(rosters.flatMap((roster) => roster.players.map((player) => player.playerVersionId))),
   ].sort();
 }
 
-/**
- * Sorted unique player-version ids across every locked rotation (stub seam
- * helper): the 300 ACTIVE members of the v2 effects state.
- */
 export function fixtureRotationPlayerVersionIds(rotations: readonly SeasonRotation[]): string[] {
   return [
     ...new Set(rotations.flatMap((rotation) => [...rotation.starters, ...rotation.benchOrder])),
   ].sort();
 }
 
-/** Canonical 'a\u0000b' pair key with a < b (stub seam helper). */
 export function fixtureSeasonPairKey(a: string, b: string): string {
   return a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
 }
@@ -386,12 +335,6 @@ function fixtureAiAssignments(league: SeasonLeague): SeasonAiAssignment[] {
   }));
 }
 
-/**
- * Synthetic roster-generation-v2 pools for fixture runs: one 20-player pool
- * per AI franchise (29 pools; the human franchise gets none). Pool versions
- * are synthetic and never appear on rosters; the block pipeline consumes
- * final rosters only, so these are recorded facts.
- */
 function fixtureAiPools(league: SeasonLeague): SeasonRun['aiPools'] {
   return league.teams
     .filter((team) => team.control === 'ai')
@@ -448,7 +391,6 @@ function scheduledGames(schedule: SeasonSchedule): SeasonGame[] {
   }));
 }
 
-/** Complete schema-v4 Season Run fixture with all 1,230 scheduled games. */
 export function buildFixtureRun(input: {
   seed?: string;
   humanFranchiseId?: string;
@@ -592,7 +534,7 @@ export function buildFixtureRun(input: {
       ],
       overallReport: null,
     })),
-    // M2.5 mutable run state: promotion-time initial values.
+
     trade: null,
     freeAgency: buildFixtureFreeAgencyState(),
     objectives: buildFixtureObjectiveState(),
@@ -603,9 +545,7 @@ export function buildFixtureRun(input: {
     stateRevision: 0,
     stateDigest: '0'.repeat(32),
   };
-  // M2.5: the run's stateDigest is the REAL canonical digest over the
-  // initial mutable facts (the reload audit recomputes it through the seam),
-  // so fixture runs pass promotion and reload exactly.
+
   return seasonRunSchema.parse({
     ...run,
     stateDigest: seasonRunStateDigestFixture({
@@ -629,8 +569,6 @@ export function buildFixtureRun(input: {
   });
 }
 
-/** M2.5 canonical state digest for fixture runs: binds the engine's authoritative
- * `seasonRunStateDigest` so fixture, stub-seam, and production-seam digests agree. */
 export function seasonRunStateDigestFixture(facts: SeasonRunStateDigestFacts): string {
   return seasonRunStateDigest(facts);
 }
@@ -661,7 +599,6 @@ function zeroStandings(league: SeasonLeague): SeasonStandings {
   };
 }
 
-/** One deterministic compact player line for the given version and seed. */
 function fixturePlayerLine(
   playerVersionIdValue: string,
   seedKey: string,
@@ -723,11 +660,6 @@ function boxOfLines(
   };
 }
 
-/**
- * Deterministic compact summaries for the rounds of one block. Player lines
- * come from the rosters of both franchises, so the fold helpers always
- * reconcile. The home side receives a small scoring edge so no ties occur.
- */
 export function buildFixtureSummaries(input: {
   runId: string;
   schedule: SeasonSchedule;
@@ -779,7 +711,6 @@ export function buildFixtureSummaries(input: {
   return summaries;
 }
 
-/** Full synthetic dataset: summaries for the entire 1,230-game season. */
 export function buildFixtureFullSeasonSummaries(input: {
   runId: string;
   schedule: SeasonSchedule;
@@ -794,7 +725,6 @@ export function buildFixtureFullSeasonSummaries(input: {
   });
 }
 
-/** Reconstructs the full 1,230-game array from the schedule and summaries. */
 export function reconstructSeasonGamesFixture(
   schedule: SeasonSchedule,
   summaries: readonly SeasonGameSummary[],
@@ -839,7 +769,6 @@ export function reconstructSeasonGamesFixture(
   });
 }
 
-/** Winner franchise of a completed summary (scores are never tied). */
 function winnerOf(summary: SeasonGameSummary): string {
   if (summary.status === 'forfeit') {
     const loser = summary.forfeitLoserFranchiseId;
@@ -851,11 +780,6 @@ function winnerOf(summary: SeasonGameSummary): string {
   return summary.homeScore > summary.awayScore ? summary.homeFranchiseId : summary.awayFranchiseId;
 }
 
-/**
- * Team aggregate fold over compact summaries (mirrors the documented engine
- * semantics: wins/losses from the official result, every box field summed,
- * full 30-row table, sorted by franchiseId).
- */
 export function foldTeamAggregatesFixture(
   league: SeasonLeague,
   summaries: readonly SeasonGameSummary[],
@@ -913,11 +837,6 @@ export function foldTeamAggregatesFixture(
   return [...totals.values()].sort((a, b) => (a.franchiseId < b.franchiseId ? -1 : 1));
 }
 
-/**
- * Player aggregate fold over compact summaries (mirrors the documented
- * engine semantics: sums of the player lines, owning franchise from the side
- * box, full 300-row table, sorted by playerVersionId).
- */
 export function foldPlayerAggregatesFixture(
   rosters: readonly SeasonRoster[],
   summaries: readonly SeasonGameSummary[],
@@ -987,7 +906,6 @@ export function foldPlayerAggregatesFixture(
   return [...totals.values()].sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
 }
 
-/** Minimal schema-valid retained detail for one human-team game. */
 export function buildFixtureRetainedDetail(input: {
   runId: string;
   summary: SeasonGameSummary;
@@ -1098,7 +1016,6 @@ export function buildFixtureRetainedDetail(input: {
   };
 }
 
-/** Minimal schema-valid recap for one accepted block (M2.5 evidence empty). */
 export function buildFixtureRecap(input: {
   runId: string;
   blockIndex: number;
@@ -1138,11 +1055,6 @@ export function buildFixtureRecap(input: {
   };
 }
 
-/**
- * M2.5 initial Influence state over an explicit franchise-id set (each at +2
- * with its recorded initial-grant entry). Mirrors the engine's
- * `createInitialSeasonInfluenceState`; used by the stub seam binding.
- */
 export function buildFixtureInfluenceStateFromIds(
   franchiseIds: readonly string[],
 ): SeasonInfluenceState {
@@ -1174,7 +1086,6 @@ export function buildFixtureInfluenceStateFromIds(
   };
 }
 
-/** Stub engine seam mirroring the documented pure engine semantics. */
 export function buildStubSeasonEngineSeam(): SeasonRunEngineSeam {
   return {
     reconstructSeasonGames: reconstructSeasonGamesFixture,
@@ -1193,7 +1104,6 @@ export function buildStubSeasonEngineSeam(): SeasonRunEngineSeam {
   };
 }
 
-/** Canonical 30-rotation set digest for fixture runs (sorted, FNV digest). */
 export function seasonRotationSetDigestFixture(rotations: readonly SeasonRotation[]): string {
   const canonical = JSON.stringify(
     [...rotations]
@@ -1212,11 +1122,6 @@ export function seasonRotationSetDigestFixture(rotations: readonly SeasonRotatio
   return seasonDigestHex(canonical);
 }
 
-/**
- * M2.5/M2.6.5 state digest for a fixture run at an arbitrary boundary:
- * merges the run's mutable facts with the given overrides and computes the
- * canonical digest, so the reload audit recomputes it exactly.
- */
 export function buildFixtureStateDigest(
   run: SeasonRun,
   overrides: Partial<SeasonRunStateDigestFacts> = {},
@@ -1241,7 +1146,6 @@ export function buildFixtureStateDigest(
   });
 }
 
-/** M2.5 accepted-checkpoint facts for a fixture block commit. */
 export function buildFixtureCheckpointState(input: {
   runId: string;
   blockIndex: number;
@@ -1262,7 +1166,6 @@ export function buildFixtureCheckpointState(input: {
   };
 }
 
-/** M2.5 typed invalid-roster interruption for a fixture block. */
 export function buildFixtureInterruption(input: {
   runId: string;
   blockIndex: number;
@@ -1282,7 +1185,6 @@ export function buildFixtureInterruption(input: {
   };
 }
 
-/** M2.5 interrupted-block pending candidate for a fixture run. */
 export function buildFixturePendingBlock(input: {
   run: SeasonRun;
   commandId: string;
@@ -1327,11 +1229,6 @@ export function buildFixturePendingBlock(input: {
   };
 }
 
-/**
- * The stored save-schema-v4 checkpoint row for a fixture run (promotion
- * shape). Callers pass shallow overrides for post-commit states; the row
- * keeps the real initial state digest so promotion + reload audit pass.
- */
 export function buildFixtureCheckpointRow(
   run: SeasonRun,
   overrides: Partial<StoredSeasonRunRecord> = {},
@@ -1363,12 +1260,6 @@ export function buildFixtureCheckpointRow(
   };
 }
 
-/**
- * Synthetic-but-schema-valid M2.3.5 global-eight draft facts (season-draft-v2)
- * for fixture runs: two human participants, one drawn eight-card offer with
- * at least three selectable cards, and one pick. Deterministic and
- * self-contained (no engine dependency).
- */
 export function buildFixtureSeasonDraftFacts(seed: string): SeasonRun['draft'] {
   const seedPath = (participantId: string, round: number, pickOrdinal: number): string[] => [
     'draft',
@@ -1421,11 +1312,6 @@ export function buildFixtureSeasonDraftFacts(seed: string): SeasonRun['draft'] {
   };
 }
 
-/**
- * Synthetic-but-schema-valid M2.3.5 mid-draft state (season-draft-v2) for
- * fixture runs: one drawn eight-card offer (at least three selectable cards)
- * and one pick. Self-contained; overrides apply shallowly.
- */
 export function buildSeasonDraftState(
   overrides: Partial<SeasonDraftState> & { revision?: number } = {},
 ): SeasonDraftState {
@@ -1496,7 +1382,6 @@ export function buildSeasonDraftState(
   };
 }
 
-/** Valid stored Season draft record for promotion fixtures (v3 state). */
 export function buildFixtureStoredDraft(
   run: SeasonRun,
   generation: SeasonLeagueGenerationResult | null = null,

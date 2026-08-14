@@ -12,15 +12,6 @@ import {
   type PositionResponsibilityModifiers,
 } from './position-responsibilities.ts';
 
-/**
- * Usage, creation, passing, and action tendencies select the initiator,
- * action, shooter, zone, and potential assister (spec/03 pipeline stages 2-3).
- * All weights are player tendencies and transferable-ability ratings; no
- * summary Overall rating is consulted. Creation and spacing scores modulate
- * the raw tendency weights so role hierarchies (primary creator, floor
- * spacer, rim finisher) measurably shape who ends possessions.
- */
-
 export type ActionType =
   'isolation' | 'pickAndRoll' | 'pickAndRollRoll' | 'postUp' | 'spotUp' | 'cut' | 'transition';
 
@@ -53,17 +44,6 @@ export interface ShotSelection {
   passed: boolean;
 }
 
-/**
- * Initiation weight: usage tendency scaled by creation ability, with a
- * bounded creation-burden bonus for high-usage initiators on weak-creating
- * lineups (their teammates cannot initiate instead, so the offense leans on
- * them). The usage exponent is deliberately soft (1.1): a high-usage creator
- * concentrates possession starts without monopolizing every possession
- * class, so usage is not double-counted through initiation and catch-and-
- * shoot pull. The assigned-slot initiation modifier (position-responsibilities)
- * nudges guards toward starting possessions and centers away from them; all
- * deterministic and bounded to keep matchups meaningful.
- */
 export function initiatorWeight(
   player: SimulationPlayer,
   team: SimulationTeam,
@@ -75,7 +55,6 @@ export function initiatorWeight(
   return usagePower * creationMod * creationBurden(player, team) * modifiers.initiation;
 }
 
-/** Bounded (1.08..1.2) burden shift for the highest-usage creators. */
 export function creationBurden(player: SimulationPlayer, team: SimulationTeam): number {
   if (player.tendencies.usageRate < 25) return 1;
   const teammates = team.players.filter((p) => p.playerId !== player.playerId);
@@ -85,7 +64,6 @@ export function creationBurden(player: SimulationPlayer, team: SimulationTeam): 
   return 1 + Math.min(0.2, 0.08 + 0.12 * shortfall);
 }
 
-/** Precomputed initiator weights for a team, in the team's immutable index order. */
 export function teamInitiatorWeights(
   team: SimulationTeam,
   positionModifiers: ReadonlyMap<string, PositionResponsibilityModifiers>,
@@ -95,7 +73,6 @@ export function teamInitiatorWeights(
   );
 }
 
-/** Neutral modifiers (all 1) used when a team lacks a precomputed table. */
 export const identityModifiers: PositionResponsibilityModifiers = {
   initiation: 1,
   pnrHandler: 1,
@@ -113,32 +90,14 @@ export function pickInitiator(
   return rng.weightedPick(team.players, weights);
 }
 
-/** Spacing weight for catch-and-shoot targets (0.55..1.45 around the shotRate). */
 export function spacingWeight(player: SimulationPlayer): number {
   return 0.55 + 0.9 * spacingScore(player);
 }
 
-/**
- * Shot responsibility on passed possessions. The band is intentionally
- * narrow: catch-and-shoot selection is driven by shot volume, spacing, and
- * the pass location (the action type), not by usage concentration. Usage
- * already shapes initiation; applying it again here made stars absorb every
- * possession class and inflated extreme scoring lines.
- */
 export function usagePull(player: SimulationPlayer): number {
   return 0.8 + 0.2 * Math.min(1, player.tendencies.usageRate / 36);
 }
 
-/**
- * Action tendency weights for one initiator (pure function of the player and
- * the assigned-slot responsibility modifiers). Speed raises the transition
- * rate: faster lineups run more (physical trait mechanism). High-usage
- * initiators run ball-dominant actions (isolation, pick-and-roll, post-up)
- * at a higher rate: their shot responsibilities come from creation, not
- * spot-up volume. The slot modifiers scale only the handler (pick-and-roll),
- * roll-man, and post-up weights, so a zero tendency stays zero: position
- * never manufactures an action.
- */
 export function actionWeights(
   initiator: SimulationPlayer,
   modifiers: PositionResponsibilityModifiers,
@@ -204,13 +163,6 @@ export interface TeammateShots {
   pass: TeammateShotWeights;
 }
 
-/**
- * Teammate shot weights for one initiator and action class, in team index
- * order minus the initiator. The pass variant is shared by every non-roll
- * action because the weight formula branches only on pickAndRollRoll. The
- * roll variant scales each teammate by their own roll-man responsibility
- * modifier (assigned slot), so bigs attract more roll finishes.
- */
 export function teammateShotWeights(
   team: SimulationTeam,
   initiator: SimulationPlayer,
@@ -251,11 +203,6 @@ export function pickShot(
   };
 }
 
-/**
- * Assister selection weights for one made basket (pure; shared by
- * `pickAssister` and the projection layer). Candidates are the four non-
- * shooters; the initiator earns a strong bonus when he did not take the shot.
- */
 export function assisterWeights(
   team: SimulationTeam,
   shooter: SimulationPlayer,
@@ -275,7 +222,6 @@ export function assisterWeights(
   });
 }
 
-/** Selects a plausible passer while preventing self-assists. */
 export function pickAssister(
   team: SimulationTeam,
   shooter: SimulationPlayer,
@@ -297,18 +243,11 @@ function defenderWeight(defender: SimulationPlayer, zone: ShotZone): number {
   return Math.max(0.25, (zoneRating - 45) / 35);
 }
 
-/**
- * Per-game defender selection base for one team: defenderWeight for every
- * (slot, zone) plus the assigned-slot rim-protection factor (interior zones
- * only). Both are deterministic per (defender, zone), so they are computed
- * once per game; only the slot-group matchup factor varies per shot.
- */
 export interface DefenderBase {
-  /** defenderWeight per (slot, zone), zone-major: weights[zoneIndex][slot]. */
   weights: number[][];
-  /** Rim-protection factor per slot (applied on interior zones only). */
+
   rimProtection: number[];
-  /** Same-group matchup weight per (defenderSlot, shooterSlot). */
+
   matchMatrix: number[][];
 }
 
@@ -327,14 +266,6 @@ export function defenderBase(
   };
 }
 
-/**
- * Selects the primary defender, favoring same-slot-group matchups (assigned
- * slots, never native position unions) and zone-relevant defense. On interior
- * zones the defender's assigned-slot rim-protection modifier shapes how often
- * bigs are assigned the block-check responsibility. The per-(slot, zone)
- * base comes from `defenderBase`; the tight loop applies only the slot-group
- * matchup factor, keeping the historical multiply order `(weight * match) * rim`.
- */
 export function pickDefender(
   team: SimulationTeam,
   zone: ShotZone,
@@ -364,25 +295,6 @@ const ZONE_INDEX: Record<ShotZone, number> = {
   aboveBreakThree: 4,
 };
 
-/**
- * Target three-point share for one player, from the recorded season volume
- * when available. Resolution order (spec/12):
- *
- * 1. No anchors at all (authored opponents, fixtures): the threePointRate
- *    tendency blended toward the era rate. This branch stays first and is
- *    unchanged.
- * 2. Null observed attempt rate (unavailable: pre-1979 not-applicable or
- *    genuinely missing records) with a reconstructed profile: the profile's
- *    conservative attempt rate, clamped to the same 0.01..0.65 band. Era
- *    growth must never manufacture a jump shot from a modern era rate for a
- *    player whose records predate the three-point line.
- * 3. No observed three-point attempts (null observed percentage or rate
- *    below the evidence minimum): the player never shoots threes.
- * 4. Very low observed volume: the observed rate stays, era growth adds only
- *    a tightly capped share.
- * 5. Established volume: the observed share anchors, and era growth moves the
- *    residual in bounded steps.
- */
 export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulationProfile): number {
   const f = shooter.tendencies;
   const eraThreeRate = profile.parameters.league3PARate;
@@ -398,15 +310,11 @@ export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulati
       ),
     );
   }
-  // Unavailable records (null rate, including pre-1979) with a reconstructed
-  // profile use the pinned conservative volume; a numeric rate, even a
-  // validated observed zero, always takes the observed paths below.
+
   if (observedRate === null && shooter.reconstructedThreePoint !== undefined) {
     return Math.min(0.65, Math.max(0.01, shooter.reconstructedThreePoint.attemptRateConservative));
   }
-  // A null rate with no reconstructed profile means no three-point evidence:
-  // the player never shoots threes (a validated observed zero rate also
-  // lands here through the numeric path below).
+
   if (
     observedPct === null ||
     observedRate === null ||
@@ -430,15 +338,6 @@ export function threePointTarget(shooter: SimulationPlayer, profile: EraSimulati
   );
 }
 
-/**
- * Blended five-zone shot weights for a player before three-point volume
- * rescaling and play-type pulls: the player's frequency tendencies blended
- * with the era zone mix. Shared by pickZone (which then applies the
- * three-point evidence gates and action pulls) and by the two-point
- * efficiency anchor in shooting.ts, so the anchor's expected conversion is
- * computed against the exact mix the sim actually shoots instead of the raw
- * tendency mix.
- */
 export function blendedZoneWeights(
   shooter: SimulationPlayer,
   profile: EraSimulationProfile,
@@ -465,12 +364,6 @@ export function blendedZoneWeights(
   return eraWeights.map((value, index) => value * (1 - blend) + (tendencyMix[index] ?? 0) * blend);
 }
 
-/**
- * Rescales an era-blended zone mix to the player's three-point volume target:
- * the pre-play-type weight vector pickZone samples. Pure and fixed per player
- * per game, so it is computed once in `zonePrep`; `pickZone` copies it before
- * applying the action pulls.
- */
 export function rescaleZoneWeights(blend: readonly number[], targetThreeRate: number): number[] {
   const weights = blend.slice();
   const currentThree = (weights[3] ?? 0) + (weights[4] ?? 0);
@@ -487,18 +380,11 @@ export function rescaleZoneWeights(blend: readonly number[], targetThreeRate: nu
   return weights;
 }
 
-/**
- * Per-player zone preparation: the unmutated era-blended zone mix, the
- * three-point volume target, and the mix rescaled to that target. All are
- * pure functions of the player and profile, so they are computed once per
- * game. `pickZone` copies the rescaled base before mutating it; callers must
- * never mutate the cached arrays.
- */
 export interface ZonePrep {
   blend: number[];
   threePointTarget: number;
   driveRate: number;
-  /** The era blend rescaled to the three-point target (pre play-type pulls). */
+
   base: number[];
 }
 
@@ -513,12 +399,6 @@ export function zonePrep(shooter: SimulationPlayer, profile: EraSimulationProfil
   };
 }
 
-/**
- * Normalized two-point (rim / short-mid / long-mid) share of a blended zone
- * mix. These are the exact relative two-point weights pickZone uses: the
- * three-point rescaling and play-type pulls scale all two-point zones by the
- * same factor, so the proportions are identical.
- */
 export function twoPointZoneSharesFromBlend(weights: readonly number[]): [number, number, number] {
   const total = (weights[0] ?? 0) + (weights[1] ?? 0) + (weights[2] ?? 0) || 1;
   return [
@@ -528,11 +408,6 @@ export function twoPointZoneSharesFromBlend(weights: readonly number[]): [number
   ];
 }
 
-/**
- * Applies the play-type zone pulls to a rescaled zone base (pure; shared by
- * `pickZone` and the projection layer so expected zone shares use the exact
- * sampled weight vector).
- */
 export function applyZonePulls(
   action: ActionType,
   base: readonly number[],
@@ -547,11 +422,6 @@ export function applyZonePulls(
   return weights;
 }
 
-/**
- * Selects the shot zone from the precomputed rescaled base, modulated by the
- * play type. The cached base is copied so the per-game cache stays pristine
- * across trips.
- */
 export function pickZone(action: ActionType, prep: ZonePrep, rng: Rng): ShotZone {
   return rng.weightedPick(ZONES, applyZonePulls(action, prep.base, prep.driveRate));
 }

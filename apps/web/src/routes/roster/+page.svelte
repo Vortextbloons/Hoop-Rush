@@ -29,7 +29,6 @@
   import RosterComparison from '$lib/components/RosterComparison.svelte';
   import RosterTable from '$lib/components/RosterTable.svelte';
 
-  /** The player-detail dialog chunk loads only when a roster player is selected. */
   let playerDetailModule: Promise<
     typeof import('$lib/components/PlayerDetailDialog.svelte')
   > | null = null;
@@ -59,7 +58,6 @@
   const POSITION_OPTIONS = DETAILED_POSITIONS;
   const PAGE_SIZE = 120;
 
-  /** Typing delay before the filter/sort pipeline re-runs on the full index. */
   const SEARCH_DEBOUNCE_MS = 80;
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
@@ -72,7 +70,7 @@
   let franchiseId = $state('');
   let eraId = $state('');
   let positionFilter = $state<'PG' | 'SG' | 'SF' | 'PF' | 'C' | null>(null);
-  /** Raw input value; `search` below is the debounced query the pipeline reads. */
+
   let searchInput = $state('');
   let search = $state('');
   let sortId = $state<RosterSortId>('none');
@@ -202,7 +200,6 @@
   const hasMore = $derived(filteredRows.length > visibleCount);
   const visiblePlayers = $derived(Math.min(visibleCount, filteredRows.length));
 
-  // Reset pagination whenever the scope or ordering changes.
   $effect(() => {
     void [franchiseId, eraId, positionFilter, search, sortId, sortDir];
     visibleCount = PAGE_SIZE;

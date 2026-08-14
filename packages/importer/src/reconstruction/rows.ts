@@ -1,20 +1,7 @@
-/**
- * Fit-cohort rows and feature extraction for the conservative three-point
- * reconstruction (spec/12).
- *
- * The early three-point prior cohort is 1979-80 through 1983-84: the first
- * five seasons with a three-point line, where the shot was nascent and
- * closest to the world pre-1979 players would face. Predictors use only
- * historically available traits: FTM/FTA, stabilized FT%, relative
- * position-and-era 2P%, FGA per 36, FTA/FGA, assists per 36, position,
- * height, weight, age, and cohort. Never 3P fields, overall, offensive
- * rating, or raw FG%.
- */
 import { join } from 'node:path';
 import { NBA_ROOT } from '../config.ts';
 import { readJson } from '../json.ts';
 
-/** The early three-point prior cohort (spec/12). */
 export const RECONSTRUCTION_SEASONS = [
   '1979-80',
   '1980-81',
@@ -23,12 +10,6 @@ export const RECONSTRUCTION_SEASONS = [
   '1983-84',
 ] as const;
 
-/**
- * Modern validation cohort for the attempt translation (spec/12): the
- * "stuck in a modern game" claim is validated against modern observed
- * volume. Era-disjoint from the fit cohort, so no player leaks between
- * fitting and validation.
- */
 export const MODERN_VALIDATION_SEASONS = [
   '2014-15',
   '2015-16',
@@ -42,11 +23,6 @@ export const MODERN_VALIDATION_SEASONS = [
   '2023-24',
 ] as const;
 
-/**
- * Cohort index for a season, clamped into the fit cohort. Pre-1979 seasons
- * (which predate the whole cohort) use the earliest cohort index; the
- * season-trend feature then treats them as the start of the early era.
- */
 export function seasonIndexFor(season: string): number {
   const index = RECONSTRUCTION_SEASONS.indexOf(season as (typeof RECONSTRUCTION_SEASONS)[number]);
   if (index === -1)
@@ -56,7 +32,6 @@ export function seasonIndexFor(season: string): number {
 
 export type PositionGroup = 'G' | 'F' | 'C';
 
-/** Feature names in coefficient/covariance order (intercept excluded). */
 export const RECONSTRUCTION_FEATURE_NAMES = [
   'ftRatio',
   'ftPctShrunk',
@@ -127,9 +102,6 @@ export function attemptWeightedMean(
   return weight > 0 ? total / weight : null;
 }
 
-/** Raw (unstandardized) feature values per row. Physicals are imputed to
- * position-and-cohort medians (missing flags preserved separately), so every
- * feature is a concrete number. */
 export interface RawFeatures {
   ftRatio: number;
   ftPctShrunk: number;
@@ -148,11 +120,10 @@ export interface RawFeatures {
 }
 
 export interface FeatureContext {
-  /** Position-group free-throw priors (stabilized FT% shrinkage). */
   ftPriors: Record<PositionGroup, number>;
-  /** Position-group two-point percentage means (relative 2P%). */
+
   twoPctMeans: Record<PositionGroup, number>;
-  /** Position-group medians used to impute missing height/weight/age. */
+
   missingDefaults: Record<PositionGroup, { heightInches: number; weightLbs: number; age: number }>;
 }
 
@@ -161,11 +132,6 @@ function ratio(numerator: number | null, denominator: number | null): number | n
   return numerator / denominator;
 }
 
-/**
- * Deterministic feature extraction. Shrinkage and means come from the
- * versioned `context` (pooled over the fit cohort), so prediction for any
- * season uses the same reference values the models were fit against.
- */
 export function extractRawFeatures(row: ReconstructionRow, context: FeatureContext): RawFeatures {
   const { positionGroup: group } = row;
   const ftPrior = context.ftPriors[group];
@@ -213,16 +179,10 @@ export function featureVector(raw: RawFeatures): number[] {
   return RECONSTRUCTION_FEATURE_NAMES.map((name) => raw[name]);
 }
 
-/** Number of missing features behind a raw feature set (evidence weakness). */
 export function missingFeatureCount(raw: RawFeatures): number {
   return raw.missHeight + raw.missWeight;
 }
 
-/**
- * Loads the raw cohort rows (season-stats joined to roster physicals).
- * Rows without a stats record or with zero trials are included when the
- * evidence exists; model-specific eligibility is applied by the fitter.
- */
 export function loadCohortRows(
   seasons: readonly string[] = [...RECONSTRUCTION_SEASONS],
 ): ReconstructionRow[] {
@@ -285,11 +245,6 @@ function intOf(record: Record<string, unknown>, key: string): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
-/**
- * Builds the feature context pooled over the fit cohort: position-group FT
- * priors, two-point percentage means, and position-group medians for
- * height/weight/age. Deterministic given the same cohort rows.
- */
 export function buildFeatureContext(rows: readonly ReconstructionRow[]): FeatureContext {
   const ftPriors = {} as Record<PositionGroup, number>;
   const twoPctMeans = {} as Record<PositionGroup, number>;
@@ -318,11 +273,6 @@ export function buildFeatureContext(rows: readonly ReconstructionRow[]): Feature
   return { ftPriors, twoPctMeans, missingDefaults };
 }
 
-/**
- * Equivalent attempts behind the early-era priors. Mirrors the shrink-80
- * convention used across ratings derivation: the prior is a stabilizing
- * early-era anchor, never a dominant pseudo-sample.
- */
 export const PRIOR_EQUIVALENT_ATTEMPTS = 80;
 
 export function cohortPriors(rows: readonly ReconstructionRow[]): {

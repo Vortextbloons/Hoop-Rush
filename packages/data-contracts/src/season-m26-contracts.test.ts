@@ -33,16 +33,8 @@ import {
 } from './index.ts';
 import { buildPostseason, fixturePlayerId, SEED } from './season-schemas-fixtures.ts';
 
-/**
- * M2.6 postseason-foundations contract tests (spec/2.0/02 Playoffs, phase 1):
- * stage/completion rules on the run snapshot, stable postseason game ids,
- * command concurrency validation, deterministic command-log digests, and the
- * postseason summary / awards / almanac / replay-export contracts.
- */
-
 const DIGEST_32 = '0'.repeat(32);
 
-/** A completed postseason state: resolved seeds, a full unplayed bracket, and a Finals winner. */
 function completedPostseason(seed: string, champion: string) {
   const pending = (seriesId: string, round: string, conference: 'east' | 'west') => ({
     seriesId,
@@ -273,7 +265,7 @@ describe('season run stage and completion (M2.6)', () => {
       },
     };
     expect(seasonRunSchema.parse(completed).stage).toBe('completed');
-    // A completed stage without a champion (or completion state) is corrupt.
+
     expect(() =>
       seasonRunSchema.parse({
         ...completed,
@@ -288,7 +280,7 @@ describe('season run stage and completion (M2.6)', () => {
       }),
     ).toThrow();
     expect(() => seasonRunSchema.parse({ ...completed, completion: null })).toThrow();
-    // An active regular-season run must not carry completion state.
+
     expect(seasonRunSchema.parse(baseRun('regular-season')).completion).toBeNull();
     expect(() =>
       seasonRunSchema.parse({
@@ -353,7 +345,7 @@ describe('postseason game ids (M2.6)', () => {
       seasonStartPostseasonCommandSchema.safeParse({ ...base, command: 'start-postseason' })
         .success,
     ).toBe(true);
-    // Regular-season game ids and malformed ids are not postseason targets.
+
     expect(
       seasonAdvancePostseasonCommandSchema.safeParse({
         ...base,
@@ -385,8 +377,7 @@ describe('postseason summaries (M2.6, postseason-summary-v1)', () => {
     expect(parsed.winnerFranchiseId).toBe('lakers');
     const digest = seasonPostseasonSummaryDigest(summary);
     expect(digest).toMatch(/^[0-9a-f]{32}$/);
-    // The digest is a pure function of the facts: re-parsed records hash
-    // identically and the stored resultDigest field is excluded.
+
     expect(seasonPostseasonSummaryDigest(parsed)).toBe(digest);
     expect(seasonPostseasonSummaryDigest({ ...parsed, resultDigest: 'f'.repeat(32) })).toBe(digest);
   });
@@ -410,7 +401,6 @@ describe('postseason summaries (M2.6, postseason-summary-v1)', () => {
   });
 
   it('rejects mismatched phase/series/game-number combinations', () => {
-    // Playoff phase with a play-in round.
     expect(() =>
       seasonPostseasonSummarySchema.parse(
         basePostseasonSummary({
@@ -422,19 +412,19 @@ describe('postseason summaries (M2.6, postseason-summary-v1)', () => {
         }),
       ),
     ).toThrow();
-    // Play-in phase with a series id.
+
     expect(() =>
       seasonPostseasonSummarySchema.parse(basePostseasonSummary({ seriesId: 'finals' })),
     ).toThrow();
-    // A tied final game is corrupt.
+
     expect(() =>
       seasonPostseasonSummarySchema.parse(basePostseasonSummary({ awayScore: 104 })),
     ).toThrow();
-    // A winner that did not win by score is corrupt.
+
     expect(() =>
       seasonPostseasonSummarySchema.parse(basePostseasonSummary({ winnerFranchiseId: 'celtics' })),
     ).toThrow();
-    // A forfeit must carry the official 2-0 result and no player lines.
+
     const forfeit = seasonPostseasonSummarySchema.parse(
       basePostseasonSummary({
         status: 'forfeit',
@@ -536,7 +526,7 @@ describe('awards, almanac, and replay exports (M2.6)', () => {
         seasonReplayExportSchema.parse({ ...parsed, digest: 'f'.repeat(32) }),
       ),
     ).toBe(digest);
-    // The export digest differs from the summary digest (different facts).
+
     expect(digest).not.toBe(seasonPostseasonSummaryDigest(summary));
   });
 });
@@ -579,14 +569,14 @@ describe('command log (M2.6, command-log-v1)', () => {
     });
     const digest = seasonCommandLogDigest(log.entries);
     expect(digest).toMatch(/^[0-9a-f]{32}$/);
-    // Identical facts hash identically, however they were constructed.
+
     expect(seasonCommandLogDigest(entries)).toBe(digest);
     expect(
       seasonCommandLogDigest(
         log.entries.map((item) => JSON.parse(JSON.stringify(item)) as SeasonCommandLogEntry),
       ),
     ).toBe(digest);
-    // Any fact change changes the hash.
+
     expect(
       seasonCommandLogDigest([entry(0), entry(1), entry(2, { resultDigest: '3'.repeat(32) })]),
     ).not.toBe(digest);
@@ -597,7 +587,7 @@ describe('command log (M2.6, command-log-v1)', () => {
         entry(2, { relatedGameIds: ['pi-east-seven-eight'] }),
       ]),
     ).not.toBe(digest);
-    // The empty log hash is a fixed chain head.
+
     expect(SEASON_EMPTY_COMMAND_LOG_DIGEST).toBe(seasonDigestHex(canonicalJson([])));
   });
 

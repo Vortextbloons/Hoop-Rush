@@ -10,93 +10,13 @@ import {
   type SeasonTradeGradeLog,
 } from '@hoop-rush/data-contracts';
 
-/**
- * M2.6 trade grades (spec/2.0/07, trade-grade-v1, engine side). Grades every
- * ACCEPTED trade of a Season Run from recorded facts only: the run snapshot
- * (trade-window state), the regular-season compact summaries, and the
- * postseason summaries through the champion. The derivation is a pure
- * function of those inputs — no seed, no RNG, no narrative — and every grade
- * carries per-component scores and bounded recorded reasons.
- *
- * ## Window semantics (frozen)
- *
- * A trade window opens after the accepted checkpoint of its block (windows
- * open at blocks 2, 4, 5 — `window.blockIndex` is a recorded fact). The
- * post-trade evaluation span of a window is every recorded game AFTER that
- * block through the champion: regular-season rounds strictly after the
- * opening block's final round, plus every postseason summary. The earliest
- * possible offer application is right after that checkpoint, so this span is
- * the recorded, deterministic approximation of "games after the trade"
- * (per-game application times are not recorded).
- *
- * ## Sides
- *
- * Every accepted trade produces two sides: the `to` franchise (received =
- * offer.incoming, sent = offer.outgoing) and the `from` franchise (the
- * reverse). Each side is graded independently from its own received-vs-sent
- * view. A player traded again in a later window keeps accruing through the
- * champion (their production contributes to every earlier window's received
- * or sent pool exactly as recorded); windows never overlap in game spans, so
- * no fact is double-counted.
- *
- * ## Score (0-100, frozen weights)
- *
- * - Production (55%): nonnegative accumulated MVP-style production using the
- *   awards module's per-appearance value formula (see below). Each received
- *   and sent player accumulates max(0, Σ per-appearance value) over the
- *   post-trade span; `reference` is the best such accumulation of any player
- *   in the same span. Component = 70% absolute level against the reference
- *   plus 30% received-vs-sent edge, both monotone in the received total:
- *   `absolute = 100 * received / max(reference, ε)`,
- *   `edge = 50 + 50 * (received - sent) / max(received + sent, ε)`.
- * - Availability (15%): the received players' appearance share of the
- *   post-trade team games (`appearances / (|received| * teamGames)`).
- * - Realized minutes and starts (15%): the mean over received players of
- *   `0.7 * minutesPerGame / 48 + 0.3 * startsPerGame / 5` (full-game minute
- *   ceiling and one of five starts per game).
- * - Team-performance trend (15%): `50 + 50 * clamp(-1, 1, postWinRate -
- *   preWinRate)` where the win rates are the graded franchise's post-trade
- *   (regular + postseason) and pre-trade regular-season records.
- *
- * The score is the rounded weighted sum, clamped to 0-100. Labels are the
- * frozen display grades: A 80+, B 65-79, C 45-64, D 30-44, F < 30.
- *
- * ## Small samples
- *
- * A side with fewer than five post-trade team games
- * (`SEASON_TRADE_GRADE_MIN_SAMPLE`) — including no games at all — is graded
- * NEUTRAL: score `SEASON_TRADE_GRADE_NEUTRAL_SCORE` (50), label C,
- * `neutral` true, with the recorded reason. No component score is invented
- * for it.
- *
- * ## Production formula (awards-machinery mirror)
- *
- * The per-appearance MVP value is the awards module's exact formula: Game
- * Score (PTS + 0.4*FGM - 0.7*FGA - 0.4*(FTA-FTM) + 0.7*ORB + 0.3*DRB + STL +
- * 0.7*AST + 0.7*BLK - 0.4*PF - TOV) plus the defense bonus
- * (0.6*STL + 0.6*BLK + 0.15*DRB), the playmaking bonus (0.5*AST), the
- * efficiency bonus ((ts - leagueAvgTs) * shotsUsed with ts =
- * points/(2*shotsUsed) over every post-trade line), and the game-result
- * bonus (+0.75 win, -0.75 loss), summed per appearance. `season/awards.ts`
- * keeps these constants private (frozen for this wave), so this module
- * re-derives the identical formulas with mirrored constants; the lead may
- * export the awards primitives at integration and point this module at them
- * (the bytes must not change).
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
-/** The frozen per-side sample floor: fewer post-trade team games is neutral. */
 export const SEASON_TRADE_GRADE_MIN_SAMPLE = 5;
 
-/** The frozen neutral score for below-floor samples (label C). */
 export const SEASON_TRADE_GRADE_NEUTRAL_SCORE = 50;
 
-/** Production component inner weights: level vs received/sent edge. */
 const PRODUCTION_LEVEL_WEIGHT = 0.7;
 const PRODUCTION_EDGE_WEIGHT = 0.3;
 
-/** Frozen component weights of the final score. */
 export const SEASON_TRADE_GRADE_WEIGHTS = {
   production: 0.55,
   availability: 0.15,
@@ -104,34 +24,30 @@ export const SEASON_TRADE_GRADE_WEIGHTS = {
   trend: 0.15,
 } as const;
 
-/** Full-game minute ceiling of the minutes slot (48 minutes per game). */
 const MINUTES_FULL_GAME = 48;
-/** Starts-per-game ceiling of the starts slot (five starters per game). */
+
 const STARTS_FULL_GAME = 5;
 
-/** Awards-machinery mirrors (see the module docstring; awards.ts is frozen). */
 const DEFENSE_WEIGHTS = { steal: 0.6, block: 0.6, defensiveRebound: 0.15 } as const;
 const PLAYMAKING_ASSIST_WEIGHT = 0.5;
 const TEAM_BONUS = { win: 0.75, loss: -0.75 } as const;
 const CONSISTENCY_REFERENCE_EPSILON = 1e-9;
 
-/** The trade-grade derivation inputs: recorded facts only. */
 export interface SeasonTradeGradesInput {
   runId: string;
-  /** The final run snapshot (the recorded trade-window state lives on it). */
+
   run: SeasonRun;
-  /** Regular-season compact summaries (every recorded round). */
+
   summaries: SeasonGameSummary[];
-  /** Postseason summaries through the champion, in play order. */
+
   postseasonSummaries: SeasonPostseasonSummary[];
 }
 
-/** Per-player post-trade folding over the recorded summaries. */
 interface PlayerPostTradeFacts {
   appearances: number;
   starts: number;
   seconds: number;
-  /** Raw per-appearance MVP-value inputs (baseline resolved after folding). */
+
   valueBases: number[];
   efficiencyValues: number[];
   shotsList: number[];
@@ -144,10 +60,8 @@ interface PostTradeFacts {
   teamWins: Map<string, number>;
 }
 
-/** The shape both summary families fold (their compact lines are identical). */
 type FoldLine = SeasonGameSummary['homePlayers'][number];
 
-/** The recorded-game shape both summary families satisfy. */
 interface FoldGame {
   homeFranchiseId: string;
   awayFranchiseId: string;
@@ -172,7 +86,6 @@ function trueShootingOf(line: {
   return shots <= 0 ? 0 : line.points / (2 * shots);
 }
 
-/** The awards module's per-appearance MVP value base (mirror, docstring). */
 function mvpValueBaseOf(line: {
   points: number;
   fieldGoalsMade: number;
@@ -208,7 +121,6 @@ function mvpValueBaseOf(line: {
   );
 }
 
-/** The per-appearance MVP value of one line against the league baseline. */
 function mvpValueOf(row: PlayerPostTradeFacts, index: number, leagueAverageTs: number): number {
   const valueBase = row.valueBases[index] ?? 0;
   const shots = row.shotsList[index] ?? 0;
@@ -219,7 +131,6 @@ function mvpValueOf(row: PlayerPostTradeFacts, index: number, leagueAverageTs: n
   );
 }
 
-/** Folds the post-trade recorded games (regular after the window + postseason). */
 function foldPostTradeFacts(games: readonly FoldGame[]): PostTradeFacts {
   const players = new Map<string, PlayerPostTradeFacts>();
   const teamGames = new Map<string, number>();
@@ -272,7 +183,6 @@ function foldPostTradeFacts(games: readonly FoldGame[]): PostTradeFacts {
   return { players, teamGames, teamWins };
 }
 
-/** The league-average true-shooting baseline over the same folded lines. */
 function leagueAverageTsOf(facts: PostTradeFacts): number {
   let points = 0;
   let shots = 0;
@@ -288,7 +198,6 @@ function leagueAverageTsOf(facts: PostTradeFacts): number {
   return shots > 0 ? points / (2 * shots) : 0.5;
 }
 
-/** The accumulated per-appearance value of one player (nonnegative). */
 function accumulatedProductionOf(facts: PostTradeFacts, playerVersionId: string): number {
   const row = facts.players.get(playerVersionId);
   if (row === undefined || row.appearances === 0) return 0;
@@ -300,7 +209,6 @@ function accumulatedProductionOf(facts: PostTradeFacts, playerVersionId: string)
   return Math.max(0, total);
 }
 
-/** Accumulated production of a player set, nonnegative per player. */
 function accumulatedProductionOfSet(
   facts: PostTradeFacts,
   playerVersionIds: readonly string[],
@@ -312,7 +220,6 @@ function accumulatedProductionOfSet(
   return total;
 }
 
-/** The best nonnegative accumulated production of any player in the span. */
 function referenceProductionOf(facts: PostTradeFacts): number {
   let best = 0;
   for (const playerVersionId of facts.players.keys()) {
@@ -322,7 +229,6 @@ function referenceProductionOf(facts: PostTradeFacts): number {
   return best;
 }
 
-/** 55% component: production level (vs reference) plus the received/sent edge. */
 function productionComponentOf(
   facts: PostTradeFacts,
   received: readonly string[],
@@ -341,7 +247,6 @@ function productionComponentOf(
   return clampScore(PRODUCTION_LEVEL_WEIGHT * absolute + PRODUCTION_EDGE_WEIGHT * edge);
 }
 
-/** 15% component: received players' appearance share of the team games. */
 function availabilityComponentOf(
   facts: PostTradeFacts,
   received: readonly string[],
@@ -355,7 +260,6 @@ function availabilityComponentOf(
   return clampScore((100 * appearances) / (received.length * teamGames));
 }
 
-/** 15% component: realized minutes and starts of the received players. */
 function minutesComponentOf(
   facts: PostTradeFacts,
   received: readonly string[],
@@ -373,7 +277,6 @@ function minutesComponentOf(
   return clampScore((100 * total) / received.length);
 }
 
-/** Pre-trade regular-season win rate of a franchise (0.5 when no pre-trade games). */
 function preTradeWinRateOf(
   summaries: readonly SeasonGameSummary[],
   franchiseId: string,
@@ -398,12 +301,10 @@ function preTradeWinRateOf(
   return games > 0 ? wins / games : 0.5;
 }
 
-/** Clamps a value into [0, 100]. */
 function clampScore(value: number): number {
   return Math.min(100, Math.max(0, value));
 }
 
-/** The label of a bounded score under the frozen cutoffs. */
 export function seasonTradeGradeLabelOf(score: number): SeasonTradeGradeLabel {
   if (score >= 80) return 'A';
   if (score >= 65) return 'B';
@@ -412,7 +313,6 @@ export function seasonTradeGradeLabelOf(score: number): SeasonTradeGradeLabel {
   return 'F';
 }
 
-/** The deterministic grade id of one side of one accepted trade. */
 function gradeIdOf(
   runId: string,
   windowIndex: number,
@@ -422,19 +322,12 @@ function gradeIdOf(
   return `tg-${seasonDigestHex(canonicalJson({ runId, windowIndex, offerId, franchiseId }))}`;
 }
 
-/** The canonical self-excluded digest of a grade log. */
 function tradeGradeLogDigestOf(log: SeasonTradeGradeLog): string {
   const facts: Record<string, unknown> = { ...log };
   delete facts.digest;
   return seasonDigestHex(canonicalJson(facts));
 }
 
-/**
- * Derives the trade-grade log of a completed run: one grade per side of
- * every accepted trade, from recorded post-trade facts through the
- * champion. Deterministic and explainable; the log carries a self-consistent
- * canonical digest.
- */
 export function deriveSeasonTradeGrades(input: SeasonTradeGradesInput): SeasonTradeGradeLog {
   const run = input.run;
   const grades: SeasonTradeGrade[] = [];
@@ -544,7 +437,6 @@ export function deriveSeasonTradeGrades(input: SeasonTradeGradesInput): SeasonTr
   return seasonTradeGradeLogSchema.parse({ ...log, digest: tradeGradeLogDigestOf(log) });
 }
 
-/** The first regular-season round strictly after a window's opening block. */
 function postTradeFirstRoundOf(blockIndex: number): number {
   return (blockIndex + 1) * 10 + 1;
 }

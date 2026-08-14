@@ -18,11 +18,6 @@
   import SeasonPlayerFace from './SeasonPlayerFace.svelte';
   import TradePlayerDetailDialog from './TradePlayerDetailDialog.svelte';
 
-  /**
-   * Trade offers panel (M2.5): player headshots, OVR badges, and tap-to-open
-   * season stats. Accept/Decline use an always-mounted confirm dialog.
-   */
-
   let {
     windowIndex,
     offers,

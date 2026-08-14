@@ -36,40 +36,20 @@ import {
   type ActionType,
 } from '../sim/usage.ts';
 
-/**
- * Deterministic expected ledger (projection milestone). One side's offense is
- * aggregated as the exact expectation over the possession engine's pure
- * probability functions, per 100 possessions, without any random draw. The
- * engine's sampled pipeline remains authoritative; this module adds only
- * deterministic expectation over the same formulas and constants.
- *
- * Neutral assumptions (documented, calibration-visible):
- * - every trip is a regulation non-buzzer trip (no late-clock penalty, no
- *   dead-ball team rebound from FGA misses);
- * - the defending team is never in the bonus (period foul state is a game
- *   flow effect; free-throw pressure components capture the draw separately);
- * - missed non-final free throws are declared dead-ball defensive team
- *   rebounds, folded into defensive rebounds;
- * - second-chance value uses a bounded analytic continuation correction that
- *   never loops or samples repeated rebounds.
- */
-
 const ZONES: readonly ShotZone[] = SHOT_ZONES;
 
-/** Regulation period seconds used for the make-probability late-clock term (no penalty). */
 const REGULATION_START_SECONDS = REGULATION_PERIOD_SECONDS;
 
-/** Per-player ledger facts in team index order. */
 export interface LedgerPlayerFacts {
   slotIndex: number;
   player: SimulationPlayer;
-  /** Share of shot attempts taken. */
+
   usageShare: number;
-  /** Share of initiations led. */
+
   initiatorShare: number;
-  /** Normalized creation contribution (0-100). */
+
   creationShare: number;
-  /** Spacing contribution (0-100). */
+
   spacingContribution: number;
   expectedShots: number;
   expectedMakes: number;
@@ -78,26 +58,25 @@ export interface LedgerPlayerFacts {
   expectedTurnovers: number;
   expectedRebounds: number;
   expectedFouls: number;
-  /** Normalized defensive contribution (0-100). */
+
   defensiveContribution: number;
 }
 
-/** One side of the expected ledger (team index order throughout). */
 export interface LedgerSide {
   ledger: ProjectionLedger;
   turnoverCauses: ProjectionTurnoverCauses;
   actions: Record<ActionType, number>;
   zones: Record<ShotZone, number>;
-  /** Shooter distribution in team index order (sums to 1). */
+
   shooters: number[];
   players: LedgerPlayerFacts[];
-  /** Aggregate make probability across shot mass. */
+
   aggregateMakePct: number;
-  /** Expected passes per 100 possessions. */
+
   passOpportunity: number;
-  /** Expected play-type shot-quality lift across shot mass (two-point only). */
+
   shotQualityLift: number;
-  /** Expected defensive contest penalty applied across shot mass. */
+
   expectedContest: number;
 }
 
@@ -106,7 +85,6 @@ export interface ExpectedLedgerResult {
   defense: LedgerSide;
 }
 
-/** Internal mutable ledger with rebound-chance denominators. */
 interface LedgerInternal {
   fieldGoalAttempts: number;
   fieldGoalMakes: number;
@@ -128,7 +106,6 @@ interface LedgerInternal {
   defensiveReboundChances: number;
 }
 
-/** Per-player accumulated expectation, aligned with `players` by index. */
 interface PlayerAgg {
   shots: number;
   makes: number;
@@ -138,10 +115,6 @@ interface PlayerAgg {
   fouls: number;
 }
 
-/**
- * Probability a turnover is credited as an opponent steal: the deterministic
- * expected value of the engine's `isSteal` draw.
- */
 export function expectedStealShare(stealAbility: number, profile: EraSimulationProfile): number {
   return Math.min(
     0.9,
@@ -153,10 +126,6 @@ export function expectedStealShare(stealAbility: number, profile: EraSimulationP
   );
 }
 
-/**
- * The per-100 expected ledger of one five-man side against another. Computes
- * both directions so steals/blocks/fouls cross-terms reconcile exactly.
- */
 export function projectExpectedLedger(input: {
   team: SimulationTeam;
   prep: TeamPrep;
@@ -185,8 +154,6 @@ export function projectExpectedLedger(input: {
     passingAnchorFactor,
   });
 
-  // Cross terms: steals credited to each side's defense come from the
-  // opponent's turnover mass converted at this side's steal ability.
   const offenseSteals = defense.ledger.turnovers * expectedStealShare(prep.stealAbility, profile);
   const defenseSteals =
     offense.ledger.turnovers * expectedStealShare(opponentPrep.stealAbility, profile);
@@ -218,13 +185,6 @@ function computeSide(input: {
   );
   const turnoverRate = Math.min(1, Math.max(0, turnoverMass));
 
-  // --- Shot mass after turnovers and non-shooting fouls ---
-  // The engine checks for a non-shooting foul up to four times per trip and
-  // continues the trip after non-bonus fouls (the neutral assumption here is
-  // "never in the bonus", so a non-shooting foul never ends a trip). The
-  // expected number of non-shooting fouls per trip is the truncated geometric
-  // expectation p + p² + p³ + p⁴; the trip still ends in a shot unless it
-  // turned over. All masses below are per 100 possessions.
   const noTurnover = 1 - turnoverRate;
   const nsfPerTrip = nonShootingFoulProbability(profile);
   const expectedNsfPerTrip =
@@ -232,12 +192,6 @@ function computeSide(input: {
   const nonShootingFoulRate = noTurnover * expectedNsfPerTrip;
   const shotMass = noTurnover * 100;
 
-  // Aggregated per distinct (shooter, zone, action, defender) key with cached
-  // zone shares, defender distributions, and per-key shot probabilities, so
-  // the expensive probability functions run at most once per key instead of
-  // once per initiator path. Caches are flat typed arrays over the small
-  // (player x zone x action) domains; `keyOrder` preserves first-seen key
-  // order so the aggregation pass accumulates exactly as the Map did.
   const playerCount = players.length;
   const actionCount = ACTION_TYPES.length;
   const zoneCount = ZONES.length;
@@ -271,8 +225,7 @@ function computeSide(input: {
     if (actionTable === undefined) continue;
     const actionShares = normalizedWeights(actionTable);
     const teammateShots = prep.teammateShots.get(initiatorKey);
-    // The roll/pass teammate weights are per initiator, not per action;
-    // normalize each variant once and reuse it across actions.
+
     const normalizedRollShots =
       teammateShots === undefined
         ? undefined
@@ -322,8 +275,7 @@ function computeSide(input: {
             }
             defenderSeen[defenderSlot] = 1;
           }
-          // Prefix shared by every defender: same left-associative multiply
-          // order as the sampled pipeline, so the values are unchanged.
+
           const keyBase =
             (shooterIndex * playerCount * zoneCount + zoneIndex) * actionCount + actionIndex;
           const keyStride = zoneCount * actionCount;
@@ -413,9 +365,7 @@ function computeSide(input: {
     profile,
   );
   const shotPrepByIndex: Array<ShotPrep | undefined> = new Array<ShotPrep | undefined>(playerCount);
-  // Pure per-key probability functions are memoized over the subset of their
-  // inputs that actually vary across keys: shootingFoulProbability does not
-  // depend on the action, blockProbability not on the shooter, and so on.
+
   const foulPFlat = new Float64Array(playerCount * playerCount * zoneCount);
   const foulPSeen = new Uint8Array(playerCount * playerCount * zoneCount);
   const blockPFlat = new Float64Array(playerCount * zoneCount * actionCount);
@@ -430,8 +380,7 @@ function computeSide(input: {
   const assistPSeen = new Uint8Array(playerCount * actionCount * zoneCount * playerCount);
   const assisterFlat = new Float64Array(playerCount * actionCount * zoneCount * playerCount);
   const assisterSeen = new Uint8Array(playerCount * actionCount * zoneCount);
-  // Normalized assister weights depend only on the (shooter, initiator) pair,
-  // so each pair is computed at most once per side instead of once per key.
+
   const assisterWeightByPair: Array<number[] | undefined> = new Array<number[] | undefined>(
     playerCount * playerCount,
   );
@@ -500,7 +449,6 @@ function computeSide(input: {
     internal.blocks += mass * blockProb;
     internal.fouls += mass * foulP;
 
-    // Free throws: and-one on made-with-foul, full set on miss-with-foul.
     const madeWithFoulShare = madeWithFoulProb / Math.max(1e-9, foulP);
     const missedWithFoulShare = missedWithFoulProb / Math.max(1e-9, foulP);
     const ftaMass = mass * foulP * (madeWithFoulShare * 1 + missedWithFoulShare * ftCount);
@@ -509,7 +457,6 @@ function computeSide(input: {
     internal.freeThrowMakes += ftmMass;
     internal.points += ftmMass;
 
-    // Rebounds on missed field goals (live).
     let orebP = orebPSeen[zoneIndex] === 1 ? orebPFlat[zoneIndex] : undefined;
     if (orebP === undefined) {
       orebP = offensiveReboundProbability(
@@ -528,9 +475,6 @@ function computeSide(input: {
     internal.offensiveRebounds += liveOreb;
     internal.defensiveRebounds += missMass * (1 - orebP);
 
-    // Rebounds on missed free throws: the last attempt (and the and-one) are
-    // live rim rebounds; non-final attempts are dead-ball defensive team
-    // rebounds folded into defensive rebounds.
     const liveFtMiss = mass * (missedWithFoulProb + madeWithFoulProb) * (1 - ftP);
     internal.offensiveReboundChances += liveFtMiss;
     internal.defensiveReboundChances += liveFtMiss;
@@ -538,8 +482,6 @@ function computeSide(input: {
     internal.defensiveRebounds += liveFtMiss * (1 - rimOrebP);
     internal.defensiveRebounds += mass * missedWithFoulProb * (ftCount - 1) * (1 - ftP);
 
-    // Assists on made passed shots: expectation over the initiator-weighted
-    // assister distribution (the passed mass per initiator is recorded).
     const passedMass = passedMassByKey[keyIndex] ?? 0;
     if (passedMass > 0) {
       const totalPassed = passedMass;
@@ -611,16 +553,11 @@ function computeSide(input: {
       mass * -contestAt(contestFlat, contestSeen, defender, defenderIndex, zone, zoneIndex);
   }
 
-  /** Per-player turnover attribution by initiator share. */
   for (let index = 0; index < players.length; index += 1) {
     playerAggAt(index).turnovers =
       (initiatorShares[index] ?? 0) * (turnoverRates[index] ?? 0) * 100;
   }
 
-  // Bounded analytic continuation: a continuation only follows a miss that is
-  // offensive-rebounded, so the geometric series ratio is q x (1 - makeAvg)
-  // (the engine's continuation path skips security/foul checks; turnovers
-  // stay base while shots, makes, free throws, and rebounds scale).
   const makeAvg =
     internal.fieldGoalAttempts > 0 ? internal.fieldGoalMakes / internal.fieldGoalAttempts : 0.45;
   const averageOrebRate =
@@ -661,7 +598,7 @@ function computeSide(input: {
     assists: internal.assists * scale,
     steals: internal.steals,
     blocks: internal.blocks * scale,
-    // Shooting fouls drawn plus expected non-shooting fouls, per 100.
+
     fouls: internal.fouls * scale + nonShootingFoulRate,
     secondChancePoints: internal.points * (scale - 1),
   };
@@ -722,7 +659,6 @@ function shotPrepFor(prep: TeamPrep, shooter: SimulationPlayer): ShotPrep {
   };
 }
 
-/** Cached per-shooter shot prep, indexed by team index (pure per (prep, shooter)). */
 function shotPrepAt(
   cache: Array<ShotPrep | undefined>,
   prep: TeamPrep,
@@ -737,7 +673,6 @@ function shotPrepAt(
   return cached;
 }
 
-/** Memoized play-type conversion bonus (pure per (action, zone)). */
 function shotQualityAt(
   flat: Float64Array,
   seen: Uint8Array,
@@ -754,7 +689,6 @@ function shotQualityAt(
   return value;
 }
 
-/** Memoized defensive contest adjustment (pure per (defender, zone)). */
 function contestAt(
   flat: Float64Array,
   seen: Uint8Array,
@@ -771,11 +705,6 @@ function contestAt(
   return value;
 }
 
-/**
- * Expected defender probability distribution for one (shooter slot, zone):
- * exactly the `pickDefender` weight formula (zone weights × same-slot-group
- * matchup × assigned-slot rim protection on interior zones).
- */
 function defenderDistribution(prep: TeamPrep, zone: ShotZone, shooterSlot: number): number[] {
   const interior = zone === 'rim' || zone === 'shortMid';
   const zoneIndex = ZONES.indexOf(zone);
@@ -795,11 +724,6 @@ function normalizedWeights(weights: readonly number[]): number[] {
   return weights.map((value) => value / Math.max(1e-9, total));
 }
 
-/**
- * Normalized teammate shot shares mapped to team indices, for one variant
- * (roll or pass). Pure per (teammate weights, team); computed once per
- * initiator and reused across every action that shares the variant.
- */
 function normalizeTeammateShots(
   shots: { teammates: SimulationPlayer[]; weights: number[] },
   playerIdToIndex: ReadonlyMap<string, number>,
@@ -817,11 +741,6 @@ function normalizeTeammateShots(
   return { teammates: shots.teammates, shares };
 }
 
-/**
- * Shooter probability per team index for one (initiator, action): the
- * initiator keeps the shot with `1 - passProbability`; passed possessions
- * distribute through the pre-normalized teammate shot shares.
- */
 function shooterSharesFor(
   players: readonly SimulationPlayer[],
   initiatorIndex: number,
@@ -839,13 +758,6 @@ function shooterSharesFor(
   return shares;
 }
 
-/**
- * Initiator-weighted assister probability per team index: the `pickAssister`
- * weight formula normalized over the four non-shooter candidates, averaged
- * over the passed-mass share each initiator led (the initiator earns a 1.35
- * bonus in the sampled pipeline, so the expectation must weight it the same
- * way).
- */
 function initiatorWeightedAssisterDistribution(
   team: SimulationTeam,
   shooter: SimulationPlayer,
@@ -877,7 +789,6 @@ function initiatorWeightedAssisterDistribution(
   return perIndex;
 }
 
-/** Defensive contribution: pressure blend over possession inputs (0-100). */
 function defensiveContributionOf(player: SimulationPlayer): number {
   const pressure =
     player.ratings.perimeterDefense * 0.5 +

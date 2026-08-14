@@ -1,22 +1,9 @@
-/**
- * Deterministic linear-algebra and fitting primitives for the conservative
- * three-point reconstruction models (spec/12).
- *
- * Everything here is hand-rolled so the fit has no scientific runtime
- * dependency: regularized binomial IRLS/Newton optimization with Laplace
- * posterior covariance, solved with Gaussian elimination. No `Math.random`,
- * no execution-order sensitivity: identical inputs always produce identical
- * coefficients.
- */
-
-/** Sigmoid with a bounded logit input to avoid overflow. */
 export function sigmoid(logit: number): number {
   if (logit > 36) return 1;
   if (logit < -36) return 0;
   return 1 / (1 + Math.exp(-logit));
 }
 
-/** Standard normal quantile (Acklam rational approximation, deterministic). */
 export function normalQuantile(p: number): number {
   const a = [
     -3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.38357751867269e2,
@@ -34,9 +21,7 @@ export function normalQuantile(p: number): number {
   const low = 0.02425;
   const high = 1 - low;
   const q = Math.min(Math.max(p, 1e-12), 1 - 1e-12);
-  // Acklam coefficients are ordered high-power first, so forward Horner
-  // with init 0 evaluates the numerator; the denominator's constant 1 is
-  // added by the final multiply-and-add.
+
   const num = (coefs: readonly number[], r: number): number =>
     coefs.reduce((sum, coef) => sum * r + coef, 0);
   const den = (coefs: readonly number[], r: number): number =>
@@ -54,8 +39,6 @@ export function normalQuantile(p: number): number {
   return (num(a, inner) * r) / den(b, inner);
 }
 
-/** FNV-1a 32-bit hash of a string (deterministic fold assignment). Canonical
- * implementation lives in `@hoop-rush/data-contracts` (`season-hash.ts`). */
 export { fnv1a32 } from '@hoop-rush/data-contracts';
 
 export function withIntercept(rows: readonly (readonly number[])[]): number[][] {
@@ -98,7 +81,6 @@ export function transpose(a: readonly (readonly number[])[]): number[][] {
   return out;
 }
 
-/** Solves A x = b by Gaussian elimination with partial pivoting. */
 export function solveLinear(a: readonly (readonly number[])[], b: readonly number[]): number[] {
   const n = b.length;
   const m = a.map((row) => [...row]);
@@ -152,24 +134,13 @@ export function invert(a: readonly (readonly number[])[]): number[][] {
 }
 
 export interface FittedBinomial {
-  /** Coefficients ordered [intercept, ...feature coefficients]. */
   coefficients: number[];
-  /** Laplace posterior covariance (X'WX + penalty)^-1, same ordering. */
+
   covariance: number[][];
-  /** Iterations until convergence. */
+
   iterations: number;
 }
 
-/**
- * Regularized binomial logistic regression via IRLS with a Laplace
- * covariance. Design rows include the intercept; ridge `lambda` penalizes
- * every feature parameter (the intercept is unpenalized, anchored by the
- * prior pseudo-observations). `priorMakes`/`priorTrials` add pseudo-
- * observations on the intercept column, shrinking the mean toward the
- * early-era prior. Optional `penalties` per parameter (intercept first)
- * allows sparse indicator features (e.g. missing-data flags) to be shrunk
- * harder than the rest.
- */
 export function fitBinomialLogistic(
   design: readonly (readonly number[])[],
   makes: readonly number[],
@@ -188,7 +159,7 @@ export function fitBinomialLogistic(
   const xRows = design.map((row) => [...row]);
   const y: number[] = makes.map((m, i) => m / Math.max(1, trials[i] ?? 1));
   const w: number[] = makes.map((_, i) => Math.max(0, trials[i] ?? 0));
-  // Prior pseudo-observations on the intercept: a 1.0 row at the prior rate.
+
   xRows.push(new Array<number>(k).fill(0).map((_, i) => (i === 0 ? 1 : 0)));
   y.push(priorMakes / Math.max(1, priorTrials));
   w.push(Math.max(0, priorTrials));
@@ -206,8 +177,7 @@ export function fitBinomialLogistic(
       for (let j = 0; j < k; j += 1) logit += (row[j] ?? 0) * (beta[j] ?? 0);
       p.push(sigmoid(logit));
     }
-    // X'WX + penalty and the true score X'(y - p) (Newton/IRLS: the
-    // p(1-p) factor belongs in the Hessian weights only).
+
     const h: number[][] = new Array<number>(k).fill(0).map(() => new Array<number>(k).fill(0));
     const gradient: number[] = new Array<number>(k).fill(0);
     for (let i = 0; i < xRows.length; i += 1) {
@@ -236,7 +206,6 @@ export function fitBinomialLogistic(
     if (maxDelta < tolerance) break;
   }
 
-  // Laplace covariance at the converged iterate: (X'WX + penalty)^-1.
   const h: number[][] = new Array<number>(k).fill(0).map(() => new Array<number>(k).fill(0));
   for (let i = 0; i < xRows.length; i += 1) {
     const row = xRows[i] as number[];

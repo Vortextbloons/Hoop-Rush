@@ -42,27 +42,6 @@ import { sha256Hex } from '../io.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-/**
- * M2.6 `season run reproduce` (replay-export-v1, full-run): rebuilds a
- * completed Season Run from a full-run replay export and FAILS AT THE FIRST
- * DIVERGENCE (ordinal, command id, expected vs actual facts). The export's
- * accepted command log is replayed through the authoritative engine dispatch
- * (`handleSeasonRunCommand`); `submit-season-block` commands (when the log
- * contains them) run through the shared block pipeline. Reproduction needs
- * the packaged assets the run froze: the manifest entries are loaded and
- * hash-verified against the export's asset hashes.
- *
- * Verification order (first failure wins, reported precisely):
- * 1. Chain facts (no replay needed): ordinal density, hash chain, run ids,
- *    pre/post revision monotonicity, command/entry identity.
- * 2. Per command: acceptance, post-state revision/digest, result digest
- *    (the shared `seasonCommandResultDigest` convention), game ids.
- * 3. Final state digest, champion, and the recomputed awards digest.
- *
- * The same replay logic is exported as `replaySeasonRunExport` so tests and
- * the web can call the authoritative path directly.
- */
-
 export const SEASON_RUN_REPRODUCE_OPTIONS: Record<string, boolean> = {
   input: true,
   manifest: true,
@@ -70,7 +49,6 @@ export const SEASON_RUN_REPRODUCE_OPTIONS: Record<string, boolean> = {
   format: true,
 };
 
-/** One precise first-divergence fact (ordinal, command id, expected vs actual). */
 export interface SeasonRunReplayDivergence {
   ordinal: number | null;
   commandId: string;
@@ -87,7 +65,6 @@ export interface SeasonRunReplayDivergence {
   detail: string;
 }
 
-/** The runner state the replay drives (mirror of the CLI block runner). */
 interface ReplayRunnerState {
   run: SeasonRun;
   effects: SeasonEffectsState;
@@ -96,21 +73,15 @@ interface ReplayRunnerState {
   pending: SeasonPendingBlockCandidate | null;
 }
 
-/**
- * The authoritative full-run replay: verifies the chain facts, replays every
- * command through the engine, and returns the first divergence (null when
- * the export reproduces exactly). Pure engine + packaged-asset path; the
- * CLI command and the CLI tests call this same function.
- */
 export function replaySeasonRunExport(
   exportArtifact: SeasonRunReplayExport,
   deps: {
     catalog: import('@hoop-rush/data-contracts').SeasonDraftCatalog;
     profile: import('@hoop-rush/data-contracts').EraSimulationProfile;
     verifyAssetHashes: (expected: SeasonRunReplayExport['assetHashes']) => string[];
-    /** M2.6.5: the packaged free-agency index (needed to replay resolve commands). */
+
     freeAgencyIndex?: SeasonFreeAgencyIndex;
-    /** M2.6.5: the frozen roster-targets policy (AI free-agency ceilings). */
+
     freeAgencyTargets?: SeasonRosterTargets;
   },
 ): { divergence: SeasonRunReplayDivergence | null; divergences: string[] } {
@@ -150,7 +121,6 @@ export function replaySeasonRunExport(
   return replayFromInitialRun(exportArtifactParsed, deps);
 }
 
-/** Verifies the log chain facts that need no replay (ordinals, hash chain). */
 function chainFactsOf(exportArtifact: SeasonRunReplayExport): string[] {
   const failures: string[] = [];
   const entries = exportArtifact.commandLog.entries;
@@ -197,7 +167,6 @@ function chainFactsOf(exportArtifact: SeasonRunReplayExport): string[] {
   return failures;
 }
 
-/** The ordinal of the first chain failure (null when the failure is log-level). */
 function ordinalOfFirstChainFailure(failures: readonly string[]): number | null {
   const first = failures[0];
   if (first === undefined) return null;
@@ -205,7 +174,6 @@ function ordinalOfFirstChainFailure(failures: readonly string[]): number | null 
   return match === null ? null : Number(match[1]);
 }
 
-/** The initial runner state of a replay from the export's initial run. */
 function runnerStateOf(
   exportArtifact: SeasonRunReplayExport,
   deps: {
@@ -241,7 +209,6 @@ function runnerStateOf(
   };
 }
 
-/** The runner's schedule artifact (regenerated deterministically from the league + seed). */
 function scheduleOf(state: ReplayRunnerState) {
   return generateSeasonSchedule({
     league: state.run.league,
@@ -249,7 +216,6 @@ function scheduleOf(state: ReplayRunnerState) {
   });
 }
 
-/** Replays every command from the initial run; returns the first divergence. */
 function replayFromInitialRun(
   exportArtifact: SeasonRunReplayExport,
   deps: {
@@ -301,9 +267,7 @@ function replayFromInitialRun(
       profile: deps.profile,
       freeAgencyIndex: deps.freeAgencyIndex,
       freeAgencyTargets: deps.freeAgencyTargets,
-      // The recorded regular-season summaries: the engine derives the season
-      // awards when the replay reaches the playoffs/completion, exactly like
-      // the production orchestration path (the state digest covers them).
+
       regularSeasonSummaries: state.summaries,
       postseasonGameResolver: defaultSeasonPostseasonGameResolver,
     });
@@ -395,10 +359,6 @@ function replayFromInitialRun(
     }
   }
 
-  // Final-state, champion, and award reconciliation. The champion is
-  // verified only when the replay actually produced one (a partial-run
-  // export whose log ends mid-season cannot reproduce the champion; that is
-  // reported as a fact of the export, not a divergence).
   const freeAgencyFailures = freeAgencyReconciliationFailures(
     state.run,
     exportArtifact,
@@ -428,10 +388,7 @@ function replayFromInitialRun(
       ],
     };
   }
-  // The final digest covers the free-agency state; the reconciliation below
-  // is the belt-and-suspenders recorded-fact audit of the replayed windows,
-  // declarations, canonical candidates, traces, signings, signingCounts,
-  // and seasonSpend.
+
   if (freeAgencyFailures.length > 0) {
     return {
       divergence: {
@@ -455,11 +412,7 @@ function replayFromInitialRun(
       divergences,
     };
   }
-  // Awards verification (award-result): the almanac awards digest must
-  // recompute over the replayed regular-season facts. The recorded award
-  // set is only comparable when the replay regenerated the FULL regular
-  // season (an export whose log starts after the regular season cannot
-  // verify awards from partial facts; that is reported, not a divergence).
+
   const fullRegularSeason =
     state.summaries.filter((summary) => summary.round >= 1 && summary.round <= 82).length >= 1230;
   const recordedAwards = state.run.awards;
@@ -481,8 +434,7 @@ function replayFromInitialRun(
       };
     }
   }
-  // Trade-grade verification (trade-grade-result): the almanac trade-grades
-  // digest must recompute over the replayed facts through the champion.
+
   if (fullRegularSeason) {
     const recomputedGrades = deriveSeasonTradeGrades({
       runId: exportArtifact.runId,
@@ -506,15 +458,6 @@ function replayFromInitialRun(
   return { divergence: null, divergences };
 }
 
-/**
- * M2.6.5 free-agency fact reconciliation of the replayed run against the
- * recorded export: the replayed freeAgency facts (windows, canonical
- * candidates, declarations, traces, signings, signingCounts, seasonSpend)
- * must pass the structural audit, and — when the log replays no free-agency
- * commands — the replayed free-agency state must equal the export's
- * recorded pre-state byte-for-byte. The final state digest covers
- * freeAgency, so a mismatch here is attributable to the free-agency facts.
- */
 export function freeAgencyReconciliationFailures(
   run: SeasonRun,
   exportArtifact: SeasonRunReplayExport,
@@ -536,7 +479,7 @@ export function freeAgencyReconciliationFailures(
   return failures;
 }
 
-/** Replays one logged block submission through the shared block pipeline. */ function replayBlock(
+function replayBlock(
   entry: SeasonRunReplayExport['commandLog']['entries'][number],
   state: ReplayRunnerState,
   deps: {
@@ -629,7 +572,6 @@ export function freeAgencyReconciliationFailures(
   return { divergence: null, divergences: [] };
 }
 
-/** The CLI command: reads a full-run replay export and reproduces it. */
 export function seasonRunReproduce(args: {
   input: string | null;
   manifest: string | null;
@@ -659,8 +601,7 @@ export function seasonRunReproduce(args: {
   const profile = new PackagedData(packaged.manifest, packaged.dir).eraProfile(
     exportArtifact.eraId,
   );
-  // M2.6.5: the packaged free-agency assets are loaded only when the export
-  // freezes their hashes (pre-M2.6.5 exports stay replayable without them).
+
   let freeAgencyIndex: import('@hoop-rush/data-contracts').SeasonFreeAgencyIndex | undefined;
   let freeAgencyTargets: import('@hoop-rush/data-contracts').SeasonRosterTargets | undefined;
   if (exportArtifact.assetHashes.freeAgencyIndex !== undefined) {

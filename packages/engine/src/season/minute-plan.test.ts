@@ -11,14 +11,6 @@ import {
 } from './minute-plan.ts';
 import type { SeasonRotation } from '@hoop-rush/data-contracts';
 
-/**
- * Minute-policy optimizer contract (minute-policy-v1): every plan is legal,
- * deterministic, integer-valued, totals exactly 240 minutes, preserves the
- * structure, and is dynamic when player projection, stamina, or fatigue
- * differ. Envelope ordering, risk-adjusted selection, the Heavy gate, and
- * the fatigue forward model are covered below.
- */
-
 const IDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'] as const;
 
 function structureOf(): MinutePlanStructure {
@@ -125,7 +117,6 @@ describe('minute-plan legality and structure', () => {
   });
 });
 
-/** Throws when an envelope plan index is missing (keeps accesses non-null). */
 function planAt(plans: MinutePlanCandidate[], index: number): MinutePlanCandidate {
   const plan = plans[index];
   if (plan === undefined) throw new Error(`minute plan ${String(index)} missing`);

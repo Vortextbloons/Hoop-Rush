@@ -489,7 +489,6 @@ function writeSeason(
   writeJson(join(dir, 'season-stats.json'), stats);
 }
 
-/** Standard two-season fixture with career-labels + bbref caches present. */
 function buildStandardFixture(label: string): FixtureRoot {
   const root = makeRoot(label);
   writeSeason(root, '1991-92', ROSTER_S1, STINTS_S1, STATS_S1);
@@ -502,7 +501,6 @@ function buildStandardFixture(label: string): FixtureRoot {
 
 const roots: string[] = [];
 
-/** Console messages captured by a vi.spyOn(console, 'log') mock. */
 function messages(spy: { mock: { calls: ReadonlyArray<ReadonlyArray<unknown>> } }): string[] {
   return spy.mock.calls.map((call) => String(call[0]));
 }
@@ -653,11 +651,11 @@ describe('overallBandForPercentile', () => {
   });
 
   it('interpolates within each band', () => {
-    expect(overallBandForPercentile(0.004)).toBe(96); // 99 - (p/0.005)*4
-    expect(overallBandForPercentile(0.02)).toBe(93); // 94 - ((p-0.005)/0.045)*4
-    expect(overallBandForPercentile(0.1)).toBe(88); // 89 - ((p-0.05)/0.14)*4
-    expect(overallBandForPercentile(0.5)).toBe(78); // 84 - ((p-0.19)/0.61)*12
-    expect(overallBandForPercentile(0.9)).toBe(56); // 71 - ((p-0.8)/0.2)*31
+    expect(overallBandForPercentile(0.004)).toBe(96);
+    expect(overallBandForPercentile(0.02)).toBe(93);
+    expect(overallBandForPercentile(0.1)).toBe(88);
+    expect(overallBandForPercentile(0.5)).toBe(78);
+    expect(overallBandForPercentile(0.9)).toBe(56);
   });
 
   it('clamps to the 40..99 contract', () => {
@@ -703,8 +701,8 @@ describe('normalizePoolOveralls', () => {
     const diagnostics = normalizePoolOveralls(rows);
     expect(diagnostics).toEqual({ totalRowCount: 4, rowsWithoutRawOverall: 0 });
     const [p4, p1, p2, p3] = rows;
-    // Rank order: p-1 (90), p-2 (80; id tie-break), p-3 (80), p-4 (60).
-    expect(p1?.summaryRatings.overallRating).toBe(99); // p = 0
+
+    expect(p1?.summaryRatings.overallRating).toBe(99);
     expect(p1?.ratingProfile).toEqual({
       schemaVersion: 2,
       modelVersion: 'ratings-model-v3.3',
@@ -713,16 +711,16 @@ describe('normalizePoolOveralls', () => {
       overallPercentile: 0.25,
       overallCohortVersion: COHORT_NORMALIZATION_VERSION,
     });
-    expect(p2?.summaryRatings.overallRating).toBe(83); // p = 0.25
+    expect(p2?.summaryRatings.overallRating).toBe(83);
     expect(p2?.ratingProfile?.overallPercentile).toBe(0.5);
-    expect(p3?.summaryRatings.overallRating).toBe(78); // p = 0.5
+    expect(p3?.summaryRatings.overallRating).toBe(78);
     expect(p3?.ratingProfile?.overallPercentile).toBe(0.75);
-    expect(p4?.summaryRatings.overallRating).toBe(73); // p = 0.75
+    expect(p4?.summaryRatings.overallRating).toBe(73);
     expect(p4?.ratingProfile?.overallPercentile).toBe(1);
-    // Tie-break: identical raw overall, playerId ascending.
+
     expect(p2?.playerId).toBe('p-2');
     expect(p3?.playerId).toBe('p-3');
-    // Only overallRating and the profile percentile fields may change.
+
     expect(p4?.summaryRatings.offenseRating).toBe(60);
     expect(p4?.summaryRatings.defenseRating).toBe(60);
   });
@@ -732,7 +730,7 @@ describe('normalizePoolOveralls', () => {
     const diagnostics = normalizePoolOveralls(rows);
     expect(diagnostics).toEqual({ totalRowCount: 2, rowsWithoutRawOverall: 2 });
     const [p1, p2] = rows;
-    expect(p2?.summaryRatings.overallRating).toBe(99); // canonical 95 ranks first
+    expect(p2?.summaryRatings.overallRating).toBe(99);
     expect(p2?.ratingProfile).toEqual({
       schemaVersion: 2,
       modelVersion: 'ratings-model-v3.3',
@@ -740,7 +738,7 @@ describe('normalizePoolOveralls', () => {
       overallPercentile: undefined,
       overallCohortVersion: undefined,
     });
-    expect(p1?.summaryRatings.overallRating).toBe(78); // p = 0.5
+    expect(p1?.summaryRatings.overallRating).toBe(78);
     expect(p1?.ratingProfile).toEqual({
       schemaVersion: 2,
       modelVersion: 'ratings-model-v3.3',
@@ -754,7 +752,7 @@ describe('normalizePoolOveralls', () => {
     expect(normalizePoolOveralls([])).toEqual({ totalRowCount: 0, rowsWithoutRawOverall: 0 });
     const single = [row('p-1', 'lakers', 75)];
     expect(normalizePoolOveralls(single)).toEqual({ totalRowCount: 1, rowsWithoutRawOverall: 0 });
-    expect(single[0]?.summaryRatings.overallRating).toBe(99); // p = 0
+    expect(single[0]?.summaryRatings.overallRating).toBe(99);
     expect(single[0]?.ratingProfile?.overallPercentile).toBe(1);
   });
 });
@@ -796,9 +794,6 @@ describe('computePool (fixture)', () => {
     expect(p.eraId).toBe('1990s');
     expect(p.eligibility).toEqual({ minimumTeamGames: MIN_TEAM_GAMES });
 
-    // 6 eligible: Alpha, Bravo, Echo, Foxtrot, Golf, Hotel.
-    // Excluded: Charlie (39-game stint), Delta (no summaryRatings), India (no
-    // season-stats row), Kilo (0-GP stats), Zulu (no roster entry).
     expect(p.players.map((player) => player.playerExternalId)).toEqual([
       '1',
       '2',
@@ -810,7 +805,6 @@ describe('computePool (fixture)', () => {
 
     const byId = new Map(p.players.map((player) => [player.playerExternalId, player]));
 
-    // Alpha: higher selectionScore wins (1992-93 over 1991-92).
     const alpha = byId.get('1');
     expect(alpha?.seasonKey).toBe('1992-93');
     expect(alpha?.selectionScore).toBe(62.229);
@@ -834,7 +828,6 @@ describe('computePool (fixture)', () => {
       normalizationVersion: POSITION_NORMALIZATION_VERSION,
     });
 
-    // Bravo: peak season 2 also beats season 1; 40 games is the boundary.
     const bravo = byId.get('2');
     expect(bravo?.seasonKey).toBe('1992-93');
     expect(bravo?.selectionScore).toBe(60.632);
@@ -845,8 +838,6 @@ describe('computePool (fixture)', () => {
     expect(bravo?.source.ratingsVersion).toBe(RATINGS_VERSION);
     expect(bravo?.source.dataVersion).toBe(DATA_VERSION);
 
-    // Echo: empty career label set falls back to the roster position; null
-    // advanced stats pass through as null; float counts truncate.
     const echo = byId.get('5');
     expect(echo?.seasonKey).toBe('1991-92');
     expect(echo?.selectionScore).toBe(59.752);
@@ -865,7 +856,6 @@ describe('computePool (fixture)', () => {
     expect(echo?.stats.tsPct).toBeNull();
     expect(echo?.stats.efgPct).toBeNull();
 
-    // Foxtrot: equal score across seasons -> more team minutes wins (1991-92).
     const foxtrot = byId.get('6');
     expect(foxtrot?.seasonKey).toBe('1991-92');
     expect(foxtrot?.selectionScore).toBe(55.3);
@@ -879,40 +869,33 @@ describe('computePool (fixture)', () => {
       normalizationVersion: POSITION_NORMALIZATION_VERSION,
     });
 
-    // Golf: full tie (score, minutes, games) -> earlier season wins (1991-92).
     const golf = byId.get('7');
     expect(golf?.seasonKey).toBe('1991-92');
     expect(golf?.selectionScore).toBe(54.805);
     expect(golf?.stats.usageRate).toBeNull();
 
-    // Hotel: equal score + equal minutes -> more team games wins (1991-92).
     const hotel = byId.get('8');
     expect(hotel?.seasonKey).toBe('1991-92');
     expect(hotel?.selectionScore).toBe(55.3);
     expect(hotel?.eligibility.teamGames).toBe(60);
     expect(hotel?.eligibility.teamMinutes).toBe(1200);
 
-    // Strict engine contracts survive packaging; provenance and anchors too.
     expect(Object.keys(alpha?.detailedRatings ?? {})).toHaveLength(18);
     expect(Object.keys(alpha?.tendencies ?? {})).toHaveLength(23);
     expect(alpha?.detailedRatings.passing).toBe(60);
     expect(alpha?.anchors.gamesPlayed).toBe(60);
     expect(alpha?.provenance['threePoint']?.kind).toBe('derived');
 
-    // Coverage summary carries the band and the policy version.
     const poolResult = pool as Pool;
     expect(poolResult.coverageSummary.coverageBand).toBe('complete-box-derived');
     expect(poolResult.coverageSummary.policyVersion).toBe(CONFIDENCE_POLICY_VERSION);
 
-    // Unknown position label is warned and preserved in sourceLabels, and it
-    // never feeds the playable union.
     const warning = messages(log).find((message) => message.includes('unknown position labels'));
     expect(warning).toContain("unknown position labels: ['XYZ']");
     expect(warning).toContain('(6)');
 
     expect(messages(log).some((m) => m.includes('scanning 2 seasons'))).toBe(true);
 
-    // The produced pool satisfies the runtime schema.
     expect(() => parsePool(pool)).not.toThrow();
   });
 
@@ -929,7 +912,7 @@ describe('computePool (fixture)', () => {
     manifest.eras = [
       { eraId: '1980s', label: '1980s', fromSeasonKey: '1980-81', toSeasonKey: '1989-90' },
     ];
-    // Season with a lakers roster but no stints.json at all.
+
     const dir = join(root.nba, '1988-89');
     mkdirSync(dir, { recursive: true });
     writeJson(join(dir, 'roster.json'), ROSTER_S1.map(rosterRow));
@@ -1075,15 +1058,14 @@ describe('allPoolTargets', () => {
   it('matches slots x eras with lineage overlap and packaged seasons', () => {
     buildStandardFixture('all-targets');
     const targets = allPoolTargets(fixtureManifest());
-    // Every slot with NBA lineage in the 1990s and packaged fixture seasons
-    // qualifies (29 slots); only the Pelicans (2002-03 founding) do not.
+
     expect(targets).toContainEqual(['lakers', '1990s']);
     expect(targets).toContainEqual(['celtics', '1990s']);
     expect(targets).toContainEqual(['nets', '1990s']);
     expect(targets).toContainEqual(['grizzlies', '1990s']);
     expect(targets).not.toContainEqual(['pelicans', '1990s']);
     expect(targets).toHaveLength(29);
-    // The 2000s era has no packaged seasons.
+
     expect(targets.some(([, era]) => era === '2000s')).toBe(false);
   });
 });
@@ -1135,9 +1117,7 @@ describe('defaultPoolWorkers', () => {
 describe('asset altIds preservation', () => {
   it('backfills nbaHeadshotAvailable and photoUrl from the previous pool build', () => {
     const root = buildStandardFixture('altids');
-    // Simulate a previous build annotated by scripts/annotate-markers.mjs:
-    // bbref id on record, stale bbref in the file, markers present, and one
-    // player whose photoUrl is legitimately null.
+
     const previous = {
       schemaVersion: SCHEMA_VERSION,
       dataVersion: DATA_VERSION,
@@ -1214,20 +1194,16 @@ describe('candidateKey', () => {
     const lowerScore = mk('1991-92', 1200, 60, 10);
     expect(compareKeys(candidateKey(higherScore), candidateKey(lowerScore))).toBe(1);
 
-    // Availability and minutes now contribute to the score before the
-    // documented minutes/games tie-breakers.
     const moreMinutes = mk('1991-92', 1200, 60, 10);
     const fewerMinutes = mk('1992-93', 1000, 50, 10);
     const moreKey = candidateKey(moreMinutes);
     const fewerKey = candidateKey(fewerMinutes);
     expect(compareKeys(moreKey, fewerKey)).toBe(1);
 
-    // Equal score + minutes -> more games wins: 55.9 both.
     const moreGames = mk('1991-92', 1200, 60, 10);
     const fewerGames = mk('1992-93', 1200, 40, 6);
     expect(compareKeys(candidateKey(moreGames), candidateKey(fewerGames))).toBe(1);
 
-    // Full tie -> earlier season wins (higher -seasonStart).
     const earlier = mk('1991-92', 1200, 60, null);
     const later = mk('1992-93', 1200, 60, null);
     expect(compareKeys(candidateKey(earlier), candidateKey(later))).toBe(1);
@@ -1295,11 +1271,6 @@ describe('run / writePool / updateManifest', () => {
 
 describe('schema fit (documented discrepancy)', () => {
   it('parsePool rejects a player whose playable union is empty (schema forbids empty unions)', () => {
-    // normalizePositionLabels returns detailed=[] for a player whose only
-    // label is "" (or whose labels are all unknown). The TS schema forbids
-    // an empty union with .min(1); computePool's record builder falls back
-    // to 'SF', and the writer logs the validation failure rather than
-    // dropping a player when a record somehow ships an empty union.
     const pool = computePool('lakers', '1990s', fixtureManifest(), BBREF_IDS, false) as Pool;
     const { detailed, sourceLabels } = normalizePositionLabels(new Set(['']));
     expect(detailed).toEqual([]);

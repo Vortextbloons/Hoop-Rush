@@ -1,28 +1,10 @@
 import type { SeasonPairChemistryState } from '@hoop-rush/data-contracts';
 import { SEASON_ROSTER_SIZE } from './roster-rules.ts';
 
-/**
- * M2.4 pair chemistry (spec/2.0/04, season-chemistry-v1). Every roster's 45
- * canonical player pairs start at zero shared possessions; after each
- * completed trip every pair of each active five increments by one. Wins,
- * scores, player identity, and off-court time never add chemistry, so a
- * pair's chemistry is a pure record of shared recorded play.
- *
- * Pair chemistry is `shared / (shared + 600)` converted to basis points;
- * active-unit chemistry is the arithmetic mean of its ten pair values.
- * Trades in M2.5 naturally create zero-state pairs; no same-person-version
- * exception exists.
- *
- * Pure TypeScript: no Svelte, persistence, worker, or network code.
- */
-
-/** Chemistry half-life constant: a pair reaches 50% at 600 shared trips. */
 export const SEASON_CHEMISTRY_HALF_SHARED = 600;
 
-/** Basis-point scale (10,000 = 100%). */
 export const SEASON_CHEMISTRY_BASIS_POINT_SCALE = 10_000;
 
-/** Canonical pair key: `a<0>b`, where a < b lexicographically. */
 export function seasonPairKey(a: string, b: string): string {
   return `${a}\u0000${b}`;
 }
@@ -31,7 +13,6 @@ export function seasonPairIsCanonical(a: string, b: string): boolean {
   return a < b;
 }
 
-/** All 45 unordered canonical pairs of a ten-player roster. */
 export function canonicalRosterPairs(roster: readonly string[]): Array<[string, string]> {
   if (roster.length !== SEASON_ROSTER_SIZE || new Set(roster).size !== SEASON_ROSTER_SIZE) {
     throw new Error(
@@ -50,7 +31,6 @@ export function canonicalRosterPairs(roster: readonly string[]): Array<[string, 
   return pairs;
 }
 
-/** The ten unordered canonical pairs of an active unit (five versions). */
 export function unitPairs(unit: readonly string[]): Array<[string, string]> {
   if (unit.length !== 5 || new Set(unit).size !== 5) {
     throw new Error(
@@ -69,19 +49,12 @@ export function unitPairs(unit: readonly string[]): Array<[string, string]> {
   return pairs;
 }
 
-/** Pair chemistry in basis points: `shared / (shared + 600)`, rounded. */
 export function pairChemistryBasisPoints(shared: number): number {
   return Math.round(
     (shared / (shared + SEASON_CHEMISTRY_HALF_SHARED)) * SEASON_CHEMISTRY_BASIS_POINT_SCALE,
   );
 }
 
-/**
- * Shared unit-chemistry mean: the arithmetic mean of the pair basis points
- * over the unit's ten canonical pairs, rounded once. `sharedOf` resolves
- * each pair's shared possessions; callers decide missing-pair handling
- * (`unitChemistryBasisPoints` throws, the effects buffer defaults to zero).
- */
 export function unitChemistryFromShared(
   unit: readonly string[],
   sharedOf: (a: string, b: string) => number,
@@ -93,11 +66,6 @@ export function unitChemistryFromShared(
   return Math.round(sum / 10);
 }
 
-/**
- * Active-unit chemistry: the arithmetic mean of its ten pair values, in
- * basis points. Every pair of the unit must exist in the supplied pair
- * states; a missing pair is a roster mismatch and throws.
- */
 export function unitChemistryBasisPoints(
   pairStates: readonly SeasonPairChemistryState[],
   unit: readonly string[],
@@ -112,10 +80,6 @@ export function unitChemistryBasisPoints(
   });
 }
 
-/**
- * The five unit pairs' shared-possession totals as a map (for per-unit
- * explanation facts). Missing pairs throw, matching unitChemistryBasisPoints.
- */
 export function unitSharedPossessions(
   pairStates: readonly SeasonPairChemistryState[],
   unit: readonly string[],

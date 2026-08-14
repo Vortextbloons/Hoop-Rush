@@ -2,14 +2,6 @@
   import type { SeasonTiebreakResolution } from '@hoop-rush/data-contracts';
   import { tiebreakResolutionViewModel } from '$lib/season/season-postseason-presentation';
 
-  /**
-   * Tiebreak explanations (M2.6 League tab): every recorded tie resolution
-   * from the authoritative engine ranking, grouped by conference and
-   * expandable — the collapsed row names the rule, the kind, and the slots
-   * it decided; the expanded body lists the teams in decided order with the
-   * recorded deciding facts. Scannable, not a spreadsheet.
-   */
-
   let {
     resolutions,
     franchiseName,

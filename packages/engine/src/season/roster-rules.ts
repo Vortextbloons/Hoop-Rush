@@ -2,21 +2,6 @@ import type { Position } from '@hoop-rush/data-contracts';
 import { canPlay, slotGroupOf } from '../domain/positions.ts';
 import { SEASON_ROSTER_RULES_VERSION } from '@hoop-rush/data-contracts';
 
-/**
- * Authoritative Season Run ten-player roster legality (spec/2.0/03,
- * season-roster-v1, M2.1). Pure TypeScript: no Svelte, persistence, worker,
- * or network code. A legal roster has exactly ten distinct playerVersionIds,
- * at least three guard-capable, three forward-capable, and two center-capable
- * players, a legal G,G,F,F,C matching, and a legal five after removing any
- * single member. Draft completion applies the stricter target of four
- * guard-, four forward-, and three center-capable players; multi-position
- * players satisfy multiple counts but occupy one roster slot.
- *
- * Feasibility searches use a capped-state DP over group coverage, so picks
- * that make completion impossible with the remaining catalog are rejected
- * during rolls and selections instead of failing at the end.
- */
-
 export const SEASON_ROSTER_RULES = {
   version: SEASON_ROSTER_RULES_VERSION,
   size: 10,
@@ -25,7 +10,6 @@ export const SEASON_ROSTER_RULES = {
   fiveStructure: { guards: 2, forwards: 2, centers: 1 },
 } as const;
 
-/** Ten-player roster size shared across season rules (seam constant). */
 export const SEASON_ROSTER_SIZE = SEASON_ROSTER_RULES.size;
 
 export interface SeasonRosterMemberInput {
@@ -33,10 +17,6 @@ export interface SeasonRosterMemberInput {
   playable: readonly Position[];
 }
 
-/**
- * Bitmask of coarse groups a player covers: bit 0 guard, bit 1 forward,
- * bit 2 center. Multi-position players cover several bits at once.
- */
 export function groupMaskOf(playable: readonly Position[]): number {
   let mask = 0;
   for (const position of playable) {
@@ -65,13 +45,7 @@ export function rosterGroupCounts(members: readonly SeasonRosterMemberInput[]): 
   return { guards, forwards, centers };
 }
 
-/**
- * True when a legal G,G,F,F,C matching exists among the members. Capped DP
- * over (guards ≤ 2, forwards ≤ 2, centers ≤ 1); greedy assignment is not
- * sound for multi-position players, so exact reachability is required.
- */
 export function legalFiveExists(members: readonly SeasonRosterMemberInput[]): boolean {
-  // State index: g*6 + f*2 + c with g in 0..2, f in 0..2, c in 0..1 (18 states).
   let reachable = 1;
   for (const member of members) {
     const mask = groupMaskOf(member.playable);
@@ -89,15 +63,10 @@ export function legalFiveExists(members: readonly SeasonRosterMemberInput[]): bo
     reachable = 0;
     for (const state of next) reachable |= 1 << state;
   }
-  // Target state g=2, f=2, c=1 -> 2*6 + 2*2 + 1 = 17.
+
   return (reachable & (1 << 17)) !== 0;
 }
 
-/**
- * True when a legal five remains after removing any single member. Empty
- * input trivially satisfies the per-removal loop only when no member exists;
- * callers combine this with the size check.
- */
 export function legalFiveAfterAnyRemoval(members: readonly SeasonRosterMemberInput[]): boolean {
   for (let remove = 0; remove < members.length; remove += 1) {
     const remaining: SeasonRosterMemberInput[] = [];
@@ -111,7 +80,6 @@ export function legalFiveAfterAnyRemoval(members: readonly SeasonRosterMemberInp
   return true;
 }
 
-/** True when the stricter draft-completion coverage target is met. */
 export function completionTargetsMet(members: readonly SeasonRosterMemberInput[]): boolean {
   const counts = rosterGroupCounts(members);
   return (
@@ -121,10 +89,6 @@ export function completionTargetsMet(members: readonly SeasonRosterMemberInput[]
   );
 }
 
-/**
- * Validates the complete ten-player roster contract. Returns every failure;
- * an empty array means the roster is legal.
- */
 export function validateSeasonRoster(members: readonly SeasonRosterMemberInput[]): string[] {
   const failures: string[] = [];
   const ids = members.map((member) => member.playerVersionId);
@@ -161,12 +125,6 @@ export function validateSeasonRoster(members: readonly SeasonRosterMemberInput[]
   return failures;
 }
 
-/**
- * Feasibility from precomputed counts: owned group counts and per-mask
- * counts of the available pool. Callers that probe many candidates reuse the
- * per-mask counts so the capped DP runs once per probe instead of scanning
- * the pool each time.
- */
 export function rosterFeasibleFromCounts(
   ownedCounts: { guards: number; forwards: number; centers: number },
   availableMaskCounts: readonly number[],
@@ -180,8 +138,6 @@ export function rosterFeasibleFromCounts(
   const startC = Math.min(SEASON_ROSTER_RULES.completionTargets.centers, ownedCounts.centers);
   if (startG >= 4 && startF >= 4 && startC >= 3) return true;
 
-  // State index: used*(5*5*4) + g*(5*4) + f*4 + c with used in 0..remainingPicks,
-  // g in 0..4, f in 0..4, c in 0..3.
   const usedBase = 100;
   const stateCount = usedBase * (remainingPicks + 1);
   const reachable = new Uint8Array(stateCount);
@@ -219,13 +175,6 @@ export function rosterFeasibleFromCounts(
   return reachable[targetUsed * usedBase + targetG * 16 + targetF * 4 + targetC] === 1;
 }
 
-/**
- * True when the current participant can still reach the completion target
- * with `remainingPicks` more selections from `available`. The DP caps group
- * counts at the targets (4/4/3) and picks at `remainingPicks`; candidate
- * fungibility is folded into per-mask counts, so the search is exact and
- * fast even with thousands of available versions.
- */
 export function rosterFeasible(
   owned: readonly SeasonRosterMemberInput[],
   available: readonly SeasonRosterMemberInput[],

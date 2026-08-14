@@ -4,14 +4,6 @@ import { generateSeasonSchedule, seasonRotationSetDigest } from '@hoop-rush/engi
 import type { SeasonBlockStartInput } from './season-block-runner';
 import { FakeSeasonBlockRunner } from './fake-season-block-runner';
 
-/**
- * FakeSeasonBlockRunner unit tests: the deterministic e2e runner streams
- * progress, cancels between games, retries idempotently, and never produces
- * tied finals (the engine rejects ties). Commits derive the M2.5 state
- * chain through the real `completeSeasonBlockCommit`, so the input run is a
- * full fixture (not a skeletal double).
- */
-
 vi.mock('$lib/season/season-repo', () => ({
   getSeasonRunRepository: vi.fn(() =>
     Promise.resolve({
@@ -103,7 +95,7 @@ describe('FakeSeasonBlockRunner', () => {
     expect(events[1]).toBe('progress');
     runner.cancel(requestId);
     expect(events[2]).toBe('cancelled');
-    // The flag is consumed, so the next startBlock runs to completion.
+
     const requestId2 = runner.startBlock({ ...minimalInput(), commandId: 'blk-fake-2' });
     expect(requestId2).not.toBe(requestId);
     await vi.advanceTimersByTimeAsync(3000);

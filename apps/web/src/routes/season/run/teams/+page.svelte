@@ -15,16 +15,6 @@
     summaryRatingsOfSlice,
   } from '$lib/season/season-player-slice';
 
-  /**
-   * Season Run team detail (M2.5 team drill-down): any franchise's roster,
-   * locked rotation (starters, bench order, target minutes, closing five),
-   * and folded per-player stats, reached at /season/run/teams?franchiseId=X
-   * by clicking a team in the League tab (standings or team stats). The
-   * human franchise renders the same read-only view plus a link to the
-   * Rotation editor; AI rotations are frozen for the run, so the locked
-   * rotation is always authoritative.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   const franchiseId = $derived(page.url.searchParams.get('franchiseId') ?? '');

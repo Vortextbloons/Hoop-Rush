@@ -10,18 +10,6 @@
   import { foldSeasonAggregates, LEADER_CATEGORY_LABELS } from '$lib/season/season-presentation';
   import { engineOrderLeaderTables, LEADER_CATEGORIES } from '$lib/season/season-leaders-view';
 
-  /**
-   * Leaders tab (spec/2.0/11, M2.3.5, M2.6): per-category league leaders
-   * folded from accepted summaries, ordered with the ENGINE's authoritative
-   * tie-break (per-game desc, value desc, playerVersionId asc) — not the
-   * value-first order of the frozen web `leaderTables` helper. Every entry
-   * is a distinct player-season version and shows its historical source
-   * logo and season. Mobile renders one category at a time with a
-   * headshot-led first-place card; desktop renders all categories as leader
-   * columns. From the playoffs on, the recorded season awards (MVP, DPOY,
-   * Sixth Man, All-League First Team) lead the page.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
   let activeCategory = $state<SeasonLeaderCategory>('points');
@@ -33,7 +21,6 @@
     aggregates ? engineOrderLeaderTables(aggregates.players, aggregates.teams) : null,
   );
   const rosterByVersion = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, SeasonRosterEntry>();
     for (const roster of shell.run?.rosters ?? []) {
       for (const entry of roster.players) map.set(entry.playerVersionId, entry);

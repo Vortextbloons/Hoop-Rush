@@ -9,16 +9,6 @@
   import type { SeasonRunCommandError } from '$lib/season/season-hub-state';
   import type { InfluenceSpendAffordance } from '$lib/season/season-influence-view';
 
-  /**
-   * Interruption recovery panel (M2.5): a typed `invalid-roster` state. The
-   * human cannot field a legal five at the next game's tipoff from health
-   * availability; the block is paused with its pending candidate preserved
-   * (no replay). Three explainable paths: (a) rotation repair in the
-   * existing editor, (b) a risky-rehab spend for an unavailable injured
-   * player (floor -3), or (c) an explicit forfeit of the next game — then
-   * Resume block re-simulates from the next game forward.
-   */
-
   let {
     interruption,
     pending,
@@ -32,13 +22,12 @@
     onForfeit,
     onResume,
   }: {
-    /** The typed interruption (null after a reload; the pending still proves the pause). */
     interruption: SeasonInvalidRosterInterruption | null;
     pending: SeasonPendingBlockCandidate | null;
     playerName: (playerVersionId: string) => string;
-    /** injuryId -> player display name (for the rehab buttons). */
+
     injuryPlayerName: (injuryId: string) => string;
-    /** risky-rehab affordances for the unavailable injured players. */
+
     rehabAffordances: InfluenceSpendAffordance[];
     balance: number;
     busy?: boolean;

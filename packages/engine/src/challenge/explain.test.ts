@@ -245,7 +245,7 @@ describe('explainSeason', () => {
 
   it('flags weak defensive glass from the opponent offensive-rebound rate', () => {
     const explanation = explainSeason(threeGameRun());
-    // Opponent OReb 0 in this fixture; rate 0 < threshold 0.3.
+
     expect(explanation.opponentOffensiveReboundRate).toBeLessThan(
       EXPLAIN_THRESHOLDS.opponentOffensiveReboundRate,
     );
@@ -256,7 +256,7 @@ describe('explainSeason', () => {
     const explanation = explainSeason(threeGameRun());
     expect(explanation.usageLeader).not.toBeNull();
     expect(explanation.usageLeader?.playerId).toBe('p-1');
-    // p-1: 130 FGA + 0.44*10 FTA + 10 TOV = 144.4 of a 265.28 team usage.
+
     expect(explanation.usageLeader?.usageShare).toBeCloseTo(144.4 / 265.28, 6);
     expect(explanation.usageLeader?.usageShare).toBeGreaterThanOrEqual(
       EXPLAIN_THRESHOLDS.usageShare,

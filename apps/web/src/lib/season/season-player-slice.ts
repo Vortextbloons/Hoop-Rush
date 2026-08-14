@@ -1,15 +1,5 @@
 import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
 
-/**
- * Performance pass: lookup helpers over the compact per-run player slice
- * (positions/ratings/stamina/durability persisted at draft promotion). The
- * rotation editor, team page, lock preview, and hub fatigue projections read
- * from the slice instead of the full packaged draft catalog, so the shell
- * stays interactive before the ~17 MB catalog download/parse finishes. The
- * full catalog remains behind the lazy trade-only path (trade offers need
- * detailed ratings) and inside the simulation worker.
- */
-
 export type SeasonRunPlayerSlice = ReadonlyMap<string, SeasonRunPlayerSliceEntry>;
 
 export function playerSliceOf(

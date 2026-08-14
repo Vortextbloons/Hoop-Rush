@@ -8,15 +8,6 @@
   import GameStrip from '$lib/components/GameStrip.svelte';
   import TeamLogo from '$lib/components/TeamLogo.svelte';
 
-  /**
-   * Challenge progress overlay (spec/08): the full-screen presentation shared
-   * by Sandbox and Classic. The 82-cell strip fills left to right; the
-   * currently revealed opponent, game number, score, and live record sit
-   * directly above it. The owning route drives the runner lifecycle and the
-   * bounded announcements; this component only presents accepted run state
-   * and issues the Cancel / Continue / Retry commands.
-   */
-
   let {
     manifest,
     run,
@@ -70,9 +61,6 @@
   });
 </script>
 
-<!-- Full-screen presentation overlay.
-     Layout is fully reserved: top-aligned, fixed scoreboard columns, and
-     reserved logo boxes so paced reveals cannot reflow. -->
 <div
   class="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-none bg-background [scrollbar-gutter:stable]"
 >
@@ -90,7 +78,6 @@
       {/if}
     </h1>
 
-    <!-- Live scoreboard: fixed center column so digit/name churn cannot shove sides. -->
     <div
       class="mt-6 grid grid-cols-[minmax(0,1fr)_9.5rem_minmax(0,1fr)] items-center gap-3 rounded-2xl border border-line-strong bg-card p-4 shadow-[0_0_24px_hsl(13_100%_62%/0.12)] sm:grid-cols-[minmax(0,1fr)_12rem_minmax(0,1fr)] sm:p-6"
     >

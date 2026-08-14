@@ -6,16 +6,6 @@ import type {
 import type { Rng } from './rng.ts';
 import { ENGINE_CONSTANTS } from './constants.ts';
 
-/**
- * Ball security versus defensive pressure resolves turnovers and optional
- * steals (spec/03 pipeline stage 3). Turnover probability is anchored to the
- * era's turnover-per-possession baseline: a handler at the population-mean
- * reference converts at the era rate, and player turnover tendency, ball
- * handling, passing, and defensive pressure move the probability in bounded
- * steps. Era differences therefore flow through the model instead of living
- * in a hardcoded intercept.
- */
-
 export function defenderPressure(defender: SimulationPlayer): number {
   return (
     (defender.ratings.perimeterDefense * 0.5 +
@@ -25,14 +15,6 @@ export function defenderPressure(defender: SimulationPlayer): number {
   );
 }
 
-/**
- * Possession-estimates per trip for the era (FGA + 0.44*FTA + TOV per game
- * divided by trips per team game). Turnover tendencies are measured per
- * possession-estimate while the engine checks ball security once per trip,
- * so the blend in turnoverProbability converts the player tendency to the
- * per-trip convention with this ratio. Derived from the frozen era targets;
- * null when the targets cannot support it.
- */
 export function eraPossEstimatePerTrip(profile: EraSimulationProfile): number | null {
   const t = profile.targets;
   const fta = t.freeThrowsAttemptedPerGame.value;
@@ -51,16 +33,6 @@ export function eraPossEstimatePerTrip(profile: EraSimulationProfile): number | 
   return possEstimate / poss;
 }
 
-/**
- * Turnover probability for a ball handler against a five-man defense. The
- * player's observed per-possession turnover tendency is the primary anchor
- * (turnoverObservedBlend) so a star handler converts near his own real rate
- * instead of the league mean; the era base pulls the residual. The tendency
- * is converted to the engine's per-trip convention so at the population mean
- * the blend reproduces the era turnover target exactly. Defensive pressure,
- * ball handling, and passing then move the probability in bounded steps
- * around the packaged pool population means.
- */
 export function turnoverProbability(
   handler: SimulationPlayer,
   pressure: number,
@@ -87,12 +59,6 @@ export function turnoverProbability(
   return Math.min(c.turnoverMax, Math.max(c.turnoverMin, raw));
 }
 
-/**
- * Whether a turnover is credited as an opponent steal. The era's recorded
- * steal share of turnovers is the anchor: an average defensive team
- * (steal-rating neutral) converts turnovers into steals at exactly the era
- * share, and above-average ball pressure earns a bounded bonus.
- */
 export function isSteal(rng: Rng, stealAbility: number, profile: EraSimulationProfile): boolean {
   const p =
     profile.parameters.stealShareOfTurnovers *

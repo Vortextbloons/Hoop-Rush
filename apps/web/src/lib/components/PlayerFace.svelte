@@ -8,7 +8,6 @@
 
   type HeadshotPlayer = Pick<PeakPlayerSeason, 'playerId' | 'playerExternalId' | 'altIds'>;
 
-  /** Seconds before a pending headshot request is treated as stalled. */
   const HEADSHOT_TIMEOUT_MS = 15000;
 
   let {
@@ -42,18 +41,9 @@
   const showInitials = $derived(!src || attempt >= urls.length);
   const applyStallTimeout = $derived(shouldStallTimeoutHeadshot(src, urls, attempt, player));
 
-  /**
-   * A request that hangs (e.g. a reset connection that never errors) would
-   * otherwise stall the fallback chain; advance past any src that has not
-   * completed within the timeout. Confirmed NBA headshots are exempt when
-   * the only remaining fallback is a wiki action photo.
-   */
   $effect(() => {
     const current = src;
-    // A lazy image may intentionally remain unrequested while offscreen.
-    // Starting the stall clock here would exhaust valid candidates before
-    // the browser ever tries them. Lazy requests still advance on `error`;
-    // reserve the timeout recovery for eager, immediately requested faces.
+
     if (!eager || !current || !applyStallTimeout) return;
     const timer = setTimeout(() => {
       if (imgEl && !imgEl.complete && imgEl.naturalWidth === 0) {

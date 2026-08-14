@@ -5,16 +5,6 @@ import type {
 } from '@hoop-rush/data-contracts';
 import { oneDecimal, percentOneDecimal } from './format';
 
-/**
- * Pure presentation helpers for the Roster browser: filtering, sorting, and
- * grouping of the global players index. No DOM, no Svelte — unit-testable.
- */
-
-/**
- * Roster-browser row: a draft-index entry joined with its roster-details
- * (season stats and physical profile). The Roster screen builds these by
- * joining the two assets; draft screens use `PlayersIndexEntry` only.
- */
 export type RosterDetailRow = PlayersIndexEntry & RosterDetailsEntry;
 
 export type RosterListItem<T = RosterDetailRow> =
@@ -26,7 +16,7 @@ export interface RosterColumn {
   label: string;
   sort?: RosterSortId;
   numeric?: boolean;
-  /** Hide column below this breakpoint (table only). */
+
   hideBelow?: 'md' | 'lg';
 }
 
@@ -45,7 +35,6 @@ export type RosterSortId =
 
 export type RosterSortDirection = 'asc' | 'desc';
 
-/** Default direction per sort mode; numeric ratings/stat modes favor best-first. */
 export function defaultDirection(sortId: RosterSortId): RosterSortDirection {
   switch (sortId) {
     case 'overall':
@@ -63,7 +52,7 @@ export function defaultDirection(sortId: RosterSortId): RosterSortDirection {
 export interface RosterFilters {
   franchiseId: string | null;
   eraId: string | null;
-  /** Detailed position union member ('PG' | 'SG' | 'SF' | 'PF' | 'C'). */
+
   position: 'PG' | 'SG' | 'SF' | 'PF' | 'C' | null;
   query: string;
 }
@@ -78,7 +67,6 @@ const POSITION_ORDER: Readonly<Record<string, number>> = {
 
 const lowercaseNameCache = new WeakMap<PlayersIndexEntry, string>();
 
-/** Case-folded display name, memoized per row object (the index is immutable). */
 export function lowercaseName(row: PlayersIndexEntry): string {
   let folded = lowercaseNameCache.get(row);
   if (folded === undefined) {
@@ -190,11 +178,6 @@ export function groupRoster(rows: RosterDetailRow[]): RosterGroup[] {
   return groups;
 }
 
-/**
- * Paginates a flat item list (players plus optional group headers) so that
- * exactly `count` player rows are included; group headers leading into the
- * page are kept.
- */
 export function paginateItems<T extends { type: string }>(items: T[], count: number): T[] {
   let players = 0;
   const page: T[] = [];
@@ -206,13 +189,6 @@ export function paginateItems<T extends { type: string }>(items: T[], count: num
   return page;
 }
 
-/**
- * Paginates grouped roster rows in a single pass, emitting a group header the
- * first time each franchise/era key appears and stopping once `count` player
- * rows are included. Output-identical to
- * `paginateItems(groupRoster(rows).flatMap(...), count)` for contiguously
- * grouped input (the players index order).
- */
 export function paginateGroupedRows<T extends PlayersIndexEntry>(
   rows: T[],
   count: number,
@@ -244,7 +220,6 @@ export function paginateGroupedRows<T extends PlayersIndexEntry>(
   return page;
 }
 
-/** Per-game value of a counting stat, guarding against zero games. */
 export function perGame(stats: PlayerSeasonStats, key: keyof PlayerSeasonStats): number {
   if (stats.gamesPlayed <= 0) return 0;
   const value = stats[key];
@@ -252,7 +227,6 @@ export function perGame(stats: PlayerSeasonStats, key: keyof PlayerSeasonStats):
   return value / stats.gamesPlayed;
 }
 
-/** Made/attempted percentage 0-1, guarding against zero attempts. */
 export function shotPct(made: number | null, attempted: number | null): number {
   if (made === null || attempted === null || attempted <= 0) return 0;
   return made / attempted;

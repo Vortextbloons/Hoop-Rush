@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, waitFor, within } from '@testing-library/svelte';
 import {
@@ -18,18 +16,6 @@ import {
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
 mockSvelteKitApp();
-
-/**
- * RotationEditor component tests (M2.3 hub, M2.3.5 team workspace): one
- * unified ten-player list at every breakpoint — strategy buttons, minute
- * steppers with visible rebalancing, tap-to-type minutes, closing-five
- * toggles, bench move-up/down controls, the invalid-rotation alert, and
- * per-player failure placement. The editor's engine-validated commits are
- * unit-tested in season-rotation-editor.test.ts; here we verify the wiring.
- * The strategy-button tests cover the page-owned projection hook: each
- * button applies its strategy's plan automatically with the fixed preset as
- * the fallback.
- */
 
 function members(): RotationMember[] {
   return rotationMembers();
@@ -52,22 +38,18 @@ function renderEditor(overrides: { minutes?: Array<[string, number]> } = {}) {
   return { editor, onchange, ...result };
 }
 
-/** The single unified rotation list (starters + bench rows). */
 function rotationList(container: HTMLElement) {
   const section = container.querySelector('section[aria-labelledby="starters-heading"]');
   if (section === null) throw new Error('starters section missing');
   return within(section as HTMLElement);
 }
 
-/** The top-of-page minutes panel: all ten players with their minute controls. */
 function minutesList(container: HTMLElement) {
   const section = container.querySelector('section[aria-labelledby="minutes-heading"]');
   if (section === null) throw new Error('minutes section missing');
   return within(section as HTMLElement);
 }
 
-/** A three-plan optimize fixture: legal rotations over the fixture roster,
- * distinct per-strategy policies, and one heavy-strain plan. */
 function fixturePlanResult(): MinutePlanOptimizationResult {
   const base = legalRotation();
   const plan = (
@@ -112,7 +94,7 @@ describe('RotationEditor component', () => {
     expect(container.querySelector('p strong')?.textContent).toBe('240');
     expect(queryByRole('button', { name: 'Bench' })).toBeNull();
     expect(queryByRole('button', { name: 'Closing' })).toBeNull();
-    // Five starter rows with slot pickers and five bench rows are present.
+
     const starterList = rotationList(container);
     expect(starterList.getAllByRole('combobox', { name: /Starter slot/ })).toHaveLength(5);
     const benchSection = container.querySelector('section[aria-labelledby="bench-heading"]');
@@ -120,7 +102,7 @@ describe('RotationEditor component', () => {
     expect(
       within(benchSection as HTMLElement).getAllByRole('button', { name: /bench order/i }),
     ).toHaveLength(10);
-    // All ten minute controls live in the top minutes panel.
+
     expect(minutesList(container).getAllByRole('group', { name: /Minutes for/ })).toHaveLength(10);
   });
 
@@ -157,16 +139,16 @@ describe('RotationEditor component', () => {
       throw new Error('fixture roster has no center-only player');
     }
     const starterList = rotationList(container);
-    // The center-only player never appears in a guard slot picker.
+
     const guardPicker = starterList.getByRole('combobox', { name: 'Starter slot 1' });
     const guardNames = [...guardPicker.querySelectorAll('option')].map((o) => o.textContent);
     expect(guardNames).not.toContain(centerOnly.displayName);
-    // The center picker lists exactly the center-capable roster players.
+
     const centerPicker = starterList.getByRole('combobox', { name: 'Starter slot 5' });
     const centerNames = [...centerPicker.querySelectorAll('option')].map((o) => o.textContent);
     const expected = optionIds(4).map((id) => editor.names.get(id) ?? '');
     expect(centerNames.sort()).toEqual(expected.sort());
-    // Every picker still contains its current starter.
+
     for (let slotIndex = 0; slotIndex < 5; slotIndex += 1) {
       const current = editor.rotation.starters[slotIndex];
       if (current === undefined) continue;
@@ -222,7 +204,7 @@ describe('RotationEditor component', () => {
     await fireEvent.click(list.getByRole('button', { name: `Increase minutes for ${label}` }));
     const status = container.querySelector('[role="status"]');
     expect(status?.textContent ?? '').toMatch(/took 1 from/);
-    // The compensated player's row carries the highlight ring.
+
     const second = editor.rotation.starters[1];
     if (second === undefined) {
       throw new Error('fixture rotation has no second starter');
@@ -250,7 +232,7 @@ describe('RotationEditor component', () => {
     const [rotation] = onchange.mock.calls.at(-1) as [SeasonRotation, string[]];
     expect(rotation.targetMinutes.find((t) => t.playerVersionId === first)?.minutes).toBe(40);
     expect(rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0)).toBe(240);
-    // The editor state committed and the input closed.
+
     expect(container.querySelector('input[inputmode="numeric"]')).toBeNull();
   });
 
@@ -321,12 +303,12 @@ describe('RotationEditor component', () => {
     expect(onchange).toHaveBeenCalledTimes(1);
     expect(editor.rotation.benchOrder[0]).toBe(second);
     expect(editor.rotation.benchOrder[1]).toBe(first);
-    // The player at the top of the bench cannot move up any further.
+
     const upForFirst = benchList.getByRole('button', {
       name: `Move ${secondLabel} up in bench order`,
     });
     expect((upForFirst as HTMLButtonElement).disabled).toBe(true);
-    // The displaced player can still move up into the first spot.
+
     const upForLast = benchList.getByRole('button', {
       name: `Move ${firstLabel} up in bench order`,
     });
@@ -346,8 +328,7 @@ describe('RotationEditor component', () => {
       'select[aria-label="Starter slot 1"]',
     ) as HTMLSelectElement;
     await fireEvent.change(select, { target: { value: centerOnly.playerVersionId } });
-    // The engine rejects the swap; the rotation is unchanged and the page
-    // reports the rejection.
+
     expect(editor.rotation.starters[0]).not.toBe(centerOnly.playerVersionId);
     expect(onchange).not.toHaveBeenCalled();
     const alert = container.querySelector('[role="alert"]');
@@ -356,9 +337,7 @@ describe('RotationEditor component', () => {
 
   it('surfaces per-player audit failures beside the affected row', () => {
     const editor = createRotationEditor(legalRotation(), members());
-    // Promote a bench player who cannot play a guard slot into starter slot 0,
-    // demoting the incumbent guard to the bench. The audit fails per-player
-    // ("starter {id} cannot play slot 0") while the partition stays unique.
+
     const bench = editor.rotation.benchOrder.find((id) => {
       const candidate = CANDIDATES.find((c) => c.playerVersionId === id);
       if (candidate === undefined) {
@@ -396,7 +375,7 @@ describe('RotationEditor component', () => {
 
   it('surfaces the invalid-rotation alert when the audit fails', () => {
     const editor = createRotationEditor(legalRotation(), members());
-    // Break the 240 total: give the first starter 48 (33+32... total 256).
+
     const first = editor.rotation.starters[0];
     if (first === undefined) {
       throw new Error('fixture rotation has no first starter');
@@ -450,14 +429,14 @@ describe('RotationEditor component', () => {
     });
     await fireEvent.click(getByRole('button', { name: 'Balanced' }));
     expect(run).toHaveBeenCalledTimes(1);
-    // Busy while the page's promise is pending.
+
     const busyButton = getByRole('button', { name: 'Optimizing…' }) as HTMLButtonElement;
     expect(busyButton.disabled).toBe(true);
     released[0]?.(result);
     await waitFor(() => {
       expect(onchange).toHaveBeenCalledTimes(1);
     });
-    // The plan for the clicked strategy commits through the editor audit.
+
     const [rotation] = onchange.mock.calls[0] as [SeasonRotation, string[]];
     expect(rotation.minutePolicy.strategy).toBe('balanced');
     expect(editor.rotation.minutePolicy.strategy).toBe('balanced');
@@ -501,7 +480,7 @@ describe('RotationEditor component', () => {
     await waitFor(() => {
       expect(onchange).toHaveBeenCalledTimes(1);
     });
-    // The fixed Balanced table (33 / 21,18,15,12,9) is the fallback.
+
     const [rotation] = onchange.mock.calls[0] as [SeasonRotation, string[]];
     const minutes = new Map(
       rotation.targetMinutes.map((row) => [row.playerVersionId, row.minutes]),
@@ -525,8 +504,7 @@ describe('RotationEditor component', () => {
         optimize: { run, busy: false, error: null },
       },
     });
-    // fixturePlanResult covers all three strategies, so drop the bench-heavy
-    // plan: clicking Bench-Heavy must still apply the fixed preset table.
+
     run.mockImplementation(() =>
       Promise.resolve({
         ...result,
@@ -560,7 +538,7 @@ describe('RotationEditor component', () => {
     await waitFor(() => {
       expect(getByRole('button', { name: 'Balanced' })).not.toBeNull();
     });
-    // The page records the failure and pushes it through the hook's error prop.
+
     await rerender({ ...props, optimize: { run, busy: false, error: 'boom' } });
     const alert = getByRole('alert');
     expect(alert.textContent).toMatch(/Projection unavailable — applied the preset minutes: boom/);

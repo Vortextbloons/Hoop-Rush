@@ -19,12 +19,6 @@ import { buildInitialPostseasonState } from './season-postseason.ts';
 import { SEASON_OBJECTIVE_CATALOG } from './season-objective.ts';
 import { SEASON_ALIGNMENT } from './season-alignment.ts';
 
-/**
- * Self-contained Season Run contract fixtures shared by the data-contracts
- * schema tests. Kept in a plain module (not a test file) so multiple test
- * files reuse the builders without re-executing describe blocks.
- */
-
 export const CONFERENCE_TEAMS: Record<'east' | 'west', string[]> = {
   east: SEASON_ALIGNMENT.filter((entry) => entry.conference === 'east').map(
     (entry) => entry.franchiseId,
@@ -92,12 +86,10 @@ export function buildGames(schedule: SeasonSchedule): SeasonGame[] {
   }));
 }
 
-/** M2.6 initial postseason state (postseason-v2 scaffold). */
 export function buildPostseason(seed: string): SeasonRun['postseason'] {
   return buildInitialPostseasonState(seed);
 }
 
-/** Empty M2.5 health state: no injury records yet. */
 export function buildEmptyHealth(): SeasonHealthState {
   return {
     schemaVersion: 1,
@@ -106,10 +98,6 @@ export function buildEmptyHealth(): SeasonHealthState {
   };
 }
 
-/**
- * Initial M2.6.5 free-agency state: no windows, no canonical candidates,
- * every franchise at zero season signings and zero season spend.
- */
 export function buildEmptyFreeAgency(): SeasonRun['freeAgency'] {
   const franchises = [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west];
   return {
@@ -122,11 +110,6 @@ export function buildEmptyFreeAgency(): SeasonRun['freeAgency'] {
   };
 }
 
-/**
- * M2.5 initial Influence state: every franchise at +2 with its recorded
- * `initial-grant` ledger entry (blockIndex and commandId null), no windows
- * open, and no rehab spends.
- */
 export function buildInitialInfluence(): SeasonInfluenceState {
   const franchises = [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west];
   return {
@@ -429,14 +412,6 @@ export function buildRun(): SeasonRun {
   };
 }
 
-/**
- * Deterministic roster-generation-v2 pools for the fixture run: one
- * 20-player pool per AI franchise (29 pools; the human franchise gets
- * none), each with ten selections, one allocation seed path per selection,
- * and a leading anchor whose role score clears the p90 threshold. Pool
- * versions are distinct from roster versions so the fixture never depends
- * on pool-rosters identity.
- */
 function buildFixtureAiPools(
   league: SeasonLeague,
   aiAssignments: SeasonRun['aiAssignments'],
@@ -477,12 +452,10 @@ function buildFixtureAiPools(
     });
 }
 
-/** Deterministic fixture playerVersionId (`pv-` + 32 hex digits). */
 export function fixturePlayerId(index: number): string {
   return `pv-${String(index).padStart(32, '0')}`;
 }
 
-/** Valid M2.4 effects state: 300 active player loads, 45 canonical pairs per roster. */
 export function buildEffectsStateFixture(): SeasonEffectsState {
   const playerStates: SeasonPlayerLoadState[] = Array.from({ length: 300 }, (_, index) => ({
     playerVersionId: fixturePlayerId(index),
@@ -511,7 +484,6 @@ export function buildEffectsStateFixture(): SeasonEffectsState {
   };
 }
 
-/** One zero compact player line for a fixture summary. */
 export function buildFixturePlayerLine(
   playerVersionId: string,
 ): SeasonGameSummary['homePlayers'][number] {
@@ -535,7 +507,6 @@ export function buildFixturePlayerLine(
   };
 }
 
-/** One zero team box for a fixture summary. */
 export function buildFixtureTeamBox(franchiseId: string): SeasonGameSummary['homeBox'] {
   return {
     franchiseId,
@@ -557,7 +528,6 @@ export function buildFixtureTeamBox(franchiseId: string): SeasonGameSummary['hom
   };
 }
 
-/** One zero-value M2.5-ready summary (v3, empty injury events). */
 export function buildSummaryFixture(): SeasonGameSummary {
   return {
     schemaVersion: 1,
@@ -583,7 +553,6 @@ export function buildSummaryFixture(): SeasonGameSummary {
   };
 }
 
-/** One zero-value aggregate row per franchise (30 rows, canonically sorted). */
 function buildTeamAggregateRows(): SeasonTeamAggregate[] {
   return [...CONFERENCE_TEAMS.east, ...CONFERENCE_TEAMS.west].map((franchiseId) => ({
     franchiseId,
@@ -608,7 +577,6 @@ function buildTeamAggregateRows(): SeasonTeamAggregate[] {
   }));
 }
 
-/** One zero-value aggregate row per rostered version (300 rows). */
 function buildPlayerAggregateRows(): SeasonPlayerAggregate[] {
   return Array.from({ length: 300 }, (_, index) => ({
     playerVersionId: fixturePlayerId(index),
@@ -634,7 +602,6 @@ function buildPlayerAggregateRows(): SeasonPlayerAggregate[] {
   }));
 }
 
-/** M2.5-ready block recap (empty evidence, human balance 2, no free agency). */
 function buildRecapFixture(run: SeasonRun): SeasonCandidateCheckpoint['recap'] {
   return {
     schemaVersion: 1,
@@ -670,10 +637,6 @@ function buildRecapFixture(run: SeasonRun): SeasonCandidateCheckpoint['recap'] {
   };
 }
 
-/**
- * A minimal but schema-valid M2.5 candidate checkpoint (block 0, zeroed
- * aggregates, one zero summary, empty M2.5 state, state chain at 0).
- */
 export function buildCheckpointFixture(): SeasonCandidateCheckpoint {
   const run = buildRun();
   return {
@@ -748,10 +711,6 @@ export function buildCheckpointFixture(): SeasonCandidateCheckpoint {
   };
 }
 
-/**
- * A minimal but schema-valid M2.5 pending block candidate (block 0,
- * interrupted before any summary, empty partial folds).
- */
 export function buildPendingBlockFixture(): SeasonPendingBlockCandidate {
   const run = buildRun();
   return {
@@ -776,12 +735,6 @@ export function buildPendingBlockFixture(): SeasonPendingBlockCandidate {
   };
 }
 
-/**
- * Minimal valid simulation ratings (matches `simulationRatingsSchema`).
- * The four scoring values match the fixture player defaults in
- * `@hoop-rush/test-fixtures` (`buildSimulationPlayer` derives from these),
- * so the season-game fixtures and the sim fixtures share one canonical set.
- */
 export const SIMULATION_RATINGS: SeasonGamePlayerInput['ratings'] = {
   insideScoring: 78,
   closeShot: 70,
@@ -803,7 +756,6 @@ export const SIMULATION_RATINGS: SeasonGamePlayerInput['ratings'] = {
   vertical: 66,
 };
 
-/** Minimal valid simulation tendencies (matches `simulationTendenciesSchema`). */
 export const SIMULATION_TENDENCIES: SeasonGamePlayerInput['tendencies'] = {
   usageRate: 20,
   passRate: 30,

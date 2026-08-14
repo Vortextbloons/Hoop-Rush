@@ -1,11 +1,3 @@
-/**
- * M2.5 calibration core shared by `season health calibrate`, `season trade
- * calibrate`, and `season influence calibrate` (spec/2.0 M2.5, contract §17).
- * Cohorts run the engine block pipeline in process over root-seed-cloned
- * runs; worker counts and chunk order never change the facts (a worker
- * variant is deferred to stay bounded).
- */
-
 import {
   SEASON_BLOCK_COUNT,
   SEASON_HEALTH_VERSION,
@@ -57,28 +49,26 @@ export function m25InitialObjectivesState(): SeasonObjectiveState {
   });
 }
 
-/** The +2 initial Influence state for all franchises (engine-owned). */
 export function m25InitialInfluenceState(franchiseIds: readonly string[]): SeasonInfluenceState {
   return createInitialSeasonInfluenceState(franchiseIds);
 }
 
-/** The run-state facts `seasonRunStateDigest` canonicalizes (§20 item 2, M2.6). */
 export interface SeasonM25RunStateFacts {
   stateRevision: number;
-  /** M2.6: the explicit run stage. */
+
   stage: SeasonRun['stage'];
-  /** M2.6: the postseason-v2 state. */
+
   postseason: SeasonRun['postseason'];
-  /** M2.6: season awards (null until postseason qualification). */
+
   awards: SeasonRun['awards'];
-  /** M2.6: completion state (null until a champion is decided). */
+
   completion: SeasonRun['completion'];
   checkpointState: SeasonCheckpointState | null;
   health: SeasonHealthState;
   influence: SeasonInfluenceState;
   transactions: SeasonRun['transactions'];
   trade: SeasonTradeState | null;
-  /** M2.6.5: the free-agency market state. */
+
   freeAgency: SeasonRun['freeAgency'];
   objectives: SeasonObjectiveState;
   rosters: SeasonRun['rosters'];
@@ -111,11 +101,6 @@ export function m25RunStateFacts(
   };
 }
 
-/**
- * Fresh run clone for one cohort seed (identical rosters/schedule/rotations,
- * new root seed, clean M2.5 facts). stateDigest excludes itself from its own
- * computation, mirroring the checkpoint digest.
- */
 export function m25FreshRun(
   base: SeasonRun,
   rootSeed: string,
@@ -125,8 +110,7 @@ export function m25FreshRun(
   const fresh: SeasonRun = {
     ...base,
     rootSeed,
-    // M2.6: the postseason scaffold (seeds, scheduled play-in ids) derives
-    // from the run root seed, so each cohort seed owns its scaffold.
+
     stage: 'regular-season',
     postseason: buildInitialPostseasonState(rootSeed),
     awards: null,
@@ -145,27 +129,27 @@ export function m25FreshRun(
 
 export interface SeasonM25WindowOpen {
   blockIndex: number;
-  /** The applied window result; null when no window opens (§20). */
+
   result: SeasonWindowOpenResult | null;
 }
 
 export interface SeasonM25SeasonFacts {
   rootSeed: string;
-  /** Final run state (health/influence/transactions/trade folded). */
+
   run: SeasonRun;
-  /** One candidate checkpoint per block (0..8), in block order. */
+
   checkpoints: SeasonCandidateCheckpoint[];
-  /** Post-block state chain facts per block (0..8). */
+
   postBlock: Array<{ stateRevision: number; stateDigest: string }>;
-  /** Trade windows opened at blocks 2/4/5 (only when driveWindows). */
+
   windows: SeasonM25WindowOpen[];
-  /** Pre-block Influence balance snapshot per block commit (9 per season). */
+
   balanceSnapshots: Array<Record<string, number>>;
-  /** The final post-block effects state (loads + pair chemistries). */
+
   effects: SeasonEffectsState;
-  /** The packaged catalog (playable positions for the legality audits). */
+
   catalog: SeasonDraftCatalog;
-  /** Every regular-season compact summary of the season, in game-id order. */
+
   summaries: SeasonGameSummary[];
 }
 
@@ -173,24 +157,18 @@ export interface SeasonM25DriverOptions {
   runPath?: string | null;
   manifestPath?: string | null;
   profileEra?: string | null;
-  /** The cohort root seed for this season. */
+
   rootSeed: string;
-  /** Open trade windows at blocks 2/4/5 (trade + influence cohorts). */
+
   driveWindows: boolean;
-  /** Select the first offered objective per block 0-7 (influence cohort). */
+
   pickObjectives: boolean;
-  /** Determinism probe: re-run window generation at the first window block. */
+
   probeWindow?: boolean;
 }
 
-/** The window blocks in schedule order (contract §13). */
 export const M25_TRADE_WINDOW_BLOCKS = [2, 4, 5] as const;
 
-/**
- * Simulates one full season through the engine pipeline with M2.5 facts
- * threaded. Fixture and cohort paths share this driver; worker counts and
- * chunk order never change the recorded facts.
- */
 export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFacts {
   const state: SeasonBlockRunnerState = createSeasonBlockRunner({
     runPath: options.runPath,
@@ -231,8 +209,7 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
     checkpoints.push(checkpoint);
     postBlock.push({ stateRevision: state.stateRevision, stateDigest: state.stateDigest });
     balanceSnapshots.push({ ...checkpoint.influence.balances });
-    // Record the locked objective selection; run selections are the
-    // objective-history source the influence gates measure.
+
     if (state.objectiveId !== null && checkpoint.objective.objectiveId !== null) {
       state.run = {
         ...state.run,
@@ -258,8 +235,7 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
         blockIndex,
         rootSeed: options.rootSeed,
         humanFranchiseId: state.humanFranchiseId,
-        // Window generation needs the packaged catalog (positions + ratings);
-        // otherwise the engine throws SeasonTradeFactsError.
+
         catalog: state.catalog,
         effects: state.effects,
       };
@@ -267,7 +243,6 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
       windows.push({ blockIndex, result });
       if (result !== null) {
         if (options.probeWindow && !probed) {
-          // Determinism probe: the same input must generate identical offers.
           const again = openSeasonTradeWindow(windowInput);
           if (JSON.stringify(again?.trade) !== JSON.stringify(result.trade)) {
             throw new Error(
@@ -287,8 +262,7 @@ export function runSeasonM25(options: SeasonM25DriverOptions): SeasonM25SeasonFa
           stateRevision: result.stateRevision,
           stateDigest: result.stateDigest,
         };
-        // Sync runner facts to the post-window revision/digest so the next
-        // block's command asserts the advanced chain.
+
         state.stateRevision = result.stateRevision;
         state.stateDigest = result.stateDigest;
         state.effects = result.effects;

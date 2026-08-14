@@ -5,19 +5,6 @@
   import { franchiseIdentityOf } from '$lib/season/season-branding';
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
 
-  /**
-   * Box score view for one completed human-team game (M2.3, M2.3.5): team
-   * totals and the ten compact player lines from the summary, joined with
-   * roster names and positions. Exact integers only — no derived
-   * efficiencies beyond what the compact contract carries.
-   *
-   * Responsive: below `md` a compact primary-stat view (Player, Min, Pts,
-   * Reb, Ast) with no horizontal scroll sits above an expandable full-stat
-   * table; at `md+` the full 13-column table renders directly. When a
-   * manifest plus both franchise ids are provided, the header shows the
-   * team logos.
-   */
-
   let {
     box,
     opponentName,
@@ -29,11 +16,11 @@
     box: BoxScore;
     opponentName: string;
     resultLabel: string;
-    /** Packaged manifest; when present the header renders team logos. */
+
     manifest?: HoopRushManifest | null;
-    /** Owning franchise of the boxed team (header logo). */
+
     teamFranchiseId?: string | null;
-    /** Opponent franchise (header logo). */
+
     opponentFranchiseId?: string | null;
   } = $props();
 

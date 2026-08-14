@@ -3,14 +3,6 @@
   import PlayerFace from '$lib/components/PlayerFace.svelte';
   import type { SeasonFaceRef } from '$lib/season/season-branding';
 
-  /**
-   * Seasonal wrapper around the shared PlayerFace: uniform sizing, reserved
-   * dimensions, lazy loading for offscreen faces, and an initials fallback.
-   * Faces whose players-index join failed (empty playerExternalId) render
-   * initials directly without a doomed network request. The human masthead
-   * and the currently visible draft offer render faces eagerly.
-   */
-
   let {
     face,
     manifest,

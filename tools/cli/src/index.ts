@@ -19,7 +19,6 @@ interface CommandEntry {
   load: () => Promise<CommandDef>;
 }
 
-/** Registers a command whose module (and its import graph) loads on demand. */
 function command(load: CommandEntry['load']): CommandEntry {
   return { load };
 }
@@ -952,9 +951,6 @@ async function main(argv: string[]): Promise<{ report: CliReport; format: 'text'
   let commandKey: string;
   let def: CommandDef;
   try {
-    // Resolve the command: three-word and two-word commands first, then
-    // single-word commands when the next token is an option or the first
-    // word alone is registered.
     commandKey = argv.slice(0, 3).join(' ');
     let entry = COMMANDS[commandKey];
     if (!entry) {

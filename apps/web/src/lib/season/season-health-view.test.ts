@@ -14,15 +14,6 @@ import {
   recurrenceOf,
 } from './season-health-view';
 
-/**
- * M2.5 health view-model tests (season-health-v1): availability status
- * derivation, recovery estimates from the remaining-games countdown, the
- * recurrence flag, the checkpoint strip rows, and the roster injury
- * timeline. Fixtures are minimal typed states; the derivation mirrors the
- * frozen engine rule (active = an injury with missed games remaining that is
- * not same-game-returned).
- */
-
 const INJURY_ID_A = 'inj-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const INJURY_ID_B = 'inj-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
@@ -172,7 +163,7 @@ describe('availabilityStripRows', () => {
     expect(rows).toHaveLength(6);
     const first = rows[0];
     expect(first?.status).toBe('active');
-    // The 2nd future team game after the R1 occurrence is at R11.
+
     expect(first?.returnRange).toEqual({ min: 11, max: 11 });
     expect(first?.nextGameConsequence).toContain('Out for the next 2 games');
     expect(first?.nextGameConsequence).toContain('back around R11');

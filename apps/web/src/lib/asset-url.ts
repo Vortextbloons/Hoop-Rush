@@ -1,13 +1,5 @@
 import { resolve } from '$app/paths';
 
-/**
- * Shared packaged-asset URL resolution and memoization for the data loaders
- * (classic/sandbox `data.ts` and Season `season-assets.ts`). URLs are
- * relative to the packaged `data/` directory under the site root (GitHub
- * Pages base path aware); memoized loads share one in-flight promise per key
- * and evict on failure so a later request retries.
- */
-
 export function siteRoot(): string {
   return resolve('/');
 }
@@ -28,7 +20,6 @@ export function memoized<T>(key: string, load: () => Promise<T>): Promise<T> {
   return promise;
 }
 
-/** @internal Clears the shared memoized-loader cache between unit tests. */
 export function clearMemoizedLoaders(): void {
   memoCache.clear();
 }

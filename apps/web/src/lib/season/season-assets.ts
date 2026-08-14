@@ -27,8 +27,7 @@ export interface SeasonArtifactUrls {
   catalogHash: string;
   profileUrl: string;
   profileHash: string;
-  /** Projection milestone: the versioned projection model artifact (absent
-   * when the manifest predates the milestone). */
+
   modelUrl?: string;
   modelHash?: string;
 }
@@ -75,8 +74,7 @@ export function loadSeasonDraftCatalog(): Promise<SeasonDraftCatalog> {
     const manifest = await getManifest();
     const entry = manifest.season?.draftCatalog;
     if (!entry) throw new Error('The season draft catalog artifact is unavailable.');
-    // The catalog is immutable and content-addressed; a validated copy in
-    // IndexedDB spares a ~10.2 MB re-download and re-parse per reload.
+
     const cached = await readCachedAsset(entry.contentHash, parseSeasonDraftCatalog);
     if (cached !== null) return cached;
     const catalog = await loadPackagedSeasonDraftCatalog(
@@ -108,14 +106,6 @@ export function loadSeasonEraProfile(): Promise<EraSimulationProfile> {
   });
 }
 
-/**
- * M2.6.5: the packaged free-agency eligibility index (free-agency-index-v1,
- * ~4.1 MB). Hash-verified through the content-addressed cache so a reload
- * after the first market open pays no re-download or re-parse; the engine
- * reads it as the runtime universe for market generation and resolution.
- * Throws when the manifest predates the milestone (the market cannot open
- * without the packaged universe).
- */
 export function loadSeasonFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
   return memoized('season/free-agency-index', async () => {
     const manifest = await getManifest();
@@ -135,13 +125,6 @@ export function loadSeasonFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
   });
 }
 
-/**
- * M2.6.5: the frozen roster-targets policy used as AI free-agency ceilings
- * (`policy.bandPoolScoreCaps`, outlier limits). Runtime always loads
- * `season.rosterTargets`. The packaged `season.freeAgencyTargets` entry is
- * the free-agency-targets-v1 calibration artifact — a different schema —
- * and must not be parsed as roster targets.
- */
 export function loadSeasonFreeAgencyTargets(): Promise<SeasonRosterTargets> {
   return memoized('season/free-agency-targets', async () => {
     const manifest = await getManifest();
@@ -153,12 +136,6 @@ export function loadSeasonFreeAgencyTargets(): Promise<SeasonRosterTargets> {
   });
 }
 
-/**
- * The fixed season home-court profile. The engine's tuned constant is
- * authoritative (season-home-court-v1); the packaged
- * `season/home-court-targets.json` artifact is the calibration evidence and
- * is validated by the CLI `season home-court calibrate --validate` command.
- */
 export function loadSeasonHomeCourtProfile(): Promise<SeasonHomeCourtProfile> {
   return Promise.resolve({ ...SEASON_HOME_COURT_PROFILE });
 }
@@ -182,11 +159,6 @@ export function seasonArtifactUrls(): Promise<SeasonArtifactUrls> {
   });
 }
 
-/**
- * Projection milestone: loads the versioned projection model artifact
- * (projection-model-v1) through the hashed asset pipeline, memoized per
- * manifest hash. Throws when the manifest predates the milestone.
- */
 export function loadSeasonProjectionModel(): Promise<ProjectionModelArtifact> {
   return memoized('projection/model', async () => {
     const manifest = await getManifest();
@@ -198,7 +170,6 @@ export function loadSeasonProjectionModel(): Promise<ProjectionModelArtifact> {
   });
 }
 
-/** @internal Resets memoized loaders between unit tests. */
 export function clearSeasonAssetCaches(): void {
   clearMemoizedLoaders();
 }

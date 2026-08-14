@@ -23,7 +23,6 @@ describe('cli: replay', () => {
       const payload = simGameReportSchema.parse(jsonPayload(stdout));
       const { result } = payload;
 
-      // Build the serialized GameSimulationInput from the fixture + seed.
       const fixture = JSON.parse(
         readFileSync(join(REPO_ROOT, 'tools/cli/src/fixtures/equal.json'), 'utf8'),
       ) as { home: unknown; away: unknown };
@@ -70,8 +69,7 @@ describe('cli: replay', () => {
       const profile = JSON.parse(
         readFileSync(join(REPO_ROOT, 'apps/web/static/data/era-sim/1990s.json'), 'utf8'),
       ) as { dataVersion: string };
-      // The input uses seed A; the expected result comes from a DIFFERENT seed,
-      // so the replay must diverge while staying schema-valid.
+
       const other = await runCli([
         'sim',
         'game',

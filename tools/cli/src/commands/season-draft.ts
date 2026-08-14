@@ -20,13 +20,6 @@ import {
   readJsonFile,
 } from './season-data.ts';
 
-/**
- * `season draft reproduce` (spec/2.0 M2.3.5): replays a committed command
- * sequence against the initial draft state through the authoritative engine
- * and reports every drawn offer, pick, rejection, the final digest, and any
- * divergence from the expected digest.
- */
-
 export const SEASON_DRAFT_REPRODUCE_OPTIONS: Record<string, boolean> = {
   input: true,
   manifest: true,

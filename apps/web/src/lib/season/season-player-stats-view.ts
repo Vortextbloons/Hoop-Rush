@@ -1,15 +1,6 @@
 import type { SeasonGameSummary, SeasonRoster } from '@hoop-rush/data-contracts';
 import { foldSeasonAggregates } from './season-presentation';
 
-/**
- * Season Run player stats view-model: the human team's ten roster entries
- * joined to folded season aggregates (the same pure fold over accepted
- * summaries the Leaders, League, and team-detail views use). Totals, per-game
- * rates, and shooting percentages all derive from recorded facts — never
- * invented here. A player with no games played keeps an all-zero line with
- * null percentages (no attempts to divide).
- */
-
 export interface SeasonPlayerStatsRow {
   playerVersionId: string;
   displayName: string;
@@ -48,7 +39,7 @@ export interface SeasonPlayerStatsRow {
 export interface SeasonPlayerStatsView {
   franchiseId: string;
   rows: SeasonPlayerStatsRow[];
-  /** True once any block has been accepted (fold had summaries to read). */
+
   hasStats: boolean;
 }
 

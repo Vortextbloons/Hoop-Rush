@@ -11,19 +11,10 @@ import {
   type SeasonPostseasonWorkerStartRequest,
 } from './season-postseason-worker.ts';
 
-/**
- * M2.6 postseason worker wire contract tests: every envelope family parses
- * and rejects under `SEASON_POSTSEASON_WORKER_WIRE_SCHEMA_VERSION`, the
- * start request carries the full authoritative run snapshot and effects, the
- * complete message union separates accepted commit facts from typed engine
- * rejections, and malformed/stale envelopes are rejected at the boundary.
- */
-
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
 const COMMAND_ID = 'adv-0123456789abcdef';
 const TARGET = 'pi-east-seven-eight';
 
-/** Schema-valid zero effects state (300 loads, 1,350 pairs). */
 function fixtureEffects(run: ReturnType<typeof buildRun>): SeasonEffectsState {
   const playerStates = run.rosters.flatMap((roster) =>
     roster.players.map((player) => ({
@@ -140,7 +131,7 @@ describe('season postseason worker wire (M2.6)', () => {
       profileHash: '0'.repeat(64),
     });
     expect(warm.success).toBe(true);
-    // The block warm family must not parse in the postseason union.
+
     expect(
       seasonPostseasonWorkerRequestSchema.safeParse({
         schemaVersion: 5,

@@ -26,24 +26,6 @@ import { simChallengeReportSchema } from '../report-schemas.ts';
 import { loadPackagedData, PackagedData, loadBracketFile, loadProfileFile } from './data-loader.ts';
 import { loadFixture } from './sim.ts';
 
-/**
- * `sim challenge` (spec/09): runs one complete Sandbox challenge through the
- * authoritative bracket loader, challenge commands, seed derivation,
- * aggregation, and game engine. The run always completes all 82 games; the
- * report carries the record, outcome, first loss, and exact aggregates.
- *
- * The lineup is always five pool players resolved from the packaged draft
- * index (`--lineup`): ids (`playerId`, `playerId@franchiseId/eraId`) or
- * names (`Name`, `Name@Franchise`, `Name@Franchise/era`), mirroring the web
- * sandbox draft path (`resolvePlayerRefs` + `toSimulationPlayer`). The
- * simulation environment defaults to the app's fixed '2010s' sandbox era.
- */
-
-/**
- * Fixed simulation environment era for every sandbox run. Shared with the
- * web app through `@hoop-rush/data-contracts` `FIXED_SANDBOX_ERA` (spec/1.0
- * 01-product.md: "every Sandbox run simulates in the 2010s decade").
- */
 export { FIXED_SANDBOX_ERA };
 
 export const SIM_CHALLENGE_OPTIONS: Record<string, boolean> = {
@@ -57,7 +39,6 @@ export const SIM_CHALLENGE_OPTIONS: Record<string, boolean> = {
   verbose: false,
 };
 
-/** Resolves the user lineup: a fixture id (home team) or a SimulationTeam JSON file. */
 export function resolveUserTeam(lineup: string): SimulationTeam {
   if (lineup.endsWith('.json') || lineup.includes('/') || lineup.includes('\\')) {
     const path = isAbsolute(lineup) ? lineup : resolve(lineup);
@@ -77,7 +58,6 @@ export function resolveUserTeam(lineup: string): SimulationTeam {
   return fixture.home;
 }
 
-/** Derives the lineup record and player snapshots from a legal team. */
 export function lineupForTeam(team: SimulationTeam): {
   lineup: ChallengeCreation['lineup'];
   players: SimulationPlayer[];
@@ -94,19 +74,16 @@ export function lineupForTeam(team: SimulationTeam): {
   return { lineup, players };
 }
 
-/** One resolved lineup reference: a playerId plus the pool it must come from. */
 interface PoolRef {
   playerId: string;
   franchiseId: string;
   eraId: string;
 }
 
-/** Normalizes a name or label for index matching (case and inner whitespace). */
 function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-/** Display name of a franchise slot (falls back to the id). */
 function franchiseDisplayName(data: PackagedData, franchiseId: string): string {
   return (
     data.manifest.modernFranchiseSlots.find((franchise) => franchise.franchiseId === franchiseId)
@@ -114,7 +91,6 @@ function franchiseDisplayName(data: PackagedData, franchiseId: string): string {
   );
 }
 
-/** Resolves a franchise qualifier (franchiseId or display name) to a franchiseId. */
 function resolveFranchiseQualifier(data: PackagedData, value: string): string | null {
   const normalized = normalizeName(value);
   for (const franchise of data.manifest.modernFranchiseSlots) {
@@ -128,7 +104,6 @@ function resolveFranchiseQualifier(data: PackagedData, value: string): string | 
   return null;
 }
 
-/** Whether an index row's name equals the given name (display or first+last). */
 function nameMatches(row: PlayersIndexEntry, name: string): boolean {
   const normalized = normalizeName(name);
   return (
@@ -137,11 +112,6 @@ function nameMatches(row: PlayersIndexEntry, name: string): boolean {
   );
 }
 
-/**
- * Deterministic pick among matching rows after a franchise qualifier narrows
- * the choice to the same player across eras: highest selection score, then
- * earliest season, then index order.
- */
 export function bestRow(rows: PlayersIndexEntry[]): PlayersIndexEntry {
   const sorted = [...rows].sort((a, b) => {
     if (b.selectionScore !== a.selectionScore) return b.selectionScore - a.selectionScore;
@@ -155,11 +125,6 @@ export function bestRow(rows: PlayersIndexEntry[]): PlayersIndexEntry {
 
 const CANDIDATE_CAP = 12;
 
-/**
- * Resolves a player name against the index. Without a franchise qualifier the
- * name must match exactly one row; with a franchise, remaining era choices
- * resolve deterministically (see `bestRow`).
- */
 function resolveName(
   name: string,
   franchiseId: string | undefined,
@@ -200,7 +165,6 @@ function resolveName(
   return bestRow(rows);
 }
 
-/** Resolves a qualified id token: `playerId@franchiseId/eraId` (exact match). */
 function resolveQualifiedId(
   playerId: string,
   qualifier: string,
@@ -227,7 +191,6 @@ function resolveQualifiedId(
   return { playerId, franchiseId, eraId };
 }
 
-/** Resolves a qualified name token: `Name@Franchise` or `Name@Franchise/era`. */
 function resolveQualifiedName(
   name: string,
   qualifier: string,
@@ -255,14 +218,6 @@ function resolveQualifiedName(
   return resolveName(name, franchiseId, era.eraId, index, data);
 }
 
-/**
- * Parses one `--lineup` token. Ids (`playerId`, `playerId@franchiseId/eraId`)
- * resolve exactly. Names (`Name`, `Name@Franchise`, `Name@Franchise/era`)
- * resolve against the draft index: the same playerId or player name can peak
- * in several franchise/era contexts (spec/02 draft index), so ambiguous bare
- * values are rejected with the qualifying forms; a franchise-qualified name
- * resolves remaining era choices deterministically (best `overall`).
- */
 function parsePoolRef(token: string, index: PlayersIndex, data: PackagedData): PoolRef {
   const at = token.indexOf('@');
   if (at === -1) {
@@ -298,11 +253,6 @@ function parsePoolRef(token: string, index: PlayersIndex, data: PackagedData): P
   return resolveQualifiedName(left, qualifier, token, index, data);
 }
 
-/**
- * Resolves a comma-separated `--lineup` spec to five peak player-seasons in
- * slot order (G,G,F,F,C). Each distinct franchise/era pool is loaded at most
- * once, mirroring the web `resolvePlayerRefs` path.
- */
 export function resolvePoolLineup(spec: string, data: PackagedData): PeakPlayerSeason[] {
   const tokens = spec
     .split(',')
@@ -400,9 +350,6 @@ export function simChallenge(args: {
   const started = performance.now();
   let run: ChallengeRun;
   try {
-    // Sandbox mode simulates the complete season `reruns` times from derived
-    // attempt seeds and keeps the best record; the chosen attempt's seed
-    // becomes the reported run seed.
     run = simulateChallengeBestOf(creation, profile, context, reruns);
   } catch (error) {
     throw new Error(`challenge simulation failed: ${(error as Error).message}`);

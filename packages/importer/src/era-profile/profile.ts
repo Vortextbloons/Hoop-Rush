@@ -1,18 +1,3 @@
-/**
- * Era simulation profile derivation (port of scripts/import-nba/compute_era_sim_profile.py).
- *
- * Each profile is derived from the era's raw packaged season data
- * (`raw-data/nba/<season>/stints.json` per season), plus the packaged Lakers pool
- * for that era, which provides population anchor ratings and shot-mix priors.
- *
- * Field families that the era's league evidence does not publish (rebound
- * splits before 1973-74, turnovers before 1977-78, threes before 1979-80)
- * never become zero-filled aggregates: their parameters are estimated from
- * documented league rules or priors and carry their own provenance (spec/12).
- *
- * Targets are emitted as initial estimates from the same source aggregates with
- * wide tolerances; the calibration baseline freezes the final gates.
- */
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { NBA_ROOT, PUBLIC_DATA } from '../config.ts';
@@ -27,25 +12,22 @@ import {
 } from '@hoop-rush/data-contracts';
 
 export const ESTIMATE_TO_TRIPS_FACTOR = 0.93;
-// Engine conversion from the league possessions-per-game estimate to the
-// real trip rate the box scores account (engine constant `estimateToTripsFactor`).
+
 export const PROFILE_VERSION_PREFIX = 'm3';
 export const ERA_PROFILE_DATA_VERSION = 'm3.5';
 export const ERA_SIM_DIR = join(PUBLIC_DATA, 'era-sim');
 
-/** Documented estimates for families the league did not publish (spec/12). */
 export const ERA_RULE_ESTIMATES = {
-  /** League turnovers per possession before turnover tracking (1977-78). */
   turnoverPerPossessionBeforeTracking: 0.17,
-  /** League steals share of turnovers before tracking. */
+
   stealShareBeforeTracking: 0.3,
-  /** League offensive rebound rate before rebound splits (1973-74). */
+
   offensiveReboundRateBeforeSplits: 0.28,
-  /** Share of personal fouls that are shooting fouls (not derivable from box scores). */
+
   shootingFoulShare: 0.55,
-  /** Free-throw anchor when no pool exists for the era. */
+
   defaultFreeThrowAnchor: 74,
-  /** Assist anchor when no pool exists for the era. */
+
   defaultAssistAnchor: 70,
 } as const;
 
@@ -161,7 +143,6 @@ export function erasWithData(): EraDef[] {
   return manifest.eras.filter((era) => eraSeasons(era).length > 0);
 }
 
-/** Provenance for a parameter produced from fully observed league evidence. */
 function derivedProvenance(fields: string[]): ParameterProvenance {
   return {
     kind: 'derived',
@@ -172,7 +153,6 @@ function derivedProvenance(fields: string[]): ParameterProvenance {
   };
 }
 
-/** Provenance for a parameter estimated from a documented league rule or prior. */
 function estimatedProvenance(
   fields: string[],
   sourceStatus: 'unavailable' | 'not-applicable' | 'available' = 'unavailable',
@@ -189,7 +169,6 @@ function estimatedProvenance(
   };
 }
 
-/** Provenance for a league-rule value (e.g. no three-point line before 1979-80). */
 function ruleProvenance(fields: string[], notesCode: string): ParameterProvenance {
   return {
     kind: 'derived',
@@ -217,9 +196,6 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
   const threeRate = a.tpa !== null ? a.tpa / Math.max(1.0, a.fga) : 0;
   const parameterProvenance: Record<string, ParameterProvenance> = {};
 
-  // Zone mix and anchors come from the packaged Lakers pool when available;
-  // otherwise documented defaults (estimated). Three-point shares normalize
-  // to the league 3PA rate (0 before 1979-80 by league rule).
   let mix: ZoneMix;
   let ftAnchor: number;
   let passAnchor: number;
@@ -260,9 +236,7 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
   const threePct = a.tpm !== null && a.tpa !== null ? a.tpm / Math.max(1.0, a.tpa) : 0;
   const ftaPerFga = a.fta / Math.max(1.0, a.fga);
   const ftPct = a.ftm / Math.max(1.0, a.fta);
-  // Ratio families derive over their common-support seasons (spec/12):
-  // mixed-support eras (steals from 1973-74, turnovers from 1977-78) never
-  // distort a ratio; absent support falls back to documented estimates.
+
   const tovPerPoss =
     a.pairs.turnoverPerPossession !== null
       ? a.pairs.turnoverPerPossession.tov / Math.max(1.0, a.pairs.turnoverPerPossession.possessions)
@@ -288,7 +262,6 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
   const ftaPerGame = a.fta / a.teamGames;
   const pfPerGame = a.pf / a.teamGames;
 
-  // Parameter provenance (spec/12): estimated inputs are explicit.
   parameterProvenance['pace'] =
     paceRaw !== null
       ? derivedProvenance(['fga', 'fta', 'oreb', 'tov'])
@@ -393,12 +366,7 @@ export function computeEraProfile(era: EraDef): EraSimProfile {
         cornerThree: target(mix.cornerThree, 0.015),
         aboveBreakThree: target(mix.aboveBreakThree, 0.02),
       },
-      // Game-level randomness gates. These are not derivable from stint
-      // box aggregates; the values below are the measured engine
-      // distribution, which matches the real NBA margin distribution
-      // (about 28% of games decided by 5 or fewer, 19% by 20 or more).
-      // Overtime is lower than the real ~5% because sandbox v1 has no
-      // end-game clock management (spec/03), which reduces tie endings.
+
       closeGameRate: target(0.28, 0.04, 2000),
       blowoutRate: target(0.19, 0.04, 2000),
       overtimeRate: target(0.027, 0.012, 2000),

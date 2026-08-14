@@ -27,39 +27,30 @@ import { checkGameResult } from '../sim/invariants.ts';
 import { addGameToAggregates, zeroRunAggregates } from './aggregates.ts';
 import { SEED_DERIVATION_VERSION, deriveGameSeed } from './seeds.ts';
 
-/**
- * Challenge commands (spec/10 authoritative commands): the single path from a
- * validated lineup and frozen bracket to an accepted run. `createChallenge`
- * freezes every version and snapshots the bracket; `createNextGameInput`
- * derives the next seed and opponent; `acceptGameResult` verifies game
- * number, opponent, derived seed, and all frozen versions before returning a
- * new accepted state. Runs are immutable: every command returns a new state.
- */
-
 export interface ChallengeCreationBase {
   runId: string;
   franchiseId: string | null;
   eraId: string;
   homeDisplayName: string;
-  /** Legal G,G,F,F,C assignment validated by this command. */
+
   lineup: Lineup;
-  /** Five distinct pool players matching the lineup assignments, in slot order. */
+
   players: SimulationPlayer[];
-  /** Per-player pool provenance in slot order (always exactly five). */
+
   selections: RunPlayerSelection[];
   runSeed: Seed;
   dataVersion: string;
   ratingVersion: string;
   positionNormalizationVersion: string;
   engineVersion: string;
-  /** Era simulation profile whose version is frozen into the run. */
+
   profile: EraSimulationProfile;
   bracket: OpponentBracket;
 }
 
 export interface SandboxChallengeCreation extends ChallengeCreationBase {
   mode: 'sandbox';
-  /** Sandbox runs reject Classic fields. */
+
   variant?: undefined;
   classicDraft?: undefined;
 }
@@ -263,7 +254,6 @@ function validateCreationInput(input: ChallengeCreation): string[] {
   return failures;
 }
 
-/** Creates the authoritative accepted run state (spec/10 CreateChallenge). */
 export function createChallenge(input: ChallengeCreation): ChallengeRun {
   const failures = validateCreationInput(input);
   if (failures.length > 0) {
@@ -328,7 +318,6 @@ export function opponentForGame(
   return opponent;
 }
 
-/** Builds the serialized input for one game number (worker + main thread share this). */
 export function createGameInput(
   run: ChallengeRun,
   profile: EraSimulationProfile,
@@ -356,7 +345,6 @@ export function createGameInput(
   };
 }
 
-/** Builds the input for the next unplayed game, or null when the run is complete. */
 export function createNextGameInput(
   run: ChallengeRun,
   profile: EraSimulationProfile,
@@ -367,12 +355,6 @@ export function createNextGameInput(
   return createGameInput(run, profile, nextGame);
 }
 
-/**
- * Verifies and accepts one game result (spec/03 outputs, spec/04 state
- * ownership). Returns a new accepted run; throws with a precise reason when
- * the result does not match the run's game number, opponent, derived seed, or
- * frozen versions. Runs never partially advance: on failure nothing changes.
- */
 export function acceptGameResult(run: ChallengeRun, result: GameResult): ChallengeRun {
   const failures: string[] = [];
   if (run.status !== 'active') {
@@ -446,14 +428,13 @@ export function simulateChallenge(
   while (current.status === 'active') {
     const input = createNextGameInput(current, profile);
     if (!input) break;
-    // The authoritative check runs once, inside acceptGameResult below.
+
     const result = simulateGame(input, context);
     current = acceptGameResult(current, result);
   }
   return current;
 }
 
-/** Marks an active run abandoned (Cancel is the only way to pause). */
 export function abandonChallenge(run: ChallengeRun): ChallengeRun {
   if (run.status !== 'active') {
     throw new Error(`cannot abandon a run in status ${run.status}`);

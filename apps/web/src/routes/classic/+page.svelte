@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
+  import { base, resolve } from '$app/paths';
+  import type { RouteId } from './$types';
   import { X } from '@lucide/svelte';
   import type {
     ClassicDraftState,
@@ -41,7 +42,6 @@
   import DraftPoolBrowser from '$lib/components/draft/DraftPoolBrowser.svelte';
   import ClassicRollReel from '$lib/components/classic/ClassicRollReel.svelte';
 
-  /** The slot-picker dialog chunk loads only when a player is selected. */
   let slotPickerModule: Promise<
     typeof import('$lib/components/draft/SlotPickerDialog.svelte')
   > | null = null;
@@ -76,14 +76,10 @@
   let launchError: string | null = $state(null);
   let resolvedDraftPlayers = $state.raw<PeakPlayerSeason[]>([]);
 
-  /** False once this component starts being destroyed (see below). */
   let mounted = true;
   $effect(() => {
     mounted = true;
     return () => {
-      // Post-destroy async callbacks (persistence, bits-ui dismissal timers)
-      // must never write reactive state on a torn-down tree; that can
-      // cascade into an update-depth error during navigation away.
       mounted = false;
     };
   });
@@ -180,7 +176,6 @@
       : '',
   );
 
-  /** O(1) drafted-pick lookup: one index scan instead of one linear scan per pick. */
   const rowByPickKey = $derived(
     index
       ? new Map(index.players.map((p) => [`${p.playerId}|${p.franchiseId}|${p.eraId}`, p] as const))
@@ -200,7 +195,6 @@
     return rows;
   });
 
-  /** Resolve full profiles for Fit/Matchup explanations while drafting. */
   $effect(() => {
     const m = manifest;
     const refs = slots
@@ -245,14 +239,6 @@
     return next;
   }
 
-  /**
-   * Persists a fresh roll and triggers the reel animation for it. Callers lock
-   * interactions (spinning = true) BEFORE awaiting: the engine result is
-   * synchronous but the persist is async, so the stale pool must be hidden the
-   * moment the command is issued. spinKey only changes here, after the
-   * persisted state matches the reels, so a resumed saved state never
-   * re-animates.
-   */
   async function applyRoll(next: ClassicDraftState, axis: 'both' | 'franchise' | 'era') {
     draft = await persist(next);
     if (!mounted) return;
@@ -273,8 +259,6 @@
     actionError = null;
     launchError = null;
     try {
-      // Lock interactions immediately so the feedback shows before the async
-      // persist resolves (the engine result itself is synchronous).
       spinning = true;
       const next = classic.createClassicDraft(
         {
@@ -288,9 +272,7 @@
       );
       draft = await persist(next);
       if (!mounted) return;
-      // The very first roll animates too: the reel mounts with spinKey > 0
-      // and spins on mount. A resumed draft always mounts with spinKey 0 and
-      // never replays.
+
       reelAxis = 'both';
       spinKey += 1;
     } catch (error) {
@@ -329,14 +311,6 @@
     pickerPlayer = player;
   }
 
-  /**
-   * Slot choice from the picker. A drafted player repositions (swapping or
-   * displacing incumbents); a new player is drafted into the slot. The fifth
-   * pick auto-launches the season (no reel spin — the draft is done); every
-   * other successful placement rolls the next round through the reels.
-   * Interactions lock before the async persist so the stale pool can never be
-   * clicked again.
-   */
   async function placePlayer(player: IndexRow, slotIndex: number) {
     if (!draft || catalog.length === 0 || spinning || starting) return;
     actionError = null;
@@ -371,12 +345,6 @@
     }
   }
 
-  /**
-   * The single path into the season: promotes the completed draft to an active
-   * run and navigates to the challenge. On failure the persisted draft is
-   * retained (promotion only clears it on success), so the page stays and
-   * shows the recovery UI with the error.
-   */
   async function launchRun(draftToRun: ClassicDraftState) {
     starting = true;
     launchError = null;
@@ -394,10 +362,8 @@
     guardOpen = false;
     setClassicGuardBypass(true);
     await clearClassicDraftState();
-    // The target pathname comes from the navigation URL, which already carries
-    // the base path, so resolve() must not be applied on top of it.
-    // eslint-disable-next-line svelte/no-navigation-without-resolve
-    void goto(target ? `${target.pathname}${target.search}` : '/');
+    const raw = target ? `${target.pathname}${target.search}` : '/';
+    void goto(resolve((raw.startsWith(base) ? raw.slice(base.length) : raw) as RouteId));
   }
 </script>
 

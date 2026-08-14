@@ -10,14 +10,6 @@ import { auditSeasonRotation } from '../season/rotation.ts';
 import { buildInput } from './season.test-helpers.ts';
 import { optimizeSeasonRotation, projectedQualityWeights } from './minute-plan-quality.ts';
 
-/**
- * Minute-plan quality + optimization entry (minute-policy-v1): projected
- * quality weights come from the first unit containing each player (starters,
- * closing, then bench-heavy), and the optimizer builds three legal plan
- * rotations per structure, re-scores with projected net ratings, and selects
- * the recommendation under the same Heavy gate as buildMinutePlanCandidates.
- */
-
 function smallModel(): ProjectionModelArtifact {
   return {
     schemaVersion: 1,
@@ -192,7 +184,7 @@ describe('projectedQualityWeights', () => {
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThanOrEqual(1);
     }
-    // Every starter and closer sits in the first two units, so no fallbacks.
+
     for (const id of [...rotation.starters, ...rotation.closingFive]) {
       expect(quality.has(id)).toBe(true);
     }
@@ -219,9 +211,7 @@ describe('projectedQualityWeights', () => {
     });
     const offense = base.offense.players.find((row) => row.playerVersionId === starterId);
     expect(offense).toBeDefined();
-    // The defense-side rows describe the reference offense; the quality
-    // helper falls back to the roster player's own defensive contribution
-    // from the offense-side ledger row when no defense row matches.
+
     const defense = base.defense.players.find((row) => row.playerVersionId === starterId);
     const defensiveContribution =
       defense?.defensiveContribution ?? offense?.defensiveContribution ?? 0;
@@ -282,7 +272,7 @@ describe('optimizeSeasonRotation', () => {
       expect(plan.rotation.targetMinutes.reduce((sum, row) => sum + row.minutes, 0)).toBe(240);
       expect(plan.riskScore).toBeGreaterThanOrEqual(0);
       expect(plan.riskScore).toBeLessThanOrEqual(1);
-      // The projected facts match an independent projection of the plan.
+
       const reference = projectSeasonRoster({
         roster,
         rotation: plan.rotation,
@@ -300,9 +290,7 @@ describe('optimizeSeasonRotation', () => {
 
   it('recommends starter-heavy for a healthy high-stamina star team', () => {
     const { players, rotation } = buildInput();
-    // Tune the starters into stars and the bench into role players (mirrors
-    // the minute-plan.test.ts helper pattern of 0.9-quality stars against a
-    // 0.35-quality bench), so the starter-heavy envelope clearly wins.
+
     const starterIds = new Set(rotation.starters);
     const starTeam = players.map((player) => {
       const star = starterIds.has(player.playerVersionId ?? player.playerId);

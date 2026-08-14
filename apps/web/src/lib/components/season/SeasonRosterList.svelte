@@ -15,17 +15,6 @@
   import { formatPositions } from '$lib/player-positions';
   import { candidateOf } from '$lib/season/season-catalog-index';
 
-  /**
-   * Human franchise roster cards (M2.4, M2.6.5): ten player-season versions
-   * with faces, historical source identity, OVR, the rotation role/minutes
-   * from the pending rotation, the recorded fatigue band + workload, and the
-   * last-game minutes. M2.6.5 distinguishes ACTIVE (the ten rotation
-   * members, with fatigue/load facts) from INACTIVE (rostered depth outside
-   * the rotation, shown without load facts). Rendered on the Team tab beside
-   * the rotation editor as the identity reference for the lineup decisions
-   * above it.
-   */
-
   let {
     roster,
     manifest,
@@ -38,13 +27,13 @@
     roster: SeasonRoster;
     manifest: HoopRushManifest;
     shell: SeasonRunShellData;
-    /** Current rotation role + minutes for each playerVersionId. */
+
     roleOf: (playerVersionId: string) => { role: string; minutes: number | string };
-    /** M2.4 recorded effects state at the last accepted boundary. */
+
     effects: SeasonEffectsState | null;
-    /** Accepted summaries (last-game minutes per player). */
+
     summaries: SeasonGameSummary[];
-    /** When true, the parent panel owns the section heading. */
+
     embedded?: boolean;
   } = $props();
 

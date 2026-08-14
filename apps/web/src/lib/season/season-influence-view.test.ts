@@ -15,15 +15,6 @@ import {
   objectiveChoicesViewModel,
 } from './season-influence-view';
 
-/**
- * M2.5 Influence + objective view-model tests (season-influence-v1,
- * season-objective-v1): balance/cap/floor facts, recent ledger entries, the
- * spend affordances (extra trade offer per tracked window, risky rehab per
- * active injury), and the objective picker facts. The engine's deterministic
- * three-choice derivation is mocked here (engine-owned, tested in the
- * engine); the view model mapping is under test.
- */
-
 const FRANCHISE = 'lakers';
 
 function influenceState(overrides: Partial<SeasonInfluenceState> = {}): SeasonInfluenceState {

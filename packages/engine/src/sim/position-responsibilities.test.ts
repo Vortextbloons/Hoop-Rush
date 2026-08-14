@@ -190,7 +190,7 @@ describe('assigned-position responsibility modifiers', () => {
       'pickAndRollRoll',
       new Map(),
     ).weights;
-    const rimIndex = rollWeighted.length - 1; // rim is last teammate
+    const rimIndex = rollWeighted.length - 1;
     const rim = rollPlain[rimIndex];
     expect(rim).toBeDefined();
     expect(rollWeighted[rimIndex] ?? 0).toBeCloseTo(

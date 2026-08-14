@@ -4,13 +4,6 @@ import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
 import { importManifest, importOpponent, importPools, importRunAll } from './import.ts';
 import { DEFAULT_MANIFEST } from './season-data.ts';
 
-/**
- * `import` command tests (spec/09): usage validation of the pool/run-all
- * target parsing and the pure report paths. The heavy build paths (pool
- * construction, ratings, manifest rewriting against the packaged data) are
- * exercised by the pipeline itself, not here.
- */
-
 describe('pool target parsing (shared by importPools and importRunAll)', () => {
   it.each([
     ['importPools', importPools],
@@ -43,11 +36,6 @@ describe('importRunAll', () => {
 });
 
 describe('importManifest / importOpponent', () => {
-  // These commands refresh the PACKAGED manifest in place (the importer's
-  // manifest builder rewrites the season section from its fixed key list,
-  // dropping M2.6.5 entries like freeAgencyIndex/freeAgencyTargets), so the
-  // tests snapshot the committed manifest bytes and restore them afterwards
-  // to keep the suite order-independent.
   let committedManifest: Buffer;
   beforeAll(() => {
     committedManifest = readFileSync(DEFAULT_MANIFEST);

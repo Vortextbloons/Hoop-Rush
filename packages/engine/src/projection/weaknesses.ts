@@ -1,19 +1,9 @@
 import type { ProjectionModelArtifact, ProjectionWeakness } from '@hoop-rush/data-contracts';
 
-/**
- * Weakness generation (projection milestone). Weaknesses come from explicit
- * component thresholds in the frozen model artifact; every weakness records
- * its code, severity, threshold, measured value, and evidence strings.
- * Critical weaknesses reject a candidate in ranking; noncritical ones reduce
- * its score nonlinearly (weight x severity²).
- */
-
-/** The measured component values a weakness check reads. */
 export interface WeaknessComponentValues {
   [code: string]: number;
 }
 
-/** Generates weaknesses from the artifact policy table and measured values. */
 export function identifyWeaknesses(
   model: ProjectionModelArtifact,
   values: WeaknessComponentValues,
@@ -39,7 +29,6 @@ export function identifyWeaknesses(
   return weaknesses;
 }
 
-/** Nonlinear weakness penalty: sum of weight x severity². */
 export function weaknessPenalty(
   model: ProjectionModelArtifact,
   weaknesses: readonly ProjectionWeakness[],

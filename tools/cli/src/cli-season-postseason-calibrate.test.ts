@@ -11,20 +11,8 @@ import {
   type SeasonPostseasonSeasonFacts,
 } from './commands/season-postseason-calibrate.ts';
 
-/**
- * M2.6 `season postseason calibrate` tests (postseason-targets-v1): the
- * cohort fold, the frozen gates (exactly one champion per season, zero
- * duplicate/missing bracket teams, zero both-invalid games, series length,
- * upset rate, home advantage, advancement by strength, award plausibility,
- * forfeits, integrity failures), the --write artifact flow, and the CLI
- * end-to-end with an injected season runner. The real full-season driver is
- * integration-gated (HOOP_RUSH_INTEGRATION_RUNS=1) in
- * cli-season-postseason-calibrate-integration.test.ts.
- */
-
 const INTEGRATION_RUNS = process.env.HOOP_RUSH_INTEGRATION_RUNS === '1';
 
-/** One season with a champion and a clean bracket (the healthy cohort). */
 function cleanSeason(rootSeed: string, length = 5): SeasonPostseasonSeasonFacts {
   return {
     rootSeed,
@@ -260,8 +248,6 @@ describe('season postseason calibrate command (postseason-targets-v1)', () => {
   });
 
   it('runs end-to-end through the CLI on a missing targets artifact', async () => {
-    // The CLI subprocess cannot receive injected deps; the end-to-end path
-    // exercises the command surface with the --validate scaffold instead.
     const { code, stderr } = await runCli([
       'season',
       'postseason',

@@ -1,15 +1,6 @@
 <script lang="ts">
   import type { BlockRunState } from '$lib/season/season-hub-state';
 
-  /**
-   * Block progress panel (spec/2.0/02 ten-game blocks, M2.3): determinate
-   * game progress from the runner's progress events, the latest score, cancel
-   * and retry affordances, and a restrained live region that announces only
-   * milestone changes (started / complete / cancelled / failed), never every
-   * game. The actual simulation runs on the worker; this panel only renders
-   * runner events, so the main thread stays free.
-   */
-
   let {
     block,
     onCancel,

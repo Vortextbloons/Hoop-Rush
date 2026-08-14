@@ -26,16 +26,6 @@ import {
 } from '@hoop-rush/data-contracts';
 import { describeCommandRejection, type SeasonPostseasonProgress } from './season-hub-state';
 
-/**
- * M2.6 postseason presentation (spec/2.0/02 Playoffs, m26-handoff). Pure
- * formatting and view-model derivation over engine exports and recorded
- * data-contracts facts; every basketball rule (ranking, eligibility,
- * legality, simulation) stays in the engine. The frozen Track A/B
- * cross-track contract types live with the hub (`SeasonPostseasonProgress`,
- * postseason methods); this module re-exports the shapes the shell binds
- * against and adds the presentation helpers.
- */
-
 export type HubPostseasonPhase = SeasonPostseasonProgress['phase'];
 export type HubPostseasonProgress = SeasonPostseasonProgress;
 
@@ -50,11 +40,6 @@ export function idlePostseasonProgress(): HubPostseasonProgress {
   };
 }
 
-/**
- * The frozen hub postseason method surface (m26-handoff "Cross-track API
- * contract"). Track A implements these on `SeasonHubState`; the shell binds
- * through `hasPostseasonHubMethods`.
- */
 export interface SeasonPostseasonHubMethods {
   startPostseason(): Promise<void>;
   advancePostseason(input?: { targetGameId?: string }): Promise<void>;
@@ -68,7 +53,6 @@ export interface SeasonPostseasonHubMethods {
   postseason: HubPostseasonProgress;
 }
 
-/** True when the hub implements the frozen postseason surface (Track A). */
 export function hasPostseasonHubMethods(hub: {
   startPostseason?: unknown;
   postseason?: unknown;
@@ -76,7 +60,6 @@ export function hasPostseasonHubMethods(hub: {
   return typeof hub.startPostseason === 'function' && hub.postseason !== undefined;
 }
 
-/** Copy shown when the postseason orchestration is not available in this build. */
 export const POSTSEASON_ORCHESTRATION_UNAVAILABLE =
   'Postseason simulation is not available in this build yet. Save your run — it is safe — and update the app to continue.';
 
@@ -135,7 +118,6 @@ export function humanPlaysNextGame(run: SeasonRun, humanFranchiseId: string): bo
   return seasonPostseasonHumanPlaysGame(run.postseason, next.gameId, humanFranchiseId);
 }
 
-/** The next game's teams, or null when the state cannot pair it. */
 export function nextGameTeamsOf(
   run: SeasonRun,
   gameId: string,
@@ -185,7 +167,6 @@ export function tiebreakSlotsLabel(slots: readonly number[]): string {
     : `slots ${slots.map((slot) => String(slot)).join('–')}`;
 }
 
-/** One scannable tiebreak resolution row (collapsed summary + evidence). */
 export interface TiebreakResolutionViewModel {
   resolution: SeasonTiebreakResolution;
   ruleLabel: string;
@@ -226,7 +207,7 @@ export interface SeriesCardViewModel {
   round: PlayoffRound;
   conference: ConferenceId | null;
   label: string;
-  /** The 2-2-1-1-1 home-court side (higher seed; Finals home-court team). */
+
   homeFranchiseId: string | null;
   awayFranchiseId: string | null;
   homeSeed: number | null;
@@ -234,7 +215,7 @@ export interface SeriesCardViewModel {
   homeWins: number;
   awayWins: number;
   winnerFranchiseId: string | null;
-  /** The next scheduled game (null when the series is complete). */
+
   nextGame: { gameNumber: number; homeFranchiseId: string } | null;
   lastResult: SeriesGameResultViewModel | null;
   status: 'upcoming' | 'in-progress' | 'complete';
@@ -370,8 +351,7 @@ export function playInGameCardViewModel(
     matchup === 'seven-eight' ? 'sevenEight' : matchup === 'nine-ten' ? 'nineTen' : 'final';
   const game = playIn.games[gameKey];
   const ranking = playIn.ranking;
-  // The engine derives the scheduled pairing from the ranking; mirror it so
-  // scheduled cards show the seeded matchup instead of TBD.
+
   const engineTeams = seasonPostseasonGameTeamsOf(state, game.gameId);
   const homeFranchiseId = game.homeFranchiseId ?? engineTeams?.home ?? null;
   const awayFranchiseId = game.awayFranchiseId ?? engineTeams?.away ?? null;
@@ -499,7 +479,6 @@ export function bracketColumnsOf(
   return columns;
 }
 
-/** Ordered cards for mobile (Play-In sections + every bracket series). */
 export function mobileBracketCardsOf(
   state: SeasonPostseasonState,
   humanFranchiseId: string | null,
@@ -626,7 +605,6 @@ export interface RiskyRehabOption {
 
 export const SEASON_POSTSEASON_REHAB_COST = SEASON_POSTSEASON_RISKY_REHAB_COST;
 
-/** Active human-team injuries that qualify for a postseason risky-rehab roll. */
 export function riskyRehabOptionsOf(
   run: SeasonRun,
   humanFranchiseId: string,

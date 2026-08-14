@@ -2,13 +2,6 @@
   import { untrack } from 'svelte';
   import type { ChallengeRun, GameResult } from '@hoop-rush/data-contracts';
 
-  /**
-   * The signature M3 progress element: an 82-cell strip that fills from left
-   * to right as games are committed. Wins, losses, and the first eliminating
-   * loss are highlighted; upcoming games stay muted. The strip is
-   * presentation-only: revealed results come from accepted run state.
-   */
-
   let {
     run,
     games,
@@ -21,11 +14,6 @@
 
   const firstLoss = $derived(run.firstLossGameNumber);
 
-  /**
-   * Opponent display names keyed by opponentId. The bracket is fixed for the
-   * mounted run, so this is built once via untrack: during the paced reveal
-   * the run prop reassigns every reveal but the bracket never changes.
-   */
   const opponentNames = $derived(
     untrack(() => new Map(run.bracket.opponents.map((o) => [o.opponentId, o.displayName]))),
   );
@@ -45,7 +33,6 @@
     });
   });
 
-  /** Opponent display name for one game number. */
   function opponentName(gameNumber: number): string {
     const opponentId = run.bracket.schedule[gameNumber - 1]?.opponentId;
     return (

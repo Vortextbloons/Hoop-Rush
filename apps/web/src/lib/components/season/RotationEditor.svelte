@@ -27,23 +27,6 @@
   } from '$lib/season/season-rotation-editor';
   import { formatPositions, SLOT_LABELS } from '$lib/player-positions';
 
-  /**
-   * Season Run rotation editor (spec/2.0/04 M2.2 contract, M2.3.5 team
-   * workspace). Mutates the shell-owned `RotationEditor` (engine-validated
-   * commits only) through one unified ten-player list at every breakpoint:
-   * the five starters with their slot pickers, then the five bench players
-   * in substitution-hierarchy order with move-up/move-down controls. Each row
-   * carries the closing-five toggle, tap-to-type target minutes with visible
-   * rebalancing (who gained and lost is announced and highlighted), and the
-   * audit failures that block submission. The 240-minute total bar and the
-   * closing-five chip strip render above the list on all screen sizes.
-   *
-   * The three strategy buttons (Starter-Heavy / Balanced / Bench-Heavy) run
-   * the page-owned projection optimization for their strategy and apply the
-   * recommended plan automatically; the fixed preset tables remain the
-   * fallback when projection is unavailable or fails.
-   */
-
   let {
     editor,
     disabled,
@@ -61,17 +44,11 @@
     faces?: ReadonlyMap<string, SeasonFaceRef> | null;
     manifest?: HoopRushManifest | null;
     overallByVersion?: ReadonlyMap<string, number> | null;
-    /** Recorded M2.4 effects state (fatigue band per row; optional). */
+
     effects?: SeasonEffectsState | null;
-    /** Accepted summaries of the last block (last-game minutes; optional). */
+
     summaries?: SeasonGameSummary[];
-    /**
-     * Optimize-with-projection hook (the page owns runner invocation:
-     * shell/catalog/effects access). `run` resolves with the three minute
-     * plans or rejects; `busy`/`error` mirror the page's async state. Each
-     * strategy button applies the plan for its strategy automatically and
-     * falls back to the fixed preset when projection fails or is absent.
-     */
+
     optimize?: {
       run: (rotation: SeasonRotation) => Promise<MinutePlanOptimizationResult>;
       busy: boolean;
@@ -86,8 +63,7 @@
   const rowByVersion = $derived(
     new Map(rows.map((row) => [row.member.playerVersionId, row] as const)),
   );
-  // Id lists tick on `revision` so plain-object editors (component tests)
-  // re-render after every committed mutation.
+
   const starterIds = $derived.by(() => {
     void revision;
     return editor.rotation.starters;
@@ -115,40 +91,29 @@
   });
   const failureIndex = $derived(indexRotationFailures(failures));
 
-  /** Transient engine rejection of an illegal edit (nothing committed). */
   let rejection: string | null = $state(null);
 
-  /** The open promote/demote picker: which side owns it and which player. */
   let swap: { kind: 'promote' | 'demote'; playerVersionId: string } | null = $state(null);
-  /** Spoken announce for a committed roster swap. */
+
   let swapNotice: string | null = $state(null);
   let swapNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Rostered players outside the ten-player rotation (inactive depth). */
   const inactiveRows = $derived.by(() => {
     void revision;
     return editor.inactiveMembers();
   });
 
-  /** Rebalance visibility: highlighted rows + the spoken/announced notice. */
   let highlightIds = $state<ReadonlySet<string>>(new Set());
   let rebalanceNotice: string | null = $state(null);
   let noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Inline minutes editing state (one row at a time). */
   let editingId: string | null = $state(null);
   let editingMinutes: number | null = $state(null);
   let draft = $state('');
   let editingInput: HTMLInputElement | null = $state(null);
 
-  /**
-   * Re-render tick for DOM reactivity when the editor is a plain (non-$state)
-   * object — e.g. in component tests. In the app the shell proxies the
-   * editor through `$state`, so this is a harmless extra invalidation.
-   */
   let revision = $state(0);
 
-  /** The strategy button currently running its projection optimization. */
   let optimizingPreset: (typeof ROTATION_PRESETS)[number] | null = $state(null);
 
   const minutesProgress = $derived(Math.min(100, Math.round((minutesTotal / 240) * 100)));
@@ -295,11 +260,6 @@
     swap = null;
   }
 
-  /**
-   * Commits a roster swap: the inactive player replaces the active player
-   * in the ten-player rotation (engine-audited; reverts with a rejection
-   * when the result would be illegal).
-   */
   function commitSwap(inactiveId: string, activeId: string) {
     if (disabled || swap === null) return;
     const failuresAfter = editor.promoteToRotation(inactiveId, activeId);
@@ -320,12 +280,6 @@
     }
   }
 
-  /**
-   * Applies one strategy: runs the page-owned projection optimization and
-   * applies that strategy's plan automatically. The fixed preset is the
-   * fallback when the hook is absent or the optimization fails, so the
-   * buttons always work (even fully offline).
-   */
   async function applyPreset(preset: (typeof ROTATION_PRESETS)[number]) {
     if (disabled) return;
     rejection = null;

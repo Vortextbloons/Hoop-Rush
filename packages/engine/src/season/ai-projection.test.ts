@@ -8,13 +8,6 @@ import { DEFAULT_ERA_SIM_PROFILE } from '@hoop-rush/test-fixtures';
 import { soloInput } from './ai-test-support.ts';
 import { generateAiLeague } from './ai-generation.ts';
 
-/**
- * AI projection shadow-mode tests (projection milestone): with projection
- * dependencies present, generation records compact summaries on evaluations
- * while selection, pools, anchors, legality, and the generation digest stay
- * byte-identical to projection-free generation.
- */
-
 function tinyModel(): ProjectionModelArtifact {
   const player = (index: number, positions: string[]): SimulationPlayer => ({
     playerId: `p-ref-${String(index)}`,
@@ -145,12 +138,12 @@ describe('AI projection shadow mode', () => {
         model: tinyModel(),
       },
     });
-    // Selection, pools, rotations, and the canonical digest are unchanged.
+
     expect(projected.digest).toBe(base.digest);
     expect(projected.rosters).toEqual(base.rosters);
     expect(projected.aiPools).toEqual(base.aiPools);
     expect(projected.rotations).toEqual(base.rotations);
-    // Evaluations carry the compact summaries.
+
     const aiEvaluations = projected.evaluations.filter(
       (evaluation) => evaluation.franchiseId !== 'lakers',
     );
@@ -160,7 +153,7 @@ describe('AI projection shadow mode', () => {
       expect(typeof evaluation.projectionSummary?.searchDigest).toBe('string');
       expect(evaluation.projectionSummary?.searchDigest).toMatch(/^[0-9a-f]{32}$/);
     }
-    // The result still validates against the generation schema.
+
     seasonLeagueGenerationResultSchema.parse(projected);
   });
 

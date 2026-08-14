@@ -16,9 +16,6 @@ import { seasonCheckpointDigest } from './checkpoint.ts';
 import { seasonRotationSetDigest } from './rotation.ts';
 import { blockCommand, buildTestRun, pipelineInput } from './block-test-support.ts';
 
-// Block 0 costs seconds to simulate; the pipeline describe consumes the
-// command handler's accepted checkpoint (same simulation path, same input),
-// and the command-validation describe asserts on the accepted result.
 let input: SeasonBlockSimulationInput;
 let checkpoint: ReturnType<typeof simulateSeasonBlock>;
 let accepted: ReturnType<typeof handleSubmitSeasonBlockCommand>;
@@ -51,9 +48,6 @@ describe('season block pipeline (M2.3)', () => {
   });
 
   it('treats every outcome as a valid summary (final or typed forfeit)', () => {
-    // A legitimate basketball outcome: if enough guard-capable players foul
-    // out, the roster cannot field a legal five and the typed 2-0 forfeit
-    // machinery takes over (no fabricated winner, no player statistics).
     for (const summary of checkpoint.gameSummaries) {
       if (summary.status === 'forfeit') {
         expect(summary.homeScore + summary.awayScore).toBe(2);
@@ -97,7 +91,6 @@ describe('season block pipeline (M2.3)', () => {
       })),
     ).toEqual(expect.arrayContaining([expect.stringContaining('duplicate game ids')]));
 
-    // A retained detail outside the block (next block's round) is flagged.
     const outsideGame = input.schedule.games.find((game) => game.round === 11);
     const detail = checkpoint.retainedDetails[0];
     if (outsideGame !== undefined && detail !== undefined) {
@@ -112,10 +105,6 @@ describe('season block pipeline (M2.3)', () => {
 });
 
 describe('season block command validation', () => {
-  // The accepted submission is hoisted in the shared beforeAll above (one
-  // block-0 simulation); rejection paths are validated before any
-  // simulation, so the tests below only build cheap fixture inputs.
-
   it('accepts a valid command and rejects a stale cursor', () => {
     expect(accepted.status).toBe('accepted');
     if (accepted.status !== 'accepted') return;
@@ -187,8 +176,6 @@ describe('season block command validation', () => {
     if (tampered.rejection.code !== 'invalid-rotations') return;
     expect(tampered.rejection.franchiseFailures.length).toBe(30);
 
-    // An individually illegal rotation (the closing five swaps its guard
-    // pair with non-guards in the guard slots).
     const illegalRotation = run.rotations.map((rotation, index) => {
       if (index !== 0) return rotation;
       const closingFive = [...rotation.closingFive];
@@ -254,8 +241,7 @@ describe('season block command validation', () => {
   it('rejects invalid command ids at the schema boundary', () => {
     const { run } = buildTestRun();
     const command = blockCommand(run, 0, 0);
-    // The command schema is the first boundary: malformed ids never reach
-    // the engine validation path.
+
     const malformed = { ...command, commandId: 'bad id!' };
     expect(seasonSubmitBlockCommandSchema.safeParse(malformed).success).toBe(false);
   });

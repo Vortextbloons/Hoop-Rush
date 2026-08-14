@@ -1,5 +1,3 @@
-// @vitest-environment jsdom
-
 import { describe, expect, it } from 'vitest';
 import { render } from '@testing-library/svelte';
 import { buildManifest, buildSeasonLeague, buildSeasonRunFixture } from '@hoop-rush/test-fixtures';
@@ -14,13 +12,6 @@ import type { SeasonRunPlayerSliceEntry } from '@hoop-rush/persistence';
 import { mockSvelteKitApp } from '../../../test/svelte-testing';
 
 mockSvelteKitApp();
-
-/**
- * Hub submit gating (performance pass): with a loaded run, the compact
- * player slice, and an idle block state, the "Lock rotation and simulate
- * block" button must be enabled. Guards the e2e-real-worker journey that
- * completes blocks through the trade-window checkpoints.
- */
 
 const MANIFEST: HoopRushManifest = buildManifest();
 
@@ -79,7 +70,7 @@ function shellWithRun(run: SeasonRun): SeasonRunShell {
   shell.humanTeam = run.league.teams.find((team) => team.franchiseId === 'lakers') ?? null;
   shell.nextBlockIndex = 0;
   shell.seasonComplete = false;
-  // The layout builds the editor from the slice; mirror that here.
+
   const humanRotation = run.rotations.find((rotation) => rotation.franchiseId === 'lakers');
   const humanRoster = run.rosters.find((roster) => roster.franchiseId === 'lakers');
   if (humanRotation !== undefined && humanRoster !== undefined) {

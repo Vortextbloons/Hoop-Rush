@@ -8,16 +8,6 @@ import {
 import { makeReport, EXIT_USAGE_OR_DATA_ERROR, type CliReport } from '../report.ts';
 import { DEFAULT_MANIFEST } from './data-loader.ts';
 
-/**
- * `hoop-rush data lineage-audit`: proves historical team ranges map to
- * exactly one modern slot, detects gaps/overlaps/duplicates, verifies pool
- * ownership (every packaged player-season resolves through the lineage
- * table), checks ABA exclusion, audits per-segment historical logo metadata,
- * and reports unavailable combinations (spec/09, spec/12). `--verify-logos`
- * additionally fetches each segment's primary logo candidate and fails on
- * unreachable or non-image responses.
- */
-
 export const DATA_LINEAGE_AUDIT_OPTIONS: Record<string, boolean> = {
   input: true,
   format: true,
@@ -77,10 +67,6 @@ export async function dataLineageAudit(args: {
   const logoFailures: string[] = [];
   const logoVerificationFailures: string[] = [];
 
-  // Historical logo metadata: every segment carries at least one well-formed
-  // candidate with a source host (spec/12 branding contract). Missing
-  // artwork must never block gameplay, but the manifest must still declare
-  // the verified reference.
   for (const segment of manifest.franchiseLineage) {
     const candidates = segment.logoCandidates ?? [];
     if (candidates.length === 0) {
@@ -112,7 +98,6 @@ export async function dataLineageAudit(args: {
     }
   }
 
-  // Optional live verification of each segment's primary logo candidate.
   if (args.verifyLogos) {
     for (const segment of manifest.franchiseLineage) {
       const primary = segment.logoCandidates?.[0];
@@ -157,7 +142,6 @@ export async function dataLineageAudit(args: {
     }
   }
 
-  // Per-slot segments sorted; detect overlaps (gaps are legal: Hornets 2002-03).
   const bySlot = new Map<string, typeof manifest.franchiseLineage>();
   for (const segment of manifest.franchiseLineage) {
     const list = bySlot.get(segment.modernFranchiseId) ?? [];
@@ -182,7 +166,6 @@ export async function dataLineageAudit(args: {
     }
   }
 
-  // Exactly one segment owns each (slot, season) point.
   const owners = new Map<string, string>();
   for (const segment of manifest.franchiseLineage) {
     const from = segment.validFromSeasonKey;
@@ -201,8 +184,6 @@ export async function dataLineageAudit(args: {
     }
   }
 
-  // Pool ownership: every packaged player-season resolves through the lineage
-  // table to the pool's modern slot with the packaged historical identity.
   const manifestDir = dirname(inputPath);
   for (const pool of manifest.pools) {
     const assetPath = isAbsolute(pool.url) ? pool.url : resolve(manifestDir, pool.url);
@@ -229,10 +210,7 @@ export async function dataLineageAudit(args: {
           `${pool.franchiseId}/${pool.eraId}: ${player.displayName} ${player.seasonKey} (${identity.displayName}, ${identity.teamId}) has no owning lineage segment`,
         );
       }
-      // ABA/predecessor exclusion: NBA-valid ranges start at the BAA/NBA
-      // membership season encoded in the lineage table; any season before the
-      // slot's first segment is impossible by construction of stints, but the
-      // identity must still match the segment display name.
+
       if (segment && segment.displayName !== identity.displayName) {
         ownershipFailures.push(
           `${pool.franchiseId}/${pool.eraId}: ${player.displayName} identity "${identity.displayName}" does not match segment "${segment.displayName}"`,

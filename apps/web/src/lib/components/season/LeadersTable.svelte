@@ -15,17 +15,6 @@
   import SeasonTeamLogo from './SeasonTeamLogo.svelte';
   import { oneDecimal } from '$lib/format';
 
-  /**
-   * League leaders board for one category (spec/2.0/02 leaders,
-   * M2.3.5 Leaders tab). Entries arrive in the ENGINE's authoritative order
-   * (per-game desc, value desc, playerVersionId asc). Identity =
-   * playerVersionId: every row is a distinct player-season version and shows
-   * its historical source logo and season, so versions of the same person
-   * stay identifiable. The first place renders as a headshot-led card; the
-   * rest as compact ranked rows. Works as a single column (mobile) and as
-   * one board among several in the desktop grid.
-   */
-
   let {
     category,
     entries,
@@ -49,7 +38,6 @@
   const valueText = (value: number): string =>
     Number.isInteger(value) ? String(value) : oneDecimal(value);
 
-  /** Historical source identity for one version (logo candidates + label). */
   function versionSource(entry: SeasonLeaderEntry): {
     teamExternalId: string;
     logoCandidates: readonly string[];
@@ -69,9 +57,7 @@
     };
   }
 
-  /** Resolved once per entry: the markup and meta call it several times. */
   const sourceByVersion = $derived.by(() => {
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     const map = new Map<string, ReturnType<typeof versionSource>>();
     for (const entry of entries) map.set(entry.playerVersionId, versionSource(entry));
     return map;
@@ -80,7 +66,6 @@
     first !== null ? (sourceByVersion.get(first.playerVersionId) ?? null) : null,
   );
 
-  /** "ABBR · 1995-96 · 10 gp" plus the era identity label when it differs. */
   function sourceMeta(entry: SeasonLeaderEntry): string {
     const source = sourceByVersion.get(entry.playerVersionId) ?? null;
     if (source === null)

@@ -5,11 +5,6 @@ import { writeFileSync } from 'node:fs';
 import { buildSeasonDraftCatalog, buildSeasonRotation } from '@hoop-rush/test-fixtures';
 import type { SeasonDraftCandidate, SimulationPlayer } from '@hoop-rush/data-contracts';
 
-/**
- * Projection milestone CLI tests: artifact derivation, single-lineup
- * projections, paired calibration cohorts, and benchmark timing.
- */
-
 const EQUAL_FIXTURE = join(REPO_ROOT, 'tools/cli/src/fixtures/equal.json');
 const MODEL = join(REPO_ROOT, 'apps/web/static/data/projection/projection-model.json');
 
@@ -246,10 +241,7 @@ describe('projection benchmark', () => {
     };
     expect(payload.payload?.median).toBeGreaterThan(0);
     expect(payload.payload?.p95).toBeGreaterThanOrEqual(payload.payload?.median ?? 0);
-    // The wall-clock gate is enforced by the command itself (exit 1 when a
-    // p95 exceeds the release budget); assert the format contract only when
-    // the gate passed, so shared CI cannot flake on timing (same [0, 1]
-    // pattern as the sibling benchmark tests).
+
     if (code === 0) {
       expect(payload.failures ?? []).toEqual([]);
       expect(

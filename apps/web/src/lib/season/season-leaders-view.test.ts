@@ -3,13 +3,6 @@ import type { SeasonPlayerAggregate, SeasonTeamAggregate } from '@hoop-rush/data
 import { deriveSeasonLeaders } from '@hoop-rush/engine';
 import { engineOrderLeaderTables, LEADER_CATEGORIES } from './season-leaders-view';
 
-/**
- * Leaders tab ordering tests (M2.3.5): the engine-authoritative tie-break is
- * perGame desc, value desc, playerVersionId asc — NOT the value-first order
- * of the frozen web `leaderTables` helper. The eligibility gate and depth
- * mirror the frozen engine constants.
- */
-
 function team(franchiseId: string, gamesPlayed: number): SeasonTeamAggregate {
   return {
     franchiseId,
@@ -70,8 +63,6 @@ describe('engineOrderLeaderTables', () => {
 
   it('orders by per-game desc before value desc (engine tie-break)', () => {
     const players = [
-      // Higher total (300) but lower rate (30/g) must rank BELOW the higher
-      // rate (240 in 7 games = 34.3/g) even though the total is smaller.
       player('v-big', 'lakers', 10, { points: 300 }),
       player('v-rate', 'lakers', 7, { points: 240 }),
     ];
@@ -95,10 +86,9 @@ describe('engineOrderLeaderTables', () => {
 
   it('applies the 70% game-share eligibility gate per team', () => {
     const players = [
-      // 3 of 10 team games: below the 0.7 gate despite the best rate.
       player('v-ineligible', 'hawks', 3, { points: 300 }),
       player('v-eligible', 'hawks', 10, { points: 200 }),
-      // 5 of 5 team games: eligible (>= 3.5); its higher rate ranks first.
+
       player('v-spurs', 'spurs', 5, { points: 150 }),
     ];
     const tables = engineOrderLeaderTables(players, teams);
@@ -116,8 +106,6 @@ describe('engineOrderLeaderTables', () => {
   });
 
   it('drops players with zero games even when teams share the id', () => {
-    // Both players belong to the lakers; the team has played one game, so a
-    // zero-game player fails the 0.7 gate while a one-game player passes it.
     const lakersOneGame = [team('lakers', 1)];
     const players = [
       player('v-zero', 'lakers', 0, { points: 0 }),

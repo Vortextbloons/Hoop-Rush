@@ -38,22 +38,8 @@
     summaryRatingsOfSlice,
   } from '$lib/season/season-player-slice';
 
-  /**
-   * Season Run team tab (M2.3.5, M2.4, M2.5): the unified rotation
-   * workspace for the human franchise — one ten-player list that IS the
-   * rotation editor (starters, bench order, closing five, target minutes)
-   * with fatigue bands and last-game minutes inline, the unit-chemistry
-   * panel, the injury timeline, and the sticky action bar. The editor is
-   * shell-owned and survives tab switches; there is no separate save — the
-   * rotation locks when the block submits. Roster identity, fatigue, and
-   * availability context that previously lived on a separate Roster tab
-   * now render here.
-   */
-
   const shell = getContext<SeasonRunShellData>(SEASON_RUN_SHELL_CONTEXT);
 
-  /** Team games remaining from the run cursor: the upcoming block's lock
-   * plus every later block (blocks 0-7 lock 10 games, block 8 locks 2). */
   function seasonGamesRemaining(nextBlockIndex: number): number {
     let remaining = 0;
     for (let block = nextBlockIndex; block < SEASON_BLOCK_COUNT; block += 1) {
@@ -94,9 +80,6 @@
       : null,
   );
 
-  /** Optimize-with-projection inputs: ten load rows from the compact player
-   * slice stamina/durability and the recorded effects state, and the
-   * upcoming-block horizon from the run cursor. */
   const optimizeLoad = $derived.by(() => {
     const slice = shell.playerSlice;
     const editor = shell.editor;
@@ -133,7 +116,6 @@
   let optimizing = $state(false);
   let optimizeError: string | null = $state(null);
 
-  /** The RotationEditor `optimize` hook: the page owns runner invocation. */
   const optimize = $derived.by(() => {
     const editor = shell.editor;
     if (editor === null || optimizeLoad === null || optimizeHorizon <= 0 || optimizeSeed === null) {
@@ -164,10 +146,8 @@
     };
   });
 
-  /** Accepted summaries of the last block (last-game minutes per player). */
   let summaries: SeasonGameSummary[] = $state([]);
 
-  /** Invalidates minute-weighted projections when the shell editor mutates in place. */
   let rotationRevision = $state(0);
 
   const ratingsOf = (playerVersionId: string) =>
@@ -183,7 +163,6 @@
     });
   });
 
-  /** League-normalized strip from the last locked rotation (baseline for deltas). */
   const lockedTeamProjection = $derived.by(() => {
     const run = shell.run;
     const humanId = shell.humanFranchiseId;
@@ -200,7 +179,6 @@
     return raw === null ? null : normalizeTeamProjection(raw, baselines);
   });
 
-  /** League-normalized strip from the pending rotation editor state. */
   const teamProjection = $derived.by(() => {
     void rotationRevision;
     const run = shell.run;
@@ -242,7 +220,6 @@
     });
   });
 
-  /** Per-player injury history (health records + accepted summaries). */
   const injuryTimeline = $derived(
     run !== null && roster !== null && humanFranchiseId !== null && health !== null
       ? humanInjuryTimeline(health, roster, humanFranchiseId, summaries)

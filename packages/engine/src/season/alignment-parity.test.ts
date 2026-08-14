@@ -7,14 +7,6 @@ import {
 import { buildSeasonLeague, buildSimulationPlayer } from '@hoop-rush/test-fixtures';
 import { ALL_FRANCHISES } from './block-test-support.ts';
 
-/**
- * Fixture-alignment parity: every package derives its 30-franchise fixture
- * ids from the canonical SEASON_ALIGNMENT, and the sim fixture ratings
- * derive from the canonical data-contracts constants. These tests pin the
- * derivations so a future edit to the canonical facts cannot drift the
- * fixture copies silently.
- */
-
 describe('canonical alignment parity', () => {
   it('ALL_FRANCHISES covers the canonical set exactly once', () => {
     const canonical = SEASON_ALIGNMENT.map((entry) => entry.franchiseId);

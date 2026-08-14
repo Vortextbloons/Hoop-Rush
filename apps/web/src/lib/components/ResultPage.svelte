@@ -15,14 +15,6 @@
   import SeasonReport from './SeasonReport.svelte';
   import AsyncState from './AsyncState.svelte';
 
-  /**
-   * Challenge result (spec/08): final record and 82-0 outcome with the League
-   * MVP spotlight, the full game strip, aggregate facts, and the user's
-   * five-player season table, shared by the Sandbox and Classic result
-   * routes. This component owns loading the completed run, the manifest, and
-   * the headshot indexes; the route owns the mode-specific Run again action.
-   */
-
   let {
     mode,
     eyebrow,
@@ -32,7 +24,7 @@
     editTeamHrefFor = null,
   }: {
     mode: 'sandbox' | 'classic';
-    /** Small uppercase label above the heading, e.g. "Sandbox · Result". */
+
     eyebrow: string;
     modeLabelFor: (run: ChallengeRun | null) => string;
     onRunAgain: () => Promise<void>;
@@ -42,9 +34,9 @@
   } = $props();
 
   let manifest = $state.raw<HoopRushManifest | null>(null);
-  /** playerId → peak season across the run's loaded pools (slot provenance). */
+
   let byId = $state<Map<string, PeakPlayerSeason> | null>(null);
-  /** playerId → global players-index entry, used for MVP headshots. */
+
   let indexById = $state.raw<Map<string, PlayersIndexEntry> | null>(null);
   let run = $state.raw<ChallengeRun | null>(null);
   let error = $state<string | null>(null);
@@ -89,9 +81,7 @@
               indexById = new Map(ix.players.map((p) => [p.playerId, p]));
             }
           },
-          () => {
-            // Headshots are best-effort; the report renders without them.
-          },
+          () => {},
         );
       },
       () => {
@@ -139,7 +129,6 @@
     retryCount += 1;
   }
 
-  /** Resolves the run's player pools for lineup headshots. */
   $effect(() => {
     const currentRun = run;
     const m = manifest;
@@ -158,7 +147,6 @@
     };
   });
 
-  /** Wraps the route's same-team rerun with the shared run/byId/error state. */
   function retrySameTeam() {
     const handler = onRetrySameTeam;
     if (!handler || !run || !byId || running) return;

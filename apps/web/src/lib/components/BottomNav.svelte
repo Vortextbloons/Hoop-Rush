@@ -6,14 +6,8 @@
 
   export type { NavItem } from '$lib/nav-items';
 
-  /** Backward-compatible alias used by the root layout's nav wiring. */
   export type BottomNavItem = NavItem;
 
-  /**
-   * Shared fixed bottom navigation. Accessible label and an optional intent
-   * callback (used to warm caches on hover/focus) are caller-provided; there
-   * is no hardcoded route behavior.
-   */
   let {
     items,
     label = 'Main navigation',

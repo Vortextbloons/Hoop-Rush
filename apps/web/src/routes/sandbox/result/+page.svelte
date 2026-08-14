@@ -8,19 +8,10 @@
   import { buildSandboxHref, generateSeed } from '$lib/sandbox-url';
   import ResultPage from '$lib/components/ResultPage.svelte';
 
-  /**
-   * Sandbox challenge result: the shared SeasonReport record. This route owns
-   * the mode-specific actions — Run again (cleared draft), Edit team
-   * (restore the completed lineup on the draft page), and Retry with same
-   * team (new seed, same five).
-   */
-
-  /** Fresh start: back to a completely cleared sandbox draft. */
   async function runAgain() {
     void goto(resolve('/sandbox'));
   }
 
-  /** Same five, new seed: start another sandbox run immediately. */
   async function retrySameTeam(
     currentRun: ChallengeRun,
     playersById: Map<string, PeakPlayerSeason>,

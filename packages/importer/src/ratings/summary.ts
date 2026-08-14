@@ -1,12 +1,3 @@
-/**
- * Ratings v3 summary adapters.
- *
- * Summary ratings remain UI-facing and never enter possession resolution.
- * Offense and Defense come from the authoritative v3 computation
- * (computeOffenseDefense); the packaged Overall is produced by the versioned
- * profile in v3.ts. The compatibility helpers below are provisional
- * diagnostics and never feed packaging.
- */
 import { clamp, clampRating, safeFloat } from '../json.ts';
 import { computeOverall } from './weights.ts';
 import { DEFAULT_RATINGS_MODEL_ARTIFACT } from './artifact.ts';
@@ -40,7 +31,6 @@ const TENDENCY_DEFAULTS: Pick<SimulationTendencies, 'turnoverRate' | 'foulRate'>
   foulRate: 2,
 };
 
-/** Neutral-complete shape for the shared computation; missing keys default to 50. */
 function completeRatings(ratings: Record<string, number>): SimulationRatings {
   const filled = Object.fromEntries(RATING_KEYS.map((key) => [key, 50])) as Record<
     keyof SimulationRatings,
@@ -49,10 +39,6 @@ function completeRatings(ratings: Record<string, number>): SimulationRatings {
   return { ...filled, ...ratings };
 }
 
-/**
- * Offense and Defense summaries are the authoritative v3 computation; the
- * returned overallRating is a 55/45 blend of them and is NOT packaged.
- */
 export function computeSummaryRatings(
   ratings: Record<string, number>,
   tendencies: Record<string, number>,
@@ -64,12 +50,11 @@ export function computeSummaryRatings(
   return {
     offenseRating,
     defenseRating,
-    /** Provisional diagnostic only; packaged Overall comes from the rating profile. */
+
     overallRating: clampRating(0.55 * offenseRating + 0.45 * defenseRating),
   };
 }
 
-/** Provisional diagnostic production score for calibration reports; never the packaged Overall. */
 export function computeProductionImpact(stats: StatsRow): number {
   const gp = Math.max(0, Math.trunc(safeFloat(stats.gamesPlayed)));
   const minutes = safeFloat(stats.minutes);
@@ -99,11 +84,6 @@ export function computeProductionImpact(stats: StatsRow): number {
   return clamp(impact, 55, 99);
 }
 
-/**
- * Provisional diagnostic compatibility entry point; never used by packaging.
- * Complete inputs return the authoritative profile curve (canonicalOverall);
- * partial inputs blend legacy position weights with measured impact metrics.
- */
 export function computeRealOverall(
   ratings: Record<string, number>,
   position: string,

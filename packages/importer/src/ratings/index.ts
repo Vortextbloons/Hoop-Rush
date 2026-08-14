@@ -1,6 +1,3 @@
-/**
- * Ratings derivation for the import pipeline.
- */
 export * from './era.ts';
 export * from './weights.ts';
 export * from './summary.ts';

@@ -3,13 +3,6 @@
   import { franchiseAbbreviation } from '@hoop-rush/data-contracts';
   import { useImageFallback } from '$lib/use-image-fallback.svelte';
 
-  /**
-   * Seasonal wrapper around the shared TeamLogo: uniform sizing, reserved
-   * dimensions (no layout shift), lazy loading for offscreen marks, and a
-   * franchise-abbreviation fallback when every logo candidate fails. The
-   * human masthead is always rendered eagerly (`eager`).
-   */
-
   let {
     manifest,
     franchiseId,
@@ -22,7 +15,7 @@
     manifest: HoopRushManifest;
     franchiseId: string;
     teamExternalId: string;
-    /** Verified historical logo candidates (era-scoped); tried before the modern chain. */
+
     logoCandidates?: readonly string[];
     alt?: string;
     size?: 'sm' | 'md' | 'lg';

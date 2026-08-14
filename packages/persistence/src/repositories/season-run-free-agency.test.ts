@@ -29,20 +29,6 @@ import {
   buildStubSeasonEngineSeam,
 } from '../testing/season-run-fixture.ts';
 
-/**
- * M2.6.5 free-agency persistence contract tests (spec/2.0/15): the
- * save-schema-v7 wrapper carries the schema-10 free-agency state; save-6
- * rows surface the typed incompatibility flow and are never deleted;
- * free-agency declarations/skips/resolutions apply in ONE transaction with
- * every winning signing atomic (rosters, ownership, Influence ledger,
- * transactions, free-agency state, revision/digest, command log); an
- * injected mid-resolution failure rolls everything back; acquired players
- * receive factual zero-game aggregate rows; and the reload audit reconciles
- * the free-agency facts (declarations, signings, caps) over the state
- * digest. The engine math runs through the stub seam (documented pure
- * semantics); the command results below mirror the frozen engine contract.
- */
-
 const FA_LAKERS = {
   playerVersionId: playerVersionId('p-synth-fa-lakers', 'lakers', '1990s', '1995-96'),
   playerId: 'p-synth-fa-lakers',
@@ -177,7 +163,6 @@ function baseFreeAgency(): SeasonFreeAgencyState {
   return buildFixtureFreeAgencyState();
 }
 
-/** Window 0 (opened by block 2) with two candidates; every franchise skipped. */
 function openWindowState(run: SeasonRun): SeasonFreeAgencyState {
   const base = baseFreeAgency();
   return seasonFreeAgencyStateSchema.parse({
@@ -199,7 +184,6 @@ function openWindowState(run: SeasonRun): SeasonFreeAgencyState {
   });
 }
 
-/** Resolves window 0 with one signing per named team; caps reconciled. */
 function resolvedWindowState(
   run: SeasonRun,
   commandId: string,
@@ -318,12 +302,6 @@ interface ResolutionContext {
   effects: ReturnType<typeof buildFixtureEffectsState>;
 }
 
-/**
- * Commits blocks 0-2 (block 2 opens the market window) and returns the
- * engine-facing post-resolution run: two winning signings (lakers, celtics)
- * applied to rosters, ownership, the Influence ledger, and the transaction
- * log in one snapshot with revision 4 and the recomputed state digest.
- */
 async function setupResolution(adapters: Adapters): Promise<ResolutionContext> {
   const { repo, run, blocks } = adapters;
   await promote(adapters);
@@ -465,6 +443,37 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     expect(snapshot?.run.freeAgency).toEqual(stored?.run.freeAgency);
   });
 
+  it('reloads an open market that is still waiting on the human declaration', async () => {
+    const adapters = makeAdapters();
+    const { repo, run, blocks } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    await repo.commitSeasonBlock(commitInputFor(adapters, 1));
+    const opened = openWindowState(run);
+    const window = opened.windows[0];
+    if (window === undefined) throw new Error('expected an open window');
+    const { lakers: _human, ...aiDeclarations } = window.declarations;
+    const pendingHuman = {
+      ...opened,
+      windows: [{ ...window, declarations: aiDeclarations }],
+    };
+    const block2 = blocks[2];
+    if (block2 === undefined) throw new Error('no block 2');
+    await repo.commitSeasonBlock({
+      ...commitInputFor(adapters, 2),
+      freeAgency: pendingHuman,
+      stateDigest: buildFixtureStateDigest(run, {
+        stateRevision: block2.stateRevision,
+        checkpointState: block2.checkpointState,
+        effects: block2.effects,
+        freeAgency: pendingHuman,
+      }),
+    });
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot?.run.freeAgency.windows[0]?.status).toBe('open');
+    expect(snapshot?.run.freeAgency.windows[0]?.declarations.lakers).toBeUndefined();
+  });
+
   it('reports a stored save-schema-6 row as typed incompatible and preserves it', async () => {
     const adapters = makeAdapters();
     const { db, repo, run } = adapters;
@@ -492,7 +501,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       },
     });
     expect(await db.seasonRuns.count()).toBe(1);
-    // The discard-and-restart flow is the ONLY recovery path.
+
     await repo.clearSeasonRun(run.runId);
     expect(await db.seasonRuns.count()).toBe(0);
     expect(await repo.loadActiveRun()).toBeNull();
@@ -513,33 +522,31 @@ describe('season run free-agency persistence (M2.6.5)', () => {
 
     const stored = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (stored === undefined) throw new Error('expected the stored checkpoint row');
-    // Rosters grew 10 -> 11 for both winners; ownership 300 -> 302.
+
     const lakersRoster = stored.run.rosters.find((roster) => roster.franchiseId === 'lakers');
     const celticsRoster = stored.run.rosters.find((roster) => roster.franchiseId === 'celtics');
     expect(lakersRoster?.players).toHaveLength(11);
     expect(celticsRoster?.players).toHaveLength(11);
     expect(stored.run.ownership).toHaveLength(302);
-    // Influence ledger debits reconcile to balance 0.
+
     expect(stored.influence.balances.lakers).toBe(0);
     expect(stored.influence.balances.celtics).toBe(0);
     expect(
       stored.influence.ledger.filter((entry) => entry.source === 'free-agent-signing'),
     ).toHaveLength(2);
-    // Immutable signing transactions ride the run.
+
     expect(stored.transactions.filter((entry) => entry.type === 'free-agent-signing')).toHaveLength(
       2,
     );
-    // Free-agency facts: resolved window, per-franchise caps.
+
     expect(stored.run.freeAgency.windows[0]?.signings).toHaveLength(2);
     expect(stored.run.freeAgency.signingCounts.lakers).toBe(1);
     expect(stored.run.freeAgency.seasonSpend.lakers).toBe(2);
-    // State chain advanced with the digest covering the new facts.
+
     expect(stored.stateRevision).toBe(4);
     expect(stored.stateDigest).toBe(context.run.stateDigest);
     expect(stored.checkpointState?.revision).toBe(3);
 
-    // The full validated reload recomputes the digest over the free-agency
-    // facts and passes every reconciliation check.
     const snapshot = await repo.loadActiveRun();
     expect(snapshot?.run.stateDigest).toBe(context.run.stateDigest);
     expect(
@@ -609,7 +616,6 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       }),
     ).rejects.toThrow();
 
-    // The accepted command id is recorded: replaying it is a duplicate.
     await repo.applySeasonRunCommand({
       runId: run.runId,
       command: context.command,
@@ -641,8 +647,6 @@ describe('season run free-agency persistence (M2.6.5)', () => {
     const before = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
     if (before === undefined) throw new Error('expected the stored checkpoint row');
 
-    // The command-log write happens AFTER the checkpoint put inside the
-    // transaction; a failure there must roll the checkpoint write back too.
     vi.spyOn(db.seasonCommandLog, 'put').mockRejectedValueOnce(new Error('injected failure'));
     await expect(
       repo.applySeasonRunCommand({
@@ -671,7 +675,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       after?.influence.ledger.filter((entry) => entry.source === 'free-agent-signing'),
     ).toHaveLength(0);
     expect(await db.seasonCommandLog.where('runId').equals(run.runId).count()).toBe(0);
-    // The run still reloads and audits cleanly after the rollback.
+
     const snapshot = await repo.loadActiveRun();
     expect(snapshot?.run.stateRevision).toBe(3);
   });
@@ -888,7 +892,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       ),
     );
     expect(log.entries[2]?.transactionIds).toEqual(['tx-fa-lakers']);
-    // Reload after the ordinal chain: the audit reconciles the resolved facts.
+
     const snapshot = await repo.loadActiveRun();
     expect(snapshot?.run.stateRevision).toBe(6);
     expect(snapshot?.run.freeAgency.windows[0]?.status).toBe('resolved');
@@ -925,7 +929,7 @@ describe('season run free-agency persistence (M2.6.5)', () => {
       seconds: 0,
     });
     expect(celticsRow?.franchiseId).toBe('celtics');
-    // Existing cumulative rows are preserved, not reset.
+
     const existing = stored?.playerAggregates.find(
       (row) => row.playerVersionId === run.rosters[0]?.players[0]?.playerVersionId,
     );
