@@ -1,4 +1,5 @@
 import {
+  SEASON_AGGREGATES_VERSION,
   SEASON_AI_VERSION,
   SEASON_ALIGNMENT,
   SEASON_BLOCK_VERSION,
@@ -94,7 +95,7 @@ export const ALL_FRANCHISES: readonly string[] = [
 export const VERSIONS: SeasonCheckpointVersions = {
   blockVersion: SEASON_BLOCK_VERSION,
   summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-  aggregatesVersion: 'season-aggregates-v1',
+  aggregatesVersion: SEASON_AGGREGATES_VERSION,
   recapVersion: SEASON_RECAP_VERSION,
   leadersVersion: 'season-leaders-v1',
   homeCourtVersion: 'season-home-court-v1',
@@ -111,6 +112,9 @@ export const VERSIONS: SeasonCheckpointVersions = {
   injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
   tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
   influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+  freeAgencyVersion: 'season-free-agency-v1',
+  freeAgencyIndexVersion: 'free-agency-index-v1',
+  freeAgencyTargetsVersion: 'free-agency-targets-v1',
 };
 
 export interface TestRun {
@@ -198,6 +202,9 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
       almanacVersion: 'almanac-v1',
       replayExportVersion: 'replay-export-v1',
       postseasonTargetsVersion: 'postseason-targets-v1',
+      freeAgencyVersion: VERSIONS.freeAgencyVersion,
+      freeAgencyIndexVersion: VERSIONS.freeAgencyIndexVersion,
+      freeAgencyTargetsVersion: VERSIONS.freeAgencyTargetsVersion,
     },
     league,
     rosters: generation.rosters,
@@ -255,6 +262,14 @@ function buildFreshTestRun(options: { humanFranchiseId?: string } = {}): TestRun
     evaluations: generation.evaluations,
     // M2.5: run-scoped state chain and economy facts (schema 7).
     trade: null,
+    freeAgency: {
+      schemaVersion: 1,
+      freeAgencyVersion: 'season-free-agency-v1',
+      windows: [],
+      canonicalCandidates: {},
+      signingCounts: Object.fromEntries(league.teams.map((team) => [team.franchiseId, 0])),
+      seasonSpend: Object.fromEntries(league.teams.map((team) => [team.franchiseId, 0])),
+    },
     objectives: {
       schemaVersion: 1,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,
@@ -426,9 +441,11 @@ function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
     }
   }
   return seasonEffectsStateSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     playerStates,
+    inactivePlayerStates: [],
     pairStates,
+    archivedPairs: [],
   });
 }
 

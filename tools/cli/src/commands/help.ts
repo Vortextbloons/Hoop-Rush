@@ -177,6 +177,24 @@ Commands:
                           objective success, spend rates).
                           --input <run.json> --seed-from N --seed-to N
                           --out <path> --validate <path> --manifest <path>
+  season free-agency audit
+                          Audit a persisted run's recorded free-agency facts
+                          (window order 2/4/6, candidate uniqueness, one
+                          featured, canonical identity persistence,
+                          declarations, traces, band/signing/spend caps,
+                          ledger/transaction/ownership links, effects
+                          invariants).
+                          --input <run.json> --manifest <path>
+  season free-agency calibrate
+                          Freeze free-agency-targets-v1 from seasons with
+                          markets at blocks 2/4/6 (composition, identity and
+                          canonical stability, interest/win/signing/skip by
+                          band, caps 1/2/3/3, spend, tie-break ordering,
+                          trace accuracy, quality vs drafted starters, elite
+                          exclusion, legality, effects invariants,
+                          determinism, summary identity).
+                          --input <run.json> --seed-from N --seed-to N
+                          --out <path> --validate <path> --manifest <path>
   season effects sensitivity
                           A/B the effects mechanism caps across the fixture
                           cohort (sensitivity report, no artifact write).
@@ -216,7 +234,8 @@ Commands:
   season run reproduce   Rebuild a completed Season Run from a full-run replay
                           export (replay-export-v1) and fail at the FIRST
                           divergence: ordinal, command id, state digest, result
-                          digest, game result, awards, trade grades, or champion.
+                          digest, game result, awards, trade grades, champion,
+                          or free-agency facts.
                           --input <export.json> --manifest <path>
                           --profile <eraId> --format <format>
   season postseason audit

@@ -1,4 +1,4 @@
-﻿import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   playoffGameIdOf,
   seasonRunSchema,
@@ -31,12 +31,11 @@ import { matchStartingFive } from './rotation.ts';
 import { zeroSeasonGameTransition, type SeasonPostseasonGameResolver } from './postseason.ts';
 
 /**
- * M2.5 typed run command tests (spec/2.0/07 M2.5 Â§8): the six handlers, their
+ * M2.5 typed run command tests (spec/2.0/07 M2.5 §8): the typed handlers, their
  * deterministic preconditions and typed rejections, state-chain advancement
  * (revision +1 + recomputed digest), and replay determinism. The health
  * seams (risky-rehab outcome rolls, forfeit summaries, pending advancement)
- * are stubbed to their contract semantics until the health workstream lands
- * the real implementations.
+ * are stubbed to their contract semantics so these tests stay hermetic.
  */
 
 vi.mock('./injuries.ts', async (importOriginal) => {
@@ -201,7 +200,7 @@ type SeasonRunCommandFragment = {
 
 function commandOf(run: SeasonRun, command: SeasonRunCommandFragment): SeasonRunCommand {
   return {
-    schemaVersion: 9,
+    schemaVersion: 10,
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,
@@ -236,7 +235,7 @@ function pendingOf(
 ): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
-    blockVersion: 'season-block-v3',
+    blockVersion: 'season-block-v4',
     runId: run.runId,
     commandId: 'block-3-command',
     blockIndex: 3,
@@ -830,10 +829,12 @@ describe('accept-trade-offer command', () => {
     );
     if (centerCapable.length < 2) throw new Error('fixture human roster needs two centers');
     const outgoing = centerCapable.slice(0, 2).map((player) => player.playerVersionId);
-    const pureGuards = celticsRoster.players.filter((player) =>
-      playableOf(player.playerVersionId).every((position) => ['PG', 'SG'].includes(position)),
+    // Incoming players must be non-center-capable so the human roster loses
+    // both centers with no center replacement (roster-illegal swap).
+    const nonCenters = celticsRoster.players.filter(
+      (player) => !playableOf(player.playerVersionId).includes('C'),
     );
-    const incoming = pureGuards.slice(0, 2).map((player) => player.playerVersionId);
+    const incoming = nonCenters.slice(0, 2).map((player) => player.playerVersionId);
     if (outgoing.length < 2 || incoming.length < 2) throw new Error('fixture lacks swap players');
     const illegalOffer: SeasonTradeOffer = {
       offerId: 'off-' + 'e'.repeat(32),

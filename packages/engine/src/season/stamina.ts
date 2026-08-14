@@ -196,7 +196,9 @@ export function applySeasonRecoveryTick(
         lastCompletedRound: Math.min(82, player.lastCompletedRound + 1),
       };
     }),
+    inactivePlayerStates: state.inactivePlayerStates,
     pairStates: state.pairStates,
+    archivedPairs: state.archivedPairs,
   };
 }
 

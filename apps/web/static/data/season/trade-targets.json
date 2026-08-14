@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "targetsVersion": "trade-targets-v1",
+  "targetsVersion": "trade-targets-v2",
   "policy": {
     "aiTradesPerSeason": {
       "min": 8,
@@ -12,11 +12,11 @@
       5
     ],
     "valueBands": {
-      "1-for-1": [
+      "1-1": [
         850,
         1150
       ],
-      "2-for-2": [
+      "multi": [
         800,
         1200
       ]
@@ -39,6 +39,12 @@
       "aiTradesMin": 0,
       "aiTradesMax": 15,
       "acceptedTrades": 108,
+      "packageMix": {
+        "1-1": 55,
+        "2-2": 53,
+        "1-2": 0,
+        "2-1": 0
+      },
       "illegalRosterFailures": 0,
       "duplicateOwnershipFailures": 0,
       "valueBandFailures": 0,
@@ -52,7 +58,13 @@
       "aiTradesMean": 13,
       "illegalRosterFailures": 0,
       "duplicateOwnershipFailures": 0,
-      "valueBandFailures": 0
+      "valueBandFailures": 0,
+      "packageMix": {
+        "1-1": 26,
+        "2-2": 26,
+        "1-2": 0,
+        "2-1": 0
+      }
     }
   },
   "gates": {
@@ -62,10 +74,11 @@
     "valueBands": true,
     "deterministicOffers": true,
     "chemistryInvariants": true,
+    "packageMix": true,
     "heldOut": true
   },
-  "engineVersion": "m3-engine-v10",
+  "engineVersion": "m3-engine-v11",
   "gameVersion": "season-game-v4",
   "gameTargetsVersion": "season-game-targets-v4",
-  "generatedAtIso": "2026-08-07T00:05:07.279Z"
+  "generatedAtIso": "2026-08-14T06:38:18.165Z"
 }

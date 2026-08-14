@@ -291,13 +291,17 @@ describe('season trade window opening', () => {
       expect(offer.toFranchiseId).not.toBe(HUMAN);
       expect(offer.fromFranchiseId).not.toBe(HUMAN);
       expect(offer.toFranchiseId).not.toBe(offer.fromFranchiseId);
-      // AI acceptances are mutually within the frozen band.
-      expect(
-        ratioMutuallyWithinBand(
-          offer.valueBand.ratioBasisPoints,
-          offer.outgoingPlayerVersionIds.length as 1 | 2,
-        ),
-      ).toBe(true);
+      // AI acceptances are mutually within the frozen band (v2 kinds).
+      const kind =
+        offer.outgoingPlayerVersionIds.length === 1 && offer.incomingPlayerVersionIds.length === 1
+          ? ('1-1' as const)
+          : offer.outgoingPlayerVersionIds.length === 2 &&
+              offer.incomingPlayerVersionIds.length === 2
+            ? ('2-2' as const)
+            : offer.outgoingPlayerVersionIds.length === 1
+              ? ('1-2' as const)
+              : ('2-1' as const);
+      expect(ratioMutuallyWithinBand(offer.valueBand.ratioBasisPoints, kind)).toBe(true);
     }
   });
 
@@ -516,7 +520,7 @@ describe('season applySeasonTrade', () => {
       ...base,
       trade: {
         schemaVersion: 1,
-        tradeVersion: 'season-trade-v1' as const,
+        tradeVersion: 'season-trade-v2' as const,
         windows: [{ windowIndex: 0, blockIndex: 2, status: 'open' as const, offers: [offer] }],
       },
       effects,
@@ -864,15 +868,19 @@ describe('season contextual player value', () => {
   });
 
   it('mutual band membership follows the frozen bounds', () => {
-    expect(ratioMutuallyWithinBand(1000, 1)).toBe(true);
-    expect(ratioMutuallyWithinBand(869, 1)).toBe(false);
-    expect(ratioMutuallyWithinBand(870, 1)).toBe(true);
-    expect(ratioMutuallyWithinBand(1150, 1)).toBe(true);
-    expect(ratioMutuallyWithinBand(1151, 1)).toBe(false);
-    expect(ratioMutuallyWithinBand(833, 2)).toBe(false);
-    expect(ratioMutuallyWithinBand(834, 2)).toBe(true);
-    expect(ratioMutuallyWithinBand(1200, 2)).toBe(true);
-    expect(ratioMutuallyWithinBand(1201, 2)).toBe(false);
+    expect(ratioMutuallyWithinBand(1000, '1-1')).toBe(true);
+    expect(ratioMutuallyWithinBand(869, '1-1')).toBe(false);
+    expect(ratioMutuallyWithinBand(870, '1-1')).toBe(true);
+    expect(ratioMutuallyWithinBand(1150, '1-1')).toBe(true);
+    expect(ratioMutuallyWithinBand(1151, '1-1')).toBe(false);
+    expect(ratioMutuallyWithinBand(833, '2-2')).toBe(false);
+    expect(ratioMutuallyWithinBand(834, '2-2')).toBe(true);
+    expect(ratioMutuallyWithinBand(1200, '2-2')).toBe(true);
+    expect(ratioMutuallyWithinBand(1201, '2-2')).toBe(false);
+    // Uneven packages use the 80-120 band like every multi-player package.
+    expect(ratioMutuallyWithinBand(834, '1-2')).toBe(true);
+    expect(ratioMutuallyWithinBand(1200, '2-1')).toBe(true);
+    expect(ratioMutuallyWithinBand(833, '1-2')).toBe(false);
   });
 });
 

@@ -27,7 +27,6 @@ export function seasonPairKey(a: string, b: string): string {
   return `${a}\u0000${b}`;
 }
 
-/** Whether a pair is canonically ordered (a < b lexicographically). */
 export function seasonPairIsCanonical(a: string, b: string): boolean {
   return a < b;
 }

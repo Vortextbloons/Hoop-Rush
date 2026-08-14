@@ -189,3 +189,140 @@ describe('dataValidate', () => {
     expect(report.failures.some((f) => f.includes('nbaHeadshotAvailable'))).toBe(false);
   });
 });
+
+describe('dataValidate season free-agency index audit', () => {
+  const versionId = `pv-${'a'.repeat(32)}`;
+  const playerId = 'p-fixture-1';
+
+  /** A minimal schema-valid free-agency index artifact. */
+  function minimalIndex(catalogHash: string): unknown {
+    return {
+      schemaVersion: 1,
+      indexVersion: 'free-agency-index-v1',
+      dataVersion: 'data-v1',
+      catalogRef: {
+        catalogVersion: 'season-draft-catalog-v4',
+        contentHash: catalogHash,
+        candidateCount: 1,
+      },
+      candidates: [
+        {
+          playerVersionId: versionId,
+          playerId,
+          displayName: 'Fixture One',
+          positions: {
+            primary: 'PG',
+            secondary: [],
+            playable: ['PG'],
+            normalizationVersion: 'position-v3',
+          },
+          band: 'emergency',
+          minimumInfluence: 1,
+          supportedRoles: ['depth', 'emergency'],
+          strengths: [],
+          limitations: [],
+          durabilityRating: 45,
+          minutesPerGame: 4.2,
+          availability: { healthy: true, notes: '' },
+          catalogRef: {
+            catalogVersion: 'season-draft-catalog-v4',
+            dataVersion: 'data-v1',
+            candidateIndex: 0,
+          },
+          derivationEvidence: 'tier depth; stamina 50/95; dur 95',
+          exclusionEvidence: '',
+        },
+      ],
+      groupedVersions: { [playerId]: [versionId] },
+    };
+  }
+
+  async function writeSeasonManifest(indexHash: string, catalogHash: string): Promise<string> {
+    const seasonDir = join(dir, 'season');
+    await mkdir(seasonDir);
+    const catalogBytes = JSON.stringify({ catalogVersion: 'season-draft-catalog-v4' });
+    const catalogPath = join(seasonDir, 'draft-catalog.json');
+    await writeFile(catalogPath, catalogBytes);
+    const indexPath = join(seasonDir, 'free-agency-index.json');
+    await writeFile(indexPath, JSON.stringify(minimalIndex(catalogHash)));
+    return writeManifest(
+      buildManifest({
+        season: {
+          league: { url: 'season/league.json', contentHash: 'a'.repeat(64) },
+          schedule: { url: 'season/schedule.json', contentHash: 'b'.repeat(64) },
+          draftCatalog: {
+            url: 'season/draft-catalog.json',
+            contentHash: catalogHash,
+          },
+          rosterTargets: { url: 'season/roster-targets.json', contentHash: 'c'.repeat(64) },
+          freeAgencyIndex: {
+            url: 'season/free-agency-index.json',
+            contentHash: indexHash,
+          },
+        },
+      }),
+    );
+  }
+
+  it('accepts a hash-verified free-agency index pinned to the draft catalog', async () => {
+    const catalogHash = createHash('sha256')
+      .update('{"catalogVersion":"season-draft-catalog-v4"}')
+      .digest('hex');
+    const indexBytes = JSON.stringify(minimalIndex(catalogHash));
+    const indexHash = createHash('sha256').update(indexBytes).digest('hex');
+    const path = await writeSeasonManifest(indexHash, catalogHash);
+    const report = await dataValidate(path, true);
+    expect(report.ok).toBe(true);
+    expect(report.failures).toEqual([]);
+    expect(report.details.some((d) => d.includes('free-agency-index: 1 candidates'))).toBe(true);
+  });
+
+  it('flags a free-agency index content-hash mismatch', async () => {
+    const catalogHash = createHash('sha256')
+      .update('{"catalogVersion":"season-draft-catalog-v4"}')
+      .digest('hex');
+    const wrongHash = 'f'.repeat(64);
+    const path = await writeSeasonManifest(wrongHash, catalogHash);
+    const report = await dataValidate(path, false);
+    expect(report.ok).toBe(false);
+    expect(report.failures.some((f) => f.includes('content hash mismatch'))).toBe(true);
+  });
+
+  it('flags a free-agency index whose catalogRef pins a different catalog hash', async () => {
+    const catalogHash = createHash('sha256')
+      .update('{"catalogVersion":"season-draft-catalog-v4"}')
+      .digest('hex');
+    const staleCatalogHash = 'e'.repeat(64);
+    const seasonDir = join(dir, 'season');
+    await mkdir(seasonDir);
+    await writeFile(
+      join(seasonDir, 'draft-catalog.json'),
+      JSON.stringify({ catalogVersion: 'season-draft-catalog-v4' }),
+    );
+    const staleIndexBytes = JSON.stringify(minimalIndex(staleCatalogHash));
+    await writeFile(join(seasonDir, 'free-agency-index.json'), staleIndexBytes);
+    const indexHash = createHash('sha256').update(staleIndexBytes).digest('hex');
+    const path = await writeManifest(
+      buildManifest({
+        season: {
+          league: { url: 'season/league.json', contentHash: 'a'.repeat(64) },
+          schedule: { url: 'season/schedule.json', contentHash: 'b'.repeat(64) },
+          draftCatalog: { url: 'season/draft-catalog.json', contentHash: catalogHash },
+          rosterTargets: { url: 'season/roster-targets.json', contentHash: 'c'.repeat(64) },
+          freeAgencyIndex: { url: 'season/free-agency-index.json', contentHash: indexHash },
+        },
+      }),
+    );
+    const report = await dataValidate(path, false);
+    expect(report.ok).toBe(false);
+    expect(
+      report.failures.some((f) => f.includes('does not match the packaged draft catalog')),
+    ).toBe(true);
+  });
+
+  it('passes when no free-agency index is packaged', async () => {
+    const path = await writeManifest(buildManifest());
+    const report = await dataValidate(path, false);
+    expect(report.ok).toBe(true);
+  });
+});

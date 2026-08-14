@@ -27,10 +27,6 @@ import { seasonTransactionEntry } from './transactions.ts';
  * - `appliedAtStateRevision` on transaction entries defaults to
  *   `blockIndex + 1` (the revision the block commit produces in the
  *   standard pipeline); callers that know the real revision pass it.
- *
- * NOTE (lead): `applySeasonBlockInfluenceGrants` was a no-op PLACEHOLDER
- * until the trade/economy workstream landed (block grant +1 for all 30
- * franchises, objective-reward +1 for the human on success).
  */
 
 /**

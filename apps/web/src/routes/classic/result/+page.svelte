@@ -13,7 +13,6 @@
    * fresh seed and five new rounds.
    */
 
-  /** Fresh start: clears any draft state and returns to the variant picker. */
   async function runAgain() {
     await clearClassicDraftState();
     void goto(resolve('/classic'));

@@ -4,12 +4,14 @@ import {
   loadSeasonDraftCatalog as loadPackagedSeasonDraftCatalog,
   parseProjectionModelArtifact,
   parseSeasonDraftCatalog,
+  seasonFreeAgencyIndexSchema,
   seasonLeagueSchema,
   seasonRosterTargetsSchema,
   seasonScheduleSchema,
   type EraSimulationProfile,
   type ProjectionModelArtifact,
   type SeasonDraftCatalog,
+  type SeasonFreeAgencyIndex,
   type SeasonHomeCourtProfile,
   type SeasonLeague,
   type SeasonRosterTargets,
@@ -19,23 +21,6 @@ import { SEASON_HOME_COURT_PROFILE } from '@hoop-rush/engine';
 import { getManifest } from '$lib/data';
 import { clearMemoizedLoaders, memoized, resolveAssetUrl } from '$lib/asset-url';
 import { readCachedAsset, writeCachedAsset } from '$lib/pool-cache';
-
-/**
- * PROVISIONAL IMPLEMENTATION — OWNED BY THE LEAD.
- *
- * The lead implements this file in parallel with the M2.3 UI; these exported
- * signatures are FROZEN and must not change. This provisional version lets the
- * screens build and e2e run before the lead's implementation lands; replace
- * the bodies freely (hash-verify + parse semantics should stay identical).
- *
- * Frozen exports:
- *   loadSeasonLeague(): Promise<SeasonLeague>
- *   loadSeasonSchedule(): Promise<SeasonSchedule>
- *   loadSeasonDraftCatalog(): Promise<SeasonDraftCatalog>
- *   loadSeasonEraProfile(): Promise<EraSimulationProfile>   (fixed 2010s)
- *   loadSeasonHomeCourtProfile(): Promise<SeasonHomeCourtProfile>
- *   seasonArtifactUrls(): Promise<SeasonArtifactUrls>       (worker input)
- */
 
 export interface SeasonArtifactUrls {
   catalogUrl: string;
@@ -120,6 +105,50 @@ export function loadSeasonEraProfile(): Promise<EraSimulationProfile> {
     const entry = manifest.eraSimulationProfiles.find((p) => p.eraId === FIXED_SEASON_ERA);
     if (!entry) throw new Error('The 2010s era simulation profile is unavailable.');
     return loadEraSimulationProfile(resolveAssetUrl(entry.url), entry.contentHash);
+  });
+}
+
+/**
+ * M2.6.5: the packaged free-agency eligibility index (free-agency-index-v1,
+ * ~4.1 MB). Hash-verified through the content-addressed cache so a reload
+ * after the first market open pays no re-download or re-parse; the engine
+ * reads it as the runtime universe for market generation and resolution.
+ * Throws when the manifest predates the milestone (the market cannot open
+ * without the packaged universe).
+ */
+export function loadSeasonFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
+  return memoized('season/free-agency-index', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.season?.freeAgencyIndex;
+    if (!entry) throw new Error('The season free-agency index artifact is unavailable.');
+    const cached = await readCachedAsset(entry.contentHash, (value: unknown) =>
+      seasonFreeAgencyIndexSchema.parse(value),
+    );
+    if (cached !== null) return cached;
+    const index = await fetchVerified(
+      resolveAssetUrl(entry.url),
+      entry.contentHash,
+      (value: unknown) => seasonFreeAgencyIndexSchema.parse(value),
+    );
+    void writeCachedAsset(entry.contentHash, index);
+    return index;
+  });
+}
+
+/**
+ * M2.6.5: the frozen roster-targets policy (AI free-agency ceilings). Prefers
+ * the dedicated `season.freeAgencyTargets` manifest entry when packaged and
+ * falls back to the roster-targets artifact (the frozen AI band policy the
+ * free-agency ceilings derive from).
+ */
+export function loadSeasonFreeAgencyTargets(): Promise<SeasonRosterTargets> {
+  return memoized('season/free-agency-targets', async () => {
+    const manifest = await getManifest();
+    const entry = manifest.season?.freeAgencyTargets ?? manifest.season?.rosterTargets;
+    if (!entry) throw new Error('The season free-agency targets artifact is unavailable.');
+    return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) =>
+      seasonRosterTargetsSchema.parse(value),
+    );
   });
 }
 

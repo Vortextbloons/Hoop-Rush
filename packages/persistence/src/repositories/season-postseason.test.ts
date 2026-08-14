@@ -107,6 +107,7 @@ function stateDigestOf(adapters: Adapters, run: SeasonRun): string {
     ownership: run.ownership,
     rotations: run.rotations,
     effects,
+    freeAgency: run.freeAgency,
   });
 }
 
@@ -250,7 +251,7 @@ function commandOf(
   commandId: string,
 ): SeasonRunCommand {
   return {
-    schemaVersion: 9,
+    schemaVersion: 10,
     command,
     commandId,
     runId: run.runId,

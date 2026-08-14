@@ -112,6 +112,9 @@ export const SEASON_VERSIONS_M25: SeasonRun['versions'] = {
   almanacVersion: 'almanac-v1',
   replayExportVersion: 'replay-export-v1',
   postseasonTargetsVersion: 'postseason-targets-v1',
+  freeAgencyVersion: 'season-free-agency-v1',
+  freeAgencyIndexVersion: 'free-agency-index-v1',
+  freeAgencyTargetsVersion: 'free-agency-targets-v1',
 };
 
 /**
@@ -185,7 +188,13 @@ export function zeroEffectsOf(run: SeasonRun): SeasonEffectsState {
       }
     }
   }
-  return { schemaVersion: 1, playerStates, pairStates };
+  return {
+    schemaVersion: 2,
+    playerStates,
+    inactivePlayerStates: [],
+    pairStates,
+    archivedPairs: [],
+  };
 }
 
 export function economyTestCatalog(): SeasonDraftCatalog {
@@ -323,6 +332,14 @@ export function buildEconomyTestRun(
     generationAudit: buildFixtureGenerationAudit(seed),
     evaluations: buildFixtureEvaluations(rosterRows, aiAssignments),
     trade: null,
+    freeAgency: {
+      schemaVersion: 1,
+      freeAgencyVersion: 'season-free-agency-v1',
+      windows: [],
+      canonicalCandidates: {},
+      signingCounts: Object.fromEntries(franchiseIds.map((franchiseId) => [franchiseId, 0])),
+      seasonSpend: Object.fromEntries(franchiseIds.map((franchiseId) => [franchiseId, 0])),
+    },
     objectives: {
       schemaVersion: 1,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,

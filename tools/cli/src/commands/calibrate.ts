@@ -360,9 +360,8 @@ export function calibrateRun(args: {
       away: weak,
     };
     invariantFailures += accumulate(equalAcc, equalInput, true);
-    // `accumulate` already simulates swInput and tracks the strong-side home
-    // win when asked; running the same seed a second time would be a pure
-    // duplicate of a deterministic game.
+    // equalInput and swInput share the seed; accumulate already simulates
+    // swInput and tracks the strong-side home win, so it is not run again.
     invariantFailures += accumulate(strongWeakAcc, swInput, true);
   }
 

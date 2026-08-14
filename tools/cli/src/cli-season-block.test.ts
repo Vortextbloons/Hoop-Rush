@@ -24,10 +24,11 @@ const SEASON_RUN = join(REPO_ROOT, 'tools/cli/src/fixtures/season-run.json');
 // v3 fixture (talent-ordered AI rotations change the rotation-set digest),
 // the minute-policy-v1 fixture (optimizer minute plans change the
 // rotation-set digest again), the season-stamina-v2 fatigue rebalance
-// (stronger accumulation and effect caps change game outcomes), and the
+// (stronger accumulation and effect caps change game outcomes), the
 // M2.6 postseason-foundations engine changes (compact game-summary and
-// aggregate folding, committed in `m2.6 start`).
-const BLOCK_ZERO_DIGEST = '14343fee37e0ced2423e33f862240d5e';
+// aggregate folding, committed in `m2.6 start`), and the M2.6.5 schema-10
+// fixture regeneration (free-agency state enters the run digest).
+const BLOCK_ZERO_DIGEST = '623840d1feffa17d73461c1fc24d2001';
 
 describe('cli: season block simulate', () => {
   // The default block-0 boot is shared by the simulate and audit tests.

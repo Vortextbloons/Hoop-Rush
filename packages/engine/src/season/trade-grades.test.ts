@@ -256,7 +256,7 @@ function offer(
 }
 
 function tradeState(windows: SeasonTradeState['windows']): SeasonTradeState {
-  return { schemaVersion: 1, tradeVersion: 'season-trade-v1', windows };
+  return { schemaVersion: 1, tradeVersion: 'season-trade-v2', windows };
 }
 
 /** A run with one accepted window-0 trade: lakers receive STAR for SECOND. */

@@ -12,6 +12,7 @@ import {
   seasonCommandLogSchema,
   seasonCompactInjuryEventSchema,
   seasonEffectsStateSchema,
+  seasonFreeAgencyStateSchema,
   seasonGameSimulationResultSchema,
   seasonGameSummarySchema,
   seasonHealthStateSchema,
@@ -203,7 +204,9 @@ export type SeasonRunCursor = z.infer<typeof seasonRunCursorSchema>;
  * M2.6: the `run` slice additionally carries the postseason advancement
  * fields (`stage`, `postseason`, `awards`, `completion`), which postseason
  * advancement commits rewrite; they stay promotion-time values on fresh
- * runs.
+ * runs. M2.6.5: the slice carries the run-scoped free-agency state (block
+ * commits and command applications rewrite it with the engine-produced
+ * post-boundary state).
  */
 export const seasonRunCheckpointDeltaSchema = seasonRunRecordFieldsSchema
   .pick({
@@ -229,19 +232,26 @@ export const seasonRunCheckpointDeltaSchema = seasonRunRecordFieldsSchema
   .extend({
     /**
      * The snapshot slices a commit rewrites: the 30 rotations locked by the
-     * commit, the mutated rosters and ownership (trades), and the M2.6
-     * postseason advancement fields (optional: present only on postseason
-     * advancement commits, which rewrite `stage`/`postseason`/`awards`/
-     * `completion`; a block commit leaves them at their snapshot values).
+     * commit, the mutated rosters and ownership (trades, free-agency
+     * signings), the M2.6 postseason advancement fields (optional: present
+     * only on postseason advancement commits, which rewrite
+     * `stage`/`postseason`/`awards`/`completion`; a block commit leaves them
+     * at their snapshot values), and the M2.6.5 run-scoped free-agency
+     * state (every commit and command application rewrites it from the
+     * engine-produced post-boundary state).
      */
     run: z.object({
       rosters: z.array(seasonRosterSchema).length(SEASON_TEAM_COUNT),
-      ownership: z.array(seasonOwnershipSchema).length(SEASON_TEAM_COUNT * 10),
+      ownership: z
+        .array(seasonOwnershipSchema)
+        .min(SEASON_TEAM_COUNT * SEASON_ROSTER_MIN_SIZE)
+        .max(SEASON_TEAM_COUNT * SEASON_ROSTER_MAX_SIZE),
       rotations: z.array(seasonRotationSchema).length(SEASON_TEAM_COUNT),
       stage: seasonRunStageSchema.optional(),
       postseason: seasonPostseasonStateSchema.optional(),
       awards: seasonAwardsSchema.nullable().optional(),
       completion: seasonRunCompletionSchema.nullable().optional(),
+      freeAgency: seasonFreeAgencyStateSchema,
     }),
     /** M2.4 authoritative post-block effects state, committed with the block. */
     effects: seasonEffectsStateSchema,
@@ -316,9 +326,7 @@ export const storedSeasonPendingBlockRowSchema = z.object({
 });
 export type StoredSeasonPendingBlockRow = z.infer<typeof storedSeasonPendingBlockRowSchema>;
 
-// ---------------------------------------------------------------------------
 // M2.6 postseason-foundations rows (Dexie v8, additive).
-// ---------------------------------------------------------------------------
 
 /**
  * One postseason game summary row (M2.6, `seasonPostseasonSummaries`, keyed
@@ -468,9 +476,7 @@ export const seasonCompletedSeasonSchema = z.object({
 });
 export type SeasonCompletedSeason = z.infer<typeof seasonCompletedSeasonSchema>;
 
-// ---------------------------------------------------------------------------
 // Performance pass: the compact per-run player presentation slice (Dexie v9).
-// ---------------------------------------------------------------------------
 
 /**
  * One compact per-player row of the run's presentation slice. Everything the

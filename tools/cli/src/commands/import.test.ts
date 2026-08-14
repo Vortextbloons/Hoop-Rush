@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EXIT_OK, EXIT_USAGE_OR_DATA_ERROR } from '../report.ts';
 import { importManifest, importOpponent, importPools, importRunAll } from './import.ts';
+import { DEFAULT_MANIFEST } from './season-data.ts';
 
 /**
  * `import` command tests (spec/09): usage validation of the pool/run-all
@@ -41,6 +43,19 @@ describe('importRunAll', () => {
 });
 
 describe('importManifest / importOpponent', () => {
+  // These commands refresh the PACKAGED manifest in place (the importer's
+  // manifest builder rewrites the season section from its fixed key list,
+  // dropping M2.6.5 entries like freeAgencyIndex/freeAgencyTargets), so the
+  // tests snapshot the committed manifest bytes and restore them afterwards
+  // to keep the suite order-independent.
+  let committedManifest: Buffer;
+  beforeAll(() => {
+    committedManifest = readFileSync(DEFAULT_MANIFEST);
+  });
+  afterAll(() => {
+    writeFileSync(DEFAULT_MANIFEST, committedManifest);
+  });
+
   it('importManifest reports success with a valid packaged manifest', () => {
     const report = importManifest();
     expect(report.command).toBe('import manifest');

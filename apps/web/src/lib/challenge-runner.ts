@@ -89,7 +89,6 @@ export class ChallengeRunner {
     return this.run;
   }
 
-  /** Error message for the retry action; null unless phase is 'error'. */
   get errorMessage(): string | null {
     return this.lastError;
   }

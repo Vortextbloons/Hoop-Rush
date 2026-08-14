@@ -2,6 +2,8 @@ import type {
   HoopRushManifest,
   SeasonActiveRunIndex,
   SeasonDraftCatalog,
+  SeasonFreeAgencyRoleExpectation,
+  SeasonFreeAgencyState,
   SeasonHealthState,
   SeasonInfluenceState,
   SeasonInvalidRosterInterruption,
@@ -79,6 +81,7 @@ export class SeasonRunShell implements SeasonRunShellData {
   health = $state.raw<SeasonHealthState | null>(null);
   influence = $state.raw<SeasonInfluenceState | null>(null);
   trade = $state.raw<SeasonTradeState | null>(null);
+  freeAgency = $state.raw<SeasonFreeAgencyState | null>(null);
   objectives = $state.raw<SeasonObjectiveState | null>(null);
   pending = $state<SeasonPendingBlockCandidate | null>(null);
   interruption = $state<SeasonInvalidRosterInterruption | null>(null);
@@ -127,6 +130,25 @@ export class SeasonRunShell implements SeasonRunShellData {
     return Promise.resolve();
   };
   declineTradeOffer = (input: { windowIndex: number; offerId: string }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  declareFreeAgentInterest = (input: {
+    windowIndex: number;
+    targets: {
+      playerVersionId: string;
+      roleExpectation: SeasonFreeAgencyRoleExpectation;
+      influence: number;
+    }[];
+  }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  skipFreeAgentMarket = (input: { windowIndex: number }): Promise<void> => {
+    void input;
+    return Promise.resolve();
+  };
+  resolveFreeAgentMarket = (input: { windowIndex: number }): Promise<void> => {
     void input;
     return Promise.resolve();
   };

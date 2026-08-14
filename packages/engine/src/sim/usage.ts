@@ -50,7 +50,6 @@ const ACTION_INDEX: Record<ActionType, number> = {
 export interface ShotSelection {
   shooter: SimulationPlayer;
   initiator: SimulationPlayer;
-  /** Whether the possession produced a pass before the shot. */
   passed: boolean;
 }
 

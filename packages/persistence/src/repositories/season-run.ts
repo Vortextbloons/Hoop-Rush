@@ -5,6 +5,7 @@ import type {
   SeasonCandidateCheckpoint,
   SeasonCheckpointState,
   SeasonEffectsState,
+  SeasonFreeAgencyState,
   SeasonGameSummary,
   SeasonHealthState,
   SeasonInfluenceState,
@@ -54,7 +55,7 @@ export interface CommitSeasonBlockInput {
   standings: SeasonStandings;
   /** Sorted by franchiseId ascending (30 rows). */
   teamAggregates: SeasonTeamAggregate[];
-  /** Sorted by playerVersionId ascending (300 rows). */
+  /** Sorted by playerVersionId ascending (300-450 rows; M2.6.5). */
   playerAggregates: SeasonPlayerAggregate[];
   /** Every game of this block (150, or 30 in the final block). */
   summaries: SeasonGameSummary[];
@@ -65,6 +66,13 @@ export interface CommitSeasonBlockInput {
   rotations: SeasonRotation[];
   /** M2.4 authoritative post-block effects state; the reload audit reconciles it. */
   effects: SeasonEffectsState;
+  /**
+   * M2.6.5: authoritative post-block free-agency state (windows opened by
+   * this block's checkpoint, AI declarations, resolution traces and
+   * signings). Stored on the run snapshot slice and covered by the state
+   * digest.
+   */
+  freeAgency: SeasonFreeAgencyState;
   /** M2.5: authoritative post-block health state (append-only injuries). */
   health: SeasonHealthState;
   /**
@@ -116,12 +124,13 @@ export interface SeasonRunSnapshot {
 }
 
 /**
- * Typed marker for a stored pre-minute-policy run (save-schema v1-v4 family);
- * the discard screen shows the discard-and-restart affordance and the legacy
- * row stays untouched until the user confirms `clearSeasonRun(runId)`.
+ * Typed marker for a stored pre-minute-policy run (save-schema v1-v6 family,
+ * schema 9 and below); the discard screen shows the discard-and-restart
+ * affordance and the legacy row stays untouched until the user confirms
+ * `clearSeasonRun(runId)`.
  */
 export interface SeasonRunIncompatibleInfo {
-  /** The current save-schema family (v5 since the minute-policy contract). */
+  /** The current save-schema family (v7 since the M2.6.5 roster-depth contract). */
   storedSaveSchemaVersion: typeof SEASON_RUN_SAVE_SCHEMA_VERSION;
   /** Run snapshot schema version recorded in the stored row. */
   storedRunSchemaVersion: number;
@@ -129,24 +138,41 @@ export interface SeasonRunIncompatibleInfo {
   runId: string;
 }
 
-/** One between-block command application (M2.5, atomic). */
+/** One between-block command application (M2.5/M2.6.5, atomic). */
 export interface SeasonRunCommandApplication {
   runId: string;
   /** The typed command whose expected state facts are validated. */
   command: SeasonRunCommand;
   /**
-   * The engine-produced post-command run snapshot (schema 7); its mutable
-   * state is stored atomically.
+   * The engine-produced post-command run snapshot (schema 10); its mutable
+   * state — rosters, ownership, rotations, free agency, health,
+   * transactions, influence, trade, objectives, checkpointState, and the
+   * state chain — is stored atomically. A free-agency resolution applies
+   * every winning signing here (ownership transfer, roster insertion,
+   * Influence ledger debit, immutable transaction entries, and the
+   * free-agency state in one snapshot).
    */
   run: SeasonRun;
   /**
    * The engine-produced post-command effects state. Commands do not mutate
-   * load facts, but accepted trades reset chemistry pairs, so trades carry
-   * the post-command effects; optional until the economy workstream ships it.
+   * load facts, but accepted trades reset chemistry pairs and free-agency
+   * signings freeze/restore inactive and archived records, so trades and
+   * signings carry the post-command effects; optional until the economy
+   * workstream ships it.
    */
   effects?: SeasonEffectsState;
   /** The pending candidate after the command (null clears the pending row). */
   pending: SeasonPendingBlockCandidate | null;
+  /**
+   * M2.6.5 command log: canonical digest of the accepted command's result
+   * facts. Optional so pre-log callers keep working; defaults to the
+   * canonical `seasonCommandResultDigest` over the empty result.
+   */
+  resultDigest?: string;
+  /** M2.6.5 command log: game ids the command advanced (canonically ordered). */
+  relatedGameIds?: string[];
+  /** M2.6.5 command log: transaction ids the command produced (canonically ordered). */
+  transactionIds?: string[];
 }
 
 /**
@@ -252,9 +278,11 @@ export interface SeasonRunRepository {
   /** M2.5: deletes the pending row (no-op when absent). */
   discardPendingBlock(runId: string): Promise<void>;
   /**
-   * M2.5: atomically applies one between-block command result, validating run
-   * identity, the command's expected state facts, and commandId uniqueness,
-   * then stores the engine-produced mutable run state and pending candidate.
+   * M2.5/M2.6.5: atomically applies one between-block command result,
+   * validating run identity, the command's expected state facts, and
+   * commandId uniqueness, then stores the engine-produced mutable run state,
+   * the pending candidate, and the accepted command-log entry (ordinal-dense,
+   * free-agency commands included) in ONE transaction.
    */
   applySeasonRunCommand(input: SeasonRunCommandApplication): Promise<void>;
   /**

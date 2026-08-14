@@ -373,8 +373,37 @@ export { seasonRunStateDigest, type SeasonRunStateDigestFacts } from './season/s
 export {
   openSeasonTradeWindow,
   WINDOW_BLOCK_INDEX_TO_INDEX,
+  seasonTradeValueBandFor,
+  ratioMutuallyWithinBand,
+  type SeasonTradePackageKind,
   type SeasonWindowOpenResult,
 } from './season/trades.ts';
+// M2.6.5 free-agency market (spec/2.0/15): canonical identity selection,
+// window composition and opening, declaration/skip validation, the recorded
+// seven-step resolution, signing application, and the block gating helper.
+export {
+  SEASON_FREE_AGENCY_BAND_SIGNING_CAPS,
+  SEASON_FREE_AGENCY_WINDOW_COMPOSITION,
+  SEASON_FREE_AGENCY_WINDOW_MAX_CANDIDATES,
+  SEASON_FREE_AGENCY_WINDOW_BLOCK_INDEXES,
+  freeAgencySeed,
+  seasonFreeAgencyUniverseOf,
+  canonicalFreeAgencyIdentity,
+  composeSeasonFreeAgencyWindow,
+  openSeasonFreeAgencyWindow,
+  freeAgencyUnresolvedWindowIndex,
+  applyFreeAgencyDeclaration,
+  applyFreeAgencySkip,
+  resolveSeasonFreeAgencyWindow,
+  FreeAgencyValidationRejection,
+  type SeasonFreeAgencyContext,
+  type SeasonFreeAgencyWindowOpenResult,
+  type SeasonFreeAgencyResolutionResult,
+} from './season/free-agency.ts';
+// M2.6.5 effects reconciliation (season-chemistry-v2): the pure block-lock
+// rotation-scoped rebuild (demotion freeze, promotion restore, zero-state
+// new pairs, 300/1,350 invariants).
+export { reconcileSeasonEffects, type SeasonEffectsReconcileInput } from './season/effects.ts';
 // Season Run (2.0 M2.6) trade grades (trade-grade-v1, Track C): one grade
 // per side of every accepted trade, derived from recorded post-trade facts
 // (regular-season + postseason summaries through the champion) with the

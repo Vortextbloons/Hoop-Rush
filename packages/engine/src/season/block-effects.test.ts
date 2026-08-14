@@ -45,6 +45,8 @@ import { buildMinimalRotation } from './rotation.ts';
 import { pairChemistryBasisPoints } from './chemistry.ts';
 import { createInitialSeasonInfluenceState } from './influence.ts';
 import {
+  SEASON_AGGREGATES_VERSION,
+  SEASON_CHECKPOINT_VERSION,
   SEASON_HEALTH_VERSION,
   SEASON_INFLUENCE_TARGETS_VERSION,
   SEASON_INFLUENCE_VERSION,
@@ -252,10 +254,10 @@ function buildSynthesizedRun(): { run: SeasonRun; catalog: SeasonDraftCatalog } 
       gameVersion: SEASON_GAME_VERSION,
       gameTargetsVersion: SEASON_GAME_TARGETS_VERSION,
       rosterTargetsVersion: 'roster-targets-v2',
-      checkpointVersion: 'season-checkpoint-v3',
+      checkpointVersion: SEASON_CHECKPOINT_VERSION,
       blockVersion: SEASON_BLOCK_VERSION,
       summaryVersion: SEASON_GAME_SUMMARY_VERSION,
-      aggregatesVersion: 'season-aggregates-v1',
+      aggregatesVersion: SEASON_AGGREGATES_VERSION,
       recapVersion: SEASON_RECAP_VERSION,
       leadersVersion: 'season-leaders-v1',
       homeCourtVersion: 'season-home-court-v1',
@@ -277,6 +279,9 @@ function buildSynthesizedRun(): { run: SeasonRun; catalog: SeasonDraftCatalog } 
       almanacVersion: 'almanac-v1',
       replayExportVersion: 'replay-export-v1',
       postseasonTargetsVersion: 'postseason-targets-v1',
+      freeAgencyVersion: 'season-free-agency-v1',
+      freeAgencyIndexVersion: 'free-agency-index-v1',
+      freeAgencyTargetsVersion: 'free-agency-targets-v1',
     },
     league,
     rosters,
@@ -334,6 +339,14 @@ function buildSynthesizedRun(): { run: SeasonRun; catalog: SeasonDraftCatalog } 
     evaluations,
     // M2.5: run-scoped state chain and economy facts (schema 7).
     trade: null,
+    freeAgency: {
+      schemaVersion: 1,
+      freeAgencyVersion: 'season-free-agency-v1',
+      windows: [],
+      canonicalCandidates: {},
+      signingCounts: Object.fromEntries(league.teams.map((team) => [team.franchiseId, 0])),
+      seasonSpend: Object.fromEntries(league.teams.map((team) => [team.franchiseId, 0])),
+    },
     objectives: {
       schemaVersion: 1,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,

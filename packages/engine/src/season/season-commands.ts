@@ -67,6 +67,14 @@ import type {
   SeasonUnavailablePlayerRejection,
   SeasonWindowNotOpenRejection,
   SeasonWrongGameRejection,
+  SeasonDeclareFreeAgentInterestCommand,
+  SeasonDeclareFreeAgentInterestResult,
+  SeasonSkipFreeAgentMarketCommand,
+  SeasonSkipFreeAgentMarketResult,
+  SeasonResolveFreeAgentMarketCommand,
+  SeasonResolveFreeAgentMarketResult,
+  SeasonFreeAgencyIndex,
+  SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
 import { SEASON_ROUND_COUNT, playInGameIdOf } from '@hoop-rush/data-contracts';
 import { expandSeasonRunRosters } from './block.ts';
@@ -117,6 +125,12 @@ import {
   generatedExtraOfferForSpend,
   type SeasonEconomyRun,
 } from './trades.ts';
+import {
+  FreeAgencyValidationRejection,
+  applyFreeAgencyDeclaration,
+  applyFreeAgencySkip,
+  resolveSeasonFreeAgencyWindow,
+} from './free-agency.ts';
 import { seasonTransactionEntry } from './transactions.ts';
 
 /**
@@ -192,6 +206,18 @@ export interface SeasonRunCommandContext {
    * partial-facts replay contexts).
    */
   regularSeasonSummaries?: readonly SeasonGameSummary[];
+  /**
+   * M2.6.5: the packaged free-agency index (free-agency-index-v1). Required
+   * by `resolve-free-agent-market`; a missing index throws
+   * `SeasonFreeAgencyFactsError` rather than recording an unvalidated
+   * resolution.
+   */
+  freeAgencyIndex?: SeasonFreeAgencyIndex;
+  /**
+   * M2.6.5: the frozen roster-targets policy (AI free-agency ceilings).
+   * Optional seam: when absent, the recorded fallback ceilings apply.
+   */
+  freeAgencyTargets?: SeasonRosterTargets;
 }
 
 export type SeasonRunCommandResult =
@@ -205,7 +231,10 @@ export type SeasonRunCommandResult =
   | { command: 'advance-postseason'; result: SeasonAdvancePostseasonResult }
   | { command: 'submit-postseason-rotation'; result: SeasonSubmitPostseasonRotationResult }
   | { command: 'spectate-postseason-game'; result: SeasonSpectatePostseasonGameResult }
-  | { command: 'fast-forward-postseason'; result: SeasonFastForwardPostseasonResult };
+  | { command: 'fast-forward-postseason'; result: SeasonFastForwardPostseasonResult }
+  | { command: 'declare-free-agent-interest'; result: SeasonDeclareFreeAgentInterestResult }
+  | { command: 'skip-free-agent-market'; result: SeasonSkipFreeAgentMarketResult }
+  | { command: 'resolve-free-agent-market'; result: SeasonResolveFreeAgentMarketResult };
 
 export interface SeasonRunCommandOutput {
   result: SeasonRunCommandResult;
@@ -230,7 +259,7 @@ export class SeasonRunCommandNotImplementedError extends Error {
   }
 }
 
-/** The six command kinds this dispatch handles (submit-season-block excluded). */
+/** The command kinds this dispatch handles (submit-season-block excluded). */
 type DispatchableCommandKind =
   | 'select-block-objective'
   | 'spend-influence'
@@ -242,7 +271,10 @@ type DispatchableCommandKind =
   | 'advance-postseason'
   | 'submit-postseason-rotation'
   | 'spectate-postseason-game'
-  | 'fast-forward-postseason';
+  | 'fast-forward-postseason'
+  | 'declare-free-agent-interest'
+  | 'skip-free-agent-market'
+  | 'resolve-free-agent-market';
 
 /**
  * The engine-facing run view for this dispatch: the command layer supplies
@@ -274,6 +306,7 @@ function runStateDigestFactsOf(run: SeasonEconomyRun): Parameters<typeof seasonR
     ownership: run.ownership,
     rotations: run.rotations,
     effects: run.effects,
+    freeAgency: run.freeAgency,
   };
 }
 
@@ -1823,6 +1856,205 @@ function handleFastForwardPostseason(
   };
 }
 
+// ---------------------------------------------------------------------------
+// M2.6.5 free-agency handlers (spec/2.0/15)
+// ---------------------------------------------------------------------------
+
+/** Marker error for missing free-agency facts at the command boundary. */
+export class SeasonFreeAgencyFactsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SeasonFreeAgencyFactsError';
+  }
+}
+
+/** Converts a rejection wrapper to the typed rejection payload. */
+function freeAgencyRejectionTo(error: FreeAgencyValidationRejection): SeasonRunCommandRejection {
+  return error.rejection as SeasonRunCommandRejection;
+}
+
+function rejectedFreeAgency(
+  command:
+    | SeasonDeclareFreeAgentInterestCommand
+    | SeasonSkipFreeAgentMarketCommand
+    | SeasonResolveFreeAgentMarketCommand,
+  rejection: SeasonRunCommandRejection,
+  run: SeasonRun,
+): SeasonRunCommandOutput {
+  return {
+    result: {
+      command: command.command as DispatchableCommandKind,
+      result: { status: 'rejected', commandId: command.commandId, rejection },
+    } as SeasonRunCommandResult,
+    run,
+    pending: null,
+  };
+}
+
+function handleDeclareFreeAgentInterest(
+  command: SeasonDeclareFreeAgentInterestCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, null);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  if (run.freeAgency.windows.every((window) => window.windowIndex !== command.windowIndex)) {
+    return rejectedFreeAgency(
+      command,
+      {
+        code: 'free-agency-window-not-open',
+        franchiseId: command.franchiseId,
+        windowIndex: command.windowIndex,
+      },
+      run,
+    );
+  }
+  let nextFreeAgency;
+  try {
+    nextFreeAgency = applyFreeAgencyDeclaration(
+      run,
+      command.windowIndex,
+      command.franchiseId,
+      command.commandId,
+      command.targets,
+    );
+  } catch (error) {
+    if (error instanceof FreeAgencyValidationRejection) {
+      return rejectedFreeAgency(command, freeAgencyRejectionTo(error), run);
+    }
+    throw error;
+  }
+  const next = advanceRunState({ ...run, freeAgency: nextFreeAgency });
+  return {
+    result: {
+      command: 'declare-free-agent-interest',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        franchiseId: command.franchiseId,
+        windowIndex: command.windowIndex,
+        declaration: command.targets,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handleSkipFreeAgentMarket(
+  command: SeasonSkipFreeAgentMarketCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, null);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  if (run.freeAgency.windows.every((window) => window.windowIndex !== command.windowIndex)) {
+    return rejectedFreeAgency(
+      command,
+      {
+        code: 'free-agency-window-not-open',
+        franchiseId: command.franchiseId,
+        windowIndex: command.windowIndex,
+      },
+      run,
+    );
+  }
+  let nextFreeAgency;
+  try {
+    nextFreeAgency = applyFreeAgencySkip(
+      run,
+      command.windowIndex,
+      command.franchiseId,
+      command.commandId,
+    );
+  } catch (error) {
+    if (error instanceof FreeAgencyValidationRejection) {
+      return rejectedFreeAgency(command, freeAgencyRejectionTo(error), run);
+    }
+    throw error;
+  }
+  const next = advanceRunState({ ...run, freeAgency: nextFreeAgency });
+  return {
+    result: {
+      command: 'skip-free-agent-market',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        franchiseId: command.franchiseId,
+        windowIndex: command.windowIndex,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
+function handleResolveFreeAgentMarket(
+  command: SeasonResolveFreeAgentMarketCommand,
+  context: SeasonRunCommandContext,
+): SeasonRunCommandOutput {
+  const base = baseValidation(command, context.run, null);
+  if (base !== null) return base;
+  const run = economyRunOf(context);
+  if (context.catalog === undefined || context.freeAgencyIndex === undefined) {
+    throw new SeasonFreeAgencyFactsError(
+      'resolve-free-agent-market requires the packaged catalog and free-agency index; the command layer supplies them',
+    );
+  }
+  let resolution;
+  try {
+    resolution = resolveSeasonFreeAgencyWindow(
+      {
+        run: context.run,
+        effects: context.effects as SeasonEffectsState,
+        catalog: context.catalog,
+        index: context.freeAgencyIndex,
+        targets: context.freeAgencyTargets,
+        humanFranchiseId: context.humanFranchiseId,
+      },
+      command.windowIndex,
+      command.commandId,
+    );
+  } catch (error) {
+    if (error instanceof FreeAgencyValidationRejection) {
+      return rejectedFreeAgency(command, freeAgencyRejectionTo(error), run);
+    }
+    throw error;
+  }
+  const next = advanceRunState({
+    ...run,
+    freeAgency: resolution.freeAgency,
+    rosters: resolution.rosters,
+    ownership: resolution.ownership,
+    influence: resolution.influence,
+    transactions: resolution.transactions,
+    effects: resolution.effects,
+  });
+  const humanSigned = resolution.signings.some(
+    (signing) => signing.franchiseId === context.humanFranchiseId,
+  );
+  return {
+    result: {
+      command: 'resolve-free-agent-market',
+      result: {
+        status: 'accepted',
+        commandId: command.commandId,
+        windowIndex: command.windowIndex,
+        traces: resolution.traces.map((trace) => ({
+          seedPath: trace.seedPath,
+          resolution: trace.resolution,
+          signingFranchiseId: trace.signingFranchiseId,
+          signedPlayerVersionId: trace.signedPlayerVersionId,
+        })),
+        signings: resolution.signings,
+        humanSigned,
+      },
+    },
+    run: next,
+    pending: null,
+  };
+}
+
 /**
  * The typed run command dispatch (spec/2.0/07 M2.5 §8): validates run
  * identity, commandId uniqueness, and the expected state revision/digest,
@@ -1860,5 +2092,11 @@ export function handleSeasonRunCommand(
       throw new SeasonRunCommandNotImplementedError(
         'submit-season-block is handled by the block pipeline, not the run command dispatch',
       );
+    case 'declare-free-agent-interest':
+      return handleDeclareFreeAgentInterest(command, context);
+    case 'skip-free-agent-market':
+      return handleSkipFreeAgentMarket(command, context);
+    case 'resolve-free-agent-market':
+      return handleResolveFreeAgentMarket(command, context);
   }
 }

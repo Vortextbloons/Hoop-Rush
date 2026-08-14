@@ -283,7 +283,13 @@ describe('SeasonHubState between-block commands', () => {
     const seed = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
     const league = buildSeasonLeague({}, { humanFranchiseId: 'lakers' });
     const schedule = generateSeasonSchedule({ league, seed });
-    const effects: SeasonEffectsState = { schemaVersion: 1, playerStates: [], pairStates: [] };
+    const effects: SeasonEffectsState = {
+      schemaVersion: 2,
+      playerStates: [],
+      inactivePlayerStates: [],
+      pairStates: [],
+      archivedPairs: [],
+    };
     const run = {
       ...buildSeasonRunFixture({ schedule, league, seed, humanFranchiseId: 'lakers' }),
       effects,
@@ -460,7 +466,13 @@ function hubZeroEffects(run: SeasonRun): SeasonEffectsState {
       }
     }
   }
-  return { schemaVersion: 1, playerStates, pairStates };
+  return {
+    schemaVersion: 2,
+    playerStates,
+    inactivePlayerStates: [],
+    pairStates,
+    archivedPairs: [],
+  };
 }
 
 /** Distinct east records; a west 7-8 tie between clippers and lakers. */
@@ -554,6 +566,7 @@ function hubBoundaryRun(): SeasonRun {
       ownership: base.ownership,
       rotations: base.rotations,
       effects,
+      freeAgency: base.freeAgency,
     }),
   };
   return run;
@@ -583,7 +596,7 @@ async function advanceHubRunToHumanGame(
       throw new Error(`the run ended before a human rotation decision: ${decision.kind}`);
     }
     const command: SeasonRunCommand = {
-      schemaVersion: 9,
+      schemaVersion: 10,
       commandId: `hub-adv-${String(guard)}`,
       runId: current.runId,
       expectedStateRevision: current.stateRevision,

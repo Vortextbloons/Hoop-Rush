@@ -1,5 +1,7 @@
 import {
+  SEASON_ROSTER_MAX_SIZE,
   SEASON_ROTATION_PRESET_TARGETS,
+  SEASON_ROTATION_SIZE,
   canPlay,
   type Position,
   type SeasonMinutePolicyStrategy,
@@ -40,8 +42,6 @@ export interface MinuteAdjustment {
   delta: number;
 }
 
-/** Result of a rebalancing minutes edit: failures (empty = committed) plus
- * the players whose target minutes changed. */
 export interface RebalanceResult {
   failures: string[];
   adjustments: MinuteAdjustment[];
@@ -90,25 +90,115 @@ export function rotationRoleOf(rotation: SeasonRotation, playerVersionId: string
   }
   const benchIndex = rotation.benchOrder.indexOf(playerVersionId);
   if (benchIndex !== -1) return `Bench ${String(benchIndex + 1)}`;
-  return 'Unrostered';
+  return 'Inactive';
 }
 
 export class RotationEditor {
   rotation: SeasonRotation;
   private readonly members: RotationMember[];
-  readonly memberPlayable: ReadonlyMap<string, readonly Position[]>;
+  /** Playables for the ten ACTIVE rotation members only, so the engine audit
+   * (which requires an exact partition correspondence) stays clean. */
+  memberPlayable: ReadonlyMap<string, readonly Position[]>;
   readonly names: ReadonlyMap<string, string>;
   private readonly rosterIds: string[];
+  private activeIds: Set<string>;
 
   constructor(rotation: SeasonRotation, members: RotationMember[]) {
-    if (members.length !== 10) {
-      throw new Error(`rotation editor needs ten members (got ${String(members.length)})`);
+    if (members.length < SEASON_ROTATION_SIZE || members.length > SEASON_ROSTER_MAX_SIZE) {
+      throw new Error(
+        `rotation editor needs ${String(SEASON_ROTATION_SIZE)} to ${String(
+          SEASON_ROSTER_MAX_SIZE,
+        )} roster members (got ${String(members.length)})`,
+      );
+    }
+    const partition = [...rotation.starters, ...rotation.benchOrder];
+    if (partition.length !== SEASON_ROTATION_SIZE) {
+      throw new Error(
+        `rotation must reference exactly ${String(SEASON_ROTATION_SIZE)} players (got ${String(partition.length)})`,
+      );
     }
     this.rotation = rotation;
     this.members = members;
-    this.memberPlayable = new Map(members.map((m) => [m.playerVersionId, m.playable]));
+    this.activeIds = new Set(partition);
+    this.memberPlayable = new Map(
+      members
+        .filter((member) => this.activeIds.has(member.playerVersionId))
+        .map((member) => [member.playerVersionId, member.playable]),
+    );
     this.names = new Map(members.map((m) => [m.playerVersionId, m.displayName]));
     this.rosterIds = members.map((m) => m.playerVersionId);
+  }
+
+  /** The ten players currently in the rotation (starters + bench order). */
+  activeMemberIds(): string[] {
+    return [...this.rotation.starters, ...this.rotation.benchOrder];
+  }
+
+  /** True when the roster player is one of the ten active rotation members. */
+  isActive(playerVersionId: string): boolean {
+    return this.activeIds.has(playerVersionId);
+  }
+
+  /** Rostered players outside the rotation (inactive depth). */
+  inactiveMembers(): RotationMember[] {
+    return this.members.filter((member) => !this.activeIds.has(member.playerVersionId));
+  }
+
+  /**
+   * M2.6.5: promotes an inactive roster player into the rotation in place of
+   * an active player, keeping exactly ten active members. The promoted player
+   * takes the demoted player's rotation position (starter slot, bench slot,
+   * target minutes, and closing-five slot when present). The candidate is
+   * engine-audited against the ten active members; reverts with failures
+   * when the result is illegal (e.g. the promoted player cannot play the
+   * vacated starter slot, or the closing five becomes illegal).
+   */
+  promoteToRotation(inactivePlayerVersionId: string, replacedPlayerVersionId: string): string[] {
+    if (inactivePlayerVersionId === replacedPlayerVersionId) return [];
+    if (!this.rosterIds.includes(inactivePlayerVersionId)) {
+      return [`${inactivePlayerVersionId} is not on the roster`];
+    }
+    if (!this.rosterIds.includes(replacedPlayerVersionId)) {
+      return [`${replacedPlayerVersionId} is not on the roster`];
+    }
+    if (this.activeIds.has(inactivePlayerVersionId)) {
+      return [`${inactivePlayerVersionId} is already in the rotation`];
+    }
+    if (!this.activeIds.has(replacedPlayerVersionId)) {
+      return [`${replacedPlayerVersionId} is not in the rotation`];
+    }
+    const promoted = this.members.find(
+      (member) => member.playerVersionId === inactivePlayerVersionId,
+    );
+    if (promoted === undefined) {
+      return [`${inactivePlayerVersionId} is not on the roster`];
+    }
+    const candidate: SeasonRotation = {
+      ...this.rotation,
+      starters: this.rotation.starters.map((id) =>
+        id === replacedPlayerVersionId ? inactivePlayerVersionId : id,
+      ),
+      benchOrder: this.rotation.benchOrder.map((id) =>
+        id === replacedPlayerVersionId ? inactivePlayerVersionId : id,
+      ),
+      targetMinutes: this.rotation.targetMinutes.map((entry) =>
+        entry.playerVersionId === replacedPlayerVersionId
+          ? { playerVersionId: inactivePlayerVersionId, minutes: entry.minutes }
+          : entry,
+      ),
+      closingFive: this.rotation.closingFive.map((id) =>
+        id === replacedPlayerVersionId ? inactivePlayerVersionId : id,
+      ),
+    };
+    const playable = new Map(this.memberPlayable);
+    playable.delete(replacedPlayerVersionId);
+    playable.set(inactivePlayerVersionId, promoted.playable);
+    const failures = auditSeasonRotation(candidate, playable);
+    if (failures.length > 0) return failures;
+    this.rotation = candidate;
+    this.memberPlayable = playable;
+    this.activeIds = new Set([...candidate.starters, ...candidate.benchOrder]);
+    return [];
   }
 
   rows(): Array<{
@@ -135,11 +225,15 @@ export class RotationEditor {
   }
 
   /** Members that can legally fill one starter slot, mirroring the engine
-   * audit's eligibility so the pickers never offer an illegal swap. */
+   * audit's eligibility so the pickers never offer an illegal swap. Inactive
+   * depth is not offered here (promote it through the inactive roster
+   * section first). */
   eligibleForSlot(slotIndex: number): RotationMember[] {
     const group = SLOT_GROUPS[slotIndex];
     if (group === undefined) return [];
-    return this.members.filter((member) => canPlay(member.playable, group));
+    return this.members.filter(
+      (member) => this.activeIds.has(member.playerVersionId) && canPlay(member.playable, group),
+    );
   }
 
   minutesFor(playerVersionId: string): number {
@@ -148,7 +242,6 @@ export class RotationEditor {
     );
   }
 
-  /** Audit failures of the current rotation; empty means valid. */
   validate(): string[] {
     return auditSeasonRotation(this.rotation, this.memberPlayable);
   }
@@ -185,8 +278,11 @@ export class RotationEditor {
    * signed deltas for the UI to highlight and announce.
    */
   rebalanceMinutes(playerVersionId: string, minutes: number): RebalanceResult {
-    if (!this.rosterIds.includes(playerVersionId)) {
-      return { failures: [`${playerVersionId} is not on the roster`], adjustments: [] };
+    if (!this.activeIds.has(playerVersionId)) {
+      return {
+        failures: [`${playerVersionId} is not an active rotation member`],
+        adjustments: [],
+      };
     }
     const clamped = Math.max(0, Math.min(48, Math.round(minutes)));
     const current = this.minutesFor(playerVersionId);
@@ -251,8 +347,8 @@ export class RotationEditor {
    * Keeps exactly five; reverts (with failures) when no legal result exists.
    */
   toggleClosing(playerVersionId: string): string[] {
-    if (!this.rosterIds.includes(playerVersionId)) {
-      return [`${playerVersionId} is not on the roster`];
+    if (!this.activeIds.has(playerVersionId)) {
+      return [`${playerVersionId} is not an active rotation member`];
     }
     const closingFive = [...this.rotation.closingFive];
     const currentSlot = closingFive.indexOf(playerVersionId);
@@ -345,8 +441,8 @@ export class RotationEditor {
   assignStarter(slotIndex: number, playerVersionId: string): string[] {
     const current = this.rotation.starters[slotIndex];
     if (current === playerVersionId) return [];
-    if (!this.rosterIds.includes(playerVersionId)) {
-      return [`${playerVersionId} is not on the roster`];
+    if (!this.activeIds.has(playerVersionId)) {
+      return [`${playerVersionId} is not an active rotation member`];
     }
     const starters = [...this.rotation.starters];
     const benchOrder = [...this.rotation.benchOrder];
@@ -371,8 +467,8 @@ export class RotationEditor {
   assignClosing(slotIndex: number, playerVersionId: string): string[] {
     const current = this.rotation.closingFive[slotIndex];
     if (current === playerVersionId) return [];
-    if (!this.rosterIds.includes(playerVersionId)) {
-      return [`${playerVersionId} is not on the roster`];
+    if (!this.activeIds.has(playerVersionId)) {
+      return [`${playerVersionId} is not an active rotation member`];
     }
     const closingFive = [...this.rotation.closingFive];
     const otherSlot = closingFive.indexOf(playerVersionId);

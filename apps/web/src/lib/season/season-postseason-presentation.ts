@@ -36,10 +36,6 @@ import { describeCommandRejection, type SeasonPostseasonProgress } from './seaso
  * against and adds the presentation helpers.
  */
 
-// ---------------------------------------------------------------------------
-// Frozen cross-track contract (m26-handoff): hub postseason progress mirror.
-// ---------------------------------------------------------------------------
-
 export type HubPostseasonPhase = SeasonPostseasonProgress['phase'];
 export type HubPostseasonProgress = SeasonPostseasonProgress;
 
@@ -84,10 +80,6 @@ export function hasPostseasonHubMethods(hub: {
 export const POSTSEASON_ORCHESTRATION_UNAVAILABLE =
   'Postseason simulation is not available in this build yet. Save your run — it is safe — and update the app to continue.';
 
-// ---------------------------------------------------------------------------
-// Stage and ranking facts.
-// ---------------------------------------------------------------------------
-
 export function postseasonStageLabel(stage: SeasonRun['stage']): string {
   switch (stage) {
     case 'regular-season':
@@ -101,12 +93,10 @@ export function postseasonStageLabel(stage: SeasonRun['stage']): string {
   }
 }
 
-/** Authoritative engine tiebreak ranking of the run's current standings. */
 export function postseasonRankingsOf(run: SeasonRun): SeasonPostseasonRankings {
   return rankSeasonPostseason(run.league, run.standings, run.rootSeed);
 }
 
-/** Standings-table entry shape ordered by the authoritative ranking. */
 export function rankedEntriesOf(
   rankings: SeasonPostseasonRankings,
   standings: SeasonStandings,
@@ -125,10 +115,6 @@ export function rankedEntriesOf(
   }
   return entries;
 }
-
-// ---------------------------------------------------------------------------
-// Next-game facts for the hub decision panel.
-// ---------------------------------------------------------------------------
 
 export type NextPostseasonGame =
   | { kind: 'game'; gameId: string }
@@ -156,10 +142,6 @@ export function nextGameTeamsOf(
 ): { home: string; away: string } | null {
   return seasonPostseasonGameTeamsOf(run.postseason, gameId);
 }
-
-// ---------------------------------------------------------------------------
-// Tiebreak copy (league tab).
-// ---------------------------------------------------------------------------
 
 export function tiebreakRuleLabel(rule: SeasonTiebreakResolution['rule']): string {
   switch (rule) {
@@ -230,10 +212,6 @@ export function tiebreakResolutionViewModel(
     summary: `${ruleLabel} · ${kindLabel} · ${slotsLabel}`,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Series and bracket view models (bracket route + hub matchup card).
-// ---------------------------------------------------------------------------
 
 export interface SeriesGameResultViewModel {
   gameNumber: number;
@@ -325,7 +303,6 @@ export function seriesCardViewModel(
   };
 }
 
-/** The playoff series a franchise is currently part of (null when none). */
 export function humanSeriesOf(
   run: SeasonRun,
   humanFranchiseId: string,
@@ -351,10 +328,6 @@ export function humanSeriesOf(
   }
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Play-In view models.
-// ---------------------------------------------------------------------------
 
 export interface PlayInGameCardViewModel {
   gameId: string;
@@ -460,10 +433,6 @@ export function playInColumnViewModel(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Bracket columns (desktop round columns; mobile ordered series cards).
-// ---------------------------------------------------------------------------
-
 export interface BracketColumnViewModel {
   key: 'play-in' | PlayoffRound;
   title: string;
@@ -556,10 +525,6 @@ export function mobileBracketCardsOf(
   return cards;
 }
 
-// ---------------------------------------------------------------------------
-// Postseason summary presentation (schedule tab + history).
-// ---------------------------------------------------------------------------
-
 export interface PostseasonSummaryRow {
   summary: SeasonPostseasonSummary;
   phaseLabel: string;
@@ -592,10 +557,6 @@ export function postseasonSummaryRow(
     humanGame,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Awards presentation (leaders tab + history).
-// ---------------------------------------------------------------------------
 
 export interface AwardViewModel {
   key: 'mvp' | 'dpoy' | 'sixth-man';
@@ -651,10 +612,6 @@ export function awardsViewModel(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Risky rehab options (postseason rotation decision, 2 Influence).
-// ---------------------------------------------------------------------------
-
 export interface RiskyRehabOption {
   injuryId: string;
   playerVersionId: string;
@@ -693,11 +650,6 @@ export function riskyRehabOptionsOf(
     .sort((a, b) => a.playerVersionId.localeCompare(b.playerVersionId));
 }
 
-// ---------------------------------------------------------------------------
-// Typed rejection copy for the postseason commands.
-// ---------------------------------------------------------------------------
-
-/** Human-readable copy for the M2.6 postseason rejection codes. */
 export function describePostseasonRejection(
   command: SeasonRunCommand['command'],
   rejection: SeasonRunCommandRejection,

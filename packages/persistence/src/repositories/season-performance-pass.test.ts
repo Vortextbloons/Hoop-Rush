@@ -377,7 +377,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       rotations: run.rotations,
       recap: {
         schemaVersion: 1,
-        recapVersion: 'season-recap-v3',
+        recapVersion: 'season-recap-v4',
         runId: run.runId,
         blockIndex: 0,
         completedRounds: 10,
@@ -427,6 +427,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       expectedStateRevision: 0,
       expectedStateDigest: run.stateDigest,
       window: null,
+      freeAgency: run.freeAgency,
     });
 
     const rows = await repo.loadBlockSummaries(run.runId, 0);
@@ -478,7 +479,7 @@ describe('Season Run performance pass (dexie v9)', () => {
     };
     const trade: SeasonTradeState = {
       schemaVersion: 1,
-      tradeVersion: 'season-trade-v1' as const,
+      tradeVersion: 'season-trade-v2' as const,
       windows: [
         {
           windowIndex: 0,
@@ -527,6 +528,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         ownership: run.ownership,
         rotations: run.rotations,
         effects,
+        freeAgency: run.freeAgency,
       });
       await repo.commitSeasonBlock({
         runId: run.runId,
@@ -543,7 +545,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         rotations: run.rotations,
         recap: {
           schemaVersion: 1,
-          recapVersion: 'season-recap-v3',
+          recapVersion: 'season-recap-v4',
           runId: run.runId,
           blockIndex,
           completedRounds: toRound,
@@ -564,6 +566,13 @@ describe('Season Run performance pass (dexie v9)', () => {
           },
           objectiveEvidence: null,
           tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+          freeAgencyEvidence: {
+            windowIndex: null,
+            signings: [],
+            influenceDelta: 0,
+            seasonSignings: 0,
+            seasonSpend: 0,
+          },
           influenceBalance: { humanBalance: 2 },
         },
         effects,
@@ -578,6 +587,7 @@ describe('Season Run performance pass (dexie v9)', () => {
         expectedStateRevision: priorStateRevision,
         expectedStateDigest: priorStateDigest,
         window: null,
+        freeAgency: run.freeAgency,
       });
       priorStateRevision = stateRevision;
       priorStateDigest = stateDigest;
@@ -618,6 +628,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       ownership: run.ownership,
       rotations: run.rotations,
       effects,
+      freeAgency: run.freeAgency,
     });
     const window = {
       trade,
@@ -646,7 +657,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       rotations: run.rotations,
       recap: {
         schemaVersion: 1,
-        recapVersion: 'season-recap-v3',
+        recapVersion: 'season-recap-v4',
         runId: run.runId,
         blockIndex,
         completedRounds: 30,
@@ -667,6 +678,13 @@ describe('Season Run performance pass (dexie v9)', () => {
         },
         objectiveEvidence: null,
         tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+        freeAgencyEvidence: {
+          windowIndex: null,
+          signings: [],
+          influenceDelta: 0,
+          seasonSignings: 0,
+          seasonSpend: 0,
+        },
         influenceBalance: { humanBalance: 2 },
       },
       effects,
@@ -684,6 +702,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       expectedStateRevision: priorStateRevision,
       expectedStateDigest: priorStateDigest,
       window,
+      freeAgency: run.freeAgency,
     });
 
     // Full validated reload: before the fix this threw SeasonRunLoadError
@@ -725,7 +744,7 @@ describe('Season Run performance pass (dexie v9)', () => {
       runId: run.runId,
       ordinal: 0,
       command: {
-        schemaVersion: 9,
+        schemaVersion: 10,
         command: 'select-block-objective',
         commandId: 'cmd-ps',
         runId: run.runId,

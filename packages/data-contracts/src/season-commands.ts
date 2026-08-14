@@ -187,9 +187,7 @@ export const seasonGameMismatchRejectionSchema = z.object({
 });
 export type SeasonGameMismatchRejection = z.infer<typeof seasonGameMismatchRejectionSchema>;
 
-// ---------------------------------------------------------------------------
 // M2.6.5 free-agency commands and typed rejections (spec/2.0/15).
-// ---------------------------------------------------------------------------
 
 /**
  * Re-exported from season-block.ts (the submit-block rejection union owns
@@ -497,9 +495,7 @@ export type SeasonResolveFreeAgentMarketResult = z.infer<
   typeof seasonResolveFreeAgentMarketResultSchema
 >;
 
-// ---------------------------------------------------------------------------
 // M2.6 postseason commands and typed rejections (spec/2.0/02 Playoffs).
-// ---------------------------------------------------------------------------
 
 /**
  * The command requires a run stage the run is not in (e.g. starting the

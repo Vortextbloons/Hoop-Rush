@@ -226,7 +226,13 @@ function shellWithCommit(): SeasonRunShellData {
         stateDigest: '0'.repeat(32),
       },
     ],
-    effects: { schemaVersion: 1, playerStates: [], pairStates: [] },
+    effects: {
+      schemaVersion: 2,
+      playerStates: [],
+      inactivePlayerStates: [],
+      pairStates: [],
+      archivedPairs: [],
+    },
   } satisfies SeasonRunSnapshot;
   const shell: SeasonRunShellData = {
     ...initialSeasonRunShellData(),

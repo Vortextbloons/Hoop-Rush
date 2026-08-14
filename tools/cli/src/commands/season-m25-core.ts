@@ -3,10 +3,7 @@
  * calibrate`, and `season influence calibrate` (spec/2.0 M2.5, contract §17).
  * Cohorts run the engine block pipeline in process over root-seed-cloned
  * runs; worker counts and chunk order never change the facts (a worker
- * variant is deferred to stay bounded). Engine seams like
- * `seasonRunStateDigest` and `openSeasonTradeWindow` land in
- * `packages/engine/src/index.ts` at M2.5 integration; until then those
- * imports are typecheck-red by design.
+ * variant is deferred to stay bounded).
  */
 
 import {
@@ -81,6 +78,8 @@ export interface SeasonM25RunStateFacts {
   influence: SeasonInfluenceState;
   transactions: SeasonRun['transactions'];
   trade: SeasonTradeState | null;
+  /** M2.6.5: the free-agency market state. */
+  freeAgency: SeasonRun['freeAgency'];
   objectives: SeasonObjectiveState;
   rosters: SeasonRun['rosters'];
   ownership: SeasonRun['ownership'];
@@ -103,6 +102,7 @@ export function m25RunStateFacts(
     influence: run.influence,
     transactions: run.transactions,
     trade: run.trade,
+    freeAgency: run.freeAgency,
     objectives: run.objectives,
     rosters: run.rosters,
     ownership: run.ownership,

@@ -1,5 +1,6 @@
 import {
   blockIndexForRound,
+  emptySeasonPlayerAggregate,
   humanTeamOf,
   seasonAcceptedBlockSchema,
   seasonAlmanacSchema,
@@ -7,8 +8,10 @@ import {
   seasonCommandLogDigest,
   seasonCommandLogEntrySchema,
   seasonCommandLogSchema,
+  seasonCommandResultDigest,
   seasonPostseasonSummarySchema,
   seasonEffectsStateSchema,
+  seasonFreeAgencyStateSchema,
   seasonReplayExportDigest,
   seasonReplayExportSchema,
   seasonRunCommandSchema,
@@ -28,9 +31,11 @@ import {
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
   type SeasonPendingBlockCandidate,
+  type SeasonPlayerAggregate,
   type SeasonPostseasonSummary,
   type SeasonReplayExport,
   type SeasonRetainedGameDetail,
+  type SeasonRoster,
   type SeasonRun,
   type SeasonSchedule,
 } from '@hoop-rush/data-contracts';
@@ -90,30 +95,36 @@ import {
 
 /**
  * Concrete IndexedDB Season Run repository (spec/2.0/07 persistence,
- * spec/2.0/10 M2.3, M2.4, M2.5). The active run lives in the dedicated
- * v6/v7 tables, isolated from the Challenge and Classic stores:
+ * spec/2.0/10 M2.3, M2.4, M2.5, M2.6.5). The active run lives in the
+ * dedicated v6/v7 tables, isolated from the Challenge and Classic stores:
  *
  * - `seasonRuns`          — single checkpoint row (snapshot minus the 1,230
  *   scheduled games, plus cursor facts, standings, aggregates, recap, the
- *   M2.4 effects state, and the M2.5 mutable run state).
+ *   M2.4 effects state, and the M2.5 mutable run state; M2.6.5 save-schema
+ *   v7 wraps the schema-10 snapshot with the free-agency state).
  * - `seasonRunSummaries`  — one compact summary per completed league game.
  * - `seasonRunDetails`    — one retained detail per human-team game.
  * - `seasonRunBlocks`     — one accepted block per commit (append-only).
  * - `seasonRunIndex`      — single lightweight active-run index row.
  * - `seasonPendingBlocks` (v7) — one interrupted-block pending candidate per
  *   run, keyed by runId.
+ * - `seasonCommandLog`    (v8) — one accepted command per row, append-only
+ *   and ordinal-dense (M2.6.5: free-agency commands included).
  *
  * `commitSeasonBlock` writes everything in ONE Dexie transaction: either
  * every row commits or none does, so no partial block can ever be accepted.
  * Revision regressions, duplicate command ids, and stale expected state facts
  * are rejected inside the transaction, and any pending-block row for the run
- * is deleted with it. Reads validate every record through the stored schemas
+ * is deleted with it. `applySeasonRunCommand` commits the command's run
+ * mutation, its accepted command-log entry, and the pending-row change in
+ * ONE transaction, so a free-agency resolution applies every winning signing
+ * atomically. Reads validate every record through the stored schemas
  * and run the reconciliation audit; corrupt or half-applied state throws a
  * typed `SeasonRunLoadError`.
  *
- * ## Legacy rows (stored save schemas v1, v2, v3)
+ * ## Legacy rows (stored save schemas v1..v6)
  *
- * Pre-v4 rows are detected with a typed `SeasonRunIncompatibleError` and
+ * Pre-v7 rows are detected with a typed `SeasonRunIncompatibleError` and
  * NEVER deleted automatically: they cannot enter the current simulator, the
  * UI shows the explicit "Season rules changed" discard-and-restart screen,
  * and deletion happens only through `clearSeasonRun(runId)` after user
@@ -174,10 +185,10 @@ function isDevelopmentRow(row: unknown): boolean {
 }
 
 /**
- * M2.5 typed legacy-run detection (schema-4/schema-5/schema-6 runs under older
- * Season rules). The stored row is preserved byte-for-byte; callers surface
- * the info through the discard-and-restart screen and delete only after the
- * user confirms via `clearSeasonRun(runId)`.
+ * M2.6.5 typed legacy-run detection (schema-9 runs and save-schema-v6 rows
+ * under older Season rules). The stored row is preserved byte-for-byte;
+ * callers surface the info through the discard-and-restart screen and delete
+ * only after the user confirms via `clearSeasonRun(runId)`.
  */
 export class SeasonRunIncompatibleError extends Error {
   readonly info: SeasonRunIncompatibleInfo;
@@ -232,6 +243,32 @@ function byGameId<T extends { gameId: string }>(rows: readonly T[]): T[] {
 
 function byRevision<T extends { revision: number }>(rows: readonly T[]): T[] {
   return [...rows].sort((a, b) => a.revision - b.revision);
+}
+
+/**
+ * M2.6.5 player-aggregate top-up: every rostered version must own a
+ * cumulative aggregate row (300-450). Acquisitions between blocks (free-
+ * agency signings, trades) add players who never played a game; they get a
+ * factual zero-game aggregate row at application time, preserving the
+ * existing cumulative values of every other player. Rows stay sorted by
+ * playerVersionId ascending so the stored table keeps its canonical order.
+ */
+function topUpPlayerAggregates(
+  stored: readonly SeasonPlayerAggregate[],
+  rosters: readonly SeasonRoster[],
+): SeasonPlayerAggregate[] {
+  const byVersionId = new Map(stored.map((row) => [row.playerVersionId, row]));
+  for (const roster of rosters) {
+    for (const player of roster.players) {
+      if (!byVersionId.has(player.playerVersionId)) {
+        byVersionId.set(
+          player.playerVersionId,
+          emptySeasonPlayerAggregate(player.playerVersionId, roster.franchiseId),
+        );
+      }
+    }
+  }
+  return [...byVersionId.values()].sort((a, b) => (a.playerVersionId < b.playerVersionId ? -1 : 1));
 }
 
 export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPostseasonRepository {
@@ -390,6 +427,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           ownership: stored.run.ownership,
           rotations: stored.run.rotations,
           effects: stored.effects,
+          freeAgency: stored.run.freeAgency,
         });
         const block = seasonAcceptedBlockSchema.parse({
           ...last,
@@ -478,6 +516,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           ownership: stored.run.ownership,
           rotations: stored.run.rotations,
           effects: stored.effects,
+          freeAgency: stored.run.freeAgency,
         });
         if (stateDigest === stored.stateDigest) return false;
 
@@ -921,7 +960,14 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           lastCheckpointDigest: input.checkpointDigest,
           standings: input.standings,
           teamAggregates: input.teamAggregates,
-          playerAggregates: input.playerAggregates,
+          // M2.6.5: the engine-produced post-block table covers the full
+          // 300-450 roster set; the top-up is a defensive guarantee that an
+          // acquisition never drops a factual zero row (the post-commit
+          // roster set is the window's or the snapshot's).
+          playerAggregates: topUpPlayerAggregates(
+            input.playerAggregates,
+            window !== null ? window.rosters : (cursor.run.rosters as SeasonRoster[]),
+          ),
           recap: input.recap,
           effects: window !== null ? window.effects : input.effects,
           updatedAtIso,
@@ -930,6 +976,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             rosters: window !== null ? window.rosters : (cursor.run.rosters as never),
             ownership: window !== null ? window.ownership : (cursor.run.ownership as never),
             rotations: window !== null ? window.rotations : input.rotations,
+            freeAgency: seasonFreeAgencyStateSchema.parse(input.freeAgency),
           },
         });
         await this.db.seasonRuns.put({
@@ -1036,119 +1083,183 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
 
   async applySeasonRunCommand(input: SeasonRunCommandApplication): Promise<void> {
     const command = input.command;
-    await this.db.transaction('rw', this.db.seasonRuns, this.db.seasonPendingBlocks, async () => {
-      const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
-      if (checkpoint === undefined) {
-        throw new SeasonRunCommandRunMismatchError(input.runId);
-      }
-      if (
-        (checkpoint as { saveSchemaVersion?: unknown }).saveSchemaVersion !==
-        SEASON_RUN_SAVE_SCHEMA_VERSION
-      ) {
-        throw new SeasonRunCommandRunMismatchError(input.runId);
-      }
-      const cursor = seasonRunCursorSchema.parse(checkpoint);
-      if (cursor.run.runId !== input.runId || command.runId !== input.runId) {
-        throw new SeasonRunCommandRunMismatchError(input.runId);
-      }
-      if (input.run.runId !== input.runId) {
-        throw new SeasonRunCommandRunMismatchError(input.runId);
-      }
-      // The command asserted the run state facts it was assembled against; a
-      // stale command is rejected (the engine recomputes the digest).
-      if (cursor.stateRevision !== command.expectedStateRevision) {
-        throw new SeasonRunCommandStaleStateError(
-          command.commandId,
-          command.expectedStateRevision,
-          cursor.stateRevision,
-        );
-      }
-      if (cursor.stateDigest !== command.expectedStateDigest) {
-        throw new SeasonRunCommandStaleStateError(
-          command.commandId,
-          command.expectedStateRevision,
-          cursor.stateRevision,
-        );
-      }
-      // Bounded commandId dedupe against the recorded command history.
-      const commandId = command.commandId;
-      const recorded: string[] = [];
-      if (cursor.lastCommandId !== null) recorded.push(cursor.lastCommandId);
-      if (cursor.checkpointState !== null) recorded.push(cursor.checkpointState.commandId);
-      for (const entry of cursor.transactions) {
-        if (entry.commandId !== null) recorded.push(entry.commandId);
-      }
-      for (const entry of cursor.influence.ledger) {
-        if (entry.commandId !== null) recorded.push(entry.commandId);
-      }
-      for (const selection of Object.values(cursor.objectives.selections)) {
-        recorded.push(selection.selectedByCommandId);
-      }
-      if (recorded.includes(commandId)) {
-        throw new SeasonRunCommandDuplicateError(commandId);
-      }
-
-      // Store the engine-produced mutable run state: the snapshot's
-      // rosters/ownership/rotations slices are rewritten (trades move
-      // players); standings/aggregates/recap never change between blocks.
-      const delta = seasonRunCheckpointDeltaSchema.parse({
-        completedRounds: cursor.completedRounds,
-        revision: cursor.revision,
-        lastCommandId: cursor.lastCommandId,
-        lastRotationDigest: checkpoint.lastRotationDigest,
-        lastCheckpointDigest: checkpoint.lastCheckpointDigest,
-        standings: checkpoint.standings,
-        teamAggregates: checkpoint.teamAggregates,
-        playerAggregates: checkpoint.playerAggregates,
-        recap: checkpoint.recap,
-        effects: input.effects ?? checkpoint.effects,
-        updatedAtIso: new Date().toISOString(),
-        health: input.run.health,
-        transactions: input.run.transactions,
-        influence: input.run.influence,
-        trade: input.run.trade,
-        objectives: input.run.objectives,
-        checkpointState: input.run.checkpointState,
-        stateRevision: input.run.stateRevision,
-        stateDigest: input.run.stateDigest,
-        run: {
-          rosters: input.run.rosters,
-          ownership: input.run.ownership,
-          rotations: input.run.rotations,
-        },
-      });
-      await this.db.seasonRuns.put({
-        ...checkpoint,
-        ...delta,
-        run: {
-          ...checkpoint.run,
-          ...delta.run,
-        },
-      });
-      if (input.pending === null) {
-        await this.db.seasonPendingBlocks.delete(input.runId);
-      } else {
-        // A pending can only be produced by resume/forfeit commands, which
-        // require an existing pending row. Preserve the recorded interruption
-        // facts, advancing `nextGameId` to the pending's current value.
-        const existingPending = await this.db.seasonPendingBlocks.get(input.runId);
-        if (existingPending === undefined) {
-          throw new SeasonRunLoadError(
-            ['a command produced a pending candidate without a prior pending row'],
-            'Season Run pending block state is inconsistent',
+    await this.db.transaction(
+      'rw',
+      this.db.seasonRuns,
+      this.db.seasonPendingBlocks,
+      this.db.seasonCommandLog,
+      async () => {
+        const checkpoint = await this.db.seasonRuns.get(SEASON_RUN_RECORD_ID);
+        if (checkpoint === undefined) {
+          throw new SeasonRunCommandRunMismatchError(input.runId);
+        }
+        if (
+          (checkpoint as { saveSchemaVersion?: unknown }).saveSchemaVersion !==
+          SEASON_RUN_SAVE_SCHEMA_VERSION
+        ) {
+          throw new SeasonRunCommandRunMismatchError(input.runId);
+        }
+        const cursor = seasonRunCursorSchema.parse(checkpoint);
+        if (cursor.run.runId !== input.runId || command.runId !== input.runId) {
+          throw new SeasonRunCommandRunMismatchError(input.runId);
+        }
+        if (input.run.runId !== input.runId) {
+          throw new SeasonRunCommandRunMismatchError(input.runId);
+        }
+        // The command asserted the run state facts it was assembled against; a
+        // stale command is rejected (the engine recomputes the digest).
+        if (cursor.stateRevision !== command.expectedStateRevision) {
+          throw new SeasonRunCommandStaleStateError(
+            command.commandId,
+            command.expectedStateRevision,
+            cursor.stateRevision,
           );
         }
-        await this.db.seasonPendingBlocks.put({
-          runId: input.runId,
-          block: input.pending,
-          interruption: {
-            ...existingPending.interruption,
-            nextGameId: input.pending.nextGameId,
+        if (cursor.stateDigest !== command.expectedStateDigest) {
+          throw new SeasonRunCommandStaleStateError(
+            command.commandId,
+            command.expectedStateRevision,
+            cursor.stateRevision,
+          );
+        }
+        // Bounded commandId dedupe against the recorded command history: the
+        // cursor facts, the append-only command log (M2.6.5: every accepted
+        // command enters it, free-agency commands included), and the recorded
+        // selection facts.
+        const commandId = command.commandId;
+        const recorded: string[] = [];
+        if (cursor.lastCommandId !== null) recorded.push(cursor.lastCommandId);
+        if (cursor.checkpointState !== null) recorded.push(cursor.checkpointState.commandId);
+        for (const entry of cursor.transactions) {
+          if (entry.commandId !== null) recorded.push(entry.commandId);
+        }
+        for (const entry of cursor.influence.ledger) {
+          if (entry.commandId !== null) recorded.push(entry.commandId);
+        }
+        for (const selection of Object.values(cursor.objectives.selections)) {
+          recorded.push(selection.selectedByCommandId);
+        }
+        const existingLogRows = await this.db.seasonCommandLog
+          .where('runId')
+          .equals(input.runId)
+          .toArray();
+        const logEntries = existingLogRows
+          .map((row) => storedSeasonCommandLogRowSchema.parse(row).entry)
+          .sort((a, b) => a.ordinal - b.ordinal);
+        for (const entry of logEntries) {
+          recorded.push(entry.command.commandId);
+        }
+        if (recorded.includes(commandId)) {
+          throw new SeasonRunCommandDuplicateError(commandId);
+        }
+        // The append-only log must stay dense from ordinal 0: a gap (missing
+        // row or row/entry ordinal disagreement) would make the next ordinal
+        // ambiguous, so it is rejected rather than appended over.
+        for (let index = 0; index < logEntries.length; index += 1) {
+          if (logEntries[index]?.ordinal !== index) {
+            throw new SeasonRunLoadError(
+              ['command log ordinals are not dense from 0 (gap at ordinal ' + String(index) + ')'],
+              'Season Run command log state is inconsistent',
+            );
+          }
+        }
+
+        // Store the engine-produced mutable run state: the snapshot's
+        // rosters/ownership/rotations/free-agency slices are rewritten (trades
+        // and free-agency signings move players); standings/aggregates/recap
+        // never change between blocks, and acquired players receive factual
+        // zero-game aggregate rows (M2.6.5).
+        const delta = seasonRunCheckpointDeltaSchema.parse({
+          completedRounds: cursor.completedRounds,
+          revision: cursor.revision,
+          lastCommandId: cursor.lastCommandId,
+          lastRotationDigest: checkpoint.lastRotationDigest,
+          lastCheckpointDigest: checkpoint.lastCheckpointDigest,
+          standings: checkpoint.standings,
+          teamAggregates: checkpoint.teamAggregates,
+          playerAggregates: topUpPlayerAggregates(checkpoint.playerAggregates, input.run.rosters),
+          recap: checkpoint.recap,
+          effects: input.effects ?? checkpoint.effects,
+          updatedAtIso: new Date().toISOString(),
+          health: input.run.health,
+          transactions: input.run.transactions,
+          influence: input.run.influence,
+          trade: input.run.trade,
+          objectives: input.run.objectives,
+          checkpointState: input.run.checkpointState,
+          stateRevision: input.run.stateRevision,
+          stateDigest: input.run.stateDigest,
+          run: {
+            rosters: input.run.rosters,
+            ownership: input.run.ownership,
+            rotations: input.run.rotations,
+            freeAgency: input.run.freeAgency,
           },
+        });
+        await this.db.seasonRuns.put({
+          ...checkpoint,
+          ...delta,
+          run: {
+            ...checkpoint.run,
+            ...delta.run,
+          },
+        });
+        // M2.6.5: every accepted command enters the append-only command log
+        // (free-agency declarations/skips/resolutions included) with its
+        // ordinal, pre/post state facts, and result facts, so the CLI replay
+        // and the completed-season almanac reconcile the whole chain.
+        const ordinal = logEntries.length;
+        const entry = seasonCommandLogEntrySchema.parse({
+          runId: input.runId,
+          ordinal,
+          command,
+          preStateRevision: command.expectedStateRevision,
+          preStateDigest: command.expectedStateDigest,
+          postStateRevision: input.run.stateRevision,
+          postStateDigest: input.run.stateDigest,
+          resultDigest: seasonCheckpointDigestSchema.parse(
+            input.resultDigest ??
+              seasonCommandResultDigest({
+                commandId: command.commandId,
+                gameIds: input.relatedGameIds ?? [],
+                summaryDigests: [],
+              }),
+          ),
+          previousLogDigest: seasonCommandLogDigest(logEntries),
+          relatedGameIds: [...(input.relatedGameIds ?? [])].sort(),
+          transactionIds: [...(input.transactionIds ?? [])].sort(),
+        });
+        await this.db.seasonCommandLog.put({
+          runId: input.runId,
+          ordinal,
+          entry,
           updatedAtIso: new Date().toISOString(),
         });
-      }
-    });
+        if (input.pending === null) {
+          await this.db.seasonPendingBlocks.delete(input.runId);
+        } else {
+          // A pending can only be produced by resume/forfeit commands, which
+          // require an existing pending row. Preserve the recorded interruption
+          // facts, advancing `nextGameId` to the pending's current value.
+          const existingPending = await this.db.seasonPendingBlocks.get(input.runId);
+          if (existingPending === undefined) {
+            throw new SeasonRunLoadError(
+              ['a command produced a pending candidate without a prior pending row'],
+              'Season Run pending block state is inconsistent',
+            );
+          }
+          await this.db.seasonPendingBlocks.put({
+            runId: input.runId,
+            block: input.pending,
+            interruption: {
+              ...existingPending.interruption,
+              nextGameId: input.pending.nextGameId,
+            },
+            updatedAtIso: new Date().toISOString(),
+          });
+        }
+      },
+    );
   }
 
   async promoteSeasonDraftToRun(
@@ -1193,6 +1304,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
       ownership: validatedRun.ownership,
       rotations: validatedRun.rotations,
       effects: this.seam.zeroSeasonEffectsState(validatedRun.rosters),
+      freeAgency: validatedRun.freeAgency,
     });
     const checkpointRow = storedSeasonRunRecordSchema.parse({
       recordId: SEASON_RUN_RECORD_ID,
@@ -1535,6 +1647,7 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
             postseason: validatedRun.postseason,
             awards: validatedRun.awards,
             completion: validatedRun.completion,
+            freeAgency: validatedRun.freeAgency,
           },
         });
         await this.db.seasonRuns.put({

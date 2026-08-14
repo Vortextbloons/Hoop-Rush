@@ -5,6 +5,7 @@ import {
   type SeasonRotation,
   type SeasonSubmitBlockCommand,
 } from '@hoop-rush/data-contracts';
+import { freeAgencyUnresolvedWindowIndex } from '@hoop-rush/engine';
 import { loadSeasonHomeCourtProfile, seasonArtifactUrls } from './season-assets';
 import { newSeasonId } from './season-ids';
 import { pendingRotationSetDigest } from './season-lock-preview';
@@ -39,7 +40,8 @@ export type SubmitBlockFailureCode =
   | 'block-busy'
   | 'rotation-invalid'
   | 'asset-unavailable'
-  | 'objective-not-selected';
+  | 'objective-not-selected'
+  | 'free-agency-unresolved';
 
 export interface SubmitBlockFailure {
   code: SubmitBlockFailureCode;
@@ -101,6 +103,20 @@ export async function buildSubmitBlockEnvelope(
     return fail(
       'objective-not-selected',
       'Pick a block objective first — the selected objective locks into this block.',
+    );
+  }
+
+  // M2.6.5: an open free-agency market blocks the next rotation lock (the
+  // engine's authoritative gate; the worker wire carries no pre-block
+  // free-agency state, so the shell gates before submission). The window
+  // must be explicitly resolved on the free-agency screen.
+  const unresolvedWindowIndex = freeAgencyUnresolvedWindowIndex(run.freeAgency);
+  if (unresolvedWindowIndex !== null) {
+    return fail(
+      'free-agency-unresolved',
+      `The free-agency market window ${String(
+        unresolvedWindowIndex + 1,
+      )} is still open — resolve it on the free-agency screen (/season/run/free-agency) before the next block can submit.`,
     );
   }
 

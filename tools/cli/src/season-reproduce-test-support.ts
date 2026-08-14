@@ -11,6 +11,7 @@ import {
   type SeasonAlmanac,
   type SeasonCommandLog,
   type SeasonCommandLogEntry,
+  type SeasonFreeAgencyState,
   type SeasonRunReplayExport,
   type SeasonRunReplayExportInput,
 } from '@hoop-rush/data-contracts';
@@ -18,12 +19,17 @@ import {
   createSeasonEffectsState,
   expandSeasonRunRosters,
   handleSeasonRunCommand,
+  openSeasonFreeAgencyWindow,
   openSeasonTradeWindow,
   seasonObjectiveChoicesForBlock,
 } from '@hoop-rush/engine';
 import { REPO_ROOT } from './cli-test-helpers.ts';
 import { loadSeasonRunFixture } from './commands/season-block.ts';
-import { loadSeasonDraftCatalog } from './commands/season-data.ts';
+import {
+  loadSeasonDraftCatalog,
+  loadSeasonFreeAgencyIndex,
+  loadSeasonRosterTargets,
+} from './commands/season-data.ts';
 import { loadPackagedData, PackagedData } from './commands/data-loader.ts';
 
 /**
@@ -48,6 +54,8 @@ export function loadManifestHashes(): SeasonRunReplayExportInput['assetHashes'] 
       league?: { contentHash?: string };
       schedule?: { contentHash?: string };
       draftCatalog?: { contentHash?: string };
+      freeAgencyIndex?: { contentHash?: string };
+      freeAgencyTargets?: { contentHash?: string };
     };
     eraSimulationProfiles?: Array<{ eraId?: string; contentHash?: string }>;
   };
@@ -58,6 +66,14 @@ export function loadManifestHashes(): SeasonRunReplayExportInput['assetHashes'] 
     schedule: manifest.season?.schedule?.contentHash ?? '',
     draftCatalog: manifest.season?.draftCatalog?.contentHash ?? '',
     eraProfile,
+    // M2.6.5: the free-agency assets ride the export only when the manifest
+    // carries them (the committed manifest pins both since M2.6.5).
+    ...(manifest.season?.freeAgencyIndex?.contentHash === undefined
+      ? {}
+      : { freeAgencyIndex: manifest.season.freeAgencyIndex.contentHash }),
+    ...(manifest.season?.freeAgencyTargets?.contentHash === undefined
+      ? {}
+      : { freeAgencyTargets: manifest.season.freeAgencyTargets.contentHash }),
   };
 }
 
@@ -71,6 +87,18 @@ export function replayDeps(): {
   const packaged = loadPackagedData(MANIFEST);
   const profile = new PackagedData(packaged.manifest, packaged.dir).eraProfile('1990s');
   return { catalog, profile, verifyAssetHashes: () => [] };
+}
+
+/** The M2.6.5 free-agency replay deps (index + targets seams included). */
+export function freeAgencyReplayDeps(): ReturnType<typeof replayDeps> & {
+  freeAgencyIndex: ReturnType<typeof loadSeasonFreeAgencyIndex>;
+  freeAgencyTargets: ReturnType<typeof loadSeasonRosterTargets>;
+} {
+  return {
+    ...replayDeps(),
+    freeAgencyIndex: loadSeasonFreeAgencyIndex(MANIFEST),
+    freeAgencyTargets: loadSeasonRosterTargets(MANIFEST),
+  };
 }
 
 /** Re-chains a command log with the frozen hash-chain rule. */
@@ -193,7 +221,7 @@ export function buildReplayedRun(): ReplayedRun {
 
   const acceptOutput = record(
     {
-      schemaVersion: 9,
+      schemaVersion: 10,
       command: 'accept-trade-offer',
       commandId: 'repro-accept-1',
       runId: run.runId,
@@ -208,7 +236,7 @@ export function buildReplayedRun(): ReplayedRun {
   effects = acceptOutput.effects;
   const selectOutput = record(
     {
-      schemaVersion: 9,
+      schemaVersion: 10,
       command: 'select-block-objective',
       commandId: 'repro-select-1',
       runId: run.runId,
@@ -225,7 +253,7 @@ export function buildReplayedRun(): ReplayedRun {
   if (secondOpen !== undefined) {
     finalRun = record(
       {
-        schemaVersion: 9,
+        schemaVersion: 10,
         command: 'decline-trade-offer',
         commandId: 'repro-decline-1',
         runId: run.runId,
@@ -261,6 +289,160 @@ export function buildReplayedRun(): ReplayedRun {
     assetHashes: loadManifestHashes(),
     initialRun: windowedRun,
     initialEffects: window.effects,
+    commandLog,
+    postseasonSummaries: [],
+    almanac,
+    championFranchiseId: 'lakers',
+    finalStateDigest,
+  };
+  return { exportInput, exportArtifact: buildSeasonRunReplayExport(exportInput) };
+}
+
+/**
+ * M2.6.5 free-agency replay export: the committed fixture run with the
+ * block-2 free-agency market OPEN (the post-commit snapshot the production
+ * flow would record), and a two-command log — the human skip and the window
+ * resolution — driven through the authoritative command layer. The export's
+ * initial run carries the opened window (AI declarations recorded at open);
+ * the replay resolves it and must reproduce the recorded final state
+ * byte-for-byte. `mutateInitialFreeAgency` lets tests corrupt a recorded
+ * free-agency fact of the export (canonical candidates, signing counts).
+ */
+export function buildFreeAgencyReplayedRun(
+  mutateInitialFreeAgency?: (freeAgency: SeasonFreeAgencyState) => void,
+): ReplayedRun {
+  const run = loadSeasonRunFixture(SEASON_RUN);
+  const catalog = loadSeasonDraftCatalog(MANIFEST);
+  const index = loadSeasonFreeAgencyIndex(MANIFEST);
+  const targets = loadSeasonRosterTargets(MANIFEST);
+  const humanFranchiseId = humanFranchiseIdOf(run.league);
+  if (humanFranchiseId === null) throw new Error('fixture has no human franchise');
+  const expanded = expandSeasonRunRosters(run, catalog);
+  const staminaInputs: import('@hoop-rush/data-contracts').SeasonStaminaInput[] = [];
+  for (const player of expanded.values()) {
+    if (player.stamina === undefined) {
+      throw new Error(`expanded player ${player.playerVersionId} has no stamina profile`);
+    }
+    staminaInputs.push(player.stamina);
+  }
+  const initialEffects = createSeasonEffectsState(staminaInputs);
+  const opened = openSeasonFreeAgencyWindow(
+    { run, effects: initialEffects, catalog, index, targets, humanFranchiseId },
+    0,
+    2,
+  );
+  // The AI declarations at window open commit against the run's recorded
+  // Influence balances (up to 3 per target). The fresh fixture run holds the
+  // initial +2 grant, which some declarations exceed; top every balance up
+  // so the recorded window resolves (the calibration driver accumulates
+  // block grants before its windows open; this fixture snapshots the window
+  // on the fresh run for a fast replay export).
+  const balances = Object.fromEntries(run.league.teams.map((team) => [team.franchiseId, 6]));
+  const initialRun = {
+    ...run,
+    freeAgency: opened.freeAgency,
+    influence: { ...run.influence, balances },
+  };
+  mutateInitialFreeAgency?.(initialRun.freeAgency);
+
+  const entries: SeasonCommandLogEntry[] = [];
+  const record = (
+    command: Parameters<typeof handleSeasonRunCommand>[0],
+    runFor: typeof run,
+    currentEffects: typeof initialEffects,
+  ): { run: typeof run; effects: typeof initialEffects } => {
+    const output = handleSeasonRunCommand(command, {
+      run: runFor,
+      pending: null,
+      humanFranchiseId,
+      catalog,
+      effects: currentEffects,
+      freeAgencyIndex: index,
+      freeAgencyTargets: targets,
+    });
+    if (output.result.result.status === 'rejected') {
+      throw new Error(
+        `free-agency replay fixture command rejected: ${JSON.stringify(output.result.result)}`,
+      );
+    }
+    const accepted = output.result.result;
+    const gameIds = 'advancedGameIds' in accepted ? accepted.advancedGameIds : [];
+    const summaryDigests = (output.postseasonSummaries ?? []).map(
+      (summary) => summary.resultDigest,
+    );
+    entries.push(
+      seasonCommandLogEntrySchema.parse({
+        runId: run.runId,
+        ordinal: entries.length,
+        command,
+        preStateRevision: command.expectedStateRevision,
+        preStateDigest: command.expectedStateDigest,
+        postStateRevision: output.run.stateRevision,
+        postStateDigest: output.run.stateDigest,
+        resultDigest: seasonCommandResultDigest({
+          commandId: command.commandId,
+          gameIds,
+          summaryDigests,
+        }),
+        previousLogDigest: SEASON_EMPTY_COMMAND_LOG_DIGEST,
+        relatedGameIds: gameIds,
+        transactionIds: [],
+      }),
+    );
+    const next = output.run as typeof run & { effects?: typeof initialEffects };
+    return { run: next, effects: next.effects ?? currentEffects };
+  };
+
+  const skipOutput = record(
+    {
+      schemaVersion: 10,
+      command: 'skip-free-agent-market',
+      commandId: 'repro-fa-skip-1',
+      runId: run.runId,
+      expectedStateRevision: initialRun.stateRevision,
+      expectedStateDigest: initialRun.stateDigest,
+      franchiseId: humanFranchiseId,
+      windowIndex: 0,
+    },
+    initialRun,
+    initialEffects,
+  );
+  const resolveOutput = record(
+    {
+      schemaVersion: 10,
+      command: 'resolve-free-agent-market',
+      commandId: 'repro-fa-resolve-1',
+      runId: run.runId,
+      expectedStateRevision: skipOutput.run.stateRevision,
+      expectedStateDigest: skipOutput.run.stateDigest,
+      windowIndex: 0,
+    },
+    skipOutput.run,
+    skipOutput.effects,
+  );
+
+  const commandLog = chainLog(entries);
+  const finalStateDigest = resolveOutput.run.stateDigest;
+  const almanac: SeasonAlmanac = {
+    schemaVersion: 1,
+    almanacVersion: 'almanac-v1',
+    runId: run.runId,
+    rootSeed: run.rootSeed,
+    championFranchiseId: 'lakers',
+    postseasonDigest: DIGEST_32,
+    commandLogDigest: seasonCommandLogDigest(commandLog.entries),
+    awardsDigest: DIGEST_32,
+    tradeGradesDigest: DIGEST_32,
+    digest: DIGEST_32,
+  };
+  const exportInput: SeasonRunReplayExportInput = {
+    runId: run.runId,
+    rootSeed: run.rootSeed,
+    eraId: '1990s',
+    versions: run.versions,
+    assetHashes: loadManifestHashes(),
+    initialRun,
+    initialEffects,
     commandLog,
     postseasonSummaries: [],
     almanac,

@@ -16,11 +16,14 @@
   import { candidateOf } from '$lib/season/season-catalog-index';
 
   /**
-   * Human franchise roster cards (M2.4): ten player-season versions with
-   * faces, historical source identity, OVR, the rotation role/minutes from
-   * the pending rotation, the recorded fatigue band + workload, and the
-   * last-game minutes. Rendered on the Team tab beside the rotation editor
-   * as the identity reference for the lineup decisions above it.
+   * Human franchise roster cards (M2.4, M2.6.5): ten player-season versions
+   * with faces, historical source identity, OVR, the rotation role/minutes
+   * from the pending rotation, the recorded fatigue band + workload, and the
+   * last-game minutes. M2.6.5 distinguishes ACTIVE (the ten rotation
+   * members, with fatigue/load facts) from INACTIVE (rostered depth outside
+   * the rotation, shown without load facts). Rendered on the Team tab beside
+   * the rotation editor as the identity reference for the lineup decisions
+   * above it.
    */
 
   let {
@@ -79,10 +82,15 @@
       {@const candidate = candidateOf(shell.catalog, entry.playerVersionId)}
       {@const playable = shell.playablePositions(entry.playerVersionId)}
       {@const rotation = roleOf(entry.playerVersionId)}
-      {@const load = effects === null ? null : loadStateOf(effects, entry.playerVersionId)}
+      {@const active = rotation.role !== 'Inactive'}
+      {@const load =
+        active && effects !== null ? loadStateOf(effects, entry.playerVersionId) : null}
       {@const band = load === null ? null : fatigueBand(load.fatigueBasisPoints)}
       {@const lastMinutes = lastGameMinutes.get(entry.playerVersionId) ?? null}
-      <li class="overflow-hidden bg-surface-1 p-3 sm:rounded-xl">
+      <li
+        data-season-roster-status={active ? 'active' : 'inactive'}
+        class="overflow-hidden bg-surface-1 p-3 sm:rounded-xl"
+      >
         <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
           <div class="flex min-w-0 items-start gap-2 sm:gap-3">
             {#if face !== null}
@@ -103,6 +111,13 @@
                     class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
                   >
                     OVR {candidate.summaryRatings.overallRating}
+                  </span>
+                {/if}
+                {#if !active}
+                  <span
+                    class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
+                  >
+                    Inactive
                   </span>
                 {/if}
                 {#if band !== null && load !== null}

@@ -169,7 +169,9 @@ describe('lineup strength across fixtures', () => {
       buildAway: () => buildStrongWeakFixture().weak,
       seedPrefix: 'sw',
       runs: 200,
-      assert: (homeWins, awayWins) => { expect(homeWins).toBeGreaterThan(awayWins * 2); },
+      assert: (homeWins, awayWins) => {
+        expect(homeWins).toBeGreaterThan(awayWins * 2);
+      },
     },
     {
       label: 'medium opponents beat weak opponents more often than not',
@@ -181,7 +183,9 @@ describe('lineup strength across fixtures', () => {
       buildAway: () => ratingFixture({ insideScoring: 40, threePoint: 40, ballHandling: 40 }),
       seedPrefix: 'mm',
       runs: 150,
-      assert: (homeWins) => { expect(homeWins).toBeGreaterThan(75); },
+      assert: (homeWins) => {
+        expect(homeWins).toBeGreaterThan(75);
+      },
     },
   ];
 

@@ -130,6 +130,7 @@ function commitInputFor(
     expectedStateRevision: blockIndex,
     expectedStateDigest: block.expectedStateDigest,
     window: null,
+    freeAgency: dataset.run.freeAgency,
   };
 }
 
@@ -1118,7 +1119,7 @@ describe('season run M2.5 command application (v5)', () => {
     overrides: Partial<SeasonRunCommand> = {},
   ): SeasonRunCommand {
     return {
-      schemaVersion: 7,
+      schemaVersion: 10,
       command: 'select-block-objective',
       commandId: 'cmd-select-0',
       runId: adapters.run.runId,
@@ -1343,6 +1344,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       ownership: run.ownership,
       rotations: run.rotations,
       effects: base.effects,
+      freeAgency: run.freeAgency,
     });
     await repo.commitSeasonBlock({
       ...base,
@@ -1368,6 +1370,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       ownership: snapshot.run.ownership,
       rotations: snapshot.run.rotations,
       effects: snapshot.effects,
+      freeAgency: snapshot.run.freeAgency,
     });
     expect(snapshot.run.stateDigest).toBe(repairedDigest);
     expect(snapshot.acceptedBlocks.at(-1)?.stateDigest).toBe(repairedDigest);
@@ -1411,6 +1414,7 @@ describe('season run M2.5 reload audit (v5)', () => {
         ownership: snapshot?.run.ownership ?? adapters.run.ownership,
         rotations: snapshot?.run.rotations ?? locked,
         effects: snapshot?.effects ?? base.effects,
+        freeAgency: snapshot?.run.freeAgency ?? adapters.run.freeAgency,
       }),
     );
     const stored = await db.seasonRuns.get(SEASON_RUN_RECORD_ID);
@@ -1446,6 +1450,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       ownership: run.ownership,
       rotations: locked,
       effects: base.effects,
+      freeAgency: run.freeAgency,
     });
     await repo.commitSeasonBlock({
       ...base,
@@ -1497,6 +1502,7 @@ describe('season run M2.5 reload audit (v5)', () => {
       ownership: stored.run.ownership,
       rotations,
       effects: stored.effects,
+      freeAgency: stored.run.freeAgency,
     });
     await db.seasonRuns.put({
       ...stored,

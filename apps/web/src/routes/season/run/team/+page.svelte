@@ -242,7 +242,7 @@
     });
   });
 
-  /** M2.5: per-player injury history (health records + accepted summaries). */
+  /** Per-player injury history (health records + accepted summaries). */
   const injuryTimeline = $derived(
     run !== null && roster !== null && humanFranchiseId !== null && health !== null
       ? humanInjuryTimeline(health, roster, humanFranchiseId, summaries)
@@ -266,7 +266,10 @@
     if (editor === null) return null;
     const map = new SvelteMap<string, { role: string; minutes: number | string }>();
     for (const row of editor.rows()) {
-      map.set(row.member.playerVersionId, { role: row.role, minutes: row.minutes });
+      map.set(row.member.playerVersionId, {
+        role: row.role,
+        minutes: editor.isActive(row.member.playerVersionId) ? row.minutes : '—',
+      });
     }
     return map;
   });
@@ -313,12 +316,11 @@
           Rotation workspace
         </h2>
         <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-          Ten player-season versions · role, minutes, fatigue, and availability resolve here · the
-          rotation locks when the block submits
+          Ten active players · role, minutes, fatigue, and availability resolve here · inactive
+          roster depth can be promoted to the rotation · the rotation locks when the block submits
         </p>
       </div>
 
-      <!-- 0-100 team strip: minute-weighted player ratings from the pending rotation. -->
       {#if teamProjection !== null}
         {@const overallDelta = projectionDelta(
           teamProjection.overall,
@@ -437,8 +439,6 @@
       {/if}
     </section>
 
-    <!-- Sticky action bar: validation state + simulate (identical on every
-         breakpoint; the block locks from here or from the Hub preview). -->
     <div
       class="sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20 mt-6 scroll-mb-24 px-3 sm:bottom-4 sm:px-0"
     >

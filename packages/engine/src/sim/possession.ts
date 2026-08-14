@@ -200,7 +200,6 @@ export class PossessionStepper {
     this.startedRemaining = ctx.state.secondsRemaining;
   }
 
-  /** Advances exactly one atomic unit of work. */
   step(): PossessionStep {
     if (this.phase === 'done') {
       if (this.finalStep === null) {
@@ -671,7 +670,6 @@ function resolveFreeThrows(
   recorder.freeThrowTrip(offenseSide);
 }
 
-/** How one shot sequence ended, for the caller's boundary decision. */
 interface ShotOutcome {
   /** True when an offensive rebound keeps the trip alive. */
   continues: boolean;

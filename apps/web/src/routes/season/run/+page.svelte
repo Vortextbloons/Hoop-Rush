@@ -106,6 +106,11 @@
   const openWindow = $derived(
     run?.trade !== null && run?.trade !== undefined ? openWindowOf(run.trade) : null,
   );
+  /** M2.6.5: the open free-agency market window (block submission is
+   * authoritatively gated while one is unresolved). */
+  const openFreeAgencyWindow = $derived(
+    shell.freeAgency?.windows.find((window) => window.status === 'open') ?? null,
+  );
   const influenceVm = $derived(
     shell.influence !== null && humanFranchiseId !== null
       ? influenceViewModel(shell.influence, humanFranchiseId, shell.health, openWindow)
@@ -152,7 +157,7 @@
     return map;
   });
 
-  /** M2.5: the objective locked for the next block (shown in the lock preview). */
+  /** The objective locked for the next block (shown in the lock preview). */
   const selectedObjective = $derived.by(() => {
     if (run === null || nextBlockIndex === null || nextBlockIndex >= 8) return null;
     const selection = run.objectives.selections[nextBlockIndex];
@@ -163,7 +168,7 @@
     return { objectiveId: selection.objectiveId, name };
   });
 
-  /** M2.4: build-time stamina ratings from the compact player slice
+  /** Build-time stamina ratings from the compact player slice
    * (constant per run; the catalog is never parsed for this view). */
   const staminaByVersion = $derived.by(() => {
     const slice = shell.playerSlice;
@@ -192,7 +197,7 @@
       snapshot !== null && snapshot.acceptedBlocks.length > 0
         ? (snapshot.acceptedBlocks[snapshot.acceptedBlocks.length - 1]?.rotationDigest ?? null)
         : null;
-    // M2.4: fatigue-risk projections need the recorded load state and the
+    // Fatigue-risk projections need the recorded load state and the
     // build-time stamina ratings (from the catalog).
     const effects = snapshot?.effects ?? null;
     return buildLockPreview({
@@ -269,10 +274,6 @@
         record: blockRecord(accepted.blockIndex),
       })),
   );
-
-  // -------------------------------------------------------------------------
-  // M2.6 postseason decision facts.
-  // -------------------------------------------------------------------------
 
   const postseason = $derived(run?.postseason ?? null);
   const eliminated = $derived(
@@ -531,7 +532,7 @@
       </section>
     {:else if snapshot !== null}
       {#if blockPaused}
-        <!-- M2.5 interruption recovery: the block is paused with a pending candidate. -->
+        <!-- Interruption recovery: the block is paused with a pending candidate. -->
         <InterruptionPanel
           {interruption}
           {pending}
@@ -571,7 +572,7 @@
             </span>
           </div>
 
-          <!-- M2.5: objective picker (blocks 0-7) -->
+          <!-- Objective picker (blocks 0-7) -->
           {#if objectiveVm !== null}
             {#if commandError !== null && commandError.command === 'select-block-objective'}
               <p
@@ -682,7 +683,7 @@
               </a>
             </div>
 
-            <!-- (c) Fatigue risk + continuity (M2.4, projection only) -->
+            <!-- Fatigue risk + continuity (projection only) -->
             {#if preview !== null && preview.fatigueProjections.length > 0}
               <div class="rounded-lg bg-surface-2 p-3">
                 <h3
@@ -831,7 +832,39 @@
         </section>
       {/if}
 
-      <!-- M2.5: trade offers panel (open window) -->
+      {#if openFreeAgencyWindow !== null}
+        <section
+          aria-labelledby="free-agency-cta-heading"
+          data-fa-hub-cta
+          class="flex flex-col gap-3 rounded-none border border-primary/30 bg-primary/5 p-4 sm:rounded-xl sm:p-5"
+        >
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2
+              id="free-agency-cta-heading"
+              class="font-display text-lg font-extrabold uppercase tracking-tight"
+            >
+              Free Agency Window {openFreeAgencyWindow.windowIndex + 1}
+            </h2>
+            <span class="font-mono text-[10px] text-muted-foreground">
+              {openFreeAgencyWindow.candidates.length} candidate
+              {openFreeAgencyWindow.candidates.length === 1 ? '' : 's'} on the market
+            </span>
+          </div>
+          <p class="text-sm text-muted-foreground">
+            Declare interest in up to two targets — or skip — before the next block can submit.
+            Resolve the market whenever you are ready.
+          </p>
+          <a
+            href={resolve('/season/run/free-agency' as RouteId)}
+            data-fa-hub-cta-link
+            class="inline-flex w-fit items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-opacity outline-none focus-visible:ring-2 focus-visible:ring-ring hover:opacity-90"
+          >
+            Open Free Agency
+            <span aria-hidden="true">&rarr;</span>
+          </a>
+        </section>
+      {/if}
+
       {#if openWindow !== null && shell.manifest !== null}
         {#await loadTradeOffersPanel() then { default: TradeOffersPanel }}
           <p class="px-3 py-3 font-mono text-xs text-muted-foreground sm:px-0">
@@ -858,7 +891,6 @@
         {/await}
       {/if}
 
-      <!-- M2.5: Influence panel (balance, ledger, spend affordances) -->
       {#if influenceVm !== null}
         <InfluencePanel
           balance={influenceVm.balance}

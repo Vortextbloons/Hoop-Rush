@@ -82,8 +82,12 @@ describe('RotationEditor', () => {
     expect(e.rotation.closingFive).toHaveLength(5);
   });
 
-  it('throws when the member list is not ten players', () => {
-    expect(() => createRotationEditor(rotation(), members().slice(0, 9))).toThrow(/ten members/);
+  it('throws when the member list is outside ten to fifteen players', () => {
+    expect(() => createRotationEditor(rotation(), members().slice(0, 9))).toThrow(
+      /10 to 15 roster members/,
+    );
+    const sixteen = [...members(), ...members().slice(0, 6)];
+    expect(() => createRotationEditor(rotation(), sixteen)).toThrow(/10 to 15 roster members/);
   });
 
   it('sets and clamps target minutes per player', () => {

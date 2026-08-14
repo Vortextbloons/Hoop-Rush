@@ -8,6 +8,7 @@ import {
   type SeasonPairChemistryState,
   type SeasonPlayerAggregate,
   type SeasonRoster,
+  type SeasonRotation,
   type SeasonTeamAggregate,
 } from '@hoop-rush/data-contracts';
 import {
@@ -98,9 +99,7 @@ function seasonRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[
  */
 function seasonRotationPlayerVersionIds(rotations: readonly SeasonRotation[]): string[] {
   return [
-    ...new Set(
-      rotations.flatMap((rotation) => [...rotation.starters, ...rotation.benchOrder]),
-    ),
+    ...new Set(rotations.flatMap((rotation) => [...rotation.starters, ...rotation.benchOrder])),
   ].sort();
 }
 

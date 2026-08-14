@@ -1,4 +1,4 @@
-﻿import { resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 import {
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
@@ -265,7 +265,8 @@ export function representativeEffectsState(input: SeasonGameSimulationInput): {
     [...input.home.players, ...input.away.players].map((player) => player.playerVersionId),
   );
   const state: SeasonEffectsState = {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    inactivePlayerStates: base.inactivePlayerStates,
     playerStates: base.playerStates.map((player) => {
       if (!gameVersions.has(player.playerVersionId)) return player;
       const rosterIndex = input.home.players.findIndex(
@@ -280,6 +281,7 @@ export function representativeEffectsState(input: SeasonGameSimulationInput): {
       };
     }),
     pairStates: base.pairStates.map((pair) => ({ ...pair, sharedPossessions: 1000 })),
+    archivedPairs: base.archivedPairs,
   };
   return {
     state,
@@ -510,8 +512,9 @@ export function runMiniSeason(
       current,
     );
     current = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       playerStates: transition.postgamePlayerStates,
+      inactivePlayerStates: current.inactivePlayerStates,
       pairStates: current.pairStates.map((pair) => {
         const increment = transition.pairIncrements.find(
           (inc) => inc.a === pair.a && inc.b === pair.b,
@@ -520,6 +523,7 @@ export function runMiniSeason(
           ? pair
           : { ...pair, sharedPossessions: pair.sharedPossessions + increment.sharedPossessions };
       }),
+      archivedPairs: current.archivedPairs,
     };
   }
   return current;
@@ -558,13 +562,15 @@ export function seasonEffectsSensitivity(
   }> = [];
   for (const fatigueBp of fatigueLevels) {
     const leveled: SeasonEffectsState = {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      inactivePlayerStates: state.inactivePlayerStates,
       playerStates: state.playerStates.map((player) => ({
         ...player,
         fatigueBasisPoints:
           player.fatigueBasisPoints > 0 || fatigueBp === 0 ? fatigueBp : player.fatigueBasisPoints,
       })),
       pairStates: state.pairStates,
+      archivedPairs: state.archivedPairs,
     };
     const { transition } = deps.simulateSeasonGameWithEffects(
       input,
@@ -607,7 +613,7 @@ export function seasonEffectsSensitivity(
   });
   const details = rows.map(
     (row) =>
-      `fatigue ${String(row.fatigueBp).padStart(5)}bp Â· shooter ${String(row.shooterDelta)} Â· handler ${String(row.handlerDelta)} Â· defense ${String(row.defenseDelta)} Â· security ${String(row.securityDelta)} Â· assist ${String(row.assistDelta)} Â· help ${String(row.helpDelta)} (millionths)`,
+      `fatigue ${String(row.fatigueBp).padStart(5)}bp · shooter ${String(row.shooterDelta)} · handler ${String(row.handlerDelta)} · defense ${String(row.defenseDelta)} · security ${String(row.securityDelta)} · assist ${String(row.assistDelta)} · help ${String(row.helpDelta)} (millionths)`,
   );
   return makeReport('season effects sensitivity', { fixture: fixtureId }, { details, payload });
 }
@@ -666,9 +672,9 @@ export async function seasonEffectsDistribution(
   });
   const details = [
     `${String(facts.length)} games (${String(completed.length)} completed) in ${String(Date.now() - started)}ms`,
-    `scoring delta median ${payload.scoringDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_SCORING_ENVELOPE * 100)}%)`,
-    `turnover delta median ${payload.turnoverDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_TURNOVER_ENVELOPE * 100)}%)`,
-    `assist delta median ${payload.assistDeltaMedian.toFixed(3)}% (gate Â±${String(SEASON_EFFECTS_ASSIST_ENVELOPE * 100)}%)`,
+    `scoring delta median ${payload.scoringDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_SCORING_ENVELOPE * 100)}%)`,
+    `turnover delta median ${payload.turnoverDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_TURNOVER_ENVELOPE * 100)}%)`,
+    `assist delta median ${payload.assistDeltaMedian.toFixed(3)}% (gate ±${String(SEASON_EFFECTS_ASSIST_ENVELOPE * 100)}%)`,
   ];
   const failuresList: string[] = [];
   if (failures.length > 0)
@@ -736,7 +742,7 @@ export function seasonEffectsRoles(
   });
   const details = rows.map(
     (row) =>
-      `${row.fixtureId}: starter median ${String(row.starterMedianFatigue)}bp Â· bench median ${String(row.benchMedianFatigue)}bp`,
+      `${row.fixtureId}: starter median ${String(row.starterMedianFatigue)}bp · bench median ${String(row.benchMedianFatigue)}bp`,
   );
   const failuresList: string[] = [];
   if (!starterOrdering)
@@ -1010,11 +1016,11 @@ export async function seasonEffectsCalibrate(
   });
 
   const details = [
-    `calibration ${String(calibration.games)} games Â· held-out ${String(heldOut.games)} games (${String(workers)} workers)`,
-    `scoring delta ${calibration.scoringMedian.toFixed(3)}% Â· turnover ${calibration.turnoverMedian.toFixed(3)}% Â· assist ${calibration.assistMedian.toFixed(3)}%`,
-    `held-out envelope share ${(heldOutWithinEnvelopeShare * 100).toFixed(1)}% (gate â‰¥ ${String(SEASON_EFFECTS_HELD_OUT_PASS_SHARE * 100)}%)`,
-    `rotation ordering ${rolesPayload.starterOrderingPass ? 'pass' : 'fail'} Â· bench ${rolesPayload.benchOrderingPass ? 'pass' : 'fail'}`,
-    `chemistry separation ${String(chemistry.separationBp)}bp (gate â‰¥ ${String(SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP)}bp)`,
+    `calibration ${String(calibration.games)} games · held-out ${String(heldOut.games)} games (${String(workers)} workers)`,
+    `scoring delta ${calibration.scoringMedian.toFixed(3)}% · turnover ${calibration.turnoverMedian.toFixed(3)}% · assist ${calibration.assistMedian.toFixed(3)}%`,
+    `held-out envelope share ${(heldOutWithinEnvelopeShare * 100).toFixed(1)}% (gate ≥ ${String(SEASON_EFFECTS_HELD_OUT_PASS_SHARE * 100)}%)`,
+    `rotation ordering ${rolesPayload.starterOrderingPass ? 'pass' : 'fail'} · bench ${rolesPayload.benchOrderingPass ? 'pass' : 'fail'}`,
+    `chemistry separation ${String(chemistry.separationBp)}bp (gate ≥ ${String(SEASON_EFFECTS_CHEMISTRY_SEPARATION_BP)}bp)`,
     `targets ${targetsWritten ? `written to ${targetsPath ?? '?'}` : 'NOT written'}`,
   ];
   if (!zeroFailures) gateFailures.push('accounting/invariant failures in the cohort');

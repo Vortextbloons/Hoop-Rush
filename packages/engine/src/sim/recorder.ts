@@ -281,7 +281,6 @@ export class GameRecorder {
     this.sides[side].teamRebounds += 1;
   }
 
-  /** One made field goal on a passed possession by this player (diagnostics). */
   assistOpportunity(side: SideIndex, slot: number): void {
     this.playerAt(side, slot).assistOpportunities += 1;
   }
@@ -302,7 +301,6 @@ export class GameRecorder {
     }
   }
 
-  /** One field-goal attempt defended by this player (diagnostics). */
   contest(side: SideIndex, slot: number): void {
     this.playerAt(side, slot).contestedShots += 1;
   }

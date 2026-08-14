@@ -24,12 +24,9 @@ import { SEASON_ROUND_COUNT } from '@hoop-rush/data-contracts';
  */
 
 export interface InfluenceSpendAffordance {
-  /** The spend the user can request. */
   purpose: 'extra-trade-offer' | 'risky-rehab';
   cost: number;
-  /** windowIndex for extra-trade-offer spends. */
   windowIndex: number | null;
-  /** injuryId for risky-rehab spends. */
   injuryId: string | null;
   /** The injured player for risky-rehab spends (from the health record). */
   playerVersionId: string | null;

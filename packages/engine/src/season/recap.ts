@@ -19,6 +19,8 @@ import {
   type SeasonTransactionEntry,
   type SeasonUpcomingHumanGame,
   type SeasonVersionSpotlight,
+  type SeasonFreeAgencyBand,
+  type SeasonFreeAgencyState,
 } from '@hoop-rush/data-contracts';
 import { blockRoundRange } from '@hoop-rush/data-contracts';
 import { provisionalStandingOrder } from './aggregates.ts';
@@ -77,6 +79,11 @@ export interface SeasonBlockRecapInput {
   transactions?: readonly SeasonTransactionEntry[];
   /** M2.5: the post-block Influence state (delta + human balance). */
   influence?: SeasonInfluenceState;
+  /**
+   * M2.6.5: the post-block free-agency state (free-agency evidence). Absent
+   * in fixture-driven recaps: the evidence reports zero signings.
+   */
+  freeAgency?: SeasonFreeAgencyState;
 }
 
 /** Team games in a block (150 in blocks 0-7, 30 in the final block). */
@@ -393,6 +400,61 @@ export function blockInjuryEvidenceOf(input: {
 }
 
 /**
+ * M2.6.5 block-level free-agency evidence (season-recap-v4): the window
+ * resolved this block (if any), its signings, the human franchise's
+ * Influence delta from free agency this block, and the human franchise's
+ * season signing/spend counts. A block itself signs nothing (windows open
+ * after the commit), so fixture-driven blocks report zero.
+ */
+export function blockFreeAgencyEvidenceOf(input: {
+  blockIndex: number;
+  humanFranchiseId: string | null;
+  freeAgency: SeasonFreeAgencyState | undefined;
+}): {
+  windowIndex: number | null;
+  signings: Array<{
+    franchiseId: string;
+    playerVersionId: string;
+    band: SeasonFreeAgencyBand;
+    influenceCost: number;
+  }>;
+  influenceDelta: number;
+  seasonSignings: number;
+  seasonSpend: number;
+} {
+  const freeAgency = input.freeAgency;
+  if (freeAgency === undefined) {
+    return {
+      windowIndex: null,
+      signings: [],
+      influenceDelta: 0,
+      seasonSignings: 0,
+      seasonSpend: 0,
+    };
+  }
+  const resolvedWindow = freeAgency.windows.find(
+    (window) => window.blockIndex === input.blockIndex && window.status === 'resolved',
+  );
+  let humanDelta = 0;
+  if (input.humanFranchiseId !== null) {
+    humanDelta = freeAgency.seasonSpend[input.humanFranchiseId] ?? 0;
+  }
+  return {
+    windowIndex: resolvedWindow?.windowIndex ?? null,
+    signings: (resolvedWindow?.signings ?? []).map((signing) => ({
+      franchiseId: signing.franchiseId,
+      playerVersionId: signing.playerVersionId,
+      band: signing.band,
+      influenceCost: signing.influenceCost,
+    })),
+    influenceDelta: -humanDelta,
+    seasonSignings:
+      input.humanFranchiseId === null ? 0 : (freeAgency.signingCounts[input.humanFranchiseId] ?? 0),
+    seasonSpend: humanDelta,
+  };
+}
+
+/**
  * M2.5 block-level trade evidence: accepted trades with this blockIndex
  * recorded in the post-block transactions, and the human franchise's
  * Influence ledger delta for this block. A block itself accepts no trades
@@ -472,6 +534,11 @@ export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlock
     transactions: input.transactions,
     influence: input.influence,
   });
+  const freeAgencyEvidence = blockFreeAgencyEvidenceOf({
+    blockIndex: input.blockIndex,
+    humanFranchiseId: input.humanFranchiseId,
+    freeAgency: input.freeAgency,
+  });
   return {
     schemaVersion: 1,
     recapVersion: SEASON_RECAP_VERSION,
@@ -503,6 +570,7 @@ export function buildSeasonBlockRecap(input: SeasonBlockRecapInput): SeasonBlock
           }
         : null,
     tradeEvidence,
+    freeAgencyEvidence,
     influenceBalance: {
       humanBalance:
         input.influence === undefined
@@ -549,6 +617,14 @@ export function seasonBlockRecapCanonical(recap: SeasonBlockRecap): string {
     upcomingHumanGames: [...recap.upcomingHumanGames].sort((a, b) =>
       a.gameId < b.gameId ? -1 : 1,
     ),
+    freeAgencyEvidence: {
+      ...recap.freeAgencyEvidence,
+      signings: [...recap.freeAgencyEvidence.signings].sort(
+        (a, b) =>
+          (a.franchiseId < b.franchiseId ? -1 : a.franchiseId > b.franchiseId ? 1 : 0) ||
+          (a.playerVersionId < b.playerVersionId ? -1 : 1),
+      ),
+    },
   });
 }
 
@@ -689,6 +765,16 @@ export function auditSeasonBlockRecap(
   const expectedUpcoming = upcomingHumanGamesOf(input);
   if (JSON.stringify(recap.upcomingHumanGames) !== JSON.stringify(expectedUpcoming)) {
     failures.push('recap upcoming human games do not match the schedule');
+  }
+
+  // M2.6.5: free-agency evidence must match the recorded post-block state.
+  const expectedFreeAgency = blockFreeAgencyEvidenceOf({
+    blockIndex: input.blockIndex,
+    humanFranchiseId: input.humanFranchiseId,
+    freeAgency: input.freeAgency,
+  });
+  if (JSON.stringify(recap.freeAgencyEvidence) !== JSON.stringify(expectedFreeAgency)) {
+    failures.push('recap free-agency evidence does not match the recorded state');
   }
   return failures;
 }

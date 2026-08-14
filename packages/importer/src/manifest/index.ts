@@ -312,10 +312,10 @@ export function run(dataDir = PUBLIC_DATA): void {
     };
   }
 
-  // Season Run artifacts (2.0): league, schedule, draft catalog, and roster
-  // targets hashes when the packaged season assets exist (optional so 1.0
-  // manifests stay valid; the season generators update these entries in
-  // place).
+  // Season Run artifacts (2.0): league, schedule, draft catalog, roster
+  // targets, and the M2.6.5 free-agency index/targets hashes when the
+  // packaged season assets exist (optional so 1.0 manifests stay valid; the
+  // season generators update these entries in place).
   const seasonDir = join(dataDir, 'season');
   const seasonRefs: Record<string, { url: string; contentHash: string }> = {};
   for (const [key, name] of [
@@ -323,6 +323,8 @@ export function run(dataDir = PUBLIC_DATA): void {
     ['schedule', 'schedule.json'],
     ['draftCatalog', 'draft-catalog.json'],
     ['rosterTargets', 'roster-targets.json'],
+    ['freeAgencyIndex', 'free-agency-index.json'],
+    ['freeAgencyTargets', 'free-agency-targets.json'],
   ] as const) {
     const path = join(seasonDir, name);
     if (fileExists(path)) {

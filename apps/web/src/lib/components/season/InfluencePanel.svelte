@@ -22,6 +22,7 @@
     'objective-reward': 'Objective reward',
     'extra-trade-offer': 'Extra trade offer',
     'risky-rehab': 'Risky rehab',
+    'free-agent-signing': 'Free-agent signing',
   };
 
   let {

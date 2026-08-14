@@ -141,10 +141,6 @@
     return row.won ? 'W' : 'L';
   }
 
-  // -------------------------------------------------------------------------
-  // M2.6 postseason schedule: recorded Play-In + playoff summaries.
-  // -------------------------------------------------------------------------
-
   let postseasonSummaries = $state<SeasonPostseasonSummary[] | null>(null);
   let postseasonSummariesError = $state<string | null>(null);
 

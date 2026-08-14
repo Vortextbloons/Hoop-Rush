@@ -165,7 +165,6 @@
     ),
   );
 
-  /** Draft rows joined with their roster details for the table and dialog. */
   const rosterRows = $derived.by((): IndexRow[] => {
     if (!index || !details) return [];
     const byKey = new SvelteMap<string, RosterDetailsEntry>();
@@ -217,7 +216,6 @@
     eraId = id;
   }
 
-  /** Applies a sort mode, toggling direction when the mode is already active. */
   function chooseSort(id: RosterSortId) {
     if (id === sortId && id !== 'none') {
       sortDir = sortDir === 'asc' ? 'desc' : 'asc';

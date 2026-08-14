@@ -4,9 +4,10 @@ import {
   SEASON_GAMES_PER_ROUND,
   SEASON_INFLUENCE_CAP,
   SEASON_ENDING_MISSED_GAMES_SENTINEL,
-  SEASON_ROSTER_SIZE,
+  SEASON_ROTATION_SIZE,
   SEASON_TEAM_COUNT,
   type SeasonAcceptedBlock,
+  type SeasonFreeAgencySigning,
   type SeasonGame,
   type SeasonGameSummary,
   type SeasonLeague,
@@ -88,6 +89,7 @@ export function auditSeasonRunState(
   const failures: string[] = [];
   const { stored, summaries, retainedDetails, acceptedBlocks } = facts;
 
+  const leagueFranchiseIds = new Set(facts.league.teams.map((team) => team.franchiseId));
   const scheduleById = new Map(facts.schedule.games.map((game) => [game.gameId, game]));
   const summaryIds = new Set<string>();
 
@@ -335,11 +337,17 @@ export function auditSeasonRunState(
     }
   }
 
-  // M2.4 effects state: player load and pair chemistry.
+  // M2.4/M2.6.5 effects state: 300 ACTIVE rotation load records, 0-150
+  // inactive depth records, 1,350 ACTIVE canonical pairs (45 per rotation),
+  // and 0-1,350 archived pairs carrying franchiseId.
   const { effects } = stored;
-  const expectedPlayerCount = SEASON_TEAM_COUNT * SEASON_ROSTER_SIZE;
-  const expectedPairCount = (SEASON_TEAM_COUNT * SEASON_ROSTER_SIZE * (SEASON_ROSTER_SIZE - 1)) / 2;
   const rosterIds = seam.seasonRosterPlayerVersionIds(facts.rosters);
+  const rosterIdSet = new Set(rosterIds);
+  // M2.6.5: the ACTIVE player set is the 30-rotation union (300 members),
+  // never the full 300-450 roster union — inactive depth owns no loads.
+  const rotationIds = seam.seasonRotationPlayerVersionIds(stored.run.rotations);
+  const rotationIdSet = new Set(rotationIds);
+  const expectedPlayerCount = SEASON_ROTATION_SIZE * SEASON_TEAM_COUNT;
   const effectIds = new Set<string>();
   for (const player of effects.playerStates) {
     if (effectIds.has(player.playerVersionId)) {
@@ -372,8 +380,25 @@ export function auditSeasonRunState(
       `effects player state count ${String(effects.playerStates.length)} is not ${String(expectedPlayerCount)}`,
     );
   }
-  if (effectIds.size !== rosterIds.length || rosterIds.some((id) => !effectIds.has(id))) {
-    failures.push('effects player set does not match the union of the 30 rosters');
+  if (
+    rotationIds.length !== expectedPlayerCount ||
+    rotationIds.some((id) => !effectIds.has(id)) ||
+    effectIds.size !== rotationIdSet.size ||
+    [...effectIds].some((id) => !rotationIdSet.has(id))
+  ) {
+    failures.push('effects active player set does not match the 30 locked rotations');
+  }
+  // M2.6.5 inactive depth: every inactive load is a rostered version outside
+  // the active set (the schema already rejects active/inactive overlap).
+  const inactiveEffectIds = new Set<string>();
+  for (const player of effects.inactivePlayerStates) {
+    if (inactiveEffectIds.has(player.playerVersionId)) {
+      failures.push(`duplicate inactive effects player state ${player.playerVersionId}`);
+    }
+    inactiveEffectIds.add(player.playerVersionId);
+    if (!rosterIdSet.has(player.playerVersionId)) {
+      failures.push(`inactive effects player ${player.playerVersionId} is outside the 30 rosters`);
+    }
   }
   const pairKeys = new Set<string>();
   for (const pair of effects.pairStates) {
@@ -394,17 +419,201 @@ export function auditSeasonRunState(
       );
     }
   }
-  if (effects.pairStates.length !== expectedPairCount) {
-    failures.push(
-      `effects pair state count ${String(effects.pairStates.length)} is not ${String(expectedPairCount)}`,
+  if (effects.pairStates.length !== 1350) {
+    failures.push(`effects pair state count ${String(effects.pairStates.length)} is not 1350`);
+  }
+  // M2.6.5: the 1,350 ACTIVE pairs are exactly the 45 canonical pairs of each
+  // ten-player rotation (pair members never span rotations).
+  const expectedPairKeys = new Set<string>();
+  for (const rotation of stored.run.rotations) {
+    const ids = [...rotation.starters, ...rotation.benchOrder].sort();
+    if (ids.length !== SEASON_ROTATION_SIZE) {
+      failures.push(`rotation ${rotation.franchiseId} does not name ten rotation members`);
+      continue;
+    }
+    for (let i = 0; i < ids.length; i += 1) {
+      const a = ids[i];
+      if (a === undefined) continue;
+      for (let j = i + 1; j < ids.length; j += 1) {
+        const b = ids[j];
+        if (b === undefined) continue;
+        expectedPairKeys.add(seam.seasonPairKey(a, b));
+      }
+    }
+  }
+  if (
+    expectedPairKeys.size !== pairKeys.size ||
+    [...expectedPairKeys].some((key) => !pairKeys.has(key))
+  ) {
+    failures.push('effects active pairs do not match the 45 canonical pairs of each rotation');
+  }
+  // M2.6.5 archived pairs: demotion-frozen records keyed by (franchiseId,
+  // a, b); members stay rostered (trades delete the traded player's
+  // archived records).
+  const archivedKeys = new Set<string>();
+  for (const pair of effects.archivedPairs) {
+    const key = `${pair.franchiseId}\u0000${pair.a}\u0000${pair.b}`;
+    if (archivedKeys.has(key)) {
+      failures.push(`duplicate archived effects pair ${key}`);
+    }
+    archivedKeys.add(key);
+    if (!seam.seasonPairIsCanonical(pair.a, pair.b)) {
+      failures.push(`archived effects pair ${key} is not canonical (a < b)`);
+    }
+    if (!rosterIdSet.has(pair.a) || !rosterIdSet.has(pair.b)) {
+      failures.push(`archived effects pair ${key} has a member outside the 30 rosters`);
+    }
+    if (!leagueFranchiseIds.has(pair.franchiseId)) {
+      failures.push(
+        `archived effects pair ${key} references unknown franchise ${pair.franchiseId}`,
+      );
+    }
+  }
+
+  // M2.6.5 ownership reconciliation: 300-450 unique rows, one per rostered
+  // version, each naming the owning franchise of its roster.
+  const ownershipCount = stored.run.ownership.length;
+  if (ownershipCount < SEASON_TEAM_COUNT * 10 || ownershipCount > SEASON_TEAM_COUNT * 15) {
+    failures.push(`ownership row count ${String(ownershipCount)} is outside 300-450`);
+  }
+  const rosterOwnerOf = new Map<string, string>();
+  for (const roster of facts.rosters) {
+    for (const player of roster.players) {
+      if (rosterOwnerOf.has(player.playerVersionId)) {
+        failures.push(`player ${player.playerVersionId} appears on two rosters`);
+      }
+      rosterOwnerOf.set(player.playerVersionId, roster.franchiseId);
+    }
+  }
+  const ownershipIds = new Set<string>();
+  for (const row of stored.run.ownership) {
+    if (ownershipIds.has(row.playerVersionId)) {
+      failures.push(`duplicate ownership row ${row.playerVersionId}`);
+    }
+    ownershipIds.add(row.playerVersionId);
+    const rosterOwner = rosterOwnerOf.get(row.playerVersionId);
+    if (rosterOwner === undefined) {
+      failures.push(`ownership row ${row.playerVersionId} references a player outside the rosters`);
+    } else if (row.ownerFranchiseId !== rosterOwner) {
+      failures.push(
+        `ownership row ${row.playerVersionId} names owner ${row.ownerFranchiseId}, roster owner is ${rosterOwner}`,
+      );
+    }
+  }
+  for (const roster of facts.rosters) {
+    for (const player of roster.players) {
+      if (!ownershipIds.has(player.playerVersionId)) {
+        failures.push(`roster player ${player.playerVersionId} has no ownership row`);
+      }
+    }
+  }
+
+  // M2.6.5 free-agency reconciliation: recorded facts only — window order,
+  // full declaration coverage, signings on winning rosters, and the
+  // per-franchise signing/spend caps reconciling from the signings.
+  const { freeAgency } = stored.run;
+  const signingById = new Map<string, SeasonFreeAgencySigning>();
+  const signingCountsFromSignings = new Map<string, number>();
+  const seasonSpendFromSignings = new Map<string, number>();
+  freeAgency.windows.forEach((window, index) => {
+    if (window.windowIndex !== index) {
+      failures.push(
+        `free-agency window at position ${String(index)} carries windowIndex ${String(window.windowIndex)}`,
+      );
+    }
+    if (window.blockIndex !== 2 + index * 2) {
+      failures.push(
+        `free-agency window ${String(index)} opened by block ${String(window.blockIndex)}, expected block ${String(2 + index * 2)}`,
+      );
+    }
+    if (window.blockIndex > (last?.blockIndex ?? -1)) {
+      failures.push(
+        `free-agency window ${String(index)} opened by block ${String(window.blockIndex)} that is not accepted`,
+      );
+    }
+    const declared = new Set(Object.keys(window.declarations));
+    for (const franchiseId of leagueFranchiseIds) {
+      if (!declared.has(franchiseId)) {
+        failures.push(`free-agency window ${String(index)} misses declaration for ${franchiseId}`);
+      }
+    }
+    for (const declaration of Object.values(window.declarations)) {
+      if (declaration.windowIndex !== window.windowIndex) {
+        failures.push(
+          `free-agency declaration ${declaration.franchiseId} names window ${String(declaration.windowIndex)}, expected ${String(window.windowIndex)}`,
+        );
+      }
+    }
+    const candidateVersions = new Set(
+      window.candidates.map((candidate) => candidate.playerVersionId),
     );
+    for (const signing of window.signings) {
+      if (signingById.has(signing.signingId)) {
+        failures.push(`duplicate free-agency signing ${signing.signingId}`);
+      }
+      signingById.set(signing.signingId, signing);
+      if (signing.windowIndex !== window.windowIndex) {
+        failures.push(
+          `free-agency signing ${signing.signingId} names window ${String(signing.windowIndex)}, expected ${String(window.windowIndex)}`,
+        );
+      }
+      if (!candidateVersions.has(signing.playerVersionId)) {
+        failures.push(`free-agency signing ${signing.signingId} is not a window candidate`);
+      }
+      const owner = rosterOwnerOf.get(signing.playerVersionId);
+      if (owner === undefined || owner !== signing.franchiseId) {
+        failures.push(
+          `free-agency signing ${signing.signingId} does not reconcile with ownership (${signing.playerVersionId} -> ${String(owner)})`,
+        );
+      }
+      if (signing.appliedAtStateRevision > stored.stateRevision) {
+        failures.push(
+          `free-agency signing ${signing.signingId} applied at revision ${String(signing.appliedAtStateRevision)} beyond the stored stateRevision ${String(stored.stateRevision)}`,
+        );
+      }
+      const transactionIds = new Set(stored.transactions.map((entry) => entry.transactionId));
+      if (!transactionIds.has(signing.transactionId)) {
+        failures.push(
+          `free-agency signing ${signing.signingId} links unknown transaction ${signing.transactionId}`,
+        );
+      }
+      const ledgerEntryIds = new Set(stored.influence.ledger.map((entry) => entry.entryId));
+      if (!ledgerEntryIds.has(signing.ledgerEntryId)) {
+        failures.push(
+          `free-agency signing ${signing.signingId} links unknown influence ledger entry ${signing.ledgerEntryId}`,
+        );
+      }
+      signingCountsFromSignings.set(
+        signing.franchiseId,
+        (signingCountsFromSignings.get(signing.franchiseId) ?? 0) + 1,
+      );
+      seasonSpendFromSignings.set(
+        signing.franchiseId,
+        (seasonSpendFromSignings.get(signing.franchiseId) ?? 0) + signing.influenceCost,
+      );
+    }
+  });
+  for (const franchiseId of leagueFranchiseIds) {
+    const recordedSignings = freeAgency.signingCounts[franchiseId];
+    const counted = signingCountsFromSignings.get(franchiseId) ?? 0;
+    if (recordedSignings !== counted) {
+      failures.push(
+        `free-agency signingCounts for ${franchiseId} is ${String(recordedSignings)}, signings reconcile ${String(counted)}`,
+      );
+    }
+    const recordedSpend = freeAgency.seasonSpend[franchiseId];
+    const spent = seasonSpendFromSignings.get(franchiseId) ?? 0;
+    if (recordedSpend !== spent) {
+      failures.push(
+        `free-agency seasonSpend for ${franchiseId} is ${String(recordedSpend)}, signings reconcile ${String(spent)}`,
+      );
+    }
   }
 
   // M2.5 health state: recorded injuries are run-scoped facts.
   const { health } = stored;
   const healthRosterIds = seam.seasonRosterPlayerVersionIds(facts.rosters);
   const healthRosterIdSet = new Set(healthRosterIds);
-  const leagueFranchiseIds = new Set(facts.league.teams.map((team) => team.franchiseId));
   const healthInjuryIds = new Set<string>();
   for (const injury of health.injuries) {
     if (healthInjuryIds.has(injury.injuryId)) {
@@ -558,6 +767,7 @@ export function auditSeasonRunState(
       ownership: stored.run.ownership,
       rotations: stored.run.rotations,
       effects: stored.effects,
+      freeAgency: stored.run.freeAgency,
     });
   } catch (error) {
     digestFailure = `state digest recomputation failed: ${errorMessage(error)}`;

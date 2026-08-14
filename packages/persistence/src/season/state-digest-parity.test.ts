@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { seasonRunStateDigest, type SeasonRunStateDigestFacts } from '@hoop-rush/engine';
+import { seasonRunStateDigest } from '@hoop-rush/engine';
 import { seasonRunEngineSeam } from './engine-seam.ts';
+import type { SeasonRunStateDigestFacts } from './engine-seam-types.ts';
 import {
   buildFixtureEffectsState,
   buildFixtureRun,
@@ -9,10 +10,14 @@ import {
 } from '../testing/season-run-fixture.ts';
 
 /**
- * M2.5 state-digest parity: the persistence seam binds the engine's
+ * M2.5/M2.6.5 state-digest parity: the persistence seam binds the engine's
  * authoritative `seasonRunStateDigest` (single implementation, no local
  * mirror), so the reload audit, the benchmark, and the fixture builders can
- * never fork from engine-recomputed digests.
+ * never fork from engine-recomputed digests. The seam facts contract
+ * (engine-seam-types.ts) adds the M2.6.5 free-agency state; until the
+ * engine binding lands, both the stored digests and the recomputation run
+ * through the same engine function, so parity holds on both sides of the
+ * integration.
  */
 
 const SEED = 'a1b2c3d4e5f60718293a4b5c6d7e8f9a';
@@ -44,6 +49,7 @@ describe('seasonRunEngineSeam state digest parity', () => {
       ownership: run.ownership,
       rotations: run.rotations,
       effects: buildFixtureEffectsState(run.rosters),
+      freeAgency: run.freeAgency,
     };
     // The stored fixture digest (built through the same binding) reconciles.
     expect(buildFixtureStateDigest(run)).toBe(run.stateDigest);

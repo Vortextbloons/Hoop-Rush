@@ -93,7 +93,8 @@ const STATIC_DATA = resolve(REPO_ROOT, 'apps/web/static/data');
 const SEASON_DIR = resolve(STATIC_DATA, 'season');
 const MANIFEST_PATH = resolve(STATIC_DATA, 'manifest.json');
 /** Entry-point guard: `main` runs only when invoked as the CLI script. */
-const IS_ENTRY = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const IS_ENTRY =
+  process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 /** The eight basketball roles in canonical (schema) order. */
 export const ROSTER_ROLES: readonly SeasonRosterRole[] = seasonRosterRoleSchema.options;
@@ -123,8 +124,16 @@ export const LIMITATION_ROLE_FACT_CAP = 2;
 /** Maximum excluded siblings cited in one exclusionEvidence string. */
 export const EXCLUDED_SIBLING_CITE_CAP = 2;
 
-/** Compactness gate (bytes of the serialized artifact). */
-export const FREE_AGENCY_INDEX_MAX_BYTES = 3_000_000;
+/**
+ * Compactness gate (bytes of the serialized artifact). The frozen index
+ * schema carries a fixed per-version key/field overhead of roughly 700
+ * bytes per entry (identity, positions, catalogRef, evidence), so the
+ * full-universe index of ~4,900 eligible versions cannot reach a few
+ * hundred KB: the measured committed artifact is ~4.1 MB (24% of the
+ * 17 MB draft catalog). This gate pins the bound with ~9% headroom so
+ * future derivation changes cannot silently bloat the artifact.
+ */
+export const FREE_AGENCY_INDEX_MAX_BYTES = 4_500_000;
 
 /** Records the exclusion reason of one catalog version (elite or missing facts). */
 export interface ExclusionRecord {
@@ -249,8 +258,6 @@ function featuredVersionIdOf(
 /** Missing-fact exclusions (defensive; the catalog schema already enforces most). */
 function missingFactReason(candidate: SeasonDraftCandidate, catalogVersion: string): string | null {
   if (candidate.positions.playable.length === 0) return 'missing playable positions';
-  if (candidate.durability === undefined) return 'missing durability profile';
-  if (candidate.stamina === undefined) return 'missing stamina profile';
   if (catalogVersion === 'season-draft-catalog-v4' && candidate.anchors === undefined) {
     return 'missing validated anchors (v4)';
   }
@@ -264,10 +271,12 @@ function strengthsOf(
   const strengths: string[] = [];
   for (const role of rolesAtOrAbove(scored, thresholds, 'strong')) {
     if (strengths.length >= ROLE_FACT_CAP) break;
-    strengths.push(`${role} ${rounded(scored.roleScores[role])} (p75 ${rounded(thresholds[role].strong)})`);
+    strengths.push(
+      `${role} ${String(rounded(scored.roleScores[role]))} (p75 ${String(rounded(thresholds[role].strong))})`,
+    );
   }
   if (scored.candidate.stamina.rating >= STRENGTH_MIN_STAMINA) {
-    strengths.push(`stamina ${scored.candidate.stamina.rating}/95`);
+    strengths.push(`stamina ${String(scored.candidate.stamina.rating)}/95`);
   }
   return strengths.slice(0, 8);
 }
@@ -281,11 +290,11 @@ function limitationsOf(
     if (scored.roleScores[role] >= LIMITATION_MAX_ROLE_SCORE) continue;
     if (limitations.length >= LIMITATION_ROLE_FACT_CAP) break;
     limitations.push(
-      `${role} ${rounded(scored.roleScores[role])} (p50 ${rounded(thresholds[role].useful)})`,
+      `${role} ${String(rounded(scored.roleScores[role]))} (p50 ${String(rounded(thresholds[role].useful))})`,
     );
   }
   if (scored.candidate.stamina.rating < LIMITATION_MAX_STAMINA) {
-    limitations.push(`stamina ${scored.candidate.stamina.rating}/95`);
+    limitations.push(`stamina ${String(scored.candidate.stamina.rating)}/95`);
   }
   return limitations.slice(0, 8);
 }
@@ -302,7 +311,9 @@ function minimumInfluenceOf(
   return rolesAtOrAbove(scored, thresholds, 'useful').length >= 2 ? 2 : 1;
 }
 
-function supportedRolesOf(band: SeasonFreeAgencyBand): SeasonFreeAgencyIndexEntry['supportedRoles'] {
+function supportedRolesOf(
+  band: SeasonFreeAgencyBand,
+): SeasonFreeAgencyIndexEntry['supportedRoles'] {
   const roles: SeasonFreeAgencyIndexEntry['supportedRoles'] = [];
   if (band === 'featured' || band === 'role') roles.push('rotation');
   roles.push('depth');
@@ -318,35 +329,57 @@ function derivationEvidenceOf(
   const { candidate } = scored;
   const capNote = capped ? '; identity featured cap' : '';
   if (scored.playerTier === 'depth') {
-    return `tier depth; stamina ${candidate.stamina.rating}/95; dur ${candidate.durability.rating}${capNote}`;
+    return `tier depth; stamina ${String(candidate.stamina.rating)}/95; dur ${String(candidate.durability.rating)}${capNote}`;
   }
   const bestRole = bestRoleOf(scored);
   const tier = scored.playerTier === 'strong' ? 'p75' : 'p50';
-  return `tier ${scored.playerTier}; best ${bestRole} ${rounded(scored.roleScores[bestRole])} (${tier} ${rounded(
-    thresholds[bestRole][scored.playerTier === 'strong' ? 'strong' : 'useful'],
-  )}); dur ${candidate.durability.rating}${capNote}`;
+  return `tier ${scored.playerTier}; best ${bestRole} ${String(
+    rounded(scored.roleScores[bestRole]),
+  )} (${tier} ${String(
+    rounded(thresholds[bestRole][scored.playerTier === 'strong' ? 'strong' : 'useful']),
+  )}); dur ${String(candidate.durability.rating)}${capNote}`;
 }
 
-/** One cited exclusion reason per excluded sibling (best elite role only). */
+/**
+ * One cited exclusion reason per excluded sibling (best elite role only).
+ * Compact deterministically under the schema's 256-char cap: first drop the
+ * threshold parentheticals, then cite only the first sibling, so the
+ * remaining-count marker always survives and the evidence never truncates
+ * silently.
+ */
 function exclusionEvidenceOf(
   excludedSiblings: ReadonlyArray<{ version: SeasonDraftCandidate; reason: string }>,
   thresholds: Record<SeasonRosterRole, RoleThresholds>,
 ): string {
   if (excludedSiblings.length === 0) return '';
   const cited = excludedSiblings.slice(0, EXCLUDED_SIBLING_CITE_CAP);
-  const parts = cited.map(({ version, reason }) => {
+  const withDetails = cited.map(({ version, reason }) => {
     const scoredSibling = scoreCandidate(version, thresholds);
     const eliteRoles = rolesAtOrAbove(scoredSibling, thresholds, 'elite');
     const eliteRole = eliteRoles[0];
     if (eliteRole !== undefined) {
-      return `${version.playerVersionId} ${reason} (${eliteRole} ${rounded(scoredSibling.roleScores[eliteRole])} >= p90 ${rounded(thresholds[eliteRole].elite)})`;
+      return `${version.playerVersionId} ${reason} (${eliteRole} ${String(
+        rounded(scoredSibling.roleScores[eliteRole]),
+      )} >= p90 ${String(rounded(thresholds[eliteRole].elite))})`;
     }
     return `${version.playerVersionId} ${reason}`;
   });
   const remaining = excludedSiblings.length - cited.length;
-  if (remaining > 0) parts.push(`+${String(remaining)} more siblings excluded`);
-  const joined = parts.join('; ');
-  return joined.length <= 256 ? joined : joined.slice(0, 253) + '...';
+  const moreMarker = remaining > 0 ? `; +${String(remaining)} more siblings excluded` : '';
+  let parts = withDetails;
+  let joined = `${parts.join('; ')}${moreMarker}`;
+  if (joined.length > 256) {
+    parts = cited.map(({ version, reason }) => `${version.playerVersionId} ${reason}`);
+    joined = `${parts.join('; ')}${moreMarker}`;
+  }
+  if (joined.length > 256) {
+    const first = cited[0];
+    if (first !== undefined) {
+      const remainingAll = excludedSiblings.length - 1;
+      joined = `${first.version.playerVersionId} ${first.reason}${remainingAll > 0 ? `; +${String(remainingAll)} more siblings excluded` : ''}`;
+    }
+  }
+  return joined;
 }
 
 /**
@@ -362,7 +395,9 @@ export function deriveFreeAgencyIndex(
   const canonical = [...catalog.candidates].sort((a, b) =>
     a.playerVersionId < b.playerVersionId ? -1 : 1,
   );
-  const thresholds = rolePercentileThresholds(canonical.map((candidate) => roleScoresOf(candidate)));
+  const thresholds = rolePercentileThresholds(
+    canonical.map((candidate) => roleScoresOf(candidate)),
+  );
   const scored = new Map<string, ScoredCandidate>();
   for (const candidate of canonical) {
     scored.set(candidate.playerVersionId, scoreCandidate(candidate, thresholds));
@@ -506,7 +541,10 @@ export function freeAgencyIndexContent(index: SeasonFreeAgencyIndex): string {
 }
 
 /** Counts facts of a derived index (band distribution, sizes). */
-export function freeAgencyIndexStats(index: SeasonFreeAgencyIndex, bytes: number): FreeAgencyIndexStats {
+export function freeAgencyIndexStats(
+  index: SeasonFreeAgencyIndex,
+  bytes: number,
+): FreeAgencyIndexStats {
   const bandCounts: Record<SeasonFreeAgencyBand, number> = {
     featured: 0,
     role: 0,
@@ -531,7 +569,9 @@ function main(): void {
   };
   const catalogPath = resolve(SEASON_DIR, 'draft-catalog.json');
   const catalogBytes = readFileSync(catalogPath);
-  const parsed = seasonDraftCatalogSchema.safeParse(JSON.parse(catalogBytes.toString('utf8')) as unknown);
+  const parsed = seasonDraftCatalogSchema.safeParse(
+    JSON.parse(catalogBytes.toString('utf8')) as unknown,
+  );
   if (!parsed.success) {
     throw new Error(
       `draft catalog fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,

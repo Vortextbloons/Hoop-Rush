@@ -10,7 +10,9 @@ import {
   playersIndexSchema,
   rosterDetailsSchema,
   REQUIRED_RATING_KEYS,
+  SEASON_DRAFT_CATALOG_VERSION,
   SELECTION_SCORE_VERSION,
+  seasonFreeAgencyIndexSchema,
   unavailabilityReasonSchema,
   POSITIONS,
   POSITION_NORMALIZATION_VERSION,
@@ -699,6 +701,85 @@ async function auditGlobalAssets(
   return { ok: failures.length === 0, details, failures };
 }
 
+/**
+ * Audits the M2.6.5 free-agent eligibility index (free-agency-index-v1):
+ * file presence, content-hash match against the manifest entry, schema
+ * validity (including the grouped-versions identity superRefine), and the
+ * cross-artifact pin: the index's `catalogRef.contentHash` must equal the
+ * manifest's `season.draftCatalog` content hash, so a stale index derived
+ * from an older catalog is caught here.
+ */
+async function auditSeasonFreeAgencyIndex(
+  manifest: HoopRushManifest,
+  manifestDir: string,
+  verbose: boolean,
+): Promise<AuditResult> {
+  const failures: string[] = [];
+  const details: string[] = [];
+  const entry = manifest.season?.freeAgencyIndex;
+  if (entry === undefined) {
+    details.push('free-agency-index: none packaged');
+    return { ok: true, details, failures };
+  }
+  const assetPath = isAbsolute(entry.url) ? entry.url : resolve(manifestDir, entry.url);
+  let content: Buffer;
+  try {
+    const info = await stat(assetPath);
+    if (!info.isFile()) {
+      failures.push(`free-agency-index: asset is not a file (${assetPath})`);
+      return { ok: false, details, failures };
+    }
+    content = await readFile(assetPath);
+  } catch {
+    failures.push(`free-agency-index: asset missing (${assetPath})`);
+    return { ok: false, details, failures };
+  }
+  const actualHash = sha256Hex(content);
+  if (actualHash !== entry.contentHash) {
+    failures.push(`free-agency-index: content hash mismatch (${assetPath})`);
+  } else if (verbose) {
+    details.push(`free-agency-index: hash verified (${assetPath})`);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(content.toString('utf8')) as unknown;
+  } catch {
+    failures.push('free-agency-index: artifact is not valid JSON');
+    return { ok: false, details, failures };
+  }
+  const parsed = seasonFreeAgencyIndexSchema.safeParse(raw);
+  if (!parsed.success) {
+    failures.push(
+      `free-agency-index: artifact fails the index schema: ${parsed.error.issues[0]?.path.join('.') ?? '(root)'} ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+    return { ok: failures.length === 0, details, failures };
+  }
+  const index = parsed.data;
+  const draftEntry = manifest.season?.draftCatalog;
+  if (draftEntry === undefined) {
+    failures.push('free-agency-index: manifest has no season.draftCatalog entry to pin against');
+  } else if (index.catalogRef.contentHash !== draftEntry.contentHash) {
+    failures.push(
+      `free-agency-index: catalogRef content hash ${index.catalogRef.contentHash} does not match the packaged draft catalog ${draftEntry.contentHash}`,
+    );
+  } else if (index.catalogRef.catalogVersion !== SEASON_DRAFT_CATALOG_VERSION) {
+    failures.push(
+      `free-agency-index: unexpected catalogVersion ${index.catalogRef.catalogVersion}`,
+    );
+  }
+  const bandCounts = { featured: 0, role: 0, development: 0, emergency: 0 } as Record<
+    'featured' | 'role' | 'development' | 'emergency',
+    number
+  >;
+  for (const candidate of index.candidates) {
+    bandCounts[candidate.band] += 1;
+  }
+  details.push(
+    `free-agency-index: ${String(index.candidates.length)} candidates · ${String(Object.keys(index.groupedVersions).length)} identities · featured ${String(bandCounts.featured)} / role ${String(bandCounts.role)} / development ${String(bandCounts.development)} / emergency ${String(bandCounts.emergency)} · ${String(content.length)} bytes`,
+  );
+  return { ok: failures.length === 0, details, failures };
+}
+
 export async function dataValidate(inputPath: string, verbose: boolean): Promise<CliReport> {
   let raw: string;
   try {
@@ -746,6 +827,7 @@ export async function dataValidate(inputPath: string, verbose: boolean): Promise
     await auditEraSimulationProfiles(manifest, manifestDir, verbose),
     await auditBracket(manifest, manifestDir, verbose),
     await auditGlobalAssets(manifest, manifestDir, verbose),
+    await auditSeasonFreeAgencyIndex(manifest, manifestDir, verbose),
     auditAssets(manifest),
   ];
 

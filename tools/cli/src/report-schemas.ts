@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   SEASON_EFFECT_TARGETS_LEGACY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION,
   SEASON_INFLUENCE_TARGETS_VERSION,
   SEASON_INJURY_TARGETS_VERSION,
   SEASON_POSTSEASON_TARGETS_VERSION,
@@ -1185,6 +1186,13 @@ export const seasonTradeCalibrateReportSchema = z.object({
   aiTradesMax: z.number().int().nonnegative(),
   /** Accepted trades across the cohort (AI activity; the human never acts). */
   acceptedTrades: z.number().int().nonnegative(),
+  /** M2.6.5 (season-trade-v2): accepted offers by package kind. */
+  packageMix: z.object({
+    '1-1': z.number().int().nonnegative(),
+    '2-2': z.number().int().nonnegative(),
+    '1-2': z.number().int().nonnegative(),
+    '2-1': z.number().int().nonnegative(),
+  }),
   illegalRosterFailures: z.number().int().nonnegative(),
   duplicateOwnershipFailures: z.number().int().nonnegative(),
   valueBandFailures: z.number().int().nonnegative(),
@@ -1200,6 +1208,7 @@ export const seasonTradeCalibrateReportSchema = z.object({
     valueBands: z.boolean(),
     deterministicOffers: z.boolean(),
     chemistryInvariants: z.boolean(),
+    packageMix: z.boolean(),
     heldOut: z.boolean(),
   }),
   metrics: z.array(seasonM25GateSchema),
@@ -1282,8 +1291,8 @@ export const seasonRunReproduceReportSchema = z.object({
   verifiedChampion: z.boolean(),
   firstDivergence: z
     .object({
-      ordinal: z.number().int().nonnegative(),
-      commandId: z.string().min(1).max(64),
+      ordinal: z.number().int().nonnegative().nullable(),
+      commandId: z.string().max(64),
       kind: z.enum([
         'state-digest',
         'result-digest',
@@ -1293,6 +1302,7 @@ export const seasonRunReproduceReportSchema = z.object({
         'champion',
         'chain-fact',
         'rejected-command',
+        'free-agency',
       ]),
       detail: z.string().min(1),
     })
@@ -1381,3 +1391,124 @@ export const seasonPostseasonCalibrateReportSchema = z.object({
   pass: z.boolean(),
 });
 export type SeasonPostseasonCalibrateReport = z.infer<typeof seasonPostseasonCalibrateReportSchema>;
+
+/** M2.6.5 `season free-agency audit` per-failure-class counts. */
+export const seasonFreeAgencyAuditCountsSchema = z.object({
+  windowOrderFailures: z.number().int().nonnegative(),
+  candidateUniquenessFailures: z.number().int().nonnegative(),
+  featuredFailures: z.number().int().nonnegative(),
+  canonicalFailures: z.number().int().nonnegative(),
+  declarationFailures: z.number().int().nonnegative(),
+  traceFailures: z.number().int().nonnegative(),
+  bandCapFailures: z.number().int().nonnegative(),
+  signingCapFailures: z.number().int().nonnegative(),
+  spendCapFailures: z.number().int().nonnegative(),
+  ledgerFailures: z.number().int().nonnegative(),
+  transactionFailures: z.number().int().nonnegative(),
+  ownershipFailures: z.number().int().nonnegative(),
+  effectsFailures: z.number().int().nonnegative(),
+});
+export type SeasonFreeAgencyAuditCountsReport = z.infer<typeof seasonFreeAgencyAuditCountsSchema>;
+
+/**
+ * M2.6.5 `season free-agency audit` report payload (spec/2.0/15): the
+ * recorded free-agency failure classes of one persisted run (window order,
+ * candidate uniqueness, featured cap, canonical identity persistence,
+ * declarations, traces, band/signing/spend caps, ledger/transaction/
+ * ownership links, effects invariants).
+ */
+export const seasonFreeAgencyAuditReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season free-agency audit'),
+  runId: z.string().min(1).max(64),
+  rootSeed: z.string().min(1).max(64),
+  windows: z.number().int().nonnegative(),
+  signings: z.number().int().nonnegative(),
+  canonicalIdentities: z.number().int().nonnegative(),
+  counts: seasonFreeAgencyAuditCountsSchema,
+  failures: z.array(z.string().min(1)).max(200),
+  pass: z.boolean(),
+});
+export type SeasonFreeAgencyAuditReport = z.infer<typeof seasonFreeAgencyAuditReportSchema>;
+
+/**
+ * M2.6.5 `season free-agency calibrate` report payload (spec/2.0/15,
+ * free-agency-targets-v1): the measured market facts (composition,
+ * exhaustion, identity/canonical stability, interest/win/signing/skip by
+ * band, caps, spend, tie-break ordering, trace accuracy, quality vs drafted
+ * starters, elite exclusion, AI growth by band, legality, effects
+ * invariants, determinism, summary identity) plus the frozen gate flags.
+ */
+export const seasonFreeAgencyCalibrateReportSchema = z.object({
+  schemaVersion: z.literal(1),
+  command: z.literal('season free-agency calibrate'),
+  targetsVersion: z.literal(SEASON_FREE_AGENCY_TARGETS_VERSION),
+  calibrationSeeds: z.number().int().nonnegative(),
+  validationSeeds: z.number().int().nonnegative(),
+  seasonsSimulated: z.number().int().nonnegative(),
+  windowsOpened: z.number().int().nonnegative(),
+  signings: z.number().int().nonnegative(),
+  uniqueIdentities: z.number().int().nonnegative(),
+  canonicalReuse: z.number().int().nonnegative(),
+  candidateTotal: z.number().int().nonnegative(),
+  candidateShortfalls: z.number().int().nonnegative(),
+  declaredTargets: z.number().int().nonnegative(),
+  signingsByBand: z.object({
+    contender: z.number().int().nonnegative(),
+    playoff: z.number().int().nonnegative(),
+    average: z.number().int().nonnegative(),
+    weaker: z.number().int().nonnegative(),
+  }),
+  interestByBand: z.object({
+    featured: z.number().int().nonnegative(),
+    role: z.number().int().nonnegative(),
+    development: z.number().int().nonnegative(),
+    emergency: z.number().int().nonnegative(),
+  }),
+  winsByBand: z.object({
+    featured: z.number().int().nonnegative(),
+    role: z.number().int().nonnegative(),
+    development: z.number().int().nonnegative(),
+    emergency: z.number().int().nonnegative(),
+  }),
+  skipShare: z.number().min(0).max(1),
+  bandCapViolations: z.number().int().nonnegative(),
+  signingCapViolations: z.number().int().nonnegative(),
+  spendCapViolations: z.number().int().nonnegative(),
+  linkFailures: z.number().int().nonnegative(),
+  traceAuditFailures: z.number().int().nonnegative(),
+  effectsFailures: z.number().int().nonnegative(),
+  influenceDecideFailures: z.number().int().nonnegative(),
+  eliteExclusionFailures: z.number().int().nonnegative(),
+  oneOutlierFailures: z.number().int().nonnegative(),
+  richGetRicherFailures: z.number().int().nonnegative(),
+  signedAboveDraftedMedianShare: z.number().min(0).max(1),
+  determinismProbe: z.object({ probed: z.boolean(), identical: z.boolean() }),
+  summaryIdentityProbe: z.object({ probed: z.boolean(), identical: z.boolean() }),
+  gates: z.object({
+    windowsOpened: z.boolean(),
+    bandSigningCaps: z.boolean(),
+    threeSigningsPerSeason: z.boolean(),
+    sixInfluencePerSeason: z.boolean(),
+    linkReconciliation: z.boolean(),
+    traceAudit: z.boolean(),
+    effectsInvariants: z.boolean(),
+    rosterLegality: z.boolean(),
+    ownershipRows: z.boolean(),
+    eliteExclusion: z.boolean(),
+    oneOutlierCeiling: z.boolean(),
+    noRichGetRicher: z.boolean(),
+    influenceTieBreak: z.boolean(),
+    determinismProbe: z.boolean(),
+    candidateQuality: z.boolean(),
+    interestActivity: z.boolean(),
+    summaryIdentity: z.boolean(),
+    heldOut: z.boolean(),
+  }),
+  metrics: z.array(seasonM25GateSchema),
+  skippedGates: z.array(z.string().min(1)),
+  targetsWritten: z.boolean(),
+  targetsPath: z.string().nullable(),
+  durationMs: z.number().nonnegative(),
+});
+export type SeasonFreeAgencyCalibrateReport = z.infer<typeof seasonFreeAgencyCalibrateReportSchema>;

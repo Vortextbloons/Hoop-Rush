@@ -109,7 +109,7 @@ describe('openWindowOf', () => {
   it('returns the first open window', () => {
     const trade: SeasonTradeState = {
       schemaVersion: 1,
-      tradeVersion: 'season-trade-v1',
+      tradeVersion: 'season-trade-v2',
       windows: [
         { windowIndex: 0, blockIndex: 2, status: 'closed', offers: [] },
         { windowIndex: 1, blockIndex: 4, status: 'open', offers: [] },
@@ -122,7 +122,7 @@ describe('openWindowOf', () => {
     expect(openWindowOf(null)).toBeNull();
     const closed: SeasonTradeState = {
       schemaVersion: 1,
-      tradeVersion: 'season-trade-v1',
+      tradeVersion: 'season-trade-v2',
       windows: [{ windowIndex: 0, blockIndex: 2, status: 'closed', offers: [] }],
     };
     expect(openWindowOf(closed)).toBeNull();
@@ -178,7 +178,7 @@ describe('humanTradeOffersOf', () => {
   it('returns only human-targeted offers in the open window', () => {
     const trade: SeasonTradeState = {
       schemaVersion: 1,
-      tradeVersion: 'season-trade-v1',
+      tradeVersion: 'season-trade-v2',
       windows: [
         {
           windowIndex: 0,

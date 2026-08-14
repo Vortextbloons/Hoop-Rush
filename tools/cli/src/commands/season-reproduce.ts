@@ -6,8 +6,10 @@ import {
   seasonTradeGradeLogDigest,
   humanFranchiseIdOf,
   type SeasonEffectsState,
+  type SeasonFreeAgencyIndex,
   type SeasonGameSummary,
   type SeasonPendingBlockCandidate,
+  type SeasonRosterTargets,
   type SeasonRun,
   type SeasonRunReplayExport,
   type SeasonSubmitBlockCommand,
@@ -27,8 +29,15 @@ import {
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonRunReproduceReportSchema } from '../report-schemas.ts';
-import { DEFAULT_MANIFEST, loadSeasonDraftCatalog, readJsonFile } from './season-data.ts';
+import {
+  DEFAULT_MANIFEST,
+  loadSeasonDraftCatalog,
+  loadSeasonFreeAgencyIndex,
+  loadSeasonRosterTargets,
+  readJsonFile,
+} from './season-data.ts';
 import { loadPackagedData, PackagedData } from './data-loader.ts';
+import { auditSeasonFreeAgencyFacts } from './season-free-agency-audit.ts';
 import { sha256Hex } from '../io.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -73,7 +82,8 @@ export interface SeasonRunReplayDivergence {
     | 'game-result'
     | 'award-result'
     | 'trade-grade-result'
-    | 'champion';
+    | 'champion'
+    | 'free-agency';
   detail: string;
 }
 
@@ -98,6 +108,10 @@ export function replaySeasonRunExport(
     catalog: import('@hoop-rush/data-contracts').SeasonDraftCatalog;
     profile: import('@hoop-rush/data-contracts').EraSimulationProfile;
     verifyAssetHashes: (expected: SeasonRunReplayExport['assetHashes']) => string[];
+    /** M2.6.5: the packaged free-agency index (needed to replay resolve commands). */
+    freeAgencyIndex?: SeasonFreeAgencyIndex;
+    /** M2.6.5: the frozen roster-targets policy (AI free-agency ceilings). */
+    freeAgencyTargets?: SeasonRosterTargets;
   },
 ): { divergence: SeasonRunReplayDivergence | null; divergences: string[] } {
   const exportArtifactParsed = seasonRunReplayExportSchema.parse(exportArtifact);
@@ -241,6 +255,8 @@ function replayFromInitialRun(
   deps: {
     catalog: import('@hoop-rush/data-contracts').SeasonDraftCatalog;
     profile: import('@hoop-rush/data-contracts').EraSimulationProfile;
+    freeAgencyIndex?: SeasonFreeAgencyIndex;
+    freeAgencyTargets?: SeasonRosterTargets;
   },
 ): { divergence: SeasonRunReplayDivergence | null; divergences: string[] } {
   const state = runnerStateOf(exportArtifact, deps);
@@ -248,6 +264,7 @@ function replayFromInitialRun(
   const entries = exportArtifact.commandLog.entries;
   const humanFranchiseId = humanFranchiseIdOf(state.run.league);
   const schedule = scheduleOf(state);
+  let replayedFreeAgencyCommands = 0;
 
   const divergenceOf = (
     ordinal: number,
@@ -282,6 +299,8 @@ function replayFromInitialRun(
       catalog: deps.catalog,
       effects: state.effects,
       profile: deps.profile,
+      freeAgencyIndex: deps.freeAgencyIndex,
+      freeAgencyTargets: deps.freeAgencyTargets,
       // The recorded regular-season summaries: the engine derives the season
       // awards when the replay reaches the playoffs/completion, exactly like
       // the production orchestration path (the state digest covers them).
@@ -351,6 +370,13 @@ function replayFromInitialRun(
     state.effects = nextRun.effects ?? state.effects;
     state.pending = output.pending;
     state.acceptedCommandIds = [...state.acceptedCommandIds, commandId];
+    if (
+      command.command === 'declare-free-agent-interest' ||
+      command.command === 'skip-free-agent-market' ||
+      command.command === 'resolve-free-agent-market'
+    ) {
+      replayedFreeAgencyCommands += 1;
+    }
     if (output.postseasonSummaries !== undefined) {
       const gameIdMismatch = output.postseasonSummaries.some(
         (summary) => !entry.relatedGameIds.includes(summary.gameId),
@@ -373,7 +399,23 @@ function replayFromInitialRun(
   // verified only when the replay actually produced one (a partial-run
   // export whose log ends mid-season cannot reproduce the champion; that is
   // reported as a fact of the export, not a divergence).
+  const freeAgencyFailures = freeAgencyReconciliationFailures(
+    state.run,
+    exportArtifact,
+    replayedFreeAgencyCommands,
+  );
   if (state.run.stateDigest !== exportArtifact.finalStateDigest) {
+    if (freeAgencyFailures.length > 0) {
+      return {
+        divergence: {
+          ordinal: null,
+          commandId: '',
+          kind: 'free-agency',
+          detail: freeAgencyFailures[0] ?? 'free-agency facts diverged',
+        },
+        divergences: freeAgencyFailures,
+      };
+    }
     return {
       divergence: {
         ordinal: null,
@@ -381,7 +423,24 @@ function replayFromInitialRun(
         kind: 'state-digest',
         detail: `final state digest ${state.run.stateDigest} does not match the export ${exportArtifact.finalStateDigest}`,
       },
-      divergences,
+      divergences: [
+        `final state digest ${state.run.stateDigest} does not match the export ${exportArtifact.finalStateDigest}`,
+      ],
+    };
+  }
+  // The final digest covers the free-agency state; the reconciliation below
+  // is the belt-and-suspenders recorded-fact audit of the replayed windows,
+  // declarations, canonical candidates, traces, signings, signingCounts,
+  // and seasonSpend.
+  if (freeAgencyFailures.length > 0) {
+    return {
+      divergence: {
+        ordinal: null,
+        commandId: '',
+        kind: 'free-agency',
+        detail: freeAgencyFailures[0] ?? 'free-agency facts diverged',
+      },
+      divergences: freeAgencyFailures,
     };
   }
   const champion = state.run.completion?.championFranchiseId ?? null;
@@ -447,8 +506,37 @@ function replayFromInitialRun(
   return { divergence: null, divergences };
 }
 
-/** Replays one logged block submission through the shared block pipeline. */
-function replayBlock(
+/**
+ * M2.6.5 free-agency fact reconciliation of the replayed run against the
+ * recorded export: the replayed freeAgency facts (windows, canonical
+ * candidates, declarations, traces, signings, signingCounts, seasonSpend)
+ * must pass the structural audit, and — when the log replays no free-agency
+ * commands — the replayed free-agency state must equal the export's
+ * recorded pre-state byte-for-byte. The final state digest covers
+ * freeAgency, so a mismatch here is attributable to the free-agency facts.
+ */
+export function freeAgencyReconciliationFailures(
+  run: SeasonRun,
+  exportArtifact: SeasonRunReplayExport,
+  replayedFreeAgencyCommands: number,
+): string[] {
+  const failures: string[] = [];
+  const audit = auditSeasonFreeAgencyFacts(run);
+  for (const failure of audit.failures) {
+    failures.push(`replayed free-agency: ${failure}`);
+  }
+  if (replayedFreeAgencyCommands === 0 && exportArtifact.initialRun !== undefined) {
+    const recorded = exportArtifact.initialRun.freeAgency;
+    if (JSON.stringify(run.freeAgency) !== JSON.stringify(recorded)) {
+      failures.push(
+        'replayed free-agency state differs from the export pre-state although no free-agency command was replayed',
+      );
+    }
+  }
+  return failures;
+}
+
+/** Replays one logged block submission through the shared block pipeline. */ function replayBlock(
   entry: SeasonRunReplayExport['commandLog']['entries'][number],
   state: ReplayRunnerState,
   deps: {
@@ -571,6 +659,16 @@ export function seasonRunReproduce(args: {
   const profile = new PackagedData(packaged.manifest, packaged.dir).eraProfile(
     exportArtifact.eraId,
   );
+  // M2.6.5: the packaged free-agency assets are loaded only when the export
+  // freezes their hashes (pre-M2.6.5 exports stay replayable without them).
+  let freeAgencyIndex: import('@hoop-rush/data-contracts').SeasonFreeAgencyIndex | undefined;
+  let freeAgencyTargets: import('@hoop-rush/data-contracts').SeasonRosterTargets | undefined;
+  if (exportArtifact.assetHashes.freeAgencyIndex !== undefined) {
+    freeAgencyIndex = loadSeasonFreeAgencyIndex(manifestPath);
+  }
+  if (exportArtifact.assetHashes.freeAgencyTargets !== undefined) {
+    freeAgencyTargets = loadSeasonRosterTargets(manifestPath);
+  }
 
   const verifyAssetHashes = (expected: SeasonRunReplayExport['assetHashes']): string[] => {
     const failures: string[] = [];
@@ -586,13 +684,23 @@ export function seasonRunReproduce(args: {
       const actual = sha256Hex(readFileSync(resolve(packaged.dir, entry.url)));
       if (actual !== expected[key]) {
         failures.push(
-          `${label} content hash ${actual} does not match the export hash ${expected[key]}`,
+          `${label} content hash ${actual} does not match the export hash ${String(expected[key])}`,
         );
       }
     };
     expectedOf(packaged.manifest.season?.league, 'league', 'league');
     expectedOf(packaged.manifest.season?.schedule, 'schedule', 'schedule');
     expectedOf(packaged.manifest.season?.draftCatalog, 'draftCatalog', 'draftCatalog');
+    if (expected.freeAgencyIndex !== undefined) {
+      expectedOf(packaged.manifest.season?.freeAgencyIndex, 'freeAgencyIndex', 'freeAgencyIndex');
+    }
+    if (expected.freeAgencyTargets !== undefined) {
+      expectedOf(
+        packaged.manifest.season?.freeAgencyTargets,
+        'freeAgencyTargets',
+        'freeAgencyTargets',
+      );
+    }
     const eraEntry = packaged.manifest.eraSimulationProfiles.find(
       (entry) => entry.eraId === exportArtifact.eraId,
     );
@@ -613,6 +721,8 @@ export function seasonRunReproduce(args: {
     catalog,
     profile,
     verifyAssetHashes,
+    freeAgencyIndex,
+    freeAgencyTargets,
   });
 
   const chainVerified = divergence === null || divergence.kind !== 'chain-fact';

@@ -8,6 +8,7 @@
     BarChart3,
     CalendarDays,
     ClipboardList,
+    Gavel,
     LayoutGrid,
     LogOut,
     RefreshCw,
@@ -78,18 +79,28 @@
     { id: 'leaders', label: 'Leaders', href: '/season/run/leaders', icon: BarChart3 },
   ];
 
-  /** M2.6: the bracket tab appears once the postseason begins (Play-In
-   * through the champion); the shell keeps the other five tabs intact. */
-  const postseasonNavItems: NavItem[] = [
-    ...seasonNavItems,
-    { id: 'postseason', label: 'Postseason', href: '/season/run/postseason', icon: Trophy },
-  ];
+  /** The Free Agency tab appears once a market window has opened (windows
+   * stay reachable after resolution so signings and traces stay readable).
+   * The bracket tab appears once the postseason begins. */
+  const freeAgencyNavItem: NavItem = {
+    id: 'free-agency',
+    label: 'Free Agency',
+    href: '/season/run/free-agency',
+    icon: Gavel,
+  };
 
+  /** The bracket tab appears once the postseason begins (Play-In
+   * through the champion); the shell keeps the other tabs intact. */
   const navItems = $derived.by(() => {
     const stage = shell.run?.stage ?? null;
+    const freeAgencyVisible = (shell.run?.freeAgency.windows.length ?? 0) > 0;
+    const base = freeAgencyVisible ? [...seasonNavItems, freeAgencyNavItem] : seasonNavItems;
     return stage === 'play-in' || stage === 'playoffs' || stage === 'completed'
-      ? postseasonNavItems
-      : seasonNavItems;
+      ? [
+          ...base,
+          { id: 'postseason', label: 'Postseason', href: '/season/run/postseason', icon: Trophy },
+        ]
+      : base;
   });
 
   const shell = new SeasonRunShell();
@@ -131,6 +142,7 @@
     shell.influence = run?.influence ?? null;
     shell.trade =
       run?.trade !== null && run?.trade !== undefined ? cloneTradeState(run.trade) : null;
+    shell.freeAgency = run?.freeAgency ?? null;
     shell.objectives = run?.objectives ?? null;
 
     if (run !== null) {
@@ -221,9 +233,9 @@
     shell.snapshot = hub.snapshot;
     shell.index = hub.index;
     shell.block = hub.block;
-    // M2.6 postseason orchestration mirror (Track A's progress surface).
+    // Postseason orchestration mirror (Track A's progress surface).
     shell.postseason = hasPostseasonHubMethods(hub) ? hub.postseason : shell.postseason;
-    // M2.5 interruption/pending mirrors + the last typed command rejection.
+    // Interruption/pending mirrors + the last typed command rejection.
     shell.pending = hub.pending;
     shell.interruption = hub.interruption;
     shell.commandError = hub.commandError;
@@ -598,7 +610,7 @@
 
   const incompatible = $derived(shell.hub?.incompatible ?? null);
 
-  /** M2.6: history routes render without an active run (the champion was
+  /** History routes render without an active run (the champion was
    * promoted to completed history and the active-run pointer removed). */
   const isHistoryRoute = $derived(routeId?.startsWith('/season/run/history') ?? false);
 

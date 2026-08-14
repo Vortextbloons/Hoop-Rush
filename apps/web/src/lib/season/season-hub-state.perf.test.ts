@@ -80,9 +80,11 @@ function minimalSnapshot(overrides: Partial<SeasonRunSnapshot> = {}): SeasonRunS
     retainedDetails: [],
     acceptedBlocks: [],
     effects: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       playerStates: [],
+      inactivePlayerStates: [],
       pairStates: [],
+      archivedPairs: [],
     },
     ...overrides,
   };

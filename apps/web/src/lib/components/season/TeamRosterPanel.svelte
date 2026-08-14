@@ -37,6 +37,10 @@
   } = $props();
 
   let view = $state<RosterPanelView>('roster');
+
+  /** M2.6.5: the roster may hold up to fifteen players; ten are active
+   * rotation members and the rest are inactive depth. */
+  const inactiveCount = $derived(shell.editor?.inactiveMembers().length ?? 0);
 </script>
 
 <section aria-labelledby="roster-panel-heading" class="min-w-0" data-team-roster-panel>
@@ -49,7 +53,11 @@
         Roster
       </h3>
       <p class="mt-1 font-mono text-[10px] text-muted-foreground">
-        Ten player-season versions · identity, workload, and folded box scores
+        Ten active rotation players
+        {#if inactiveCount > 0}
+          · {inactiveCount} inactive {inactiveCount === 1 ? 'player' : 'players'}
+        {/if}
+        · identity, workload, and folded box scores
       </p>
     </div>
     <div

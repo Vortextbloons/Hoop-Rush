@@ -142,8 +142,6 @@ function main(): void {
         tendencies: Record<string, number>;
         stats?: { minutes: number | null; gamesPlayed: number | null };
         eligibility?: { teamGames?: number | null };
-        // Projection milestone (v4): validated observed anchors and optional
-        // reconstructed three-point profile from the packaged pool record.
         anchors?: SeasonDraftCandidate['anchors'];
         reconstructedThreePoint?: SeasonDraftCandidate['reconstructedThreePoint'];
       }>;
@@ -225,7 +223,6 @@ function main(): void {
     positionNormalizationVersion: positionNormalizationVersion || 'position-v3',
     playerVersionIdVersion: 'player-version-id-v1',
     staminaVersion: SEASON_STAMINA_VERSION,
-    // M2.5: durability profile derivation version for every candidate.
     durabilityVersion: SEASON_DURABILITY_VERSION,
     pools,
     candidates: [...candidates.values()].sort((a, b) =>

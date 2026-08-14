@@ -1,0 +1,166 @@
+{
+  "schemaVersion": 1,
+  "targetsVersion": "free-agency-targets-v1",
+  "policy": {
+    "bandSigningCaps": {
+      "contender": 1,
+      "playoff": 2,
+      "average": 3,
+      "weaker": 3
+    },
+    "maxSigningsPerSeason": 3,
+    "maxSeasonSpend": 6,
+    "windowComposition": {
+      "featured": 1,
+      "role": 5,
+      "development": 3,
+      "emergency": 3
+    },
+    "maxCandidates": 12,
+    "minWindowsPerSeason": 3,
+    "ownershipRows": [
+      300,
+      450
+    ],
+    "activeEffects": [
+      300,
+      1350
+    ],
+    "aboveDraftedShareEnvelope": [
+      0,
+      0.5
+    ],
+    "skipShareMax": 0.95,
+    "minSeasons": 4
+  },
+  "cohort": {
+    "seedFrom": 0,
+    "seedTo": 7
+  },
+  "heldOut": {
+    "seedFrom": 8,
+    "seedTo": 11
+  },
+  "measured": {
+    "calibration": {
+      "seasonsSimulated": 8,
+      "windowsOpened": 24,
+      "windowsComplete": 24,
+      "candidateTotal": 288,
+      "candidateShortfalls": 0,
+      "uniqueIdentities": 285,
+      "canonicalReuse": 3,
+      "declarations": 720,
+      "declaredTargets": 601,
+      "interestByBand": {
+        "featured": 143,
+        "role": 227,
+        "development": 186,
+        "emergency": 45
+      },
+      "winsByBand": {
+        "featured": 16,
+        "role": 28,
+        "development": 18,
+        "emergency": 6
+      },
+      "interestFranchises": 109,
+      "skipFranchises": 147,
+      "skipShare": 0.6125,
+      "signings": 68,
+      "signingFranchises": 60,
+      "signingsPerFranchiseMean": 0.2833333333333333,
+      "signingsPerFranchiseMin": 0,
+      "signingsPerFranchiseMax": 3,
+      "signingCapReached": 1,
+      "bandCapViolations": 0,
+      "signingCapViolations": 0,
+      "spendCapViolations": 0,
+      "influenceCostsMean": 1.582986111111111,
+      "influenceCostsMin": 0,
+      "influenceCostsMax": 3,
+      "rosterSizesMean": 10.283333333333335,
+      "rosterSizesMin": 0,
+      "rosterSizesMax": 13,
+      "ownershipRows": 2468,
+      "activeLoads": 2400,
+      "activePairs": 10800,
+      "effectsFailures": 0,
+      "rosterIllegal": 0,
+      "rotationIllegal": 0,
+      "traceAuditFailures": 0,
+      "linkFailures": 0,
+      "influenceDecideFailures": 0,
+      "eliteExclusionFailures": 0,
+      "oneOutlierFailures": 0,
+      "signedAboveDraftedMedian": 0,
+      "signedAboveDraftedMedianShare": 0,
+      "signingsByBand": {
+        "contender": 17,
+        "playoff": 36,
+        "average": 15,
+        "weaker": 0
+      },
+      "richGetRicherFailures": 0,
+      "determinismProbe": {
+        "probed": true,
+        "identical": true
+      },
+      "summaryIdentityProbe": {
+        "probed": false,
+        "identical": true
+      }
+    },
+    "heldOut": {
+      "seasonsSimulated": 4,
+      "windowsOpened": 12,
+      "windowsComplete": 12,
+      "signings": 37,
+      "bandCapViolations": 0,
+      "signingCapViolations": 0,
+      "spendCapViolations": 0,
+      "linkFailures": 0,
+      "traceAuditFailures": 0,
+      "effectsFailures": 0,
+      "rosterIllegal": 0,
+      "rotationIllegal": 0,
+      "influenceDecideFailures": 0,
+      "eliteExclusionFailures": 0,
+      "oneOutlierFailures": 0,
+      "richGetRicherFailures": 0,
+      "ownershipRows": 1237,
+      "determinismProbe": {
+        "probed": true,
+        "identical": true
+      },
+      "summaryIdentityProbe": {
+        "probed": false,
+        "identical": true
+      }
+    }
+  },
+  "gates": {
+    "windowsOpened": true,
+    "bandSigningCaps": true,
+    "threeSigningsPerSeason": true,
+    "sixInfluencePerSeason": true,
+    "linkReconciliation": true,
+    "traceAudit": true,
+    "effectsInvariants": true,
+    "rosterLegality": true,
+    "ownershipRows": true,
+    "eliteExclusion": true,
+    "oneOutlierCeiling": true,
+    "noRichGetRicher": true,
+    "influenceTieBreak": true,
+    "determinismProbe": true,
+    "candidateQuality": true,
+    "interestActivity": true,
+    "summaryIdentity": true,
+    "heldOut": true
+  },
+  "engineVersion": "m3-engine-v11",
+  "gameVersion": "season-game-v4",
+  "gameTargetsVersion": "season-game-targets-v4",
+  "generatedAtIso": "2026-08-14T07:03:34.730Z"
+}

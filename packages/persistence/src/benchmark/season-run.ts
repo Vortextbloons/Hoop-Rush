@@ -396,6 +396,7 @@ export async function benchmarkSeasonRunPersistence(
         expectedStateRevision: block.blockIndex,
         expectedStateDigest: block.expectedStateDigest,
         window: null,
+        freeAgency: run.freeAgency,
       });
       commitTimes.push(performance.now() - started);
     }

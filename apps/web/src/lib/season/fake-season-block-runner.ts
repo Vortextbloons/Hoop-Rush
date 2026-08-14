@@ -4,6 +4,9 @@ import {
   SEASON_CHECKPOINT_VERSION,
   SEASON_CHEMISTRY_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_INDEX_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -30,6 +33,7 @@ import {
   type SeasonCheckpointState,
   type SeasonCompactPlayerLine,
   type SeasonEffectsState,
+  type SeasonFreeAgencyState,
   type SeasonGameSummary,
   type SeasonHealthState,
   type SeasonInfluenceState,
@@ -47,6 +51,7 @@ import {
   type SeasonWindowOpenResult,
 } from '@hoop-rush/persistence';
 import { completeSeasonBlockCommit } from '@hoop-rush/engine';
+import type { SeasonFreeAgencyIndex, SeasonRosterTargets } from '@hoop-rush/data-contracts';
 import { assembleCommittedSnapshot } from '$lib/season/season-block-runner';
 import type {
   SeasonBlockResumeInput,
@@ -121,6 +126,48 @@ function emptyLine(playerVersionId: string): SeasonCompactPlayerLine {
   };
 }
 
+/** M2.6.5: the schema-2 zero effects state (no inactive depth, no archives). */
+function emptyEffectsState(): SeasonEffectsState {
+  return {
+    schemaVersion: 2,
+    playerStates: [],
+    inactivePlayerStates: [],
+    pairStates: [],
+    archivedPairs: [],
+  };
+}
+
+/**
+ * M2.6.5: the block recap's free-agency evidence (mirror of the engine's
+ * `blockFreeAgencyEvidenceOf`): the window resolved by this block, its
+ * signings, and the human franchise's season signing/spend counts.
+ */
+function freeAgencyEvidenceOf(input: {
+  blockIndex: number;
+  humanFranchiseId: string | null;
+  freeAgency: SeasonFreeAgencyState;
+}): SeasonBlockRecap['freeAgencyEvidence'] {
+  const freeAgency = input.freeAgency;
+  const resolvedWindow = freeAgency.windows.find(
+    (window) => window.blockIndex === input.blockIndex && window.status === 'resolved',
+  );
+  const humanDelta =
+    input.humanFranchiseId === null ? 0 : (freeAgency.seasonSpend[input.humanFranchiseId] ?? 0);
+  return {
+    windowIndex: resolvedWindow?.windowIndex ?? null,
+    signings: (resolvedWindow?.signings ?? []).map((signing) => ({
+      franchiseId: signing.franchiseId,
+      playerVersionId: signing.playerVersionId,
+      band: signing.band,
+      influenceCost: signing.influenceCost,
+    })),
+    influenceDelta: -humanDelta,
+    seasonSignings:
+      input.humanFranchiseId === null ? 0 : (freeAgency.signingCounts[input.humanFranchiseId] ?? 0),
+    seasonSpend: humanDelta,
+  };
+}
+
 declare global {
   interface Window {
     /** e2e: when true, the fake stalls the first startBlock until cancelled. */
@@ -136,6 +183,7 @@ interface FakeM25CommitInput {
   health: SeasonHealthState;
   transactions: SeasonTransactionEntry[];
   influence: SeasonInfluenceState;
+  freeAgency: SeasonFreeAgencyState;
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
@@ -257,12 +305,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         if (run === undefined) throw new Error('no active run to resume');
         const startInput: SeasonBlockStartInput = {
           run,
-          effects: snapshot?.effects ??
-            this.lastStartInput?.effects ?? {
-              schemaVersion: 1,
-              playerStates: [],
-              pairStates: [],
-            },
+          effects: snapshot?.effects ?? this.lastStartInput?.effects ?? emptyEffectsState(),
           rotations: input.rotations,
           blockIndex: input.blockIndex,
           expectedRevision: input.expectedRevision,
@@ -300,12 +343,19 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
           pending.effects,
         );
         if (this.cancelled) return;
-        const committed = this.committedFacts(startInput, checkpoint, pending.commandId);
+        const freeAgencyAssets = await this.freeAgencyAssetsOf(startInput);
+        const committed = this.committedFacts(
+          startInput,
+          checkpoint,
+          pending.commandId,
+          freeAgencyAssets,
+        );
         const prior = await loadCurrentSnapshot(this.scheduleOf(startInput)).catch(() => null);
         await this.commitCheckpoint(startInput, pending.commandId, checkpoint, {
           health: pending.health,
           influence: this.fakeInfluenceFor(startInput, input.blockIndex),
           transactions: this.fakeTransactionsFor(input.blockIndex),
+          freeAgency: committed.freeAgency,
           checkpointState: committed.checkpointState,
           stateRevision: committed.stateRevision,
           stateDigest: committed.stateDigest,
@@ -349,9 +399,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     this.listeners.clear();
   }
 
-  /** Performance pass: the fake needs no packaged asset prewarm. */
   prewarm(): void {
-    // no-op (test seam; the fake never fetches packaged assets)
+    // no-op: the fake never fetches packaged assets.
   }
 
   subscribe(listener: (event: SeasonRunnerEvent) => void): () => void {
@@ -540,6 +589,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       stateRevision: number;
       stateDigest: string;
       window: SeasonWindowOpenResult | null;
+      freeAgency: SeasonFreeAgencyState;
     } | null = null;
     // The prior accepted state is read BEFORE the commit: the committed
     // snapshot must fold the pre-commit facts, or the just-committed block
@@ -547,11 +597,13 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
     // summaries in the emitted snapshot).
     const prior = await loadCurrentSnapshot(this.scheduleOf(input)).catch(() => null);
     try {
-      committed = this.committedFacts(input, checkpoint, input.commandId);
+      const freeAgencyAssets = await this.freeAgencyAssetsOf(input);
+      committed = this.committedFacts(input, checkpoint, input.commandId, freeAgencyAssets);
       await this.commitCheckpoint(input, input.commandId, checkpoint, {
         health: this.fakeHealthFor(input),
         influence: this.fakeInfluenceFor(input, input.blockIndex),
         transactions: this.fakeTransactionsFor(input.blockIndex),
+        freeAgency: committed.freeAgency,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
@@ -593,6 +645,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       stateRevision: number;
       stateDigest: string;
       window: SeasonWindowOpenResult | null;
+      freeAgency: SeasonFreeAgencyState;
     },
     prior: SeasonRunSnapshot | null,
   ): SeasonRunSnapshot {
@@ -605,6 +658,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       commandId,
       rotationDigest: input.rotationDigest,
       window: committed.window,
+      freeAgency: committed.freeAgency,
       checkpointState: committed.checkpointState,
       stateRevision: committed.stateRevision,
       stateDigest: committed.stateDigest,
@@ -613,6 +667,26 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       priorAcceptedBlocks: current?.acceptedBlocks ?? [],
       priorRetainedDetails: current?.retainedDetails ?? [],
     });
+  }
+
+  /**
+   * M2.6.5: the packaged free-agency index + roster-targets policy for
+   * window blocks (2/4/6); other blocks never need the ~4 MB asset.
+   */
+  private async freeAgencyAssetsOf(
+    input: SeasonBlockStartInput,
+  ): Promise<
+    { freeAgencyIndex?: SeasonFreeAgencyIndex; freeAgencyTargets?: SeasonRosterTargets } | undefined
+  > {
+    if (input.blockIndex !== 2 && input.blockIndex !== 4 && input.blockIndex !== 6) {
+      return undefined;
+    }
+    const module = await import('./season-assets');
+    const [freeAgencyIndex, freeAgencyTargets] = await Promise.all([
+      module.loadSeasonFreeAgencyIndex(),
+      module.loadSeasonFreeAgencyTargets(),
+    ]);
+    return { freeAgencyIndex, freeAgencyTargets };
   }
 
   private async buildCheckpoint(
@@ -662,6 +736,11 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       },
       objectiveEvidence: null,
       tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+      freeAgencyEvidence: freeAgencyEvidenceOf({
+        blockIndex: input.blockIndex,
+        humanFranchiseId: input.humanFranchiseId,
+        freeAgency: input.run.freeAgency,
+      }),
       influenceBalance: {
         humanBalance:
           this.fakeInfluenceFor(input, input.blockIndex).balances[input.humanFranchiseId ?? ''] ??
@@ -696,6 +775,9 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
         injuryTargetsVersion: SEASON_INJURY_TARGETS_VERSION,
         tradeTargetsVersion: SEASON_TRADE_TARGETS_VERSION,
         influenceTargetsVersion: SEASON_INFLUENCE_TARGETS_VERSION,
+        freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
+        freeAgencyIndexVersion: SEASON_FREE_AGENCY_INDEX_VERSION,
+        freeAgencyTargetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
       },
       blockIndex: input.blockIndex,
       completedRounds,
@@ -710,6 +792,10 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       effects,
       health,
       influence: this.fakeInfluenceFor(input, input.blockIndex),
+      // M2.6.5: the carried pre-block free-agency state (the commit side
+      // opens market windows on top of it; the fake mirrors the real
+      // runner's authoritative carrier).
+      freeAgency: input.run.freeAgency,
       transactions: this.fakeTransactionsFor(input.blockIndex),
       objective: {
         objectiveId: null,
@@ -762,6 +848,7 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       recap: checkpoint.recap,
       rotations: input.rotations,
       effects: checkpoint.effects,
+      freeAgency: m25.freeAgency,
       health: m25.health,
       transactions: m25.transactions,
       influence: m25.influence,
@@ -781,17 +868,23 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
    * candidate and the LOCKED rotation set (mirror of the real runner, which
    * commits the locked rotations — the human team's pending edit included —
    * so the state digest must cover exactly that set or the reload audit
-   * reports a divergence).
+   * reports a divergence). M2.6.5: the packaged free-agency index + targets
+   * travel only for window blocks (2/4/6).
    */
   private committedFacts(
     input: SeasonBlockStartInput,
     checkpoint: SeasonCandidateCheckpoint,
     commandId: string,
+    freeAgencyAssets?: {
+      freeAgencyIndex?: SeasonFreeAgencyIndex;
+      freeAgencyTargets?: SeasonRosterTargets;
+    },
   ): {
     checkpointState: SeasonCheckpointState;
     stateRevision: number;
     stateDigest: string;
     window: SeasonWindowOpenResult | null;
+    freeAgency: SeasonFreeAgencyState;
   } {
     return completeSeasonBlockCommit({
       run: { ...input.run, rotations: input.rotations },
@@ -800,6 +893,8 @@ export class FakeSeasonBlockRunner implements SeasonBlockRunner {
       rotationDigest: input.rotationDigest,
       humanFranchiseId: input.humanFranchiseId,
       effects: checkpoint.effects,
+      freeAgencyIndex: freeAgencyAssets?.freeAgencyIndex,
+      freeAgencyTargets: freeAgencyAssets?.freeAgencyTargets,
     });
   }
 

@@ -11,7 +11,13 @@ import {
 import { jsonPayload, runCli, withTmpDir } from './cli-test-helpers.ts';
 import { seasonRunReproduceReportSchema } from './report-schemas.ts';
 import { replaySeasonRunExport } from './commands/season-reproduce.ts';
-import { buildReplayedRun, chainLog, replayDeps } from './season-reproduce-test-support.ts';
+import {
+  buildFreeAgencyReplayedRun,
+  buildReplayedRun,
+  chainLog,
+  freeAgencyReplayDeps,
+  replayDeps,
+} from './season-reproduce-test-support.ts';
 
 /**
  * M2.6 `season run reproduce` tests (replay-export-v1, full-run): the
@@ -198,6 +204,98 @@ describe('season run reproduce (replay-export-v1)', () => {
       );
       expect(secondPayload).toEqual(firstPayload);
       expect(firstPayload.pass).toBe(true);
+    });
+  });
+});
+
+describe('season run reproduce free-agency divergence (M2.6.5)', () => {
+  it('reproduces a free-agency replay export with no divergence', () => {
+    const { exportArtifact } = buildFreeAgencyReplayedRun();
+    const { divergence, divergences } = replaySeasonRunExport(
+      exportArtifact,
+      freeAgencyReplayDeps(),
+    );
+    expect(divergence).toBeNull();
+    expect(divergences).toEqual([]);
+  });
+
+  it('reports a free-agency divergence when a recorded canonical candidate is missing', () => {
+    const { exportInput } = buildFreeAgencyReplayedRun((freeAgency) => {
+      const first = Object.keys(freeAgency.canonicalCandidates)[0];
+      if (first !== undefined) {
+        freeAgency.canonicalCandidates = Object.fromEntries(
+          Object.entries(freeAgency.canonicalCandidates).filter(([key]) => key !== first),
+        );
+      }
+    });
+    const { divergence } = replaySeasonRunExport(
+      buildSeasonRunReplayExport(exportInput),
+      freeAgencyReplayDeps(),
+    );
+    expect(divergence).not.toBeNull();
+    expect(divergence?.kind).toBe('free-agency');
+    expect(divergence?.detail).toContain('canonical identity record');
+  });
+
+  it('reports a free-agency divergence when a recorded signing count is tampered', () => {
+    const { exportInput } = buildFreeAgencyReplayedRun((freeAgency) => {
+      freeAgency.signingCounts = { ...freeAgency.signingCounts, lakers: 1 };
+    });
+    const { divergence } = replaySeasonRunExport(
+      buildSeasonRunReplayExport(exportInput),
+      freeAgencyReplayDeps(),
+    );
+    expect(divergence).not.toBeNull();
+    expect(divergence?.kind).toBe('free-agency');
+  });
+
+  it('fails the CLI command on a tampered free-agency export and passes on the clean file', async () => {
+    await withTmpDir(async (dir) => {
+      const clean = buildFreeAgencyReplayedRun();
+      const exportPath = join(dir, 'fa-replay-export.json');
+      writeFileSync(
+        exportPath,
+        `${JSON.stringify(buildSeasonRunReplayExport(clean.exportInput), null, 2)}\n`,
+      );
+      const ok = await runCli([
+        'season',
+        'run',
+        'reproduce',
+        '--input',
+        exportPath,
+        '--format',
+        'json',
+      ]);
+      expect(ok.code).toBe(0);
+      const okPayload = seasonRunReproduceReportSchema.parse(jsonPayload(ok.stdout, ok.stderr));
+      expect(okPayload.pass).toBe(true);
+
+      const tampered = buildFreeAgencyReplayedRun((freeAgency) => {
+        const first = Object.keys(freeAgency.canonicalCandidates)[0];
+        if (first !== undefined) {
+          freeAgency.canonicalCandidates = Object.fromEntries(
+            Object.entries(freeAgency.canonicalCandidates).filter(([key]) => key !== first),
+          );
+        }
+      });
+      const tamperedPath = join(dir, 'fa-replay-tampered.json');
+      writeFileSync(
+        tamperedPath,
+        `${JSON.stringify(buildSeasonRunReplayExport(tampered.exportInput), null, 2)}\n`,
+      );
+      const bad = await runCli([
+        'season',
+        'run',
+        'reproduce',
+        '--input',
+        tamperedPath,
+        '--format',
+        'json',
+      ]);
+      expect(bad.code).toBe(1);
+      const badPayload = seasonRunReproduceReportSchema.parse(jsonPayload(bad.stdout, bad.stderr));
+      expect(badPayload.pass).toBe(false);
+      expect(badPayload.firstDivergence?.kind).toBe('free-agency');
     });
   });
 });

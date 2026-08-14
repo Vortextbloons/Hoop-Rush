@@ -37,7 +37,13 @@ function snapshotOf(run: SeasonRun): SeasonRunSnapshot {
     summaries: [],
     retainedDetails: [],
     acceptedBlocks: [],
-    effects: { schemaVersion: 1, playerStates: [], pairStates: [] },
+    effects: {
+      schemaVersion: 2,
+      playerStates: [],
+      inactivePlayerStates: [],
+      pairStates: [],
+      archivedPairs: [],
+    },
   };
 }
 
@@ -160,6 +166,7 @@ function baseShell(): SeasonRunShellData {
     health: run.health,
     influence: run.influence,
     trade: run.trade,
+    freeAgency: run.freeAgency,
     objectives: run.objectives,
     pending: null,
     interruption: null,
@@ -185,6 +192,9 @@ function baseShell(): SeasonRunShellData {
     spendInfluence: () => Promise.resolve(),
     acceptTradeOffer: () => Promise.resolve(),
     declineTradeOffer: () => Promise.resolve(),
+    declareFreeAgentInterest: () => Promise.resolve(),
+    skipFreeAgentMarket: () => Promise.resolve(),
+    resolveFreeAgentMarket: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
     startPostseason: () => Promise.resolve(),

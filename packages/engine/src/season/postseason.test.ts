@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   SEASON_ENDING_MISSED_GAMES_SENTINEL,
   buildInitialPostseasonState,
@@ -385,7 +385,7 @@ type SeasonRunCommandFragment = {
 
 function commandOf(run: SeasonRun, fragment: SeasonRunCommandFragment): SeasonRunCommand {
   return {
-    schemaVersion: 9,
+    schemaVersion: 10,
     runId: run.runId,
     expectedStateRevision: run.stateRevision,
     expectedStateDigest: run.stateDigest,

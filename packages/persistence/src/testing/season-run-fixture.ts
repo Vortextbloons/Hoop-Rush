@@ -11,6 +11,9 @@ import {
   SEASON_COMMAND_LOG_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_INDEX_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_VERSION,
   SEASON_GAME_COUNT,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
@@ -51,6 +54,7 @@ import {
   buildEmptyHealth,
   buildInitialPostseasonState,
   seasonEffectsStateSchema,
+  seasonFreeAgencyStateSchema,
   seasonGameSimulationResultSchema,
   seasonHealthStateSchema,
   seasonObjectiveStateSchema,
@@ -90,7 +94,7 @@ import {
   reduceSeasonStandings,
   seasonRunStateDigest,
 } from '@hoop-rush/engine';
-import type { SeasonRunStateDigestFacts } from '@hoop-rush/engine';
+import type { SeasonRunStateDigestFacts } from '../season/engine-seam-types.ts';
 import type { SeasonRunEngineSeam } from '../season/engine-seam-types.ts';
 import { SEASON_RUN_RECORD_ID, type StoredSeasonRunRecord } from '../schemas/season-run-record.ts';
 import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/season-draft-record.ts';
@@ -98,15 +102,17 @@ import { SEASON_DRAFT_RECORD_ID, type StoredSeasonDraft } from '../schemas/seaso
 /**
  * Synthetic-but-schema-valid Season Run fixtures for the persistence tests
  * and the `benchmarkSeasonRunPersistence` harness (spec/2.0/10 M2.3, M2.4,
- * M2.5). The builders stay in the persistence package because the benchmark
- * harness is production code and `@hoop-rush/test-fixtures` is a devDependency;
- * the M2.5 leaf shapes bind the canonical data-contracts builders where outputs
- * are identical, and everything else derives deterministically from integer
- * arithmetic — no Math.random, no clocks — with fold helpers mirroring the
- * documented engine semantics, so the reload reconciliation audit passes with
- * either the production engine seam or the stub seam. Fixture runs are
- * schema-7 (M2.5) with the M2.5 mutable run state and the REAL state digest
- * computed through the engine's canonical `seasonRunStateDigest`.
+ * M2.5, M2.6.5). The builders stay in the persistence package because the
+ * benchmark harness is production code and `@hoop-rush/test-fixtures` is a
+ * devDependency; the leaf shapes bind the canonical data-contracts builders
+ * where outputs are identical, and everything else derives deterministically
+ * from integer arithmetic — no Math.random, no clocks — with fold helpers
+ * mirroring the documented engine semantics, so the reload reconciliation
+ * audit passes with either the production engine seam or the stub seam.
+ * Fixture runs are schema-10 (M2.6.5) with the M2.5 mutable run state, the
+ * v2 rotation-scoped effects state, the empty free-agency state, and the
+ * REAL state digest computed through the engine's canonical
+ * `seasonRunStateDigest`.
  */
 
 /** Accepted 30-franchise alignment; conference/division follow league-v1
@@ -137,6 +143,23 @@ export function buildFixtureLeague(humanFranchiseId = 'lakers'): SeasonLeague {
 /** M2.5 empty health state: no injury records yet (canonical binding). */
 export function buildFixtureHealthState(): SeasonHealthState {
   return seasonHealthStateSchema.parse(buildEmptyHealth());
+}
+
+/**
+ * M2.6.5 initial free-agency state for the fixture league: no windows, no
+ * canonical candidates, every franchise at zero season signings and zero
+ * season spend. Built locally (data-contracts does not export its fixture
+ * `buildEmptyFreeAgency` through the package entry; the shape is frozen).
+ */
+export function buildFixtureFreeAgencyState(): SeasonRun['freeAgency'] {
+  return seasonFreeAgencyStateSchema.parse({
+    schemaVersion: 1,
+    freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
+    windows: [],
+    canonicalCandidates: {},
+    signingCounts: Object.fromEntries(FRANCHISE_ORDER.map((franchiseId) => [franchiseId, 0])),
+    seasonSpend: Object.fromEntries(FRANCHISE_ORDER.map((franchiseId) => [franchiseId, 0])),
+  });
 }
 
 /**
@@ -286,9 +309,11 @@ export function buildFixtureEffectsState(
     }
   }
   return seasonEffectsStateSchema.parse({
-    schemaVersion: 1,
+    schemaVersion: 2,
     playerStates,
+    inactivePlayerStates: [],
     pairStates,
+    archivedPairs: [],
   });
 }
 
@@ -296,6 +321,16 @@ export function buildFixtureEffectsState(
 export function fixtureRosterPlayerVersionIds(rosters: readonly SeasonRoster[]): string[] {
   return [
     ...new Set(rosters.flatMap((roster) => roster.players.map((player) => player.playerVersionId))),
+  ].sort();
+}
+
+/**
+ * Sorted unique player-version ids across every locked rotation (stub seam
+ * helper): the 300 ACTIVE members of the v2 effects state.
+ */
+export function fixtureRotationPlayerVersionIds(rotations: readonly SeasonRotation[]): string[] {
+  return [
+    ...new Set(rotations.flatMap((rotation) => [...rotation.starters, ...rotation.benchOrder])),
   ].sort();
 }
 
@@ -472,6 +507,9 @@ export function buildFixtureRun(input: {
       almanacVersion: SEASON_ALMANAC_VERSION,
       replayExportVersion: SEASON_REPLAY_EXPORT_VERSION,
       postseasonTargetsVersion: SEASON_POSTSEASON_TARGETS_VERSION,
+      freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
+      freeAgencyIndexVersion: SEASON_FREE_AGENCY_INDEX_VERSION,
+      freeAgencyTargetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
     },
     league,
     rosters,
@@ -556,6 +594,7 @@ export function buildFixtureRun(input: {
     })),
     // M2.5 mutable run state: promotion-time initial values.
     trade: null,
+    freeAgency: buildFixtureFreeAgencyState(),
     objectives: buildFixtureObjectiveState(),
     health: buildFixtureHealthState(),
     transactions: [],
@@ -585,6 +624,7 @@ export function buildFixtureRun(input: {
       ownership: run.ownership,
       rotations: run.rotations,
       effects: buildFixtureEffectsState(run.rosters),
+      freeAgency: run.freeAgency,
     }),
   });
 }
@@ -1087,6 +1127,13 @@ export function buildFixtureRecap(input: {
     },
     objectiveEvidence: null,
     tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+    freeAgencyEvidence: {
+      windowIndex: null,
+      signings: [],
+      influenceDelta: 0,
+      seasonSignings: 0,
+      seasonSpend: 0,
+    },
     influenceBalance: { humanBalance: 2 },
   };
 }
@@ -1136,6 +1183,7 @@ export function buildStubSeasonEngineSeam(): SeasonRunEngineSeam {
     reduceSeasonStandings,
     seasonRotationSetDigest: seasonRotationSetDigestFixture,
     seasonRosterPlayerVersionIds: fixtureRosterPlayerVersionIds,
+    seasonRotationPlayerVersionIds: fixtureRotationPlayerVersionIds,
     zeroSeasonEffectsState: (rosters) => buildFixtureEffectsState(rosters),
     seasonPairKey: fixtureSeasonPairKey,
     seasonPairIsCanonical: (a, b) => a < b,
@@ -1165,9 +1213,9 @@ export function seasonRotationSetDigestFixture(rotations: readonly SeasonRotatio
 }
 
 /**
- * M2.5 state digest for a fixture run at an arbitrary boundary: merges the
- * run's mutable facts with the given overrides and computes the canonical
- * digest, so the reload audit recomputes it exactly.
+ * M2.5/M2.6.5 state digest for a fixture run at an arbitrary boundary:
+ * merges the run's mutable facts with the given overrides and computes the
+ * canonical digest, so the reload audit recomputes it exactly.
  */
 export function buildFixtureStateDigest(
   run: SeasonRun,
@@ -1189,6 +1237,7 @@ export function buildFixtureStateDigest(
     ownership: overrides.ownership ?? run.ownership,
     rotations: overrides.rotations ?? run.rotations,
     effects: overrides.effects ?? buildFixtureEffectsState(run.rosters),
+    freeAgency: overrides.freeAgency ?? run.freeAgency,
   });
 }
 

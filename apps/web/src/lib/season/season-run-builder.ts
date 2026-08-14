@@ -9,6 +9,9 @@ import {
   SEASON_COMMAND_LOG_VERSION,
   SEASON_DRAFT_VERSION,
   SEASON_EFFECT_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_INDEX_VERSION,
+  SEASON_FREE_AGENCY_TARGETS_VERSION,
+  SEASON_FREE_AGENCY_VERSION,
   SEASON_GAME_SUMMARY_VERSION,
   SEASON_GAME_TARGETS_VERSION,
   SEASON_GAME_VERSION,
@@ -165,6 +168,9 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
       almanacVersion: SEASON_ALMANAC_VERSION,
       replayExportVersion: SEASON_REPLAY_EXPORT_VERSION,
       postseasonTargetsVersion: SEASON_POSTSEASON_TARGETS_VERSION,
+      freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
+      freeAgencyIndexVersion: SEASON_FREE_AGENCY_INDEX_VERSION,
+      freeAgencyTargetsVersion: SEASON_FREE_AGENCY_TARGETS_VERSION,
     },
     league: correctedLeague,
     rosters: generation.rosters,
@@ -257,6 +263,17 @@ export function buildSeasonRunFromGeneration(input: BuildSeasonRunInput): Season
     },
     evaluations: generation.evaluations,
     trade: null,
+    // M2.6.5: a fresh run carries the empty free-agency state (no windows,
+    // no canonical candidates, every franchise at zero season signings and
+    // zero season spend).
+    freeAgency: {
+      schemaVersion: 1,
+      freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
+      windows: [],
+      canonicalCandidates: {},
+      signingCounts: Object.fromEntries(correctedLeague.teams.map((team) => [team.franchiseId, 0])),
+      seasonSpend: Object.fromEntries(correctedLeague.teams.map((team) => [team.franchiseId, 0])),
+    },
     objectives: {
       schemaVersion: 1,
       objectiveVersion: SEASON_OBJECTIVE_VERSION,

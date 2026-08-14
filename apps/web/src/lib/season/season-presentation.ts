@@ -5,6 +5,7 @@ import {
   type HoopRushManifest,
   type SeasonBlockInjuryEvidence,
   type SeasonBlockRecap,
+  type SeasonFreeAgencyState,
   type SeasonGame,
   type SeasonGameSummary,
   type SeasonLeaderCategory,
@@ -323,7 +324,6 @@ export function humanScheduleRows(
     });
 }
 
-/** Rounds completed → display label ("through 20 games", "season complete"). */
 export function progressLabel(completedRounds: number): string {
   if (completedRounds >= SEASON_ROUND_COUNT) return 'Season complete';
   return `Rounds 1–${String(completedRounds)} complete`;
@@ -846,7 +846,54 @@ export function deriveBlockRecap(input: {
         )
         .reduce((sum, entry) => sum + entry.appliedDelta, 0),
     },
+    freeAgencyEvidence: blockFreeAgencyEvidenceOf({
+      blockIndex,
+      humanFranchiseId,
+      freeAgency: run.freeAgency,
+    }),
     influenceBalance: { humanBalance: humanBalanceAtBlockEnd(run, humanFranchiseId, blockIndex) },
+  };
+}
+
+/**
+ * M2.6.5: block-level free-agency evidence (season-recap-v4; mirror of the
+ * engine's `blockFreeAgencyEvidenceOf`): the window resolved by this block,
+ * its signings, and the human franchise's season signing/spend counts. A
+ * block itself signs nothing (windows resolve between blocks), so ordinary
+ * blocks report zero.
+ */
+export function blockFreeAgencyEvidenceOf(input: {
+  blockIndex: number;
+  humanFranchiseId: string | null;
+  freeAgency: SeasonFreeAgencyState | undefined;
+}): SeasonBlockRecap['freeAgencyEvidence'] {
+  const freeAgency = input.freeAgency;
+  if (freeAgency === undefined) {
+    return {
+      windowIndex: null,
+      signings: [],
+      influenceDelta: 0,
+      seasonSignings: 0,
+      seasonSpend: 0,
+    };
+  }
+  const resolvedWindow = freeAgency.windows.find(
+    (window) => window.blockIndex === input.blockIndex && window.status === 'resolved',
+  );
+  const humanDelta =
+    input.humanFranchiseId === null ? 0 : (freeAgency.seasonSpend[input.humanFranchiseId] ?? 0);
+  return {
+    windowIndex: resolvedWindow?.windowIndex ?? null,
+    signings: (resolvedWindow?.signings ?? []).map((signing) => ({
+      franchiseId: signing.franchiseId,
+      playerVersionId: signing.playerVersionId,
+      band: signing.band,
+      influenceCost: signing.influenceCost,
+    })),
+    influenceDelta: -humanDelta,
+    seasonSignings:
+      input.humanFranchiseId === null ? 0 : (freeAgency.signingCounts[input.humanFranchiseId] ?? 0),
+    seasonSpend: humanDelta,
   };
 }
 

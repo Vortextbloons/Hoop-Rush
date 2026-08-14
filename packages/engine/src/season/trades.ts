@@ -20,14 +20,12 @@ import {
 } from '@hoop-rush/data-contracts';
 import { slotGroupOf, type SlotGroup } from '../domain/positions.ts';
 import { canonicalRosterPairs } from './chemistry.ts';
+import { reconcileSeasonEffects } from './effects.ts';
 import { applyRiskyRehabOutcome, rollSeasonRehabOutcome } from './injuries.ts';
 import { applySeasonInfluenceSpend } from './influence.ts';
 import { buildMinimalRotation, validateSeasonRotation } from './rotation.ts';
-import {
-  SEASON_ROSTER_SIZE,
-  validateSeasonRoster,
-  type SeasonRosterMemberInput,
-} from './roster-rules.ts';
+import { validateSeasonRoster, type SeasonRosterMemberInput } from './roster-rules.ts';
+import { SEASON_ROSTER_MAX_SIZE, SEASON_ROSTER_MIN_SIZE } from '@hoop-rush/data-contracts';
 import { drawHexInt } from './season-seeds.ts';
 import { seasonRunStateDigest } from './state-digest.ts';
 import { seasonTransactionEntry } from './transactions.ts';
@@ -166,10 +164,38 @@ export const WINDOW_BLOCK_INDEX_TO_INDEX: Readonly<Record<number, number>> = {
 
 /** Frozen 1-for-1 value band (basis points). */
 const BAND_85_115 = { lower: 850, upper: 1150 } as const;
-/** Frozen 2-for-2 value band (basis points). */
+/** Frozen multi-player / uneven package value band (basis points). */
 const BAND_80_120 = { lower: 800, upper: 1200 } as const;
 /** The schema's recordable ratio window (seasonTradeOfferValueBandSchema). */
 const RATIO_SCHEMA_BOUNDS = { lower: 800, upper: 1200 } as const;
+
+/**
+ * M2.6.5 trade package kinds (spec/2.0/15): 1-for-1, 2-for-2, 1-for-2, and
+ * 2-for-1 are legal when both resulting rosters stay within 10-15 and
+ * retain a legal ten-player rotation subset. Value bands: 85-115 for
+ * 1-for-1, 80-120 for every multi-player or uneven package.
+ */
+export type SeasonTradePackageKind = '1-1' | '2-2' | '1-2' | '2-1';
+
+/** The seeded package-kind draw (weights: 1-1 40%, 2-2 30%, 1-2 15%, 2-1 15%). */
+function packageKindOf(seed: string): SeasonTradePackageKind {
+  const draw = seedInt(seed, 100);
+  if (draw < 40) return '1-1';
+  if (draw < 70) return '2-2';
+  if (draw < 85) return '1-2';
+  return '2-1';
+}
+
+/** The outgoing/incoming sizes of a package kind. */
+export function packageSizesOf(kind: SeasonTradePackageKind): {
+  outgoing: number;
+  incoming: number;
+} {
+  if (kind === '1-1') return { outgoing: 1, incoming: 1 };
+  if (kind === '2-2') return { outgoing: 2, incoming: 2 };
+  if (kind === '1-2') return { outgoing: 1, incoming: 2 };
+  return { outgoing: 2, incoming: 1 };
+}
 
 /** Value-function weights (documented above). */
 const VALUE_OFFENSE_WEIGHT = 0.45;
@@ -294,7 +320,7 @@ export interface SeasonTradePlayerHealthFacts {
  * mirrors the health workstream's `seasonPlayerAvailable` exactly (a player
  * is unavailable iff they have an injury that is not same-game-returned and
  * has missed games remaining); implemented locally so the trade module stays
- * a pure function of the recorded state while the health seam is pending.
+ * a pure function of the recorded state.
  */
 export function seasonTradePlayerHealthFacts(
   health: SeasonHealthState,
@@ -412,9 +438,13 @@ function canPlayGroup(playable: readonly Position[], group: SlotGroup): boolean 
   return playable.some((position) => slotGroupOf(position) === group);
 }
 
-/** The 1-for-1 / 2-for-2 value band of a candidate swap (to-side view). */
+/**
+ * The value band of a candidate swap (to-side view). 1-for-1 packages use
+ * the 85-115 band; every multi-player or uneven package (2-for-2, 1-for-2,
+ * 2-for-1) uses the 80-120 band (season-trade-v2, spec/2.0/15).
+ */
 export function seasonTradeValueBandFor(input: {
-  size: 1 | 2;
+  kind: SeasonTradePackageKind;
   outgoingValues: readonly number[];
   incomingValues: readonly number[];
 }): SeasonTradeOfferValueBand {
@@ -426,20 +456,28 @@ export function seasonTradeValueBandFor(input: {
     RATIO_SCHEMA_BOUNDS.upper,
     Math.max(RATIO_SCHEMA_BOUNDS.lower, raw),
   );
-  const bounds = input.size === 1 ? BAND_85_115 : BAND_80_120;
+  const bounds = input.kind === '1-1' ? BAND_85_115 : BAND_80_120;
   const qualified = ratioBasisPoints >= bounds.lower && ratioBasisPoints <= bounds.upper;
-  return { ratioBasisPoints, band: input.size === 1 ? '85-115' : '80-120', qualified };
+  return {
+    ratioBasisPoints,
+    band: input.kind === '1-1' ? '85-115' : '80-120',
+    qualified,
+  };
 }
 
 /**
  * True when the ratio is mutually within the band: both the ratio and its
  * reciprocal (the other side's view) fall inside the frozen band. This is
- * the AI-to-AI acceptance rule (M2.5 §13: bands influence AI willingness).
- * The reciprocal is bounded with a ceiling so the integer boundary matches
- * the documented mutual windows (1-for-1: [870, 1150], 2-for-2: [834, 1200]).
+ * the AI-to-AI acceptance rule (M2.5 §13: bands influence AI willingness;
+ * M2.6.5: 85-115 for 1-for-1, 80-120 otherwise). The reciprocal is bounded
+ * with a ceiling so the integer boundary matches the documented mutual
+ * windows (1-for-1: [870, 1150], 2-for-2: [834, 1200]).
  */
-export function ratioMutuallyWithinBand(ratioBasisPoints: number, size: 1 | 2): boolean {
-  const bounds = size === 1 ? BAND_85_115 : BAND_80_120;
+export function ratioMutuallyWithinBand(
+  ratioBasisPoints: number,
+  kind: SeasonTradePackageKind,
+): boolean {
+  const bounds = kind === '1-1' ? BAND_85_115 : BAND_80_120;
   if (ratioBasisPoints < bounds.lower || ratioBasisPoints > bounds.upper) return false;
   const reciprocal = Math.ceil(1_000_000 / ratioBasisPoints);
   return reciprocal >= bounds.lower && reciprocal <= bounds.upper;
@@ -520,28 +558,108 @@ function swappedRosterIds(
   return [...rosterIds.filter((id) => !removed.includes(id)), ...added];
 }
 
-/** True when the roster keeps the full ten-player legality contract. */
-function rosterIsLegal(rosterIds: readonly string[], facts: SeasonTradeCatalogFacts): boolean {
-  if (rosterIds.length !== SEASON_ROSTER_SIZE || new Set(rosterIds).size !== SEASON_ROSTER_SIZE) {
-    return false;
+/**
+ * True when the roster keeps the season-trade-v2 contract: 10-15 distinct
+ * versions, unique real-player identities, and a legal ten-player rotation
+ * subset (a G,G,F,F,C five that survives any single removal).
+ */
+function rosterIsLegal(
+  rosterIds: readonly string[],
+  facts: SeasonTradeCatalogFacts,
+  identityByVersion: ReadonlyMap<string, string>,
+): boolean {
+  return rosterLegalityReasons(rosterIds, facts, identityByVersion).length === 0;
+}
+
+/** The identity map (playerVersionId -> playerId) derived from the run rosters. */
+function identityByVersionOf(run: SeasonRun): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const roster of run.rosters) {
+    for (const player of roster.players) {
+      map.set(player.playerVersionId, player.playerId);
+    }
+  }
+  return map;
+}
+
+/**
+ * Legality failure strings for a candidate roster (accept-command path).
+ * M2.6.5 (season-trade-v2): the resulting roster must hold 10-15 distinct
+ * versions, unique identities, and at least one legal ten-player rotation
+ * subset (the rotation rules the game pipeline enforces).
+ */
+function rosterLegalityReasons(
+  rosterIds: readonly string[],
+  facts: SeasonTradeCatalogFacts,
+  identityByVersion: ReadonlyMap<string, string>,
+): string[] {
+  const failures: string[] = [];
+  if (rosterIds.length < SEASON_ROSTER_MIN_SIZE || rosterIds.length > SEASON_ROSTER_MAX_SIZE) {
+    failures.push(`roster must hold 10-15 players (got ${String(rosterIds.length)})`);
+  }
+  if (new Set(rosterIds).size !== rosterIds.length) {
+    failures.push('roster must contain distinct playerVersionIds');
+  }
+  const identities = new Set<string>();
+  for (const id of rosterIds) {
+    const playerId = identityByVersion.get(id);
+    if (playerId !== undefined) identities.add(playerId);
+  }
+  if (identities.size !== new Set(rosterIds).size) {
+    failures.push('roster must contain unique real-player identities');
   }
   const members: SeasonRosterMemberInput[] = rosterIds.map((playerVersionId) => ({
     playerVersionId,
     playable: facts.playable.get(playerVersionId) ?? [],
   }));
-  return validateSeasonRoster(members).length === 0;
+  if (!rotationSubsetExists(members)) {
+    failures.push('roster has no legal ten-player rotation subset');
+  }
+  return failures;
 }
 
-/** Legality failure strings for a candidate roster (accept-command path). */
-function rosterLegalityReasons(
-  rosterIds: readonly string[],
-  facts: SeasonTradeCatalogFacts,
-): string[] {
-  const members: SeasonRosterMemberInput[] = rosterIds.map((playerVersionId) => ({
-    playerVersionId,
-    playable: facts.playable.get(playerVersionId) ?? [],
-  }));
-  return validateSeasonRoster(members);
+/**
+ * True when the members admit a legal ten-player rotation subset: ten
+ * members with a G,G,F,F,C five that survives removing any single member.
+ * Bounded subset enumeration over the 10-15 member rosters (C(15,5) at
+ * most); the first valid subset in canonical order decides.
+ */
+function rotationSubsetExists(members: readonly SeasonRosterMemberInput[]): boolean {
+  if (members.length < 10) return false;
+  const extras = members.length - 10;
+  if (extras === 0) {
+    return validateTenMemberRotation(members);
+  }
+  const byId = new Map(members.map((member) => [member.playerVersionId, member]));
+  const ids = [...members.map((member) => member.playerVersionId)].sort();
+  const total = 1 << ids.length;
+  for (let mask = 0; mask < total; mask += 1) {
+    if (bitCount(mask) !== extras) continue;
+    const subset: SeasonRosterMemberInput[] = [];
+    for (let i = 0; i < ids.length; i += 1) {
+      if ((mask & (1 << i)) === 0) {
+        const member = byId.get(ids[i] as string);
+        if (member !== undefined) subset.push(member);
+      }
+    }
+    if (subset.length === 10 && validateTenMemberRotation(subset)) return true;
+  }
+  return false;
+}
+
+function bitCount(value: number): number {
+  let count = 0;
+  let v = value;
+  while (v > 0) {
+    count += v & 1;
+    v >>= 1;
+  }
+  return count;
+}
+
+/** The v1 rotation legality contract over exactly ten members. */
+function validateTenMemberRotation(members: readonly SeasonRosterMemberInput[]): boolean {
+  return validateSeasonRoster(members).length === 0;
 }
 
 interface OfferGenerationContext {
@@ -554,7 +672,7 @@ interface OfferGenerationContext {
 
 interface OfferCandidate {
   aiFranchiseId: string;
-  size: 1 | 2;
+  kind: SeasonTradePackageKind;
   outgoing: string[];
   incoming: string[];
   /** Raw ratio (to-side view) before schema clamping. */
@@ -565,27 +683,32 @@ function humanOfferCandidate(
   context: OfferGenerationContext,
   seedPath: string[],
   aiFranchiseId: string,
-  size: 1 | 2,
+  kind: SeasonTradePackageKind,
   probeIndex: number,
 ): OfferCandidate | null {
   const { run, rootSeed, humanFranchiseId, catalogFacts } = context;
+  const sizes = packageSizesOf(kind);
+  const identityByVersion = identityByVersionOf(run);
   const humanRosterIds = rosterPlayerVersionIdsOf(run, humanFranchiseId);
   const aiRosterIds = rosterPlayerVersionIdsOf(run, aiFranchiseId);
   const outgoing = pickDistinct(
     humanRosterIds,
     (id) => tradeSeed(rootSeed, ...seedPath, 'outgoing', String(probeIndex), id),
     (id) => id,
-    size,
+    sizes.outgoing,
   );
   const incoming = pickDistinct(
     aiRosterIds,
     (id) => tradeSeed(rootSeed, ...seedPath, 'incoming', String(probeIndex), id),
     (id) => id,
-    size,
+    sizes.incoming,
   );
   const humanAfter = swappedRosterIds(humanRosterIds, outgoing, incoming);
   const aiAfter = swappedRosterIds(aiRosterIds, incoming, outgoing);
-  if (!rosterIsLegal(humanAfter, catalogFacts) || !rosterIsLegal(aiAfter, catalogFacts)) {
+  if (
+    !rosterIsLegal(humanAfter, catalogFacts, identityByVersion) ||
+    !rosterIsLegal(aiAfter, catalogFacts, identityByVersion)
+  ) {
     return null;
   }
   const outgoingValues = outgoing.map((id) =>
@@ -608,7 +731,7 @@ function humanOfferCandidate(
     (1000 * incomingValues.reduce((sum, value) => sum + value, 0)) /
       outgoingValues.reduce((sum, value) => sum + value, 0),
   );
-  return { aiFranchiseId, size, outgoing, incoming, rawRatio };
+  return { aiFranchiseId, kind, outgoing, incoming, rawRatio };
 }
 
 function rankedAiFranchises(
@@ -624,11 +747,21 @@ function rankedAiFranchises(
   );
 }
 
+/** The package-kind iteration order starting at the drawn kind (cyclic). */
+function kindOrderStartingAt(kind: SeasonTradePackageKind): SeasonTradePackageKind[] {
+  const order: SeasonTradePackageKind[] = ['1-1', '2-2', '1-2', '2-1'];
+  const start = order.indexOf(kind);
+  return [...order.slice(start), ...order.slice(0, start)];
+}
+
 /**
  * Generates one human-facing offer (base or extra): deterministic AI
  * franchise and swap selection with bounded legality/plausibility probes.
- * Returns null only when no legal candidate exists at all (window opens with
- * one fewer offer; virtually unreachable for legal 30-team leagues).
+ * The drawn package kind is probed first; when the rosters cannot support
+ * it (e.g. uneven packages on exactly-ten rosters), the remaining kinds are
+ * probed in deterministic order so offers still generate. Returns null only
+ * when no legal candidate exists at all (window opens with one fewer offer;
+ * virtually unreachable for legal 30-team leagues).
  */
 export function generateHumanTradeOffer(
   context: OfferGenerationContext,
@@ -636,24 +769,28 @@ export function generateHumanTradeOffer(
   usedFranchiseIds: readonly string[],
 ): SeasonTradeOffer | null {
   const { rootSeed } = context;
-  const size: 1 | 2 = seedInt(tradeSeed(rootSeed, ...seedPath, 'size'), 100) < 55 ? 1 : 2;
+  const drawnKind = packageKindOf(tradeSeed(rootSeed, ...seedPath, 'size'));
+  const kinds = kindOrderStartingAt(drawnKind);
 
   const franchises = rankedAiFranchises(context, seedPath, usedFranchiseIds);
   for (const aiFranchiseId of franchises) {
     let best: OfferCandidate | null = null;
-    for (let probe = 0; probe < OFFER_PROBE_BUDGET; probe += 1) {
-      const candidate = humanOfferCandidate(context, seedPath, aiFranchiseId, size, probe);
-      if (candidate === null) continue;
-      const inRange =
-        candidate.rawRatio >= RATIO_SCHEMA_BOUNDS.lower &&
-        candidate.rawRatio <= RATIO_SCHEMA_BOUNDS.upper;
-      if (inRange) {
-        best = candidate;
-        break;
+    for (const kind of kinds) {
+      for (let probe = 0; probe < OFFER_PROBE_BUDGET; probe += 1) {
+        const candidate = humanOfferCandidate(context, seedPath, aiFranchiseId, kind, probe);
+        if (candidate === null) continue;
+        const inRange =
+          candidate.rawRatio >= RATIO_SCHEMA_BOUNDS.lower &&
+          candidate.rawRatio <= RATIO_SCHEMA_BOUNDS.upper;
+        if (inRange) {
+          best = candidate;
+          break;
+        }
+        if (best === null || Math.abs(candidate.rawRatio - 1000) < Math.abs(best.rawRatio - 1000)) {
+          best = candidate;
+        }
       }
-      if (best === null || Math.abs(candidate.rawRatio - 1000) < Math.abs(best.rawRatio - 1000)) {
-        best = candidate;
-      }
+      if (best !== null) break;
     }
     if (best !== null) {
       return assembleHumanOffer(context, seedPath, best);
@@ -694,7 +831,7 @@ function assembleHumanOffer(
     }),
   );
   const valueBand = seasonTradeValueBandFor({
-    size: candidate.size,
+    kind: candidate.kind,
     outgoingValues,
     incomingValues,
   });
@@ -834,7 +971,7 @@ function aiTradeCandidate(
 ): {
   a: string;
   b: string;
-  size: 1 | 2;
+  kind: SeasonTradePackageKind;
   outgoing: string[];
   incoming: string[];
   rawRatio: number;
@@ -857,61 +994,79 @@ function aiTradeCandidate(
   const pairKey = a < b ? `${a}\u0000${b}` : `${b}\u0000${a}`;
   if (usedPairs.has(pairKey)) return null;
 
-  const size: 1 | 2 = seedInt(tradeSeed(rootSeed, ...basePath, 'size'), 100) < 55 ? 1 : 2;
+  const kind = packageKindOf(tradeSeed(rootSeed, ...basePath, 'size'));
+  const identityByVersion = identityByVersionOf(run);
   const rosterA = rosterPlayerVersionIdsOf(run, a);
   const rosterB = rosterPlayerVersionIdsOf(run, b);
-  const outgoing = pickDistinct(
-    rosterA,
-    (id) => tradeSeed(rootSeed, ...basePath, 'outgoing', id),
-    (id) => id,
-    size,
-  );
-  const incoming = pickDistinct(
-    rosterB,
-    (id) => tradeSeed(rootSeed, ...basePath, 'incoming', id),
-    (id) => id,
-    size,
-  );
-  if (
-    outgoing.some((id) => protectedPlayers.has(id)) ||
-    incoming.some((id) => protectedPlayers.has(id))
-  ) {
-    return null;
+  // When the rosters cannot support the drawn kind (e.g. uneven packages on
+  // exactly-ten rosters), probe the remaining kinds in deterministic order.
+  for (const probeKind of kindOrderStartingAt(kind)) {
+    const probeSizes = packageSizesOf(probeKind);
+    const outgoing = pickDistinct(
+      rosterA,
+      (id) => tradeSeed(rootSeed, ...basePath, 'outgoing', id),
+      (id) => id,
+      probeSizes.outgoing,
+    );
+    const incoming = pickDistinct(
+      rosterB,
+      (id) => tradeSeed(rootSeed, ...basePath, 'incoming', id),
+      (id) => id,
+      probeSizes.incoming,
+    );
+    if (
+      outgoing.some((id) => protectedPlayers.has(id)) ||
+      incoming.some((id) => protectedPlayers.has(id))
+    ) {
+      continue;
+    }
+
+    const aAfter = swappedRosterIds(rosterA, outgoing, incoming);
+    const bAfter = swappedRosterIds(rosterB, incoming, outgoing);
+    if (
+      !rosterIsLegal(aAfter, catalogFacts, identityByVersion) ||
+      !rosterIsLegal(bAfter, catalogFacts, identityByVersion)
+    ) {
+      continue;
+    }
+
+    // To-side view: franchise b receives franchise a's outgoing players.
+    const incomingValues = outgoing.map((id) =>
+      seasonTradePlayerValue(id, {
+        run,
+        catalogFacts,
+        receivingFranchiseId: b,
+        candidateRosterIds: bAfter,
+      }),
+    );
+    const outgoingValues = incoming.map((id) =>
+      seasonTradePlayerValue(id, {
+        run,
+        catalogFacts,
+        receivingFranchiseId: b,
+        candidateRosterIds: bAfter,
+      }),
+    );
+    const rawRatio = Math.round(
+      (1000 * incomingValues.reduce((sum, value) => sum + value, 0)) /
+        outgoingValues.reduce((sum, value) => sum + value, 0),
+    );
+    if (!ratioMutuallyWithinBand(rawRatio, probeKind)) continue;
+    return { a, b, kind: probeKind, outgoing, incoming, rawRatio };
   }
-
-  const aAfter = swappedRosterIds(rosterA, outgoing, incoming);
-  const bAfter = swappedRosterIds(rosterB, incoming, outgoing);
-  if (!rosterIsLegal(aAfter, catalogFacts) || !rosterIsLegal(bAfter, catalogFacts)) return null;
-
-  // To-side view: franchise b receives franchise a's outgoing players.
-  const incomingValues = outgoing.map((id) =>
-    seasonTradePlayerValue(id, {
-      run,
-      catalogFacts,
-      receivingFranchiseId: b,
-      candidateRosterIds: bAfter,
-    }),
-  );
-  const outgoingValues = incoming.map((id) =>
-    seasonTradePlayerValue(id, {
-      run,
-      catalogFacts,
-      receivingFranchiseId: b,
-      candidateRosterIds: bAfter,
-    }),
-  );
-  const rawRatio = Math.round(
-    (1000 * incomingValues.reduce((sum, value) => sum + value, 0)) /
-      outgoingValues.reduce((sum, value) => sum + value, 0),
-  );
-  if (!ratioMutuallyWithinBand(rawRatio, size)) return null;
-  return { a, b, size, outgoing, incoming, rawRatio };
+  return null;
 }
 
 function assembleAiOffer(
   run: SeasonEconomyRun,
   context: OfferGenerationContext,
-  candidate: { a: string; b: string; size: 1 | 2; outgoing: string[]; incoming: string[] },
+  candidate: {
+    a: string;
+    b: string;
+    kind: SeasonTradePackageKind;
+    outgoing: string[];
+    incoming: string[];
+  },
   attempt: number,
 ): SeasonTradeOffer {
   // Offer-field convention (shared with human offers): `outgoing` is the
@@ -943,7 +1098,7 @@ function assembleAiOffer(
     }),
   );
   const valueBand = seasonTradeValueBandFor({
-    size: candidate.size,
+    kind: candidate.kind,
     outgoingValues,
     incomingValues,
   });
@@ -1310,6 +1465,7 @@ export function openSeasonTradeWindow(
     influence: next.influence,
     transactions: next.transactions,
     trade: next.trade,
+    freeAgency: next.freeAgency,
     objectives: next.objectives,
     rosters: next.rosters,
     ownership: next.ownership,
@@ -1344,14 +1500,16 @@ export interface SeasonTradeApplicationResult {
 }
 
 /**
- * Applies one trade atomically (M2.5 §13): unique ownership transfer (a
- * version never appears on two rosters), both rosters updated (legal ten
- * players), deterministic rotation repair with preserved minute targets,
- * injury records follow the players, player loads stay keyed to the version
- * while old-roster pairs are removed and new-roster canonical pairs are
- * added at zero shared possessions (1,350 pairs / 300 loads preserved), and
- * one immutable `trade` transaction entry. Also marks the offer `accepted`
- * in the run's trade state when it is recorded there. Does NOT advance
+ * Applies one trade atomically (M2.5 §13; M2.6.5 season-trade-v2): unique
+ * ownership transfer (a version never appears on two rosters), both rosters
+ * updated (legal 10-15 players with unique identities and a legal ten-player
+ * rotation subset), injury records follow the players, and one immutable
+ * `trade` transaction entry. When ONLY inactive players move, rotations and
+ * the active effects state are untouched (spec/2.0/15). When rotation
+ * players move, rotations are repaired deterministically (retained
+ * assignments/minutes preserved where possible) and the active pair state
+ * is rebuilt from the repaired rotations, preserving unchanged pairs and
+ * creating zero-state pairs for new rotation teammates. Does NOT advance
  * `stateRevision`/`stateDigest` — the caller (command handler or window
  * opener) bumps the revision exactly once and recomputes the digest.
  */
@@ -1367,16 +1525,20 @@ export function applySeasonTrade(
     );
   }
   const facts = seasonTradeCatalogFactsOf(catalog);
+  const identityByVersion = identityByVersionOf(run);
   const { toFranchiseId, fromFranchiseId } = offer;
   if (toFranchiseId === fromFranchiseId) {
     throw new SeasonTradeInvariantError('a trade must involve two distinct franchises');
   }
   const outgoing = offer.outgoingPlayerVersionIds;
   const incoming = offer.incomingPlayerVersionIds;
-  if (outgoing.length === 0 || outgoing.length !== incoming.length) {
-    throw new SeasonTradeInvariantError(
-      'a trade must move the same number of players on both sides',
-    );
+  if (
+    outgoing.length === 0 ||
+    outgoing.length > 2 ||
+    incoming.length === 0 ||
+    incoming.length > 2
+  ) {
+    throw new SeasonTradeInvariantError('a trade must move one or two players on each side');
   }
 
   // Structural pre-checks: every moved version on its stated roster exactly
@@ -1426,8 +1588,12 @@ export function applySeasonTrade(
   const toIdsAfter = toEntries.map((player) => player.playerVersionId);
   const fromIdsAfter = fromEntries.map((player) => player.playerVersionId);
   const legalityFailures = [
-    ...rosterLegalityReasons(toIdsAfter, facts).map((reason) => `${toFranchiseId}: ${reason}`),
-    ...rosterLegalityReasons(fromIdsAfter, facts).map((reason) => `${fromFranchiseId}: ${reason}`),
+    ...rosterLegalityReasons(toIdsAfter, facts, identityByVersion).map(
+      (reason) => `${toFranchiseId}: ${reason}`,
+    ),
+    ...rosterLegalityReasons(fromIdsAfter, facts, identityByVersion).map(
+      (reason) => `${fromFranchiseId}: ${reason}`,
+    ),
   ];
   if (legalityFailures.length > 0) {
     throw new SeasonTradeInvariantError(
@@ -1457,31 +1623,42 @@ export function applySeasonTrade(
     return rotation;
   });
 
-  // Effects: player loads follow the version (unchanged set of 300); pairs
-  // involving moved players are removed and the two new rosters' canonical
-  // pairs are added at zero shared possessions (exactly 1,350 pairs).
+  // Effects (M2.6.5, spec/2.0/15): moving only inactive players leaves the
+  // active rotations and effects unchanged — no reconcile at all. When the
+  // rotation membership changes, the active effects state is reconciled
+  // against the new rosters and repaired rotations (demotion freeze,
+  // promotion restore, zero-state newly active pairs), then the traded
+  // players' archived chemistry is deleted (loads follow the version).
+  const rotationMembersBefore = new Set([
+    ...(run.rotations.find((rotation) => rotation.franchiseId === toFranchiseId)?.starters ?? []),
+    ...(run.rotations.find((rotation) => rotation.franchiseId === toFranchiseId)?.benchOrder ?? []),
+    ...(run.rotations.find((rotation) => rotation.franchiseId === fromFranchiseId)?.starters ?? []),
+    ...(run.rotations.find((rotation) => rotation.franchiseId === fromFranchiseId)?.benchOrder ??
+      []),
+  ]);
   const movedSet = new Set(moved);
-  const keptPairs = run.effects.pairStates.filter(
-    (pair) => !movedSet.has(pair.a) && !movedSet.has(pair.b),
-  );
-  const addedPairs = [
-    ...canonicalRosterPairs(toIdsAfter),
-    ...canonicalRosterPairs(fromIdsAfter),
-  ].filter(([a, b]) => !keptPairs.some((pair) => pair.a === a && pair.b === b));
-  const pairStates = [
-    ...keptPairs,
-    ...addedPairs.map(([a, b]) => ({ a, b, sharedPossessions: 0 })),
-  ].sort((x, y) => (x.a < y.a ? -1 : x.a > y.a ? 1 : x.b < y.b ? -1 : 1));
-  if (pairStates.length !== 1350) {
-    throw new SeasonTradeInvariantError(
-      `effects pair states must stay at 1,350 after a trade (got ${String(pairStates.length)})`,
+  const activeMoved = moved.some((id) => rotationMembersBefore.has(id));
+  let effects: SeasonEffectsState = run.effects;
+  if (activeMoved) {
+    const nextRosters = run.rosters.map((roster) =>
+      roster.franchiseId === toFranchiseId
+        ? { ...roster, players: toEntries }
+        : roster.franchiseId === fromFranchiseId
+          ? { ...roster, players: fromEntries }
+          : roster,
     );
+    effects = reconcileSeasonEffects({
+      previous: run.effects,
+      rosters: nextRosters,
+      rotations,
+    });
+    effects = {
+      ...effects,
+      archivedPairs: effects.archivedPairs.filter(
+        (pair) => !movedSet.has(pair.a) && !movedSet.has(pair.b),
+      ),
+    };
   }
-  const effects: SeasonEffectsState = {
-    schemaVersion: 1,
-    playerStates: run.effects.playerStates,
-    pairStates,
-  };
 
   // Health records follow the players (franchiseId updated).
   const health: SeasonHealthState = {
@@ -1589,7 +1766,38 @@ function repairRotationAfterTrade(
     playerVersionId,
     playable: facts.playable.get(playerVersionId) ?? [],
   }));
-  const base = buildMinimalRotation({ franchiseId: oldRotation.franchiseId, members });
+  // M2.6.5: rosters may hold 10-15 players; the rotation keeps exactly ten.
+  // Retain the old rotation members still on the roster, then fill remaining
+  // slots from the new roster by role fit and canonical id.
+  const rotationIds = new Set([...oldRotation.starters, ...oldRotation.benchOrder]);
+  const retained: SeasonRosterMemberInput[] = members.filter((member) =>
+    rotationIds.has(member.playerVersionId),
+  );
+  const rotationMembers = [
+    ...retained,
+    ...members
+      .filter((member) => !rotationIds.has(member.playerVersionId))
+      .sort((a, b) => {
+        const groupsOf = (member: SeasonRosterMemberInput) => {
+          const groups = new Set<SlotGroup>();
+          for (const position of member.playable) groups.add(slotGroupOf(position));
+          return (['G', 'F', 'C'] as const).filter((group) => groups.has(group)).length;
+        };
+        const groupsA = groupsOf(a);
+        const groupsB = groupsOf(b);
+        if (groupsA !== groupsB) return groupsB - groupsA;
+        return a.playerVersionId < b.playerVersionId ? -1 : 1;
+      }),
+  ].slice(0, 10);
+  if (rotationMembers.length !== 10) {
+    throw new SeasonTradeInvariantError(
+      `rotation repair for ${oldRotation.franchiseId} could not select ten members`,
+    );
+  }
+  const base = buildMinimalRotation({
+    franchiseId: oldRotation.franchiseId,
+    members: rotationMembers,
+  });
   const minutesById = new Map(
     oldRotation.targetMinutes.map((entry) => [entry.playerVersionId, entry.minutes]),
   );
@@ -1597,7 +1805,8 @@ function repairRotationAfterTrade(
   const minutesByIncoming = new Map(
     pairing.map(([incomingId, outgoingId]) => [incomingId, outgoingId]),
   );
-  const targetMinutes = newRosterIds.map((playerVersionId) => {
+  const rotationMemberIds = rotationMembers.map((member) => member.playerVersionId);
+  const targetMinutes = rotationMemberIds.map((playerVersionId) => {
     const inheritedFrom = minutesByIncoming.get(playerVersionId);
     const minutes =
       inheritedFrom !== undefined
@@ -1606,10 +1815,10 @@ function repairRotationAfterTrade(
     return { playerVersionId, minutes };
   });
   const rotation: SeasonRotation = { ...base, targetMinutes };
-  // Validate against the ROSTER's ten players only (the catalog facts map
+  // Validate against the ROTATION's ten players only (the catalog facts map
   // covers every candidate in the packaged catalog, far beyond this roster).
   const memberPlayable = new Map<string, readonly Position[]>();
-  for (const playerVersionId of newRosterIds) {
+  for (const playerVersionId of rotationMemberIds) {
     const playable = facts.playable.get(playerVersionId);
     if (playable !== undefined) memberPlayable.set(playerVersionId, playable);
   }

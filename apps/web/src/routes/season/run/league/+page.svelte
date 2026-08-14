@@ -46,7 +46,7 @@
   const run = $derived(shell.run);
   const standings = $derived(run?.standings ?? null);
 
-  /** M2.6: authoritative engine ranking (tiebreak sequence) of the current
+  /** Authoritative engine ranking (tiebreak sequence) of the current
    * standings; ordering + resolutions are the engine's, never the UI's. */
   const rankings = $derived(run !== null ? postseasonRankingsOf(run) : null);
   const rankedEntries = $derived(

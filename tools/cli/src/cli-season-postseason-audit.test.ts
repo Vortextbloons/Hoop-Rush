@@ -474,7 +474,7 @@ describe('season postseason audit (postseason-v2)', () => {
           runId: run.runId,
           ordinal: 0,
           command: {
-            schemaVersion: 9,
+            schemaVersion: 10,
             command: 'start-postseason',
             commandId: 'audit-start-1',
             runId: run.runId,

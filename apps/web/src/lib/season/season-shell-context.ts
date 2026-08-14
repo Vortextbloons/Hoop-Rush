@@ -2,6 +2,8 @@ import type {
   HoopRushManifest,
   SeasonActiveRunIndex,
   SeasonDraftCatalog,
+  SeasonFreeAgencyRoleExpectation,
+  SeasonFreeAgencyState,
   SeasonHealthState,
   SeasonInfluenceState,
   SeasonInvalidRosterInterruption,
@@ -93,6 +95,9 @@ export interface SeasonRunShellData {
   influence: SeasonInfluenceState | null;
   /** M2.5: run-scoped trade-window state mirror (null until the first window). */
   trade: SeasonTradeState | null;
+  /** M2.6.5: run-scoped free-agency state mirror (windows, declarations,
+   * traces, signings; null when no run is loaded). */
+  freeAgency: SeasonFreeAgencyState | null;
   /** M2.5: run-scoped objective state mirror (catalog + selections). */
   objectives: SeasonObjectiveState | null;
   /** M2.5: uncommitted pending block candidate of an interrupted run. */
@@ -122,19 +127,28 @@ export interface SeasonRunShellData {
     blockIndex: number;
     objectiveId: SeasonObjectiveId;
   }) => Promise<void>;
-  /** M2.5: spends Influence (extra trade offer or risky rehab). */
   spendInfluence: (input: {
     purpose: SeasonSpendInfluencePurpose;
     windowIndex?: number;
     injuryId?: string;
   }) => Promise<void>;
-  /** M2.5: accepts an open trade offer. */
   acceptTradeOffer: (input: { windowIndex: number; offerId: string }) => Promise<void>;
-  /** M2.5: declines an open trade offer. */
   declineTradeOffer: (input: { windowIndex: number; offerId: string }) => Promise<void>;
+  /** M2.6.5: declares interest in one or two ordered free-agency targets. */
+  declareFreeAgentInterest: (input: {
+    windowIndex: number;
+    targets: {
+      playerVersionId: string;
+      roleExpectation: SeasonFreeAgencyRoleExpectation;
+      influence: number;
+    }[];
+  }) => Promise<void>;
+  /** M2.6.5: skips the open free-agency market window. */
+  skipFreeAgentMarket: (input: { windowIndex: number }) => Promise<void>;
+  /** M2.6.5: resolves the open free-agency market window. */
+  resolveFreeAgentMarket: (input: { windowIndex: number }) => Promise<void>;
   /** M2.5: forfeits the interrupted game and advances the pending block. */
   forfeitInterruptedGame: () => Promise<void>;
-  /** M2.5: resumes an interrupted block from its pending candidate. */
   resumeBlock: () => Promise<void>;
   /**
    * M2.6 postseason actions (frozen Cross-track API contract — Track A
@@ -191,6 +205,7 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     health: null,
     influence: null,
     trade: null,
+    freeAgency: null,
     objectives: null,
     pending: null,
     interruption: null,
@@ -210,6 +225,9 @@ export function initialSeasonRunShellData(): SeasonRunShellData {
     spendInfluence: () => Promise.resolve(),
     acceptTradeOffer: () => Promise.resolve(),
     declineTradeOffer: () => Promise.resolve(),
+    declareFreeAgentInterest: () => Promise.resolve(),
+    skipFreeAgentMarket: () => Promise.resolve(),
+    resolveFreeAgentMarket: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
     startPostseason: () => Promise.resolve(),

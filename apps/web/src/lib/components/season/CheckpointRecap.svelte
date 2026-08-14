@@ -424,4 +424,36 @@
       </section>
     {/if}
   {/if}
+
+  {#if recap.freeAgencyEvidence.windowIndex !== null}
+    <section
+      aria-labelledby="recap-free-agency-heading"
+      class="rounded-none bg-surface-1 p-4 sm:rounded-xl"
+      data-recap-free-agency-evidence
+    >
+      <h2
+        id="recap-free-agency-heading"
+        class="font-display text-base font-extrabold uppercase tracking-tight"
+      >
+        Free agency
+      </h2>
+      <p class="mt-1 text-sm">
+        <span class="text-muted-foreground">
+          Window {recap.freeAgencyEvidence.windowIndex + 1} resolved with
+          {recap.freeAgencyEvidence.signings.length} signing
+          {recap.freeAgencyEvidence.signings.length === 1 ? '' : 's'}
+          {#if recap.freeAgencyEvidence.signings.length > 0}
+            —
+            {recap.freeAgencyEvidence.signings
+              .map((signing) => `${franchiseName(signing.franchiseId)} (${signing.band})`)
+              .join(', ')}
+          {/if}
+        </span>
+        <span class="ml-2 font-mono text-[10px] text-muted-foreground">
+          · season: {recap.freeAgencyEvidence.seasonSignings}/3 signings,
+          {recap.freeAgencyEvidence.seasonSpend}/6 Influence
+        </span>
+      </p>
+    </section>
+  {/if}
 </div>

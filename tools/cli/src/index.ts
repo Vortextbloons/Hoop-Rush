@@ -610,6 +610,35 @@ const COMMANDS: Record<string, CommandEntry> = {
         }),
     };
   }),
+  'season free-agency audit': command(async () => {
+    const { seasonFreeAgencyAudit, SEASON_FREE_AGENCY_AUDIT_OPTIONS } =
+      await import('./commands/season-free-agency-audit.ts');
+    return {
+      options: SEASON_FREE_AGENCY_AUDIT_OPTIONS,
+      run: (args) =>
+        seasonFreeAgencyAudit({
+          input: getOptionString(args, 'input') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+        }),
+    };
+  }),
+  'season free-agency calibrate': command(async () => {
+    const { seasonFreeAgencyCalibrate, SEASON_FREE_AGENCY_CALIBRATE_OPTIONS } =
+      await import('./commands/season-free-agency-calibrate.ts');
+    return {
+      options: SEASON_FREE_AGENCY_CALIBRATE_OPTIONS,
+      run: (args) =>
+        seasonFreeAgencyCalibrate({
+          input: getOptionString(args, 'input') ?? null,
+          'seed-from': getOptionString(args, 'seed-from') ?? null,
+          'seed-to': getOptionString(args, 'seed-to') ?? null,
+          workers: getOptionString(args, 'workers') ?? null,
+          out: getOptionString(args, 'out') ?? null,
+          manifest: getOptionString(args, 'manifest') ?? null,
+          validate: getOptionString(args, 'validate') ?? null,
+        }),
+    };
+  }),
   'season run reproduce': command(async () => {
     const { seasonRunReproduce, SEASON_RUN_REPRODUCE_OPTIONS } =
       await import('./commands/season-reproduce.ts');

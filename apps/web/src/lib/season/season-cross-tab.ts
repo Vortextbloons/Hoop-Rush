@@ -39,12 +39,8 @@ function noopChannel(): Pick<BroadcastChannel, 'postMessage' | 'close'> & {
 } {
   return {
     onmessage: null,
-    postMessage(): void {
-      // no channel: nothing to broadcast
-    },
-    close(): void {
-      // no-op
-    },
+    postMessage(): void {},
+    close(): void {},
   };
 }
 

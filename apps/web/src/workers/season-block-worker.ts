@@ -86,9 +86,7 @@ let cancelled = false;
  */
 let accumulatedRunId: string | null = null;
 let accumulatedSummaries: SeasonGameSummary[] = [];
-/** M2.4: the authoritative effects state carried across blocks in this worker. */
 let accumulatedEffects: SeasonEffectsState | null = null;
-/** M2.5: the authoritative health state carried across blocks in this worker. */
 let accumulatedHealth: SeasonHealthState | null = null;
 
 /**
@@ -149,7 +147,7 @@ function postError(
   diagnostics: { seed?: string | null; gameId?: string | null; blockIndex?: number | null } = {},
 ): void {
   const payload: SeasonWorkerErrorMessage = {
-    schemaVersion: 5,
+    schemaVersion: 6,
     type: 'season-block-error',
     requestId,
     code,
@@ -216,7 +214,7 @@ function throwIfCancelled(): void {
   }
 }
 
-/** M2.5: the league-wide empty health state (block 0 / fresh worker). */
+/** League-wide empty health state (block 0 / fresh worker). */
 function initialHealth(): SeasonHealthState {
   return {
     schemaVersion: 1,
@@ -225,16 +223,16 @@ function initialHealth(): SeasonHealthState {
   };
 }
 
-/** M2.5: the league-wide initial Influence state (defensive fallback). */
+/** League-wide initial Influence state (defensive fallback). */
 function initialInfluence(run: SeasonBlockRunContext): SeasonInfluenceState {
   return createInitialSeasonInfluenceState(run.league.teams.map((team) => team.franchiseId));
 }
 
 /**
- * M2.5 SEAM (health workstream): the per-game simulation outcome is either
- * the game facts (summary, retained detail, next effects, next health) or a
- * typed `invalid-roster` interruption marker. Detection is defensive so the
- * M2.4 outcome shape (no interruption field) also parses.
+ * The per-game simulation outcome is either the game facts (summary,
+ * retained detail, next effects, next health) or a typed `invalid-roster`
+ * interruption marker. Detection is defensive so the pre-interruption
+ * outcome shape (no interruption field) also parses.
  */
 function isInterruption(
   outcome: unknown,
@@ -248,7 +246,6 @@ function isInterruption(
 
 async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   const run: SeasonBlockRunContext = request.run;
-  // Cache the run-static context so wire-v5 continuations can skip it.
   contextByRunId.set(request.runId, {
     run: request.run,
     schedule: request.schedule,
@@ -270,9 +267,9 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
     accumulatedSummaries = [...accumulatedSummaries, ...request.newSummaries];
   }
-  // M2.4: effects follows the same reset/delta convention — a full reset
-  // carries the authoritative pre-block state, the delta path keeps the
-  // worker's accumulated state.
+  // Effects follows the same reset/delta convention — a full reset carries
+  // the authoritative pre-block state, the delta path keeps the worker's
+  // accumulated state.
   if (request.priorEffects !== undefined && request.priorEffects !== null) {
     accumulatedEffects = request.priorEffects;
   } else if (accumulatedRunId === null) {
@@ -283,8 +280,8 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     );
     return;
   }
-  // M2.5: health follows the same convention; a fresh worker with no
-  // priorHealth (block 0) falls back to the empty state.
+  // Health follows the same convention; a fresh worker with no priorHealth
+  // (block 0) falls back to the empty state.
   if (request.priorHealth !== undefined && request.priorHealth !== null) {
     accumulatedHealth = request.priorHealth;
   } else if (accumulatedHealth === null) {
@@ -334,8 +331,6 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     rosterPlayerIds: rosterPlayerIdsOf(run),
     priorSummaries: accumulatedSummaries,
     effects: accumulatedEffects ?? initialEffects(expanded),
-    // M2.5: the pre-block health state, the pre-block Influence economy, the
-    // authoritative run-scoped transaction log, and the locked objective.
     health: accumulatedHealth,
     influence: request.priorInfluence ?? initialInfluence(run),
     transactions: request.priorTransactions ?? [],
@@ -353,7 +348,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
   }
 
   const games = seasonBlockGamesOf(request.schedule, request.blockIndex);
-  // M2.5: resume mid-block from an interrupted pending candidate — simulate
+  // Resume mid-block from an interrupted pending candidate — simulate
   // from `startGameId` forward (null = block start). The block-scoped
   // summaries already accumulated (the pending's partial summaries, shipped
   // as the reset/delta) seed the candidate so the assembled block covers
@@ -382,7 +377,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     return;
   }
   const remainingGames = games.slice(startIndex);
-  // M2.4 recovery cadence mirrors the CLI pipeline: one between-round tick per
+  // Recovery cadence mirrors the CLI pipeline: one between-round tick per
   // player, never before the first game. On resume the tick fires only when
   // the first resumed game crosses a round boundary (the pending's partial
   // summaries already carried their ticks), so the cadence matches the
@@ -441,7 +436,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     if (isLast || now - lastProgressAt >= PROGRESS_MIN_INTERVAL_MS) {
       lastProgressAt = now;
       post({
-        schemaVersion: 5,
+        schemaVersion: 6,
         type: 'season-block-progress',
         requestId: request.requestId,
         blockIndex: request.blockIndex,
@@ -481,7 +476,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
       rotationDigest: request.rotationDigest,
     });
     post({
-      schemaVersion: 5,
+      schemaVersion: 6,
       type: 'season-block-complete',
       requestId: request.requestId,
       result: { status: 'interrupted', pending },
@@ -514,14 +509,13 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     ...summaries,
   ];
   post({
-    schemaVersion: 5,
+    schemaVersion: 6,
     type: 'season-block-complete',
     requestId: request.requestId,
     result: { status: 'committed', checkpoint: candidate },
   });
 }
 
-/** M2.4: the league-wide zero effects state from the expanded rosters. */
 function initialEffects(
   expanded: ReadonlyMap<string, import('@hoop-rush/data-contracts').SeasonGamePlayerInput>,
 ): SeasonEffectsState {
@@ -568,7 +562,7 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
           loadProfileCached(request.profileUrl, request.profileHash),
         ]);
         post({
-          schemaVersion: 5,
+          schemaVersion: 6,
           type: 'season-block-warm-ack',
           requestId: request.requestId,
         });

@@ -183,7 +183,7 @@ describe('observed player anchors', () => {
   });
 });
 
-/** Average field-goal percentage of one anchored player across many games. */
+/** A league-average defense team (every rating at the population mean). */
 function averageDefenseTeam(): SimulationTeam {
   const base = buildLegalSimulationTeam();
   const first = base.players[0];

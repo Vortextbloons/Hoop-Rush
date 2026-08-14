@@ -244,7 +244,13 @@ function zeroEffects(run: SeasonRun): SeasonEffectsState {
       }
     }
   }
-  return { schemaVersion: 1, playerStates, pairStates };
+  return {
+    schemaVersion: 2,
+    playerStates,
+    inactivePlayerStates: [],
+    pairStates,
+    archivedPairs: [],
+  };
 }
 
 /** The run at the end of the regular season with the crafted standings. */
@@ -274,6 +280,7 @@ function runAtPostseasonBoundary(): SeasonRun {
       ownership: base.ownership,
       rotations: base.rotations,
       effects,
+      freeAgency: base.freeAgency,
     }),
   };
   return run;

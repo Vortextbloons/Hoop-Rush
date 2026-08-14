@@ -4,6 +4,8 @@
   SeasonCheckpointState,
   SeasonDraftCatalog,
   SeasonEffectsState,
+  SeasonFreeAgencyIndex,
+  SeasonFreeAgencyState,
   SeasonGameSummary,
   SeasonHealthState,
   SeasonHomeCourtProfile,
@@ -12,6 +14,7 @@
   SeasonObjectiveState,
   SeasonPendingBlockCandidate,
   SeasonRetainedGameDetail,
+  SeasonRosterTargets,
   SeasonRotation,
   SeasonRun,
 } from '@hoop-rush/data-contracts';
@@ -273,6 +276,24 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
   }
 
+  /**
+   * M2.6.5: the packaged free-agency index + roster-targets policy the
+   * commit path needs to open market windows on blocks 2/4/6. The engine
+   * throws on window blocks without the index, so a failed load here
+   * surfaces as an internal error rather than silently skipping a market.
+   */
+  async function resolveFreeAgencyAssets(): Promise<{
+    freeAgencyIndex: SeasonFreeAgencyIndex;
+    freeAgencyTargets: SeasonRosterTargets;
+  }> {
+    const module = await import('./season-assets');
+    const [freeAgencyIndex, freeAgencyTargets] = await Promise.all([
+      module.loadSeasonFreeAgencyIndex(),
+      module.loadSeasonFreeAgencyTargets(),
+    ]);
+    return { freeAgencyIndex, freeAgencyTargets };
+  }
+
   function createWorker(): Worker {
     if (worker !== null) return worker;
     // Vite bundles `new Worker(new URL(...))` only when the URL literal is
@@ -408,13 +429,27 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     }
     try {
       const repository = await resolveRepository();
+      // M2.6.5: the worker wire carries no pre-block free-agency state (the
+      // run context slice omits it), so the worker's candidate would fall
+      // back to the empty state and the committed run would LOSE resolved
+      // windows, canonical identities, and signings. The runner owns
+      // canonical acceptance: it replaces the candidate's free-agency
+      // carrier with the authoritative pre-block state from the submitted
+      // run. The checkpoint digest does not cover free agency (frozen
+      // digest scope), so the worker's digest stays valid.
+      const authoritative = { ...checkpoint, freeAgency: state.input.run.freeAgency };
       // M2.5: the engine derives the post-block run state facts (checkpoint
       // state, state chain, and the optional trade-window open) from the
       // submitted run and the accepted candidate. Window blocks (2/4/5)
       // need the packaged catalog for the deterministic offer generation;
       // a failed catalog load surfaces as an internal error rather than
-      // silently skipping a trade window.
+      // silently skipping a trade window. Free-agency window blocks (2/4/6)
+      // need the packaged free-agency index + roster-targets policy.
       const catalog = await resolveCatalog(state.input);
+      const freeAgencyAssets =
+        state.blockIndex === 2 || state.blockIndex === 4 || state.blockIndex === 6
+          ? await resolveFreeAgencyAssets()
+          : null;
       const committed = completeSeasonBlockCommit({
         // The digest must cover the EXACT rotation set the commit stores:
         // the locked rotations (the human team's pending rotation included),
@@ -422,12 +457,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         // merge any rotation edit would make the stored stateDigest fail to
         // recompute over the stored facts on reload.
         run: { ...state.input.run, rotations: state.rotations },
-        candidate: checkpoint,
+        candidate: authoritative,
         commandId: state.commandId,
         rotationDigest: state.rotationDigest,
         humanFranchiseId: state.input.humanFranchiseId,
         catalog: catalog ?? undefined,
         effects: checkpoint.effects,
+        freeAgencyIndex: freeAgencyAssets?.freeAgencyIndex,
+        freeAgencyTargets: freeAgencyAssets?.freeAgencyTargets,
       });
       const window: SeasonWindowOpenResult | null = committed.window;
       // M2.5: a resumed block's pending retained details (games completed
@@ -437,25 +474,29 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         ...(state.resumePending?.retainedDetails ?? []),
         ...checkpoint.retainedDetails,
       ]);
-      const objectives = objectivesWithSuccess(state.input.run, checkpoint);
+      const objectives = objectivesWithSuccess(state.input.run, authoritative);
       await repository.commitSeasonBlock({
-        runId: checkpoint.runId,
-        revision: checkpoint.revision + 1,
+        runId: authoritative.runId,
+        revision: authoritative.revision + 1,
         commandId: state.commandId,
-        rotationDigest: checkpoint.rotationDigest,
-        checkpointDigest: checkpoint.digest,
-        completedRounds: checkpoint.completedRounds,
-        standings: checkpoint.standings,
-        teamAggregates: checkpoint.teamAggregates,
-        playerAggregates: checkpoint.playerAggregates,
-        summaries: checkpoint.gameSummaries,
+        rotationDigest: authoritative.rotationDigest,
+        checkpointDigest: authoritative.digest,
+        completedRounds: authoritative.completedRounds,
+        standings: authoritative.standings,
+        teamAggregates: authoritative.teamAggregates,
+        playerAggregates: authoritative.playerAggregates,
+        summaries: authoritative.gameSummaries,
         retainedDetails,
-        recap: checkpoint.recap,
+        recap: authoritative.recap,
         rotations: state.rotations,
-        effects: window !== null ? window.effects : checkpoint.effects,
-        health: checkpoint.health,
-        transactions: window !== null ? window.transactions : checkpoint.transactions,
-        influence: window !== null ? window.influence : checkpoint.influence,
+        effects: window !== null ? window.effects : authoritative.effects,
+        // M2.6.5: the post-block free-agency state (a window opened by this
+        // block supersedes the carried pre-block state; otherwise the
+        // carried state is stored unchanged).
+        freeAgency: committed.freeAgency,
+        health: authoritative.health,
+        transactions: window !== null ? window.transactions : authoritative.transactions,
+        influence: window !== null ? window.influence : authoritative.influence,
         trade: window !== null ? window.trade : state.input.run.trade,
         objectives,
         checkpointState: committed.checkpointState,
@@ -503,10 +544,11 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       const snapshot = assembleCommittedSnapshot({
         run: state.input.run,
         rotations: state.rotations,
-        checkpoint,
+        checkpoint: authoritative,
         commandId: state.commandId,
         rotationDigest: state.rotationDigest,
         window,
+        freeAgency: committed.freeAgency,
         checkpointState: committed.checkpointState,
         stateRevision: committed.stateRevision,
         stateDigest: committed.stateDigest,
@@ -515,7 +557,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
         priorAcceptedBlocks,
         priorRetainedDetails,
       });
-      emit({ type: 'complete', requestId, checkpoint, snapshot });
+      emit({ type: 'complete', requestId, checkpoint: authoritative, snapshot });
     } catch (error) {
       emit({
         type: 'error',
@@ -690,14 +732,14 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
     // full context again.
     if (newSummaries !== undefined) {
       return seasonWorkerContinueRequestSchema.parse({
-        schemaVersion: 5,
+        schemaVersion: 6,
         type: 'season-block-continue',
         rotations: plainRotations,
         ...plainCommon,
       });
     }
     return seasonWorkerStartRequestSchema.parse({
-      schemaVersion: 5,
+      schemaVersion: 6,
       type: 'season-block-start',
       // The worker simulates with the LOCKED rotation set; the wire carries
       // only the run context the block pipeline reads (the scheduled games,
@@ -926,7 +968,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
       if (worker === null || requestId !== currentRequestId) return;
       worker.postMessage(
         seasonWorkerCancelRequestSchema.parse({
-          schemaVersion: 5,
+          schemaVersion: 6,
           type: 'season-block-cancel',
           requestId,
         }),
@@ -971,7 +1013,7 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
           warmRequestId = requestId;
           target.postMessage(
             seasonWorkerWarmRequestSchema.parse({
-              schemaVersion: 5,
+              schemaVersion: 6,
               type: 'season-block-warm',
               requestId,
               catalogUrl: artifacts.catalogUrl,
@@ -1023,6 +1065,12 @@ export function assembleCommittedSnapshot(input: {
   commandId: string;
   rotationDigest: string;
   window: SeasonWindowOpenResult | null;
+  /**
+   * M2.6.5: the authoritative post-block free-agency state the commit
+   * stored (the committed candidate's carried state, plus any market window
+   * this block opened).
+   */
+  freeAgency: SeasonFreeAgencyState;
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
@@ -1050,6 +1098,10 @@ export function assembleCommittedSnapshot(input: {
     influence: window !== null ? window.influence : checkpoint.influence,
     transactions: window !== null ? window.transactions : checkpoint.transactions,
     trade: window !== null ? window.trade : run.trade,
+    // M2.6.5: the committed free-agency state (the block's carried state,
+    // plus any market window it opened) rides the run snapshot so the
+    // in-memory view matches the reloaded audit exactly.
+    freeAgency: input.freeAgency,
     objectives,
     checkpointState: input.checkpointState,
     stateRevision: input.stateRevision,

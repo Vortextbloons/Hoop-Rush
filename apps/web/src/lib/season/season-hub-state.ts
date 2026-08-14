@@ -6,6 +6,8 @@ import {
   type SeasonActiveRunIndex,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
+  type SeasonFreeAgencyIndex,
+  type SeasonFreeAgencyRoleExpectation,
   type SeasonGameSummary,
   type SeasonInvalidRosterInterruption,
   type SeasonObjectiveId,
@@ -13,6 +15,7 @@ import {
   type SeasonPostseasonRotationPayload,
   type SeasonPostseasonSummary,
   type SeasonRetainedGameDetail,
+  type SeasonRosterTargets,
   type SeasonRun,
   type SeasonRunCommand,
   type SeasonRunCommandRejection,
@@ -219,6 +222,14 @@ export class SeasonHubState {
   commandError: SeasonRunCommandError | null = null;
   /** Packaged draft catalog for trade commands; set after assets load. */
   catalog: SeasonDraftCatalog | null = null;
+  /**
+   * M2.6.5: the packaged free-agency eligibility index (free-agency-index-v1)
+   * the resolve command's engine context needs; loaded lazily on the first
+   * market resolution and memoized per manifest.
+   */
+  freeAgencyIndex: SeasonFreeAgencyIndex | null = null;
+  /** M2.6.5: the frozen roster-targets policy (AI free-agency ceilings). */
+  freeAgencyTargets: SeasonRosterTargets | null = null;
 
   constructor(
     repo: SeasonRunRepository & SeasonPostseasonRepository,
@@ -298,6 +309,27 @@ export class SeasonHubState {
       });
     }
     return this.profilePromise;
+  }
+
+  /**
+   * M2.6.5: memoized packaged free-agency index (resolve commands). Loaded
+   * once per manifest; the ~4.1 MB JSON parse is a one-time main-thread cost.
+   */
+  private async ensureFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
+    if (this.freeAgencyIndex !== null) return this.freeAgencyIndex;
+    const module = await import('./season-assets');
+    const index = await module.loadSeasonFreeAgencyIndex();
+    this.freeAgencyIndex = index;
+    return index;
+  }
+
+  /** M2.6.5: memoized frozen roster-targets policy (AI free-agency ceilings). */
+  private async ensureFreeAgencyTargets(): Promise<SeasonRosterTargets> {
+    if (this.freeAgencyTargets !== null) return this.freeAgencyTargets;
+    const module = await import('./season-assets');
+    const targets = await module.loadSeasonFreeAgencyTargets();
+    this.freeAgencyTargets = targets;
+    return targets;
   }
 
   /**
@@ -717,6 +749,107 @@ export class SeasonHubState {
     await this.dispatch(command);
   }
 
+  // -------------------------------------------------------------------------
+  // M2.6.5 free-agency commands (frozen cross-track API contract).
+  // -------------------------------------------------------------------------
+
+  /**
+   * M2.6.5: declares the human franchise's interest in one or two ordered
+   * targets of the open market window. Declarations are final once accepted;
+   * the winning commitment is debited at resolution, losing targets cost
+   * zero.
+   */
+  async declareFreeAgentInterest(input: {
+    windowIndex: number;
+    targets: {
+      playerVersionId: string;
+      roleExpectation: SeasonFreeAgencyRoleExpectation;
+      influence: number;
+    }[];
+  }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'declare-free-agent-interest',
+      commandId: newSeasonId('fad'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      franchiseId: this.requiredHumanFranchiseId(),
+      windowIndex: input.windowIndex,
+      targets: input.targets,
+    };
+    await this.dispatch(command);
+  }
+
+  /** M2.6.5: skips the open market window (no targets, no cost, no penalty). */
+  async skipFreeAgentMarket(input: { windowIndex: number }): Promise<void> {
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'skip-free-agent-market',
+      commandId: newSeasonId('fas'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      franchiseId: this.requiredHumanFranchiseId(),
+      windowIndex: input.windowIndex,
+    };
+    await this.dispatch(command);
+  }
+
+  /**
+   * M2.6.5: resolves the open market window (first priorities by candidate,
+   * then second priorities; winners leave every remaining target list).
+   * Accepted only after the human franchise declared or skipped. The engine
+   * context carries the packaged free-agency index + roster-targets policy
+   * (the same assets the block commit uses to open windows).
+   */
+  async resolveFreeAgentMarket(input: { windowIndex: number }): Promise<void> {
+    const snapshot = this.snapshot;
+    this.commandError = null;
+    if (snapshot === null) {
+      this.commandError = {
+        command: 'resolve-free-agent-market',
+        rejection: null,
+        message: 'The active run is not loaded yet.',
+      };
+      this.emit();
+      return;
+    }
+    try {
+      await Promise.all([
+        this.ensureFreeAgencyIndex(),
+        this.ensureFreeAgencyTargets(),
+        this.catalog === null
+          ? import('./season-assets').then((module) => module.loadSeasonDraftCatalog())
+          : Promise.resolve(null),
+      ]).then(([index, targets, catalog]) => {
+        this.freeAgencyIndex = index;
+        this.freeAgencyTargets = targets;
+        if (catalog !== null) this.catalog = catalog;
+      });
+    } catch (error) {
+      this.commandError = {
+        command: 'resolve-free-agent-market',
+        rejection: null,
+        message: `The free-agency market assets are unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+      this.emit();
+      return;
+    }
+    const command: SeasonRunCommand = {
+      schemaVersion: SEASON_RUN_SCHEMA_VERSION,
+      command: 'resolve-free-agent-market',
+      commandId: newSeasonId('far'),
+      runId: this.requiredRunId(),
+      expectedStateRevision: this.requiredStateRevision(),
+      expectedStateDigest: this.requiredStateDigest(),
+      windowIndex: input.windowIndex,
+    };
+    await this.dispatch(command);
+  }
+
   cancel(): void {
     const requestId = this.block.requestId;
     if (this.block.phase !== 'running' || requestId === null) return;
@@ -1127,6 +1260,11 @@ export class SeasonHubState {
         humanFranchiseId: this.humanFranchiseId(),
         effects: snapshot.effects,
         catalog: this.catalog ?? undefined,
+        // M2.6.5: the packaged free-agency index + roster-targets policy
+        // (resolve-free-agent-market requires both; the engine throws
+        // without them, so the hub loads them before dispatching).
+        freeAgencyIndex: this.freeAgencyIndex ?? undefined,
+        freeAgencyTargets: this.freeAgencyTargets ?? undefined,
       } satisfies SeasonRunCommandContext);
       const envelope = output.result;
       if (envelope.result.status === 'rejected') {
@@ -1375,6 +1513,55 @@ export function describeCommandRejection(
       return `Series ${rejection.seriesId} cannot advance: ${rejection.reason}.`;
     case 'integrity-failure':
       return `The postseason integrity check failed: ${rejection.reason}.`;
+    // M2.6.5 free-agency rejections (seasonRunCommandRejectionSchema members).
+    case 'free-agency-unresolved':
+      return `The free-agency market window ${String(
+        rejection.windowIndex + 1,
+      )} is still open — resolve it on the free-agency screen (/season/run/free-agency) before the next block can submit.`;
+    case 'free-agency-window-not-open':
+      return `The free-agency market window ${String(
+        rejection.windowIndex + 1,
+      )} is not open right now.`;
+    case 'free-agency-already-resolved':
+      return `The free-agency market window ${String(
+        rejection.windowIndex + 1,
+      )} is already resolved.`;
+    case 'free-agency-already-declared':
+      return `The franchise already declared or skipped the free-agency market window ${String(
+        rejection.windowIndex + 1,
+      )}.`;
+    case 'free-agency-target-ineligible':
+      return `The declared target is not a candidate of this free-agency window.`;
+    case 'free-agency-duplicate-identity':
+      return `The declared target's identity is already active in the league.`;
+    case 'free-agency-invalid-priority':
+      return `The two targets must be distinct — ${rejection.playerVersionId} appears twice.`;
+    case 'free-agency-unsupported-role':
+      return `The role expectation is not supported for that free-agency candidate.`;
+    case 'free-agency-invalid-influence':
+      return `The committed Influence must be the candidate's minimum through 3 (minimum ${String(
+        rejection.minimum,
+      )}).`;
+    case 'free-agency-roster-cap':
+      return `The franchise roster (${String(
+        rejection.rosterSize,
+      )} players) is already at the 15-player cap.`;
+    case 'free-agency-season-signing-cap':
+      return `The franchise already signed ${String(
+        rejection.signingCount,
+      )} free agents this season (cap 3).`;
+    case 'free-agency-season-influence-cap':
+      return `The franchise already spent ${String(
+        rejection.seasonSpend,
+      )} Influence on free agency this season (cap 6).`;
+    case 'free-agency-insufficient-balance':
+      return `Influence balance ${String(rejection.balance)} cannot cover the ${String(
+        rejection.required,
+      )}-point free-agency commitment.`;
+    case 'free-agency-pending-declaration':
+      return `The market cannot resolve until every human-controlled franchise declares or skips.`;
+    case 'free-agency-ownership-conflict':
+      return `The signing would create an ownership conflict: ${rejection.reason}.`;
     default:
       return `The ${command} command was rejected.`;
   }

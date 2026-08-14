@@ -49,9 +49,11 @@ function effectsState(fatigue: number, shared: number): SeasonEffectsState {
     }
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     playerStates,
+    inactivePlayerStates: [],
     pairStates: pairStates.slice(0, 1350),
+    archivedPairs: [],
   };
 }
 
@@ -82,6 +84,7 @@ function minimalShell(): SeasonRunShellData {
     health: null,
     influence: null,
     trade: null,
+    freeAgency: null,
     objectives: null,
     pending: null,
     interruption: null,
@@ -101,6 +104,9 @@ function minimalShell(): SeasonRunShellData {
     spendInfluence: () => Promise.resolve(),
     acceptTradeOffer: () => Promise.resolve(),
     declineTradeOffer: () => Promise.resolve(),
+    declareFreeAgentInterest: () => Promise.resolve(),
+    skipFreeAgentMarket: () => Promise.resolve(),
+    resolveFreeAgentMarket: () => Promise.resolve(),
     forfeitInterruptedGame: () => Promise.resolve(),
     resumeBlock: () => Promise.resolve(),
     startPostseason: () => Promise.resolve(),
@@ -265,7 +271,7 @@ describe('CheckpointRecap (M2.4)', () => {
   it('renders the mechanism-evidence section with recorded figures', () => {
     const recap: SeasonBlockRecap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v3',
+      recapVersion: 'season-recap-v4',
       runId: 'run-1',
       blockIndex: 0,
       completedRounds: 10,
@@ -286,6 +292,13 @@ describe('CheckpointRecap (M2.4)', () => {
       },
       objectiveEvidence: null,
       tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+      freeAgencyEvidence: {
+        windowIndex: null,
+        signings: [],
+        influenceDelta: 0,
+        seasonSignings: 0,
+        seasonSpend: 0,
+      },
       influenceBalance: { humanBalance: 2 },
     };
     const { container } = render(CheckpointRecap, {
@@ -331,7 +344,7 @@ describe('CheckpointRecap (M2.4)', () => {
       props: {
         recap: {
           schemaVersion: 1,
-          recapVersion: 'season-recap-v3',
+          recapVersion: 'season-recap-v4',
           runId: 'run-1',
           blockIndex: 0,
           completedRounds: 10,
@@ -352,6 +365,13 @@ describe('CheckpointRecap (M2.4)', () => {
           },
           objectiveEvidence: null,
           tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+          freeAgencyEvidence: {
+            windowIndex: null,
+            signings: [],
+            influenceDelta: 0,
+            seasonSignings: 0,
+            seasonSpend: 0,
+          },
           influenceBalance: { humanBalance: 2 },
         },
         humanRecord: null,

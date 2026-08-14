@@ -13,9 +13,11 @@ import {
   createEngineContext,
   expandSeasonRunRosters,
   legalFiveAfterAnyRemoval,
+  ratioMutuallyWithinBand,
   validateSeasonRoster,
   validateSeasonRotation,
   type SeasonRosterMemberInput,
+  type SeasonTradePackageKind,
 } from '@hoop-rush/engine';
 import { makeReport, type CliReport } from '../report.ts';
 import { seasonTradeCalibrateReportSchema } from '../report-schemas.ts';
@@ -35,17 +37,20 @@ import { runSeasonM25, type SeasonM25SeasonFacts } from './season-m25-core.ts';
 import { commitTargetsArtifact, validateTargetsArtifact } from '../artifact.ts';
 
 /**
- * `season trade calibrate` (spec/2.0 M2.5, contract §17): freezes
- * `trade-targets-v1` from seasons that open trade windows at blocks 2/4/5
- * through the engine economy. The human franchise never acts, so every
- * accepted offer is AI activity; the season gate freezes the mean accepted
- * AI trades per season in [8, 15] (LEAD DECISION, contract §13). Other
- * frozen gates: zero illegal / duplicate-ownership trades, accepted offers
- * inside the frozen value bands (85-115 1-for-1, 80-120 2-for-2),
- * deterministic offer generation, and chemistry invariants (45 canonical
- * pairs per roster, 1,350 league-wide, zero-state chemistry on traded
- * pairs). Cohort: 8 calibration + 4 held-out seasons (seasons are the
- * expensive unit); the runner is in-process (a worker variant is deferred).
+ * `season trade calibrate` (spec/2.0 M2.5, contract §17, M2.6.5
+ * season-trade-v2): freezes `trade-targets-v2` from seasons that open trade
+ * windows at blocks 2/4/5 through the engine economy. The human franchise
+ * never acts, so every accepted offer is AI activity; the season gate
+ * freezes the mean accepted AI trades per season in [8, 15] (LEAD DECISION,
+ * contract §13). Other frozen gates: zero illegal / duplicate-ownership
+ * trades, accepted offers inside the frozen value bands (85-115 for 1-for-1,
+ * 80-120 for every multi-player or uneven package), deterministic offer
+ * generation, the package-kind mix (the engine accepts even packages
+ * 1-1/2-2; uneven 1-2/2-1 packages measured but not gated), and chemistry
+ * invariants (45 canonical pairs per rotation, 1,350 league-wide, zero-state
+ * chemistry on traded pairs). Cohort: 8 calibration + 4 held-out seasons
+ * (seasons are the expensive unit); the runner is in-process (a worker
+ * variant is deferred).
  */
 
 export const SEASON_TRADE_CALIBRATE_OPTIONS: Record<string, boolean> = {
@@ -68,13 +73,31 @@ export const SEASON_TRADE_VALIDATION_SEED_COUNT = 4;
 export const SEASON_TRADE_MIN_AI_TRADES_PER_SEASON = 8;
 export const SEASON_TRADE_MAX_AI_TRADES_PER_SEASON = 15;
 
-/** Frozen value bands: ratio basis points per offer size. */
+/** Frozen value bands: ratio basis points per package kind (v2). */
 export const SEASON_TRADE_VALUE_BANDS = {
-  '1-for-1': { min: 850, max: 1150 },
-  '2-for-2': { min: 800, max: 1200 },
+  '1-1': { min: 850, max: 1150 },
+  multi: { min: 800, max: 1200 },
 } as const;
 
-/** Chemistry invariants (canonical pairs per roster and league-wide). */
+/** The frozen value band of one package kind (85-115 only for 1-for-1). */
+export function seasonTradeValueBandOf(kind: SeasonTradePackageKind): { min: number; max: number } {
+  return kind === '1-1' ? SEASON_TRADE_VALUE_BANDS['1-1'] : SEASON_TRADE_VALUE_BANDS.multi;
+}
+
+/** The package kind of an offer (from its recorded sizes). */
+export function packageKindOfOffer(offer: {
+  outgoingPlayerVersionIds: readonly unknown[];
+  incomingPlayerVersionIds: readonly unknown[];
+}): SeasonTradePackageKind {
+  const outgoing = offer.outgoingPlayerVersionIds.length;
+  const incoming = offer.incomingPlayerVersionIds.length;
+  if (outgoing === 1 && incoming === 1) return '1-1';
+  if (outgoing === 2 && incoming === 2) return '2-2';
+  if (outgoing === 1 && incoming === 2) return '1-2';
+  return '2-1';
+}
+
+/** Chemistry invariants (canonical pairs per rotation and league-wide). */
 export const SEASON_TRADE_PAIRS_PER_ROSTER = 45;
 export const SEASON_TRADE_PAIRS_LEAGUE = 1350;
 
@@ -92,8 +115,8 @@ export const seasonTradeTargetsSchema = z.object({
     }),
     windows: z.tuple([z.literal(2), z.literal(4), z.literal(5)]),
     valueBands: z.object({
-      '1-for-1': z.tuple([z.literal(850), z.literal(1150)]),
-      '2-for-2': z.tuple([z.literal(800), z.literal(1200)]),
+      '1-1': z.tuple([z.literal(850), z.literal(1150)]),
+      multi: z.tuple([z.literal(800), z.literal(1200)]),
     }),
     chemistryPairsPerRoster: z.literal(45),
     chemistryPairsTotal: z.literal(1350),
@@ -113,6 +136,12 @@ export const seasonTradeTargetsSchema = z.object({
       aiTradesMin: z.number().int().nonnegative(),
       aiTradesMax: z.number().int().nonnegative(),
       acceptedTrades: z.number().int().nonnegative(),
+      packageMix: z.object({
+        '1-1': z.number().int().nonnegative(),
+        '2-2': z.number().int().nonnegative(),
+        '1-2': z.number().int().nonnegative(),
+        '2-1': z.number().int().nonnegative(),
+      }),
       illegalRosterFailures: z.number().int().nonnegative(),
       duplicateOwnershipFailures: z.number().int().nonnegative(),
       valueBandFailures: z.number().int().nonnegative(),
@@ -127,6 +156,12 @@ export const seasonTradeTargetsSchema = z.object({
       illegalRosterFailures: z.number().int().nonnegative(),
       duplicateOwnershipFailures: z.number().int().nonnegative(),
       valueBandFailures: z.number().int().nonnegative(),
+      packageMix: z.object({
+        '1-1': z.number().int().nonnegative(),
+        '2-2': z.number().int().nonnegative(),
+        '1-2': z.number().int().nonnegative(),
+        '2-1': z.number().int().nonnegative(),
+      }),
     }),
   }),
   gates: z.object({
@@ -136,6 +171,7 @@ export const seasonTradeTargetsSchema = z.object({
     valueBands: z.boolean(),
     deterministicOffers: z.boolean(),
     chemistryInvariants: z.boolean(),
+    packageMix: z.boolean(),
     heldOut: z.boolean(),
   }),
   engineVersion: z.string().min(1).max(64),
@@ -167,7 +203,10 @@ export function aiTradesOf(season: SeasonM25SeasonFacts): number {
 
 /**
  * Value-band failures among the accepted offers of one season: only the
- * window each result opened is counted (see `aiTradesOf`).
+ * window each result opened is counted (see `aiTradesOf`). The expected
+ * band comes from the offer's package kind (85-115 for 1-for-1, 80-120 for
+ * every multi-player or uneven package); the ratio must also be mutually
+ * within the band (the engine acceptance rule).
  */
 export function valueBandFailuresOf(season: SeasonM25SeasonFacts): number {
   let failures = 0;
@@ -181,14 +220,16 @@ export function valueBandFailuresOf(season: SeasonM25SeasonFacts): number {
         failures += 1;
         continue;
       }
-      const expected =
-        offer.outgoingPlayerVersionIds.length === 1
-          ? SEASON_TRADE_VALUE_BANDS['1-for-1']
-          : SEASON_TRADE_VALUE_BANDS['2-for-2'];
+      const kind = packageKindOfOffer(offer);
+      const expected = seasonTradeValueBandOf(kind);
       if (
         offer.valueBand.ratioBasisPoints < expected.min ||
         offer.valueBand.ratioBasisPoints > expected.max
       ) {
+        failures += 1;
+        continue;
+      }
+      if (!ratioMutuallyWithinBand(offer.valueBand.ratioBasisPoints, kind)) {
         failures += 1;
       }
     }
@@ -196,15 +237,29 @@ export function valueBandFailuresOf(season: SeasonM25SeasonFacts): number {
   return failures;
 }
 
+/** Accepted offers by package kind of one season (recorded facts). */
+export function packageMixOf(season: SeasonM25SeasonFacts): Record<SeasonTradePackageKind, number> {
+  const mix: Record<SeasonTradePackageKind, number> = { '1-1': 0, '2-2': 0, '1-2': 0, '2-1': 0 };
+  for (const window of season.windows) {
+    if (window.result === null) continue;
+    const opened = window.result.trade.windows.at(-1);
+    if (opened === undefined) continue;
+    for (const offer of opened.offers) {
+      if (offer.status !== 'accepted') continue;
+      mix[packageKindOfOffer(offer)] += 1;
+    }
+  }
+  return mix;
+}
+
 /**
- * Post-season roster legality and unique-ownership audit. `duplicateOwnership`
- * counts a season where the league does not own exactly 300 distinct
- * versions across ten-player rosters (the expansion throws on duplicates,
- * unknown versions, or a wrong total); `illegal` counts rosters that fail
- * the ten-player roster rules (legal five after any removal + roster
- * legality) or whose rotation fails rotation legality (trades repair
- * rotations deterministically, so a post-season failure is an invariant
- * breach).
+ * Post-season roster legality and unique-ownership audit (season-roster-v2,
+ * M2.6.5): `illegal` counts rosters that fail the 10-15 roster rules
+ * (roster legality, distinct versions, unique identities, ownership rows)
+ * or whose ten-player rotation subset fails legality (members on the
+ * roster, legal five after any removal); `duplicateOwnership` counts a
+ * season where the league does not own exactly the roster versions (the
+ * expansion throws on duplicates, unknown versions, or a wrong total).
  */
 export function rosterAuditFailuresOf(season: SeasonM25SeasonFacts): {
   illegal: number;
@@ -224,32 +279,54 @@ export function rosterAuditFailuresOf(season: SeasonM25SeasonFacts): {
 
   let illegal = 0;
   const membersByFranchise = new Map<string, SeasonRosterMemberInput[]>();
+  const versionIds = new Set<string>();
   for (const roster of run.rosters) {
     const members: SeasonRosterMemberInput[] = roster.players.map((player) => ({
       playerVersionId: player.playerVersionId,
       playable: [...(playableByVersion.get(player.playerVersionId) ?? [])],
     }));
-    if (members.length !== 10) {
+    if (members.length < 10 || members.length > 15) {
       illegal += 1;
       continue;
     }
-    if (!legalFiveAfterAnyRemoval(members) || validateSeasonRoster(members).length > 0) {
-      illegal += 1;
+    if (validateSeasonRoster(members).length > 0) illegal += 1;
+    for (const player of roster.players) {
+      if (versionIds.has(player.playerVersionId)) illegal += 1;
+      versionIds.add(player.playerVersionId);
+      if (!run.ownership.some((row) => row.playerVersionId === player.playerVersionId)) {
+        illegal += 1;
+      }
     }
     membersByFranchise.set(roster.franchiseId, members);
   }
   for (const rotation of run.rotations) {
-    const members = membersByFranchise.get(rotation.franchiseId);
-    if (members === undefined) {
+    const rosterMembers = membersByFranchise.get(rotation.franchiseId);
+    if (rosterMembers === undefined) {
       illegal += 1;
       continue;
     }
+    const rosterIds = new Set(rosterMembers.map((member) => member.playerVersionId));
+    const rotationMembers = [...rotation.starters, ...rotation.benchOrder].map(
+      (playerVersionId) => {
+        if (!rosterIds.has(playerVersionId)) illegal += 1;
+        return {
+          playerVersionId,
+          playable: [...(playableByVersion.get(playerVersionId) ?? [])],
+        };
+      },
+    );
+    if (rotationMembers.length !== 10) illegal += 1;
+    if (!legalFiveAfterAnyRemoval(rotationMembers)) illegal += 1;
     const memberPlayable = new Map(
-      members.map((member) => [member.playerVersionId, member.playable]),
+      rotationMembers.map((member) => [member.playerVersionId, member.playable]),
     );
     if (validateSeasonRotation(rotation, memberPlayable).length > 0) illegal += 1;
   }
-  return { illegal, duplicateOwnership: 0 };
+  const duplicateOwnership = run.ownership.length < 300 || run.ownership.length > 450 ? 1 : 0;
+  if (versionIds.size !== run.ownership.length) {
+    return { illegal, duplicateOwnership: duplicateOwnership + 1 };
+  }
+  return { illegal, duplicateOwnership };
 }
 
 function initialRostersOf(run: SeasonRun): string[][] {
@@ -257,9 +334,10 @@ function initialRostersOf(run: SeasonRun): string[][] {
 }
 
 /**
- * Chemistry invariants of one season: exactly 45 canonical pairs per final
- * roster (1,350 league-wide) and zero-state chemistry on every pair created
- * by a trade (a pair that was not on the same roster at season start).
+ * Chemistry invariants of one season (season-chemistry-v2, M2.6.5): exactly
+ * 45 canonical pairs per final ten-player rotation (1,350 league-wide) and
+ * zero-state chemistry on every pair created by a trade (a pair that was
+ * not on the same roster at season start).
  */
 export function chemistryFailuresOf(season: SeasonM25SeasonFacts): {
   pairs: number;
@@ -271,14 +349,14 @@ export function chemistryFailuresOf(season: SeasonM25SeasonFacts): {
   for (const roster of initialRostersOf(run)) {
     for (const [a, b] of canonicalRosterPairs(roster)) initialPairs.add(`${a}\u0000${b}`);
   }
-  const finalRosters = run.rosters.map((roster) =>
-    roster.players.map((player) => player.playerVersionId),
+  const finalRotationPairs: string[][] = run.rotations.map((rotation) =>
+    [...rotation.starters, ...rotation.benchOrder].sort(),
   );
   const finalPairs = new Set<string>();
   let pairs = 0;
   let pairFailures = 0;
-  for (const roster of finalRosters) {
-    const canonical = canonicalRosterPairs(roster);
+  for (const rotation of finalRotationPairs) {
+    const canonical = canonicalRosterPairs(rotation);
     if (canonical.length !== SEASON_TRADE_PAIRS_PER_ROSTER) pairFailures += 1;
     pairs += canonical.length;
     for (const [a, b] of canonical) finalPairs.add(`${a}\u0000${b}`);
@@ -311,6 +389,7 @@ export interface SeasonTradeCohortFacts {
   aiTradesMin: number;
   aiTradesMax: number;
   acceptedTrades: number;
+  packageMix: Record<SeasonTradePackageKind, number>;
   illegalRosterFailures: number;
   duplicateOwnershipFailures: number;
   valueBandFailures: number;
@@ -335,6 +414,17 @@ export function evaluateTradeGates(args: {
     0,
   );
   const valueBandFailures = c.reduce((sum, season) => sum + valueBandFailuresOf(season), 0);
+  const packageMix = c.reduce<Record<SeasonTradePackageKind, number>>(
+    (mix, season) => {
+      const seasonMix = packageMixOf(season);
+      mix['1-1'] += seasonMix['1-1'];
+      mix['2-2'] += seasonMix['2-2'];
+      mix['1-2'] += seasonMix['1-2'];
+      mix['2-1'] += seasonMix['2-1'];
+      return mix;
+    },
+    { '1-1': 0, '2-2': 0, '1-2': 0, '2-1': 0 },
+  );
   const chemistry = c.map(chemistryFailuresOf);
   const chemistryPairs = chemistry.reduce((sum, entry) => sum + entry.pairs, 0);
   const chemistryPairFailures = chemistry.reduce((sum, entry) => sum + entry.pairFailures, 0);
@@ -386,6 +476,14 @@ export function evaluateTradeGates(args: {
       SEASON_TRADE_MIN_SEASONS,
     ),
     m25RangeGate(
+      'packageMix',
+      Math.min(packageMix['1-1'], packageMix['2-2']),
+      1,
+      1_000_000,
+      trades.reduce((sum, value) => sum + value, 0),
+      30,
+    ),
+    m25RangeGate(
       'heldOut.aiTradesPerSeason',
       heldOutMean,
       SEASON_TRADE_MIN_AI_TRADES_PER_SEASON,
@@ -401,6 +499,7 @@ export function evaluateTradeGates(args: {
       aiTradesMin: Math.min(...trades, 0),
       aiTradesMax: Math.max(...trades, 0),
       acceptedTrades: trades.reduce((sum, value) => sum + value, 0),
+      packageMix,
       illegalRosterFailures: illegal,
       duplicateOwnershipFailures: duplicates,
       valueBandFailures,
@@ -483,6 +582,7 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
       gateValue(metrics, 'chemistryPairs') &&
       gateValue(metrics, 'chemistryPairFailures') &&
       gateValue(metrics, 'zeroStateNewPairFailures'),
+    packageMix: gateValue(metrics, 'packageMix'),
     heldOut: gateValue(metrics, 'heldOut.aiTradesPerSeason'),
   };
 
@@ -500,14 +600,8 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
         },
         windows: [2, 4, 5],
         valueBands: {
-          '1-for-1': [
-            SEASON_TRADE_VALUE_BANDS['1-for-1'].min,
-            SEASON_TRADE_VALUE_BANDS['1-for-1'].max,
-          ],
-          '2-for-2': [
-            SEASON_TRADE_VALUE_BANDS['2-for-2'].min,
-            SEASON_TRADE_VALUE_BANDS['2-for-2'].max,
-          ],
+          '1-1': [SEASON_TRADE_VALUE_BANDS['1-1'].min, SEASON_TRADE_VALUE_BANDS['1-1'].max],
+          multi: [SEASON_TRADE_VALUE_BANDS.multi.min, SEASON_TRADE_VALUE_BANDS.multi.max],
         },
         chemistryPairsPerRoster: SEASON_TRADE_PAIRS_PER_ROSTER,
         chemistryPairsTotal: SEASON_TRADE_PAIRS_LEAGUE,
@@ -521,6 +615,7 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
           aiTradesMin: measured.aiTradesMin,
           aiTradesMax: measured.aiTradesMax,
           acceptedTrades: measured.acceptedTrades,
+          packageMix: { ...measured.packageMix },
           illegalRosterFailures: measured.illegalRosterFailures,
           duplicateOwnershipFailures: measured.duplicateOwnershipFailures,
           valueBandFailures: measured.valueBandFailures,
@@ -541,6 +636,17 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
             0,
           ),
           valueBandFailures: heldOut.reduce((sum, season) => sum + valueBandFailuresOf(season), 0),
+          packageMix: heldOut.reduce<Record<SeasonTradePackageKind, number>>(
+            (mix, season) => {
+              const seasonMix = packageMixOf(season);
+              mix['1-1'] += seasonMix['1-1'];
+              mix['2-2'] += seasonMix['2-2'];
+              mix['1-2'] += seasonMix['1-2'];
+              mix['2-1'] += seasonMix['2-1'];
+              return mix;
+            },
+            { '1-1': 0, '2-2': 0, '1-2': 0, '2-1': 0 },
+          ),
         },
       },
       gates,
@@ -574,6 +680,7 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
     aiTradesMin: measured.aiTradesMin,
     aiTradesMax: measured.aiTradesMax,
     acceptedTrades: measured.acceptedTrades,
+    packageMix: { ...measured.packageMix },
     illegalRosterFailures: measured.illegalRosterFailures,
     duplicateOwnershipFailures: measured.duplicateOwnershipFailures,
     valueBandFailures: measured.valueBandFailures,
@@ -588,6 +695,7 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
       valueBands: gates.valueBands,
       deterministicOffers: gates.deterministicOffers,
       chemistryInvariants: gates.chemistryInvariants,
+      packageMix: gates.packageMix,
       heldOut: gates.heldOut,
     },
     metrics,
@@ -600,6 +708,7 @@ export function seasonTradeCalibrate(args: SeasonTradeArgs): CliReport {
   const details = [
     `${String(calibration.length)} calibration + ${String(heldOut.length)} held-out seasons in ${String(Date.now() - started)}ms (${String(workers)} workers)`,
     `AI trades per season mean ${measured.aiTradesMean.toFixed(2)} (min ${String(measured.aiTradesMin)} · max ${String(measured.aiTradesMax)}; gate [${String(SEASON_TRADE_MIN_AI_TRADES_PER_SEASON)}, ${String(SEASON_TRADE_MAX_AI_TRADES_PER_SEASON)}])`,
+    `accepted package mix 1-1 ${String(measured.packageMix['1-1'])} · 2-2 ${String(measured.packageMix['2-2'])} · 1-2 ${String(measured.packageMix['1-2'])} · 2-1 ${String(measured.packageMix['2-1'])}`,
     `illegal rosters ${String(measured.illegalRosterFailures)} · duplicate ownership ${String(measured.duplicateOwnershipFailures)} · value-band failures ${String(measured.valueBandFailures)}`,
     `chemistry pairs ${String(measured.chemistryPairs)} (${String(SEASON_TRADE_PAIRS_LEAGUE)} per season) · pair failures ${String(measured.chemistryPairFailures)} · zero-state new-pair failures ${String(measured.zeroStateNewPairFailures)}`,
     `deterministic offer generation ${String(measured.deterministicOffers)}`,

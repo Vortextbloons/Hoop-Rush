@@ -46,7 +46,7 @@ function shellWithRun(run: SeasonRun): SeasonRunShell {
     retainedDetails: [],
     acceptedBlocks: [],
     effects: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       playerStates: run.rosters
         .flatMap((roster) => roster.players)
         .map((entry) => ({
@@ -55,7 +55,9 @@ function shellWithRun(run: SeasonRun): SeasonRunShell {
           recentLoadBasisPoints: 0,
           lastCompletedRound: 0,
         })),
+      inactivePlayerStates: [],
       pairStates: [],
+      archivedPairs: [],
     },
   };
   shell.run = run;

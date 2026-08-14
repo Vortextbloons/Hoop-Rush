@@ -3,6 +3,7 @@ import {
   type SeasonAwards,
   type SeasonCheckpointState,
   type SeasonEffectsState,
+  type SeasonFreeAgencyState,
   type SeasonHealthState,
   type SeasonInfluenceState,
   type SeasonObjectiveState,
@@ -18,8 +19,8 @@ import {
 import { canonicalJson } from './checkpoint.ts';
 
 /**
- * M2.5/M2.6 canonical run-state digest (spec/2.0/07, LEAD DECISION in the
- * M2.5 contract §3 and §20.2). The mutable Season Run state — the facts
+ * M2.5/M2.6/M2.6.5 canonical run-state digest (spec/2.0/07, LEAD DECISION in
+ * the M2.5 contract §3 and §20.2). The mutable Season Run state — the facts
  * every block commit and every typed run command advances — hashes to one
  * 32-hex digest that the state chain carries on the run snapshot
  * (`stateRevision` + `stateDigest`). The digest is a pure function of the
@@ -27,12 +28,13 @@ import { canonicalJson } from './checkpoint.ts';
  * produces the same digest for the same facts.
  *
  * Scope (frozen): `{ stateRevision, stage, postseason, awards, completion,
- * checkpointState, health, influence, transactions, trade, objectives,
- * rosters, ownership, rotations, effects }`. M2.6 adds `stage`, the
- * postseason-v2 state, `awards`, and `completion` so authoritative
- * postseason and award facts ride the state chain. The run's stored
- * `stateDigest` field is EXCLUDED from its own computation (mirror of the
- * checkpoint digest rule).
+ * checkpointState, health, influence, transactions, trade, freeAgency,
+ * objectives, rosters, ownership, rotations, effects }`. M2.6 adds `stage`,
+ * the postseason-v2 state, `awards`, and `completion` so authoritative
+ * postseason and award facts ride the state chain; M2.6.5 adds `freeAgency`
+ * (windows, canonical candidates, declarations, traces, signings, signing
+ * counts, season spend). The run's stored `stateDigest` field is EXCLUDED
+ * from its own computation (mirror of the checkpoint digest rule).
  *
  * Canonical ordering (frozen): rosters by franchiseId, ownership by
  * playerVersionId, rotations by franchiseId, effects per the existing
@@ -41,9 +43,10 @@ import { canonicalJson } from './checkpoint.ts';
  * entryId, transactions by transactionId, postseason tiebreak resolutions
  * by resolutionId (every other postseason array is positionally fixed by
  * its own invariants: rankings and seeds in seed order, series slots in
- * bracket order, series games by gameNumber). Object keys serialize
- * canonically (recursively sorted), so parse-reordered records hash
- * identically.
+ * bracket order, series games by gameNumber), free-agency windows by
+ * windowIndex, canonical candidates by playerId, signing counts and season
+ * spend by franchiseId. Object keys serialize canonically (recursively
+ * sorted), so parse-reordered records hash identically.
  *
  * NOTE (resolved at integration): the M2.5 contract allowed this function to
  * live in checkpoint.ts "or a sibling state-digest module in the same
@@ -70,6 +73,8 @@ export interface SeasonRunStateDigestFacts {
   influence: SeasonInfluenceState;
   transactions: readonly SeasonTransactionEntry[];
   trade: SeasonTradeState | null;
+  /** M2.6.5: the free-agency market state. */
+  freeAgency: SeasonFreeAgencyState;
   objectives: SeasonObjectiveState;
   rosters: readonly SeasonRoster[];
   ownership: readonly SeasonOwnership[];
@@ -124,6 +129,22 @@ export function seasonRunStateDigest(facts: SeasonRunStateDigestFacts): string {
     },
     transactions: sortedBy(facts.transactions, (entry) => entry.transactionId),
     trade: facts.trade,
+    freeAgency: {
+      schemaVersion: facts.freeAgency.schemaVersion,
+      freeAgencyVersion: facts.freeAgency.freeAgencyVersion,
+      windows: facts.freeAgency.windows.map((window) => ({
+        windowIndex: window.windowIndex,
+        blockIndex: window.blockIndex,
+        status: window.status,
+        candidates: sortedBy(window.candidates, (candidate) => candidate.playerVersionId),
+        declarations: window.declarations,
+        traces: window.traces,
+        signings: sortedBy(window.signings, (signing) => signing.signingId),
+      })),
+      canonicalCandidates: facts.freeAgency.canonicalCandidates,
+      signingCounts: facts.freeAgency.signingCounts,
+      seasonSpend: facts.freeAgency.seasonSpend,
+    },
     objectives: facts.objectives,
     rosters: sortedBy(facts.rosters, (roster) => roster.franchiseId),
     ownership: sortedBy(facts.ownership, (row) => row.playerVersionId),

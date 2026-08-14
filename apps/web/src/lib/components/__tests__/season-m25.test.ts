@@ -197,7 +197,7 @@ function interruption(): SeasonInvalidRosterInterruption {
 function pending(): SeasonPendingBlockCandidate {
   return {
     schemaVersion: 1,
-    blockVersion: 'season-block-v3',
+    blockVersion: 'season-block-v4',
     runId: 'run-1',
     commandId: 'blk-1',
     blockIndex: 1,
@@ -208,7 +208,13 @@ function pending(): SeasonPendingBlockCandidate {
     nextGameId: 's000105',
     summaries: [],
     retainedDetails: [],
-    effects: { schemaVersion: 1, playerStates: [], pairStates: [] },
+    effects: {
+      schemaVersion: 2,
+      playerStates: [],
+      inactivePlayerStates: [],
+      pairStates: [],
+      archivedPairs: [],
+    },
     health: healthState(),
     standings: { schemaVersion: 1, standingsVersion: 'standings-v1', rows: [] },
     teamAggregates: [],
@@ -469,7 +475,7 @@ describe('CheckpointRecap (M2.5)', () => {
   it('renders the health strip and the injury evidence from recorded facts', () => {
     const recap: import('@hoop-rush/data-contracts').SeasonBlockRecap = {
       schemaVersion: 1,
-      recapVersion: 'season-recap-v3',
+      recapVersion: 'season-recap-v4',
       runId: 'run-1',
       blockIndex: 0,
       completedRounds: 10,
@@ -503,6 +509,13 @@ describe('CheckpointRecap (M2.5)', () => {
         },
       },
       tradeEvidence: { tradesAccepted: 1, influenceDelta: 1 },
+      freeAgencyEvidence: {
+        windowIndex: null,
+        signings: [],
+        influenceDelta: 0,
+        seasonSignings: 0,
+        seasonSpend: 0,
+      },
       influenceBalance: { humanBalance: 4 },
     };
     const rows = availabilityStripRows(healthState(), roster());

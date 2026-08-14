@@ -500,10 +500,12 @@ describe('M2.4 mechanism evidence', () => {
           ? 5000
           : player.fatigueBasisPoints,
       })),
+      inactivePlayerStates: state.inactivePlayerStates,
       pairStates: state.pairStates.map((pair) => ({
         ...pair,
         sharedPossessions: pair.sharedPossessions + 600,
       })),
+      archivedPairs: state.archivedPairs,
     };
     const buffer = createSeasonEffectsBuffer(pregame, homeStamina, awayStamina);
     const shooter = home.players[0]?.playerVersionId ?? '';

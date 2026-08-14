@@ -1,6 +1,7 @@
 import {
   SEASON_ENDING_MISSED_GAMES_SENTINEL,
   SEASON_BLOCK_COUNT,
+  SEASON_FREE_AGENCY_VERSION,
   SEASON_ROUND_COUNT,
   SEASON_SEED_NAMESPACES,
   SEASON_TEAM_COUNT,
@@ -15,6 +16,9 @@ import {
   type SeasonCompactInjuryEvent,
   type SeasonDraftCatalog,
   type SeasonEffectsState,
+  type SeasonFreeAgencyIndex,
+  type SeasonFreeAgencyState,
+  type SeasonFreeAgencyWindowState,
   type SeasonGamePlayerInput,
   type SeasonGameSimulationInput,
   type SeasonGameSummary,
@@ -39,6 +43,7 @@ import {
   type SeasonSubmitBlockRejection,
   type SeasonSubmitBlockResult,
   type SeasonTransactionEntry,
+  type SeasonRosterTargets,
 } from '@hoop-rush/data-contracts';
 import { createEngineContext } from '../sim/context.ts';
 import {
@@ -69,6 +74,7 @@ import { evaluateSeasonBlockObjective, seasonObjectiveChoicesForBlock } from './
 import { applySeasonBlockInfluenceGrants, createInitialSeasonInfluenceState } from './influence.ts';
 import { seasonRunStateDigest } from './state-digest.ts';
 import { openSeasonTradeWindow, type SeasonWindowOpenResult } from './trades.ts';
+import { freeAgencyUnresolvedWindowIndex, openSeasonFreeAgencyWindow } from './free-agency.ts';
 
 /**
  * M2.3 pure block pipeline (spec/2.0/02 ten-game blocks, season-block-v1).
@@ -217,6 +223,13 @@ export interface SeasonBlockSimulationInput {
    */
   transactions?: SeasonTransactionEntry[];
   /**
+   * M2.6.5: the pre-block free-agency state. Optional seam like influence:
+   * the candidate carries it into the checkpoint so the post-block facts
+   * (including any window the commit side opens) stay digest-consistent.
+   * When absent, assembly starts from the empty state.
+   */
+  freeAgency?: SeasonFreeAgencyState;
+  /**
    * M2.5: the run's objective state (fixed catalog + selections). Optional
    * seam for the submit-command validation path: when absent, the
    * `invalid-objective` check is skipped (the commit side validates the
@@ -246,6 +259,44 @@ export interface SeasonSubmitBlockCommandInput extends SeasonBlockSimulationInpu
    * authoritative run).
    */
   objectives?: SeasonObjectiveState;
+}
+
+/** M2.6.5: the empty free-agency state (30 franchises, no windows). */
+function emptyFreeAgencyStateOf(run: SeasonRun | SeasonBlockRunContext): SeasonFreeAgencyState {
+  const franchiseIds = run.league.teams.map((team) => team.franchiseId);
+  return {
+    schemaVersion: 1,
+    freeAgencyVersion: SEASON_FREE_AGENCY_VERSION,
+    windows: [],
+    canonicalCandidates: {},
+    signingCounts: Object.fromEntries(franchiseIds.map((franchiseId) => [franchiseId, 0])),
+    seasonSpend: Object.fromEntries(franchiseIds.map((franchiseId) => [franchiseId, 0])),
+  };
+}
+
+/** The run state facts the digest covers (frozen scope, self-excluded). */
+export function seasonRunStateDigestFactsOf(
+  next: SeasonRun,
+  effects: SeasonEffectsState,
+): Parameters<typeof seasonRunStateDigest>[0] {
+  return {
+    stateRevision: next.stateRevision,
+    stage: next.stage,
+    postseason: next.postseason,
+    awards: next.awards,
+    completion: next.completion,
+    checkpointState: next.checkpointState,
+    health: next.health,
+    influence: next.influence,
+    transactions: next.transactions,
+    trade: next.trade,
+    freeAgency: next.freeAgency,
+    objectives: next.objectives,
+    rosters: next.rosters,
+    ownership: next.ownership,
+    rotations: next.rotations,
+    effects,
+  };
 }
 
 /** Additive pipeline options (the worker and CLI use the one-argument form). */
@@ -283,8 +334,12 @@ export interface SeasonBlockGameSimulationOptions {
 }
 
 /**
- * Resolves every roster's ten playerVersionIds to catalog entries and
- * asserts unique ownership: exactly 300 distinct versions across the league.
+ * Resolves every LOCKED ROTATION's ten playerVersionIds to catalog entries
+ * and asserts unique ownership: exactly 300 distinct versions across the
+ * league (ten per franchise). M2.6.5 (spec/2.0/15): rosters may hold 10-15
+ * players, but the game pipeline receives exactly the ten rotation members
+ * per side — inactive depth never plays, records no minutes, and receives no
+ * stamina/chemistry/injury exposure.
  */
 export function expandSeasonRunRosters(
   run: SeasonBlockRunContext,
@@ -293,24 +348,34 @@ export function expandSeasonRunRosters(
   const candidates = new Map(
     catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
   );
+  const rosterByFranchise = new Map(run.rosters.map((roster) => [roster.franchiseId, roster]));
   const expanded = new Map<string, SeasonGamePlayerInput>();
   const seen = new Set<string>();
-  for (const roster of run.rosters) {
-    for (const player of roster.players) {
-      const candidate = candidates.get(player.playerVersionId);
+  for (const rotation of run.rotations) {
+    const roster = rosterByFranchise.get(rotation.franchiseId);
+    if (roster === undefined) {
+      throw new Error(`rotation for unknown franchise ${rotation.franchiseId}`);
+    }
+    const rosterById = new Map(roster.players.map((player) => [player.playerVersionId, player]));
+    for (const playerVersionId of [...rotation.starters, ...rotation.benchOrder]) {
+      const player = rosterById.get(playerVersionId);
+      if (player === undefined) {
+        throw new Error(
+          `rotation member ${playerVersionId} is not on roster ${rotation.franchiseId}`,
+        );
+      }
+      const candidate = candidates.get(playerVersionId);
       if (candidate === undefined) {
         throw new Error(
-          `roster ${roster.franchiseId} references unknown catalog version ${player.playerVersionId}`,
+          `roster ${rotation.franchiseId} references unknown catalog version ${playerVersionId}`,
         );
       }
-      if (seen.has(player.playerVersionId)) {
-        throw new Error(
-          `playerVersionId ${player.playerVersionId} appears on more than one roster`,
-        );
+      if (seen.has(playerVersionId)) {
+        throw new Error(`playerVersionId ${playerVersionId} appears on more than one roster`);
       }
-      seen.add(player.playerVersionId);
-      expanded.set(player.playerVersionId, {
-        playerVersionId: player.playerVersionId,
+      seen.add(playerVersionId);
+      expanded.set(playerVersionId, {
+        playerVersionId,
         playerId: player.playerId,
         displayName: player.displayName,
         positions: candidate.positions.playable,
@@ -322,7 +387,7 @@ export function expandSeasonRunRosters(
         // the effects seam and recovery ticks read the derived rating.
         stamina: {
           schemaVersion: 1,
-          playerVersionId: player.playerVersionId,
+          playerVersionId,
           rating: candidate.stamina.rating,
           historicalMpg: candidate.stamina.historicalMpg,
           derivationVersion: candidate.stamina.derivationVersion,
@@ -431,6 +496,20 @@ export function seasonBlockRejection(
         blockIndex: command.blockIndex,
       };
     }
+  }
+
+  // M2.6.5: an open free-agency market blocks the next rotation lock. There
+  // is no automatic skip or automatic resolution of saved picks; the window
+  // must be explicitly resolved (see spec/2.0/15).
+  const preBlockFreeAgency =
+    input.freeAgency ?? (input.run as Partial<SeasonRun>).freeAgency ?? emptyFreeAgencyStateOf(run);
+  const unresolvedWindowIndex = freeAgencyUnresolvedWindowIndex(preBlockFreeAgency);
+  if (unresolvedWindowIndex !== null) {
+    return {
+      code: 'free-agency-unresolved',
+      windowIndex: unresolvedWindowIndex,
+      blockIndex: command.blockIndex,
+    };
   }
 
   const computedDigest = seasonRotationSetDigest(run.rotations);
@@ -1072,6 +1151,11 @@ export function assembleSeasonBlockCandidate(
     injuryTargetsVersion: run.versions.injuryTargetsVersion,
     tradeTargetsVersion: run.versions.tradeTargetsVersion,
     influenceTargetsVersion: run.versions.influenceTargetsVersion,
+    // M2.6.5: the checkpoint freezes the free-agency material versions with
+    // the free-agency state it carries.
+    freeAgencyVersion: run.versions.freeAgencyVersion,
+    freeAgencyIndexVersion: run.versions.freeAgencyIndexVersion,
+    freeAgencyTargetsVersion: run.versions.freeAgencyTargetsVersion,
   };
   const candidate: SeasonCandidateCheckpoint = {
     schemaVersion: 1,
@@ -1098,6 +1182,12 @@ export function assembleSeasonBlockCandidate(
     // carried pre-block log).
     health,
     influence: grantResult.influence,
+    // M2.6.5: the free-agency state across the block (windows open at the
+    // commit side, never inside the pipeline).
+    freeAgency:
+      input.freeAgency ??
+      (input.run as Partial<SeasonRun>).freeAgency ??
+      emptyFreeAgencyStateOf(run),
     transactions: postTransactions,
     objective: {
       objectiveId: objective.objectiveId,
@@ -1208,6 +1298,7 @@ export function deriveSeasonPostBlockState(input: {
     influence: input.candidate.influence,
     transactions: input.candidate.transactions,
     trade: input.run.trade,
+    freeAgency: input.candidate.freeAgency,
     objectives,
     rosters: input.run.rosters,
     ownership: input.run.ownership,
@@ -1237,11 +1328,19 @@ export function completeSeasonBlockCommit(input: {
   catalog?: SeasonDraftCatalog;
   /** The pre-window effects state; defaults to the candidate's. */
   effects?: SeasonEffectsState;
+  /** M2.6.5: packaged free-agency index (required for free-agency window blocks). */
+  freeAgencyIndex?: SeasonFreeAgencyIndex;
+  /** M2.6.5: frozen roster-targets policy (AI free-agency ceilings). */
+  freeAgencyTargets?: SeasonRosterTargets;
 }): {
   checkpointState: SeasonCheckpointState;
   stateRevision: number;
   stateDigest: string;
   window: SeasonWindowOpenResult | null;
+  /** M2.6.5: the opened free-agency window (null on non-window blocks). */
+  freeAgencyWindow: SeasonFreeAgencyWindowState | null;
+  /** M2.6.5: the post-window free-agency state (unchanged on non-window blocks). */
+  freeAgency: SeasonFreeAgencyState;
 } {
   const objectives = objectivesWithBlockSuccess(input.run.objectives, input.candidate);
   const derived = deriveSeasonPostBlockState({
@@ -1257,6 +1356,7 @@ export function completeSeasonBlockCommit(input: {
     health: input.candidate.health,
     influence: input.candidate.influence,
     transactions: input.candidate.transactions,
+    freeAgency: input.candidate.freeAgency,
     objectives,
     checkpointState: derived.checkpointState,
     stateRevision: derived.stateRevision,
@@ -1270,19 +1370,84 @@ export function completeSeasonBlockCommit(input: {
     catalog: input.catalog,
     effects: input.effects ?? input.candidate.effects,
   });
-  if (window === null) {
+
+  // M2.6.5: free-agency windows open after accepted blocks 2, 4, 6, on top
+  // of the post-block (and post-trade-window) state. Each open advances the
+  // state chain by exactly one revision.
+  let runAfterTrade: SeasonRun = postBlockRun;
+  if (window !== null) {
+    runAfterTrade = {
+      ...postBlockRun,
+      trade: window.trade,
+      influence: window.influence,
+      transactions: window.transactions,
+      rosters: window.rosters,
+      ownership: window.ownership,
+      rotations: window.rotations,
+      health: window.health,
+      checkpointState: derived.checkpointState,
+      stateRevision: window.stateRevision,
+      stateDigest: window.stateDigest,
+    };
+  }
+  let freeAgency: SeasonFreeAgencyState = input.candidate.freeAgency;
+  let freeAgencyWindow: SeasonFreeAgencyWindowState | null = null;
+  const freeAgencyBlockIndexes = [2, 4, 6];
+  if (
+    freeAgencyBlockIndexes.includes(input.candidate.blockIndex) &&
+    freeAgencyUnresolvedWindowIndex(freeAgency) === null
+  ) {
+    if (input.freeAgencyIndex === undefined) {
+      throw new SeasonBlockInvariantError(
+        `block ${String(input.candidate.blockIndex)} needs the packaged free-agency index to open its market window`,
+        { blockIndex: input.candidate.blockIndex },
+      );
+    }
+    const windowIndex = freeAgencyBlockIndexes.indexOf(input.candidate.blockIndex);
+    const opened = openSeasonFreeAgencyWindow(
+      {
+        run: runAfterTrade,
+        effects: input.effects ?? input.candidate.effects,
+        catalog: input.catalog as SeasonDraftCatalog,
+        index: input.freeAgencyIndex,
+        targets: input.freeAgencyTargets,
+        humanFranchiseId: input.humanFranchiseId,
+      },
+      windowIndex,
+      input.candidate.blockIndex,
+    );
+    freeAgency = opened.freeAgency;
+    freeAgencyWindow = opened.window;
+    const next: SeasonRun = {
+      ...runAfterTrade,
+      freeAgency,
+      stateRevision: runAfterTrade.stateRevision + 1,
+      stateDigest: '',
+    };
+    const postWindowEffects = input.effects ?? input.candidate.effects;
+    runAfterTrade = {
+      ...next,
+      stateDigest: seasonRunStateDigest(seasonRunStateDigestFactsOf(next, postWindowEffects)),
+    };
+  }
+
+  if (window === null && freeAgencyWindow === null) {
     return {
       checkpointState: derived.checkpointState,
       stateRevision: derived.stateRevision,
       stateDigest: derived.stateDigest,
       window: null,
+      freeAgencyWindow: null,
+      freeAgency,
     };
   }
   return {
     checkpointState: derived.checkpointState,
-    stateRevision: window.stateRevision,
-    stateDigest: window.stateDigest,
+    stateRevision: runAfterTrade.stateRevision,
+    stateDigest: runAfterTrade.stateDigest,
     window,
+    freeAgencyWindow,
+    freeAgency,
   };
 }
 

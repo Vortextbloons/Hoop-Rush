@@ -178,10 +178,9 @@
     });
   });
 
-  /** M2.4: aggregated mechanism evidence of the block's human games. */
   const effectsEvidence = $derived(aggregateMechanismEvidence(blockDetails));
 
-  /** M2.5: per-player availability rows for the checkpoint health strip. */
+  /** Per-player availability rows for the checkpoint health strip. */
   const healthRows = $derived.by(() => {
     if (!run || !humanFranchiseId) return [];
     const roster = run.rosters.find((r) => r.franchiseId === humanFranchiseId);

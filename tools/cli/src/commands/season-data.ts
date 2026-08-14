@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import {
   seasonDraftCatalogSchema,
   seasonDraftStateSchema,
+  seasonFreeAgencyIndexSchema,
   seasonLeagueSchema,
   seasonRosterRoleSchema,
   seasonRosterTargetsSchema,
@@ -11,6 +12,7 @@ import {
   type SeasonDraftCandidate,
   type SeasonDraftCatalog,
   type SeasonDraftState,
+  type SeasonFreeAgencyIndex,
   type SeasonLeague,
   type SeasonRosterRole,
   type SeasonRosterTargets,
@@ -42,6 +44,7 @@ export const DEFAULT_SEASON_DIR = resolve(REPO_ROOT, 'apps/web/static/data/seaso
 export const DEFAULT_DRAFT_CATALOG = resolve(DEFAULT_SEASON_DIR, 'draft-catalog.json');
 export const DEFAULT_LEAGUE = resolve(DEFAULT_SEASON_DIR, 'league.json');
 export const DEFAULT_ROSTER_TARGETS = resolve(DEFAULT_SEASON_DIR, 'roster-targets.json');
+export const DEFAULT_FREE_AGENCY_INDEX = resolve(DEFAULT_SEASON_DIR, 'free-agency-index.json');
 
 /** Loads the packaged draft catalog, hash-verified against the manifest. */
 export function loadSeasonDraftCatalog(
@@ -119,6 +122,62 @@ export function loadSeasonRosterTargets(
   if (!parsed.success) {
     throw new Error(
       `roster targets fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+  }
+  return parsed.data;
+}
+
+/**
+ * Loads the packaged `free-agency-index-v1` eligibility index, hash-verified
+ * against the manifest's `season.freeAgencyIndex` entry (required, like the
+ * roster targets: free-agency market generation always reads a verified
+ * index). The index's own `catalogRef.contentHash` must also match the
+ * manifest's `season.draftCatalog` hash so a stale index is a typed
+ * failure, never silently consumed.
+ */
+export function loadSeasonFreeAgencyIndex(
+  manifestPath: string = DEFAULT_MANIFEST,
+  indexPath?: string,
+): SeasonFreeAgencyIndex {
+  const manifest = readJsonFile(manifestPath) as {
+    season?: {
+      freeAgencyIndex?: { url?: string; contentHash?: string };
+      draftCatalog?: { url?: string; contentHash?: string };
+    };
+  };
+  const entry = manifest.season?.freeAgencyIndex;
+  if (entry === undefined) {
+    throw new Error(
+      'manifest has no season.freeAgencyIndex entry (verified free-agency index required)',
+    );
+  }
+  if (entry.contentHash === undefined) {
+    throw new Error('manifest season.freeAgencyIndex entry has no contentHash');
+  }
+  const resolved =
+    indexPath ??
+    (entry.url !== undefined
+      ? resolveArtifact(dirname(manifestPath), entry.url)
+      : DEFAULT_FREE_AGENCY_INDEX);
+  const actual = sha256Hex(readFileSync(resolved));
+  if (actual !== entry.contentHash) {
+    throw new Error(
+      `free-agency index content hash mismatch: expected ${entry.contentHash}, got ${actual} (${resolved})`,
+    );
+  }
+  const parsed = seasonFreeAgencyIndexSchema.safeParse(readJsonFile(resolved));
+  if (!parsed.success) {
+    throw new Error(
+      `free-agency index fails the schema: ${parsed.error.issues[0]?.message ?? 'unknown'}`,
+    );
+  }
+  const draftEntry = manifest.season?.draftCatalog;
+  if (
+    draftEntry?.contentHash !== undefined &&
+    parsed.data.catalogRef.contentHash !== draftEntry.contentHash
+  ) {
+    throw new Error(
+      `free-agency index catalogRef hash ${parsed.data.catalogRef.contentHash} does not match the packaged draft catalog ${draftEntry.contentHash}`,
     );
   }
   return parsed.data;

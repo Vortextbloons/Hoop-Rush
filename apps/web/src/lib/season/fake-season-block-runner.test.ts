@@ -33,7 +33,13 @@ function minimalInput(): SeasonBlockStartInput {
   const run = buildSeasonRunFixture({ schedule: SCHEDULE, stateDigest: '0'.repeat(32) });
   return {
     run,
-    effects: { schemaVersion: 1, playerStates: [], pairStates: [] },
+    effects: {
+      schemaVersion: 2,
+      playerStates: [],
+      inactivePlayerStates: [],
+      pairStates: [],
+      archivedPairs: [],
+    },
     rotations: run.rotations,
     blockIndex: 0,
     expectedRevision: 0,

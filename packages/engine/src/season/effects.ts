@@ -1,10 +1,13 @@
 import type {
+  SeasonArchivedPairChemistryState,
   SeasonEffectsState,
   SeasonGameEffectsTransition,
   SeasonMechanism,
   SeasonMechanismEvidence,
   SeasonPairChemistryState,
   SeasonPlayerLoadState,
+  SeasonRoster,
+  SeasonRotation,
   SeasonStaminaInput,
 } from '@hoop-rush/data-contracts';
 import type { SideIndex } from '../sim/recorder.ts';
@@ -537,7 +540,13 @@ export function createSeasonEffectsState(
     }
   }
   pairStates.sort((x, y) => (x.a < y.a ? -1 : x.a > y.a ? 1 : x.b < y.b ? -1 : 1));
-  return { schemaVersion: 1, playerStates, pairStates };
+  return {
+    schemaVersion: 2,
+    playerStates,
+    inactivePlayerStates: [],
+    pairStates,
+    archivedPairs: [],
+  };
 }
 
 /**
@@ -594,6 +603,207 @@ export function applySeasonGameEffectsTransition(
   return {
     schemaVersion: previous.schemaVersion,
     playerStates: transition.postgamePlayerStates,
+    inactivePlayerStates: previous.inactivePlayerStates,
     pairStates: nextPairs.sort((x, y) => (x.a < y.a ? -1 : x.a > y.a ? 1 : x.b < y.b ? -1 : 1)),
+    archivedPairs: previous.archivedPairs,
+  };
+}
+
+/** The rotation-lock reconciliation inputs (M2.6.5, spec/2.0/15). */
+export interface SeasonEffectsReconcileInput {
+  /** The effects state carried from the previous block boundary. */
+  previous: SeasonEffectsState;
+  /** All 30 rosters (10-15 players each, unique identities). */
+  rosters: readonly SeasonRoster[];
+  /** All 30 locked rotations (exactly ten members each). */
+  rotations: readonly SeasonRotation[];
+}
+
+/**
+ * M2.6.5 pure effects reconciliation at block lock (spec/2.0/15,
+ * season-chemistry-v2). Rotation changes take effect only at the next block
+ * lock; this function rebuilds the rotation-scoped effects state from the
+ * locked rotations:
+ *
+ * - demoted players' load records freeze into `inactivePlayerStates` and
+ *   their previous active pairs freeze into `archivedPairs` (carrying the
+ *   franchise id);
+ * - promoted players restore their prior same-franchise load records and
+ *   prior archived pairs with current rotation teammates;
+ * - never-active signings enter with zero load and zero pair state;
+ * - unchanged active state is preserved exactly;
+ * - the result always proves 300 active loads and 1,350 active pairs, with
+ *   at most 150 inactive loads and at most 1,350 archived pairs.
+ *
+ * Inactivity never decays or invents chemistry; archived records of players
+ * who left the league entirely are dropped (trades delete them explicitly).
+ * Pure TypeScript: consumes no RNG, mutates nothing.
+ */
+export function reconcileSeasonEffects(input: SeasonEffectsReconcileInput): SeasonEffectsState {
+  const { previous, rosters, rotations } = input;
+  if (rosters.length !== 30 || rotations.length !== 30) {
+    throw new Error('season effects: reconciliation requires 30 rosters and 30 rotations');
+  }
+  const rosterByFranchise = new Map(rosters.map((roster) => [roster.franchiseId, roster]));
+  const rotationIdsByFranchise = new Map<string, string[]>();
+  const ownerOf = new Map<string, string>();
+  for (const roster of rosters) {
+    for (const player of roster.players) {
+      if (ownerOf.has(player.playerVersionId)) {
+        throw new Error(
+          `season effects: ${player.playerVersionId} appears on two rosters during reconciliation`,
+        );
+      }
+      ownerOf.set(player.playerVersionId, roster.franchiseId);
+    }
+  }
+  for (const rotation of rotations) {
+    const roster = rosterByFranchise.get(rotation.franchiseId);
+    if (roster === undefined) {
+      throw new Error(`season effects: rotation for unknown franchise ${rotation.franchiseId}`);
+    }
+    const rosterIds = new Set(roster.players.map((player) => player.playerVersionId));
+    const ids = [...rotation.starters, ...rotation.benchOrder];
+    if (ids.length !== 10) {
+      throw new Error(
+        `season effects: rotation for ${rotation.franchiseId} must contain exactly ten players`,
+      );
+    }
+    for (const id of ids) {
+      if (!rosterIds.has(id)) {
+        throw new Error(
+          `season effects: rotation member ${id} is not on roster ${rotation.franchiseId}`,
+        );
+      }
+    }
+    rotationIdsByFranchise.set(rotation.franchiseId, ids);
+  }
+
+  const activeIds = new Set<string>();
+  for (const ids of rotationIdsByFranchise.values()) {
+    for (const id of ids) activeIds.add(id);
+  }
+  const previousActive = new Map(
+    previous.playerStates.map((player) => [player.playerVersionId, player]),
+  );
+  const previousInactive = new Map(
+    previous.inactivePlayerStates.map((player) => [player.playerVersionId, player]),
+  );
+  const zeroLoad = (playerVersionId: string): SeasonPlayerLoadState => ({
+    playerVersionId,
+    fatigueBasisPoints: 0,
+    recentLoadBasisPoints: 0,
+    lastCompletedRound: 0,
+  });
+
+  // Active loads: preserve, restore from frozen, or create zero state.
+  const playerStates: SeasonPlayerLoadState[] = [];
+  for (const ids of rotationIdsByFranchise.values()) {
+    for (const id of ids) {
+      const prior = previousActive.get(id);
+      if (prior !== undefined) {
+        playerStates.push({ ...prior });
+        continue;
+      }
+      const frozen = previousInactive.get(id);
+      playerStates.push(frozen !== undefined ? { ...frozen } : zeroLoad(id));
+    }
+  }
+  playerStates.sort((x, y) => (x.playerVersionId < y.playerVersionId ? -1 : 1));
+  if (playerStates.length !== 300) {
+    throw new Error(
+      `season effects: reconciliation produced ${String(playerStates.length)} active loads`,
+    );
+  }
+
+  // Inactive loads: freeze demoted players, keep never-promoted players frozen.
+  const inactivePlayerStates: SeasonPlayerLoadState[] = [];
+  for (const [id, state] of previousActive) {
+    if (!activeIds.has(id)) inactivePlayerStates.push({ ...state });
+  }
+  for (const [id, state] of previousInactive) {
+    if (!activeIds.has(id)) inactivePlayerStates.push({ ...state });
+  }
+  if (inactivePlayerStates.length > 150) {
+    throw new Error(
+      `season effects: ${String(inactivePlayerStates.length)} inactive loads exceed 150`,
+    );
+  }
+
+  // Active pairs: preserve, restore archived same-franchise pairs, or zero.
+  const previousPairByKey = new Map(
+    previous.pairStates.map((pair) => [seasonPairKey(pair.a, pair.b), pair]),
+  );
+  const archivedByFranchise = new Map<string, Map<string, SeasonArchivedPairChemistryState>>();
+  for (const archived of previous.archivedPairs) {
+    let franchise = archivedByFranchise.get(archived.franchiseId);
+    if (franchise === undefined) {
+      franchise = new Map();
+      archivedByFranchise.set(archived.franchiseId, franchise);
+    }
+    franchise.set(seasonPairKey(archived.a, archived.b), archived);
+  }
+  const pairStates: SeasonPairChemistryState[] = [];
+  for (const [franchiseId, ids] of rotationIdsByFranchise) {
+    const franchiseArchived = archivedByFranchise.get(franchiseId);
+    for (const [a, b] of canonicalRosterPairs(ids)) {
+      const key = seasonPairKey(a, b);
+      const prior = previousPairByKey.get(key);
+      if (prior !== undefined) {
+        pairStates.push({ a, b, sharedPossessions: prior.sharedPossessions });
+        continue;
+      }
+      const restored = franchiseArchived?.get(key);
+      pairStates.push({
+        a,
+        b,
+        sharedPossessions: restored?.sharedPossessions ?? 0,
+      });
+    }
+  }
+  pairStates.sort((x, y) => (x.a < y.a ? -1 : x.a > y.a ? 1 : x.b < y.b ? -1 : 1));
+  if (pairStates.length !== 1350) {
+    throw new Error(
+      `season effects: reconciliation produced ${String(pairStates.length)} active pairs`,
+    );
+  }
+
+  // Archived pairs: freeze demoted same-franchise relationships; drop
+  // archived records of players who left the league entirely.
+  const archivedPairs: SeasonArchivedPairChemistryState[] = [];
+  const archivedKeys = new Set<string>();
+  for (const archived of previous.archivedPairs) {
+    if (ownerOf.has(archived.a) && ownerOf.has(archived.b)) {
+      archivedKeys.add(`${archived.franchiseId}\u0000${seasonPairKey(archived.a, archived.b)}`);
+      archivedPairs.push({ ...archived });
+    }
+  }
+  for (const pair of previous.pairStates) {
+    const franchiseA = ownerOf.get(pair.a);
+    const franchiseB = ownerOf.get(pair.b);
+    if (franchiseA === undefined || franchiseA !== franchiseB) continue;
+    const aActive = activeIds.has(pair.a);
+    const bActive = activeIds.has(pair.b);
+    if (aActive && bActive) continue;
+    const key = `${franchiseA}\u0000${seasonPairKey(pair.a, pair.b)}`;
+    if (archivedKeys.has(key)) continue;
+    archivedKeys.add(key);
+    archivedPairs.push({
+      franchiseId: franchiseA,
+      a: pair.a,
+      b: pair.b,
+      sharedPossessions: pair.sharedPossessions,
+    });
+  }
+  if (archivedPairs.length > 1350) {
+    throw new Error(`season effects: ${String(archivedPairs.length)} archived pairs exceed 1350`);
+  }
+
+  return {
+    schemaVersion: previous.schemaVersion,
+    playerStates,
+    inactivePlayerStates,
+    pairStates,
+    archivedPairs,
   };
 }

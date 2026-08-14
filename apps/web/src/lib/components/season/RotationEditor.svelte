@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronDown, ChevronUp, Star } from '@lucide/svelte';
+  import { ChevronDown, ChevronUp, Star, UserMinus, UserPlus } from '@lucide/svelte';
   import type {
     HoopRushManifest,
     SeasonEffectsState,
@@ -23,6 +23,7 @@
     presetLabel,
     type MinuteAdjustment,
     type RotationEditor,
+    type RotationMember,
   } from '$lib/season/season-rotation-editor';
   import { formatPositions, SLOT_LABELS } from '$lib/player-positions';
 
@@ -117,6 +118,18 @@
   /** Transient engine rejection of an illegal edit (nothing committed). */
   let rejection: string | null = $state(null);
 
+  /** The open promote/demote picker: which side owns it and which player. */
+  let swap: { kind: 'promote' | 'demote'; playerVersionId: string } | null = $state(null);
+  /** Spoken announce for a committed roster swap. */
+  let swapNotice: string | null = $state(null);
+  let swapNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Rostered players outside the ten-player rotation (inactive depth). */
+  const inactiveRows = $derived.by(() => {
+    void revision;
+    return editor.inactiveMembers();
+  });
+
   /** Rebalance visibility: highlighted rows + the spoken/announced notice. */
   let highlightIds = $state<ReadonlySet<string>>(new Set());
   let rebalanceNotice: string | null = $state(null);
@@ -160,6 +173,7 @@
 
   $effect(() => () => {
     if (noticeTimer !== null) clearTimeout(noticeTimer);
+    if (swapNoticeTimer !== null) clearTimeout(swapNoticeTimer);
   });
 
   function emit() {
@@ -271,6 +285,41 @@
     commit(editor.moveBench(benchIndex, delta));
   }
 
+  function openSwap(kind: 'promote' | 'demote', playerVersionId: string) {
+    if (disabled) return;
+    rejection = null;
+    swap = { kind, playerVersionId };
+  }
+
+  function closeSwap() {
+    swap = null;
+  }
+
+  /**
+   * Commits a roster swap: the inactive player replaces the active player
+   * in the ten-player rotation (engine-audited; reverts with a rejection
+   * when the result would be illegal).
+   */
+  function commitSwap(inactiveId: string, activeId: string) {
+    if (disabled || swap === null) return;
+    const failuresAfter = editor.promoteToRotation(inactiveId, activeId);
+    swap = null;
+    revision += 1;
+    if (failuresAfter.length === 0) {
+      rejection = null;
+      emit();
+      const inactiveName = editor.names.get(inactiveId) ?? inactiveId;
+      const activeName = editor.names.get(activeId) ?? activeId;
+      swapNotice = `${inactiveName} joined the rotation replacing ${activeName}.`;
+      if (swapNoticeTimer !== null) clearTimeout(swapNoticeTimer);
+      swapNoticeTimer = setTimeout(() => {
+        swapNotice = null;
+      }, 2200);
+    } else {
+      rejection = `That roster move is rejected: ${failuresAfter[0]}`;
+    }
+  }
+
   /**
    * Applies one strategy: runs the page-owned projection optimization and
    * applies that strategy's plan automatically. The fixed preset is the
@@ -327,15 +376,11 @@
     };
   }
 
-  function eraLabelOf(row: (typeof rows)[number]): string | null {
-    if (
-      manifest === null ||
-      row.member.franchiseId === undefined ||
-      row.member.eraId === undefined
-    ) {
+  function eraLabelOf(member: RotationMember): string | null {
+    if (manifest === null || member.franchiseId === undefined || member.eraId === undefined) {
       return null;
     }
-    const label = eraIdentityOf(manifest, row.member.franchiseId, row.member.eraId).displayLabel;
+    const label = eraIdentityOf(manifest, member.franchiseId, member.eraId).displayLabel;
     return label;
   }
 
@@ -422,7 +467,7 @@
         {@const rowFailures = failureIndex.byPlayer.get(row.member.playerVersionId) ?? null}
         {@const fatigue = fatigueOf(row)}
         {@const lastMinutes = lastGameMinutes.get(row.member.playerVersionId) ?? null}
-        {@const eraLabel = eraLabelOf(row)}
+        {@const eraLabel = eraLabelOf(row.member)}
         <li
           class="flex flex-col gap-2 py-2.5 sm:gap-1 sm:py-2{highlightOf(
             row.member.playerVersionId,
@@ -553,7 +598,7 @@
           {@const slotFailures = failureIndex.byPlayer.get(playerVersionId) ?? null}
           {@const fatigue = fatigueOf(row)}
           {@const lastMinutes = lastGameMinutes.get(playerVersionId) ?? null}
-          {@const eraLabel = eraLabelOf(row)}
+          {@const eraLabel = eraLabelOf(row.member)}
           <li
             class="flex flex-col gap-2 rounded-none bg-surface-1 p-3 sm:rounded-xl md:flex-row md:items-center md:gap-3{highlightOf(
               playerVersionId,
@@ -641,7 +686,23 @@
                   fill={row.closingIndex !== -1 ? 'currentColor' : 'none'}
                 />
               </button>
+              {#if inactiveRows.length > 0}
+                <button
+                  type="button"
+                  aria-label={`Demote ${row.member.displayName} to inactive`}
+                  onclick={() => openSwap('demote', playerVersionId)}
+                  {disabled}
+                  class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <UserMinus class="h-5 w-5 md:h-4 md:w-4" />
+                </button>
+              {/if}
             </div>
+            {#if swap?.kind === 'demote' && swap.playerVersionId === playerVersionId}
+              {@render swapPicker(inactiveRows, (optionId) =>
+                commitSwap(optionId, playerVersionId),
+              )}
+            {/if}
             {#if slotFailures !== null}
               <ul
                 id="starter-failure-{String(slotIndex)}"
@@ -672,7 +733,7 @@
           {@const rowFailures = failureIndex.byPlayer.get(playerVersionId) ?? null}
           {@const fatigue = fatigueOf(row)}
           {@const lastMinutes = lastGameMinutes.get(playerVersionId) ?? null}
-          {@const eraLabel = eraLabelOf(row)}
+          {@const eraLabel = eraLabelOf(row.member)}
           <li
             class="flex flex-col gap-2 rounded-none bg-surface-1 p-3 sm:rounded-xl md:flex-row md:items-center md:gap-3{highlightOf(
               playerVersionId,
@@ -721,6 +782,17 @@
               </div>
             </div>
             <div class="flex shrink-0 items-center justify-end gap-2">
+              {#if inactiveRows.length > 0}
+                <button
+                  type="button"
+                  aria-label={`Demote ${row.member.displayName} to inactive`}
+                  onclick={() => openSwap('demote', playerVersionId)}
+                  {disabled}
+                  class="grid h-10 w-10 place-items-center rounded-lg bg-surface-2 text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 md:h-8 md:w-8"
+                >
+                  <UserMinus class="h-4 w-4" />
+                </button>
+              {/if}
               <div
                 class="flex items-center gap-1"
                 role="group"
@@ -764,6 +836,11 @@
                 />
               </button>
             </div>
+            {#if swap?.kind === 'demote' && swap.playerVersionId === playerVersionId}
+              {@render swapPicker(inactiveRows, (optionId) =>
+                commitSwap(optionId, playerVersionId),
+              )}
+            {/if}
             {#if rowFailures !== null}
               <ul
                 id="rotation-failure-{playerVersionId}"
@@ -779,7 +856,142 @@
       {/each}
     </ul>
   </section>
+
+  {#if inactiveRows.length > 0}
+    <section
+      aria-labelledby="inactive-heading"
+      data-rotation-inactive-section
+      class="rounded-none bg-surface-1 p-3 sm:rounded-xl"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <h3
+          id="inactive-heading"
+          class="font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground"
+        >
+          Inactive roster
+        </h3>
+        <span class="font-mono text-[10px] text-muted-foreground">
+          {inactiveRows.length} rostered {inactiveRows.length === 1 ? 'player' : 'players'} outside the
+          ten-player rotation
+        </span>
+      </div>
+      <p class="mt-1 text-xs text-muted-foreground">
+        Promote a player to swap them into the rotation — the move takes effect when the next block
+        locks.
+      </p>
+      <ul class="mt-2 flex flex-col divide-y divide-border/60">
+        {#each inactiveRows as member (member.playerVersionId)}
+          {@const eraLabel = eraLabelOf(member)}
+          {@const open =
+            swap?.kind === 'promote' && swap.playerVersionId === member.playerVersionId}
+          <li data-rotation-inactive-row class="flex flex-col gap-2 py-2.5 sm:py-2">
+            <div
+              class="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-3"
+            >
+              <div class="flex min-w-0 items-start gap-2 sm:items-center sm:gap-3">
+                {#if manifest !== null && faceOf(member.playerVersionId) !== null}
+                  <SeasonPlayerFace face={faceOf(member.playerVersionId)!} {manifest} size="sm" />
+                {/if}
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold leading-snug">{member.displayName}</p>
+                  <div class="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                    {#if overallByVersion?.has(member.playerVersionId)}
+                      <span
+                        class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold text-foreground"
+                      >
+                        OVR {overallByVersion.get(member.playerVersionId)}
+                      </span>
+                    {/if}
+                    <span
+                      class="shrink-0 rounded-full bg-surface-3 px-2 py-0.5 font-mono text-[10px] font-bold text-muted-foreground"
+                    >
+                      Inactive
+                    </span>
+                  </div>
+                  <p class="mt-1 font-mono text-[10px] leading-snug text-muted-foreground">
+                    {member.seasonKey ?? ''}
+                    {#if member.playable.length > 0}· {formatPositions(member.playable)}{/if}
+                  </p>
+                  {#if eraLabel !== null}
+                    <p
+                      class="mt-0.5 line-clamp-2 font-mono text-[9px] leading-snug text-muted-foreground/70"
+                    >
+                      {eraLabel}
+                    </p>
+                  {/if}
+                </div>
+              </div>
+              <div class="flex justify-end sm:justify-start">
+                <button
+                  type="button"
+                  aria-expanded={open ? 'true' : 'false'}
+                  aria-label={`Promote ${member.displayName} to the rotation`}
+                  data-promote-button
+                  onclick={() => openSwap('promote', member.playerVersionId)}
+                  {disabled}
+                  class="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <UserPlus class="h-4 w-4" />
+                  {open ? 'Cancel' : 'Promote'}
+                </button>
+              </div>
+            </div>
+            {#if open}
+              {@render swapPicker(
+                editor
+                  .activeMemberIds()
+                  .map((activeId) => rowByVersion.get(activeId)?.member)
+                  .filter((member) => member !== undefined),
+                (optionId) => commitSwap(member.playerVersionId, optionId),
+              )}
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+
+  {#if swapNotice !== null}
+    <p role="status" class="text-xs font-semibold text-primary">{swapNotice}</p>
+  {/if}
 </div>
+
+{#snippet swapPicker(options: RotationMember[], onPick: (optionPlayerVersionId: string) => void)}
+  <div
+    class="rounded-lg bg-surface-2 p-3"
+    role="group"
+    aria-label="Choose the player to swap into the rotation"
+  >
+    <p class="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+      Replace who?
+    </p>
+    <ul class="mt-2 flex flex-col gap-1">
+      {#each options as option (option.playerVersionId)}
+        {@const optionRow = rowByVersion.get(option.playerVersionId)}
+        <li>
+          <button
+            type="button"
+            data-promote-option
+            onclick={() => onPick(option.playerVersionId)}
+            class="flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-surface-3"
+          >
+            <span class="min-w-0 truncate font-semibold">{option.displayName}</span>
+            <span class="shrink-0 font-mono text-[10px] text-muted-foreground">
+              {optionRow?.role ?? 'Inactive'}
+            </span>
+          </button>
+        </li>
+      {/each}
+    </ul>
+    <button
+      type="button"
+      onclick={closeSwap}
+      class="mt-2 text-xs font-semibold text-muted-foreground underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-foreground"
+    >
+      Cancel
+    </button>
+  </div>
+{/snippet}
 
 {#snippet minutesControl(row: (typeof rows)[number])}
   <div

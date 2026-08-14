@@ -302,12 +302,6 @@
 
   const ready = $derived(lineupIsLegal && manifest !== null && index !== null);
 
-  /**
-   * Loads the full peak records behind the picked index rows via their
-   * franchise-era pools. Distinct pools load in parallel; results stay in
-   * slot order. Pool loads are memoized, so prefetches from placing players
-   * make Play resolve without a network wait.
-   */
   async function resolveRefsToPlayers(refs: SlotRef[]): Promise<PeakPlayerSeason[]> {
     const m = manifest;
     if (!m) throw new Error('The manifest is unavailable.');
