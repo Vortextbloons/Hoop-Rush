@@ -113,9 +113,7 @@ export {
   SELECTION_SCORE_VERSION,
 } from '@hoop-rush/data-contracts';
 
-// ---------------------------------------------------------------------------
-// Career position unions (cached; scans every packaged roster once)
-// ---------------------------------------------------------------------------
+// Career position unions (cached; scans every packaged roster once).
 export function loadCareerPositionLabels(): Map<string, Set<string>> {
   // The cache is derived from the packaged roster snapshot. Version the
   // filename so older imports cannot silently erase positions for players
@@ -676,9 +674,7 @@ export function compareSelectionKeys(a: readonly number[], b: readonly number[])
   return 0;
 }
 
-// ---------------------------------------------------------------------------
-// Global cohort Overall normalization (COHORT_NORMALIZATION_VERSION)
-// ---------------------------------------------------------------------------
+// Global cohort Overall normalization (COHORT_NORMALIZATION_VERSION).
 /**
  * Minimal row shape the cohort pass needs; every PoolPlayer satisfies it.
  * Only overallRating (summary) and the optional ratingProfile percentile
@@ -1713,9 +1709,8 @@ export function updateManifest(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
+// Shared helpers.
+
 /** Season dirs with actual packaged data (roster or stints present). */
 function listSeasonKeys(): string[] {
   return readdirSync(NBA_ROOT, { withFileTypes: true })

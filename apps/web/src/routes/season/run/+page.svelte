@@ -98,13 +98,11 @@
     return `Block ${String(nextBlockIndex + 1)} of 9 · rounds ${String(fromRound)}–${String(toRound)}`;
   });
 
-  // M2.5 interruption/pending mirrors.
   const pending = $derived(shell.pending);
   const interruption = $derived(shell.interruption);
   const commandError = $derived(shell.commandError);
   const blockPaused = $derived(pending !== null || interruption !== null);
 
-  // M2.5 Influence + objective + trade panel facts.
   const openWindow = $derived(
     run?.trade !== null && run?.trade !== undefined ? openWindowOf(run.trade) : null,
   );

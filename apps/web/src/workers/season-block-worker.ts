@@ -303,7 +303,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     return;
   }
 
-  // M2.5: the candidate's expected pre-block run state facts ride the wire
+  // The candidate's expected pre-block run state facts ride the wire
   // (required fields); the runner validates the assembled candidate against
   // the authoritative submitted run at acceptance, so a wrong seam value can
   // never be committed.
@@ -417,7 +417,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
     await yieldToEventLoop();
     throwIfCancelled();
-    // M2.5 SEAM (health workstream): the simulation threads the health
+    // SEAM (health workstream): the simulation threads the health
     // state and returns either the game facts or the typed interruption.
     const outcome = simulateSeasonBlockGame(input, game, effects, health, {
       skipRecoveryTick: !(previousRound !== 0 && game.round > previousRound),
@@ -461,7 +461,7 @@ async function runBlock(request: SeasonWorkerStartRequest): Promise<void> {
     }
   }
 
-  // M2.5: the interruption stops the block BEFORE the candidate assembles:
+  // The interruption stops the block BEFORE the candidate assembles:
   // the engine builds the uncommitted pending candidate (the accepted run
   // cursor never advances; the runner persists it and resumes later).
   if (interruption !== null) {

@@ -127,7 +127,6 @@
     shell.humanFranchiseId = humanTeam?.franchiseId ?? null;
     shell.nextBlockIndex = snapshot === null ? null : snapshot.acceptedBlocks.length;
     shell.seasonComplete = (shell.nextBlockIndex ?? 0) >= 9;
-    // M2.5 run-state mirrors for the hub panels.
     shell.health = run?.health ?? null;
     shell.influence = run?.influence ?? null;
     shell.trade =

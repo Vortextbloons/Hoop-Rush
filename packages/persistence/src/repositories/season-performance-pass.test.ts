@@ -398,6 +398,13 @@ describe('Season Run performance pass (dexie v9)', () => {
         },
         objectiveEvidence: null,
         tradeEvidence: { tradesAccepted: 0, influenceDelta: 0 },
+        freeAgencyEvidence: {
+          windowIndex: null,
+          signings: [],
+          influenceDelta: 0,
+          seasonSignings: 0,
+          seasonSpend: 0,
+        },
         influenceBalance: { humanBalance: 2 },
       },
       effects,
