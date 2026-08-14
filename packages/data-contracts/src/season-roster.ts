@@ -14,7 +14,9 @@ import { SEASON_ROSTER_MAX_SIZE, SEASON_ROSTER_MIN_SIZE } from './season-version
  * player-season versions; coverage, legal-five, contingency, minutes,
  * closing-five, availability, and game validation apply to its
  * exactly-ten-member rotation (`SEASON_ROTATION_SIZE`). Drafts and AI
- * generation still produce exactly `SEASON_DRAFT_SIZE` players.
+ * generation still produce exactly `SEASON_DRAFT_SIZE` players. Ownership
+ * is by version, so two historical versions of the same person may share
+ * a roster.
  */
 
 export const seasonRosterEntrySchema = z.object({
@@ -28,10 +30,10 @@ export const seasonRosterEntrySchema = z.object({
 export type SeasonRosterEntry = z.infer<typeof seasonRosterEntrySchema>;
 
 /**
- * One franchise roster with 10-15 distinct versions and unique real-player
- * identities. The engine enforces the identity-uniqueness invariant
- * (`playerId` appears at most once) and rotation legality at every boundary;
- * the schema refines the distinct-version and capacity facts.
+ * One franchise roster with 10-15 distinct versions. Rotation legality is
+ * an engine invariant; the schema refines distinct-version and capacity
+ * facts. Same-person versions (`playerId` repeats, `playerVersionId` does
+ * not) are legal.
  */
 export const seasonRosterSchema = z
   .object({
@@ -43,7 +45,6 @@ export const seasonRosterSchema = z
   })
   .superRefine((roster, ctx) => {
     const versions = new Set<string>();
-    const identities = new Set<string>();
     for (const player of roster.players) {
       if (versions.has(player.playerVersionId)) {
         ctx.addIssue({
@@ -52,13 +53,6 @@ export const seasonRosterSchema = z
         });
       }
       versions.add(player.playerVersionId);
-      if (identities.has(player.playerId)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `duplicate roster identity ${player.playerId}`,
-        });
-      }
-      identities.add(player.playerId);
     }
   });
 export type SeasonRoster = z.infer<typeof seasonRosterSchema>;

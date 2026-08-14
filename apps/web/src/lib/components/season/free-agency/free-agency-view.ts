@@ -207,11 +207,19 @@ export interface DeclarationValidationInput {
   seasonSpend: number;
 }
 
+/** Next free declaration slot (first, then second). Null when both are taken. */
+export function nextFreePriority(entries: Iterable<{ priority: 1 | 2 }>): 1 | 2 | null {
+  const used = new Set<1 | 2>();
+  for (const entry of entries) used.add(entry.priority);
+  if (!used.has(1)) return 1;
+  if (!used.has(2)) return 2;
+  return null;
+}
+
 /** Local declaration validation (advisory; the engine remains authoritative). */
 export function validateDeclaration(input: DeclarationValidationInput): string[] {
   const failures: string[] = [];
   if (input.targets.length === 0) {
-    failures.push('Pick at least one target to declare — or skip the market.');
     return failures;
   }
   const byVersion = new Map(

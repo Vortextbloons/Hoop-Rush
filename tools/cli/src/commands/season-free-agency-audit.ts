@@ -528,18 +528,12 @@ export function auditSeasonFreeAgencyFacts(run: SeasonRun): {
         `roster of ${roster.franchiseId} has ${String(roster.players.length)} players (10-15 required)`,
       );
     }
-    const rosterIdentities = new Set<string>();
     for (const player of roster.players) {
       if (versionIds.has(player.playerVersionId)) {
         counts.effectsFailures += 1;
         failures.push(`duplicate roster version ${player.playerVersionId}`);
       }
       versionIds.add(player.playerVersionId);
-      if (rosterIdentities.has(player.playerId)) {
-        counts.effectsFailures += 1;
-        failures.push(`duplicate roster identity ${player.playerId} on ${roster.franchiseId}`);
-      }
-      rosterIdentities.add(player.playerId);
       if (!run.ownership.some((row) => row.playerVersionId === player.playerVersionId)) {
         counts.ownershipFailures += 1;
         failures.push(`roster player ${player.playerVersionId} has no ownership row`);

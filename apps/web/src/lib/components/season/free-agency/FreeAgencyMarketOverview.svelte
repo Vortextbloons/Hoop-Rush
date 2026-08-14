@@ -1,8 +1,10 @@
 <script lang="ts">
   import type {
+    HoopRushManifest,
     SeasonFreeAgencyCandidate,
     SeasonFreeAgencyRoleExpectation,
   } from '@hoop-rush/data-contracts';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
   import FreeAgencyCandidateCard from './FreeAgencyCandidateCard.svelte';
   import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
 
@@ -21,25 +23,35 @@
     priority: 0 | 1 | 2;
     role: SeasonFreeAgencyRoleExpectation | null;
     influence: number | null;
+    /** Headshot ref resolved from the packaged catalog (null -> initials). */
+    face?: SeasonFaceRef | null;
+    /** Packaged summary Overall (report field only; never a ranking rule). */
+    overallRating?: number | null;
   }
 
   let {
     cards,
+    manifest = null,
     franchiseName,
     editable = false,
     disabled = false,
+    onToggleTarget,
     onPriorityChange,
     onRoleChange,
     onInfluenceChange,
   }: {
     cards: FreeAgencyCardView[];
+    manifest?: HoopRushManifest | null;
     franchiseName: (franchiseId: string) => string;
     editable?: boolean;
     disabled?: boolean;
+    onToggleTarget: (playerVersionId: string) => void;
     onPriorityChange: (playerVersionId: string, priority: 0 | 1 | 2) => void;
     onRoleChange: (playerVersionId: string, role: SeasonFreeAgencyRoleExpectation) => void;
     onInfluenceChange: (playerVersionId: string, influence: number) => void;
   } = $props();
+
+  const targetedCount = $derived(cards.filter((card) => card.priority !== 0).length);
 </script>
 
 <section aria-labelledby="free-agency-market-heading" class="min-w-0" data-fa-market>
@@ -70,11 +82,16 @@
             isBestFit={card.isBestFit}
             interested={card.interested}
             {franchiseName}
+            face={card.face ?? null}
+            overallRating={card.overallRating ?? null}
+            {manifest}
             priority={card.priority}
             role={card.role}
             influence={card.influence}
             {editable}
             {disabled}
+            canAddTarget={card.priority !== 0 || targetedCount < 2}
+            onToggleTarget={() => onToggleTarget(card.candidate.playerVersionId)}
             onPriorityChange={(priority) =>
               onPriorityChange(card.candidate.playerVersionId, priority)}
             onRoleChange={(role) => onRoleChange(card.candidate.playerVersionId, role)}

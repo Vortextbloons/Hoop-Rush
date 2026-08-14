@@ -42,13 +42,15 @@ function emptyStandings(franchiseIds: string[]): SeasonStandings {
 }
 
 describe('season block recap (M2.3)', () => {
-  // Block 0 costs ~10s to simulate; the first two tests consume the same
-  // simulated checkpoint and its derived recap scaffolding.
+  // Block 0 costs seconds to simulate; the first two tests consume the same
+  // simulated checkpoint and its derived recap scaffolding (identical input,
+  // so the recap is built and audited once).
   let run: SeasonRun;
   let checkpoint: ReturnType<typeof simulateSeasonBlock>;
   let zero: SeasonStandings;
   let rosterPlayerIds: Map<string, string>;
   let schedule: ReturnType<typeof scheduleOf>;
+  let recap: ReturnType<typeof buildSeasonBlockRecap>;
 
   beforeAll(() => {
     const built = buildTestRun();
@@ -62,6 +64,19 @@ describe('season block recap (M2.3)', () => {
       ),
     );
     schedule = scheduleOf(run);
+    const recapInput: SeasonBlockRecapInput = {
+      runId: run.runId,
+      blockIndex: 0,
+      completedRounds: 10,
+      humanFranchiseId: 'lakers',
+      summaries: checkpoint.gameSummaries,
+      standingsBefore: zero,
+      standingsAfter: checkpoint.standings,
+      playerAggregates: checkpoint.playerAggregates,
+      schedule,
+      rosterPlayerIds,
+    };
+    recap = buildSeasonBlockRecap(recapInput);
   }, 60_000);
 
   it('builds a recap whose every claim derives from saved facts', () => {
@@ -77,7 +92,6 @@ describe('season block recap (M2.3)', () => {
       schedule,
       rosterPlayerIds,
     };
-    const recap = buildSeasonBlockRecap(recapInput);
     expect(recap.blockIndex).toBe(0);
     expect(recap.completedRounds).toBe(10);
     expect(recap.humanRecord?.franchiseId).toBe('lakers');
@@ -91,18 +105,6 @@ describe('season block recap (M2.3)', () => {
   });
 
   it('lists exactly the next block human games from the schedule', () => {
-    const recap = buildSeasonBlockRecap({
-      runId: run.runId,
-      blockIndex: 0,
-      completedRounds: 10,
-      humanFranchiseId: 'lakers',
-      summaries: checkpoint.gameSummaries,
-      standingsBefore: zero,
-      standingsAfter: checkpoint.standings,
-      playerAggregates: checkpoint.playerAggregates,
-      schedule,
-      rosterPlayerIds,
-    });
     const { fromRound, toRound } = blockRoundRange(1);
     const expectedCount = schedule.games.filter(
       (game) =>

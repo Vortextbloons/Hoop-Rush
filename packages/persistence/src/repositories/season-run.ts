@@ -104,7 +104,9 @@ export interface CommitSeasonBlockInput {
   /**
    * M2.5: the trade-window open produced by `completeSeasonBlockCommit` (null
    * when none); its mutated rosters/ownership/rotations/effects/trade/
-   * influence/transactions/stateRevision/stateDigest replace the block's.
+   * influence/transactions replace the block's. The commit's own
+   * `stateRevision`/`stateDigest` stay authoritative (they include a
+   * free-agency window opened on the same block).
    */
   window: SeasonWindowOpenResult | null;
 }

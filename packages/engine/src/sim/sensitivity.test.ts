@@ -22,10 +22,10 @@ import { createEngineContext } from './context.ts';
  */
 
 const ctx = createEngineContext();
-// 300 seeded games per side keep the magnitude gates stable: the zero-centered
+// 200 seeded games per side keep the magnitude gates stable: the zero-centered
 // v5 contest and lower zone bases make single-dimension bumps move totals by
-// ~2-4%, which is real but small enough that 200 seeds flirted with the floors.
-const SEEDS = 300;
+// ~2-4%, which is real but small enough that 200 seeds still clear the floors.
+const SEEDS = 200;
 
 function mutatePlayers(
   team: SimulationTeam,

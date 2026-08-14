@@ -71,9 +71,11 @@ import {
  * league-wide seeded rounds under tier ranges, band score caps, global
  * scarcity, and ten-player legality feasibility; and each roster is selected
  * from its own finalized pool. Generation never duplicates a version, never
- * reads packaged Overall, and never relaxes a rule: failures repair
- * deterministically and then throw `SeasonAiGenerationError` with the
- * failing phase and the last canonical allocation state.
+ * duplicates a real-player identity (`playerId`) on an AI roster or across
+ * remaining identities, never reads packaged Overall, and never relaxes a
+ * rule: failures repair deterministically and then throw
+ * `SeasonAiGenerationError` with the failing phase and the last canonical
+ * allocation state. Human rosters may hold multiple versions of one person.
  */
 
 /** Solo-human band quotas (kept as the v1 export; targets.policy is authoritative). */
@@ -525,7 +527,11 @@ interface GenerationState {
   identityPriorityTotals: Map<string, Record<SeasonAiIdentity, number>>;
   thresholds: Record<SeasonRosterRole, RoleThresholds>;
   humanOwned: Set<string>;
-  /** Candidates not human-owned and not inside any pool. */
+  /** Real-player identities claimed by humans or any pool member. */
+  claimedIdentities: Set<string>;
+  /** Every catalog version of each real-player identity. */
+  versionsByIdentity: Map<string, readonly string[]>;
+  /** Candidates not human-owned, not identity-claimed, and not inside any pool. */
   unassigned: Set<string>;
   /** Incremental per-mask counts of `unassigned` (kept in sync). */
   unassignedMaskCountsArr: number[];
@@ -563,6 +569,69 @@ function membersOf(
   versionIds: readonly string[],
 ): SeasonRosterMemberInput[] {
   return versionIds.map((versionId) => memberOf(state, versionId));
+}
+
+function playerIdOf(state: GenerationState, versionId: string): string | undefined {
+  return state.byId.get(versionId)?.playerId;
+}
+
+function uniqueIdentities(state: GenerationState, versionIds: readonly string[]): boolean {
+  const identities = new Set<string>();
+  for (const versionId of versionIds) {
+    const playerId = playerIdOf(state, versionId);
+    if (playerId === undefined) return false;
+    if (identities.has(playerId)) return false;
+    identities.add(playerId);
+  }
+  return true;
+}
+
+function leaveUnassigned(state: GenerationState, versionId: string): void {
+  if (!state.unassigned.has(versionId)) return;
+  state.unassigned.delete(versionId);
+  const mask = state.maskByVersion.get(versionId);
+  if (mask !== undefined && mask !== 0) {
+    state.unassignedMaskCountsArr[mask] = (state.unassignedMaskCountsArr[mask] ?? 0) - 1;
+  }
+  const coverageMask = state.coverageMaskByVersion.get(versionId) ?? 0;
+  for (let role = 0; role < 8; role += 1) {
+    if ((coverageMask & (1 << role)) !== 0) {
+      state.unassignedRoleCoverCounts[role] = (state.unassignedRoleCoverCounts[role] ?? 0) - 1;
+    }
+  }
+}
+
+function enterUnassigned(state: GenerationState, versionId: string): void {
+  if (state.unassigned.has(versionId) || state.humanOwned.has(versionId)) return;
+  state.unassigned.add(versionId);
+  const mask = state.maskByVersion.get(versionId);
+  if (mask !== undefined && mask !== 0) {
+    state.unassignedMaskCountsArr[mask] = (state.unassignedMaskCountsArr[mask] ?? 0) + 1;
+  }
+  const coverageMask = state.coverageMaskByVersion.get(versionId) ?? 0;
+  for (let role = 0; role < 8; role += 1) {
+    if ((coverageMask & (1 << role)) !== 0) {
+      state.unassignedRoleCoverCounts[role] = (state.unassignedRoleCoverCounts[role] ?? 0) + 1;
+    }
+  }
+}
+
+function claimIdentity(state: GenerationState, versionId: string): void {
+  const playerId = playerIdOf(state, versionId);
+  if (playerId === undefined) return;
+  state.claimedIdentities.add(playerId);
+  for (const sibling of state.versionsByIdentity.get(playerId) ?? []) {
+    if (sibling !== versionId) leaveUnassigned(state, sibling);
+  }
+}
+
+function releaseIdentity(state: GenerationState, versionId: string): void {
+  const playerId = playerIdOf(state, versionId);
+  if (playerId === undefined) return;
+  state.claimedIdentities.delete(playerId);
+  for (const sibling of state.versionsByIdentity.get(playerId) ?? []) {
+    if (sibling !== versionId) enterUnassigned(state, sibling);
+  }
 }
 
 function zeroScores(): Record<SeasonRosterRole, number> {
@@ -1011,6 +1080,10 @@ function gatesForAdd(state: GenerationState, team: PoolTeam, versionId: string):
   if (!coverageScarcityAfter(state, team, versionId)) {
     failures.push('coverage scarcity');
   }
+  const playerId = playerIdOf(state, versionId);
+  if (playerId !== undefined && state.claimedIdentities.has(playerId)) {
+    failures.push('identity already claimed');
+  }
   // Exact ten feasibility: the pool (anchors + fixed members) must admit a
   // legal ten with the remaining fill budget. With at most two slots left
   // the check is exact (used-capped per-member DP); earlier the uncapped
@@ -1034,17 +1107,10 @@ function addPoolMember(
 ): void {
   team.pool.push(versionId);
   team.memberPaths.set(versionId, seedPath);
-  state.unassigned.delete(versionId);
+  leaveUnassigned(state, versionId);
+  claimIdentity(state, versionId);
   const mask = state.maskByVersion.get(versionId);
-  if (mask !== undefined && mask !== 0) {
-    state.unassignedMaskCountsArr[mask] = (state.unassignedMaskCountsArr[mask] ?? 0) - 1;
-  }
   const coverageMask = state.coverageMaskByVersion.get(versionId) ?? 0;
-  for (let role = 0; role < 8; role += 1) {
-    if ((coverageMask & (1 << role)) !== 0) {
-      state.unassignedRoleCoverCounts[role] = (state.unassignedRoleCoverCounts[role] ?? 0) - 1;
-    }
-  }
   team.coverageMask |= coverageMask;
   if (mask !== undefined && (mask & 1) !== 0) team.groupCounts.guards += 1;
   if (mask !== undefined && (mask & 2) !== 0) team.groupCounts.forwards += 1;
@@ -1063,17 +1129,9 @@ function removePoolMember(state: GenerationState, team: PoolTeam, versionId: str
   if (index < 0) throw new Error(`pool ${team.franchiseId} does not contain ${versionId}`);
   team.pool.splice(index, 1);
   team.memberPaths.delete(versionId);
-  state.unassigned.add(versionId);
+  enterUnassigned(state, versionId);
+  releaseIdentity(state, versionId);
   const mask = state.maskByVersion.get(versionId);
-  if (mask !== undefined && mask !== 0) {
-    state.unassignedMaskCountsArr[mask] = (state.unassignedMaskCountsArr[mask] ?? 0) + 1;
-  }
-  const coverageMask = state.coverageMaskByVersion.get(versionId) ?? 0;
-  for (let role = 0; role < 8; role += 1) {
-    if ((coverageMask & (1 << role)) !== 0) {
-      state.unassignedRoleCoverCounts[role] = (state.unassignedRoleCoverCounts[role] ?? 0) + 1;
-    }
-  }
   if (mask !== undefined && (mask & 1) !== 0)
     team.groupCounts.guards = Math.max(0, team.groupCounts.guards - 1);
   if (mask !== undefined && (mask & 2) !== 0)
@@ -1215,6 +1273,7 @@ function anchorOptionsFor(state: GenerationState, team: PoolTeam): AnchorOption[
   const options: AnchorOption[] = [];
   for (const candidate of state.canonicalCandidates) {
     if (state.humanOwned.has(candidate.playerVersionId)) continue;
+    if (state.claimedIdentities.has(candidate.playerId)) continue;
     const roleTiers = state.roleTiers.get(candidate.playerVersionId);
     if (roleTiers === undefined) continue;
     const roleScores = state.roleScores.get(candidate.playerVersionId);
@@ -1617,6 +1676,7 @@ function pickForPool(state: GenerationState, team: PoolTeam, round: number): str
     const mask = state.maskByVersion.get(id) ?? 0;
     if (mask === 0 || !feasibleMasks.has(mask)) continue;
     if (!state.unassigned.has(id)) continue;
+    if (state.claimedIdentities.has(candidate.playerId)) continue;
     if (state.bans.has(`${team.franchiseId}:${id}`)) continue;
     if (!poolCoverageFeasible(state, team, id, true)) continue;
     if (!coverageScarcityAfter(state, team, id)) continue;
@@ -1722,6 +1782,7 @@ interface PoolSnapshot {
   unassigned: string[];
   unassignedMaskCountsArr: number[];
   remainingSlots: number;
+  claimedIdentities: string[];
 }
 
 function snapshotPools(state: GenerationState): PoolSnapshot {
@@ -1743,6 +1804,7 @@ function snapshotPools(state: GenerationState): PoolSnapshot {
     unassigned: [...state.unassigned],
     unassignedMaskCountsArr: [...state.unassignedMaskCountsArr],
     remainingSlots: state.remainingSlots,
+    claimedIdentities: [...state.claimedIdentities],
   };
 }
 
@@ -1764,6 +1826,7 @@ function restorePools(state: GenerationState, snapshot: PoolSnapshot): void {
   state.unassigned = new Set(snapshot.unassigned);
   state.unassignedMaskCountsArr = [...snapshot.unassignedMaskCountsArr];
   state.remainingSlots = snapshot.remainingSlots;
+  state.claimedIdentities = new Set(snapshot.claimedIdentities);
   for (const entry of snapshot.pools) {
     const team = state.teams.get(entry.franchiseId);
     if (team === undefined) throw new Error(`missing team ${entry.franchiseId}`);
@@ -1922,6 +1985,7 @@ function poolViolations(state: GenerationState, teamId: string): string[] {
     violations.push(`pool has ${String(team.pool.length)} of ${String(poolSize)} members`);
   }
   if (new Set(team.pool).size !== team.pool.length) violations.push('pool contains duplicates');
+  if (!uniqueIdentities(state, team.pool)) violations.push('pool contains duplicate identities');
   // The exact ten admission uses the order-independent used-capped per-member
   // DP (the shared per-mask DP in roster-rules is order-sensitive for
   // multi-position masks and is not used for pool validation here).
@@ -2254,6 +2318,7 @@ function coverageFeasibleFromPool(
  */
 function rosterLegal(state: GenerationState, team: PoolTeam, ids: readonly string[]): boolean {
   if (ids.length !== 10) return false;
+  if (!uniqueIdentities(state, ids)) return false;
   const members = membersOf(state, ids);
   if (validateSeasonRoster(members).length > 0) return false;
   if (!completionTargetsMet(members)) return false;
@@ -2340,6 +2405,13 @@ function greedySelection(state: GenerationState, team: PoolTeam): string[] | nul
     let best: { id: string; score: number } | undefined;
     for (const id of sortedPool) {
       if (picked.includes(id)) continue;
+      const candidateId = playerIdOf(state, id);
+      if (
+        candidateId !== undefined &&
+        picked.some((pickedId) => playerIdOf(state, pickedId) === candidateId)
+      ) {
+        continue;
+      }
       const mask = state.maskByVersion.get(id) ?? 0;
       const probeCounts = {
         guards: pickedCounts.guards + ((mask & 1) !== 0 ? 1 : 0),
@@ -2517,6 +2589,13 @@ function bestTenDfs(
     for (let i = index; i < ordered.length; i += 1) {
       const id = ordered[i];
       if (id === undefined) continue;
+      const candidateId = playerIdOf(state, id);
+      if (
+        candidateId !== undefined &&
+        picked.some((pickedId) => playerIdOf(state, pickedId) === candidateId)
+      ) {
+        continue;
+      }
       const afterPicked = [...picked, id];
       const remaining = ordered.slice(i + 1);
       const mask = state.maskByVersion.get(id) ?? 0;
@@ -2883,11 +2962,24 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
   const byId = new Map(
     catalog.candidates.map((candidate) => [candidate.playerVersionId, candidate]),
   );
+  const humanOwnedIdentities = new Set<string>();
+  const identityOwner = new Map<string, string>();
   for (const roster of input.humanRosters) {
+    const identities: string[] = [];
     for (const versionId of roster.playerVersionIds) {
-      if (!byId.has(versionId)) {
+      const candidate = byId.get(versionId);
+      if (candidate === undefined) {
         throw new Error(`human roster references unknown version ${versionId}`);
       }
+      identities.push(candidate.playerId);
+    }
+    for (const playerId of identities) {
+      const owner = identityOwner.get(playerId);
+      if (owner !== undefined && owner !== roster.franchiseId) {
+        throw new Error(`human rosters claim identity ${playerId} more than once`);
+      }
+      identityOwner.set(playerId, roster.franchiseId);
+      humanOwnedIdentities.add(playerId);
     }
   }
   const humanOwned = new Set(input.humanRosters.flatMap((roster) => roster.playerVersionIds));
@@ -2895,6 +2987,12 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
   const canonicalCandidates = [...catalog.candidates].sort((a, b) =>
     a.playerVersionId < b.playerVersionId ? -1 : a.playerVersionId > b.playerVersionId ? 1 : 0,
   );
+  const versionsByIdentity = new Map<string, string[]>();
+  for (const candidate of canonicalCandidates) {
+    const versions = versionsByIdentity.get(candidate.playerId) ?? [];
+    versions.push(candidate.playerVersionId);
+    versionsByIdentity.set(candidate.playerId, versions);
+  }
   const populationScores = canonicalCandidates
     .filter((candidate) => !humanOwned.has(candidate.playerVersionId))
     .map((candidate) => roleScoresOf(candidate));
@@ -2970,8 +3068,11 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     });
   }
   const initialUnassigned = canonicalCandidates
-    .map((candidate) => candidate.playerVersionId)
-    .filter((id) => !humanOwned.has(id));
+    .filter(
+      (candidate) =>
+        !humanOwned.has(candidate.playerVersionId) && !humanOwnedIdentities.has(candidate.playerId),
+    )
+    .map((candidate) => candidate.playerVersionId);
   const initialMaskCounts = maskCountsOf(initialUnassigned, maskByVersion);
   const state: GenerationState = {
     seed: input.seed,
@@ -2986,6 +3087,8 @@ export function generateAiLeague(input: SeasonAiGenerationInput): SeasonLeagueGe
     identityPriorityTotals,
     thresholds,
     humanOwned,
+    claimedIdentities: new Set(humanOwnedIdentities),
+    versionsByIdentity,
     unassigned: new Set(initialUnassigned),
     unassignedMaskCountsArr: initialMaskCounts,
     unassignedRoleCoverCounts: roleCoverCountsOf(initialUnassigned, coverageMaskByVersion),

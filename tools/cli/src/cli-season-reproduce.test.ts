@@ -19,6 +19,18 @@ import {
   replayDeps,
 } from './season-reproduce-test-support.ts';
 
+let sharedReplayDeps: ReturnType<typeof replayDeps> | null = null;
+function cachedReplayDeps(): ReturnType<typeof replayDeps> {
+  if (sharedReplayDeps === null) sharedReplayDeps = replayDeps();
+  return sharedReplayDeps;
+}
+
+let sharedFreeAgencyReplayDeps: ReturnType<typeof freeAgencyReplayDeps> | null = null;
+function cachedFreeAgencyReplayDeps(): ReturnType<typeof freeAgencyReplayDeps> {
+  if (sharedFreeAgencyReplayDeps === null) sharedFreeAgencyReplayDeps = freeAgencyReplayDeps();
+  return sharedFreeAgencyReplayDeps;
+}
+
 /**
  * M2.6 `season run reproduce` tests (replay-export-v1, full-run): the
  * authoritative replay over a real command sequence (trade window, accept,
@@ -30,7 +42,7 @@ import {
 describe('season run reproduce (replay-export-v1)', () => {
   it('reproduces a real command sequence with no divergence', () => {
     const { exportArtifact } = buildReplayedRun();
-    const { divergence, divergences } = replaySeasonRunExport(exportArtifact, replayDeps());
+    const { divergence, divergences } = replaySeasonRunExport(exportArtifact, cachedReplayDeps());
     expect(divergence).toBeNull();
     expect(divergences).toEqual([]);
     expect(() => seasonRunReplayExportSchema.parse(exportArtifact)).not.toThrow();
@@ -51,7 +63,7 @@ describe('season run reproduce (replay-export-v1)', () => {
         commandLogDigest: seasonCommandLogDigest(mutatedLog.entries),
       },
     });
-    const { divergence } = replaySeasonRunExport(mutated, replayDeps());
+    const { divergence } = replaySeasonRunExport(mutated, cachedReplayDeps());
     expect(divergence).not.toBeNull();
     expect(divergence?.ordinal).toBe(mutatedEntries.length - 1);
     expect(divergence?.kind).toBe('state-digest');
@@ -76,7 +88,7 @@ describe('season run reproduce (replay-export-v1)', () => {
         commandLogDigest: seasonCommandLogDigest(gappedLog.entries),
       },
     });
-    const { divergence } = replaySeasonRunExport(exportArtifact, replayDeps());
+    const { divergence } = replaySeasonRunExport(exportArtifact, cachedReplayDeps());
     expect(divergence).not.toBeNull();
     expect(divergence?.kind).toBe('chain-fact');
     expect(divergence?.detail).toContain('ordinal gap');
@@ -89,7 +101,7 @@ describe('season run reproduce (replay-export-v1)', () => {
       assetHashes: { ...exportInput.assetHashes, draftCatalog: 'f'.repeat(64) },
     });
     const { divergence } = replaySeasonRunExport(exportArtifact, {
-      ...replayDeps(),
+      ...cachedReplayDeps(),
       verifyAssetHashes: () => ['draftCatalog content hash mismatch'],
     });
     expect(divergence).not.toBeNull();
@@ -213,7 +225,7 @@ describe('season run reproduce free-agency divergence (M2.6.5)', () => {
     const { exportArtifact } = buildFreeAgencyReplayedRun();
     const { divergence, divergences } = replaySeasonRunExport(
       exportArtifact,
-      freeAgencyReplayDeps(),
+      cachedFreeAgencyReplayDeps(),
     );
     expect(divergence).toBeNull();
     expect(divergences).toEqual([]);
@@ -230,7 +242,7 @@ describe('season run reproduce free-agency divergence (M2.6.5)', () => {
     });
     const { divergence } = replaySeasonRunExport(
       buildSeasonRunReplayExport(exportInput),
-      freeAgencyReplayDeps(),
+      cachedFreeAgencyReplayDeps(),
     );
     expect(divergence).not.toBeNull();
     expect(divergence?.kind).toBe('free-agency');
@@ -243,7 +255,7 @@ describe('season run reproduce free-agency divergence (M2.6.5)', () => {
     });
     const { divergence } = replaySeasonRunExport(
       buildSeasonRunReplayExport(exportInput),
-      freeAgencyReplayDeps(),
+      cachedFreeAgencyReplayDeps(),
     );
     expect(divergence).not.toBeNull();
     expect(divergence?.kind).toBe('free-agency');

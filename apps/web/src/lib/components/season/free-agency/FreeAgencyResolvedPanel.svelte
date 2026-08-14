@@ -1,7 +1,9 @@
 <script lang="ts">
   import { ChevronDown, Trophy, X } from '@lucide/svelte';
-  import type { SeasonFreeAgencyWindowState } from '@hoop-rush/data-contracts';
+  import type { HoopRushManifest, SeasonFreeAgencyWindowState } from '@hoop-rush/data-contracts';
   import type { SeasonFreeAgencyTraceStep } from '@hoop-rush/data-contracts';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
   import {
     CRITERION_LABEL,
     FREE_AGENCY_BAND_LABEL,
@@ -11,10 +13,10 @@
 
   /**
    * Recorded results of a resolved window (spec/2.0/15): the winning
-   * signings (band, role expectation, cost), the human result (signed or
-   * not), and the categorical seven-step trace (criterion + category +
-   * cited facts) in an accessible disclosure. Read-only history: a resolved
-   * window never changes.
+   * signings (headshots, band, role expectation, cost), the human result
+   * (signed or not), and the categorical seven-step trace (criterion +
+   * category + cited facts) in an accessible disclosure. Read-only history:
+   * a resolved window never changes.
    */
 
   let {
@@ -22,6 +24,8 @@
     humanFranchiseId,
     franchiseName,
     playerName,
+    manifest = null,
+    faceOf = null,
     signingCount,
     seasonSpend,
     resolvedInThisSession = false,
@@ -30,6 +34,8 @@
     humanFranchiseId: string | null;
     franchiseName: (franchiseId: string) => string;
     playerName: (playerVersionId: string) => string;
+    manifest?: HoopRushManifest | null;
+    faceOf?: ((playerVersionId: string) => SeasonFaceRef | null) | null;
     signingCount: number;
     seasonSpend: number;
     /** True when the human pressed resolve this session (announce once). */
@@ -86,6 +92,7 @@
     <ul class="mt-3 flex flex-col gap-1.5" data-fa-signings>
       {#each window.signings as signing (signing.signingId)}
         {@const human = signing.franchiseId === humanFranchiseId}
+        {@const face = manifest !== null ? (faceOf?.(signing.playerVersionId) ?? null) : null}
         <li
           data-fa-signing
           data-fa-signing-human={human ? 'true' : 'false'}
@@ -97,6 +104,16 @@
             <Trophy class="h-4 w-4 shrink-0 text-positive" aria-hidden="true" />
           {:else}
             <X class="h-4 w-4 shrink-0 text-muted-foreground/40" aria-hidden="true" />
+          {/if}
+          {#if manifest !== null && face !== null}
+            <SeasonPlayerFace {face} {manifest} size="sm" />
+          {:else}
+            <span
+              class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"
+              aria-hidden="true"
+            >
+              ?
+            </span>
           {/if}
           <span class="min-w-0 truncate font-semibold">
             {franchiseName(signing.franchiseId)}

@@ -735,6 +735,38 @@ describe('season run schema', () => {
     expect(() => seasonRunSchema.parse({ ...run, rosters })).toThrow();
   });
 
+  it('accepts two versions of the same person on one roster', () => {
+    const run = buildRun();
+    const rosters = run.rosters.map((roster, index) => {
+      if (index !== 0) return roster;
+      const first = roster.players[0];
+      if (first === undefined) throw new Error('need a player');
+      return {
+        ...roster,
+        players: roster.players.map((player, slot) =>
+          slot === 1 ? { ...player, playerId: first.playerId } : player,
+        ),
+      };
+    });
+    expect(() => seasonRunSchema.parse({ ...run, rosters })).not.toThrow();
+  });
+
+  it('rejects duplicate player versions on one roster', () => {
+    const run = buildRun();
+    const rosters = run.rosters.map((roster, index) => {
+      if (index !== 0) return roster;
+      const first = roster.players[0];
+      if (first === undefined) throw new Error('need a player');
+      return {
+        ...roster,
+        players: roster.players.map((player, slot) =>
+          slot === 1 ? { ...player, playerVersionId: first.playerVersionId } : player,
+        ),
+      };
+    });
+    expect(() => seasonRunSchema.parse({ ...run, rosters })).toThrow();
+  });
+
   it('rejects a roster entry with an undecodable playerVersionId', () => {
     const run = buildRun();
     const rosters = run.rosters.map((roster, index) =>

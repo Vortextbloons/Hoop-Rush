@@ -1,15 +1,17 @@
 <script lang="ts">
   import { Check, Minus, Plus } from '@lucide/svelte';
   import type {
+    HoopRushManifest,
     SeasonFreeAgencyCandidate,
     SeasonFreeAgencyRoleExpectation,
   } from '@hoop-rush/data-contracts';
   import { formatPositions } from '$lib/player-positions';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
   import type { CandidateFitFacts, InterestedTeam } from './free-agency-view';
   import {
     FREE_AGENCY_BAND_BLURB,
     FREE_AGENCY_BAND_LABEL,
-    influenceOptionsOf,
     ROLE_EXPECTATION_LABEL,
   } from './free-agency-view';
 
@@ -33,11 +35,16 @@
     isBestFit = false,
     interested = [],
     franchiseName,
+    face = null,
+    overallRating = null,
+    manifest = null,
     priority = 0,
     role = null,
     influence = null,
     editable = false,
     disabled = false,
+    canAddTarget = true,
+    onToggleTarget,
     onPriorityChange,
     onRoleChange,
     onInfluenceChange,
@@ -50,6 +57,9 @@
     /** Franchises with recorded interest, human first. */
     interested?: InterestedTeam[];
     franchiseName: (franchiseId: string) => string;
+    face?: SeasonFaceRef | null;
+    overallRating?: number | null;
+    manifest?: HoopRushManifest | null;
     /** 0 = not targeted; 1 = first priority; 2 = second priority. */
     priority?: 0 | 1 | 2;
     role?: SeasonFreeAgencyRoleExpectation | null;
@@ -57,12 +67,14 @@
     /** False once the declaration is submitted (immutable). */
     editable?: boolean;
     disabled?: boolean;
+    /** False when two other players already fill the declaration. */
+    canAddTarget?: boolean;
+    onToggleTarget: () => void;
     onPriorityChange: (priority: 0 | 1 | 2) => void;
     onRoleChange: (role: SeasonFreeAgencyRoleExpectation) => void;
     onInfluenceChange: (influence: number) => void;
   } = $props();
 
-  const influences = $derived(influenceOptionsOf(candidate));
   const selected = $derived(priority !== 0);
   const effectiveInfluence = $derived(influence ?? candidate.minimumInfluence);
 
@@ -103,9 +115,30 @@
     ? 'border-primary/50 ring-1 ring-primary/30'
     : ''}"
 >
-  <div class="flex min-w-0 items-start justify-between gap-2">
-    <div class="min-w-0">
-      <h4 class="truncate text-sm font-bold leading-snug">{candidate.displayName}</h4>
+  <div class="flex min-w-0 items-start gap-2.5">
+    {#if manifest !== null && face !== null}
+      <SeasonPlayerFace {face} {manifest} size="sm" />
+    {:else}
+      <span
+        class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"
+        aria-hidden="true"
+      >
+        ?
+      </span>
+    {/if}
+    <div class="min-w-0 flex-1">
+      <div class="flex min-w-0 items-center gap-1.5">
+        <h4 class="truncate text-sm font-bold leading-snug">{candidate.displayName}</h4>
+        {#if overallRating !== null}
+          <span
+            class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
+            data-fa-overall
+            title="Packaged summary Overall (report only)"
+          >
+            OVR {overallRating}
+          </span>
+        {/if}
+      </div>
       <p class="mt-0.5 font-mono text-[10px] leading-snug text-muted-foreground">
         {formatPositions(candidate.positions.playable)}
       </p>
@@ -263,17 +296,32 @@
   {/if}
 
   <div class="mt-auto flex flex-col gap-2 border-t border-border/50 pt-2.5">
+    {#if editable}
+      <button
+        type="button"
+        data-fa-candidate-target
+        aria-pressed={selected}
+        onclick={onToggleTarget}
+        disabled={disabled || (!selected && !canAddTarget)}
+        class="inline-flex min-h-10 items-center justify-center rounded-lg px-3 py-1.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 {selected
+          ? 'bg-primary text-primary-foreground'
+          : 'bg-surface-2 text-foreground hover:bg-surface-3'}"
+      >
+        {selected ? 'Remove target' : 'Target'}
+      </button>
+    {/if}
     <div class="flex items-center gap-2">
       <label class="sr-only" for="fa-priority-{candidate.playerVersionId}">
         Target {candidate.displayName} as
       </label>
       <select
         id="fa-priority-{candidate.playerVersionId}"
-        value={priority}
         data-fa-candidate-priority
         disabled={!editable || disabled}
-        onchange={(event) =>
-          onPriorityChange(Number((event.currentTarget as HTMLSelectElement).value) as 0 | 1 | 2)}
+        bind:value={
+          () => priority,
+          (next) => onPriorityChange((typeof next === 'number' ? next : Number(next)) as 0 | 1 | 2)
+        }
         class="min-h-10 min-w-0 flex-1 rounded-lg bg-surface-2 px-2 py-1.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40"
       >
         <option value={0}>Not targeting</option>

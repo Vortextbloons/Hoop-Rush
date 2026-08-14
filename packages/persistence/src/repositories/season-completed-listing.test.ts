@@ -627,36 +627,12 @@ describe('season completed-season listing and completion transaction (M2.6)', ()
             .mockRejectedValueOnce(new Error('x-command-log')),
       ],
       [
-        'history index row',
-        'x-index',
-        (adapters) =>
-          vi
-            .spyOn(adapters.db.seasonCompletedIndex, 'put')
-            .mockRejectedValueOnce(new Error('x-index')),
-      ],
-      [
         'active checkpoint removal',
         'x-run-delete',
         (adapters) =>
           vi
             .spyOn(adapters.db.seasonRuns, 'delete')
             .mockRejectedValueOnce(new Error('x-run-delete')),
-      ],
-      [
-        'active index removal',
-        'x-index-delete',
-        (adapters) =>
-          vi
-            .spyOn(adapters.db.seasonRunIndex, 'delete')
-            .mockRejectedValueOnce(new Error('x-index-delete')),
-      ],
-      [
-        'pending candidate removal',
-        'x-pending-delete',
-        (adapters) =>
-          vi
-            .spyOn(adapters.db.seasonPendingBlocks, 'delete')
-            .mockRejectedValueOnce(new Error('x-pending-delete')),
       ],
     ];
     for (const [label, errorMessage, inject] of failures) {

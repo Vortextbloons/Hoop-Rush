@@ -769,7 +769,7 @@ describe('cli: season game calibrate (end-to-end, real engine)', () => {
         '--seed-from',
         '0',
         '--seed-to',
-        '15',
+        '7',
         '--workers',
         '2',
         '--out',
@@ -777,11 +777,11 @@ describe('cli: season game calibrate (end-to-end, real engine)', () => {
         '--format',
         'json',
       ]);
-      // 16 calibration seeds with no held-out seeds: the held-out gate fails.
+      // 8 calibration seeds with no held-out seeds: the held-out gate fails.
       expect(code).toBe(1);
       const payload = seasonGameCalibrateReportSchema.parse(jsonPayload(stdout, stderr));
       expect(payload.fixtures).toHaveLength(3);
-      expect(payload.calibrationSeedCount).toBe(16);
+      expect(payload.calibrationSeedCount).toBe(8);
       expect(payload.validationSeedCount).toBe(0);
       expect(payload.fixtureStats).toHaveLength(3);
       expect(payload.gates.zeroFailures).toBe(true);

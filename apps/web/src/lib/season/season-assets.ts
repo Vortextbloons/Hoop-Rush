@@ -136,16 +136,17 @@ export function loadSeasonFreeAgencyIndex(): Promise<SeasonFreeAgencyIndex> {
 }
 
 /**
- * M2.6.5: the frozen roster-targets policy (AI free-agency ceilings). Prefers
- * the dedicated `season.freeAgencyTargets` manifest entry when packaged and
- * falls back to the roster-targets artifact (the frozen AI band policy the
- * free-agency ceilings derive from).
+ * M2.6.5: the frozen roster-targets policy used as AI free-agency ceilings
+ * (`policy.bandPoolScoreCaps`, outlier limits). Runtime always loads
+ * `season.rosterTargets`. The packaged `season.freeAgencyTargets` entry is
+ * the free-agency-targets-v1 calibration artifact — a different schema —
+ * and must not be parsed as roster targets.
  */
 export function loadSeasonFreeAgencyTargets(): Promise<SeasonRosterTargets> {
   return memoized('season/free-agency-targets', async () => {
     const manifest = await getManifest();
-    const entry = manifest.season?.freeAgencyTargets ?? manifest.season?.rosterTargets;
-    if (!entry) throw new Error('The season free-agency targets artifact is unavailable.');
+    const entry = manifest.season?.rosterTargets;
+    if (!entry) throw new Error('The season roster-targets artifact is unavailable.');
     return fetchVerified(resolveAssetUrl(entry.url), entry.contentHash, (value: unknown) =>
       seasonRosterTargetsSchema.parse(value),
     );

@@ -216,6 +216,37 @@ describe('season AI league generation', () => {
     }
   });
 
+  it('allows a human roster to hold two versions of the same person', () => {
+    const catalog = structuredClone(CATALOG);
+    const human = humanRoster(catalog, 'lakers', '1990s');
+    const firstVersion = human[0];
+    const secondVersion = human[1];
+    if (firstVersion === undefined || secondVersion === undefined) {
+      throw new Error('human roster needs two versions');
+    }
+    const first = catalog.candidates.find((c) => c.playerVersionId === firstVersion);
+    const second = catalog.candidates.find((c) => c.playerVersionId === secondVersion);
+    if (first === undefined || second === undefined) throw new Error('candidates missing');
+    second.playerId = first.playerId;
+    const result = generateAiLeague({
+      seed: seedFromString('same-person-human'),
+      catalog,
+      league: LEAGUE,
+      humanFranchiseIds: ['lakers'],
+      humanRosters: [{ franchiseId: 'lakers', playerVersionIds: human }],
+      targets: buildTestTargets(),
+    });
+    const humanRow = result.rosters.find((r) => r.franchiseId === 'lakers');
+    expect(humanRow?.players.map((p) => p.playerVersionId).sort()).toEqual([...human].sort());
+    const humanIdentities = humanRow?.players.map((p) => p.playerId) ?? [];
+    expect(new Set(humanIdentities).size).toBe(humanIdentities.length - 1);
+    for (const roster of result.rosters.filter((r) => r.franchiseId !== 'lakers')) {
+      expect(roster.players.some((p) => p.playerId === first.playerId)).toBe(false);
+      const identities = roster.players.map((p) => p.playerId);
+      expect(new Set(identities).size).toBe(identities.length);
+    }
+  });
+
   it('orders band medians (contender > weaker) across seeds', () => {
     const seeds = ['order-1', 'order-2', 'order-3', 'order-4', 'order-5'];
     const scores = { contender: [] as number[], weaker: [] as number[] };

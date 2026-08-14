@@ -560,38 +560,22 @@ function swappedRosterIds(
 
 /**
  * True when the roster keeps the season-trade-v2 contract: 10-15 distinct
- * versions, unique real-player identities, and a legal ten-player rotation
- * subset (a G,G,F,F,C five that survives any single removal).
+ * versions and a legal ten-player rotation subset (a G,G,F,F,C five that
+ * survives any single removal). Same-person versions may coexist.
  */
-function rosterIsLegal(
-  rosterIds: readonly string[],
-  facts: SeasonTradeCatalogFacts,
-  identityByVersion: ReadonlyMap<string, string>,
-): boolean {
-  return rosterLegalityReasons(rosterIds, facts, identityByVersion).length === 0;
-}
-
-/** The identity map (playerVersionId -> playerId) derived from the run rosters. */
-function identityByVersionOf(run: SeasonRun): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const roster of run.rosters) {
-    for (const player of roster.players) {
-      map.set(player.playerVersionId, player.playerId);
-    }
-  }
-  return map;
+function rosterIsLegal(rosterIds: readonly string[], facts: SeasonTradeCatalogFacts): boolean {
+  return rosterLegalityReasons(rosterIds, facts).length === 0;
 }
 
 /**
  * Legality failure strings for a candidate roster (accept-command path).
  * M2.6.5 (season-trade-v2): the resulting roster must hold 10-15 distinct
- * versions, unique identities, and at least one legal ten-player rotation
- * subset (the rotation rules the game pipeline enforces).
+ * versions and at least one legal ten-player rotation subset (the rotation
+ * rules the game pipeline enforces). Same-person versions may coexist.
  */
 function rosterLegalityReasons(
   rosterIds: readonly string[],
   facts: SeasonTradeCatalogFacts,
-  identityByVersion: ReadonlyMap<string, string>,
 ): string[] {
   const failures: string[] = [];
   if (rosterIds.length < SEASON_ROSTER_MIN_SIZE || rosterIds.length > SEASON_ROSTER_MAX_SIZE) {
@@ -599,14 +583,6 @@ function rosterLegalityReasons(
   }
   if (new Set(rosterIds).size !== rosterIds.length) {
     failures.push('roster must contain distinct playerVersionIds');
-  }
-  const identities = new Set<string>();
-  for (const id of rosterIds) {
-    const playerId = identityByVersion.get(id);
-    if (playerId !== undefined) identities.add(playerId);
-  }
-  if (identities.size !== new Set(rosterIds).size) {
-    failures.push('roster must contain unique real-player identities');
   }
   const members: SeasonRosterMemberInput[] = rosterIds.map((playerVersionId) => ({
     playerVersionId,
@@ -688,7 +664,6 @@ function humanOfferCandidate(
 ): OfferCandidate | null {
   const { run, rootSeed, humanFranchiseId, catalogFacts } = context;
   const sizes = packageSizesOf(kind);
-  const identityByVersion = identityByVersionOf(run);
   const humanRosterIds = rosterPlayerVersionIdsOf(run, humanFranchiseId);
   const aiRosterIds = rosterPlayerVersionIdsOf(run, aiFranchiseId);
   const outgoing = pickDistinct(
@@ -706,8 +681,7 @@ function humanOfferCandidate(
   const humanAfter = swappedRosterIds(humanRosterIds, outgoing, incoming);
   const aiAfter = swappedRosterIds(aiRosterIds, incoming, outgoing);
   if (
-    !rosterIsLegal(humanAfter, catalogFacts, identityByVersion) ||
-    !rosterIsLegal(aiAfter, catalogFacts, identityByVersion)
+    !rosterIsLegal(humanAfter, catalogFacts) || !rosterIsLegal(aiAfter, catalogFacts)
   ) {
     return null;
   }
@@ -995,7 +969,6 @@ function aiTradeCandidate(
   if (usedPairs.has(pairKey)) return null;
 
   const kind = packageKindOf(tradeSeed(rootSeed, ...basePath, 'size'));
-  const identityByVersion = identityByVersionOf(run);
   const rosterA = rosterPlayerVersionIdsOf(run, a);
   const rosterB = rosterPlayerVersionIdsOf(run, b);
   // When the rosters cannot support the drawn kind (e.g. uneven packages on
@@ -1024,8 +997,7 @@ function aiTradeCandidate(
     const aAfter = swappedRosterIds(rosterA, outgoing, incoming);
     const bAfter = swappedRosterIds(rosterB, incoming, outgoing);
     if (
-      !rosterIsLegal(aAfter, catalogFacts, identityByVersion) ||
-      !rosterIsLegal(bAfter, catalogFacts, identityByVersion)
+      !rosterIsLegal(aAfter, catalogFacts) || !rosterIsLegal(bAfter, catalogFacts)
     ) {
       continue;
     }
@@ -1502,16 +1474,17 @@ export interface SeasonTradeApplicationResult {
 /**
  * Applies one trade atomically (M2.5 §13; M2.6.5 season-trade-v2): unique
  * ownership transfer (a version never appears on two rosters), both rosters
- * updated (legal 10-15 players with unique identities and a legal ten-player
- * rotation subset), injury records follow the players, and one immutable
- * `trade` transaction entry. When ONLY inactive players move, rotations and
- * the active effects state are untouched (spec/2.0/15). When rotation
- * players move, rotations are repaired deterministically (retained
- * assignments/minutes preserved where possible) and the active pair state
- * is rebuilt from the repaired rotations, preserving unchanged pairs and
- * creating zero-state pairs for new rotation teammates. Does NOT advance
- * `stateRevision`/`stateDigest` — the caller (command handler or window
- * opener) bumps the revision exactly once and recomputes the digest.
+ * updated (legal 10-15 distinct versions; same-person versions may coexist)
+ * with a legal ten-player rotation subset. Injury records follow the
+ * players, and one immutable `trade` transaction entry is recorded. When
+ * ONLY inactive players move, rotations and the active effects state are
+ * untouched (spec/2.0/15). When rotation players move, rotations are
+ * repaired deterministically (retained assignments/minutes preserved where
+ * possible) and the active pair state is rebuilt from the repaired
+ * rotations, preserving unchanged pairs and creating zero-state pairs for
+ * new rotation teammates. Does NOT advance `stateRevision`/`stateDigest` —
+ * the caller (command handler or window opener) bumps the revision exactly
+ * once and recomputes the digest.
  */
 export function applySeasonTrade(
   run: SeasonEconomyRun,
@@ -1525,7 +1498,6 @@ export function applySeasonTrade(
     );
   }
   const facts = seasonTradeCatalogFactsOf(catalog);
-  const identityByVersion = identityByVersionOf(run);
   const { toFranchiseId, fromFranchiseId } = offer;
   if (toFranchiseId === fromFranchiseId) {
     throw new SeasonTradeInvariantError('a trade must involve two distinct franchises');
@@ -1588,12 +1560,8 @@ export function applySeasonTrade(
   const toIdsAfter = toEntries.map((player) => player.playerVersionId);
   const fromIdsAfter = fromEntries.map((player) => player.playerVersionId);
   const legalityFailures = [
-    ...rosterLegalityReasons(toIdsAfter, facts, identityByVersion).map(
-      (reason) => `${toFranchiseId}: ${reason}`,
-    ),
-    ...rosterLegalityReasons(fromIdsAfter, facts, identityByVersion).map(
-      (reason) => `${fromFranchiseId}: ${reason}`,
-    ),
+    ...rosterLegalityReasons(toIdsAfter, facts).map((reason) => `${toFranchiseId}: ${reason}`),
+    ...rosterLegalityReasons(fromIdsAfter, facts).map((reason) => `${fromFranchiseId}: ${reason}`),
   ];
   if (legalityFailures.length > 0) {
     throw new SeasonTradeInvariantError(

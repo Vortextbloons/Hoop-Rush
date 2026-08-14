@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type {
+    HoopRushManifest,
     SeasonFreeAgencyCandidate,
     SeasonFreeAgencyRoleExpectation,
   } from '@hoop-rush/data-contracts';
@@ -16,9 +17,12 @@
     humanDeclarationOf,
     humanSkipped,
     interestedTeamsOf,
+    nextFreePriority,
     openFreeAgencyWindowOf,
     validateDeclaration,
   } from '$lib/components/season/free-agency/free-agency-view';
+  import { initialsOf, type SeasonFaceRef } from '$lib/season/season-branding';
+  import { candidateOf, overallRatingOf } from '$lib/season/season-catalog-index';
   import { describeCommandRejection } from '$lib/season/season-hub-state';
   import {
     SEASON_RUN_SHELL_CONTEXT,
@@ -119,6 +123,18 @@
     draft = assignPriority(playerVersionId, priority);
   }
 
+  /** Click-to-target: first pick is first priority, second pick is second. */
+  function toggleTarget(playerVersionId: string) {
+    if (submitting) return;
+    if (draft[playerVersionId] !== undefined) {
+      draft = assignPriority(playerVersionId, 0);
+      return;
+    }
+    const next = nextFreePriority(Object.values(draft));
+    if (next === null) return;
+    draft = assignPriority(playerVersionId, next);
+  }
+
   function setRole(playerVersionId: string, role: SeasonFreeAgencyRoleExpectation) {
     if (submitting) return;
     const entry = draft[playerVersionId];
@@ -162,6 +178,35 @@
 
   const activeRotationIds = $derived(shell.editor?.activeMemberIds() ?? []);
 
+  /**
+   * Headshot ref for a market candidate, resolved from the packaged catalog
+   * (the candidate card's `catalogRef` points at it). Best-effort: cards
+   * render initials without a doomed network request when the catalog is
+   * missing or the join fails.
+   */
+  function freeAgencyFaceOf(candidate: SeasonFreeAgencyCandidate): SeasonFaceRef | null {
+    const catalogCandidate = candidateOf(shell.catalog, candidate.playerVersionId);
+    if (catalogCandidate === null) return null;
+    return {
+      playerId: catalogCandidate.playerId,
+      playerExternalId: catalogCandidate.playerExternalId,
+      altIds: null,
+      initials: initialsOf(catalogCandidate.displayName),
+    };
+  }
+
+  const manifest = $derived(shell.manifest);
+
+  /** Headshot refs for the open window's candidates (version-id keyed). */
+  const candidateFaceByVersion = $derived(
+    new Map<string, SeasonFaceRef>(
+      (openWindow?.candidates ?? []).flatMap((candidate) => {
+        const face = freeAgencyFaceOf(candidate);
+        return face === null ? [] : [[candidate.playerVersionId, face] as const];
+      }),
+    ),
+  );
+
   const cards: FreeAgencyCardView[] = $derived.by(() => {
     const window = openWindow;
     if (window === null) return [];
@@ -187,6 +232,8 @@
         priority: (entry?.priority ?? 0) as 0 | 1 | 2,
         role: entry?.role ?? null,
         influence: entry?.influence ?? null,
+        face: candidateFaceByVersion.get(candidate.playerVersionId) ?? null,
+        overallRating: overallRatingOf(shell.catalog, candidate.playerVersionId),
       };
     });
   });
@@ -215,7 +262,13 @@
   });
 
   async function submitDeclaration() {
-    if (openWindow === null || submitting || localFailures.length > 0) return;
+    if (
+      openWindow === null ||
+      submitting ||
+      orderedTargets.length === 0 ||
+      localFailures.length > 0
+    )
+      return;
     submitting = true;
     try {
       await shell.declareFreeAgentInterest({
@@ -350,9 +403,11 @@
         <div class="mt-4">
           <FreeAgencyMarketOverview
             {cards}
+            {manifest}
             franchiseName={shell.franchiseName}
             editable={editable && !submitting}
             disabled={submitting}
+            onToggleTarget={toggleTarget}
             onPriorityChange={setPriority}
             onRoleChange={setRole}
             onInfluenceChange={setInfluence}
@@ -377,6 +432,9 @@
               windowIndex={openWindow.windowIndex}
               {declaration}
               candidates={openWindow.candidates}
+              {manifest}
+              faceOf={(playerVersionId) => candidateFaceByVersion.get(playerVersionId) ?? null}
+              overallOf={(playerVersionId) => overallRatingOf(shell.catalog, playerVersionId)}
               busy={submitting}
               onSubmit={() => void resolveMarket()}
             />
@@ -400,8 +458,10 @@
           <FreeAgencyResolvedPanel
             {window}
             {humanFranchiseId}
+            {manifest}
             franchiseName={shell.franchiseName}
             playerName={shell.playerName}
+            faceOf={(playerVersionId) => shell.facesByVersion.get(playerVersionId) ?? null}
             {signingCount}
             {seasonSpend}
             resolvedInThisSession={resolvedThisSession === window.windowIndex}

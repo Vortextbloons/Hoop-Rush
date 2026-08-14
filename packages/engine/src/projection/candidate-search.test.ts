@@ -90,15 +90,20 @@ function smallModel(): ProjectionModelArtifact {
     weaknesses: [],
     search: {
       seedNamespace: 'season-projection-search',
+      // Trimmed search policy for tests: every assertion type (beam
+      // determinism, feasibility failure, optimizer plans, dynamic minutes)
+      // still exercises the same code paths with far fewer node/projection
+      // evaluations per call. The partial beam stays at the full width: a
+      // narrower beam prunes extendable partials for some locked pairs.
       partialBeamsPerLens: 8,
-      completeCandidates: 4,
-      startingFives: 4,
+      completeCandidates: 2,
+      startingFives: 2,
       closingFives: 2,
       benchHierarchies: 2,
       minuteTemplates: 1,
       singleRemovals: 'all',
-      pairRemovals: 2,
-      nodeBudgets: { partial: 10_000, complete: 10_000, rotation: 40 },
+      pairRemovals: 1,
+      nodeBudgets: { partial: 2_500, complete: 10_000, rotation: 6 },
       closeScenarioWeight: 0.2,
     },
     cohorts: {

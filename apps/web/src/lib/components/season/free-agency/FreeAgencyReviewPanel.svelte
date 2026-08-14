@@ -1,7 +1,9 @@
 <script lang="ts">
   import { ShieldCheck } from '@lucide/svelte';
-  import type { SeasonFreeAgencyCandidate } from '@hoop-rush/data-contracts';
+  import type { HoopRushManifest, SeasonFreeAgencyCandidate } from '@hoop-rush/data-contracts';
   import type { SeasonFreeAgencyDeclaration } from '@hoop-rush/data-contracts';
+  import SeasonPlayerFace from '$lib/components/season/SeasonPlayerFace.svelte';
+  import type { SeasonFaceRef } from '$lib/season/season-branding';
   import { ROLE_EXPECTATION_LABEL } from './free-agency-view';
 
   /**
@@ -15,6 +17,9 @@
     windowIndex,
     declaration,
     candidates,
+    manifest = null,
+    faceOf = null,
+    overallOf = null,
     busy = false,
     onSubmit,
     onGoBackToMarket = null,
@@ -23,6 +28,9 @@
     /** The recorded (immutable) declaration; empty targets mean skip. */
     declaration: SeasonFreeAgencyDeclaration;
     candidates: readonly SeasonFreeAgencyCandidate[];
+    manifest?: HoopRushManifest | null;
+    faceOf?: ((playerVersionId: string) => SeasonFaceRef | null) | null;
+    overallOf?: ((playerVersionId: string) => number | null) | null;
     busy?: boolean;
     onSubmit: () => void;
     onGoBackToMarket?: (() => void) | null;
@@ -63,15 +71,34 @@
   {:else}
     <ol class="mt-3 flex flex-col gap-1.5" data-fa-review-targets>
       {#each declaration.targets as target, index (target.playerVersionId)}
+        {@const face = manifest !== null ? (faceOf?.(target.playerVersionId) ?? null) : null}
+        {@const overall = overallOf?.(target.playerVersionId) ?? null}
         <li
           class="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg bg-surface-2 px-3 py-2 text-sm"
         >
+          {#if manifest !== null && face !== null}
+            <SeasonPlayerFace {face} {manifest} size="sm" />
+          {:else}
+            <span
+              class="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-3 font-display text-xs font-extrabold text-muted-foreground"
+              aria-hidden="true"
+            >
+              ?
+            </span>
+          {/if}
           <span class="font-mono text-[10px] font-bold text-primary uppercase">
             {index === 0 ? 'First priority' : 'Second priority'}
           </span>
           <span class="min-w-0 truncate font-semibold">
             {names.get(target.playerVersionId) ?? target.playerVersionId}
           </span>
+          {#if overall !== null}
+            <span
+              class="shrink-0 rounded bg-surface-3 px-1.5 py-0.5 font-mono text-[10px] font-bold"
+            >
+              OVR {overall}
+            </span>
+          {/if}
           <span class="font-mono text-[10px] text-muted-foreground">
             {ROLE_EXPECTATION_LABEL[target.roleExpectation]}
           </span>

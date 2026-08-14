@@ -135,7 +135,8 @@
     </ol>
   {:else}
     <p class="mt-3 text-sm text-muted-foreground">
-      No targets yet — use the priority pickers on the candidate cards, or skip the market below.
+      No targets yet — tap Target on a candidate card (first pick is first priority), or skip the
+      market below.
     </p>
   {/if}
 

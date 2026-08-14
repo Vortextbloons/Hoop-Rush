@@ -1418,13 +1418,14 @@ export function completeSeasonBlockCommit(input: {
     );
     freeAgency = opened.freeAgency;
     freeAgencyWindow = opened.window;
+    const postWindowEffects =
+      window !== null ? window.effects : (input.effects ?? input.candidate.effects);
     const next: SeasonRun = {
       ...runAfterTrade,
       freeAgency,
       stateRevision: runAfterTrade.stateRevision + 1,
       stateDigest: '',
     };
-    const postWindowEffects = input.effects ?? input.candidate.effects;
     runAfterTrade = {
       ...next,
       stateDigest: seasonRunStateDigest(seasonRunStateDigestFactsOf(next, postWindowEffects)),

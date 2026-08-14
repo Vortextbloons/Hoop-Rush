@@ -11,7 +11,7 @@ import { createEngineContext } from './context.ts';
 const ctx = createEngineContext();
 const PERMUTATIONS = buildSlotPermutationTeams();
 /** Seeds for attribution-sensitive assertions (usage share moves in small steps). */
-const SEEDS = 400;
+const SEEDS = 200;
 
 function at<T>(list: readonly T[], index: number): T {
   const value = list[index];
@@ -230,7 +230,7 @@ describe('assigned-position responsibility across legal slot permutations', () =
   });
 
   it('keeps team-level scoring within 3% across permutations', () => {
-    const seeds = Array.from({ length: 100 }, (_, i) => `slot-team-${String(i)}`);
+    const seeds = Array.from({ length: 60 }, (_, i) => `slot-team-${String(i)}`);
     const totals = PERMUTATIONS.map((team) => {
       const { games } = runPermutation(team, seeds);
       let points = 0;

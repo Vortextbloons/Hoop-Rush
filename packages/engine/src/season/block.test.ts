@@ -16,18 +16,22 @@ import { seasonCheckpointDigest } from './checkpoint.ts';
 import { seasonRotationSetDigest } from './rotation.ts';
 import { blockCommand, buildTestRun, pipelineInput } from './block-test-support.ts';
 
+// Block 0 costs seconds to simulate; the pipeline describe consumes the
+// command handler's accepted checkpoint (same simulation path, same input),
+// and the command-validation describe asserts on the accepted result.
+let input: SeasonBlockSimulationInput;
+let checkpoint: ReturnType<typeof simulateSeasonBlock>;
+let accepted: ReturnType<typeof handleSubmitSeasonBlockCommand>;
+
+beforeAll(() => {
+  const { run, catalog } = buildTestRun();
+  input = pipelineInput(run, catalog, 0);
+  accepted = handleSubmitSeasonBlockCommand({ ...input, acceptedCommandIds: [] });
+  if (accepted.status !== 'accepted') throw new Error('expected the command to be accepted');
+  checkpoint = accepted.checkpoint;
+}, 60_000);
+
 describe('season block pipeline (M2.3)', () => {
-  // Block 0 costs ~10s to simulate; the three shape tests consume the same
-  // simulated checkpoint, and the audit only reads input state.
-  let input: SeasonBlockSimulationInput;
-  let checkpoint: ReturnType<typeof simulateSeasonBlock>;
-
-  beforeAll(() => {
-    const { run, catalog } = buildTestRun();
-    input = pipelineInput(run, catalog, 0);
-    checkpoint = simulateSeasonBlock(input);
-  }, 60_000);
-
   it('simulates block 0 with 150 summaries, 30 team rows, 300 player rows, and a clean audit', () => {
     expect(checkpoint.gameSummaries).toHaveLength(150);
     expect(checkpoint.teamAggregates).toHaveLength(30);
@@ -108,17 +112,9 @@ describe('season block pipeline (M2.3)', () => {
 });
 
 describe('season block command validation', () => {
-  // The accepted submission costs one block-0 simulation; rejection paths
-  // are validated before any simulation, so only the accept is hoisted.
-  let accepted: ReturnType<typeof handleSubmitSeasonBlockCommand>;
-
-  beforeAll(() => {
-    const { run, catalog } = buildTestRun();
-    accepted = handleSubmitSeasonBlockCommand({
-      ...pipelineInput(run, catalog, 0),
-      acceptedCommandIds: [],
-    });
-  }, 60_000);
+  // The accepted submission is hoisted in the shared beforeAll above (one
+  // block-0 simulation); rejection paths are validated before any
+  // simulation, so the tests below only build cheap fixture inputs.
 
   it('accepts a valid command and rejects a stale cursor', () => {
     expect(accepted.status).toBe('accepted');

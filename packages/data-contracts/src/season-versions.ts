@@ -195,8 +195,8 @@ export const SEASON_OFFER_TARGETS_VERSION = 'offer-targets-v1';
 
 /**
  * M2.6.5 roster rules (spec/2.0/15, season-roster-v2): a Season Run roster
- * contains 10-15 distinct player-season versions with unique real-player
- * identities; coverage, legal-five, contingency, minutes, closing-five,
+ * contains 10-15 distinct player-season versions (same-person versions may
+ * coexist); coverage, legal-five, contingency, minutes, closing-five,
  * availability, and game validation apply to its exactly-ten-member
  * rotation (`SEASON_ROTATION_SIZE`). Drafts and AI generation still produce
  * exactly `SEASON_DRAFT_SIZE` ten players. v1 (`season-roster-v1`, M2.1)

@@ -488,6 +488,26 @@ describe('free-agency declaration step (M2.6.5)', () => {
     expect((influences[0] as HTMLInputElement).value).toBe(String(first.minimumInfluence));
   });
 
+  it('adds a target via the Target button without using the priority picker', async () => {
+    const run = fixtureRun();
+    const window = windowOf(run.freeAgency);
+    const first = window.candidates[0];
+    if (first === undefined) throw new Error('need a candidate');
+    const { container } = renderRoute(run);
+    const card = candidateCards(container).find((el) =>
+      el.querySelector(`#fa-priority-${first.playerVersionId}`),
+    );
+    if (card === undefined) throw new Error(`no card for ${first.playerVersionId}`);
+    expect(container.querySelector('[data-fa-local-failures]')).toBeNull();
+    await fireEvent.click(within(card).getByRole('button', { name: 'Target' }));
+    const targets = container.querySelectorAll('[data-fa-draft-targets] li');
+    expect(targets).toHaveLength(1);
+    expect(targets[0]?.textContent).toContain('First priority');
+    expect(targets[0]?.textContent).toContain(first.displayName);
+    const submit = container.querySelector('[data-fa-declare-submit]') as HTMLButtonElement;
+    expect(submit.disabled).toBe(false);
+  });
+
   it('keeps at most one first and one second priority (swap on conflict)', async () => {
     const run = fixtureRun();
     const window = windowOf(run.freeAgency);

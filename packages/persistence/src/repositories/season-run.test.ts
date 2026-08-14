@@ -1304,6 +1304,63 @@ describe('season run M2.5 reload audit (v5)', () => {
     await expect(repo.loadActiveRun()).rejects.toThrow(/stateDigest/);
   });
 
+  it('stores the post-commit revision when a trade window is behind the free-agency bump', async () => {
+    const adapters = makeAdapters();
+    const { repo, run } = adapters;
+    await promote(adapters);
+    await repo.commitSeasonBlock(commitInputFor(adapters, 0));
+    await repo.commitSeasonBlock(commitInputFor(adapters, 1));
+    const base = commitInputFor(adapters, 2);
+    const trade = {
+      schemaVersion: 1 as const,
+      tradeVersion: 'season-trade-v2' as const,
+      windows: [
+        {
+          windowIndex: 0,
+          blockIndex: 2,
+          status: 'open' as const,
+          offers: [],
+        },
+      ],
+    };
+    const postCommitRevision = base.stateRevision + 1;
+    const postCommitDigest = buildFixtureStateDigest(run, {
+      stateRevision: postCommitRevision,
+      checkpointState: base.checkpointState,
+      health: base.health,
+      influence: base.influence,
+      transactions: base.transactions,
+      trade,
+      objectives: base.objectives,
+      rosters: run.rosters,
+      ownership: run.ownership,
+      rotations: base.rotations,
+      effects: base.effects,
+      freeAgency: base.freeAgency,
+    });
+    await repo.commitSeasonBlock({
+      ...base,
+      trade,
+      stateRevision: postCommitRevision,
+      stateDigest: postCommitDigest,
+      window: {
+        trade,
+        influence: base.influence,
+        transactions: base.transactions,
+        rosters: run.rosters,
+        ownership: run.ownership,
+        rotations: base.rotations,
+        effects: base.effects,
+        health: base.health,
+        stateRevision: base.stateRevision,
+        stateDigest: base.stateDigest,
+      },
+    });
+    const snapshot = await repo.loadActiveRun();
+    expect(snapshot?.run.stateRevision).toBe(postCommitRevision);
+    expect(snapshot?.run.stateDigest).toBe(postCommitDigest);
+  });
+
   /**
    * Regression (rotation-edit divergence): the block runner commits the
    * LOCKED rotation set (the human team's pending edit included) as the

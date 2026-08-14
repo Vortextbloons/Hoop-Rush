@@ -933,13 +933,12 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           throw new Error('commitSeasonBlock: standings miss the human franchise');
         }
 
-        // M2.5: when the engine produced a trade-window open, the window's
-        // mutated rosters/ownership/rotations/effects/trade/influence/
-        // transactions replace the block's own (AI activity folds on top).
-        // The commit's stateRevision/stateDigest already include the window
-        // and are computed over the WINDOW health, so the stored health must
-        // be the window's or the reload audit's digest recomputation fails
-        // (regression fix).
+        // The commit's stateRevision/stateDigest are the full post-commit
+        // chain from completeSeasonBlockCommit (post-block, plus trade
+        // window, plus free-agency window when that block opens both).
+        // Window basketball facts (rosters/health/trade/effects) still
+        // overlay the candidate; the chain position must not fall back to
+        // the trade-window revision or the hub snapshot races the cursor.
         const window = input.window;
         const mutableState = {
           health: window !== null ? window.health : input.health,
@@ -948,8 +947,8 @@ export class DexieSeasonRunRepository implements SeasonRunRepository, SeasonPost
           trade: window !== null ? window.trade : input.trade,
           objectives: input.objectives,
           checkpointState: input.checkpointState,
-          stateRevision: window !== null ? window.stateRevision : input.stateRevision,
-          stateDigest: window !== null ? window.stateDigest : input.stateDigest,
+          stateRevision: input.stateRevision,
+          stateDigest: input.stateDigest,
         };
 
         const delta = seasonRunCheckpointDeltaSchema.parse({

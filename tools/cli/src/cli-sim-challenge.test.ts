@@ -16,16 +16,22 @@ function fitsSlot(entry: PlayersIndexEntry, group: 'G' | 'F' | 'C'): boolean {
   return union.some((p) => C_POSITIONS.has(p));
 }
 
+let memoizedIndex: { data: PackagedData; entries: PlayersIndexEntry[] } | null = null;
 function indexData(): { data: PackagedData; entries: PlayersIndexEntry[] } {
-  const packaged = loadPackagedData();
-  const data = new PackagedData(packaged.manifest, packaged.dir);
-  return { data, entries: data.playersIndex().players };
+  if (memoizedIndex === null) {
+    const packaged = loadPackagedData();
+    const data = new PackagedData(packaged.manifest, packaged.dir);
+    memoizedIndex = { data, entries: data.playersIndex().players };
+  }
+  return memoizedIndex;
 }
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 
 /** Picks five distinct, uniquely-indexed entries that fit G,G,F,F,C. */
+let memoizedLegalLineup: PlayersIndexEntry[] | null = null;
 function legalUniqueLineup(): PlayersIndexEntry[] {
+  if (memoizedLegalLineup !== null) return memoizedLegalLineup;
   const { entries } = indexData();
   const seen = new Map<string, number>();
   for (const entry of entries) {
@@ -41,17 +47,21 @@ function legalUniqueLineup(): PlayersIndexEntry[] {
     return entry;
   };
   const exclude = new Set<string>();
-  return [
+  const lineup = [
     pick('G', exclude),
     pick('G', exclude),
     pick('F', exclude),
     pick('F', exclude),
     pick('C', exclude),
   ];
+  memoizedLegalLineup = lineup;
+  return lineup;
 }
 
 /** Legal entries whose display name is unique in the whole index and CLI-safe. */
+let memoizedLegalNames: PlayersIndexEntry[] | null = null;
 function legalUniqueNames(): PlayersIndexEntry[] {
+  if (memoizedLegalNames !== null) return memoizedLegalNames;
   const { entries } = indexData();
   const counts = new Map<string, number>();
   for (const entry of entries) {
@@ -65,6 +75,7 @@ function legalUniqueNames(): PlayersIndexEntry[] {
       !entry.displayName.includes('@'),
   );
   if (legal.length < 5) throw new Error('test helper could not assemble a name-unique lineup');
+  memoizedLegalNames = legal;
   return legal;
 }
 
@@ -75,7 +86,9 @@ function franchiseDisplayName(data: PackagedData, franchiseId: string): string {
 }
 
 /** The most common display name in the index (guaranteed ambiguous bare). */
+let memoizedAmbiguousName: string | null = null;
 function commonAmbiguousName(): string {
+  if (memoizedAmbiguousName !== null) return memoizedAmbiguousName;
   const { entries } = indexData();
   const counts = new Map<string, string[]>();
   for (const entry of entries) {
@@ -92,32 +105,56 @@ function commonAmbiguousName(): string {
   const [name, rows] = first;
   if (rows.length < 2) throw new Error('test helper: no ambiguous name found');
   const sample = rows[0];
-  return sample ?? name;
+  memoizedAmbiguousName = sample ?? name;
+  return memoizedAmbiguousName;
 }
 
-const bareIds = () =>
-  legalUniqueLineup()
-    .map((p) => p.playerId)
-    .join(',');
-const qualifiedIds = () =>
-  legalUniqueLineup()
-    .map((p) => `${p.playerId}@${p.franchiseId}/${p.eraId}`)
-    .join(',');
-const bareNames = () =>
-  legalUniqueNames()
-    .map((p) => p.displayName)
-    .join(',');
-const qualifiedNames = () => {
-  const { data } = indexData();
-  return legalUniqueNames()
-    .map((p) => `${p.displayName}@${franchiseDisplayName(data, p.franchiseId)}/${p.eraId}`)
-    .join(',');
+let memoizedBareIds: string | null = null;
+const bareIds = () => {
+  if (memoizedBareIds === null) {
+    memoizedBareIds = legalUniqueLineup()
+      .map((p) => p.playerId)
+      .join(',');
+  }
+  return memoizedBareIds;
 };
+let memoizedQualifiedIds: string | null = null;
+const qualifiedIds = () => {
+  if (memoizedQualifiedIds === null) {
+    memoizedQualifiedIds = legalUniqueLineup()
+      .map((p) => `${p.playerId}@${p.franchiseId}/${p.eraId}`)
+      .join(',');
+  }
+  return memoizedQualifiedIds;
+};
+let memoizedBareNames: string | null = null;
+const bareNames = () => {
+  if (memoizedBareNames === null) {
+    memoizedBareNames = legalUniqueNames()
+      .map((p) => p.displayName)
+      .join(',');
+  }
+  return memoizedBareNames;
+};
+let memoizedQualifiedNames: string | null = null;
+const qualifiedNames = () => {
+  if (memoizedQualifiedNames === null) {
+    const { data } = indexData();
+    memoizedQualifiedNames = legalUniqueNames()
+      .map((p) => `${p.displayName}@${franchiseDisplayName(data, p.franchiseId)}/${p.eraId}`)
+      .join(',');
+  }
+  return memoizedQualifiedNames;
+};
+let memoizedFranchiseOnlyNames: string | null = null;
 const franchiseOnlyNames = () => {
-  const { data } = indexData();
-  return legalUniqueNames()
-    .map((p) => `${p.displayName}@${franchiseDisplayName(data, p.franchiseId)}`)
-    .join(',');
+  if (memoizedFranchiseOnlyNames === null) {
+    const { data } = indexData();
+    memoizedFranchiseOnlyNames = legalUniqueNames()
+      .map((p) => `${p.displayName}@${franchiseDisplayName(data, p.franchiseId)}`)
+      .join(',');
+  }
+  return memoizedFranchiseOnlyNames;
 };
 
 describe('cli: sim challenge', () => {
@@ -225,6 +262,8 @@ describe('cli: sim challenge', () => {
       qualifiedIds(),
       '--seed',
       'abcdabcdabcdabcdabcdabcdabcdabcd',
+      '--reruns',
+      '1',
       '--format',
       'json',
     ]);
@@ -241,6 +280,8 @@ describe('cli: sim challenge', () => {
       bareNames(),
       '--seed',
       'ab11ab11ab11ab11ab11ab11ab11ab11',
+      '--reruns',
+      '1',
       '--format',
       'json',
     ]);
@@ -254,6 +295,8 @@ describe('cli: sim challenge', () => {
       qualifiedNames(),
       '--seed',
       'ab22ab22ab22ab22ab22ab22ab22ab22',
+      '--reruns',
+      '1',
       '--format',
       'json',
     ]);
@@ -269,6 +312,8 @@ describe('cli: sim challenge', () => {
       franchiseOnlyNames(),
       '--seed',
       'ab33ab33ab33ab33ab33ab33ab33ab33',
+      '--reruns',
+      '1',
       '--format',
       'json',
     ]);
@@ -326,6 +371,8 @@ describe('cli: sim challenge', () => {
       'abcdefabcdefabcdefabcdefabcdef',
       '--era',
       '1990s',
+      '--reruns',
+      '1',
       '--format',
       'json',
     ]);
@@ -378,6 +425,8 @@ describe('cli: sim challenge', () => {
         lineup,
         '--seed',
         'abcdefabcdefabcdefabcdefabcdef',
+        '--reruns',
+        '1',
         '--format',
         'json',
       ]);

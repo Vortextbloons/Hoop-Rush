@@ -281,6 +281,8 @@ export function createSeasonBlockRunner(deps: SeasonBlockRunnerDeps = {}): Seaso
    * commit path needs to open market windows on blocks 2/4/6. The engine
    * throws on window blocks without the index, so a failed load here
    * surfaces as an internal error rather than silently skipping a market.
+   * `loadSeasonFreeAgencyTargets` is the roster-targets policy, not the
+   * free-agency-targets-v1 calibration artifact.
    */
   async function resolveFreeAgencyAssets(): Promise<{
     freeAgencyIndex: SeasonFreeAgencyIndex;

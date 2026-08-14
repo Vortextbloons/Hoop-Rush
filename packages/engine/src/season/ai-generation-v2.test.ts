@@ -224,6 +224,14 @@ describe('v2 roster legality', () => {
       const minutes = rotation.targetMinutes.reduce((sum, entry) => sum + entry.minutes, 0);
       expect(minutes).toBe(240);
     }
+    const rosterIdentities = result.rosters.flatMap((roster) =>
+      roster.players.map((player) => player.playerId),
+    );
+    expect(new Set(rosterIdentities).size).toBe(rosterIdentities.length);
+    for (const roster of result.rosters) {
+      const identities = roster.players.map((player) => player.playerId);
+      expect(new Set(identities).size).toBe(identities.length);
+    }
     const rotation = result.rotations[0];
     if (rotation === undefined) throw new Error('no rotations');
     expect(rotation.targetMinutes.length).toBe(10);
